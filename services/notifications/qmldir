@@ -1,0 +1,5 @@
+module qs.services.notifications
+
+singleton NotificationsService 1.0 NotificationsService.qml
+singleton NotificationsConverter 1.0 NotificationsConverter.qml
+singleton NotificationsActionRouter 1.0 NotificationsActionRouter.qml

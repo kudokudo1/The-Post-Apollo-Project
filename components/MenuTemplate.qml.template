@@ -1,0 +1,192 @@
+import Quickshell
+import Quickshell.Wayland
+import QtQuick
+import QtQuick.Effects
+
+PanelWindow {
+    id: menu
+
+    // ─────────────────────────────────────────────
+    // BASIC MENU STATE
+    // ─────────────────────────────────────────────
+
+    property bool menuOpen: false
+    property int selectedIndex: -1
+    property bool keyboardActive: false
+
+    // ─────────────────────────────────────────────
+    // MENU CONTENT
+    // ─────────────────────────────────────────────
+
+    property string title: "MENU"
+    property var items: []
+
+    // ─────────────────────────────────────────────
+    // BASE VALUES
+    // Derived from Power.qml
+    // ─────────────────────────────────────────────
+
+    implicitWidth: 220
+    implicitHeight: 290
+
+    color: "transparent"
+
+    focusable: true
+
+    anchors {
+        top: false
+        bottom: true
+        right: true
+        left: false
+    }
+
+    margins {
+        top: 0
+        bottom: 10
+        right: 10
+        left: 0
+    }
+
+    // ─────────────────────────────────────────────
+    // MENU
+    // ─────────────────────────────────────────────
+
+    Rectangle {
+        id: menuBackground
+
+        width: 220
+        height: 290
+
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+
+        color: Colors.black
+
+        Column {
+            id: menuColumn
+
+            width: parent.width
+
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: parent.top
+            anchors.topMargin: 15
+
+            spacing: 7
+
+            // ─────────────────────────────────────
+            // TITLE
+            // ─────────────────────────────────────
+
+            Text {
+                text: menu.title
+
+                color: Colors.cyan
+
+                font.pixelSize: 20
+
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
+
+            // ─────────────────────────────────────
+            // SEPARATOR
+            // ─────────────────────────────────────
+
+            Rectangle {
+                width: parent.width - 20
+                height: 2
+
+                color: Colors.cyan
+
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
+
+            // ─────────────────────────────────────
+            // MENU ITEMS
+            // ─────────────────────────────────────
+
+            Repeater {
+                model: menu.items
+
+                delegate: Rectangle {
+                    id: menuItem
+
+                    required property int index
+                    required property string label
+
+                    width: parent.width
+                    height: 30
+
+                    color: mouse.pressed ? Colors.magenta : selectedIndex === index ? Colors.yellow : Colors.black
+
+                    Text {
+                        anchors.centerIn: parent
+
+                        text: menuItem.label
+
+                        color: mouse.pressed ? Colors.black : selectedIndex === index ? Colors.orange : Colors.cyan
+
+                        font.pixelSize: 20
+
+                        layer.enabled: mouse.containsMouse
+
+                        layer.effect: DropShadow {
+                            color: Colors.orange
+
+                            opacity: 1.0
+
+                            horizontalOffset: 0
+                            verticalOffset: 0
+
+                            radius: 30
+                            samples: 60
+
+                            transparentBorder: true
+                        }
+                    }
+
+                    MouseArea {
+                        id: mouse
+
+                        anchors.fill: parent
+
+                        hoverEnabled: true
+
+                        onEntered: {
+                            selectedIndex = index;
+                        }
+
+                        onClicked: {
+                            menu.itemTriggered(index);
+                        }
+                    }
+
+                    DropShadow {
+                        source: menuItem
+
+                        anchors.fill: menuItem
+
+                        color: mouse.pressed ? Colors.magenta : selectedIndex === index ? Colors.orange : mouse.containsMouse ? Colors.orange : Colors.cyan
+
+                        opacity: mouse.pressed ? 0.55 : selectedIndex === index ? 0.55 : mouse.containsMouse ? 0.55 : 0
+
+                        horizontalOffset: 0
+                        verticalOffset: 0
+
+                        radius: 12
+                        samples: 25
+
+                        z: -1
+
+                        transparentBorder: true
+                    }
+                }
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    // SIGNAL
+    // ─────────────────────────────────────────────
+
+    signal itemTriggered(int index)
+}

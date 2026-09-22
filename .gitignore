@@ -1,0 +1,27 @@
+# Temporary/editor files
+*~
+*.swp
+*.swo
+*.tmp
+*.bak
+
+# Logs/runtime junk
+*.log
+*.pid
+
+# Local secrets/config overrides
+.env
+.env.*
+*.pem
+*.key
+
+# Generated/cache directories
+.cache/
+__pycache__/
+
+# Old local snapshots/backups
+archive/
+
+# Local backup snapshots
+*.backup
+*.backup-*

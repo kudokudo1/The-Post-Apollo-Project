@@ -1,0 +1,6 @@
+module qs.components
+
+singleton Colors 1.0 Colors.qml
+singleton GohuFont 1.0 GohuFont.qml
+GohuText 1.0 GohuText.qml
+NotoText 1.0 NotoText.qml

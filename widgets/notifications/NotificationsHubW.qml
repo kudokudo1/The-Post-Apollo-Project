@@ -1,0 +1,1895 @@
+import QtQuick
+import Quickshell
+import Quickshell.Wayland
+import qs.components
+import qs.services.notifications
+import QtQuick.Effects
+import Qt5Compat.GraphicalEffects
+
+PanelWindow {
+    id: root
+
+    property bool menuOpen: false
+
+    // ===== QUICK CONFIG =========================================
+    // Main panel geometry. These preserve the placement you already dialed in.
+    property int panelWidth: 520
+
+    property int panelTopMargin: 0
+    property int panelBottomMargin: 5
+    property int panelLeftMargin: 0
+    property int panelRightMargin: 5
+
+    property int frameInset: 8
+
+    // Main purple glass.
+    property real backgroundOpacity: 0.64
+
+    // Card opacity compensation:
+    //
+    // Previous target:
+    //     background 0.60 + card 0.76 = ~0.904 effective alpha
+    //
+    // With background at 0.64:
+    //     x + 0.64 * (1 - x) = 0.904
+    //     x ~= 0.7333
+    //
+    // This keeps the notification fill visually close to the previous pass.
+    property real cardFillOpacity: 0.7333
+
+    // Header / search / filters.
+    property int headerHeight: 122
+
+    property int searchHeight: 32
+    property int filterStripHeight: 30
+    property int filterButtonHeight: 30
+    property int filterButtonSpacing: 5
+
+    property int historyTopGap: 10
+    property int historyBottomGap: 12
+
+    // Bottom fixed control bay.
+    property int controlBayHeight: 220
+    property int controlBaySideMargin: 10
+    property int controlBayBottomMargin: 10
+    property real controlBayOpacity: 0.64
+
+    // Notification cards.
+    property int cardHeight: 116
+    property int cardSpacing: 10
+    property int cardGlowGutter: 24
+    property int cardContentMargin: 10
+
+    // General text glow.
+    property real textGlowOpacity: 0.60
+    property int textGlowRadius: 14
+    property int textGlowSamples: 15
+
+    // Tighter white/cyan text glow.
+    property int tightGlowRadius: 7
+    property int tightGlowSamples: 9
+
+    // Outer window glow: stronger, slightly tighter, fewer samples.
+    property real frameGlowOpacity: 0.76
+    property int frameGlowRadius: 16
+    property int frameGlowSamples: 23
+
+    // Notification card glow: stronger, less perfectly smooth.
+    property real cardGlowOpacity: 0.68
+    property int cardGlowRadius: 20
+    property int cardGlowSamples: 25
+
+    // Typography.
+    property int hubTitleFontSize: 20
+    property int storedCountFontSize: 14
+
+    property int appNameFontSize: 14
+    property int notificationTitleFontSize: 15
+    property int notificationMessageFontSize: 12
+    property int notificationMetaFontSize: 10
+
+    // App icon.
+    property int appIconSize: 36
+    property int appIconInnerMargin: 3
+
+    // Scroll bar:
+    // cyan track is intentionally 2px thicker than magenta thumb.
+    property int scrollBarAreaWidth: 16
+    property int scrollTrackWidth: 7
+    property int scrollThumbWidth: 5
+    property int scrollThumbMinHeight: 34
+
+    // Post-Apollo semantic green.
+    // Use this everywhere this file means "green".
+    property color omnitrixGreen: "#00F782"
+
+    // ===== SEARCH / FILTER STATE ================================
+
+    property string searchQuery: ""
+    property string activeFilter: "all"
+
+    // ===== APP-WIDE CARD STATE ==================================
+    //
+    // Temporary frontend state.
+    //
+    // State is keyed by APP, not by individual notification.
+    // Every card from the same source reads the same object.
+    //
+    // Later the rules/backend layer can own and persist this.
+
+    property var appStates: ({})
+
+    // ===== WINDOW ===============================================
+
+    implicitWidth: root.panelWidth
+
+    anchors {
+        top: true
+        bottom: true
+        left: false
+        right: true
+    }
+
+    margins {
+        top: root.panelTopMargin
+        bottom: root.panelBottomMargin
+        left: root.panelLeftMargin
+        right: root.panelRightMargin
+    }
+
+    exclusiveZone: 0
+
+    WlrLayershell.layer: WlrLayer.Overlay
+
+    color: "transparent"
+
+    surfaceFormat.opaque: false
+
+    // IMPORTANT:
+    // Keep the real PanelWindow mapped permanently.
+    //
+    // Repeated unmap/remap was what triggered the native Qt/Quickshell
+    // second-open crash.
+    visible: true
+
+    // Closed = invisible + click-through.
+    mask: Region {
+        x: 0
+        y: 0
+
+        width: root.menuOpen ? root.width : 0
+        height: root.menuOpen ? root.height : 0
+    }
+
+    // ===== LOCAL VISUAL TYPE: GLOW TEXT =========================
+
+    component GlowText: Item {
+        id: glowText
+
+        property string text: ""
+
+        property color textColor: Colors.cyan
+        property color glowColor: textColor
+
+        property int pixelSize: 14
+
+        property real glowOpacity: root.textGlowOpacity
+        property real glowRadius: root.textGlowRadius
+        property int glowSamples: root.textGlowSamples
+
+        property int elideMode: Text.ElideNone
+        property int horizontalAlignment: Text.AlignLeft
+
+        GohuText {
+            id: glowLabel
+
+            anchors.fill: parent
+
+            text: glowText.text
+
+            font.pixelSize: glowText.pixelSize
+
+            color: glowText.textColor
+
+            elide: glowText.elideMode
+
+            horizontalAlignment: glowText.horizontalAlignment
+            verticalAlignment: Text.AlignVCenter
+        }
+
+        DropShadow {
+            anchors.fill: glowLabel
+
+            source: glowLabel
+
+            horizontalOffset: 0
+            verticalOffset: 0
+
+            radius: glowText.glowRadius
+            samples: glowText.glowSamples
+
+            color: glowText.glowColor
+
+            opacity: glowText.glowOpacity
+
+            transparentBorder: true
+        }
+    }
+
+    // ===== LOCAL VISUAL TYPE: MINI BUTTON =======================
+
+    component MiniButton: Rectangle {
+        id: miniButton
+
+        property string label: ""
+
+        property bool active: false
+        property bool danger: false
+
+        property color activeColor: Colors.orange
+
+        property int labelPixelSize: 11
+
+        signal triggered
+
+        readonly property bool hovered: buttonMouse.containsMouse
+        readonly property bool pressed: buttonMouse.pressed
+
+        readonly property color normalStateColor: active ? activeColor : Colors.cyan
+
+        readonly property color stateColor: {
+            if (danger) {
+                if (pressed || hovered)
+                    return Colors.red;
+
+                return Colors.cyan;
+            }
+
+            if (pressed)
+                return Colors.magenta;
+
+            if (hovered)
+                return Colors.orange;
+
+            return normalStateColor;
+        }
+
+        color: {
+            if (danger && pressed)
+                return Colors.red;
+
+            if (danger)
+                return Colors.dark;
+
+            if (pressed)
+                return Colors.magenta;
+
+            if (hovered)
+                return Colors.yellow;
+
+            if (active)
+                return Colors.yellow;
+
+            return Colors.dark;
+        }
+
+        border.width: 1
+
+        border.color: {
+            if (danger && pressed)
+                return Colors.black;
+
+            if (danger && hovered)
+                return Colors.red;
+
+            if (active)
+                return Colors.orange;
+
+            return stateColor;
+        }
+
+        GohuText {
+            id: miniButtonText
+
+            anchors.centerIn: parent
+
+            text: miniButton.label
+
+            font.pixelSize: miniButton.labelPixelSize
+
+            color: {
+                if (miniButton.danger && miniButton.pressed)
+                    return Colors.black;
+
+                if (miniButton.danger && miniButton.hovered)
+                    return Colors.red;
+
+                if (miniButton.active)
+                    return Colors.orange;
+
+                if (miniButton.pressed)
+                    return Colors.black;
+
+                return miniButton.stateColor;
+            }
+        }
+
+        DropShadow {
+            anchors.fill: miniButtonText
+
+            source: miniButtonText
+
+            horizontalOffset: 0
+            verticalOffset: 0
+
+            radius: 10
+            samples: 13
+
+            color: miniButton.danger && (miniButton.hovered || miniButton.pressed) ? Colors.red : miniButton.stateColor
+
+            opacity: miniButton.pressed ? 0.90 : miniButton.hovered ? 0.70 : 0.55
+
+            transparentBorder: true
+        }
+
+        DropShadow {
+            anchors.fill: miniButton
+
+            source: miniButton
+
+            horizontalOffset: 0
+            verticalOffset: 0
+
+            radius: 9
+            samples: 13
+
+            color: miniButton.danger && (miniButton.hovered || miniButton.pressed) ? Colors.red : miniButton.active ? Colors.orange : miniButton.stateColor
+
+            opacity: miniButton.pressed ? 0.60 : miniButton.hovered ? 0.44 : miniButton.active ? 0.32 : 0.10
+
+            z: -1
+
+            transparentBorder: true
+        }
+
+        MouseArea {
+            id: buttonMouse
+
+            anchors.fill: parent
+
+            hoverEnabled: true
+
+            onClicked: {
+                miniButton.triggered();
+            }
+        }
+    }
+
+    // ===== LOCAL VISUAL TYPE: FILTER BUTTON =====================
+
+    component FilterButton: Rectangle {
+        id: filterButton
+
+        property string filterId: ""
+        property string label: ""
+
+        property color accentColor: Colors.cyan
+
+        readonly property bool active: root.activeFilter === filterId
+
+        readonly property bool hovered: filterMouse.containsMouse
+
+        readonly property bool pressed: filterMouse.pressed
+
+        height: root.filterButtonHeight
+
+        color: active ? Colors.yellow : pressed ? Colors.magenta : Colors.dark
+
+        border.width: 1
+
+        border.color: active ? Colors.orange : pressed ? Colors.magenta : accentColor
+
+        GohuText {
+            id: filterLabel
+
+            anchors.centerIn: parent
+
+            text: filterButton.label
+
+            font.pixelSize: 10
+
+            color: filterButton.active ? Colors.orange : filterButton.pressed ? Colors.black : filterButton.accentColor
+        }
+
+        DropShadow {
+            anchors.fill: filterLabel
+
+            source: filterLabel
+
+            horizontalOffset: 0
+            verticalOffset: 0
+
+            radius: filterButton.hovered || filterButton.active ? 12 : 8
+
+            samples: 13
+
+            color: filterButton.active ? Colors.orange : filterButton.pressed ? Colors.magenta : filterButton.accentColor
+
+            opacity: filterButton.active ? 0.82 : filterButton.hovered ? 0.76 : 0.52
+
+            transparentBorder: true
+        }
+
+        DropShadow {
+            anchors.fill: filterButton
+
+            source: filterButton
+
+            horizontalOffset: 0
+            verticalOffset: 0
+
+            radius: 9
+            samples: 13
+
+            color: filterButton.active ? Colors.orange : filterButton.pressed ? Colors.magenta : filterButton.accentColor
+
+            opacity: filterButton.active ? 0.52 : filterButton.hovered ? 0.40 : 0.14
+
+            z: -1
+
+            transparentBorder: true
+        }
+
+        MouseArea {
+            id: filterMouse
+
+            anchors.fill: parent
+
+            hoverEnabled: true
+
+            onClicked: {
+                root.activeFilter = filterButton.filterId;
+            }
+        }
+    }
+
+    // ===== FUNCTIONS ============================================
+
+    function open() {
+        menuOpen = true;
+    }
+
+    function close() {
+        menuOpen = false;
+    }
+
+    function toggle() {
+        menuOpen = !menuOpen;
+    }
+
+    // ===== APP STATE HELPERS ====================================
+
+    function appKeyFor(sourceId, source) {
+        var sourceIdText = String(sourceId || "").trim().toLowerCase();
+        var sourceText = String(source || "").trim().toLowerCase();
+
+        if (sourceIdText !== "")
+            return sourceIdText;
+
+        if (sourceText !== "")
+            return sourceText;
+
+        return "unknown";
+    }
+
+    function stateForApp(appKey) {
+        var current = root.appStates[appKey];
+
+        if (current !== undefined)
+            return current;
+
+        return {
+            favorite: false,
+            snoozed: false,
+            dnd: false
+        };
+    }
+
+    function setAppFlag(appKey, flagName, enabled) {
+        var nextStates = ({});
+
+        for (var existingKey in root.appStates)
+            nextStates[existingKey] = root.appStates[existingKey];
+
+        var current = root.stateForApp(appKey);
+
+        var nextState = {
+            favorite: current.favorite === true,
+            snoozed: current.snoozed === true,
+            dnd: current.dnd === true
+        };
+
+        nextState[flagName] = enabled === true;
+
+        nextStates[appKey] = nextState;
+
+        // Replace the WHOLE object so all cards from this app receive
+        // the state update at the same time.
+        root.appStates = nextStates;
+    }
+
+    function toggleAppFlag(appKey, flagName) {
+        var current = root.stateForApp(appKey);
+
+        root.setAppFlag(appKey, flagName, current[flagName] !== true);
+    }
+
+    // ===== CLEAN NOTIFICATION CLASSIFICATION ====================
+    //
+    // filterGroup is mutually exclusive:
+    //
+    // warning
+    // apollo
+    // social
+    // system
+    // apps
+    //
+    // The visual tone is derived from that group:
+    //
+    // warning -> red
+    // apollo  -> orange
+    // social  -> Omnitrix green
+    // system  -> cyan
+    // apps    -> cyan
+    //
+    // Favorite is NOT another base category.
+    // Favorite is a magenta visual override.
+
+    function classificationFor(source, sourceId, category, severity) {
+        var sourceText = String(source || "").trim().toLowerCase();
+        var sourceIdText = String(sourceId || "").trim().toLowerCase();
+        var categoryText = String(category || "").trim().toLowerCase();
+        var severityText = String(severity || "").trim().toLowerCase();
+
+        // Warning / caution always wins.
+        if (severityText === "warning" || severityText === "critical" || severityText === "emergency" || categoryText === "warning" || categoryText === "critical" || categoryText === "emergency") {
+            return {
+                group: "warning",
+                tone: "warning"
+            };
+        }
+
+        // Apollo itself speaking to the operator.
+        if (sourceText.indexOf("apollo") !== -1 || sourceIdText.indexOf("apollo") !== -1 || categoryText === "apollo" || categoryText === "internal" || categoryText === "reminder" || categoryText === "important" || severityText === "important" || severityText === "reminder") {
+            return {
+                group: "apollo",
+                tone: "apollo"
+            };
+        }
+
+        // Social / voice / audio / media / fullscreen.
+        if (categoryText === "social" || categoryText === "friend" || categoryText === "friends" || categoryText === "message" || categoryText === "communication" || categoryText === "audio" || categoryText === "voice" || categoryText === "media" || categoryText === "fullscreen") {
+            return {
+                group: "social",
+                tone: "social"
+            };
+        }
+
+        // Explicit technical/system classifications.
+        if (categoryText === "system" || categoryText === "technical" || categoryText === "network" || categoryText === "hardware" || categoryText === "resource" || categoryText === "telemetry") {
+            return {
+                group: "system",
+                tone: "system"
+            };
+        }
+
+        // Normal exterior application notification.
+        return {
+            group: "apps",
+            tone: "system"
+        };
+    }
+
+    function baseColorForTone(tone) {
+        if (tone === "warning")
+            return Colors.red;
+
+        if (tone === "apollo")
+            return Colors.orange;
+
+        if (tone === "social")
+            return root.omnitrixGreen;
+
+        return Colors.cyan;
+    }
+
+    // ===== SEARCH / FILTER ======================================
+
+    function notificationMatches(source, title, message, category, severity, filterGroup) {
+        if (root.activeFilter !== "all" && root.activeFilter !== filterGroup)
+            return false;
+
+        var query = String(root.searchQuery || "").trim().toLowerCase();
+
+        if (query === "")
+            return true;
+
+        var haystack = [source, title, message, category, severity].join(" ").toLowerCase();
+
+        return haystack.indexOf(query) !== -1;
+    }
+
+    // ===== ICON HELPER ==========================================
+
+    function resolveAppIcon(appIcon, sourceId) {
+        var icon = String(appIcon || "");
+
+        if (icon === "")
+            icon = String(sourceId || "");
+
+        if (icon === "")
+            return "";
+
+        if (icon.indexOf("/") === 0 || icon.indexOf("file:") === 0 || icon.indexOf("image:") === 0 || icon.indexOf("data:") === 0)
+            return icon;
+
+        return Quickshell.iconPath(icon, true);
+    }
+
+    // ===== DISMISS ==============================================
+    //
+    // Dismiss is notification-specific.
+    // Favorite / snooze / DND are app-wide.
+
+    function dismissNotification(historyIndex) {
+        if (historyIndex < 0 || historyIndex >= NotificationsService.notifications.count)
+            return;
+
+        var entry = NotificationsService.notifications.get(historyIndex);
+        var eventId = String(entry.id || "");
+
+        NotificationsService.notifications.remove(historyIndex);
+
+        if (eventId !== "") {
+            for (var i = NotificationsService.activeNotifications.count - 1; i >= 0; i--) {
+                var active = NotificationsService.activeNotifications.get(i);
+
+                if (String(active.id || "") === eventId)
+                    NotificationsService.activeNotifications.remove(i);
+            }
+        }
+
+        NotificationsService.scheduleHistorySave();
+    }
+
+    // ===== APP NAVIGATION =======================================
+    //
+    // These actions are intentionally limited to:
+    //   - focus an exact matching app_id / XWayland class
+    //   - move that exact matching window to the current workspace
+    //   - launch its desktop entry if no exact window match exists
+    //
+    // No kill/delete/privileged action lives here.
+
+    function normalizedDesktopId(sourceId) {
+        var id = String(sourceId || "").trim();
+
+        if (id.endsWith(".desktop"))
+            id = id.slice(0, -8);
+
+        return id;
+    }
+
+    function takeMeToApp(sourceId, source) {
+        var desktopId = root.normalizedDesktopId(sourceId);
+
+        if (desktopId === "") {
+            console.warn("Notification Hub: no desktop entry for TAKE ME TO:", source);
+            return;
+        }
+
+        var script = 'id="$1"; ' + 'tree="$(swaymsg -t get_tree -r)"; ' + 'con="$(printf "%s" "$tree" | jq -r --arg id "$id" ' + '\'.. | objects ' + '| select(((.app_id? // "") | ascii_downcase) == ($id | ascii_downcase) ' + 'or (((.window_properties.class? // "") | ascii_downcase) == ($id | ascii_downcase))) ' + '| .id\' | head -n 1)"; ' + 'if [ -n "$con" ] && [ "$con" != "null" ]; then ' + '  swaymsg "[con_id=$con]" focus >/dev/null; ' + 'else ' + '  gtk-launch "$id" >/dev/null 2>&1 & ' + 'fi';
+
+        Quickshell.execDetached(["bash", "-lc", script, "_", desktopId]);
+    }
+
+    function bringAppHere(sourceId, source) {
+        var desktopId = root.normalizedDesktopId(sourceId);
+
+        if (desktopId === "") {
+            console.warn("Notification Hub: no desktop entry for BRING HERE:", source);
+            return;
+        }
+
+        var script = 'id="$1"; ' + 'tree="$(swaymsg -t get_tree -r)"; ' + 'con="$(printf "%s" "$tree" | jq -r --arg id "$id" ' + '\'.. | objects ' + '| select(((.app_id? // "") | ascii_downcase) == ($id | ascii_downcase) ' + 'or (((.window_properties.class? // "") | ascii_downcase) == ($id | ascii_downcase))) ' + '| .id\' | head -n 1)"; ' + 'if [ -n "$con" ] && [ "$con" != "null" ]; then ' + '  ws="$(swaymsg -t get_workspaces -r ' + '| jq -r \'.[] | select(.focused == true) | .name\' | head -n 1)"; ' + '  if [ -n "$ws" ]; then ' + '    swaymsg "[con_id=$con]" move container to workspace "$ws" >/dev/null; ' + '    swaymsg "[con_id=$con]" focus >/dev/null; ' + '  fi; ' + 'else ' + '  gtk-launch "$id" >/dev/null 2>&1 & ' + 'fi';
+
+        Quickshell.execDetached(["bash", "-lc", script, "_", desktopId]);
+    }
+
+    // ===== HUB CONTENT ==========================================
+    //
+    // This Item never gets destroyed when the menu closes.
+    // It only becomes transparent.
+    //
+    // Heavy animations added later should bind their running/enabled
+    // state to root.menuOpen so the persistent hidden window can sleep.
+
+    Item {
+        id: hubContent
+
+        anchors.fill: parent
+
+        opacity: root.menuOpen ? 1.0 : 0.0
+
+        // ===== PURPLE GLASS =====================================
+
+        Rectangle {
+            id: background
+
+            anchors.fill: parent
+            anchors.margins: root.frameInset
+
+            color: Colors.black
+
+            opacity: root.backgroundOpacity
+        }
+
+        // ===== ACTIVE OUTER FRAME GLOW ==========================
+
+        Rectangle {
+            id: frameGlowSource
+
+            anchors.fill: parent
+            anchors.margins: root.frameInset
+
+            color: "transparent"
+
+            border.width: 2
+            border.color: Colors.orange
+
+            z: -2
+        }
+
+        DropShadow {
+            anchors.fill: frameGlowSource
+
+            source: frameGlowSource
+
+            horizontalOffset: 0
+            verticalOffset: 0
+
+            radius: root.frameGlowRadius
+            samples: root.frameGlowSamples
+
+            color: Colors.orange
+
+            opacity: root.frameGlowOpacity
+
+            z: -3
+
+            transparentBorder: true
+        }
+
+        // ===== MAIN FRAME =======================================
+
+        Rectangle {
+            id: frame
+
+            anchors.fill: parent
+            anchors.margins: root.frameInset
+
+            color: "transparent"
+
+            border.width: 2
+            border.color: Colors.orange
+
+            // ===== HEADER =======================================
+
+            Rectangle {
+                id: header
+
+                anchors {
+                    top: parent.top
+                    left: parent.left
+                    right: parent.right
+                }
+
+                height: root.headerHeight
+
+                color: "transparent"
+
+                border.width: 1
+                border.color: Colors.cyan
+
+                // ===== TITLE ROW ================================
+
+                GlowText {
+                    anchors {
+                        top: parent.top
+                        left: parent.left
+                    }
+
+                    anchors.topMargin: 8
+                    anchors.leftMargin: 18
+
+                    width: 260
+                    height: 30
+
+                    text: "NOTIFICATION HUB"
+
+                    pixelSize: root.hubTitleFontSize
+
+                    textColor: Colors.magenta
+                    glowColor: Colors.magenta
+                }
+
+                // Stored notification count:
+                // > 0 = orange/orange
+                // 0   = white/cyan
+                GlowText {
+                    id: storedCountNumber
+
+                    anchors {
+                        top: parent.top
+                        right: storedLabel.left
+                    }
+
+                    anchors.topMargin: 8
+                    anchors.rightMargin: 2
+
+                    width: 36
+                    height: 30
+
+                    text: String(NotificationsService.notifications.count)
+
+                    pixelSize: root.storedCountFontSize
+
+                    horizontalAlignment: Text.AlignRight
+
+                    textColor: NotificationsService.notifications.count === 0 ? Colors.white : Colors.orange
+
+                    glowColor: NotificationsService.notifications.count === 0 ? Colors.cyan : Colors.orange
+
+                    glowRadius: NotificationsService.notifications.count === 0 ? root.tightGlowRadius : root.textGlowRadius
+
+                    glowSamples: NotificationsService.notifications.count === 0 ? root.tightGlowSamples : root.textGlowSamples
+                }
+
+                GlowText {
+                    id: storedLabel
+
+                    anchors {
+                        top: parent.top
+                        right: parent.right
+                    }
+
+                    anchors.topMargin: 8
+                    anchors.rightMargin: 18
+
+                    width: 56
+                    height: 30
+
+                    text: "STORED"
+
+                    pixelSize: root.storedCountFontSize
+
+                    textColor: Colors.cyan
+                    glowColor: Colors.cyan
+                }
+
+                // ===== SEARCH ===================================
+
+                Rectangle {
+                    id: searchBox
+
+                    anchors {
+                        top: parent.top
+                        left: parent.left
+                        right: parent.right
+                    }
+
+                    anchors.topMargin: 45
+                    anchors.leftMargin: 14
+                    anchors.rightMargin: 14
+
+                    height: root.searchHeight
+
+                    color: Colors.dark
+
+                    border.width: 1
+                    border.color: searchInput.activeFocus ? Colors.orange : searchMouse.containsMouse ? Colors.cyan : Colors.cyan
+
+                    DropShadow {
+                        anchors.fill: parent
+
+                        source: searchBox
+
+                        horizontalOffset: 0
+                        verticalOffset: 0
+
+                        radius: searchInput.activeFocus ? 10 : 7
+
+                        samples: 13
+
+                        color: searchInput.activeFocus ? Colors.orange : Colors.cyan
+
+                        opacity: searchInput.activeFocus ? 0.42 : searchMouse.containsMouse ? 0.30 : 0.14
+
+                        z: -1
+
+                        transparentBorder: true
+                    }
+
+                    GohuText {
+                        anchors {
+                            left: parent.left
+                            verticalCenter: parent.verticalCenter
+                        }
+
+                        anchors.leftMargin: 10
+
+                        text: "⌕"
+
+                        font.pixelSize: 15
+
+                        color: searchInput.activeFocus ? Colors.orange : Colors.cyan
+                    }
+
+                    TextInput {
+                        id: searchInput
+
+                        anchors {
+                            top: parent.top
+                            bottom: parent.bottom
+                            left: parent.left
+                            right: parent.right
+                        }
+
+                        anchors.leftMargin: 34
+                        anchors.rightMargin: 10
+
+                        text: root.searchQuery
+
+                        font.family: "GohuFont 11 Nerd Font Mono"
+                        font.pixelSize: 12
+
+                        color: Colors.white
+
+                        verticalAlignment: TextInput.AlignVCenter
+
+                        selectByMouse: true
+
+                        clip: true
+
+                        onTextChanged: {
+                            if (root.searchQuery !== text)
+                                root.searchQuery = text;
+                        }
+                    }
+
+                    DropShadow {
+                        anchors.fill: searchInput
+
+                        source: searchInput
+
+                        horizontalOffset: 0
+                        verticalOffset: 0
+
+                        radius: root.tightGlowRadius
+                        samples: root.tightGlowSamples
+
+                        color: Colors.cyan
+
+                        opacity: 0.52
+
+                        transparentBorder: true
+                    }
+
+                    GohuText {
+                        anchors {
+                            left: searchInput.left
+                            verticalCenter: parent.verticalCenter
+                        }
+
+                        visible: searchInput.text.length === 0 && !searchInput.activeFocus
+
+                        text: "SEARCH HISTORY..."
+
+                        font.pixelSize: 11
+
+                        color: Colors.cyan
+
+                        opacity: 0.48
+                    }
+
+                    MouseArea {
+                        id: searchMouse
+
+                        anchors.fill: parent
+
+                        hoverEnabled: true
+
+                        acceptedButtons: Qt.NoButton
+
+                        cursorShape: Qt.IBeamCursor
+                    }
+                }
+
+                // ===== FILTER STRIP ==============================
+
+                Row {
+                    id: filterStrip
+
+                    anchors {
+                        top: searchBox.bottom
+                        left: parent.left
+                        right: parent.right
+                    }
+
+                    anchors.topMargin: 8
+                    anchors.leftMargin: 14
+                    anchors.rightMargin: 14
+
+                    height: root.filterStripHeight
+
+                    spacing: root.filterButtonSpacing
+
+                    readonly property real buttonWidth: (width - (spacing * 5)) / 6
+
+                    FilterButton {
+                        width: filterStrip.buttonWidth
+                        height: filterStrip.height
+                        filterId: "all"
+                        label: "ALL"
+                        accentColor: Colors.magenta
+                    }
+
+                    FilterButton {
+                        width: filterStrip.buttonWidth
+                        height: filterStrip.height
+                        filterId: "apps"
+                        label: "APPS"
+                        accentColor: Colors.cyan
+                    }
+
+                    FilterButton {
+                        width: filterStrip.buttonWidth
+                        height: filterStrip.height
+                        filterId: "system"
+                        label: "SYSTEM"
+                        accentColor: root.omnitrixGreen
+                    }
+
+                    FilterButton {
+                        width: filterStrip.buttonWidth
+                        height: filterStrip.height
+                        filterId: "social"
+                        label: "SOCIAL"
+                        accentColor: Colors.yellow
+                    }
+
+                    FilterButton {
+                        width: filterStrip.buttonWidth
+                        height: filterStrip.height
+                        filterId: "apollo"
+                        label: "APOLLO"
+                        accentColor: Colors.orange
+                    }
+
+                    FilterButton {
+                        width: filterStrip.buttonWidth
+                        height: filterStrip.height
+                        filterId: "warning"
+                        label: "WARNING"
+                        accentColor: Colors.red
+                    }
+                }
+
+                // New second header divider UNDER the filters.
+                Rectangle {
+                    id: headerLine
+
+                    anchors {
+                        bottom: parent.bottom
+                        left: parent.left
+                        right: parent.right
+                    }
+
+                    height: 1
+
+                    color: Colors.cyan
+                }
+
+                DropShadow {
+                    anchors.fill: headerLine
+
+                    source: headerLine
+
+                    horizontalOffset: 0
+                    verticalOffset: 0
+
+                    radius: 10
+                    samples: 13
+
+                    color: Colors.cyan
+
+                    opacity: 0.60
+
+                    transparentBorder: true
+                }
+            }
+
+            // ===== CONTROL BAY ==================================
+            //
+            // Fixed physical bottom area.
+            //
+            // The ListView ends ABOVE this rectangle, so cards can never
+            // scroll behind it.
+            //
+            // Same opacity as the main background, but Colors.dark gives
+            // it a distinct control-deck surface.
+
+            Rectangle {
+                id: controlBay
+
+                anchors {
+                    bottom: parent.bottom
+                    left: parent.left
+                    right: parent.right
+                }
+
+                anchors.bottomMargin: root.controlBayBottomMargin
+                anchors.leftMargin: root.controlBaySideMargin
+                anchors.rightMargin: root.controlBaySideMargin
+
+                height: root.controlBayHeight
+
+                color: "transparent"
+
+                border.width: 1
+                border.color: Colors.cyan
+
+                Rectangle {
+                    anchors.fill: parent
+
+                    color: Colors.dark
+
+                    opacity: root.controlBayOpacity
+
+                    z: -2
+                }
+
+                Rectangle {
+                    id: controlBayTopLine
+
+                    anchors {
+                        top: parent.top
+                        left: parent.left
+                        right: parent.right
+                    }
+
+                    height: 1
+
+                    color: Colors.cyan
+                }
+
+                DropShadow {
+                    anchors.fill: controlBayTopLine
+
+                    source: controlBayTopLine
+
+                    horizontalOffset: 0
+                    verticalOffset: 0
+
+                    radius: 10
+                    samples: 13
+
+                    color: Colors.cyan
+
+                    opacity: 0.60
+
+                    transparentBorder: true
+                }
+
+                GlowText {
+                    anchors {
+                        top: parent.top
+                        left: parent.left
+                    }
+
+                    anchors.topMargin: 14
+                    anchors.leftMargin: 16
+
+                    width: 180
+                    height: 24
+
+                    text: "CONTROL BAY"
+
+                    pixelSize: 14
+
+                    textColor: Colors.magenta
+                    glowColor: Colors.magenta
+                }
+
+                GlowText {
+                    anchors {
+                        top: parent.top
+                        right: parent.right
+                    }
+
+                    anchors.topMargin: 14
+                    anchors.rightMargin: 16
+
+                    width: 240
+                    height: 24
+
+                    text: "HISTORY: " + (NotificationsService.historyEnabled ? "ON" : "OFF") + "  //  " + NotificationsService.historyStatus.toUpperCase()
+
+                    pixelSize: 10
+
+                    textColor: Colors.cyan
+                    glowColor: Colors.cyan
+
+                    elideMode: Text.ElideRight
+                }
+
+                // Reserved structured deck for future sliders,
+                // filters, routing controls, etc.
+                Rectangle {
+                    anchors {
+                        top: parent.top
+                        bottom: parent.bottom
+                        left: parent.left
+                        right: parent.right
+                    }
+
+                    anchors.topMargin: 48
+                    anchors.bottomMargin: 12
+                    anchors.leftMargin: 12
+                    anchors.rightMargin: 12
+
+                    color: "transparent"
+
+                    border.width: 1
+                    border.color: Colors.cyan
+
+                    opacity: 0.18
+                }
+            }
+
+            // ===== HISTORY AREA =================================
+            //
+            // There is always visible glass space between this viewport
+            // and the fixed control bay.
+
+            Item {
+                id: historyArea
+
+                anchors {
+                    top: header.bottom
+                    bottom: controlBay.top
+                    left: parent.left
+                    right: parent.right
+
+                    topMargin: root.historyTopGap
+                    bottomMargin: root.historyBottomGap
+                    leftMargin: 10
+                    rightMargin: 10
+                }
+
+                // ===== LIST =====================================
+
+                ListView {
+                    id: historyList
+
+                    anchors {
+                        top: parent.top
+                        bottom: parent.bottom
+                        left: parent.left
+                        right: scrollBarArea.left
+                    }
+
+                    spacing: 0
+
+                    clip: true
+
+                    boundsBehavior: Flickable.StopAtBounds
+
+                    model: NotificationsService.notifications
+
+                    header: Item {
+                        width: 1
+                        height: 12
+                    }
+
+                    footer: Item {
+                        width: 1
+                        height: 12
+                    }
+
+                    delegate: Item {
+                        id: notificationEntry
+
+                        required property int index
+                        required property string source
+                        required property string sourceId
+                        required property string title
+                        required property string message
+                        required property string appIcon
+                        required property string category
+                        required property string severity
+
+                        readonly property string appKey: root.appKeyFor(notificationEntry.sourceId, notificationEntry.source)
+
+                        readonly property var sharedAppState: root.stateForApp(notificationEntry.appKey)
+
+                        readonly property var classification: root.classificationFor(notificationEntry.source, notificationEntry.sourceId, notificationEntry.category, notificationEntry.severity)
+
+                        readonly property string filterGroup: notificationEntry.classification.group
+
+                        readonly property string baseTone: notificationEntry.classification.tone
+
+                        readonly property color baseColor: root.baseColorForTone(notificationEntry.baseTone)
+
+                        // Favorite is a VISUAL OVERRIDE, not a base category.
+                        readonly property color notificationColor: notificationEntry.sharedAppState.favorite === true ? Colors.magenta : notificationEntry.baseColor
+
+                        readonly property color sourceColor: notificationEntry.sharedAppState.favorite === true ? Colors.magenta : notificationEntry.baseColor
+
+                        readonly property bool matchesCurrentView: root.notificationMatches(notificationEntry.source, notificationEntry.title, notificationEntry.message, notificationEntry.category, notificationEntry.severity, notificationEntry.filterGroup)
+
+                        readonly property url resolvedAppIcon: root.resolveAppIcon(notificationEntry.appIcon, notificationEntry.sourceId)
+
+                        width: historyList.width
+
+                        // Include spacing inside delegate geometry so
+                        // filtered-out entries collapse completely.
+                        height: notificationEntry.matchesCurrentView ? root.cardHeight + root.cardSpacing : 0
+
+                        visible: notificationEntry.matchesCurrentView
+
+                        // ===== SOFT CARD GLOW SOURCE =============
+
+                        Rectangle {
+                            id: cardGlowSource
+
+                            anchors {
+                                top: parent.top
+                                left: parent.left
+                                right: parent.right
+
+                                leftMargin: root.cardGlowGutter
+                                rightMargin: root.cardGlowGutter
+                            }
+
+                            height: root.cardHeight
+
+                            color: "transparent"
+
+                            border.width: 1
+                            border.color: notificationEntry.notificationColor
+
+                            z: -3
+                        }
+
+                        DropShadow {
+                            anchors.fill: cardGlowSource
+
+                            source: cardGlowSource
+
+                            horizontalOffset: 0
+                            verticalOffset: 0
+
+                            radius: root.cardGlowRadius
+                            samples: root.cardGlowSamples
+
+                            color: notificationEntry.notificationColor
+
+                            opacity: root.cardGlowOpacity
+
+                            z: -4
+
+                            transparentBorder: true
+                        }
+
+                        // ===== CARD ===============================
+
+                        Rectangle {
+                            id: card
+
+                            anchors {
+                                top: parent.top
+                                left: parent.left
+                                right: parent.right
+
+                                leftMargin: root.cardGlowGutter
+                                rightMargin: root.cardGlowGutter
+                            }
+
+                            height: root.cardHeight
+
+                            color: "transparent"
+
+                            border.width: 1
+                            border.color: notificationEntry.notificationColor
+
+                            // Clicking the card means TAKE ME TO the app.
+                            MouseArea {
+                                id: cardClickArea
+
+                                anchors.fill: parent
+
+                                hoverEnabled: true
+
+                                z: 0
+
+                                onClicked: {
+                                    root.takeMeToApp(notificationEntry.sourceId, notificationEntry.source);
+                                }
+                            }
+
+                            // Only the fill receives opacity.
+                            Rectangle {
+                                anchors.fill: parent
+
+                                color: Colors.black
+
+                                opacity: root.cardFillOpacity
+
+                                z: -2
+                            }
+
+                            // Small internal accent rail.
+                            Rectangle {
+                                id: accentRail
+
+                                anchors {
+                                    top: parent.top
+                                    bottom: parent.bottom
+                                    left: parent.left
+
+                                    topMargin: 8
+                                    bottomMargin: 8
+                                    leftMargin: 6
+                                }
+
+                                width: 2
+
+                                color: notificationEntry.notificationColor
+
+                                z: 1
+                            }
+
+                            DropShadow {
+                                anchors.fill: accentRail
+
+                                source: accentRail
+
+                                horizontalOffset: 0
+                                verticalOffset: 0
+
+                                radius: 8
+                                samples: 11
+
+                                color: notificationEntry.notificationColor
+
+                                opacity: 0.48
+
+                                transparentBorder: true
+                            }
+
+                            // ===== FAVORITE ======================
+
+                            MiniButton {
+                                id: favoriteButton
+
+                                anchors {
+                                    top: parent.top
+                                    left: parent.left
+                                }
+
+                                anchors.topMargin: root.cardContentMargin
+                                anchors.leftMargin: root.cardContentMargin + 6
+
+                                width: 28
+                                height: 28
+
+                                z: 2
+
+                                active: notificationEntry.sharedAppState.favorite === true
+
+                                activeColor: Colors.magenta
+
+                                label: active ? "✦" : "✧"
+
+                                labelPixelSize: 17
+
+                                onTriggered: {
+                                    root.toggleAppFlag(notificationEntry.appKey, "favorite");
+                                }
+                            }
+
+                            // ===== APP ICON ======================
+
+                            Rectangle {
+                                id: appIconBox
+
+                                anchors {
+                                    top: parent.top
+                                    left: favoriteButton.right
+                                }
+
+                                anchors.topMargin: root.cardContentMargin
+                                anchors.leftMargin: 7
+
+                                width: root.appIconSize
+                                height: root.appIconSize
+
+                                z: 1
+
+                                color: Colors.dark
+
+                                border.width: 1
+                                border.color: notificationEntry.sourceColor
+
+                                Image {
+                                    id: appIconImage
+
+                                    anchors.fill: parent
+                                    anchors.margins: root.appIconInnerMargin
+
+                                    source: notificationEntry.resolvedAppIcon
+
+                                    fillMode: Image.PreserveAspectFit
+
+                                    asynchronous: true
+                                }
+
+                                // ONE icon only:
+                                // real app icon when available,
+                                // fallback glyph otherwise.
+                                GohuText {
+                                    anchors.centerIn: parent
+
+                                    visible: appIconImage.status !== Image.Ready
+
+                                    text: "-⋆♱⋆-"
+
+                                    font.pixelSize: 9
+
+                                    color: notificationEntry.sourceColor
+                                }
+                            }
+
+                            // ===== APP NAME ======================
+
+                            GlowText {
+                                id: appName
+
+                                anchors {
+                                    top: parent.top
+                                    left: appIconBox.right
+                                    right: appControls.left
+                                }
+
+                                anchors.topMargin: root.cardContentMargin
+                                anchors.leftMargin: 9
+                                anchors.rightMargin: 9
+
+                                height: 20
+
+                                z: 1
+
+                                text: notificationEntry.source
+
+                                pixelSize: root.appNameFontSize
+
+                                textColor: notificationEntry.sourceColor
+                                glowColor: notificationEntry.sourceColor
+
+                                elideMode: Text.ElideRight
+                            }
+
+                            // ===== CATEGORY / GROUP ==============
+
+                            GlowText {
+                                anchors {
+                                    top: appName.bottom
+                                    left: appIconBox.right
+                                    right: appControls.left
+                                }
+
+                                anchors.leftMargin: 9
+                                anchors.rightMargin: 9
+
+                                height: 15
+
+                                z: 1
+
+                                text: notificationEntry.filterGroup.toUpperCase() + "  //  " + notificationEntry.severity.toUpperCase()
+
+                                pixelSize: root.notificationMetaFontSize
+
+                                textColor: notificationEntry.notificationColor
+                                glowColor: notificationEntry.notificationColor
+
+                                elideMode: Text.ElideRight
+                            }
+
+                            // ===== APP-WIDE / CARD CONTROLS ======
+                            //
+                            // ZZ + DND are app-wide.
+                            // X dismisses only this notification.
+
+                            Row {
+                                id: appControls
+
+                                anchors {
+                                    top: parent.top
+                                    right: parent.right
+                                }
+
+                                anchors.topMargin: root.cardContentMargin
+                                anchors.rightMargin: root.cardContentMargin
+
+                                spacing: 5
+
+                                z: 3
+
+                                MiniButton {
+                                    width: 32
+                                    height: 28
+
+                                    label: "ZZ"
+
+                                    active: notificationEntry.sharedAppState.snoozed === true
+
+                                    activeColor: Colors.orange
+
+                                    onTriggered: {
+                                        root.toggleAppFlag(notificationEntry.appKey, "snoozed");
+                                    }
+                                }
+
+                                MiniButton {
+                                    width: 38
+                                    height: 28
+
+                                    label: "DND"
+
+                                    labelPixelSize: 9
+
+                                    active: notificationEntry.sharedAppState.dnd === true
+
+                                    activeColor: Colors.orange
+
+                                    onTriggered: {
+                                        root.toggleAppFlag(notificationEntry.appKey, "dnd");
+                                    }
+                                }
+
+                                MiniButton {
+                                    width: 28
+                                    height: 28
+
+                                    label: "×"
+
+                                    labelPixelSize: 17
+
+                                    active: false
+                                    danger: true
+
+                                    onTriggered: {
+                                        root.dismissNotification(notificationEntry.index);
+                                    }
+                                }
+                            }
+
+                            // ===== NOTIFICATION TITLE ============
+
+                            GlowText {
+                                id: notificationTitle
+
+                                anchors {
+                                    top: appIconBox.bottom
+                                    left: parent.left
+                                    right: parent.right
+                                }
+
+                                anchors.topMargin: 7
+                                anchors.leftMargin: root.cardContentMargin + 8
+                                anchors.rightMargin: root.cardContentMargin
+
+                                height: 20
+
+                                z: 1
+
+                                text: notificationEntry.title
+
+                                pixelSize: root.notificationTitleFontSize
+
+                                textColor: notificationEntry.notificationColor
+                                glowColor: notificationEntry.notificationColor
+
+                                elideMode: Text.ElideRight
+                            }
+
+                            // ===== MESSAGE =======================
+
+                            GlowText {
+                                id: notificationMessage
+
+                                anchors {
+                                    top: notificationTitle.bottom
+                                    left: parent.left
+                                    right: bringHereButton.left
+                                }
+
+                                anchors.topMargin: 2
+                                anchors.leftMargin: root.cardContentMargin + 8
+                                anchors.rightMargin: 8
+
+                                height: 19
+
+                                z: 1
+
+                                text: notificationEntry.message
+
+                                pixelSize: root.notificationMessageFontSize
+
+                                textColor: Colors.white
+
+                                // White text always glows cyan, but tightly.
+                                glowColor: Colors.cyan
+                                glowRadius: root.tightGlowRadius
+                                glowSamples: root.tightGlowSamples
+
+                                elideMode: Text.ElideRight
+                            }
+
+                            // ===== BRING HERE / OPEN =============
+                            //
+                            // Card click:
+                            //     TAKE ME TO APP
+                            //
+                            // This button:
+                            //     BRING APP HERE / OPEN HERE
+
+                            MiniButton {
+                                id: bringHereButton
+
+                                anchors {
+                                    bottom: parent.bottom
+                                    right: parent.right
+                                }
+
+                                anchors.bottomMargin: 8
+                                anchors.rightMargin: root.cardContentMargin
+
+                                width: 30
+                                height: 24
+
+                                z: 3
+
+                                label: "⇲"
+
+                                labelPixelSize: 15
+
+                                active: false
+
+                                onTriggered: {
+                                    root.bringAppHere(notificationEntry.sourceId, notificationEntry.source);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ===== CUSTOM SCROLL BAR ========================
+
+                Item {
+                    id: scrollBarArea
+
+                    anchors {
+                        top: parent.top
+                        bottom: parent.bottom
+                        right: parent.right
+                    }
+
+                    width: root.scrollBarAreaWidth
+
+                    visible: historyList.contentHeight > historyList.height + 1
+
+                    function scrollTo(localY) {
+                        var scrollable = Math.max(0, historyList.contentHeight - historyList.height);
+
+                        if (scrollable <= 0)
+                            return;
+
+                        var available = Math.max(1, scrollTrack.height - scrollThumb.height);
+
+                        var target = localY - (scrollThumb.height / 2);
+
+                        var fraction = Math.max(0, Math.min(1, target / available));
+
+                        historyList.contentY = fraction * scrollable;
+                    }
+
+                    Rectangle {
+                        id: scrollTrack
+
+                        anchors {
+                            top: parent.top
+                            bottom: parent.bottom
+                            horizontalCenter: parent.horizontalCenter
+                        }
+
+                        width: root.scrollTrackWidth
+
+                        color: Colors.cyan
+
+                        opacity: 0.52
+                    }
+
+                    Rectangle {
+                        id: scrollThumb
+
+                        anchors.horizontalCenter: parent.horizontalCenter
+
+                        width: root.scrollThumbWidth
+
+                        height: Math.max(root.scrollThumbMinHeight, scrollTrack.height * Math.min(1, historyList.height / Math.max(1, historyList.contentHeight)))
+
+                        y: {
+                            var scrollable = Math.max(0, historyList.contentHeight - historyList.height);
+
+                            var available = Math.max(0, scrollTrack.height - scrollThumb.height);
+
+                            if (scrollable <= 0)
+                                return 0;
+
+                            var fraction = Math.max(0, Math.min(1, historyList.contentY / scrollable));
+
+                            return fraction * available;
+                        }
+
+                        color: Colors.magenta
+                    }
+
+                    DropShadow {
+                        anchors.fill: scrollThumb
+
+                        source: scrollThumb
+
+                        horizontalOffset: 0
+                        verticalOffset: 0
+
+                        radius: 10
+                        samples: 13
+
+                        color: Colors.magenta
+
+                        opacity: 0.60
+
+                        transparentBorder: true
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+
+                        hoverEnabled: true
+
+                        onPressed: function (mouse) {
+                            scrollBarArea.scrollTo(mouse.y);
+                        }
+
+                        onPositionChanged: function (mouse) {
+                            if (pressed)
+                                scrollBarArea.scrollTo(mouse.y);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

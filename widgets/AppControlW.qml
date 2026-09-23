@@ -866,7 +866,7 @@ PanelWindow {
         id: systemTelemetry
 
         onFanRowsChanged: {
-            appControlWindow.reconcilePendingFanPercent(fanRows);
+            fanControl.reconcilePendingPercent(fanRows);
         }
 
         onRefreshed: {
@@ -894,129 +894,50 @@ PanelWindow {
         }
     }
 
-    // Hold a requested PWM value while the privileged write is being
-    // committed/read back. Without this, the 1.9 s monitor snapshot can
-    // overwrite the slider with the old hardware value before the write has
-    // settled, which looks like the handle instantly snapping back.
-    property string fanPendingPwmPath: ""
-    property real fanPendingPercent: -1
-    property double fanPendingSinceMs: 0
+    // Fan mutation is intentionally separate from read-only telemetry.
+    // Keep this compatibility facade while the existing AppControl UI is
+    // extracted incrementally; CPU++ and future views can consume FanControl
+    // directly without owning the privileged write machinery.
+    FanControl {
+        id: fanControl
 
-    // Keep the user's requested setpoint separate from the hardware read-back.
-    // Some firmware/EC fan controllers reject or overwrite manual PWM writes.
-    // In that case the slider should stay where the user requested it while
-    // the status text truthfully reports the different ACTUAL PWM value.
-    property var fanDesiredPercents: ({})
-    // Fan PWM writes are deliberately gated behind a visible omnitrix lock.
-    // Keep the unlock keyed to the physical PWM channel so changing rows does
-    // not accidentally unlock a different fan.
-    property var fanControlUnlockedKeys: ({})
+        onRefreshRequested: systemTelemetry.refresh()
 
-    function fanControlSafetyKey(entry) {
-        if (!entry)
-            return "";
-        return String(
-            entry.pwmPath
-            || entry.inputPath
-            || entry.id
-            || (String(entry.chip || "") + "|" + String(entry.name || ""))
-        );
+        onErrorRaised: function(message) {
+            systemTelemetry.errorText = String(message || "");
+        }
     }
 
     function fanControlUnlocked(entry) {
-        const key = fanControlSafetyKey(entry);
-        return key.length > 0 && fanControlUnlockedKeys[key] === true;
+        return fanControl.unlocked(entry);
     }
 
     function toggleFanControlUnlocked(entry) {
-        const key = fanControlSafetyKey(entry);
-        if (!key)
-            return;
-
-        const next = Object.assign({}, fanControlUnlockedKeys);
-        next[key] = !(next[key] === true);
-        fanControlUnlockedKeys = next;
+        fanControl.toggleUnlocked(entry);
     }
 
     function desiredFanPercentFor(entry) {
-        const path = String(entry && entry.pwmPath || "");
-        if (!path || fanDesiredPercents[path] === undefined)
-            return -1;
-
-        const value = Number(fanDesiredPercents[path]);
-        return isNaN(value) ? -1 : Math.max(0, Math.min(100, value));
+        return fanControl.desiredPercentFor(entry);
     }
 
     function setDesiredFanPercent(entry, percent) {
-        const path = String(entry && entry.pwmPath || "");
-        if (!path)
-            return;
-
-        const next = Object.assign({}, fanDesiredPercents);
-        next[path] = Math.max(0, Math.min(100, Number(percent || 0)));
-        fanDesiredPercents = next;
+        fanControl.setDesiredPercent(entry, percent);
     }
 
     function clearDesiredFanPercent(entry) {
-        const path = String(entry && entry.pwmPath || "");
-        if (!path || fanDesiredPercents[path] === undefined)
-            return;
-
-        const next = Object.assign({}, fanDesiredPercents);
-        delete next[path];
-        fanDesiredPercents = next;
+        fanControl.clearDesiredPercent(entry);
     }
 
     function pendingFanPercentFor(entry) {
-        if (!entry || fanPendingPercent < 0)
-            return -1;
-
-        if (String(entry.pwmPath || "") !== fanPendingPwmPath)
-            return -1;
-
-        return Math.max(0, Math.min(100, Number(fanPendingPercent)));
+        return fanControl.pendingPercentFor(entry);
     }
 
-    function clearPendingFanPercent() {
-        fanPendingPwmPath = "";
-        fanPendingPercent = -1;
-        fanPendingSinceMs = 0;
-        fanPendingClearTimer.stop();
+    function writeFanControl(entry, action, percent) {
+        fanControl.writeControl(entry, action, percent);
     }
 
-    function reconcilePendingFanPercent(rows) {
-        if (fanPendingPercent < 0 || !fanPendingPwmPath)
-            return;
-
-        const list = Array.isArray(rows) ? rows : [];
-        for (let i = 0; i < list.length; i++) {
-            const row = list[i];
-            if (String(row && row.pwmPath || "") !== fanPendingPwmPath)
-                continue;
-
-            const actual = Number(row.pwmPercent);
-            if (!isNaN(actual)
-                    && actual >= 0
-                    && Math.abs(actual - fanPendingPercent) <= 2.5) {
-                clearPendingFanPercent();
-            }
-            return;
-        }
-    }
-
-    Timer {
-        id: fanPendingClearTimer
-        interval: 5500
-        repeat: false
-
-        onTriggered: {
-            if (appControlWindow.fanPendingPercent >= 0) {
-                appControlWindow.killMonitorError =
-                    "FAN PWM WRITE DID NOT STAY AT THE REQUESTED VALUE";
-                appControlWindow.clearPendingFanPercent();
-                appControlWindow.refreshKillMonitor();
-            }
-        }
+    function writeFanPercent(entry, percent) {
+        fanControl.writePercent(entry, percent);
     }
 
     function setThermalViewMode(mode) {
@@ -2094,118 +2015,6 @@ PanelWindow {
             || appControlWindow.hasMonitorFavorites()
 
         onTriggered: appControlWindow.refreshKillMonitor()
-    }
-
-    function fanControlScript() {
-        return "import json\nimport os\nimport re\nimport sys\nimport time\n\npayload = json.loads(sys.argv[1] if len(sys.argv) > 1 else \"{}\")\naction = str(payload.get(\"action\") or \"\")\npwm_path = str(payload.get(\"pwmPath\") or \"\")\nenable_path = str(payload.get(\"pwmEnablePath\") or \"\")\n\ndef valid(path, suffix):\n    return bool(\n        re.match(r\"^/sys/class/hwmon/hwmon[0-9]+/\" + suffix + r\"$\", path)\n    )\n\nif not valid(pwm_path, r\"pwm[0-9]+\"):\n    raise SystemExit(\"invalid pwm path\")\n\nif enable_path and not valid(enable_path, r\"pwm[0-9]+_enable\"):\n    raise SystemExit(\"invalid enable path\")\n\nif not os.path.exists(pwm_path):\n    raise SystemExit(\"fan pwm control file unavailable\")\n\nif enable_path and not os.path.exists(enable_path):\n    enable_path = \"\"\n\nif not os.access(pwm_path, os.W_OK):\n    raise SystemExit(\"fan pwm control file is not writable\")\n\nif enable_path and not os.access(enable_path, os.W_OK):\n    raise SystemExit(\"fan pwm mode file is not writable\")\n\ndef read_int(path, default):\n    try:\n        return int(open(path, \"r\", encoding=\"utf-8\").read().strip())\n    except Exception:\n        return default\n\ndef write_int(path, value):\n    with open(path, \"w\", encoding=\"utf-8\") as handle:\n        handle.write(str(int(value)))\n        handle.flush()\n\ncurrent = max(0, min(255, read_int(pwm_path, 255)))\nrequested_pwm = current\n\nif action == \"auto\":\n    if not enable_path:\n        raise SystemExit(\"automatic mode control is not exposed for this channel\")\n    write_int(enable_path, 2)\n    time.sleep(0.08)\nelif action == \"manual\":\n    requested_pwm = max(current, 180)\n    if enable_path:\n        write_int(enable_path, 1)\n        time.sleep(0.06)\n    write_int(pwm_path, requested_pwm)\n    time.sleep(0.10)\nelif action == \"boost\":\n    requested_pwm = min(255, max(current, 180) + 26)\n    if enable_path:\n        write_int(enable_path, 1)\n        time.sleep(0.06)\n    write_int(pwm_path, requested_pwm)\n    time.sleep(0.10)\nelif action == \"max\":\n    requested_pwm = 255\n    if enable_path:\n        write_int(enable_path, 1)\n        time.sleep(0.06)\n    write_int(pwm_path, requested_pwm)\n    time.sleep(0.10)\nelif action == \"set\":\n    percent_raw = payload.get(\"percent\", None)\n    if percent_raw is None:\n        raise SystemExit(\"missing fan percent\")\n    percent = max(0.0, min(100.0, float(percent_raw)))\n    requested_pwm = int(round((percent / 100.0) * 255.0))\n    if enable_path:\n        write_int(enable_path, 1)\n        # Some hwmon drivers need a small gap after switching out of firmware\n        # automatic mode before a manual duty write will stick.\n        time.sleep(0.08)\n    write_int(pwm_path, requested_pwm)\n    time.sleep(0.12)\n\n    # A few drivers accept the first write but immediately restore the old\n    # value. Retry once while still in manual mode before reporting read-back.\n    first_readback = max(0, min(255, read_int(pwm_path, requested_pwm)))\n    if abs(first_readback - requested_pwm) > 3:\n        if enable_path:\n            write_int(enable_path, 1)\n            time.sleep(0.06)\n        write_int(pwm_path, requested_pwm)\n        time.sleep(0.14)\nelse:\n    raise SystemExit(\"unknown action\")\n\nreadback = max(0, min(255, read_int(pwm_path, requested_pwm)))\nenable_value = read_int(enable_path, -1) if enable_path else -1\nprint(json.dumps({\n    \"ok\": True,\n    \"action\": action,\n    \"requestedPwm\": requested_pwm,\n    \"pwmValue\": readback,\n    \"percent\": (readback / 255.0) * 100.0,\n    \"enable\": enable_value,\n    \"pwmPath\": pwm_path\n}))\n";
-    }
-
-    function writeFanControl(entry, action, percent) {
-        if (!entry
-                || entry.sensorKind !== "fan"
-                || (!entry.controlWritable && !entry.controlRequiresAuth))
-            return;
-
-        const payload = JSON.stringify({
-            action: String(action || ""),
-            percent:
-                percent === undefined || percent === null
-                ? null
-                : Math.max(0, Math.min(100, Number(percent))),
-            pwmPath: String(entry.pwmPath || ""),
-            pwmEnablePath: String(entry.pwmEnablePath || "")
-        });
-
-        const command = entry.controlWritable
-                        ? [
-                              "/usr/bin/python3",
-                              "-c",
-                              fanControlScript(),
-                              payload
-                          ]
-                        : [
-                              "pkexec",
-                              "/usr/bin/python3",
-                              "-c",
-                              fanControlScript(),
-                              payload
-                          ];
-
-        fanControlProcess.exec(command);
-    }
-
-    function writeFanPercent(entry, percent) {
-        if (!entry)
-            return;
-
-        const target =
-            Math.max(0, Math.min(100, Number(percent || 0)));
-
-        setDesiredFanPercent(entry, target);
-        fanPendingPwmPath = String(entry.pwmPath || "");
-        fanPendingPercent = target;
-        fanPendingSinceMs = Date.now();
-        fanPendingClearTimer.restart();
-
-        writeFanControl(entry, "set", target);
-    }
-
-    Process {
-        id: fanControlProcess
-
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const raw = String(text || "").trim();
-
-                if (raw.length > 0) {
-                    try {
-                        const payload = JSON.parse(raw);
-                        if (payload.ok
-                                && String(payload.pwmPath || "")
-                                   === appControlWindow.fanPendingPwmPath) {
-                            const actual = Number(payload.percent);
-                            if (!isNaN(actual)
-                                    && Math.abs(
-                                        actual
-                                        - appControlWindow.fanPendingPercent
-                                    ) > 2.5) {
-                                appControlWindow.killMonitorError =
-                                    "FAN PWM WRITE READ BACK "
-                                    + actual.toFixed(0)
-                                    + "% INSTEAD OF "
-                                    + appControlWindow.fanPendingPercent.toFixed(0)
-                                    + "%";
-                            }
-                        }
-                    } catch (error) {
-                        console.log(
-                            "AppControl: fan control readback parse:",
-                            String(error)
-                        );
-                    }
-                }
-
-                Qt.callLater(function() {
-                    appControlWindow.refreshKillMonitor();
-                });
-            }
-        }
-
-        stderr: StdioCollector {
-            onStreamFinished: {
-                const message = String(text || "").trim();
-
-                if (message.length > 0) {
-                    appControlWindow.killMonitorError = message;
-                    appControlWindow.clearPendingFanPercent();
-                    console.log("AppControl: fan control:", message);
-                }
-
-                Qt.callLater(function() {
-                    appControlWindow.refreshKillMonitor();
-                });
-            }
-        }
     }
 
     function selectedTask() {

@@ -884,6 +884,10 @@ PanelWindow {
         id: taskSafety
     }
 
+    ProcessControl {
+        id: processControl
+    }
+
     property alias thermalRows: systemTelemetry.thermalRows
     property alias fanRows: systemTelemetry.fanRows
     property alias systemRows: systemTelemetry.systemRows
@@ -2439,7 +2443,7 @@ PanelWindow {
         const entry = taskEntryForCapturedIdentity(pid, expectedName);
         if (!entry)
             return;
-        Quickshell.execDetached(["kill", signalName, String(entry.pid)]);
+        processControl.sendSignal(entry.pid, signalName);
         if (signalName === "-STOP") {
             const optimistic = Object.assign({}, taskFrozenOptimistic);
             optimistic["pid:" + String(entry.pid)] = true;
@@ -2506,12 +2510,11 @@ PanelWindow {
         if (rows.length === 0)
             return;
 
-        const command = ["kill", "-TERM"];
-        for (let i = 0; i < rows.length; i++)
-            command.push(String(rows[i].pid));
-
         console.log("AppControl: KILL ALL eligible count", rows.length);
-        Quickshell.execDetached(command);
+        processControl.sendSignalMany(
+            rows.map(function(entry) { return Number(entry.pid || 0); }),
+            "-TERM"
+        );
         taskRefreshAfterKillTimer.restart();
     }
 
@@ -2527,12 +2530,11 @@ PanelWindow {
         if (rows.length === 0)
             return;
 
-        const command = ["kill", "-TERM"];
-        for (let i = 0; i < rows.length; i++)
-            command.push(String(rows[i].pid));
-
         console.log("AppControl:", label || "BULK TERM", rows.length);
-        Quickshell.execDetached(command);
+        processControl.sendSignalMany(
+            rows.map(function(entry) { return Number(entry.pid || 0); }),
+            "-TERM"
+        );
         taskRefreshAfterKillTimer.restart();
     }
 
@@ -3396,7 +3398,7 @@ PanelWindow {
             optimistic["pid:" + String(entry.pid)] = false;
             taskFrozenOptimistic = optimistic;
             taskFreezeOptimisticReset.restart();
-            Quickshell.execDetached(["kill", "-CONT", String(entry.pid)]);
+            processControl.sendSignal(entry.pid, "-CONT");
             relockTaskDangerAction(entry, "freeze");
             taskRefreshAfterKillTimer.restart();
             return;
@@ -3661,6 +3663,7 @@ PanelWindow {
 
     function executeTaskRestart(pid, expectedName) {
         const entry = taskEntryForCapturedIdentity(pid, expectedName);
+
         if (!entry || Number(entry.pid || 0) <= 1)
             return;
 
@@ -3668,33 +3671,7 @@ PanelWindow {
                 && !taskDangerActionUnlocked(entry, "kill"))
             return;
 
-        // Capture argv/cwd/environment before SIGTERM, then relaunch the same
-        // process image. This avoids reparsing the display-only `ps args` text.
-        const script =
-            "import os, signal, subprocess, sys, time\n"
-            + "pid=int(sys.argv[1])\n"
-            + "try:\n"
-            + "    raw=open(f'/proc/{pid}/cmdline','rb').read().split(b'\\0')\n"
-            + "    argv=[x.decode('utf-8','surrogateescape') for x in raw if x]\n"
-            + "    if not argv: raise RuntimeError('EMPTY CMDLINE')\n"
-            + "    try: cwd=os.readlink(f'/proc/{pid}/cwd')\n"
-            + "    except Exception: cwd=None\n"
-            + "    env=dict(os.environ)\n"
-            + "    try:\n"
-            + "        eraw=open(f'/proc/{pid}/environ','rb').read().split(b'\\0')\n"
-            + "        for item in eraw:\n"
-            + "            if b'=' in item:\n"
-            + "                k,v=item.split(b'=',1); env[k.decode('utf-8','ignore')]=v.decode('utf-8','surrogateescape')\n"
-            + "    except Exception: pass\n"
-            + "    os.kill(pid, signal.SIGTERM)\n"
-            + "    time.sleep(0.35)\n"
-            + "    subprocess.Popen(argv, cwd=cwd, env=env, start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)\n"
-            + "except Exception as exc:\n"
-            + "    print(str(exc), file=sys.stderr)\n";
-
-        Quickshell.execDetached([
-            "/usr/bin/python3", "-c", script, String(Number(pid))
-        ]);
+        processControl.restart(entry.pid);
         relockTaskDangerAction(entry, "kill");
         taskRefreshAfterKillTimer.restart();
     }

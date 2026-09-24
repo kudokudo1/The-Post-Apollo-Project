@@ -866,6 +866,18 @@ PanelWindow {
         onMiniProbeReady: function(rows) {
             appControlWindow.applyTaskMiniProbeRows(rows);
         }
+
+        onDetailProbeReady: function(sample) {
+            appControlWindow.applyTaskDetailProbe(sample);
+        }
+
+        onDetailProbeRetryRequested: {
+            Qt.callLater(function() {
+                if (appControlWindow.menuOpen
+                        && appControlWindow.selectedResultIsTask())
+                    appControlWindow.refreshSelectedTaskGraph();
+            });
+        }
     }
 
     property alias thermalRows: systemTelemetry.thermalRows
@@ -1987,11 +1999,7 @@ PanelWindow {
         });
     }
 
-    property int taskGraphProbePid: 0
-    property real taskGraphProbeLastTicks: -1
-    property real taskGraphProbeLastIoBytes: -1
-    property real taskGraphProbeLastMs: 0
-    property bool taskGraphProbeLoading: false
+    property alias taskGraphProbeLoading: processTelemetry.detailProbeLoading
 
     function refreshKillMonitor() {
         systemTelemetry.refresh();
@@ -2070,12 +2078,9 @@ PanelWindow {
             cpu: [], mem: [], io: [], age: [], combined: []
         });
         taskHunterDetailHistoryRevision += 1;
-        taskGraphProbePid = 0;
-        taskGraphProbeLastTicks = -1;
-        taskGraphProbeLastIoBytes = -1;
-        taskGraphProbeLastMs = 0;
-        // A previous hovered PID may still own the Process. Leave the real busy
-        // state intact; its output is PID-checked and will trigger the new PID.
+        processTelemetry.resetDetailProbe(0);
+        // A previous hovered PID may still own the service Process. Its stale
+        // generation is discarded and the newly selected PID will be sampled.
     }
 
     function rebindTaskDetailGraph(forceReset) {
@@ -2144,10 +2149,7 @@ PanelWindow {
 
         seedHunterDetailHistories(entry);
 
-        taskGraphProbePid = taskHistoryPid;
-        taskGraphProbeLastTicks = -1;
-        taskGraphProbeLastIoBytes = -1;
-        taskGraphProbeLastMs = 0;
+        processTelemetry.resetDetailProbe(taskHistoryPid);
 
         // Paint the newly selected PID's seeded histories immediately. Waiting
         // for the next 450 ms /proc probe lets the previous row's pixels linger
@@ -2212,141 +2214,40 @@ PanelWindow {
         if (!entry || Number(entry.pid || 0) <= 1 || taskGraphProbeLoading)
             return;
 
-        const pid = Number(entry.pid || 0);
-        taskGraphProbeLoading = true;
-
-        taskGraphProbeProcess.exec([
-            "/bin/sh",
-            "-lc",
-            "pid=" + String(pid) + "; "
-            + "[ -r /proc/$pid/stat ] || exit 0; "
-            + "ticks=$(awk '{print $14+$15}' /proc/$pid/stat 2>/dev/null) || exit 0; "
-            + "rss=$(awk '/^VmRSS:/{print $2; exit}' /proc/$pid/status 2>/dev/null); "
-            + "total=$(awk '/^MemTotal:/{print $2; exit}' /proc/meminfo 2>/dev/null); "
-            + "clk=$(getconf CLK_TCK 2>/dev/null || printf 100); "
-            + "cores=$(getconf _NPROCESSORS_ONLN 2>/dev/null || printf 1); "
-            + "io=$(awk '/^(read_bytes|write_bytes):/{sum+=$2} END{print sum+0}' /proc/$pid/io 2>/dev/null); "
-            + "start=$(awk '{print $22}' /proc/$pid/stat 2>/dev/null); "
-            + "uptime=$(awk '{print $1}' /proc/uptime 2>/dev/null); "
-            + "printf '%s %s %s %s %s %s %s %s %s\\n' "
-            + "\"$pid\" \"$ticks\" \"${rss:-0}\" \"${total:-1}\" \"$clk\" \"$cores\" "
-            + "\"${io:-0}\" \"${start:-0}\" \"${uptime:-0}\""
-        ]);
+        processTelemetry.refreshDetailProbe({
+            pid: Number(entry.pid || 0),
+            fallbackCpu: Math.max(0, Math.min(100, Number(entry.cpu || 0))),
+            fallbackIoRate: Math.max(0, hunterTaskIoRate(entry)),
+            fallbackAgeSeconds: Math.max(0, taskElapsedSeconds(entry.elapsed))
+        });
     }
 
-    function consumeTaskGraphProbe(output) {
-        taskGraphProbeLoading = false;
-
-        const fields = String(output || "").trim().split(/\s+/);
-
-        if (fields.length < 9) {
-            Qt.callLater(function() {
-                if (appControlWindow.menuOpen && appControlWindow.selectedResultIsTask())
-                    appControlWindow.refreshSelectedTaskGraph();
-            });
-            return;
-        }
-
-        const pid = Number(fields[0] || 0);
-        const ticks = Number(fields[1] || 0);
-        const rssKiB = Number(fields[2] || 0);
-        const totalKiB = Math.max(1, Number(fields[3] || 1));
-        const tickRate = Math.max(1, Number(fields[4] || 100));
-        const cores = Math.max(1, Number(fields[5] || 1));
-        const ioBytes = Math.max(0, Number(fields[6] || 0));
-        const startTicks = Math.max(0, Number(fields[7] || 0));
-        const uptimeSeconds = Math.max(0, Number(fields[8] || 0));
-        const nowMs = Date.now();
+    function applyTaskDetailProbe(sample) {
+        const data = sample || ({});
+        const pid = Number(data.pid || 0);
 
         if (pid !== taskHistoryPid) {
-            // Selection moved while this /proc request was in flight. Never
-            // append the old PID's trace under the new row; immediately sample
-            // whichever task is now under the mouse/keyboard selector.
             Qt.callLater(function() {
-                if (appControlWindow.menuOpen && appControlWindow.selectedResultIsTask())
+                if (appControlWindow.menuOpen
+                        && appControlWindow.selectedResultIsTask())
                     appControlWindow.refreshSelectedTaskGraph();
             });
             return;
         }
 
-        let cpuPercent = 0;
+        appendTaskHistoryValues(
+            Number(data.cpuPercent || 0),
+            Number(data.memPercent || 0)
+        );
 
-        if (taskGraphProbePid === pid
-                && taskGraphProbeLastTicks >= 0
-                && taskGraphProbeLastMs > 0) {
-            const elapsedSeconds = Math.max(0.001, (nowMs - taskGraphProbeLastMs) / 1000.0);
-            const tickDelta = Math.max(0, ticks - taskGraphProbeLastTicks);
-
-            // /proc task ticks are already this process's consumed CPU time.
-            // Dividing by the machine's core count made the live history much
-            // smaller than the %CPU shown by the task list. Keep the same
-            // per-process scale as ps, then clamp to this graph's 0..100 range.
-            cpuPercent = ((tickDelta / tickRate) / elapsedSeconds) * 100.0;
-        } else {
-            const task = selectedTask();
-            cpuPercent = task ? Math.max(0, Math.min(100, Number(task.cpu || 0))) : 0;
-        }
-
-        cpuPercent = Math.max(0, Math.min(100, cpuPercent));
-        const memPercent = Math.max(0, (rssKiB / totalKiB) * 100.0);
-
-        let ioRateBytes = 0;
-        if (taskGraphProbePid === pid
-                && taskGraphProbeLastIoBytes >= 0
-                && taskGraphProbeLastMs > 0) {
-            const ioElapsed =
-                Math.max(0.001, (nowMs - taskGraphProbeLastMs) / 1000.0);
-            ioRateBytes =
-                Math.max(0, ioBytes - taskGraphProbeLastIoBytes) / ioElapsed;
-        } else {
-            const task = selectedTask();
-            ioRateBytes = task
-                          ? Math.max(0, hunterTaskIoRate(task))
-                          : 0;
-        }
-
-        const ageSeconds =
-            startTicks > 0
-            ? Math.max(0, uptimeSeconds - (startTicks / tickRate))
-            : Math.max(
-                  0,
-                  taskElapsedSeconds(
-                      selectedTask() ? selectedTask().elapsed : "0"
-                  )
-              );
-
-        taskGraphProbePid = pid;
-        taskGraphProbeLastTicks = ticks;
-        taskGraphProbeLastIoBytes = ioBytes;
-        taskGraphProbeLastMs = nowMs;
-
-        appendTaskHistoryValues(cpuPercent, memPercent);
         appendSelectedTaskHunterHistories(
             selectedTask(),
-            cpuPercent,
-            rssKiB,
-            memPercent,
-            ioRateBytes,
-            ageSeconds
+            Number(data.cpuPercent || 0),
+            Number(data.rssKiB || 0),
+            Number(data.memPercent || 0),
+            Number(data.ioRateBytes || 0),
+            Number(data.ageSeconds || 0)
         );
-    }
-
-    Process {
-        id: taskGraphProbeProcess
-
-        stdout: StdioCollector {
-            onStreamFinished: { appControlWindow.consumeTaskGraphProbe(text); }
-        }
-
-        stderr: StdioCollector {
-            onStreamFinished: {
-                appControlWindow.taskGraphProbeLoading = false;
-                Qt.callLater(function() {
-                    if (appControlWindow.menuOpen && appControlWindow.selectedResultIsTask())
-                        appControlWindow.refreshSelectedTaskGraph();
-                });
-            }
-        }
     }
 
     Timer {

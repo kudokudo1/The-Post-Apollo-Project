@@ -14,6 +14,15 @@ Scope {
 
     property bool miniProbeLoading: false
 
+    property bool detailProbeLoading: false
+    property int detailProbePid: 0
+    property real detailProbeLastTicks: -1
+    property real detailProbeLastIoBytes: -1
+    property real detailProbeLastMs: 0
+    property int detailProbeGeneration: 0
+    property int detailProbeActiveGeneration: 0
+    property var detailProbeRequest: ({})
+
     // Raw counters used only to derive live rates between samples.
     property var snapshotCpuSamples: ({})
     property var snapshotIoSamples: ({})
@@ -22,6 +31,8 @@ Scope {
 
     signal snapshotReady(var rows)
     signal miniProbeReady(var rows)
+    signal detailProbeReady(var sample)
+    signal detailProbeRetryRequested()
 
     function refreshSnapshot() {
         if (snapshotLoading)
@@ -325,6 +336,149 @@ Scope {
         miniCpuSamples = nextCpu;
         miniIoSamples = nextIo;
         return parsed;
+    }
+
+    function resetDetailProbe(pid) {
+        detailProbeGeneration += 1;
+        detailProbePid = Math.max(0, Number(pid || 0));
+        detailProbeLastTicks = -1;
+        detailProbeLastIoBytes = -1;
+        detailProbeLastMs = 0;
+        detailProbeRequest = ({});
+    }
+
+    function refreshDetailProbe(request) {
+        const item = request || ({});
+        const pid = Math.max(0, Number(item.pid || 0));
+
+        if (pid <= 1 || detailProbeLoading)
+            return;
+
+        if (detailProbePid !== pid)
+            resetDetailProbe(pid);
+
+        detailProbeLoading = true;
+        detailProbeActiveGeneration = detailProbeGeneration;
+        detailProbeRequest = {
+            pid: pid,
+            fallbackCpu: Math.max(0, Number(item.fallbackCpu || 0)),
+            fallbackIoRate: Math.max(0, Number(item.fallbackIoRate || 0)),
+            fallbackAgeSeconds: Math.max(0, Number(item.fallbackAgeSeconds || 0))
+        };
+
+        detailProbeProcess.exec([
+            "/bin/sh",
+            "-lc",
+            "pid=" + String(pid) + "; "
+            + "[ -r /proc/$pid/stat ] || exit 0; "
+            + "ticks=$(awk '{print $14+$15}' /proc/$pid/stat 2>/dev/null) || exit 0; "
+            + "rss=$(awk '/^VmRSS:/{print $2; exit}' /proc/$pid/status 2>/dev/null); "
+            + "total=$(awk '/^MemTotal:/{print $2; exit}' /proc/meminfo 2>/dev/null); "
+            + "clk=$(getconf CLK_TCK 2>/dev/null || printf 100); "
+            + "cores=$(getconf _NPROCESSORS_ONLN 2>/dev/null || printf 1); "
+            + "io=$(awk '/^(read_bytes|write_bytes):/{sum+=$2} END{print sum+0}' /proc/$pid/io 2>/dev/null); "
+            + "start=$(awk '{print $22}' /proc/$pid/stat 2>/dev/null); "
+            + "uptime=$(awk '{print $1}' /proc/uptime 2>/dev/null); "
+            + "printf '%s %s %s %s %s %s %s %s %s\\n' "
+            + "\"$pid\" \"$ticks\" \"${rss:-0}\" \"${total:-1}\" \"$clk\" \"$cores\" "
+            + "\"${io:-0}\" \"${start:-0}\" \"${uptime:-0}\""
+        ]);
+    }
+
+    function parseDetailProbe(output) {
+        if (detailProbeActiveGeneration !== detailProbeGeneration)
+            return null;
+
+        const fields = String(output || "").trim().split(/\s+/);
+
+        if (fields.length < 9)
+            return null;
+
+        const pid = Number(fields[0] || 0);
+        const ticks = Number(fields[1] || 0);
+        const rssKiB = Number(fields[2] || 0);
+        const totalKiB = Math.max(1, Number(fields[3] || 1));
+        const tickRate = Math.max(1, Number(fields[4] || 100));
+        const ioBytes = Math.max(0, Number(fields[6] || 0));
+        const startTicks = Math.max(0, Number(fields[7] || 0));
+        const uptimeSeconds = Math.max(0, Number(fields[8] || 0));
+        const nowMs = Date.now();
+        const request = detailProbeRequest || ({});
+
+        if (pid <= 1 || pid !== Number(request.pid || 0))
+            return null;
+
+        let cpuPercent = Math.max(
+            0,
+            Math.min(100, Number(request.fallbackCpu || 0))
+        );
+
+        if (detailProbePid === pid
+                && detailProbeLastTicks >= 0
+                && detailProbeLastMs > 0) {
+            const elapsedSeconds = Math.max(
+                0.001,
+                (nowMs - detailProbeLastMs) / 1000.0
+            );
+            const tickDelta = Math.max(0, ticks - detailProbeLastTicks);
+            cpuPercent = ((tickDelta / tickRate) / elapsedSeconds) * 100.0;
+        }
+
+        cpuPercent = Math.max(0, Math.min(100, cpuPercent));
+        const memPercent = Math.max(0, (rssKiB / totalKiB) * 100.0);
+
+        let ioRateBytes = Math.max(0, Number(request.fallbackIoRate || 0));
+
+        if (detailProbePid === pid
+                && detailProbeLastIoBytes >= 0
+                && detailProbeLastMs > 0) {
+            const ioElapsed =
+                Math.max(0.001, (nowMs - detailProbeLastMs) / 1000.0);
+            ioRateBytes =
+                Math.max(0, ioBytes - detailProbeLastIoBytes) / ioElapsed;
+        }
+
+        const ageSeconds =
+            startTicks > 0
+            ? Math.max(0, uptimeSeconds - (startTicks / tickRate))
+            : Math.max(0, Number(request.fallbackAgeSeconds || 0));
+
+        detailProbePid = pid;
+        detailProbeLastTicks = ticks;
+        detailProbeLastIoBytes = ioBytes;
+        detailProbeLastMs = nowMs;
+
+        return {
+            pid: pid,
+            cpuPercent: cpuPercent,
+            memPercent: memPercent,
+            rssKiB: rssKiB,
+            ioRateBytes: ioRateBytes,
+            ageSeconds: ageSeconds
+        };
+    }
+
+    Process {
+        id: detailProbeProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const sample = processTelemetry.parseDetailProbe(text);
+                processTelemetry.detailProbeLoading = false;
+
+                if (sample)
+                    processTelemetry.detailProbeReady(sample);
+                else
+                    processTelemetry.detailProbeRetryRequested();
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                processTelemetry.detailProbeLoading = false;
+                processTelemetry.detailProbeRetryRequested();
+            }
+        }
     }
 
     Process {

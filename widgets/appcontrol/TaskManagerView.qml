@@ -1239,7 +1239,7 @@ Item {
                     property bool isSelected:
                         host.detailFocused
                         && (processController.currentTask !== null)
-                        && host.setDetailActionIndex(== 0
+                        && host.selectedDetailActionIndex === 0
 
                     color:
                         isPressed ? Colors.red
@@ -1294,7 +1294,7 @@ Item {
                         enabled: taskRestartAction.canRestart
                         hoverEnabled: true
                         onEntered: {
-                            host.setKeyboardActive(false));
+                            host.setKeyboardActive(false);
                             host.clearModeRailFocus();
                             host.setDetailFocused(true);
                             host.setDetailActionIndex(0);
@@ -1382,11 +1382,11 @@ Item {
 
                     readonly property bool keyboardSelected:
                         host.detailFocused
-                        && host.setDetailActionIndex(== -2
+                        && host.selectedDetailActionIndex === -2
 
                     function keyboardStep(deltaPercent) {
                         if (!canAdjust)
-                            return);
+                            return;
 
                         const next = Math.max(
                             0,
@@ -1731,7 +1731,7 @@ Item {
                     property bool isSelected:
                         host.detailFocused
                         && (processController.currentTask !== null)
-                        && host.setDetailActionIndex(== 1
+                        && host.selectedDetailActionIndex === 1
                     property bool protectedTask:
                         taskManagerBody.currentTask
                         && processController.requiresDangerUnlock(taskManagerBody.currentTask)
@@ -1833,7 +1833,7 @@ Item {
                         enabled: taskFreezeAction.canFreeze
                         hoverEnabled: true
                         onEntered: {
-                            host.setKeyboardActive(false));
+                            host.setKeyboardActive(false);
                             host.clearModeRailFocus();
                             host.setDetailFocused(true);
                             host.setDetailActionIndex(1);
@@ -1869,7 +1869,7 @@ Item {
                     property bool isSelected:
                         host.detailFocused
                         && (processController.currentTask !== null)
-                        && host.setDetailActionIndex(== 2
+                        && host.selectedDetailActionIndex === 2
                     property bool protectedTask:
                         taskManagerBody.currentTask
                         && processController.requiresDangerUnlock(taskManagerBody.currentTask)
@@ -1982,7 +1982,7 @@ Item {
                         hoverEnabled: true
 
                         onEntered: {
-                            host.setKeyboardActive(false));
+                            host.setKeyboardActive(false);
                             host.clearModeRailFocus();
                             host.setDetailFocused(true);
                             host.setDetailActionIndex(2);

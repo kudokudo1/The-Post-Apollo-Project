@@ -888,6 +888,12 @@ PanelWindow {
         id: processControl
     }
 
+    ProcessLimits {
+        id: processLimits
+
+        onRefreshRequested: taskRefreshAfterKillTimer.restart()
+    }
+
     property alias thermalRows: systemTelemetry.thermalRows
     property alias fanRows: systemTelemetry.fanRows
     property alias systemRows: systemTelemetry.systemRows
@@ -2343,12 +2349,9 @@ PanelWindow {
     // KILL MODE / GLOBAL TASK ACTIONS
     // ============================================================
 
-    property var taskSoftLimitPids: ({})
-    property var taskLimitQueuedRequest: null
-    property var taskLimitActiveRequest: null
-    property bool taskLimitApplyLoading: false
-    property int taskLimitRequestSerial: 0
-    property string taskLimitApplyError: ""
+    property alias taskSoftLimitPids: processLimits.softLimitPids
+    property alias taskLimitApplyLoading: processLimits.applyLoading
+    property alias taskLimitApplyError: processLimits.applyError
 
     function taskProtectedFromKillAll(entry) {
         return taskSafety.protectedFromKillAll(entry);
@@ -3433,147 +3436,38 @@ PanelWindow {
     }
 
     function selectedTaskLimitBytes() {
-        const entry = selectedTask();
-        if (!entry)
-            return 0;
-        return Number(taskSoftLimitPids["pid:" + String(entry.pid || 0)] || 0);
+        return processLimits.limitBytesFor(selectedTask());
     }
 
     function selectedTaskHasSoftLimit() {
-        return selectedTaskLimitBytes() > 0;
+        return processLimits.hasSoftLimit(selectedTask());
     }
 
     function taskLimitMinimumMiB(entry) {
-        if (!entry)
-            return 128;
-        // RLIMIT_AS below current VSZ is immediately hostile to the process.
-        // Keep the slider's low end just above the process's current virtual
-        // footprint; manual input is clamped to the same safety floor.
-        return Math.max(128, Math.ceil(Number(entry.vsz || 0) / 1024) + 64);
+        return processLimits.minimumMiB(entry);
     }
 
     function taskLimitMaximumMiB(entry) {
-        const minimum = taskLimitMinimumMiB(entry);
-        const stored = selectedTaskLimitBytes() / (1024 * 1024);
-        return Math.max(
-            8192,
-            Math.ceil((minimum * 4) / 1024) * 1024,
-            stored > 0 ? Math.ceil((stored * 1.25) / 1024) * 1024 : 0
-        );
+        return processLimits.maximumMiB(entry);
     }
 
     function selectedTaskLimitMiB() {
-        const bytes = selectedTaskLimitBytes();
-        return bytes > 0 ? bytes / (1024 * 1024) : 0;
+        return processLimits.limitMiB(selectedTask());
     }
 
     function selectedTaskLimitPercent() {
-        const entry = selectedTask();
-        if (!entry || !selectedTaskHasSoftLimit())
-            return 100;
-        const minMiB = taskLimitMinimumMiB(entry);
-        const maxMiB = taskLimitMaximumMiB(entry);
-        const current = Math.max(minMiB, Math.min(maxMiB, selectedTaskLimitMiB()));
-        return Math.max(0, Math.min(98.5,
-            ((current - minMiB) / Math.max(1, maxMiB - minMiB)) * 98.5
-        ));
+        return processLimits.limitPercent(selectedTask());
     }
 
     function startQueuedTaskMemoryLimitApply() {
-        if (taskLimitApplyLoading || !taskLimitQueuedRequest)
-            return;
-
-        taskLimitActiveRequest = taskLimitQueuedRequest;
-        taskLimitQueuedRequest = null;
-        taskLimitApplyLoading = true;
-        taskLimitApplyError = "";
-
-        taskLimitApplyProcess.exec([
-            "/usr/bin/python3",
-            "-c",
-            "import json,resource,sys\n"
-            + "pid=int(sys.argv[1]); requested=int(sys.argv[2])\n"
-            + "try:\n"
-            + "    old_soft,hard=resource.prlimit(pid,resource.RLIMIT_AS)\n"
-            + "    target=(hard if hard!=resource.RLIM_INFINITY else resource.RLIM_INFINITY) if requested<=0 else (requested if hard==resource.RLIM_INFINITY else min(requested,hard))\n"
-            + "    resource.prlimit(pid,resource.RLIMIT_AS,(target,hard))\n"
-            + "    soft,hard2=resource.prlimit(pid,resource.RLIMIT_AS)\n"
-            + "    print(json.dumps({'ok':soft==target,'pid':pid,'soft':(-1 if soft==resource.RLIM_INFINITY else int(soft)),'requested':requested}))\n"
-            + "except Exception as exc:\n"
-            + "    print(json.dumps({'ok':False,'pid':pid,'requested':requested,'error':str(exc)}))\n",
-            String(taskLimitActiveRequest.pid),
-            String(taskLimitActiveRequest.capBytes)
-        ]);
+        processLimits.startQueuedApply();
     }
 
-    function consumeTaskMemoryLimitApply(output) {
-        const request = taskLimitActiveRequest;
-        let payload = null;
-        try {
-            payload = JSON.parse(String(output || "{}"));
-        } catch (error) {
-            payload = { ok: false, error: String(error) };
-        }
 
-        const newerQueued = taskLimitQueuedRequest
-                            && request
-                            && Number(taskLimitQueuedRequest.serial || 0)
-                               > Number(request.serial || 0);
-
-        if (request && !newerQueued) {
-            const next = Object.assign({}, taskSoftLimitPids);
-            const key = String(request.key || "");
-
-            if (payload && payload.ok) {
-                if (Number(request.capBytes || 0) <= 0)
-                    delete next[key];
-                else {
-                    const verified = Number(payload.soft || 0);
-                    next[key] = verified > 0
-                                ? verified
-                                : Number(request.capBytes || 0);
-                }
-                taskLimitApplyError = "";
-            } else {
-                const previous = Number(request.previousBytes || 0);
-                if (previous > 0)
-                    next[key] = previous;
-                else
-                    delete next[key];
-                taskLimitApplyError = String(
-                    payload && payload.error
-                    ? payload.error
-                    : "KERNEL MEMORY LIMIT WAS NOT APPLIED"
-                );
-            }
-
-            taskSoftLimitPids = next;
-        }
-
-        taskLimitActiveRequest = null;
-        taskLimitApplyLoading = false;
-        taskRefreshAfterKillTimer.restart();
-        Qt.callLater(function() {
-            appControlWindow.startQueuedTaskMemoryLimitApply();
-        });
-    }
-
-    Process {
-        id: taskLimitApplyProcess
-        stdout: StdioCollector {
-            onStreamFinished: appControlWindow.consumeTaskMemoryLimitApply(text)
-        }
-        stderr: StdioCollector {
-            onStreamFinished: {
-                const message = String(text || "").trim();
-                if (message.length > 0)
-                    appControlWindow.taskLimitApplyError = message;
-            }
-        }
-    }
 
     function setSelectedTaskMemoryLimitMiB(mib) {
         const entry = selectedTask();
+
         if (!entry || Number(entry.pid || 0) <= 1)
             return;
 
@@ -3581,50 +3475,29 @@ PanelWindow {
                 && !taskDangerActionUnlocked(entry, "limit"))
             return;
 
-        const pid = Number(entry.pid || 0);
-        const key = "pid:" + String(pid);
-        const previousBytes = Number(taskSoftLimitPids[key] || 0);
-        const minMiB = taskLimitMinimumMiB(entry);
-        const maxMiB = taskLimitMaximumMiB(entry);
-        const requested = Number(mib);
-        let policyBytes = 0;
-
-        if (isFinite(requested) && requested < maxMiB * 0.995) {
-            const capMiB = Math.max(minMiB, Math.min(maxMiB - 1, requested));
-            policyBytes = Math.floor(capMiB * 1024 * 1024);
-        }
-
-        // Optimistic UI, then verify what the kernel actually accepted.
-        const optimistic = Object.assign({}, taskSoftLimitPids);
-        if (policyBytes > 0)
-            optimistic[key] = policyBytes;
-        else
-            delete optimistic[key];
-        taskSoftLimitPids = optimistic;
-
-        taskLimitRequestSerial += 1;
-        taskLimitQueuedRequest = {
-            serial: taskLimitRequestSerial,
-            pid: pid,
-            key: key,
-            capBytes: policyBytes,
-            previousBytes: previousBytes
-        };
-        startQueuedTaskMemoryLimitApply();
+        processLimits.setLimitMiB(entry, mib);
     }
 
     function setSelectedTaskMemoryLimitPercent(percent) {
         const entry = selectedTask();
+
         if (!entry)
             return;
+
         const pct = Math.max(0, Math.min(100, Number(percent || 0)));
+
         if (pct >= 99.5) {
-            setSelectedTaskMemoryLimitMiB(taskLimitMaximumMiB(entry));
+            setSelectedTaskMemoryLimitMiB(
+                processLimits.maximumMiB(entry)
+            );
             return;
         }
-        const minMiB = taskLimitMinimumMiB(entry);
-        const maxMiB = taskLimitMaximumMiB(entry);
-        const capMiB = minMiB + (maxMiB - minMiB) * (pct / 98.5);
+
+        const minMiB = processLimits.minimumMiB(entry);
+        const maxMiB = processLimits.maximumMiB(entry);
+        const capMiB =
+            minMiB + (maxMiB - minMiB) * (pct / 98.5);
+
         setSelectedTaskMemoryLimitMiB(capMiB);
     }
 

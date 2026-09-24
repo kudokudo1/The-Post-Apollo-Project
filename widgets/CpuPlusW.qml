@@ -65,6 +65,7 @@ PanelWindow {
             id: thermalIconRoot
 
             property color iconColor: Colors.orange
+            property color glowColor: Colors.orange
             property real iconScale: 1.0
             property real glowOpacity: 0.46
             property bool pressed: false
@@ -118,7 +119,7 @@ PanelWindow {
                     samples: 5
 
                     opacity: thermalIconRoot.glowOpacity
-                    color: thermalIconRoot.iconColor
+                    color: thermalIconRoot.glowColor
 
                     transparentBorder: true
                 }
@@ -172,7 +173,7 @@ PanelWindow {
                                 samples: 5
 
                                 opacity: thermalIconRoot.glowOpacity
-                                color: thermalIconRoot.iconColor
+                                color: thermalIconRoot.glowColor
 
                                 transparentBorder: true
                             }
@@ -214,7 +215,7 @@ PanelWindow {
                                 samples: 5
 
                                 opacity: thermalIconRoot.glowOpacity * 0.76
-                                color: thermalIconRoot.iconColor
+                                color: thermalIconRoot.glowColor
 
                                 transparentBorder: true
                             }
@@ -255,7 +256,7 @@ PanelWindow {
                             samples: 5
 
                             opacity: thermalIconRoot.glowOpacity
-                            color: thermalIconRoot.iconColor
+                            color: thermalIconRoot.glowColor
 
                             transparentBorder: true
                         }
@@ -467,6 +468,7 @@ PanelWindow {
                     }
 
                     Column {
+                        width: parent.width
                         anchors.centerIn: parent
 
                         spacing: 1
@@ -530,7 +532,7 @@ PanelWindow {
                                         ? 0.60
                                         : 0.30
 
-                                    color: modeButton.contentColor
+                                    color: Colors.orange
 
                                     transparentBorder: true
                                 }

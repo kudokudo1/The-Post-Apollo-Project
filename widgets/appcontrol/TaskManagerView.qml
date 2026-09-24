@@ -8,6 +8,7 @@ import "../../components"
 
     required property var controller
     required property var presentationState
+    required property var processController
     required property var searchInputTarget
     required property Component safetyLockComponent
 
@@ -31,7 +32,7 @@ import "../../components"
                     && controller.selectedResult() !== null
 
                 property var currentTask:
-                    controller.selectedTask()
+                    processController.currentTask
 
                 GridLayout {
                     id: taskMetricGrid
@@ -47,10 +48,10 @@ import "../../components"
                             if (!task) return [];
 
                             return [
-                                { id: "cpu", label: "CPU", value: Number(task.cpu || 0).toFixed(1) + "%", baseAccent: Colors.orange, critical: controller.taskMetricIsCritical(task, "cpu") },
-                                { id: "mem", label: "MEM", value: Number(task.mem || 0).toFixed(1) + "%", baseAccent: Colors.magenta, critical: controller.taskMetricIsCritical(task, "mem") },
-                                { id: "rss", label: "RSS", value: controller.formatTaskMemory(task.rss), baseAccent: Colors.cyan, critical: controller.taskMetricIsCritical(task, "rss") },
-                                { id: "threads", label: "THREADS", value: String(task.threads || 0), baseAccent: Colors.omnitrix, critical: controller.taskMetricIsCritical(task, "threads") },
+                                { id: "cpu", label: "CPU", value: Number(task.cpu || 0).toFixed(1) + "%", baseAccent: Colors.orange, critical: processController.metricIsCritical(task, "cpu") },
+                                { id: "mem", label: "MEM", value: Number(task.mem || 0).toFixed(1) + "%", baseAccent: Colors.magenta, critical: processController.metricIsCritical(task, "mem") },
+                                { id: "rss", label: "RSS", value: processController.formatMemory(task.rss), baseAccent: Colors.cyan, critical: processController.metricIsCritical(task, "rss") },
+                                { id: "threads", label: "THREADS", value: String(task.threads || 0), baseAccent: Colors.omnitrix, critical: processController.metricIsCritical(task, "threads") },
                                 { id: "pid", label: "PID", value: String(task.pid || "?"), baseAccent: Colors.yellow, critical: false },
                                 { id: "uptime", label: "UPTIME", value: String(task.elapsed || "?"), baseAccent: Colors.white, critical: false }
                             ];
@@ -1157,7 +1158,7 @@ Item {
                             visible:
                                 taskManagerBody.currentTask
                                 && Number(taskManagerBody.currentTask.pid || 0) > 1
-                                && controller.taskRequiresDangerUnlock(
+                                && processController.requiresDangerUnlock(
                                        taskManagerBody.currentTask
                                    )
                             sourceComponent:
@@ -1178,7 +1179,7 @@ Item {
                             visible:
                                 taskManagerBody.currentTask
                                 && Number(taskManagerBody.currentTask.pid || 0) > 1
-                                && controller.taskRequiresDangerUnlock(
+                                && processController.requiresDangerUnlock(
                                        taskManagerBody.currentTask
                                    )
                             sourceComponent:
@@ -1199,7 +1200,7 @@ Item {
                             visible:
                                 taskManagerBody.currentTask
                                 && Number(taskManagerBody.currentTask.pid || 0) > 1
-                                && controller.taskRequiresDangerUnlock(
+                                && processController.requiresDangerUnlock(
                                        taskManagerBody.currentTask
                                    )
                             sourceComponent:
@@ -1225,12 +1226,12 @@ Item {
 
                     property bool protectedTask:
                         taskManagerBody.currentTask
-                        && controller.taskRequiresDangerUnlock(taskManagerBody.currentTask)
+                        && processController.requiresDangerUnlock(taskManagerBody.currentTask)
                     property bool canRestart:
                         taskManagerBody.currentTask
                         && Number(taskManagerBody.currentTask.pid || 0) > 1
                         && (!protectedTask
-                            || controller.taskDangerActionUnlocked(
+                            || processController.dangerActionUnlocked(
                                    taskManagerBody.currentTask, "kill"
                                ))
                     property bool isHovered:
@@ -1303,7 +1304,7 @@ Item {
                         }
                         onClicked: {
                             controller.selectedDetailActionIndex = 0;
-                            controller.restartSelectedTask();
+                            processController.requestRestart();
                         }
                     }
 
@@ -1332,15 +1333,15 @@ Item {
                         currentTask
                         && Number(currentTask.pid || 0) > 1
                         && (
-                            !controller.taskRequiresDangerUnlock(currentTask)
-                            || controller.taskDangerActionUnlocked(
+                            !processController.requiresDangerUnlock(currentTask)
+                            || processController.dangerActionUnlocked(
                                    currentTask, "limit"
                                )
                         )
                     readonly property real activePercent:
                         previewPercent >= 0
                         ? previewPercent
-                        : controller.selectedTaskLimitPercent()
+                        : processController.limitPercent()
                     readonly property real trackStartX:
                         taskLimitValuePlate.x + taskLimitValuePlate.width + 6
                     readonly property real handleWidth: 22
@@ -1365,9 +1366,9 @@ Item {
                             return 0;
                         const pct = Math.max(0, Math.min(100, Number(percent || 0)));
                         if (pct >= 99.5)
-                            return controller.taskLimitMaximumMiB(entry);
-                        const minMiB = controller.taskLimitMinimumMiB(entry);
-                        const maxMiB = controller.taskLimitMaximumMiB(entry);
+                            return processController.limitMaximumMiB(entry);
+                        const minMiB = processController.limitMinimumMiB(entry);
+                        const maxMiB = processController.limitMaximumMiB(entry);
                         return minMiB + (maxMiB - minMiB) * (pct / 98.5);
                     }
 
@@ -1377,9 +1378,9 @@ Item {
                                 return "∞";
                             return String(Math.round(mibForPercent(previewPercent)));
                         }
-                        if (!controller.selectedTaskHasSoftLimit())
+                        if (!processController.hasSoftLimit())
                             return "∞";
-                        return String(Math.round(controller.selectedTaskLimitMiB()));
+                        return String(Math.round(processController.limitMiB()));
                     }
 
                     readonly property bool keyboardSelected:
@@ -1399,8 +1400,8 @@ Item {
                         );
 
                         previewPercent = -1;
-                        controller.setSelectedTaskMemoryLimitPercent(next);
-                        controller.relockTaskDangerAction(
+                        processController.setLimitPercent(next);
+                        processController.relockDangerAction(
                             taskManagerBody.currentTask,
                             "limit"
                         );
@@ -1412,8 +1413,8 @@ Item {
 
                         const value = Number(editText || 0);
                         if (isFinite(value) && value > 0) {
-                            controller.setSelectedTaskMemoryLimitMiB(value);
-                            controller.relockTaskDangerAction(
+                            processController.setLimitMiB(value);
+                            processController.relockDangerAction(
                                 taskManagerBody.currentTask,
                                 "limit"
                             );
@@ -1543,9 +1544,9 @@ Item {
                                         onClicked: {
                                             taskLimitSlider.editingValue = true;
                                             taskLimitSlider.editText =
-                                                controller.selectedTaskHasSoftLimit()
-                                                ? String(Math.round(controller.selectedTaskLimitMiB()))
-                                                : String(Math.round(controller.taskLimitMaximumMiB(taskManagerBody.currentTask)));
+                                                processController.hasSoftLimit()
+                                                ? String(Math.round(processController.limitMiB()))
+                                                : String(Math.round(processController.limitMaximumMiB(taskManagerBody.currentTask)));
                                             taskLimitEditor.text = taskLimitSlider.editText;
                                             taskLimitEditor.forceActiveFocus();
                                             taskLimitEditor.selectAll();
@@ -1567,7 +1568,7 @@ Item {
                                     selectByMouse: true
                                     validator: IntValidator {
                                         bottom: 1
-                                        top: Math.max(1, Math.floor(controller.taskLimitMaximumMiB(taskManagerBody.currentTask)))
+                                        top: Math.max(1, Math.floor(processController.limitMaximumMiB(taskManagerBody.currentTask)))
                                     }
 
                                 function returnToLimitNavigation(moveDirection) {
@@ -1590,9 +1591,9 @@ Item {
                                     if (activeFocus) {
                                         taskLimitSlider.editingValue = true;
                                         taskLimitSlider.editText =
-                                            controller.selectedTaskHasSoftLimit()
-                                            ? String(Math.round(controller.selectedTaskLimitMiB()))
-                                            : String(Math.round(controller.taskLimitMaximumMiB(taskManagerBody.currentTask)));
+                                            processController.hasSoftLimit()
+                                            ? String(Math.round(processController.limitMiB()))
+                                            : String(Math.round(processController.limitMaximumMiB(taskManagerBody.currentTask)));
                                         selectAll();
                                     } else {
                                         taskLimitSlider.commitEditorValue();
@@ -1689,8 +1690,8 @@ Item {
                         }
                         onReleased: function(mouse) {
                             if (taskLimitSlider.previewPercent >= 0) {
-                                controller.setSelectedTaskMemoryLimitPercent(taskLimitSlider.previewPercent);
-                                controller.relockTaskDangerAction(taskManagerBody.currentTask, "limit");
+                                processController.setLimitPercent(taskLimitSlider.previewPercent);
+                                processController.relockDangerAction(taskManagerBody.currentTask, "limit");
                             }
                             taskLimitSlider.previewPercent = -1;
                             dragOffsetX = 0;
@@ -1702,8 +1703,8 @@ Item {
                             const next = Math.max(0, Math.min(100,
                                 taskLimitSlider.activePercent + (delta >= 0 ? 2 : -2)
                             ));
-                            controller.setSelectedTaskMemoryLimitPercent(next);
-                            controller.relockTaskDangerAction(taskManagerBody.currentTask, "limit");
+                            processController.setLimitPercent(next);
+                            processController.relockDangerAction(taskManagerBody.currentTask, "limit");
                             wheel.accepted = true;
                         }
                     }
@@ -1736,12 +1737,12 @@ Item {
                         && controller.selectedDetailActionIndex === 1
                     property bool protectedTask:
                         taskManagerBody.currentTask
-                        && controller.taskRequiresDangerUnlock(taskManagerBody.currentTask)
+                        && processController.requiresDangerUnlock(taskManagerBody.currentTask)
                     property bool taskUnlocked:
                         taskManagerBody.currentTask
                         && (
                             !protectedTask
-                            || controller.taskDangerActionUnlocked(
+                            || processController.dangerActionUnlocked(
                                    taskManagerBody.currentTask, "freeze"
                                )
                         )
@@ -1767,7 +1768,7 @@ Item {
                         GohuText {
                             visible:
                                 taskFreezeAction.protectedTask
-                                && !controller.selectedTaskIsFrozen()
+                                && !processController.isFrozen()
                             text: "⚠︎"
                             height: parent.height
                             verticalAlignment: Text.AlignVCenter
@@ -1786,13 +1787,13 @@ Item {
                         }
                         GohuText {
                             text:
-                                controller.selectedTaskIsFrozen()
+                                processController.isFrozen()
                                 ? "⋆˙♨⋆˚."
                                 : "₊°｡❆ ๋࣭⭑"
                             height: parent.height
                             verticalAlignment: Text.AlignVCenter
                             font.pixelSize:
-                                controller.selectedTaskIsFrozen() ? 17 : 28
+                                processController.isFrozen() ? 17 : 28
                             color: taskFreezeAction.isPressed ? Colors.black
                                    : taskFreezeAction.isHovered ? Colors.cyan
                                    : Colors.white
@@ -1807,7 +1808,7 @@ Item {
                         }
                         GohuText {
                             text:
-                                controller.selectedTaskIsFrozen()
+                                processController.isFrozen()
                                 ? "THAW PROCESS"
                                 : !taskFreezeAction.taskUnlocked
                                 ? "LOCKED • FREEZE PROCESS"
@@ -1842,7 +1843,7 @@ Item {
                         }
                         onClicked: {
                             controller.selectedDetailActionIndex = 1;
-                            controller.toggleSelectedTaskFreeze();
+                            processController.toggleFreeze();
                         }
                     }
 
@@ -1874,12 +1875,12 @@ Item {
                         && controller.selectedDetailActionIndex === 2
                     property bool protectedTask:
                         taskManagerBody.currentTask
-                        && controller.taskRequiresDangerUnlock(taskManagerBody.currentTask)
+                        && processController.requiresDangerUnlock(taskManagerBody.currentTask)
                     property bool taskUnlocked:
                         taskManagerBody.currentTask
                         && (
                             !protectedTask
-                            || controller.taskDangerActionUnlocked(
+                            || processController.dangerActionUnlocked(
                                    taskManagerBody.currentTask, "kill"
                                )
                         )
@@ -1992,7 +1993,7 @@ Item {
 
                         onClicked: {
                             controller.selectedDetailActionIndex = 2;
-                            controller.terminateSelectedTask();
+                            processController.requestTerminate();
                         }
                     }
 
@@ -2062,7 +2063,7 @@ Item {
                         GohuText {
                             id: taskProcessScopeText
                             width: taskProcessScopeFlick.width
-                            text: controller.selectedTaskScopeProcessText()
+                            text: processController.scopeProcessText()
                             font.pixelSize: 11
                             color: Colors.white
                             opacity: 0.86
@@ -2273,7 +2274,7 @@ Item {
                         Layout.fillWidth: true
                         text:
                             taskManagerBody.currentTask
-                            ? controller.formatTaskMemory(
+                            ? processController.formatMemory(
                                   taskManagerBody.currentTask.vsz
                               )
                             : "?"

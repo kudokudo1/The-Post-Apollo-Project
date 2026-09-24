@@ -903,6 +903,38 @@ PanelWindow {
         onRefreshRequested: taskRefreshAfterKillTimer.restart()
     }
 
+    ProcessPresentationController {
+        id: processPresentationController
+
+        safetyService: taskSafety
+        limitsService: processLimits
+        controlService: processControl
+        currentTask: appControlWindow.selectedTask()
+        taskRows: appControlWindow.taskRows
+
+        onConfirmationRequested: function(
+            kind,
+            title,
+            message,
+            actionLabel,
+            targetPids,
+            targetName
+        ) {
+            appControlWindow.openDestructiveConfirm(
+                kind,
+                title,
+                message,
+                actionLabel
+            );
+            appControlWindow.destructiveConfirmTargetPids =
+                Array.isArray(targetPids) ? targetPids.slice() : [];
+            appControlWindow.destructiveConfirmTargetName =
+                String(targetName || "");
+        }
+
+        onRefreshRequested: taskRefreshAfterKillTimer.restart()
+    }
+
     HunterExecutor {
         id: hunterExecutor
 
@@ -1261,7 +1293,7 @@ PanelWindow {
     // excluded there even while a row is manually unlocked.
     // Optimistic STOP/CONT state makes the FREEZE button react immediately;
     // the live task snapshot remains the authority after this short window.
-    property var taskFrozenOptimistic: ({})
+    property alias taskFrozenOptimistic: processPresentationController.frozenOptimistic
 
     // HUNTER bulk actions are deliberately single-flight. A captured target is
     // sent SIGTERM at most once; repeated button presses only reopen the same
@@ -1981,15 +2013,7 @@ PanelWindow {
     }
 
     function formatTaskMemory(kib) {
-        const value = Number(kib || 0);
-
-        if (value >= 1048576)
-            return (value / 1048576).toFixed(1) + " GiB";
-
-        if (value >= 1024)
-            return (value / 1024).toFixed(1) + " MiB";
-
-        return Math.round(value) + " KiB";
+        return processPresentationController.formatMemory(kib);
     }
 
     function clearTaskDetailHistory() {
@@ -2360,10 +2384,7 @@ PanelWindow {
             return;
         processControl.sendSignal(entry.pid, signalName);
         if (signalName === "-STOP") {
-            const optimistic = Object.assign({}, taskFrozenOptimistic);
-            optimistic["pid:" + String(entry.pid)] = true;
-            taskFrozenOptimistic = optimistic;
-            taskFreezeOptimisticReset.restart();
+            processPresentationController.markFrozen(entry, true);
             relockTaskDangerAction(entry, "freeze");
         } else {
             relockTaskDangerAction(entry, "kill");
@@ -3242,65 +3263,11 @@ PanelWindow {
     }
 
     function selectedTaskIsFrozen() {
-        const entry = selectedTask();
-        if (!entry)
-            return false;
-        const key = "pid:" + String(Number(entry.pid || 0));
-        if (taskFrozenOptimistic[key] !== undefined)
-            return !!taskFrozenOptimistic[key];
-        return String(entry.state || "").indexOf("T") !== -1;
+        return processPresentationController.isFrozen();
     }
 
     function toggleSelectedTaskFreeze() {
-        const entry = selectedTask();
-        if (!entry || Number(entry.pid || 0) <= 1)
-            return;
-
-        const frozen = selectedTaskIsFrozen();
-
-        // Only session-critical targets need a safety unlock. Ordinary
-        // processes stay directly controllable.
-        const protectedTask = taskRequiresDangerUnlock(entry);
-        if (protectedTask && !taskDangerActionUnlocked(entry, "freeze"))
-            return;
-
-        if (frozen) {
-            const optimistic = Object.assign({}, taskFrozenOptimistic);
-            optimistic["pid:" + String(entry.pid)] = false;
-            taskFrozenOptimistic = optimistic;
-            taskFreezeOptimisticReset.restart();
-            processControl.sendSignal(entry.pid, "-CONT");
-            relockTaskDangerAction(entry, "freeze");
-            taskRefreshAfterKillTimer.restart();
-            return;
-        }
-
-        openDestructiveConfirm(
-            protectedTask ? "protected-freeze" : "task-freeze",
-            protectedTask
-            ? "⚠︎ PROTECTED PROCESS • FREEZE ⚠︎"
-            : "CONFIRM PROCESS FREEZE",
-            String(entry.comm || entry.name || "PROCESS")
-            + "  [PID " + String(entry.pid) + "]\n\n"
-            + (protectedTask
-               ? taskDangerReason(entry)
-                 + "\n\nFREEZING A SESSION-CRITICAL PROCESS CAN MAKE THE DESKTOP "
-                 + "UNRESPONSIVE OR REMOVE THE CONTROLS NEEDED TO RESUME IT.\n\n"
-               : "FREEZING STOPS THIS PROCESS FROM EXECUTING UNTIL IT IS RESUMED.\n\n")
-            + (protectedTask
-               ? "THE FREEZE ACTION IS UNLOCKED FOR THIS TARGET. CONFIRM FREEZE?"
-               : "CONFIRM FREEZE?"),
-            "FREEZE"
-        );
-        destructiveConfirmTargetPids = [Number(entry.pid)];
-        destructiveConfirmTargetName = String(entry.comm || entry.name || "").trim();
-    }
-
-    Timer {
-        id: taskFreezeOptimisticReset
-        interval: 1400
-        repeat: false
-        onTriggered: appControlWindow.taskFrozenOptimistic = ({})
+        processPresentationController.toggleFreeze();
     }
 
     function selectedTaskLimitBytes() {
@@ -3308,23 +3275,23 @@ PanelWindow {
     }
 
     function selectedTaskHasSoftLimit() {
-        return processLimits.hasSoftLimit(selectedTask());
+        return processPresentationController.hasSoftLimit();
     }
 
     function taskLimitMinimumMiB(entry) {
-        return processLimits.minimumMiB(entry);
+        return processPresentationController.limitMinimumMiB(entry);
     }
 
     function taskLimitMaximumMiB(entry) {
-        return processLimits.maximumMiB(entry);
+        return processPresentationController.limitMaximumMiB(entry);
     }
 
     function selectedTaskLimitMiB() {
-        return processLimits.limitMiB(selectedTask());
+        return processPresentationController.limitMiB();
     }
 
     function selectedTaskLimitPercent() {
-        return processLimits.limitPercent(selectedTask());
+        return processPresentationController.limitPercent();
     }
 
     function startQueuedTaskMemoryLimitApply() {
@@ -3334,70 +3301,15 @@ PanelWindow {
 
 
     function setSelectedTaskMemoryLimitMiB(mib) {
-        const entry = selectedTask();
-
-        if (!entry || Number(entry.pid || 0) <= 1)
-            return;
-
-        if (taskRequiresDangerUnlock(entry)
-                && !taskDangerActionUnlocked(entry, "limit"))
-            return;
-
-        processLimits.setLimitMiB(entry, mib);
+        processPresentationController.setLimitMiB(mib);
     }
 
     function setSelectedTaskMemoryLimitPercent(percent) {
-        const entry = selectedTask();
-
-        if (!entry)
-            return;
-
-        const pct = Math.max(0, Math.min(100, Number(percent || 0)));
-
-        if (pct >= 99.5) {
-            setSelectedTaskMemoryLimitMiB(
-                processLimits.maximumMiB(entry)
-            );
-            return;
-        }
-
-        const minMiB = processLimits.minimumMiB(entry);
-        const maxMiB = processLimits.maximumMiB(entry);
-        const capMiB =
-            minMiB + (maxMiB - minMiB) * (pct / 98.5);
-
-        setSelectedTaskMemoryLimitMiB(capMiB);
+        processPresentationController.setLimitPercent(percent);
     }
 
     function terminateSelectedTask() {
-        const entry = selectedTask();
-
-        if (!entry || Number(entry.pid || 0) <= 1)
-            return;
-
-        const protectedTask = taskRequiresDangerUnlock(entry);
-        if (protectedTask && !taskDangerActionUnlocked(entry, "kill"))
-            return;
-
-        openDestructiveConfirm(
-            protectedTask ? "protected-term" : "task-term",
-            protectedTask
-            ? "⚠︎ PROTECTED PROCESS • TERMINATE ⚠︎"
-            : "CONFIRM PROCESS TERMINATION",
-            String(entry.comm || entry.name || "PROCESS")
-            + "  [PID " + String(entry.pid) + "]\n\n"
-            + (protectedTask
-               ? taskDangerReason(entry)
-                 + "\n\nTERMINATING THIS PROCESS CAN END OR DESTABILIZE THE CURRENT "
-                 + "DESKTOP SESSION.\n\n"
-               : "THIS SENDS SIGTERM TO ONLY THE CAPTURED PROCESS TARGET.\n\n")
-            + (protectedTask
-               ? "THE KILL ACTION IS UNLOCKED FOR THIS TARGET. CONFIRM SIGTERM?"
-               : "CONFIRM SIGTERM?"),
-            "END PROCESS"
-        );
-        destructiveConfirmTargetPids = [Number(entry.pid)];
-        destructiveConfirmTargetName = String(entry.comm || entry.name || "").trim();
+        processPresentationController.requestTerminate();
     }
 
 
@@ -3418,29 +3330,7 @@ PanelWindow {
     }
 
     function restartSelectedTask() {
-        const entry = selectedTask();
-        if (!entry || Number(entry.pid || 0) <= 1)
-            return;
-
-        const protectedTask = taskRequiresDangerUnlock(entry);
-        if (protectedTask && !taskDangerActionUnlocked(entry, "kill"))
-            return;
-
-        openDestructiveConfirm(
-            protectedTask ? "protected-restart" : "task-restart",
-            protectedTask
-            ? "⚠︎ PROTECTED PROCESS • RESTART ⚠︎"
-            : "CONFIRM PROCESS RESTART",
-            String(entry.comm || entry.name || "PROCESS")
-            + "  [PID " + String(entry.pid) + "]\n\n"
-            + "THIS TERMINATES THE CAPTURED PROCESS, THEN RELAUNCHES ITS ORIGINAL /proc CMDLINE.\n\n"
-            + (protectedTask
-               ? taskDangerReason(entry) + "\n\nTHE KILL ACTION IS UNLOCKED FOR THIS TARGET. CONFIRM RESTART?"
-               : "CONFIRM RESTART?"),
-            "RESTART PROCESS"
-        );
-        destructiveConfirmTargetPids = [Number(entry.pid)];
-        destructiveConfirmTargetName = String(entry.comm || entry.name || "").trim();
+        processPresentationController.requestRestart();
     }
 
     function taskMiniProbeNeeded() {
@@ -7460,14 +7350,7 @@ PanelWindow {
     }
 
     function taskMetricIsCritical(entry, metricId) {
-        if (!entry) return false;
-        switch (String(metricId || "")) {
-        case "cpu": return Number(entry.cpu || 0) >= 80;
-        case "mem": return Number(entry.mem || 0) >= 80;
-        case "rss": return Number(entry.mem || 0) >= 80;
-        case "threads": return Number(entry.threads || 0) >= 256;
-        default: return false;
-        }
+        return processPresentationController.metricIsCritical(entry, metricId);
     }
 
     function taskMetricDisplayValue(entry, metricId) {
@@ -11097,38 +10980,7 @@ PanelWindow {
     }
 
     function selectedTaskScopeProcessText() {
-        const entry = selectedTask();
-        if (!entry)
-            return "NO LIVE PROCESS SCOPE FOUND";
-
-        const pid = Number(entry.pid || 0);
-        const rows = taskTreeRowsForRoots([pid]);
-        const lines = [];
-        const parent = taskRowForPid(Number(entry.ppid || 0));
-
-        if (parent)
-            lines.push("↑ PARENT • "
-                       + String(parent.comm || parent.name || "PROCESS")
-                       + " [" + String(parent.pid) + "] • NOT CHANGED");
-
-        rows.sort(function(a, b) {
-            if (Number(a.pid || 0) === pid) return -1;
-            if (Number(b.pid || 0) === pid) return 1;
-            return Number(a.pid || 0) - Number(b.pid || 0);
-        });
-
-        for (let i = 0; i < rows.length; i++) {
-            const row = rows[i];
-            const root = Number(row.pid || 0) === pid;
-            lines.push((root ? "● PROCESS • " : "↳ CHILD • ")
-                       + String(row.comm || row.name || "PROCESS")
-                       + " [" + String(row.pid) + "]"
-                       + (root ? " • LIMIT/FREEZE/KILL TARGET"
-                               : " • PROCESS TREE"));
-        }
-
-        return lines.length > 0 ? lines.join("\n")
-                                : "NO LIVE PROCESS SCOPE FOUND";
+        return processPresentationController.scopeProcessText();
     }
 
     function selectedResourceScopeContainsProtected() {
@@ -24088,6 +23940,7 @@ PanelWindow {
                 id: taskManagerBody
                 controller: appControlWindow
                 presentationState: processPresentationState
+                processController: processPresentationController
                 searchInputTarget: searchInput
                 safetyLockComponent: taskActionSafetyLockComponent
             }

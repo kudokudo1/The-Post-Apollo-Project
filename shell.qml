@@ -180,7 +180,21 @@ PanelWindow {
 
         // CPU
 
-        Cpu {}
+        Item {
+            width: cpuButton.implicitWidth
+            height: cpuButton.implicitHeight
+
+            Cpu {
+                id: cpuButton
+                anchors.fill: parent
+                cpuPlusWindow: cpuPlusWindow
+            }
+
+            CpuPlusW {
+                id: cpuPlusWindow
+                screen: Quickshell.screens.find(s => s.name === "DP-5")
+            }
+        }
 
         // Weather
 

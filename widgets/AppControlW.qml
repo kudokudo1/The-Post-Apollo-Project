@@ -880,6 +880,10 @@ PanelWindow {
         }
     }
 
+    TaskSafety {
+        id: taskSafety
+    }
+
     property alias thermalRows: systemTelemetry.thermalRows
     property alias fanRows: systemTelemetry.fanRows
     property alias systemRows: systemTelemetry.systemRows
@@ -1222,10 +1226,6 @@ PanelWindow {
     //              clicked again or this in-memory QML state is reset.
     // Bulk HUNTER/KILL ALL never consult this override: protected tasks remain
     // excluded there even while a row is manually unlocked.
-    property var taskDangerUnlockedKeys: ({})
-    // Per-action protected-process locks. The magenta master lock in the
-    // PROCESS STATE header unlocks LIMIT / FREEZE / KILL together.
-    property var taskDangerActionUnlockedKeys: ({})
     // Optimistic STOP/CONT state makes the FREEZE button react immediately;
     // the live task snapshot remains the authority after this short window.
     property var taskFrozenOptimistic: ({})
@@ -2347,218 +2347,75 @@ PanelWindow {
     property string taskLimitApplyError: ""
 
     function taskProtectedFromKillAll(entry) {
-        if (!entry)
-            return true;
-
-        const name = String(entry.comm || entry.name || "")
-                     .trim().toLowerCase();
-        const protectedNames = [
-            "quickshell", "sway", "systemd", "dbus-broker",
-            "pipewire", "pipewire-pulse", "wireplumber",
-            "xdg-desktop-portal", "xdg-document-portal",
-            "xdg-permission-store", "at-spi-bus-launcher",
-            "at-spi2-registryd", "gpg-agent", "ssh-agent"
-        ];
-
-        return protectedNames.indexOf(name) !== -1;
+        return taskSafety.protectedFromKillAll(entry);
     }
 
     function taskDangerKey(entry) {
-        if (!entry)
-            return "";
-        const pid = Number(entry.pid || 0);
-        const name = String(entry.comm || entry.name || "PROCESS")
-                     .trim().toLowerCase();
-        const user = String(entry.user || "").trim().toLowerCase();
-        return pid > 1
-               ? ("pid:" + String(pid) + ":" + name + ":" + user)
-               : "";
+        return taskSafety.dangerKey(entry);
     }
 
     function taskDangerReason(entry) {
-        if (!entry)
-            return "";
-
-        const name = String(entry.comm || entry.name || "")
-                     .trim().toLowerCase();
-        if (name === "sway")
-            return "SWAY COMPOSITOR • FREEZING IT CAN LOCK THE DESKTOP, INPUT AND APPCONTROL";
-        if (name === "quickshell")
-            return "QUICKSHELL HOST • FREEZING IT CAN REMOVE THE APPCONTROL RESUME PATH";
-        if (name === "pipewire" || name === "pipewire-pulse" || name === "wireplumber")
-            return "CORE AUDIO SESSION SERVICE • STOPPING IT CAN BREAK DESKTOP AUDIO";
-        if (name === "dbus-broker")
-            return "SESSION MESSAGE BUS • STOPPING IT CAN BREAK DESKTOP IPC";
-        if (name === "systemd")
-            return "USER/SESSION SERVICE MANAGER • STOPPING IT CAN DESTABILIZE THE SESSION";
-        if (name.indexOf("xdg-desktop-portal") === 0
-                || name === "xdg-document-portal"
-                || name === "xdg-permission-store")
-            return "DESKTOP PORTAL SERVICE • STOPPING IT CAN BREAK FILE/APP INTEGRATION";
-        if (name.indexOf("at-spi") === 0)
-            return "ACCESSIBILITY SESSION SERVICE • APPCONTROL TABS MAY DEPEND ON IT";
-        if (name === "gpg-agent" || name === "ssh-agent")
-            return "SESSION AUTHENTICATION AGENT • STOPPING IT CAN BREAK ACTIVE AUTH FLOWS";
-
-        return taskProtectedFromKillAll(entry)
-               ? "SESSION-CRITICAL PROCESS" : "";
+        return taskSafety.dangerReason(entry);
     }
 
     function taskRequiresDangerUnlock(entry) {
-        return taskDangerReason(entry).length > 0;
+        return taskSafety.requiresDangerUnlock(entry);
     }
 
     function taskDangerUnlockMode(entry) {
-        // Lock state is target-scoped for every concrete process. Protection
-        // classification is separate and is still used for stronger warnings.
-        const key = taskDangerKey(entry);
-        if (!key)
-            return "";
-        const value = String(taskDangerUnlockedKeys[key] || "");
-        return value === "sticky" ? "sticky"
-             : value === "once" ? "once"
-             : "";
+        return taskSafety.dangerUnlockMode(entry);
     }
 
     function taskDangerUnlocked(entry) {
-        const mode = taskDangerUnlockMode(entry);
-        return mode === "once" || mode === "sticky";
+        return taskSafety.dangerUnlocked(entry);
     }
 
     function taskDangerStickyUnlocked(entry) {
-        return taskDangerUnlockMode(entry) === "sticky";
+        return taskSafety.dangerStickyUnlocked(entry);
     }
 
     function taskDangerActionKey(entry, actionKind) {
-        const base = taskDangerKey(entry);
-        const action = String(actionKind || "").trim().toLowerCase();
-        return base && action ? base + "|action:" + action : "";
+        return taskSafety.dangerActionKey(entry, actionKind);
     }
 
     function taskDangerActionUnlockMode(entry, actionKind) {
-        const master = taskDangerUnlockMode(entry);
-        if (master === "once" || master === "sticky")
-            return master;
-
-        const key = taskDangerActionKey(entry, actionKind);
-        if (!key)
-            return "";
-        const value = String(taskDangerActionUnlockedKeys[key] || "");
-        return value === "sticky" ? "sticky"
-             : value === "once" ? "once"
-             : "";
+        return taskSafety.dangerActionUnlockMode(entry, actionKind);
     }
 
     function taskDangerActionUnlocked(entry, actionKind) {
-        const mode = taskDangerActionUnlockMode(entry, actionKind);
-        return mode === "once" || mode === "sticky";
+        return taskSafety.dangerActionUnlocked(entry, actionKind);
     }
 
     function taskDangerActionStickyUnlocked(entry, actionKind) {
-        return taskDangerActionUnlockMode(entry, actionKind) === "sticky";
+        return taskSafety.dangerActionStickyUnlocked(entry, actionKind);
     }
 
     function clearTaskDangerActionUnlocks(entry) {
-        const base = taskDangerKey(entry);
-        if (!base)
-            return;
-        const prefix = base + "|action:";
-        const next = Object.assign({}, taskDangerActionUnlockedKeys);
-        let changed = false;
-        const keys = Object.keys(next);
-        for (let i = 0; i < keys.length; i++) {
-            if (String(keys[i]).indexOf(prefix) === 0) {
-                delete next[keys[i]];
-                changed = true;
-            }
-        }
-        if (changed)
-            taskDangerActionUnlockedKeys = next;
+        taskSafety.clearDangerActionUnlocks(entry);
     }
 
     function toggleTaskDangerActionUnlock(entry, actionKind) {
-        if (!entry || Number(entry.pid || 0) <= 1 || taskDangerUnlocked(entry))
-            return;
-        const key = taskDangerActionKey(entry, actionKind);
-        if (!key)
-            return;
-        const next = Object.assign({}, taskDangerActionUnlockedKeys);
-        if (next[key])
-            delete next[key];
-        else
-            next[key] = "once";
-        taskDangerActionUnlockedKeys = next;
+        taskSafety.toggleDangerActionUnlock(entry, actionKind);
     }
 
     function toggleTaskDangerActionStickyUnlock(entry, actionKind) {
-        if (!entry || Number(entry.pid || 0) <= 1 || taskDangerUnlocked(entry))
-            return;
-        const key = taskDangerActionKey(entry, actionKind);
-        if (!key)
-            return;
-        const next = Object.assign({}, taskDangerActionUnlockedKeys);
-        if (String(next[key] || "") === "sticky")
-            delete next[key];
-        else
-            next[key] = "sticky";
-        taskDangerActionUnlockedKeys = next;
+        taskSafety.toggleDangerActionStickyUnlock(entry, actionKind);
     }
 
     function relockTaskDangerAction(entry, actionKind) {
-        const key = taskDangerActionKey(entry, actionKind);
-        if (key && String(taskDangerActionUnlockedKeys[key] || "") === "once") {
-            const next = Object.assign({}, taskDangerActionUnlockedKeys);
-            delete next[key];
-            taskDangerActionUnlockedKeys = next;
-        }
-        relockTaskDanger(entry);
+        taskSafety.relockDangerAction(entry, actionKind);
     }
 
-    // Left click: one-shot unlock. Clicking any already-unlocked lock closes it.
     function toggleTaskDangerUnlock(entry) {
-        if (!entry || Number(entry.pid || 0) <= 1)
-            return;
-        const key = taskDangerKey(entry);
-        if (!key)
-            return;
-        const next = Object.assign({}, taskDangerUnlockedKeys);
-        if (next[key]) {
-            delete next[key];
-            clearTaskDangerActionUnlocks(entry);
-        } else {
-            next[key] = "once";
-        }
-        taskDangerUnlockedKeys = next;
+        taskSafety.toggleDangerUnlock(entry);
     }
 
-    // Right click: persistent/sticky unlock. It survives menu close/reopen and
-    // normal selection changes because it is held in QML memory, but disappears
-    // naturally when Quickshell/config state is reset. Right-click again locks.
     function toggleTaskDangerStickyUnlock(entry) {
-        if (!entry || Number(entry.pid || 0) <= 1)
-            return;
-        const key = taskDangerKey(entry);
-        if (!key)
-            return;
-        const next = Object.assign({}, taskDangerUnlockedKeys);
-        if (String(next[key] || "") === "sticky") {
-            delete next[key];
-            clearTaskDangerActionUnlocks(entry);
-        } else {
-            next[key] = "sticky";
-        }
-        taskDangerUnlockedKeys = next;
+        taskSafety.toggleDangerStickyUnlock(entry);
     }
 
-    // Automatic re-lock only consumes a one-shot unlock. Sticky unlocks are
-    // intentionally left alone until the user explicitly toggles them off.
     function relockTaskDanger(entry) {
-        const key = taskDangerKey(entry);
-        if (!key || String(taskDangerUnlockedKeys[key] || "") !== "once")
-            return;
-        const next = Object.assign({}, taskDangerUnlockedKeys);
-        delete next[key];
-        taskDangerUnlockedKeys = next;
+        taskSafety.relockDanger(entry);
     }
 
     function taskEntryForCapturedIdentity(pid, expectedName) {

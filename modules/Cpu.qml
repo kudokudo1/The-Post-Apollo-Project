@@ -7,6 +7,8 @@ import Qt5Compat.GraphicalEffects
 Rectangle {
     id: cpuDock
 
+    property var cpuPlusWindow
+
     implicitHeight: 50
     implicitWidth: 70
 
@@ -62,11 +64,12 @@ Rectangle {
 
         onClicked: function (mouse) {
             if (mouse.button === Qt.LeftButton) {
-                // Left-click function
+                if (cpuDock.cpuPlusWindow)
+                    cpuDock.cpuPlusWindow.toggle();
             }
 
             if (mouse.button === Qt.RightButton) {
-                // Right-click function
+                // Reserved for a future CPU++ quick action.
             }
         }
     }

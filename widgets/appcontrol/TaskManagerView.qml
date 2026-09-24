@@ -9,6 +9,8 @@ import "../../components"
     required property var controller
     required property var presentationState
     required property var processController
+    required property var graphGeometry
+    required property var hunterGraph
     required property var searchInputTarget
     required property Component safetyLockComponent
 
@@ -176,23 +178,23 @@ import "../../components"
                            === controller.killViewHunter
                     readonly property bool combiView:
                         hunterMetricView
-                        && controller.hunterMetricMode
-                           === controller.hunterMetricCombined
+                        && hunterGraph.metricMode
+                           === hunterGraph.metricCombined
                     readonly property color accent:
                         hunterMetricView
-                        ? controller.hunterMetricAccent()
+                        ? hunterGraph.metricAccent()
                         : Colors.orange
                     readonly property var historyValues: {
                         const miniRevision = presentationState.taskMiniHistoryRevision;
                         const detailRevision =
                             presentationState.taskHunterDetailHistoryRevision;
                         if (hunterMetricView)
-                            return controller.hunterDetailHistory();
+                            return hunterGraph.detailHistory();
                         return presentationState.taskCpuHistory;
                     }
                     readonly property real graphRange:
                         hunterMetricView
-                        ? controller.hunterMetricGraphRange()
+                        ? hunterGraph.metricGraphRange()
                         : 5.0
 
                     GohuText {
@@ -204,9 +206,9 @@ import "../../components"
                         text:
                             taskCpuGraph.hunterMetricView
                             ? "HUNTER "
-                              + controller.hunterMetricGraphLabel()
+                              + hunterGraph.metricGraphLabel()
                               + " HISTORY  "
-                              + controller.hunterMetricGraphValue(
+                              + hunterGraph.metricGraphValue(
                                     taskManagerBody.currentTask
                                 )
                             : "CPU HISTORY  "
@@ -238,7 +240,7 @@ import "../../components"
                         spacing: 0
 
                         GohuText {
-                            text: "HUNTER " + controller.hunterCombiIcon + " HISTORY  •  "
+                            text: "HUNTER " + hunterGraph.combiIcon + " HISTORY  •  "
                             font.pixelSize: 12
                             color: Colors.yellow
                             layer.enabled: true
@@ -403,7 +405,7 @@ import "../../components"
                             const revision = graphRevision;
                             if (taskCpuGraph.combiView)
                                 return [];
-                            return controller.graphLinePoints(
+                            return graphGeometry.linePoints(
                                 taskCpuGraph.historyValues,
                                 width,
                                 height,
@@ -480,16 +482,16 @@ import "../../components"
                                     );
                                 }
                                 readonly property var metricDisplayHistory:
-                                    controller.graphDownsampleHistory(
+                                    graphGeometry.downsampleHistory(
                                         metricHistory,
                                         presentationState.taskCombiRenderPointLimit
                                     )
                                 readonly property var metricPoints:
-                                    controller.graphLinePoints(
+                                    graphGeometry.linePoints(
                                         metricDisplayHistory,
                                         width,
                                         height,
-                                        controller.hunterMetricRangeForKey(
+                                        hunterGraph.metricRangeForKey(
                                             modelData.metric
                                         ),
                                         presentationState.taskCombiRenderPointLimit,
@@ -683,7 +685,7 @@ import "../../components"
                         return Array.isArray(values) ? values : [];
                     }
                     readonly property var displayHistory:
-                        controller.graphDownsampleHistory(
+                        graphGeometry.downsampleHistory(
                             historyValues,
                             presentationState.taskCombiRenderPointLimit
                         )
@@ -694,9 +696,9 @@ import "../../components"
                         anchors.top: parent.top
 
                         text:
-                            controller.hunterCombiIcon
+                            hunterGraph.combiIcon
                             + "  COMBINED SCORE HISTORY  "
-                            + controller.hunterMetricGraphValue(
+                            + hunterGraph.metricGraphValue(
                                   taskManagerBody.currentTask
                               )
 
@@ -795,7 +797,7 @@ import "../../components"
                         readonly property var graphPoints: {
                             const revision =
                                 presentationState.taskHunterDetailHistoryRevision;
-                            return controller.graphLinePoints(
+                            return graphGeometry.linePoints(
                                 taskCombiScoreGraph.displayHistory,
                                 width,
                                 height,
@@ -1017,7 +1019,7 @@ import "../../components"
 
                         readonly property var graphPoints: {
                             const revision = graphRevision;
-                            return controller.graphLinePoints(
+                            return graphGeometry.linePoints(
                                 presentationState.taskMemHistory,
                                 width,
                                 height,

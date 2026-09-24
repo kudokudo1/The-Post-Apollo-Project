@@ -865,6 +865,13 @@ PanelWindow {
         id: processPresentationState
     }
 
+    HunterPresentation {
+        id: hunterPresentation
+
+        presentationState: processPresentationState
+        metricMode: appControlWindow.hunterMetricMode
+    }
+
     ProcessTelemetry {
         id: processTelemetry
 
@@ -1836,17 +1843,11 @@ PanelWindow {
     }
 
     function hunterDetailMetricKey() {
-        if (hunterMetricMode === hunterMetricCpu) return "cpu";
-        if (hunterMetricMode === hunterMetricMemory) return "mem";
-        if (hunterMetricMode === hunterMetricIo) return "io";
-        if (hunterMetricMode === hunterMetricAge) return "age";
-        return "combined";
+        return hunterPresentation.detailMetricKey();
     }
 
     function hunterDetailHistory() {
-        const key = hunterDetailMetricKey();
-        const values = taskHunterDetailHistories[key];
-        return Array.isArray(values) ? values : [];
+        return hunterPresentation.detailHistory();
     }
 
     function seedHunterDetailHistories(entry) {
@@ -2687,65 +2688,27 @@ PanelWindow {
     }
 
     function taskHistoryValuesForHunter(entry) {
-        if (!entry)
-            return [];
-        const pid = Number(entry.pid || 0);
-        if (pid <= 0)
-            return [];
-        const values = taskMiniCpuHistories["pid:" + String(pid)];
-        return Array.isArray(values) ? values : [];
+        return hunterPresentation.taskHistoryValues(entry);
     }
 
     function hunterTaskPeak(entry) {
-        const values = taskHistoryValuesForHunter(entry);
-        let peak = Math.max(0, Number(entry && entry.cpuInstant || 0));
-        for (let i = 0; i < values.length; i++)
-            peak = Math.max(peak, Number(values[i] || 0));
-        return peak;
+        return hunterPresentation.taskPeak(entry);
     }
 
     function hunterTaskAverage(entry) {
-        const values = taskHistoryValuesForHunter(entry);
-        if (values.length === 0)
-            return Math.max(0, Number(entry && entry.cpuInstant || 0));
-        let total = 0;
-        const start = Math.max(0, values.length - 16);
-        for (let i = start; i < values.length; i++)
-            total += Number(values[i] || 0);
-        return total / Math.max(1, values.length - start);
+        return hunterPresentation.taskAverage(entry);
     }
 
     function hunterTaskIoRate(entry) {
-        return Math.max(0, Number(entry && entry.ioRate || 0));
+        return hunterPresentation.taskIoRate(entry);
     }
 
     function hunterTaskMemoryMiB(entry) {
-        return Math.max(0, Number(entry && entry.rss || 0)) / 1024.0;
+        return hunterPresentation.taskMemoryMiB(entry);
     }
 
     function hunterTaskMetricScore(entry) {
-        if (!entry)
-            return 0;
-
-        if (hunterMetricMode === hunterMetricCpu)
-            return hunterTaskPeak(entry) + hunterTaskAverage(entry) * 0.55;
-
-        if (hunterMetricMode === hunterMetricMemory)
-            return hunterTaskMemoryMiB(entry);
-
-        if (hunterMetricMode === hunterMetricIo)
-            return hunterTaskIoRate(entry);
-
-        if (hunterMetricMode === hunterMetricAge)
-            return taskElapsedSeconds(entry.elapsed);
-
-        // COMBINED deliberately uses bounded/logarithmic contributions so a
-        // single byte-rate spike cannot drown out CPU and memory pressure.
-        const ioMiB = hunterTaskIoRate(entry) / (1024.0 * 1024.0);
-        return hunterTaskPeak(entry)
-               + hunterTaskAverage(entry) * 0.55
-               + Math.max(0, Number(entry.mem || 0)) * 0.35
-               + Math.log(1 + ioMiB) * 3.0;
+        return hunterPresentation.taskMetricScore(entry);
     }
 
     function hunterTaskScore(entry) {
@@ -2787,97 +2750,31 @@ PanelWindow {
     }
 
     function hunterMetricAccent() {
-        if (hunterMetricMode === hunterMetricCpu) return Colors.orange;
-        if (hunterMetricMode === hunterMetricMemory) return Colors.magenta;
-        if (hunterMetricMode === hunterMetricIo) return Colors.cyan;
-        if (hunterMetricMode === hunterMetricAge) return Colors.white;
-        return Colors.yellow;
+        return hunterPresentation.metricAccent();
     }
 
     function hunterMetricGraphLabel() {
-        if (hunterMetricMode === hunterMetricCpu) return "CPU";
-        if (hunterMetricMode === hunterMetricMemory) return "MEMORY";
-        if (hunterMetricMode === hunterMetricIo) return "I/O";
-        if (hunterMetricMode === hunterMetricAge) return "AGE";
-        return hunterCombiIcon;
+        return hunterPresentation.metricGraphLabel();
     }
 
     function hunterMetricGraphValue(entry) {
-        const history = hunterDetailHistory();
-        const liveValue =
-            Array.isArray(history) && history.length > 0
-            ? Number(history[history.length - 1] || 0)
-            : NaN;
-
-        if (hunterMetricMode === hunterMetricCpu)
-            return isNaN(liveValue)
-                   ? Number(
-                         entry && entry.cpuInstant !== undefined
-                         ? entry.cpuInstant
-                         : entry && entry.cpu || 0
-                     ).toFixed(1) + "%"
-                   : liveValue.toFixed(1) + "%";
-
-        if (hunterMetricMode === hunterMetricMemory)
-            return isNaN(liveValue)
-                   ? hunterTaskMemoryMiB(entry).toFixed(0) + " MiB"
-                   : liveValue.toFixed(0) + " MiB";
-
-        if (hunterMetricMode === hunterMetricIo)
-            return isNaN(liveValue)
-                   ? hunterFormatBytesPerSecond(hunterTaskIoRate(entry))
-                   : hunterFormatBytesPerSecond(
-                         liveValue * 1024.0 * 1024.0
-                     );
-
-        if (hunterMetricMode === hunterMetricAge)
-            return isNaN(liveValue)
-                   ? hunterFormatAge(taskElapsedSeconds(entry && entry.elapsed))
-                   : hunterFormatAge(liveValue * 60.0);
-
-        return isNaN(liveValue)
-               ? hunterTaskMetricScore(entry).toFixed(1)
-               : liveValue.toFixed(1);
+        return hunterPresentation.metricGraphValue(entry);
     }
 
     function hunterMetricRangeForKey(metric) {
-        const key = String(metric || "");
-        if (key === "io")
-            return 0.25;
-        if (key === "age")
-            return 1.0;
-        return 5.0;
+        return hunterPresentation.metricRangeForKey(metric);
     }
 
     function hunterMetricGraphRange() {
-        if (hunterMetricMode === hunterMetricIo)
-            return 0.25;
-        if (hunterMetricMode === hunterMetricAge)
-            return 1.0;
-        return 5.0;
+        return hunterPresentation.metricGraphRange();
     }
 
     function hunterFormatBytesPerSecond(value) {
-        let n = Math.max(0, Number(value || 0));
-        const units = ["B/s", "KiB/s", "MiB/s", "GiB/s"];
-        let i = 0;
-        while (n >= 1024 && i < units.length - 1) {
-            n /= 1024;
-            i++;
-        }
-        return (i === 0 ? n.toFixed(0) : n.toFixed(1)) + " " + units[i];
+        return hunterPresentation.formatBytesPerSecond(value);
     }
 
     function hunterFormatAge(seconds) {
-        let value = Math.max(0, Math.floor(Number(seconds || 0)));
-        const days = Math.floor(value / 86400);
-        value %= 86400;
-        const hours = Math.floor(value / 3600);
-        value %= 3600;
-        const minutes = Math.floor(value / 60);
-        if (days > 0) return String(days) + "d " + String(hours) + "h";
-        if (hours > 0) return String(hours) + "h " + String(minutes) + "m";
-        return String(minutes) + "m";
+        return hunterPresentation.formatAge(seconds);
     }
 
     function hunterMetricReason(entry) {
@@ -2906,27 +2803,7 @@ PanelWindow {
     }
 
     function taskElapsedSeconds(value) {
-        const raw = String(value || "").trim();
-        if (!raw)
-            return 0;
-        let days = 0;
-        let clock = raw;
-        const dash = raw.indexOf("-");
-        if (dash >= 0) {
-            days = Number(raw.substring(0, dash) || 0);
-            clock = raw.substring(dash + 1);
-        }
-        const parts = clock.split(":").map(function(part) {
-            return Number(part || 0);
-        });
-        let seconds = days * 86400;
-        if (parts.length === 3)
-            seconds += parts[0] * 3600 + parts[1] * 60 + parts[2];
-        else if (parts.length === 2)
-            seconds += parts[0] * 60 + parts[1];
-        else if (parts.length === 1)
-            seconds += parts[0];
-        return seconds;
+        return hunterPresentation.elapsedSeconds(value);
     }
 
     function hunterHogCandidates() {
@@ -23941,6 +23818,8 @@ PanelWindow {
                 controller: appControlWindow
                 presentationState: processPresentationState
                 processController: processPresentationController
+                graphGeometry: graphHistory
+                hunterGraph: hunterPresentation
                 searchInputTarget: searchInput
                 safetyLockComponent: taskActionSafetyLockComponent
             }

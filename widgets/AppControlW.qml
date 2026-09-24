@@ -856,6 +856,10 @@ PanelWindow {
     property alias taskSnapshotError: processTelemetry.snapshotError
     property alias taskProcessCount: processTelemetry.processCount
 
+    GraphHistory {
+        id: graphHistory
+    }
+
     ProcessTelemetry {
         id: processTelemetry
 
@@ -1540,117 +1544,41 @@ PanelWindow {
     // live task graphs: Canvas contexts can survive PanelWindow hide/show with
     // stale paint state, which was producing black traces and invisible
     // FAVORITES graphs after closing/reopening AppControl.
-    function graphLinePoints(values, graphWidth, graphHeight, requiredRange, slotCount, topInset, bottomInset) {
-        const source = Array.isArray(values) ? values.slice() : [];
-
-        if (source.length === 0)
-            return [];
-
-        if (source.length === 1)
-            source.unshift(source[0]);
-
-        let minimum = Number(source[0] || 0);
-        let maximum = minimum;
-
-        for (let i = 1; i < source.length; i++) {
-            const value = Number(source[i] || 0);
-            minimum = Math.min(minimum, value);
-            maximum = Math.max(maximum, value);
-        }
-
-        const wantedRange = Math.max(0.0001, Number(requiredRange || 1));
-        let range = Math.max(wantedRange, maximum - minimum);
-        let lower = Math.max(0, minimum - range * 0.24);
-        let upper = maximum + range * 0.24;
-
-        if (upper - lower < wantedRange) {
-            const center = (upper + lower) / 2;
-            lower = Math.max(0, center - wantedRange / 2);
-            upper = lower + wantedRange;
-        }
-
-        const width = Math.max(1, Number(graphWidth || 1));
-        const height = Math.max(1, Number(graphHeight || 1));
-        const top = Math.max(0, Number(topInset === undefined ? 2 : topInset));
-        const bottom = Math.max(top + 1, height - Math.max(0, Number(bottomInset === undefined ? 2 : bottomInset)));
-        const slots = Math.max(2, Number(slotCount || source.length));
-        const step = width / Math.max(1, slots - 1);
-        const startX = width - step * (source.length - 1);
-        const points = [];
-
-        // Draw the measured history at its true coordinates.  v30 briefly
-        // quantized these positions onto a pixel grid to add deliberate chop,
-        // but the preferred look is smooth movement controlled only by the
-        // slower telemetry cadence below.
-        for (let i = 0; i < source.length; i++) {
-            const normalized = Math.max(0, Math.min(1,
-                (Number(source[i] || 0) - lower)
-                / Math.max(0.0001, upper - lower)
-            ));
-            const rawX = startX + i * step;
-            const rawY = bottom - normalized * Math.max(1, bottom - top);
-            points.push(Qt.point(rawX, rawY));
-        }
-
-        return points;
-    }
-
-    // COMBI draws four filled traces plus the restored combined-score trace.
-    // Keep a consecutive rolling tail rather than evenly re-sampling history.
-    // With taskCombiRenderPointLimit now equal to taskHistoryLimit this helper
-    // preserves the complete 132-slot detail timeline, so COMBI advances by
-    // exactly the same horizontal distance per sample as the ordinary graphs.
-    function graphDownsampleHistory(values, maximumPoints) {
-        const source = Array.isArray(values) ? values : [];
-        const limit = Math.max(2, Math.floor(Number(maximumPoints || source.length)));
-
-        if (source.length <= limit)
-            return source.slice();
-
-        return source.slice(Math.max(0, source.length - limit));
-    }
-
-    // Render one history inside a fixed vertical band. Retained as a generic
-    // helper, although HUNTER COMBI now overlays all four independently-scaled
-    // metrics in one shared graph area instead of splitting them into bands.
-    function graphLinePointsInBand(values, graphWidth, graphHeight, requiredRange,
-                                   slotCount, bandIndex, bandCount) {
-        const bands = Math.max(1, Number(bandCount || 1));
-        const index = Math.max(0, Math.min(bands - 1, Number(bandIndex || 0)));
-        const bandHeight = Math.max(4, Number(graphHeight || 1) / bands);
-        const local = graphLinePoints(
+    // Shared graph geometry lives outside AppControl so CPU++ and future
+    // telemetry surfaces can render the same history without copying this
+    // implementation. Keep these compatibility wrappers during extraction.
+    function graphLinePoints(values, graphWidth, graphHeight, requiredRange,
+                             slotCount, topInset, bottomInset) {
+        return graphHistory.linePoints(
             values,
             graphWidth,
-            bandHeight,
+            graphHeight,
             requiredRange,
             slotCount,
-            2,
-            2
+            topInset,
+            bottomInset
         );
-        const offsetY = index * bandHeight;
-        const points = [];
-        for (let i = 0; i < local.length; i++)
-            points.push(Qt.point(local[i].x, local[i].y + offsetY));
-        return points;
+    }
+
+    function graphDownsampleHistory(values, maximumPoints) {
+        return graphHistory.downsampleHistory(values, maximumPoints);
+    }
+
+    function graphLinePointsInBand(values, graphWidth, graphHeight, requiredRange,
+                                   slotCount, bandIndex, bandCount) {
+        return graphHistory.linePointsInBand(
+            values,
+            graphWidth,
+            graphHeight,
+            requiredRange,
+            slotCount,
+            bandIndex,
+            bandCount
+        );
     }
 
     function canvasCssColor(colorValue, alphaMultiplier) {
-        const alpha = Math.max(
-            0,
-            Math.min(
-                1,
-                Number(colorValue.a)
-                * (alphaMultiplier === undefined
-                   ? 1.0
-                   : Number(alphaMultiplier))
-            )
-        );
-
-        return "rgba("
-               + String(Math.round(Number(colorValue.r) * 255)) + ","
-               + String(Math.round(Number(colorValue.g) * 255)) + ","
-               + String(Math.round(Number(colorValue.b) * 255)) + ","
-               + String(alpha) + ")";
+        return graphHistory.cssColor(colorValue, alphaMultiplier);
     }
 
     function taskIdentityForEntry(entry) {

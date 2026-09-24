@@ -6,7 +6,7 @@ import "../../components"
             Column {
                 id: taskManagerBody
 
-    required property var controller
+    required property var host
     required property var presentationState
     required property var processController
     required property var graphGeometry
@@ -29,9 +29,7 @@ import "../../components"
                 anchors.horizontalCenter: parent.horizontalCenter
                 spacing: 12
 
-                visible:
-                    controller.selectedResultIsTask()
-                    && controller.selectedResult() !== null
+                visible: processController.currentTask !== null
 
                 property var currentTask:
                     processController.currentTask
@@ -68,7 +66,7 @@ import "../../components"
                             readonly property color glowColor:
                                 accent === Colors.white ? Colors.cyan : accent
                             readonly property bool favorite:
-                                controller.isTaskMetricFavorite(
+                                host.isTaskMetricFavorite(
                                     taskManagerBody.currentTask,
                                     modelData.id
                                 )
@@ -154,7 +152,7 @@ import "../../components"
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     onClicked: {
-                                        controller.toggleTaskMetricFavorite(
+                                        host.toggleTaskMetricFavorite(
                                             taskManagerBody.currentTask,
                                             modelData.id
                                         );
@@ -172,10 +170,7 @@ import "../../components"
                     height: 112
 
                     readonly property bool hunterMetricView:
-                        controller.selectedModeIndex
-                        === controller.killModeIndex
-                        && controller.killViewMode
-                           === controller.killViewHunter
+                        host.hunterMetricView
                     readonly property bool combiView:
                         hunterMetricView
                         && hunterGraph.metricMode
@@ -1238,13 +1233,13 @@ Item {
                                ))
                     property bool isHovered:
                         canRestart
-                        && !controller.keyboardActive
+                        && !host.keyboardActive
                         && taskRestartActionMouse.containsMouse
                     property bool isPressed: canRestart && taskRestartActionMouse.pressed
                     property bool isSelected:
-                        controller.detailFocused
-                        && controller.selectedResultIsTask()
-                        && controller.selectedDetailActionIndex === 0
+                        host.detailFocused
+                        && (processController.currentTask !== null)
+                        && host.setDetailActionIndex(== 0
 
                     color:
                         isPressed ? Colors.red
@@ -1299,13 +1294,13 @@ Item {
                         enabled: taskRestartAction.canRestart
                         hoverEnabled: true
                         onEntered: {
-                            controller.keyboardActive = false;
-                            controller.modeRailFocused = false;
-                            controller.detailFocused = true;
-                            controller.selectedDetailActionIndex = 0;
+                            host.setKeyboardActive(false));
+                            host.clearModeRailFocus();
+                            host.setDetailFocused(true);
+                            host.setDetailActionIndex(0);
                         }
                         onClicked: {
-                            controller.selectedDetailActionIndex = 0;
+                            host.setDetailActionIndex(0);
                             processController.requestRestart();
                         }
                     }
@@ -1386,12 +1381,12 @@ Item {
                     }
 
                     readonly property bool keyboardSelected:
-                        controller.detailFocused
-                        && controller.selectedDetailActionIndex === -2
+                        host.detailFocused
+                        && host.setDetailActionIndex(== -2
 
                     function keyboardStep(deltaPercent) {
                         if (!canAdjust)
-                            return;
+                            return);
 
                         const next = Math.max(
                             0,
@@ -1498,10 +1493,10 @@ Item {
                             onClicked: {
                                 taskLimitSlider.commitEditorValue();
                                 taskLimitEditor.focus = false;
-                                controller.keyboardActive = false;
-                                controller.modeRailFocused = false;
-                                controller.detailFocused = true;
-                                controller.selectedDetailActionIndex = -2;
+                                host.setKeyboardActive(false);
+                                host.clearModeRailFocus();
+                                host.setDetailFocused(true);
+                                host.setDetailActionIndex(-2);
                             }
                         }
 
@@ -1576,16 +1571,16 @@ Item {
                                 function returnToLimitNavigation(moveDirection) {
                                     taskLimitSlider.commitEditorValue();
                                     focus = false;
-                                    controller.keyboardActive = true;
-                                    controller.modeRailFocused = false;
-                                    controller.detailFocused = true;
-                                    controller.selectedDetailActionIndex = -2;
+                                    host.setKeyboardActive(true);
+                                    host.clearModeRailFocus();
+                                    host.setDetailFocused(true);
+                                    host.setDetailActionIndex(-2);
                                     Qt.callLater(function() {
                                         taskManagerBody.searchInputTarget.forceActiveFocus();
                                         if (moveDirection !== 0)
-                                            controller.moveDetailSelection(moveDirection);
+                                            host.moveDetailSelection(moveDirection);
                                         else
-                                            controller.ensureDetailActionVisible();
+                                            host.ensureDetailActionVisible();
                                     });
                                 }
 
@@ -1599,12 +1594,12 @@ Item {
                                         selectAll();
                                     } else {
                                         taskLimitSlider.commitEditorValue();
-                                        controller.modeRailFocused = false;
-                                        controller.detailFocused = true;
-                                        controller.selectedDetailActionIndex = -2;
+                                        host.clearModeRailFocus();
+                                        host.setDetailFocused(true);
+                                        host.setDetailActionIndex(-2);
                                         Qt.callLater(function() {
-                                            if (controller.menuOpen
-                                                && controller.detailFocused)
+                                            if (host.menuOpen
+                                                && host.detailFocused)
                                                 taskManagerBody.searchInputTarget.forceActiveFocus();
                                         });
                                     }
@@ -1617,9 +1612,9 @@ Item {
                                 Keys.onEscapePressed: {
                                     taskLimitSlider.editingValue = false;
                                     focus = false;
-                                    controller.modeRailFocused = false;
-                                    controller.detailFocused = true;
-                                    controller.selectedDetailActionIndex = -2;
+                                    host.clearModeRailFocus();
+                                    host.setDetailFocused(true);
+                                    host.setDetailActionIndex(-2);
                                     Qt.callLater(function() { taskManagerBody.searchInputTarget.forceActiveFocus(); });
                                 }
                                 Keys.onPressed: function(event) {
@@ -1661,10 +1656,10 @@ Item {
                         property real dragOffsetX: 0
 
                         onEntered: {
-                            controller.keyboardActive = false;
-                            controller.modeRailFocused = false;
-                            controller.detailFocused = true;
-                            controller.selectedDetailActionIndex = -2;
+                            host.setKeyboardActive(false);
+                            host.clearModeRailFocus();
+                            host.setDetailFocused(true);
+                            host.setDetailActionIndex(-2);
                         }
 
                         // Leave the numeric value plate clickable/editable.
@@ -1675,7 +1670,7 @@ Item {
                             }
                             taskLimitSlider.commitEditorValue();
                             taskLimitEditor.focus = false;
-                            controller.selectedDetailActionIndex = -2;
+                            host.setDetailActionIndex(-2);
                             const center = taskLimitHandle.x + taskLimitHandle.width / 2;
                             const overHandle =
                                 mouse.x >= taskLimitHandle.x
@@ -1730,13 +1725,13 @@ Item {
                     anchors.horizontalCenter: parent.horizontalCenter
 
                     property bool isHovered:
-                        !controller.keyboardActive
+                        !host.keyboardActive
                         && taskFreezeActionMouse.containsMouse
                     property bool isPressed: taskFreezeActionMouse.pressed
                     property bool isSelected:
-                        controller.detailFocused
-                        && controller.selectedResultIsTask()
-                        && controller.selectedDetailActionIndex === 1
+                        host.detailFocused
+                        && (processController.currentTask !== null)
+                        && host.setDetailActionIndex(== 1
                     property bool protectedTask:
                         taskManagerBody.currentTask
                         && processController.requiresDangerUnlock(taskManagerBody.currentTask)
@@ -1838,13 +1833,13 @@ Item {
                         enabled: taskFreezeAction.canFreeze
                         hoverEnabled: true
                         onEntered: {
-                            controller.keyboardActive = false;
-                            controller.modeRailFocused = false;
-                            controller.detailFocused = true;
-                            controller.selectedDetailActionIndex = 1;
+                            host.setKeyboardActive(false));
+                            host.clearModeRailFocus();
+                            host.setDetailFocused(true);
+                            host.setDetailActionIndex(1);
                         }
                         onClicked: {
-                            controller.selectedDetailActionIndex = 1;
+                            host.setDetailActionIndex(1);
                             processController.toggleFreeze();
                         }
                     }
@@ -1868,13 +1863,13 @@ Item {
                     anchors.horizontalCenter: parent.horizontalCenter
 
                     property bool isHovered:
-                        !controller.keyboardActive
+                        !host.keyboardActive
                         && taskEndActionMouse.containsMouse
                     property bool isPressed: taskEndActionMouse.pressed
                     property bool isSelected:
-                        controller.detailFocused
-                        && controller.selectedResultIsTask()
-                        && controller.selectedDetailActionIndex === 2
+                        host.detailFocused
+                        && (processController.currentTask !== null)
+                        && host.setDetailActionIndex(== 2
                     property bool protectedTask:
                         taskManagerBody.currentTask
                         && processController.requiresDangerUnlock(taskManagerBody.currentTask)
@@ -1987,14 +1982,14 @@ Item {
                         hoverEnabled: true
 
                         onEntered: {
-                            controller.keyboardActive = false;
-                            controller.modeRailFocused = false;
-                            controller.detailFocused = true;
-                            controller.selectedDetailActionIndex = 2;
+                            host.setKeyboardActive(false));
+                            host.clearModeRailFocus();
+                            host.setDetailFocused(true);
+                            host.setDetailActionIndex(2);
                         }
 
                         onClicked: {
-                            controller.selectedDetailActionIndex = 2;
+                            host.setDetailActionIndex(2);
                             processController.requestTerminate();
                         }
                     }

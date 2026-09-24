@@ -872,6 +872,11 @@ PanelWindow {
         metricMode: appControlWindow.hunterMetricMode
     }
 
+    AppControlTaskHost {
+        id: taskManagerHost
+        controller: appControlWindow
+    }
+
     ProcessTelemetry {
         id: processTelemetry
 
@@ -23815,7 +23820,7 @@ PanelWindow {
 
             TaskManagerView {
                 id: taskManagerBody
-                controller: appControlWindow
+                host: taskManagerHost
                 presentationState: processPresentationState
                 processController: processPresentationController
                 graphGeometry: graphHistory

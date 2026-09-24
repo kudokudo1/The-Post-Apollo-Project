@@ -861,6 +861,10 @@ PanelWindow {
         id: graphHistory
     }
 
+    ProcessPresentationState {
+        id: processPresentationState
+    }
+
     ProcessTelemetry {
         id: processTelemetry
 
@@ -1481,64 +1485,29 @@ PanelWindow {
         return entry.contributors;
     }
 
-    property int taskHistoryPid: 0
-    property bool taskRestoringSelection: false
-    property var taskCpuHistory: []
-    property var taskMemHistory: []
-    readonly property int taskHistoryLimit: 132
-    // v33: keep the telemetry cadence from v31/v32, but visually tween each
-    // new history sample across almost the whole interval. This makes the
-    // graphs scroll continuously right-to-left instead of jumping one slot
-    // every timer tick. The underlying samples are still real/unmodified.
-    readonly property int taskGraphScrollDuration: 920
-    readonly property int taskMiniGraphScrollDuration: 1080
-    // COMBI must use the same horizontal slot count as the ordinary detail
-    // graphs.  Rendering only 72 slots made every new COMBI sample travel
-    // almost twice as far across the same-width panel, which made the mixed
-    // traces look both faster and choppier even though they were sampled by
-    // the very same telemetry clock.  Keep all 132 slots so one sample == one
-    // identical horizontal step in NORMAL, HUNTER, and COMBI.
-    readonly property int taskCombiRenderPointLimit: taskHistoryLimit
-
-    property var taskMiniCpuHistories: ({})
-    // HUNTER keeps parallel per-PID histories for every explicit ranking
-    // metric so switching CPU/MEM/I/O/AGE/COMBI changes both the ordering and
-    // the graph instead of repainting a CPU trace under a different label.
-    property var taskMiniHunterMetricHistories: ({})
-    // Full-width HUNTER detail histories use the same 132-slot timeline as
-    // the original CPU/MEM graphs. Mini graphs remain capped separately.
-    property var taskHunterDetailHistories: ({
-        cpu: [], mem: [], io: [], age: [], combined: []
-    })
-    property int taskHunterDetailHistoryRevision: 0
-    // FAVORITES task rows are persistent-identity based rather than PID based.
-    // Keep a second history keyed by that identity so their graphs survive
-    // live row replacement / PID changes and do not render as empty boxes.
-    property var taskMiniCpuIdentityHistories: ({})
-    // Explicit revision signal for mini-graph canvases. QML does not always
-    // invalidate a Canvas binding when a nested JS-array stored in an object
-    // is replaced, so bump this on every task snapshot and repaint directly.
-    property int taskMiniHistoryRevision: 0
-    // Mini graphs have their own lightweight /proc sampler. The full task
-    // snapshot is intentionally heavier (ps + per-process reads) and can take
-    // several seconds on a busy desktop, which is why the old mini traces
-    // sometimes advanced only once for ~14 detail-graph ticks.
+    // Process graph/history state is now a reusable object rather than
+    // AppControl-owned storage. Compatibility aliases keep the existing
+    // orchestration stable while TaskManagerView/CPU++ can consume the state
+    // directly.
+    property alias taskHistoryPid: processPresentationState.taskHistoryPid
+    property alias taskRestoringSelection: processPresentationState.taskRestoringSelection
+    property alias taskCpuHistory: processPresentationState.taskCpuHistory
+    property alias taskMemHistory: processPresentationState.taskMemHistory
+    readonly property int taskHistoryLimit: processPresentationState.taskHistoryLimit
+    readonly property int taskGraphScrollDuration: processPresentationState.taskGraphScrollDuration
+    readonly property int taskMiniGraphScrollDuration: processPresentationState.taskMiniGraphScrollDuration
+    readonly property int taskCombiRenderPointLimit: processPresentationState.taskCombiRenderPointLimit
+    property alias taskMiniCpuHistories: processPresentationState.taskMiniCpuHistories
+    property alias taskMiniHunterMetricHistories: processPresentationState.taskMiniHunterMetricHistories
+    property alias taskHunterDetailHistories: processPresentationState.taskHunterDetailHistories
+    property alias taskHunterDetailHistoryRevision: processPresentationState.taskHunterDetailHistoryRevision
+    property alias taskMiniCpuIdentityHistories: processPresentationState.taskMiniCpuIdentityHistories
+    property alias taskMiniHistoryRevision: processPresentationState.taskMiniHistoryRevision
     property alias taskMiniProbeLoading: processTelemetry.miniProbeLoading
-
-    // Separate presentation tick for the little list graphs. Keep every
-    // CPU/MEM/I-O/AGE/COMBI mini graphs all use the same lightweight probe
-    // cadence. It is deliberately a little slower than the detail graph
-    // so the small trace reads as "a moment ago" without visibly lagging.
-    property int taskMiniDisplayRevision: 0
-    readonly property int taskMiniHistoryLimit: 48
-
-    // Keep the mini-graph timeline warm before KILL/FAVORITES is opened.
-    // The first 48 task snapshots are collected at the normal live cadence,
-    // after which background sampling slows down while the menu is closed.
-    // This makes the graph useful immediately instead of building its history
-    // only after the user starts looking at it.
-    property int taskMiniPreloadSnapshots: 0
-    readonly property int taskMiniPreloadTarget: taskMiniHistoryLimit
+    property alias taskMiniDisplayRevision: processPresentationState.taskMiniDisplayRevision
+    readonly property int taskMiniHistoryLimit: processPresentationState.taskMiniHistoryLimit
+    property alias taskMiniPreloadSnapshots: processPresentationState.taskMiniPreloadSnapshots
+    readonly property int taskMiniPreloadTarget: processPresentationState.taskMiniPreloadTarget
 
     // Graph geometry is generated as ordinary QML points and rendered with
     // Rectangle segments below. This deliberately avoids Qt Canvas for the
@@ -24118,6 +24087,7 @@ PanelWindow {
             TaskManagerView {
                 id: taskManagerBody
                 controller: appControlWindow
+                presentationState: processPresentationState
                 searchInputTarget: searchInput
                 safetyLockComponent: taskActionSafetyLockComponent
             }

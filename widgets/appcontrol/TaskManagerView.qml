@@ -7,6 +7,7 @@ import "../../components"
                 id: taskManagerBody
 
     required property var controller
+    required property var presentationState
     required property var searchInputTarget
     required property Component safetyLockComponent
 
@@ -181,12 +182,12 @@ import "../../components"
                         ? controller.hunterMetricAccent()
                         : Colors.orange
                     readonly property var historyValues: {
-                        const miniRevision = controller.taskMiniHistoryRevision;
+                        const miniRevision = presentationState.taskMiniHistoryRevision;
                         const detailRevision =
-                            controller.taskHunterDetailHistoryRevision;
+                            presentationState.taskHunterDetailHistoryRevision;
                         if (hunterMetricView)
                             return controller.hunterDetailHistory();
-                        return controller.taskCpuHistory;
+                        return presentationState.taskCpuHistory;
                     }
                     readonly property real graphRange:
                         hunterMetricView
@@ -356,12 +357,12 @@ import "../../components"
                             target: taskCpuCanvas
                             property: "graphScrollOffset"
                             to: 0
-                            duration: controller.taskGraphScrollDuration
+                            duration: presentationState.taskGraphScrollDuration
                             easing.type: Easing.Linear
                         }
 
                         function startGraphScroll() {
-                            const pid = Number(controller.taskHistoryPid || 0);
+                            const pid = Number(presentationState.taskHistoryPid || 0);
                             const sameTask = pid > 0 && graphScrollPid === pid;
 
                             if (!sameTask) {
@@ -375,7 +376,7 @@ import "../../components"
                                 width
                                 / Math.max(
                                     1,
-                                    controller.taskHistoryLimit - 1
+                                    presentationState.taskHistoryLimit - 1
                                 );
                             taskCpuGraphScrollAnimation.restart();
                         }
@@ -386,7 +387,7 @@ import "../../components"
                         }
 
                         function requestPaint(animateScroll, resetScroll) {
-                            const pid = Number(controller.taskHistoryPid || 0);
+                            const pid = Number(presentationState.taskHistoryPid || 0);
                             graphRevision += 1;
 
                             if (resetScroll === true)
@@ -406,7 +407,7 @@ import "../../components"
                                 width,
                                 height,
                                 taskCpuGraph.graphRange,
-                                controller.taskHistoryLimit,
+                                presentationState.taskHistoryLimit,
                                 2,
                                 2
                             );
@@ -447,14 +448,14 @@ import "../../components"
 
                                 readonly property var metricHistory: {
                                     const revision =
-                                        controller.taskHunterDetailHistoryRevision;
+                                        presentationState.taskHunterDetailHistoryRevision;
                                     const metrics = ["cpu", "mem", "io", "age"];
                                     const histories = [];
                                     let commonLength = Number.MAX_SAFE_INTEGER;
 
                                     for (let i = 0; i < metrics.length; i++) {
                                         const values =
-                                            controller.taskHunterDetailHistories[
+                                            presentationState.taskHunterDetailHistories[
                                                 metrics[i]
                                             ];
                                         const history = Array.isArray(values)
@@ -480,7 +481,7 @@ import "../../components"
                                 readonly property var metricDisplayHistory:
                                     controller.graphDownsampleHistory(
                                         metricHistory,
-                                        controller.taskCombiRenderPointLimit
+                                        presentationState.taskCombiRenderPointLimit
                                     )
                                 readonly property var metricPoints:
                                     controller.graphLinePoints(
@@ -490,7 +491,7 @@ import "../../components"
                                         controller.hunterMetricRangeForKey(
                                             modelData.metric
                                         ),
-                                        controller.taskCombiRenderPointLimit,
+                                        presentationState.taskCombiRenderPointLimit,
                                         2,
                                         2
                                     )
@@ -524,7 +525,7 @@ import "../../components"
                                             detailCombiTrace.width
                                             / Math.max(
                                                 2,
-                                                controller.taskCombiRenderPointLimit - 1
+                                                presentationState.taskCombiRenderPointLimit - 1
                                             )
                                             + 1.0
                                         )
@@ -605,7 +606,7 @@ import "../../components"
                                     taskCpuCanvas.width
                                     / Math.max(
                                         2,
-                                        controller.taskHistoryLimit - 1
+                                        presentationState.taskHistoryLimit - 1
                                     )
                                     + 1.4
                                 )
@@ -675,15 +676,15 @@ import "../../components"
                     readonly property color accent: Colors.yellow
                     readonly property var historyValues: {
                         const revision =
-                            controller.taskHunterDetailHistoryRevision;
+                            presentationState.taskHunterDetailHistoryRevision;
                         const values =
-                            controller.taskHunterDetailHistories.combined;
+                            presentationState.taskHunterDetailHistories.combined;
                         return Array.isArray(values) ? values : [];
                     }
                     readonly property var displayHistory:
                         controller.graphDownsampleHistory(
                             historyValues,
-                            controller.taskCombiRenderPointLimit
+                            presentationState.taskCombiRenderPointLimit
                         )
 
                     GohuText {
@@ -750,12 +751,12 @@ import "../../components"
                             target: taskCombiScoreCanvas
                             property: "graphScrollOffset"
                             to: 0
-                            duration: controller.taskGraphScrollDuration
+                            duration: presentationState.taskGraphScrollDuration
                             easing.type: Easing.Linear
                         }
 
                         function startGraphScroll() {
-                            const pid = Number(controller.taskHistoryPid || 0);
+                            const pid = Number(presentationState.taskHistoryPid || 0);
                             const sameTask = pid > 0 && graphScrollPid === pid;
 
                             if (!sameTask) {
@@ -769,7 +770,7 @@ import "../../components"
                                 width
                                 / Math.max(
                                     1,
-                                    controller.taskCombiRenderPointLimit - 1
+                                    presentationState.taskCombiRenderPointLimit - 1
                                 );
                             taskCombiScoreScrollAnimation.restart();
                         }
@@ -780,7 +781,7 @@ import "../../components"
                         }
 
                         function requestPaint(animateScroll, resetScroll) {
-                            const pid = Number(controller.taskHistoryPid || 0);
+                            const pid = Number(presentationState.taskHistoryPid || 0);
 
                             if (resetScroll === true)
                                 resetGraphScroll();
@@ -792,13 +793,13 @@ import "../../components"
 
                         readonly property var graphPoints: {
                             const revision =
-                                controller.taskHunterDetailHistoryRevision;
+                                presentationState.taskHunterDetailHistoryRevision;
                             return controller.graphLinePoints(
                                 taskCombiScoreGraph.displayHistory,
                                 width,
                                 height,
                                 5.0,
-                                controller.taskCombiRenderPointLimit,
+                                presentationState.taskCombiRenderPointLimit,
                                 2,
                                 2
                             );
@@ -831,7 +832,7 @@ import "../../components"
                                     taskCombiScoreCanvas.width
                                     / Math.max(
                                         2,
-                                        controller.taskCombiRenderPointLimit - 1
+                                        presentationState.taskCombiRenderPointLimit - 1
                                     )
                                     + 1.4
                                 )
@@ -972,12 +973,12 @@ import "../../components"
                             target: taskMemCanvas
                             property: "graphScrollOffset"
                             to: 0
-                            duration: controller.taskGraphScrollDuration
+                            duration: presentationState.taskGraphScrollDuration
                             easing.type: Easing.Linear
                         }
 
                         function startGraphScroll() {
-                            const pid = Number(controller.taskHistoryPid || 0);
+                            const pid = Number(presentationState.taskHistoryPid || 0);
                             const sameTask = pid > 0 && graphScrollPid === pid;
 
                             if (!sameTask) {
@@ -991,7 +992,7 @@ import "../../components"
                                 width
                                 / Math.max(
                                     1,
-                                    controller.taskHistoryLimit - 1
+                                    presentationState.taskHistoryLimit - 1
                                 );
                             taskMemGraphScrollAnimation.restart();
                         }
@@ -1002,7 +1003,7 @@ import "../../components"
                         }
 
                         function requestPaint(animateScroll, resetScroll) {
-                            const pid = Number(controller.taskHistoryPid || 0);
+                            const pid = Number(presentationState.taskHistoryPid || 0);
                             graphRevision += 1;
 
                             if (resetScroll === true)
@@ -1016,11 +1017,11 @@ import "../../components"
                         readonly property var graphPoints: {
                             const revision = graphRevision;
                             return controller.graphLinePoints(
-                                controller.taskMemHistory,
+                                presentationState.taskMemHistory,
                                 width,
                                 height,
                                 0.35,
-                                controller.taskHistoryLimit,
+                                presentationState.taskHistoryLimit,
                                 2,
                                 2
                             );
@@ -1049,7 +1050,7 @@ import "../../components"
                                 y: graphPoint.y
                                 width: Math.max(2.0,
                                     taskMemCanvas.width
-                                    / Math.max(2, controller.taskHistoryLimit - 1)
+                                    / Math.max(2, presentationState.taskHistoryLimit - 1)
                                     + 0.8)
                                 height: Math.max(0, taskMemCanvas.height - graphPoint.y - 1)
                                 color: Colors.magenta

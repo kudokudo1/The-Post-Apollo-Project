@@ -851,10 +851,22 @@ PanelWindow {
         beginKillPresentationChange("visibility", mode);
     }
 
-    property var taskRows: []
-    property bool taskSnapshotLoading: false
-    property string taskSnapshotError: ""
-    property int taskProcessCount: 0
+    property alias taskRows: processTelemetry.rows
+    property alias taskSnapshotLoading: processTelemetry.snapshotLoading
+    property alias taskSnapshotError: processTelemetry.snapshotError
+    property alias taskProcessCount: processTelemetry.processCount
+
+    ProcessTelemetry {
+        id: processTelemetry
+
+        onSnapshotReady: function(rows) {
+            appControlWindow.applyTaskSnapshot(rows);
+        }
+
+        onMiniProbeReady: function(rows) {
+            appControlWindow.applyTaskMiniProbeRows(rows);
+        }
+    }
 
     property alias thermalRows: systemTelemetry.thermalRows
     property alias fanRows: systemTelemetry.fanRows
@@ -1458,12 +1470,6 @@ PanelWindow {
         cpu: [], mem: [], io: [], age: [], combined: []
     })
     property int taskHunterDetailHistoryRevision: 0
-    // Raw /proc CPU tick snapshots used to turn the task-list mini graphs into
-    // recent CPU activity rather than ps's lifetime-average %CPU value.
-    property var taskMiniCpuTickSamples: ({})
-    // /proc/PID/io byte counters sampled alongside CPU ticks. HUNTER uses
-    // their deltas for a real recent I/O ranking instead of lifetime totals.
-    property var taskIoByteSamples: ({})
     // FAVORITES task rows are persistent-identity based rather than PID based.
     // Keep a second history keyed by that identity so their graphs survive
     // live row replacement / PID changes and do not render as empty boxes.
@@ -1476,9 +1482,7 @@ PanelWindow {
     // snapshot is intentionally heavier (ps + per-process reads) and can take
     // several seconds on a busy desktop, which is why the old mini traces
     // sometimes advanced only once for ~14 detail-graph ticks.
-    property bool taskMiniProbeLoading: false
-    property var taskMiniProbeCpuSamples: ({})
-    property var taskMiniProbeIoSamples: ({})
+    property alias taskMiniProbeLoading: processTelemetry.miniProbeLoading
 
     // Separate presentation tick for the little list graphs. Keep every
     // CPU/MEM/I-O/AGE/COMBI mini graphs all use the same lightweight probe
@@ -2360,39 +2364,11 @@ PanelWindow {
     }
 
     function refreshTaskManager() {
-        if (taskSnapshotLoading)
-            return;
-
-        taskSnapshotLoading = true;
-        taskSnapshotError = "";
-
-        taskSnapshotProcess.exec([
-            "/bin/sh",
-            "-lc",
-            "clk=$(getconf CLK_TCK 2>/dev/null || printf 100); "
-            + "LC_ALL=C ps -eo "
-            + "pid=,ppid=,user=,stat=,tty=,pcpu=,pmem=,rss=,vsz=,nlwp=,etime=,comm=,args= "
-            + "--sort=-pcpu | "
-            + "while read -r pid rest; do "
-            + "[ -n \"$pid\" ] || continue; "
-            + "ticks=$(sed 's/^[^)]*) //' /proc/$pid/stat 2>/dev/null "
-            + "| awk '{print $12+$13}'); "
-            + "readb=$(awk '$1==\"read_bytes:\" {print $2; exit}' /proc/$pid/io 2>/dev/null); "
-            + "writeb=$(awk '$1==\"write_bytes:\" {print $2; exit}' /proc/$pid/io 2>/dev/null); "
-            + "printf '%s %s %s %s %s %s\\n' \"$clk\" \"${ticks:-0}\" "
-            + "\"${readb:-0}\" \"${writeb:-0}\" \"$pid\" \"$rest\"; "
-            + "done"
-        ]);
+        processTelemetry.refreshSnapshot();
     }
 
-    function consumeTaskSnapshot(output) {
-        const lines = String(output || "").split("\n");
-        const rows = [];
-        const nowMs = Date.now();
-        const previousTickSamples = taskMiniCpuTickSamples;
-        const nextTickSamples = ({});
-        const previousIoSamples = taskIoByteSamples;
-        const nextIoSamples = ({});
+    function applyTaskSnapshot(rows) {
+        const snapshotRows = Array.isArray(rows) ? rows : [];
 
         let preservedPid = 0;
 
@@ -2401,130 +2377,16 @@ PanelWindow {
             preservedPid = Number(selectedResult().pid || 0);
         }
 
-        for (let i = 0; i < lines.length; i++) {
-            const line = String(lines[i] || "").trim();
-
-            if (!line)
-                continue;
-
-            const fields = line.split(/\s+/);
-
-            if (fields.length < 16)
-                continue;
-
-            const tickRate = Math.max(1, Number(fields[0] || 100));
-            const cpuTicks = Math.max(0, Number(fields[1] || 0));
-            const ioReadBytes = Math.max(0, Number(fields[2] || 0));
-            const ioWriteBytes = Math.max(0, Number(fields[3] || 0));
-            const pid = Number(fields[4] || 0);
-
-            if (!pid)
-                continue;
-
-            const args =
-                fields.length > 16
-                ? fields.slice(16).join(" ")
-                : String(fields[15] || "");
-
-            const comm = String(fields[15] || "").trim();
-            const tickKey = "pid:" + String(pid);
-            const previousTick = previousTickSamples[tickKey];
-            const previousIo = previousIoSamples[tickKey];
-            let cpuInstant = Math.max(0, Number(fields[9] || 0));
-            let ioReadRate = 0;
-            let ioWriteRate = 0;
-
-            if (previousTick
-                    && cpuTicks >= Number(previousTick.ticks || 0)
-                    && nowMs > Number(previousTick.ms || 0)) {
-                const elapsedSeconds = Math.max(
-                    0.001,
-                    (nowMs - Number(previousTick.ms || 0)) / 1000.0
-                );
-                const tickDelta = Math.max(
-                    0,
-                    cpuTicks - Number(previousTick.ticks || 0)
-                );
-                cpuInstant = ((tickDelta / tickRate) / elapsedSeconds) * 100.0;
-            }
-
-            cpuInstant = Math.max(0, Math.min(100, cpuInstant));
-            nextTickSamples[tickKey] = {
-                ticks: cpuTicks,
-                ms: nowMs
-            };
-
-            if (previousIo && nowMs > Number(previousIo.ms || 0)) {
-                const ioElapsedSeconds = Math.max(
-                    0.001,
-                    (nowMs - Number(previousIo.ms || 0)) / 1000.0
-                );
-                ioReadRate = Math.max(
-                    0,
-                    (ioReadBytes - Number(previousIo.read || 0)) / ioElapsedSeconds
-                );
-                ioWriteRate = Math.max(
-                    0,
-                    (ioWriteBytes - Number(previousIo.write || 0)) / ioElapsedSeconds
-                );
-            }
-            nextIoSamples[tickKey] = {
-                read: ioReadBytes,
-                write: ioWriteBytes,
-                ms: nowMs
-            };
-
-            // refreshTaskManager() itself runs `ps -eo ...`. That `ps`
-            // process can appear in its own snapshot with a large one-shot CPU
-            // value, but it exits immediately and therefore can never produce a
-            // meaningful continuous history graph. Do not present that probe as
-            // a user task.
-            if (comm === "ps"
-                    && args.indexOf("pid=,ppid=,user=,stat=,tty=,pcpu=") !== -1)
-                continue;
-
-            rows.push({
-                _taskRecord: true,
-                id: "task:" + String(pid),
-                pid: pid,
-                ppid: Number(fields[5] || 0),
-                user: String(fields[6] || ""),
-                state: String(fields[7] || ""),
-                tty: String(fields[8] || "?"),
-                cpu: Number(fields[9] || 0),
-                cpuInstant: cpuInstant,
-                mem: Number(fields[10] || 0),
-                rss: Number(fields[11] || 0),
-                vsz: Number(fields[12] || 0),
-                threads: Number(fields[13] || 0),
-                elapsed: String(fields[14] || ""),
-                comm: String(fields[15] || ""),
-                args: args,
-                ioReadRate: ioReadRate,
-                ioWriteRate: ioWriteRate,
-                ioRate: ioReadRate + ioWriteRate,
-                name: String(fields[15] || "PROCESS"),
-                label: String(fields[15] || "PROCESS")
-            });
-        }
-
-        taskMiniCpuTickSamples = nextTickSamples;
-        taskIoByteSamples = nextIoSamples;
-        // While KILL/FAVORITES is visible, the lightweight 550 ms /proc probe
-        // owns mini-history sampling. Keep this heavier snapshot for row metadata
-        // and background preloading, but do not inject irregular extra graph ticks.
         if (!taskMiniProbeNeeded()) {
-            updateTaskMiniCpuHistories(rows);
-            updateTaskMiniHunterMetricHistories(rows);
+            updateTaskMiniCpuHistories(snapshotRows);
+            updateTaskMiniHunterMetricHistories(snapshotRows);
             taskMiniHistoryRevision += 1;
             taskMiniDisplayRevision += 1;
         }
 
-        // Extend, but never reshuffle, the current presentation order during a
-        // telemetry tick. Explicit KILL presentation changes are the only place
-        // existing rows are re-ranked.
-        appendNewKillTaskOrderIds(rows);
-        taskRows = rows;
+        appendNewKillTaskOrderIds(snapshotRows);
+        taskRows = snapshotRows;
+
         if (menuOpen
                 && (selectedResultIsApplication()
                     || selectedResultIsWindow()
@@ -2534,22 +2396,12 @@ PanelWindow {
             });
         }
 
-        // When the dedicated mini sampler is active it alone publishes graph
-        // revisions. The heavier task snapshot only refreshes row metadata, so
-        // recycled delegates cannot receive irregular/stale graph repaints.
-
-        // Count successful snapshots toward the background warm-up window.
-        // Once the full mini-history width is populated, the hidden/background
-        // cadence can relax without throwing away the already-warm histories.
         taskMiniPreloadSnapshots = Math.min(
             taskMiniPreloadTarget,
             taskMiniPreloadSnapshots + 1
         );
 
-        checkTaskMetricAlerts(rows);
-        taskProcessCount = rows.length;
-        taskSnapshotLoading = false;
-        taskSnapshotError = "";
+        checkTaskMetricAlerts(snapshotRows);
 
         Qt.callLater(function() {
             if (selectedModeIndex !== killModeIndex
@@ -2577,7 +2429,6 @@ PanelWindow {
 
             taskRestoringSelection = false;
 
-            // First sample for a newly selected task.
             if (taskHistoryPid <= 0)
                 resetTaskHistoryForSelection();
         });
@@ -4122,232 +3973,43 @@ PanelWindow {
                    || selectedModeIndex === favoritesModeIndex);
     }
 
-    function taskMiniProbeScript() {
-        return "import json, os, sys, time\n"
-             + "items=json.loads(sys.argv[1] if len(sys.argv)>1 else '[]')\n"
-             + "clk=float(os.sysconf('SC_CLK_TCK'))\n"
-             + "uptime=float(open('/proc/uptime','r',encoding='utf-8').read().split()[0])\n"
-             + "mem_total=1.0\n"
-             + "try:\n"
-             + "    for line in open('/proc/meminfo','r',encoding='utf-8'):\n"
-             + "        if line.startswith('MemTotal:'):\n"
-             + "            mem_total=max(1.0,float(line.split()[1])); break\n"
-             + "except Exception: pass\n"
-             + "rows=[]\n"
-             + "def elapsed_text(seconds):\n"
-             + "    s=max(0,int(seconds)); d=s//86400; s%=86400; h=s//3600; s%=3600; m=s//60; sec=s%60\n"
-             + "    clock=f'{h:02d}:{m:02d}:{sec:02d}'\n"
-             + "    return (str(d)+'-'+clock) if d else clock\n"
-             + "for item in items:\n"
-             + "    try:\n"
-             + "        pid=int(item.get('pid',0));\n"
-             + "        if pid<=1: continue\n"
-             + "        raw=open(f'/proc/{pid}/stat','r',encoding='utf-8').read().strip()\n"
-             + "        r=raw.rfind(')'); parts=raw[r+2:].split()\n"
-             + "        ticks=float(parts[11])+float(parts[12]); start=float(parts[19])\n"
-             + "        rss=0.0\n"
-             + "        try:\n"
-             + "            for line in open(f'/proc/{pid}/status','r',encoding='utf-8'):\n"
-             + "                if line.startswith('VmRSS:'): rss=float(line.split()[1]); break\n"
-             + "        except Exception: pass\n"
-             + "        rb=0.0; wb=0.0\n"
-             + "        try:\n"
-             + "            for line in open(f'/proc/{pid}/io','r',encoding='utf-8'):\n"
-             + "                if line.startswith('read_bytes:'): rb=float(line.split()[1])\n"
-             + "                elif line.startswith('write_bytes:'): wb=float(line.split()[1])\n"
-             + "        except Exception: pass\n"
-             + "        age=max(0.0,uptime-start/clk)\n"
-             + "        comm=str(item.get('comm') or '').strip()\n"
-             + "        if not comm:\n"
-             + "            try: comm=open(f'/proc/{pid}/comm','r',encoding='utf-8').read().strip()\n"
-             + "            except Exception: comm='PROCESS'\n"
-             + "        rows.append({'pid':pid,'comm':comm,'ticks':ticks,'tickRate':clk,'read':rb,'write':wb,'rss':rss,'mem':(rss/mem_total)*100.0,'ageSeconds':age,'elapsed':elapsed_text(age)})\n"
-             + "    except Exception:\n"
-             + "        continue\n"
-             + "print(json.dumps(rows,separators=(',',':')))\n";
-    }
+
 
     function refreshTaskMiniProbe() {
         if (!taskMiniProbeNeeded() || taskMiniProbeLoading)
             return;
 
         const request = [];
+
         for (let i = 0; i < taskRows.length; i++) {
             const entry = taskRows[i];
             const pid = Number(entry && entry.pid || 0);
+
             if (pid <= 1)
                 continue;
+
             request.push({
                 pid: pid,
-                comm: String(entry.comm || entry.name || entry.label || "PROCESS")
+                comm: String(entry.comm || entry.name || entry.label || "PROCESS"),
+                fallbackCpu: Number(
+                    entry.cpuInstant !== undefined
+                    ? entry.cpuInstant
+                    : entry.cpu || 0
+                )
             });
         }
 
-        if (request.length === 0)
-            return;
-
-        taskMiniProbeLoading = true;
-        taskMiniProbeProcess.exec([
-            "/usr/bin/python3",
-            "-c",
-            taskMiniProbeScript(),
-            JSON.stringify(request)
-        ]);
+        processTelemetry.refreshMiniProbe(request);
     }
 
-    function consumeTaskMiniProbe(output) {
-        let payload = [];
-        try {
-            payload = JSON.parse(String(output || "[]"));
-        } catch (error) {
-            taskMiniProbeLoading = false;
-            return;
-        }
+    function applyTaskMiniProbeRows(rows) {
+        const samples = Array.isArray(rows) ? rows : [];
 
-        if (!Array.isArray(payload)) {
-            taskMiniProbeLoading = false;
-            return;
-        }
-
-        const nowMs = Date.now();
-        const previousCpu = taskMiniProbeCpuSamples;
-        const previousIo = taskMiniProbeIoSamples;
-        const nextCpu = ({});
-        const nextIo = ({});
-        const rows = [];
-
-        for (let i = 0; i < payload.length; i++) {
-            const sample = payload[i] || ({});
-            const pid = Number(sample.pid || 0);
-            if (pid <= 1)
-                continue;
-
-            const key = "pid:" + String(pid);
-            const ticks = Math.max(0, Number(sample.ticks || 0));
-            const tickRate = Math.max(1, Number(sample.tickRate || 100));
-            const readBytes = Math.max(0, Number(sample.read || 0));
-            const writeBytes = Math.max(0, Number(sample.write || 0));
-            const oldCpu = previousCpu[key];
-            const oldIo = previousIo[key];
-            let cpuInstant = 0;
-            let ioRate = 0;
-
-            if (oldCpu && nowMs > Number(oldCpu.ms || 0)
-                    && ticks >= Number(oldCpu.ticks || 0)) {
-                const dt = Math.max(
-                    0.001,
-                    (nowMs - Number(oldCpu.ms || 0)) / 1000.0
-                );
-                cpuInstant = Math.max(
-                    0,
-                    Math.min(
-                        100,
-                        (((ticks - Number(oldCpu.ticks || 0)) / tickRate) / dt)
-                        * 100.0
-                    )
-                );
-            } else {
-                const live = taskRows.find(function(row) {
-                    return Number(row && row.pid || 0) === pid;
-                });
-                cpuInstant = Math.max(
-                    0,
-                    Math.min(
-                        100,
-                        Number(
-                            live && live.cpuInstant !== undefined
-                            ? live.cpuInstant
-                            : live && live.cpu || 0
-                        )
-                    )
-                );
-            }
-
-            if (oldIo && nowMs > Number(oldIo.ms || 0)) {
-                const dt = Math.max(
-                    0.001,
-                    (nowMs - Number(oldIo.ms || 0)) / 1000.0
-                );
-                ioRate = Math.max(
-                    0,
-                    ((readBytes - Number(oldIo.read || 0))
-                     + (writeBytes - Number(oldIo.write || 0))) / dt
-                );
-            }
-
-            nextCpu[key] = { ticks: ticks, ms: nowMs };
-            nextIo[key] = {
-                read: readBytes,
-                write: writeBytes,
-                ms: nowMs
-            };
-
-            rows.push({
-                _taskRecord: true,
-                id: "task:" + String(pid),
-                pid: pid,
-                comm: String(sample.comm || "PROCESS"),
-                name: String(sample.comm || "PROCESS"),
-                label: String(sample.comm || "PROCESS"),
-                cpu: cpuInstant,
-                cpuInstant: cpuInstant,
-                mem: Math.max(0, Number(sample.mem || 0)),
-                rss: Math.max(0, Number(sample.rss || 0)),
-                ioRate: ioRate,
-                elapsed: String(sample.elapsed || ""),
-                ageSeconds: Math.max(0, Number(sample.ageSeconds || 0))
-            });
-        }
-
-        taskMiniProbeCpuSamples = nextCpu;
-        taskMiniProbeIoSamples = nextIo;
-
-        if (rows.length > 0) {
-            updateTaskMiniCpuHistories(rows);
-            updateTaskMiniHunterMetricHistories(rows);
+        if (samples.length > 0) {
+            updateTaskMiniCpuHistories(samples);
+            updateTaskMiniHunterMetricHistories(samples);
             taskMiniHistoryRevision += 1;
             taskMiniDisplayRevision += 1;
-        }
-
-        taskMiniProbeLoading = false;
-    }
-
-    Process {
-        id: taskMiniProbeProcess
-
-        stdout: StdioCollector {
-            onStreamFinished: {
-                appControlWindow.consumeTaskMiniProbe(text);
-            }
-        }
-
-        stderr: StdioCollector {
-            onStreamFinished: {
-                appControlWindow.taskMiniProbeLoading = false;
-            }
-        }
-    }
-
-    Process {
-        id: taskSnapshotProcess
-
-        stdout: StdioCollector {
-            onStreamFinished: {
-                appControlWindow.consumeTaskSnapshot(text);
-            }
-        }
-
-        stderr: StdioCollector {
-            onStreamFinished: {
-                const message = String(text || "").trim();
-
-                if (message.length > 0) {
-                    appControlWindow.taskSnapshotError = message;
-                    console.log("AppControl: task manager:", message);
-                }
-
-                appControlWindow.taskSnapshotLoading = false;
-            }
         }
     }
 

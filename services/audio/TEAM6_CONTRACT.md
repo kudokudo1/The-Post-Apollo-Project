@@ -119,6 +119,27 @@ The fused donor uses availability differently by host surface:
 Those decisions remain with the future host adapters. Team 6 reports the stream
 facts only.
 
+
+## Team 7 observation adapter
+
+While Team 7's exact semantic schema is still unfrozen, Team 6 exposes an additive
+`streamObservation(...)` / `observationSnapshot(...)` adapter with the shared
+reconnaissance fields:
+
+```text
+provider        = PIPEWIRE
+providerKey     = sink-input:<index>
+lifetimeClass   = ephemeral
+generation
+raw
+aliases[]
+relationships[]
+```
+
+This is deliberately an **observation**, not an `ApplicationEntity`.
+`providerKey` is only an ephemeral PipeWire coordinate. Aliases preserve their
+source kind and raw value; normalization is included only as matching evidence.
+
 ## Match evidence
 
 `descriptorMatchEvidence(descriptor, sinkInput)` returns a separate evidence

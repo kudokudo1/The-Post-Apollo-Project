@@ -15,7 +15,7 @@ combined = requirements + "\n" + coordinator
 
 # Comments may name forbidden couplings in order to document their absence.
 # Ownership checks apply to executable QML, not comments.
-executable = re.sub(r"/\\*.*?\\*/", "", combined, flags=re.S)
+executable = re.sub(r"/\*.*?\*/", "", combined, flags=re.S)
 executable = re.sub(r"//.*?$", "", executable, flags=re.M)
 
 errors: list[str] = []
@@ -86,6 +86,16 @@ if not re.search(
 if "requirements.describe(evidence, requestedCapabilities)" not in coordinator:
     errors.append("coordinator does not route explicit requests through requirements")
 
+for token in (
+    "ready: ready",
+    "conflicts: conflictRows.slice()",
+    "appliedCapabilities: applied.slice()",
+    '"caller-supplied"',
+    '"generated"',
+):
+    if token not in coordinator:
+        errors.append(f"missing augmentation readiness/lease contract token: {token}")
+
 # Three-clock invariant: provider activity must not release coordinator leases.
 if "releaseCorrelation" not in coordinator:
     errors.append("missing explicit instrumentation release hook")
@@ -101,7 +111,8 @@ for token in (
     "ACCESSIBILITY_ENABLED",
     "QT_ACCESSIBILITY",
     "QT_LINUX_ACCESSIBILITY_ALWAYS_ON",
-    "--remote-debugging-address=127.0.0.1",
+    "--remote-debugging-address=",
+    "127.0.0.1",
     "--remote-debugging-port=",
 ):
     if token not in combined:

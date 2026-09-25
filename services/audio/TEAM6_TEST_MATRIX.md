@@ -321,6 +321,10 @@ Expected:
 - WINDOW mute/volume policies absent from `liveKeys` are pruned
 - APP and TAB scopes are untouched
 - Team 6 does not independently decide which windows still exist
+- `policyKeysOutsideLiveSet(...)` exposes the pruning decision without mutation
+- `mutePolicyKeysWithPid(...)` returns only policies in the explicitly requested
+  scope
+- invalid/system-like/fractional PIDs do not produce cleanup targets
 
 ## H. Mutation validation
 

@@ -42,6 +42,10 @@ Scope {
         coreProvider: core
     }
 
+    AppLaunchCommandBuilder {
+        id: launchCommandBuilder
+    }
+
     AppBottleProvider {
         id: bottles
     }
@@ -154,6 +158,13 @@ Scope {
             launchMode,
             bottleName,
             surfaceLaunchAugmentation
+        );
+    }
+
+    function buildLaunchCommand(plan, shellPath) {
+        return launchCommandBuilder.build(
+            plan,
+            shellPath
         );
     }
 

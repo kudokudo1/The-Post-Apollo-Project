@@ -62,6 +62,7 @@ for declaration in (
     "property var _leaseState:",
     "property var _correlationState:",
     "property int _correlationSerial:",
+    "property string _sessionNonce:",
     "readonly property var leases: copyMap(_leaseState)",
     "readonly property var correlationState: copyMap(_correlationState)",
 ):
@@ -151,6 +152,7 @@ for token in (
 required_coordinator_functions = (
     "copyValue",
     "copyMap",
+    "correlationIdFor",
     "kittyListenAddress",
     "normalizedObservedLease",
     "reconcileObservedInstrumentation",
@@ -264,6 +266,7 @@ for token in (
     '"requires-socket-only"',
     '"requires-loopback"',
     "slice(0, 60)",
+    "Math.random() * 0x100000000",
 ):
     if token not in coordinator:
         errors.append(f"missing augmentation readiness/lease contract token: {token}")

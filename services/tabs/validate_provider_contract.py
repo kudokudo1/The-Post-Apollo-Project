@@ -30,6 +30,8 @@ required_functions = {
     "hasNativeLifecycleControl",
     "providerRecordKey",
     "identityEvidence",
+    "normalizedProcessPids",
+    "tabObservationSignature",
     "setLifecycleFrozen",
 }
 
@@ -110,10 +112,42 @@ for mutation_token in (
 
 # The provider boundary is consumer-controlled through one neutral activity
 # input rather than AppControl-specific mode knowledge.
-for evidence_field in ("busName", "objectPath"):
+for evidence_field in (
+    "busName",
+    "objectPath",
+    "processPids",
+    "debugPort",
+    "targetId",
+    "kittyAddress",
+    "kittyTabId",
+):
     if evidence_field not in text:
         errors.append(
             f"missing Team 7 requested provider evidence field: {evidence_field}"
+        )
+
+signature_start = text.find("function tabObservationSignature")
+signature_end = text.find("function tabRowsSignature", signature_start)
+signature_text = (
+    text[signature_start:signature_end]
+    if signature_start >= 0 and signature_end > signature_start
+    else ""
+)
+
+for evidence_field in (
+    "processPids",
+    "busName",
+    "objectPath",
+    "debugPort",
+    "targetId",
+    "kittyAddress",
+    "kittyTabId",
+    "appName",
+    "windowName",
+):
+    if evidence_field not in signature_text:
+        errors.append(
+            f"stable snapshot signature ignores evidence field: {evidence_field}"
         )
 
 if "running: tabSurfaceProvider.active" not in text:

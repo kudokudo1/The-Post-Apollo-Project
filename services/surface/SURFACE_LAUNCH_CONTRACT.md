@@ -138,6 +138,10 @@ When requested for a Kitty launch:
 
 A caller-supplied `--listen-on` endpoint is preserved instead of overwritten.
 
+The donor security boundary is also preserved: `KITTY_REMOTE` requires
+`allow_remote_control=socket-only`. A caller-supplied broader remote-control
+mode is a preparation conflict rather than being treated as equivalent.
+
 Generated endpoint metadata remains discoverable because Kitty exposes the
 listen address through its running process environment.
 
@@ -246,12 +250,14 @@ coordinator releases that transaction's partial reservations before returning
 `ready: false`. A rejected augmentation therefore owns no instrumentation
 lease and creates no application-instance correlation state.
 
-`markLaunchSucceeded(...)` keeps those logical leases.
+`markLaunchSucceeded(...)` accepts only a known prepared correlation and keeps
+its logical leases. Unknown/stale ids do not create state.
 
-`markLaunchFailed(...)` releases them.
+`markLaunchFailed(...)` releases the known transaction state/leases.
 
 `releaseCorrelation(...)` is an explicit application/lease-lifetime hook for a
-future launcher/process-lifetime owner.
+future launcher/process-lifetime owner. It removes correlation state even when a
+capability such as ACCESSIBILITY has no endpoint lease.
 
 Transaction callbacks are useful bookkeeping but are not required for ordinary
 T5 post-launch discovery.

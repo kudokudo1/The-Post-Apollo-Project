@@ -33,6 +33,7 @@ Scope {
     property var diagnostics: []
     property string diagnosticsSignature: ""
     property string dataSignature: ""
+    property string controlsSignature: ""
 
     property bool bridgeReady: false
     property string bridgeError: ""
@@ -123,6 +124,44 @@ function tabLifecycleScript() {
             normalized.push(tabObservationSignature(rows[i]));
 
         return JSON.stringify(normalized);
+    }
+
+    function controlObservationSignature(row) {
+        row = row || ({});
+
+        return [
+            String(row.provider || ""),
+            String(row.id || row.path || ""),
+            String(row.path || ""),
+            String(row.controlName || row.name || ""),
+            String(row.appName || ""),
+            String(row.windowName || ""),
+            Number(row.role || -1),
+            String(row.roleName || ""),
+            !!row.selected
+        ];
+    }
+
+    function controlRowsSignature(rows) {
+        const normalized = [];
+
+        for (let i = 0; i < rows.length; i++)
+            normalized.push(controlObservationSignature(rows[i]));
+
+        return JSON.stringify(normalized);
+    }
+
+    function updateControlsStable(nextControls) {
+        if (!Array.isArray(nextControls))
+            return;
+
+        const signature = controlRowsSignature(nextControls);
+
+        if (signature === controlsSignature)
+            return;
+
+        controlsSignature = signature;
+        controls = nextControls.slice();
     }
 
     function updateTabsStable(nextTabs) {
@@ -368,8 +407,9 @@ function tabLifecycleScript() {
                     }
 
                     if (Array.isArray(payload.controls))
-                        tabSurfaceProvider.controls =
-                            payload.controls.slice();
+                        tabSurfaceProvider.updateControlsStable(
+                            payload.controls
+                        );
 
                     if (Array.isArray(payload.tabs)) {
                         const nextTabs = payload.tabs;

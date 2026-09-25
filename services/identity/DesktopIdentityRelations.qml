@@ -15,6 +15,7 @@ QtObject {
     readonly property string relationTokenNormalized: "TOKEN_NORMALIZED_MATCH"
     readonly property string relationTokenSuffix: "TOKEN_SUFFIX_HEURISTIC"
     readonly property string relationDebugPortOwner: "EXACT_DEBUG_PORT_OWNER"
+    readonly property string relationKittyEndpoint: "EXACT_KITTY_ENDPOINT"
 
     function asText(value) {
         return value === undefined || value === null
@@ -367,6 +368,67 @@ QtObject {
         return result;
     }
 
+    // Generated/observed Kitty listen addresses can tie a launch
+    // instrumentation instance to a discovered Kitty surface. Equality is an
+    // exact endpoint fact, but still not persistent application identity.
+    function kittyEndpointEdges(observations) {
+        const source = Array.isArray(observations)
+                     ? observations
+                     : [];
+        const result = [];
+        const seen = ({});
+
+        for (let i = 0; i < source.length; i++) {
+            const launch = source[i];
+
+            if (!launch
+                    || asText(launch.provider) !== "SURFACE_LAUNCH")
+                continue;
+
+            const launchRaw = launch.raw || ({});
+            const listenOn = asText(
+                launchRaw.kittyListenOn
+            ).trim();
+
+            if (!listenOn)
+                continue;
+
+            for (let j = 0; j < source.length; j++) {
+                const surface = source[j];
+
+                if (!surface
+                        || asText(surface.provider) !== "KITTY")
+                    continue;
+
+                const surfaceRaw = surface.raw || ({});
+                const address = asText(
+                    surfaceRaw.kittyAddress
+                ).trim();
+
+                if (!address || address !== listenOn)
+                    continue;
+
+                pushUniqueEdge(
+                    result,
+                    seen,
+                    edge(
+                        launch,
+                        surface,
+                        relationKittyEndpoint,
+                        evidence.strengthExact,
+                        "raw.kittyListenOn<->raw.kittyAddress",
+                        {
+                            kittyAddress: address,
+                            evidenceFamily: "kitty-endpoint"
+                        }
+                    )
+                );
+            }
+        }
+
+        return result;
+    }
+
     function rawComparable(value) {
         return asText(value).trim().toLowerCase();
     }
@@ -503,6 +565,7 @@ QtObject {
             explicitEdges: explicitEdges(observations),
             pidGroups: pidGroups(observations),
             debugPortEdges: debugPortEdges(observations),
+            kittyEndpointEdges: kittyEndpointEdges(observations),
             aliasEdges: aliasEdges(observations)
         };
     }

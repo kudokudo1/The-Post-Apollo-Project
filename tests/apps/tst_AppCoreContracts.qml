@@ -57,6 +57,22 @@ TestCase {
     }
 
     QtObject {
+        id: fakePresentationColors
+
+        readonly property string orange: "orange"
+        readonly property string red: "red"
+        readonly property string omnitrix: "green"
+        readonly property string cyan: "cyan"
+        readonly property string magenta: "magenta"
+        readonly property string white: "white"
+    }
+
+    AppIconGlowPolicy {
+        id: iconGlowPolicy
+        colors: fakePresentationColors
+    }
+
+    QtObject {
         id: fakeIdentityEvidence
 
         function desktopEntryObservation(entry) {
@@ -90,6 +106,7 @@ TestCase {
     AppCoreFacade {
         id: facade
         identityEvidence: fakeIdentityEvidence
+        presentationColors: fakePresentationColors
         hiddenCommandNames: ["beta", "alpha"]
     }
 
@@ -584,6 +601,101 @@ TestCase {
         facade.setSourceMode(facade.sourceNative);
         facade.setLaunchMode(facade.launchNormal);
         facade.selectBottle("");
+    }
+
+    function test_iconGlowPolicyPreservesDonorClassification() {
+        compare(iconGlowPolicy.classify([]), "orange");
+        compare(
+            iconGlowPolicy.classify([255, 0, 0, 255]),
+            "red"
+        );
+        compare(
+            iconGlowPolicy.classify([0, 255, 0, 255]),
+            "green"
+        );
+        compare(
+            iconGlowPolicy.classify([0, 200, 255, 255]),
+            "cyan"
+        );
+        compare(
+            iconGlowPolicy.classify([180, 0, 255, 255]),
+            "magenta"
+        );
+        compare(
+            iconGlowPolicy.classify([255, 255, 255, 255]),
+            "white"
+        );
+        compare(
+            iconGlowPolicy.classify([0, 0, 0, 255]),
+            "magenta"
+        );
+    }
+
+    function test_iconGlowCacheReassignsAndRespectsOverwritePolicy() {
+        const before = iconGlowPolicy.cache;
+
+        compare(
+            iconGlowPolicy.remember(
+                "icon://native",
+                "cyan",
+                false
+            ),
+            true
+        );
+
+        verify(iconGlowPolicy.cache !== before);
+        compare(
+            iconGlowPolicy.cached("icon://native"),
+            "cyan"
+        );
+
+        compare(
+            iconGlowPolicy.remember(
+                "icon://native",
+                "red",
+                false
+            ),
+            false
+        );
+        compare(
+            iconGlowPolicy.cached("icon://native"),
+            "cyan"
+        );
+
+        compare(
+            iconGlowPolicy.remember(
+                "icon://native",
+                "red",
+                true
+            ),
+            true
+        );
+        compare(
+            iconGlowPolicy.cached("icon://native"),
+            "red"
+        );
+    }
+
+    function test_facadeExposesAppPresentationPolicyOnly() {
+        compare(
+            facade.classifyIconGlow(
+                [255, 0, 0, 255]
+            ),
+            "red"
+        );
+
+        compare(
+            facade.rememberIconGlow(
+                "icon://facade",
+                "cyan",
+                false
+            ),
+            true
+        );
+        compare(
+            facade.cachedIconGlow("icon://facade"),
+            "cyan"
+        );
     }
 
     function test_sourceClassification() {

@@ -73,6 +73,12 @@ TestCase {
         identityEvidence: fakeIdentityEvidence
     }
 
+    AppCoreFacade {
+        id: facade
+        identityEvidence: fakeIdentityEvidence
+        hiddenCommandNames: ["beta", "alpha"]
+    }
+
     function nativeEntry() {
         return {
             id: "org.example.Native.desktop",
@@ -335,6 +341,89 @@ TestCase {
         compare(
             identityAdapter.rawForEntry(entry).name,
             "Native App"
+        );
+    }
+
+    function test_facadeComposesIsolatedAppCore() {
+        const native = nativeEntry();
+        const brave = braveEntry();
+
+        compare(facade.sourceNative, core.sourceNative);
+        compare(facade.launchNormal, core.launchNormal);
+        compare(facade.entryKey(native), "org.example.Native.desktop");
+        compare(facade.sourceLabel(native), "NORMAL");
+        compare(
+            facade.entryLaunchableForSource(
+                native,
+                facade.sourceNative
+            ),
+            true
+        );
+
+        const observation = facade.identityObservation(native);
+
+        verify(observation !== null);
+        compare(
+            observation.providerKey,
+            "desktop-entry:org.example.Native.desktop"
+        );
+
+        const actions = facade.actionsFor(brave);
+        let newTabAction = null;
+
+        for (let i = 0; i < actions.length; i++) {
+            if (actions[i]
+                    && actions[i]._appControlBuiltin === "new-tab") {
+                newTabAction = actions[i];
+                break;
+            }
+        }
+
+        verify(newTabAction !== null);
+
+        const actionPlan = facade.planAction(
+            newTabAction,
+            brave,
+            0
+        );
+
+        compare(
+            actionPlan.kind,
+            actionPlanner.planBrowserLaunch
+        );
+        compare(
+            actionPlan.extraArgs.join(" "),
+            "--new-tab brave://newtab/"
+        );
+
+        const launchPlan = facade.planLaunch(
+            native,
+            facade.sourceNative,
+            facade.launchNormal,
+            "",
+            {
+                ready: true,
+                env: { ACCESSIBILITY_ENABLED: "1" },
+                argvAfterExecutable: ["--surface-ready"],
+                argvAppend: []
+            }
+        );
+
+        compare(
+            launchPlan.commandTokens.join(" "),
+            "/usr/bin/native-app --surface-ready"
+        );
+        compare(
+            launchPlan.launchEnv.ACCESSIBILITY_ENABLED,
+            "1"
+        );
+
+        compare(
+            facade.restoreIndex(
+                [native, brave],
+                "brave-browser.desktop"
+            ),
+            1
         );
     }
 

@@ -375,11 +375,24 @@ TestCase {
         compare(plan.commandText, "secret-command --flag");
     }
 
-    function test_suppliedSurfaceLaunchAugmentationIsOpaque() {
+    function test_surfaceLaunchAugmentationUsesPublishedShape() {
         const native = nativeEntry();
         const supplied = {
-            capabilities: ["KITTY_REMOTE", "ACCESSIBILITY"],
-            token: "t5-owned-payload"
+            ready: true,
+            correlationId: "surface-123",
+            requestedCapabilities: ["ACCESSIBILITY", "DEVTOOLS"],
+            appliedCapabilities: ["ACCESSIBILITY", "DEVTOOLS"],
+            unsupportedCapabilities: [],
+            env: {
+                ACCESSIBILITY_ENABLED: "1"
+            },
+            argvAfterExecutable: ["--after-executable"],
+            argvAppend: ["--append-last"],
+            bootstrap: {
+                debugPort: 9222
+            },
+            leases: [{ kind: "devtools-port", value: 9222 }],
+            conflicts: []
         };
 
         const plan = launchPlanner.plan(
@@ -391,14 +404,68 @@ TestCase {
         );
 
         compare(plan.kind, launchPlanner.planDesktopEntry);
-        compare(plan.surfaceLaunchAugmentation, supplied);
-        compare(plan.surfaceLaunchAugmentation.token, "t5-owned-payload");
-
-        // Team 8 must not infer or rewrite capability semantics here.
+        compare(plan.surfaceLaunchAugmentation.ready, true);
         compare(
-            plan.surfaceLaunchAugmentation.capabilities.join("+"),
-            "KITTY_REMOTE+ACCESSIBILITY"
+            plan.surfaceLaunchAugmentation.correlationId,
+            "surface-123"
         );
+        compare(plan.launchEnv.ACCESSIBILITY_ENABLED, "1");
+        compare(
+            plan.commandTokens.join(" "),
+            "/usr/bin/native-app --after-executable --append-last"
+        );
+        compare(
+            plan.surfaceLaunchAugmentation.appliedCapabilities.join("+"),
+            "ACCESSIBILITY+DEVTOOLS"
+        );
+        compare(plan.surfaceLaunchAugmentation.bootstrap.debugPort, 9222);
+    }
+
+    function test_surfaceLaunchNotReadyBlocksLaunch() {
+        const native = nativeEntry();
+
+        const plan = launchPlanner.plan(
+            native,
+            core.sourceNative,
+            core.launchNormal,
+            "",
+            {
+                ready: false,
+                conflicts: [{
+                    kind: "devtools-port",
+                    value: 9222
+                }]
+            }
+        );
+
+        compare(plan.kind, launchPlanner.planUnavailable);
+        compare(plan.reason, "surface-launch-not-ready");
+        compare(plan.surfaceLaunchAugmentation.ready, false);
+        compare(plan.surfaceLaunchAugmentation.conflicts.length, 1);
+    }
+
+    function test_surfaceLaunchAugmentsToolboxArgvStructurally() {
+        const native = nativeEntry();
+
+        const plan = launchPlanner.plan(
+            native,
+            core.sourceNative,
+            core.launchToolbox,
+            "",
+            {
+                ready: true,
+                env: { TEST_SURFACE: "1" },
+                argvAfterExecutable: ["--first"],
+                argvAppend: ["--last"]
+            }
+        );
+
+        compare(plan.kind, launchPlanner.planToolboxArgv);
+        compare(
+            plan.argv.join(" "),
+            "/usr/bin/native-app --first --last"
+        );
+        compare(plan.launchEnv.TEST_SURFACE, "1");
     }
 
     function test_bottlePayloadParsing() {

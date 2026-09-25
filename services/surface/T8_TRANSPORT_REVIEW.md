@@ -22,7 +22,21 @@ T8 currently:
 
 Those behaviors match the ownership ruling.
 
-## One current wrapper-placement gap
+## Wrapper-placement gap — RESOLVED BY T8
+
+T8 subsequently repaired the Flatpak transport and added regression coverage for:
+
+- plain Flatpak launch with no existing application argv
+- Flatpak launch with existing application argv (`ssh host`)
+- wrapper options before APP_ID
+- unresolved application boundary failing closed
+
+Observed repaired T8 branch behavior places `argvAfterExecutable` immediately
+after APP_ID and before existing application argv.
+
+The original issue and rationale are retained below as design history.
+
+## Original wrapper-placement gap
 
 The current T8 Flatpak path effectively does:
 
@@ -107,3 +121,15 @@ leases: []
 
 T8 should continue treating `ready` as authoritative even though the rejected
 payload is no longer executable by accident.
+
+
+## Current disposition
+
+```text
+T5 POLICY DEFECT       NO
+T8 TRANSPORT DEFECT    CLOSED ✅
+OWNERSHIP DISPUTE      NO
+HOST BLOCKER           NO
+```
+
+No T5 workaround is required.

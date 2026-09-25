@@ -19,6 +19,12 @@ TestCase {
             [],
             { complete: true }
         );
+
+        recovery.applySnapshot({
+            observations: [],
+            completeKinds: [],
+            errors: []
+        });
     }
 
     function braveEvidence() {

@@ -38,9 +38,8 @@ QtObject {
         return providerIdentity(entry).length > 0;
     }
 
-    // Prefer the identity emitted by FileService. The path fallback preserves
-    // the same provider namespace for compatible FILE records without making
-    // Favorites responsible for filesystem identity semantics.
+    // Consume only the identity emitted by FileService. Favorites must not
+    // synthesize canonical FILE identity from path or presentation fields.
     function providerIdentity(entry) {
         if (!isFileRecord(entry) || isParentRecord(entry))
             return "";

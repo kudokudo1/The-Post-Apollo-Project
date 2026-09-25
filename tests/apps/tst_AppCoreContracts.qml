@@ -37,6 +37,11 @@ TestCase {
         launchPlanner: launchPlanner
     }
 
+    AppSelectionPolicy {
+        id: selectionPolicy
+        catalogPolicy: catalogPolicy
+    }
+
     function nativeEntry() {
         return {
             id: "org.example.Native.desktop",
@@ -242,6 +247,41 @@ TestCase {
         compare(filtered.length, 2);
         compare(filtered[0].name, "alpha");
         compare(filtered[1].name, "beta");
+    }
+
+    function test_selectionPolicyRestoresRememberedApp() {
+        const native = nativeEntry();
+        const flatpak = flatpakEntry();
+        const rows = [native, flatpak];
+
+        compare(
+            selectionPolicy.rememberedKeyFor(flatpak),
+            "com.example.Flatpak.desktop"
+        );
+
+        compare(
+            selectionPolicy.restoreIndex(
+                rows,
+                "com.example.Flatpak.desktop"
+            ),
+            1
+        );
+
+        compare(
+            selectionPolicy.restoreIndex(
+                rows,
+                "missing.desktop"
+            ),
+            0
+        );
+
+        compare(
+            selectionPolicy.restoreIndex(
+                [],
+                "anything"
+            ),
+            -1
+        );
     }
 
     function test_sourceClassification() {

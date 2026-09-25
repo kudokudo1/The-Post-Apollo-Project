@@ -7,6 +7,7 @@ TestCase {
 
     readonly property var requirements: SurfaceLaunchRequirements
     readonly property var coordinator: SurfaceLaunchCoordinator
+    readonly property var recovery: SurfaceInstrumentationRecovery
 
     function cleanup() {
         const ids = Object.keys(coordinator.correlationState);
@@ -451,6 +452,72 @@ TestCase {
                 .appliedCapabilities
                 .indexOf("BROKEN") === -1
         );
+    }
+
+    function test_recoverySnapshotRehydratesSharedAuthorityWithoutTabs() {
+        const snapshot = recovery.applySnapshot({
+            observations: [
+                {
+                    kind: "devtools-port",
+                    value: 9444,
+                    providerKey: ""
+                },
+                {
+                    kind: "kitty-listen-on",
+                    value: "unix:@recovered-kitty",
+                    providerKey: ""
+                }
+            ],
+            completeKinds: [
+                "devtools-port",
+                "kitty-listen-on"
+            ],
+            errors: []
+        });
+
+        compare(snapshot.observations.length, 2);
+        compare(snapshot.completeKinds.length, 2);
+
+        const result = recovery.reconcileSharedAuthority();
+
+        compare(result.adopted, 2);
+        verify(
+            coordinator.leases["devtools-port:9444"] !== undefined
+        );
+        verify(
+            coordinator.leases[
+                "kitty-listen-on:unix:@recovered-kitty"
+            ] !== undefined
+        );
+        compare(
+            coordinator.leases["devtools-port:9444"].source,
+            "observed"
+        );
+    }
+
+    function test_recoverySnapshotFiltersUnknownKinds() {
+        const snapshot = recovery.applySnapshot({
+            observations: [
+                {
+                    kind: "unknown-kind",
+                    value: "ignored"
+                },
+                {
+                    kind: "devtools-port",
+                    value: 9555
+                }
+            ],
+            completeKinds: [
+                "unknown-kind",
+                "devtools-port"
+            ],
+            errors: []
+        });
+
+        compare(snapshot.observations.length, 1);
+        compare(snapshot.observations[0].kind, "devtools-port");
+        compare(snapshot.completeKinds.length, 1);
+        compare(snapshot.completeKinds[0], "devtools-port");
     }
 
     function test_observedDevToolsLeaseSurvivesCoordinatorRestartRecovery() {

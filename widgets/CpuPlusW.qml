@@ -284,7 +284,7 @@ PanelWindow {
     // entire CPU++ chassis left without changing its dimensions.
     margins {
         top: -3
-        right: 82
+        right: 182
     }
 
     color: "transparent"

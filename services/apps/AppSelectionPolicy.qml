@@ -3,7 +3,7 @@ import QtQuick
 // Team 8 — APPS Core selection policy.
 //
 // Pure APPS remembrance/restore semantics only. It never mutates host selection,
-// ListView position, focus, or navigation state.
+// host view position, input state, or navigation state.
 QtObject {
     id: policy
 

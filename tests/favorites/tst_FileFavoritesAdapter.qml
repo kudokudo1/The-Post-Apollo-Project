@@ -128,39 +128,32 @@ TestCase {
         );
     }
 
-    function test_lazy_migration_replaces_legacy_in_place() {
+    function test_lazy_migration_plan_uses_provider_identity() {
         const legacy =
             FavoritesBackend.FileFavoritesAdapter.legacyFavoriteKey(fileEntry, 2);
         const canonical =
             FavoritesBackend.FileFavoritesAdapter.canonicalFavoriteKey(fileEntry);
 
-        compare(
-            JSON.stringify(
-                FavoritesBackend.FileFavoritesAdapter.migratedKeysForEntry(
-                    fileEntry,
-                    2,
-                    ["app:keep", legacy, "task|keep"]
-                )
-            ),
-            JSON.stringify(["app:keep", canonical, "task|keep"])
-        );
+        const plan =
+            FavoritesBackend.FileFavoritesAdapter.migrationPlan(
+                fileEntry,
+                2,
+                ["app:keep", legacy, "task|keep"]
+            );
+
+        verify(plan !== null);
+        compare(plan.oldKey, legacy);
+        compare(plan.newKey, canonical);
     }
 
-    function test_duplicate_legacy_and_canonical_collapse() {
-        const legacy =
-            FavoritesBackend.FileFavoritesAdapter.legacyFavoriteKey(fileEntry, 2);
-        const canonical =
-            FavoritesBackend.FileFavoritesAdapter.canonicalFavoriteKey(fileEntry);
-
+    function test_no_migration_plan_without_legacy_membership() {
         compare(
-            JSON.stringify(
-                FavoritesBackend.FileFavoritesAdapter.migratedKeysForEntry(
-                    fileEntry,
-                    2,
-                    [canonical, legacy]
-                )
+            FavoritesBackend.FileFavoritesAdapter.migrationPlan(
+                fileEntry,
+                2,
+                ["app:keep", "task|keep"]
             ),
-            JSON.stringify([canonical])
+            null
         );
     }
 

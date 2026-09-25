@@ -50,6 +50,12 @@ TestCase {
 
         compare(augmentation.appliedCapabilities.length, 0);
         verify(augmentation.ready);
+        compare(augmentation.correlationId, "");
+        compare(
+            Object.keys(coordinator.correlationState).length,
+            0
+        );
+        compare(Object.keys(coordinator.leases).length, 0);
         compare(Object.keys(augmentation.env).length, 0);
         compare(augmentation.argvAppend.length, 0);
         compare(augmentation.argvAfterExecutable.length, 0);
@@ -77,6 +83,45 @@ TestCase {
         );
 
         compare(augmentation.appliedCapabilities.length, 0);
+    }
+
+    function test_unknownCapabilityFailsVisible() {
+        const augmentation = coordinator.buildAugmentation(
+            braveEvidence(),
+            ["DEVTOOL"]
+        );
+
+        verify(!augmentation.ready);
+        compare(augmentation.correlationId, "");
+        compare(augmentation.appliedCapabilities.length, 0);
+        compare(augmentation.unsupportedCapabilities.length, 1);
+        compare(augmentation.unsupportedCapabilities[0], "DEVTOOL");
+        compare(Object.keys(coordinator.leases).length, 0);
+        compare(
+            Object.keys(coordinator.correlationState).length,
+            0
+        );
+    }
+
+    function test_unsupportedKnownCapabilityFailsBeforeLeasing() {
+        const augmentation = coordinator.buildAugmentation(
+            {
+                displayName: "Calculator",
+                executable: "gnome-calculator",
+                argv: ["gnome-calculator"]
+            },
+            [requirements.capabilityDevTools]
+        );
+
+        verify(!augmentation.ready);
+        compare(augmentation.correlationId, "");
+        compare(augmentation.appliedCapabilities.length, 0);
+        compare(augmentation.unsupportedCapabilities.length, 1);
+        compare(
+            augmentation.unsupportedCapabilities[0],
+            requirements.capabilityDevTools
+        );
+        compare(Object.keys(coordinator.leases).length, 0);
     }
 
     function test_kittyRemoteAugmentation() {
@@ -397,6 +442,42 @@ TestCase {
         compare(
             second.conflicts[0].existingCorrelationId,
             first.correlationId
+        );
+    }
+
+    function test_rejectedConflictDoesNotStrandLeaseState() {
+        const first = coordinator.buildAugmentation(
+            braveEvidence(),
+            [requirements.capabilityDevTools]
+        );
+
+        const conflictingEvidence = braveEvidence();
+        conflictingEvidence.argv = [
+            "brave-browser",
+            "--remote-debugging-port=9222"
+        ];
+
+        const second = coordinator.buildAugmentation(
+            conflictingEvidence,
+            [requirements.capabilityDevTools]
+        );
+
+        verify(first.ready);
+        verify(!second.ready);
+        compare(second.leases.length, 0);
+        compare(second.appliedCapabilities.length, 0);
+
+        const leaseKeys = Object.keys(coordinator.leases);
+        compare(leaseKeys.length, 1);
+        compare(
+            coordinator.leases[leaseKeys[0]].correlationId,
+            first.correlationId
+        );
+
+        verify(
+            coordinator.correlationState[
+                second.correlationId
+            ] === undefined
         );
     }
 

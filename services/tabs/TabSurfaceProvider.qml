@@ -334,6 +334,57 @@ function tabLifecycleScript() {
         };
     }
 
+    function instrumentationLeaseObservations(rows) {
+        const source = Array.isArray(rows)
+            ? rows
+            : (Array.isArray(tabs) ? tabs : []);
+        const result = [];
+        const seen = {};
+
+        for (let i = 0; i < source.length; i++) {
+            const entry = source[i] || ({});
+            const evidence = identityEvidence(entry);
+            const provider = String(evidence.provider || "").toUpperCase();
+
+            if (provider === "DEVTOOLS") {
+                const port = Number(evidence.debugPort || 0);
+
+                if (port > 0) {
+                    const key = "devtools-port:" + String(port);
+
+                    if (!seen[key]) {
+                        seen[key] = true;
+                        result.push({
+                            kind: "devtools-port",
+                            value: port,
+                            providerKey: evidence.providerKey
+                        });
+                    }
+                }
+            }
+
+            if (provider === "KITTY") {
+                const address =
+                    String(evidence.kittyAddress || "").trim();
+
+                if (address) {
+                    const key = "kitty-listen-on:" + address;
+
+                    if (!seen[key]) {
+                        seen[key] = true;
+                        result.push({
+                            kind: "kitty-listen-on",
+                            value: address,
+                            providerKey: evidence.providerKey
+                        });
+                    }
+                }
+            }
+        }
+
+        return result;
+    }
+
     function nativeLifecycleKey(entry) {
         const value = providerRecordKey(entry);
         return value.length > 0 ? "tab|" + value : "";

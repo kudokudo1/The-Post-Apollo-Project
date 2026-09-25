@@ -164,6 +164,32 @@ Owns:
 
 Its browser classifier is a behavior classifier only. It is not canonical identity.
 
+## Pre-integration donor parity
+
+`services/apps/validate_donor_parity.py` is a temporary semantic guard while the donor
+APPS implementation still exists in `AppControlW.qml`.
+
+It checks that the live donor and isolated Team 8 organs still agree on:
+
+- Flatpak classification
+- source labels
+- launch-command availability
+- DesktopEntry field-code cleanup
+- browser classification
+- browser action catalog
+- browser shortcut policy
+- browser launch arguments
+- HIDDEN icon/record shape
+- APPS local key fallback
+- result-policy anchors
+
+It also asserts the intended decoupling: the extracted HIDDEN adapter must not retain the
+donor's `execute()` callback or an AppControl back-reference.
+
+This guard is **pre-integration only**. Once T3 authorizes APPS donor-block removal, it
+must be retired or converted to fixture/golden tests rather than being used to demand that
+removed donor code remain present.
+
 ## Future host integration rule
 
 When T3 Overhead eventually releases Team 8 for host integration:

@@ -349,11 +349,13 @@ Scope {
     }
 
     // Team 7 compatibility adapter. This is an observation record, not a
-    // canonical ApplicationEntity. The exact Team 7 schema is still under
-    // reconnaissance, so keep this adapter additive and provenance-rich.
+    // canonical ApplicationEntity. Team 7 now freezes the common evidence
+    // envelope, while semantic resolution and canonical entities remain
+    // separate concerns.
     function streamObservation(input) {
         const evidence = streamEvidence(input);
         const aliases = [];
+        const relationships = [];
 
         function addAlias(kind, value) {
             const rawValue = String(value || "");
@@ -363,7 +365,8 @@ Scope {
             aliases.push({
                 kind: String(kind || ""),
                 value: rawValue,
-                normalized: applicationAudioService.normalizeToken(rawValue)
+                normalized: applicationAudioService.normalizeToken(rawValue),
+                provider: "PIPEWIRE"
             });
         }
 
@@ -371,6 +374,17 @@ Scope {
         addAlias("application.id", evidence.applicationId);
         addAlias("application.name", evidence.applicationName);
         addAlias("media.name", evidence.mediaName);
+
+        const pid = Number(evidence.applicationProcessId || 0);
+        if (!isNaN(pid) && Math.floor(pid) === pid && pid > 1) {
+            relationships.push({
+                kind: "EXACT_PID",
+                targetProvider: "PROCFS",
+                targetKey: "pid:" + String(pid),
+                strength: "exact",
+                sourceField: "application.process.id"
+            });
+        }
 
         const providerKey = evidence.streamIndex === undefined
             || evidence.streamIndex === null
@@ -384,7 +398,7 @@ Scope {
             generation: observationGeneration,
             raw: evidence,
             aliases: aliases,
-            relationships: []
+            relationships: relationships
         };
     }
 

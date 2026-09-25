@@ -163,9 +163,13 @@ Bottle / terminal execution mechanism.
 
 ### Why two argv buckets exist
 
-Kitty remote-control flags must be placed with Kitty's own executable options,
-while Chromium/Electron accessibility and DevTools flags are appendable launch
-arguments.
+Kitty remote-control flags must be placed with Kitty's own application options,
+before any existing application payload/child-command arguments. Chromium /
+Electron accessibility and DevTools flags are appendable application arguments.
+
+Therefore `argvAfterExecutable` means the application-facing option boundary,
+not necessarily host argv index 1. A wrapper owner such as Flatpak/Toolbox/
+Bottles must translate that semantic boundary through its own mechanism.
 
 The shared coordinator describes the placement requirement. It does not own the
 mechanism that applies it.

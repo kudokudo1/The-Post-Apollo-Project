@@ -16,6 +16,7 @@ QtObject {
 
     readonly property string lifetimePersistent: "persistent"
     readonly property string lifetimeSession: "session"
+    readonly property string lifetimeApplicationInstance: "application-instance"
     readonly property string lifetimeEphemeral: "ephemeral"
 
     readonly property string strengthExact: "exact"
@@ -109,6 +110,7 @@ QtObject {
                          raw, aliases, relationships, generation) {
         const lifetime = lifetimeClass === lifetimePersistent
                       || lifetimeClass === lifetimeSession
+                      || lifetimeClass === lifetimeApplicationInstance
                       || lifetimeClass === lifetimeEphemeral
                       ? lifetimeClass
                       : lifetimeEphemeral;
@@ -337,6 +339,9 @@ QtObject {
             appName: asText(evidence.appName),
             windowName: asText(evidence.windowName),
             path: asText(evidence.path),
+            role: evidence.role === undefined
+                  ? null
+                  : evidence.role,
             roleName: asText(evidence.roleName),
             busName: asText(evidence.busName),
             objectPath: asText(evidence.objectPath),
@@ -357,6 +362,67 @@ QtObject {
             raw,
             aliases,
             relationships,
+            generation
+        );
+    }
+
+    // Consumes T5-domain SurfaceLaunch bootstrap/correlation output as its
+    // own application-instance observation. These coordinates help join a
+    // launch transaction to later process/surface observations, but they are
+    // never persistent semantic application identity.
+    function surfaceLaunchObservation(launchMetadata, generation) {
+        if (!launchMetadata)
+            return observation("SURFACE_LAUNCH", "",
+                               lifetimeApplicationInstance,
+                               ({}), [], [], generation);
+
+        const bootstrap = launchMetadata.bootstrap || launchMetadata;
+        const correlationId = asText(
+            bootstrap.correlationId
+            || launchMetadata.correlationId
+        );
+        const debugPort = Number(
+            bootstrap.debugPort
+            || launchMetadata.debugPort
+            || 0
+        );
+        const requested = Array.isArray(
+            launchMetadata.requestedCapabilities
+        ) ? launchMetadata.requestedCapabilities.slice() : [];
+        const applied = Array.isArray(
+            launchMetadata.appliedCapabilities
+        ) ? launchMetadata.appliedCapabilities.slice() : [];
+        const unsupported = Array.isArray(
+            launchMetadata.unsupportedCapabilities
+        ) ? launchMetadata.unsupportedCapabilities.slice() : [];
+
+        const raw = {
+            correlationId: correlationId,
+            kittyListenOn: asText(
+                bootstrap.kittyListenOn
+                || launchMetadata.kittyListenOn
+            ),
+            debugAddress: asText(
+                bootstrap.debugAddress
+                || launchMetadata.debugAddress
+            ),
+            debugPort: !isNaN(debugPort) && debugPort > 0
+                       ? debugPort
+                       : 0,
+            requestedCapabilities: requested,
+            appliedCapabilities: applied,
+            unsupportedCapabilities: unsupported
+        };
+
+        return observation(
+            "SURFACE_LAUNCH",
+            correlationId
+            ? "surface-launch:" + correlationId
+            : "",
+            lifetimeApplicationInstance,
+            raw,
+            [],
+            [],
             generation
         );
     }

@@ -472,9 +472,37 @@ without interpreting capability-domain policy.
 
 Wrapper transport is mechanism-aware. In particular, `argvAfterExecutable` must not be
 blindly inserted after token 0 for a Flatpak DesktopEntry because token 0 is `flatpak`,
-not the application executable. Team 8 currently keeps Flatpak application-facing
-augmentation after the existing wrapper/application coordinates, while direct/native argv
-places `argvAfterExecutable` immediately after the executable token.
+not the application executable.
+
+T3 later confirmed a defect in the first Flatpak transport implementation: appending
+SurfaceLaunch argv after the whole existing Flatpak command was also incorrect whenever
+the DesktopEntry already carried application arguments.
+
+The repaired invariant is now:
+
+```
+flatpak run [wrapper options] APP_ID
+    + argvAfterExecutable
+    + existing application argv
+    + argvAppend
+```
+
+Team 8 resolves the application boundary by preferring the DesktopEntry id (minus
+`.desktop`) when it appears in the Flatpak argv and falls back to parsing the
+`flatpak run` option region. If the application boundary cannot be established,
+launch planning fails closed with `flatpak-application-boundary-unresolved`.
+
+Required regression cases now include:
+
+```
+flatpak run net.kovidgoyal.kitty
+    -> APP_ID + augmentation
+
+flatpak run net.kovidgoyal.kitty ssh host
+    -> APP_ID + argvAfterExecutable + ssh host
+```
+
+Direct/native argv still places `argvAfterExecutable` immediately after token 0.
 
 Shell and Bottles plans retain normalized SurfaceLaunch augmentation for their
 mechanism-specific execution layer. Opaque shell argv mutation still fails closed.

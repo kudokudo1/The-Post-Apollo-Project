@@ -147,6 +147,8 @@ TestCase {
             providerKey: "kitty:7",
             appName: "Kitty",
             windowName: "1",
+            role: 37,
+            roleName: "page tab",
             processPids: [7001, 7002, 7002],
             kittyAddress: "unix:/tmp/kitty",
             kittyTabId: 7
@@ -155,6 +157,8 @@ TestCase {
         compare(observation.provider, "KITTY");
         compare(observation.providerKey, "kitty:7");
         compare(observation.raw.kittyTabId, 7);
+        compare(observation.raw.role, 37);
+        compare(observation.raw.roleName, "page tab");
         compare(observation.raw.processPids.length, 2);
         compare(observation.relationships.length, 2);
 
@@ -184,6 +188,39 @@ TestCase {
         verify(alias !== null);
         compare(alias.value, "Brave");
         compare(alias.normalized, "brave");
+        verify(observation.canonicalId === undefined);
+    }
+
+    function test_surfaceLaunchObservationKeepsInstanceClockSeparate() {
+        const observation = identity.surfaceLaunchObservation({
+            correlationId: "launch-abc",
+            requestedCapabilities: ["KITTY_REMOTE", "DEVTOOLS"],
+            appliedCapabilities: ["KITTY_REMOTE", "DEVTOOLS"],
+            bootstrap: {
+                correlationId: "launch-abc",
+                kittyListenOn: "unix:@appcontrol-kitty-123",
+                debugAddress: "127.0.0.1",
+                debugPort: 9222
+            }
+        }, 12);
+
+        compare(observation.provider, "SURFACE_LAUNCH");
+        compare(
+            observation.providerKey,
+            "surface-launch:launch-abc"
+        );
+        compare(
+            observation.lifetimeClass,
+            identity.lifetimeApplicationInstance
+        );
+        compare(
+            observation.raw.kittyListenOn,
+            "unix:@appcontrol-kitty-123"
+        );
+        compare(observation.raw.debugPort, 9222);
+        compare(observation.raw.appliedCapabilities.length, 2);
+
+        verify(observation.semanticKey === undefined);
         verify(observation.canonicalId === undefined);
     }
 

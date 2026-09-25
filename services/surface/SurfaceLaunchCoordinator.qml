@@ -153,8 +153,24 @@ QtObject {
         return !!leases[leaseKey(kind, value)];
     }
 
-    function addLease(kind, value, correlationId, capability) {
+    function addLease(kind, value, correlationId, capability, source) {
         const key = leaseKey(kind, value);
+        const existing = leases[key];
+
+        if (existing) {
+            return {
+                ok: false,
+                conflict: {
+                    kind: asText(kind),
+                    value: value,
+                    requestedCorrelationId: asText(correlationId),
+                    existingCorrelationId:
+                        asText(existing.correlationId),
+                    capability: asText(capability)
+                }
+            };
+        }
+
         const next = Object.assign({}, leases);
 
         next[key] = {
@@ -162,12 +178,16 @@ QtObject {
             value: value,
             correlationId: asText(correlationId),
             capability: asText(capability),
+            source: asText(source) || "generated",
             state: "reserved"
         };
 
         leases = next;
 
-        return next[key];
+        return {
+            ok: true,
+            lease: next[key]
+        };
     }
 
     function allocateDebugPort(preferred, correlationId) {
@@ -244,6 +264,7 @@ QtObject {
         const argvAfterExecutable = [];
         const argvAppend = [];
         const leaseRows = [];
+        const conflictRows = [];
         const metadata = {
             correlationId: correlationId,
             kittyListenOn: "",
@@ -267,7 +288,20 @@ QtObject {
                 );
             }
 
-            if (!listenOn) {
+            if (listenOn) {
+                const reservation = addLease(
+                    "kitty-listen-on",
+                    listenOn,
+                    correlationId,
+                    requirements.capabilityKittyRemote,
+                    "caller-supplied"
+                );
+
+                if (reservation.ok)
+                    leaseRows.push(reservation.lease);
+                else
+                    conflictRows.push(reservation.conflict);
+            } else {
                 listenOn =
                     "unix:@appcontrol-kitty-" + correlationId;
 
@@ -276,12 +310,18 @@ QtObject {
                     listenOn
                 );
 
-                leaseRows.push(addLease(
+                const reservation = addLease(
                     "kitty-listen-on",
                     listenOn,
                     correlationId,
-                    requirements.capabilityKittyRemote
-                ));
+                    requirements.capabilityKittyRemote,
+                    "generated"
+                );
+
+                if (reservation.ok)
+                    leaseRows.push(reservation.lease);
+                else
+                    conflictRows.push(reservation.conflict);
             }
 
             metadata.kittyListenOn = listenOn;
@@ -313,7 +353,20 @@ QtObject {
             let port = existingPort;
             let address = existingAddress;
 
-            if (port <= 0) {
+            if (port > 0) {
+                const reservation = addLease(
+                    "devtools-port",
+                    port,
+                    correlationId,
+                    requirements.capabilityDevTools,
+                    "caller-supplied"
+                );
+
+                if (reservation.ok)
+                    leaseRows.push(reservation.lease);
+                else
+                    conflictRows.push(reservation.conflict);
+            } else {
                 port = allocateDebugPort(
                     requirements.preferredDebugPort(evidence),
                     correlationId
@@ -331,12 +384,18 @@ QtObject {
                         "--remote-debugging-port=" + String(port)
                     );
 
-                    leaseRows.push(addLease(
+                    const reservation = addLease(
                         "devtools-port",
                         port,
                         correlationId,
-                        requirements.capabilityDevTools
-                    ));
+                        requirements.capabilityDevTools,
+                        "generated"
+                    );
+
+                    if (reservation.ok)
+                        leaseRows.push(reservation.lease);
+                    else
+                        conflictRows.push(reservation.conflict);
                 }
             }
 
@@ -368,7 +427,8 @@ QtObject {
             argvAfterExecutable: argvAfterExecutable,
             argvAppend: argvAppend,
             bootstrap: Object.assign({}, metadata),
-            leases: leaseRows.slice()
+            leases: leaseRows.slice(),
+            conflicts: conflictRows.slice()
         };
     }
 }

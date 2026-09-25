@@ -41,6 +41,7 @@ EXTRACTED = {
     "selection": APP_DIR / "AppSelectionPolicy.qml",
     "mode": APP_DIR / "AppModePolicy.qml",
     "icon_glow": APP_DIR / "AppIconGlowPolicy.qml",
+    "selector_presentation": APP_DIR / "AppSelectorPresentation.qml",
 }
 
 errors: list[str] = []
@@ -390,6 +391,57 @@ require_function_anchors(
     ),
 )
 
+require_all(
+    "donor APPS source-selector presentation",
+    donor_text,
+    (
+        'label: "-⋆♱⋆-"',
+        'label: "⋆˙⟡ ⌯⛟\\nFLATPACK"',
+        'label: "HIDDEN"',
+        '? "|ω･\`ς)"',
+        ': "|ω-ς)"',
+        'Colors.cyan',
+        'Colors.magenta',
+        'Colors.yellow',
+    ),
+)
+
+require_all(
+    "donor compact APPS source selector copy",
+    donor_text,
+    (
+        '{ group: "appSource", value: appSourceNative, label: "-⋆♱⋆-"',
+        '{ group: "appSource", value: appSourceFlatpak, label: "⋆˙⟡ ⌯⛟"',
+        '{ group: "appSource", value: appSourceHidden, label: "|ω-ς)"',
+    ),
+)
+
+require_all(
+    "donor APPS launch-selector presentation",
+    donor_text,
+    (
+        'text: "⌯♱ ๋࣭⭑"',
+        'text: "⚱"',
+        'text: "🛠"',
+        'appLaunchBottleButton',
+        'appLaunchToolboxButton',
+    ),
+)
+
+require_all(
+    "donor APPS result source badge",
+    donor_text,
+    (
+        'text:',
+        'appControlWindow.appSourceLabel(modelData)',
+        '? Colors.white',
+        '? Colors.magenta',
+        ': Colors.cyan',
+        '? 0.58',
+        ': 0.82',
+    ),
+)
+
 # filteredApps is a ScriptModel rather than a function, so guard the distinctive
 # donor semantics directly in the containing source.
 require_all(
@@ -656,6 +708,60 @@ require_function_anchors(
         'comment: "Command-line application from $PATH"',
         'keywords: "terminal cli hidden command"',
         "command: [name]",
+    ),
+)
+
+require_function_anchors(
+    "extracted APPS source-selector presentation",
+    texts.get("selector_presentation", ""),
+    "sourceOptions",
+    (
+        '"-⋆♱⋆-"',
+        '"⋆˙⟡ ⌯⛟"',
+        '"FLATPACK"',
+        '"HIDDEN"',
+        '"|ω-ς)"',
+        'palette("cyan")',
+        'palette("magenta")',
+        'palette("yellow")',
+    ),
+)
+
+require_function_anchors(
+    "extracted APPS launch-selector presentation",
+    texts.get("selector_presentation", ""),
+    "launchOptions",
+    (
+        '"⌯♱ ๋࣭⭑"',
+        "bottleIcon: true",
+        "toolboxIcon: true",
+        'palette("cyan")',
+        'palette("magenta")',
+        'palette("omnitrix")',
+    ),
+)
+
+require_function_anchors(
+    "extracted APPS hidden-face presentation",
+    texts.get("selector_presentation", ""),
+    "hiddenFace",
+    (
+        '"|ω･\`ς)"',
+        '"|ω-ς)"',
+    ),
+)
+
+require_function_anchors(
+    "extracted APPS result source badge",
+    texts.get("selector_presentation", ""),
+    "sourceBadge",
+    (
+        "sourceLabel",
+        'palette("white")',
+        'palette("magenta")',
+        'palette("cyan")',
+        "0.58",
+        "0.82",
     ),
 )
 

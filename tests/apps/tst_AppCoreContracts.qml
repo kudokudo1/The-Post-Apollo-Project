@@ -837,7 +837,7 @@ TestCase {
         compare(command.correlationId, "surface-toolbox");
     }
 
-    function test_bottleCommandBuilderPreservesDonorAndFailsClosedForMutation() {
+    function test_bottleCommandBuilderPreservesDonorAndCarriesSurfaceLaunch() {
         let plan = launchPlanner.plan(
             nativeEntry(),
             core.sourceNative,
@@ -872,7 +872,16 @@ TestCase {
             "Gaming",
             {
                 ready: true,
-                env: { ACCESSIBILITY_ENABLED: "1" }
+                correlationId: "surface-bottle",
+                env: {
+                    ACCESSIBILITY_ENABLED: "1"
+                },
+                argvAfterExecutable: [
+                    "--force-renderer-accessibility=complete"
+                ],
+                argvAppend: [
+                    "--remote-debugging-port=9222"
+                ]
             }
         );
 
@@ -880,11 +889,55 @@ TestCase {
 
         compare(
             command.kind,
+            launchCommandBuilder.commandArgv
+        );
+        compare(command.correlationId, "surface-bottle");
+
+        verify(
+            command.argv[2].indexOf(
+                "flatpak run '--env=ACCESSIBILITY_ENABLED=1' "
+                + "--command=bottles-cli"
+            ) !== -1
+        );
+
+        verify(
+            command.argv[2].indexOf(
+                "env 'ACCESSIBILITY_ENABLED=1' "
+                + "bottles-cli run"
+            ) !== -1
+        );
+
+        verify(
+            command.argv[2].indexOf(
+                "--args '--force-renderer-accessibility=complete "
+                + "--remote-debugging-port=9222'"
+            ) !== -1
+        );
+    }
+
+    function test_bottleSurfaceLaunchComplexArgsFailClosed() {
+        const plan = launchPlanner.plan(
+            nativeEntry(),
+            core.sourceNative,
+            core.launchBottle,
+            "Gaming",
+            {
+                ready: true,
+                argvAppend: [
+                    "--title=contains spaces"
+                ]
+            }
+        );
+
+        const command = launchCommandBuilder.build(plan, "");
+
+        compare(
+            command.kind,
             launchCommandBuilder.commandUnavailable
         );
         compare(
             command.reason,
-            "surface-launch-bottle-transport-unresolved"
+            "surface-launch-bottle-arg-quoting-unresolved"
         );
     }
 

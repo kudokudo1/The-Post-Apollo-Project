@@ -16,6 +16,26 @@ PanelWindow {
     property int thermalSelectedIndex: 0
     property int systemSelectedIndex: 0
 
+    // Target-list submodes. THERMAL mirrors AppControl's TEMP/FAN split.
+    // SYSTEM extends the same interaction pattern to hardware categories.
+    property int thermalSubMode: 0 // 0 = temperature, 1 = fans
+    property string systemSubMode: "ALL"
+
+    readonly property var thermalSubModes: [
+        { name: "TEMP", key: 0, symbol: "🌡" },
+        { name: "FAN", key: 1, symbol: "✇" }
+    ]
+
+    readonly property var systemSubModes: [
+        { name: "ALL", key: "ALL", symbol: "🖳" },
+        { name: "CPU", key: "CPU", symbol: "" },
+        { name: "MEM", key: "MEMORY", symbol: "" },
+        { name: "GPU", key: "GPU", symbol: "󰢮" },
+        { name: "DISK", key: "STORAGE", symbol: "" },
+        { name: "NET", key: "NETWORK", symbol: "🛰" },
+        { name: "SWAP", key: "SWAP", symbol: "⇄" }
+    ]
+
     // Rail-face animation state, matching AppControl's FAVORITES behavior.
     property bool favoritesFaceClickPulse: false
     property bool favoritesFaceBlinking: false
@@ -108,13 +128,36 @@ PanelWindow {
     }
 
     function selectedMonitorRows() {
-        if (selectedModeIndex === 2)
-            return thermalRows;
+        if (selectedModeIndex === 2) {
+            return thermalRows.filter(function(entry) {
+                const isFan = entry && entry.sensorKind === "fan";
+                return thermalSubMode === 1 ? isFan : !isFan;
+            });
+        }
 
-        if (selectedModeIndex === 3)
-            return systemRows;
+        if (selectedModeIndex === 3) {
+            if (systemSubMode === "ALL")
+                return systemRows;
+
+            return systemRows.filter(function(entry) {
+                return String(entry && entry.category || "").toUpperCase()
+                       === systemSubMode;
+            });
+        }
 
         return [];
+    }
+
+    function selectThermalSubMode(mode) {
+        thermalSubMode = Number(mode) === 1 ? 1 : 0;
+        thermalSelectedIndex = 0;
+        refreshSharedMonitors();
+    }
+
+    function selectSystemSubMode(category) {
+        systemSubMode = String(category || "ALL").toUpperCase();
+        systemSelectedIndex = 0;
+        refreshSharedMonitors();
     }
 
     function selectedMonitorIndex() {
@@ -175,6 +218,44 @@ PanelWindow {
         }
 
         return String(entry.metric || entry.secondary || "");
+    }
+
+    function monitorEntryIcon(entry) {
+        if (!entry)
+            return "";
+
+        if (appControlWindow && appControlWindow.monitorResultIcon)
+            return appControlWindow.monitorResultIcon(entry);
+
+        if (entry._thermalRecord)
+            return entry.sensorKind === "fan" ? "【✇】" : "₊˚⊹🌡 ๋࣭⭑";
+
+        if (entry._systemRecord) {
+            const category = String(entry.category || "").toUpperCase();
+            if (category === "CPU") return "";
+            if (category === "MEMORY") return "";
+            if (category === "GPU") return "󰢮";
+            if (category === "STORAGE") return "";
+            if (category === "NETWORK") return "🛰";
+            if (category === "SWAP") return "⇄";
+            return "🖳";
+        }
+
+        return "";
+    }
+
+    function monitorEntryAccent(entry) {
+        if (!entry)
+            return Colors.cyan;
+
+        if (entry._thermalRecord && appControlWindow)
+            return appControlWindow.thermalAccent(entry);
+
+        if (entry._systemRecord && appControlWindow
+                && appControlWindow.systemIconAccent)
+            return appControlWindow.systemIconAccent(entry);
+
+        return Colors.cyan;
     }
 
     function scheduleFavoritesFaceBlink() {
@@ -480,7 +561,7 @@ PanelWindow {
     // entire CPU++ chassis left without changing its dimensions.
     margins {
         top: -3
-        right: 200
+        right: 220
     }
 
     color: "transparent"
@@ -1078,12 +1159,175 @@ PanelWindow {
             color: Colors.cyan
         }
 
+        Item {
+            id: targetSubModeStrip
+
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: targetHeaderLine.bottom
+
+            anchors.leftMargin: 8
+            anchors.rightMargin: 8
+            anchors.topMargin: 7
+
+            height:
+                cpuPlusWindow.selectedModeIndex === 2
+                ? 38
+                : cpuPlusWindow.selectedModeIndex === 3
+                ? 122
+                : 0
+
+            visible:
+                cpuPlusWindow.selectedModeIndex === 2
+                || cpuPlusWindow.selectedModeIndex === 3
+
+            Flow {
+                anchors.fill: parent
+                spacing: 4
+
+                Repeater {
+                    model:
+                        cpuPlusWindow.selectedModeIndex === 2
+                        ? cpuPlusWindow.thermalSubModes
+                        : cpuPlusWindow.systemSubModes
+
+                    Rectangle {
+                        id: subModeButton
+
+                        required property int index
+                        required property var modelData
+
+                        readonly property bool isSelected:
+                            cpuPlusWindow.selectedModeIndex === 2
+                            ? cpuPlusWindow.thermalSubMode === Number(modelData.key)
+                            : cpuPlusWindow.systemSubMode === String(modelData.key)
+
+                        readonly property bool isHovered:
+                            subModeMouse.containsMouse
+
+                        readonly property bool isPressed:
+                            subModeMouse.pressed
+
+                        width:
+                            cpuPlusWindow.selectedModeIndex === 2
+                            ? (targetSubModeStrip.width - 4) / 2
+                            : (targetSubModeStrip.width - 4) / 2
+
+                        height: 27
+
+                        color:
+                            isPressed
+                            ? Colors.magenta
+                            : isHovered || isSelected
+                            ? Colors.yellow
+                            : Colors.dark
+
+                        border.width: 1
+                        border.color:
+                            isSelected
+                            ? Colors.magenta
+                            : isHovered || isPressed
+                            ? Colors.orange
+                            : cpuPlusWindow.selectedModeIndex === 2
+                              && Number(modelData.key) === 1
+                            ? Colors.omnitrix
+                            : Colors.orange
+
+                        Row {
+                            anchors.centerIn: parent
+                            spacing: 4
+
+                            GohuText {
+                                anchors.verticalCenter: parent.verticalCenter
+
+                                text: String(modelData.symbol || "")
+                                font.pixelSize:
+                                    cpuPlusWindow.selectedModeIndex === 3
+                                    && String(modelData.key) === "NETWORK"
+                                    ? 13
+                                    : 12
+
+                                color:
+                                    subModeButton.isPressed
+                                    ? Colors.black
+                                    : subModeButton.isSelected
+                                    ? Colors.magenta
+                                    : subModeButton.isHovered
+                                    ? Colors.orange
+                                    : cpuPlusWindow.selectedModeIndex === 2
+                                      && Number(subModeButton.modelData.key) === 1
+                                    ? Colors.omnitrix
+                                    : Colors.cyan
+
+                                layer.enabled: !subModeButton.isPressed
+                                layer.effect: DropShadow {
+                                    radius: 5
+                                    samples: 5
+                                    opacity: 0.50
+                                    color:
+                                        subModeButton.isHovered
+                                        ? Colors.orange
+                                        : subModeButton.isSelected
+                                        ? Colors.magenta
+                                        : Colors.cyan
+                                    transparentBorder: true
+                                }
+                            }
+
+                            GohuText {
+                                anchors.verticalCenter: parent.verticalCenter
+
+                                text: String(modelData.name || "")
+                                font.pixelSize: 8
+
+                                color:
+                                    subModeButton.isPressed
+                                    ? Colors.black
+                                    : subModeButton.isSelected
+                                    ? Colors.magenta
+                                    : subModeButton.isHovered
+                                    ? Colors.orange
+                                    : Colors.white
+                            }
+                        }
+
+                        MouseArea {
+                            id: subModeMouse
+
+                            anchors.fill: parent
+                            hoverEnabled: true
+
+                            onClicked: {
+                                if (cpuPlusWindow.selectedModeIndex === 2)
+                                    cpuPlusWindow.selectThermalSubMode(modelData.key);
+                                else
+                                    cpuPlusWindow.selectSystemSubMode(modelData.key);
+                            }
+                        }
+
+                        RectangularShadow {
+                            anchors.fill: parent
+                            spread: isHovered || isSelected ? 4 : 2
+                            z: -1
+                            opacity: isHovered || isSelected ? 0.42 : 0.12
+                            color:
+                                isSelected
+                                ? Colors.magenta
+                                : isHovered
+                                ? Colors.orange
+                                : Colors.cyan
+                        }
+                    }
+                }
+            }
+        }
+
         Flickable {
             id: monitorSelectorScroll
 
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.top: targetHeaderLine.bottom
+            anchors.top: targetSubModeStrip.bottom
             anchors.bottom: parent.bottom
 
             anchors.margins: 8
@@ -1104,12 +1348,7 @@ PanelWindow {
                 spacing: 7
 
                 Repeater {
-                    model:
-                        cpuPlusWindow.selectedModeIndex === 2
-                        ? cpuPlusWindow.thermalRows
-                        : cpuPlusWindow.selectedModeIndex === 3
-                        ? cpuPlusWindow.systemRows
-                        : []
+                    model: cpuPlusWindow.selectedMonitorRows()
 
                     Rectangle {
                         id: monitorRowButton
@@ -1163,36 +1402,115 @@ PanelWindow {
                             }
                         }
 
-                        Column {
+                        Row {
                             anchors.fill: parent
-                            anchors.margins: 7
-                            spacing: 3
+                            anchors.margins: 6
+                            spacing: 7
 
-                            GohuText {
-                                width: parent.width
+                            Item {
+                                id: monitorRowIconBox
 
-                                text:
-                                    cpuPlusWindow.monitorEntryTitle(
+                                width: 42
+                                height: parent.height
+
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    width: parent.width
+                                    horizontalAlignment: Text.AlignHCenter
+
+                                    text:
+                                        cpuPlusWindow.monitorEntryIcon(
+                                            monitorRowButton.modelData
+                                        )
+
+                                    font.pixelSize:
                                         monitorRowButton.modelData
-                                    )
+                                        && monitorRowButton.modelData._thermalRecord
+                                        ? (
+                                              monitorRowButton.modelData.sensorKind
+                                              === "fan" ? 15 : 10
+                                          )
+                                        : String(
+                                              monitorRowButton.modelData
+                                              && monitorRowButton.modelData.category
+                                              || ""
+                                          ).toUpperCase() === "NETWORK"
+                                        ? 17
+                                        : 20
 
-                                font.pixelSize: 10
-                                color: monitorRowButton.foreground
-                                elide: Text.ElideRight
+                                    fontSizeMode: Text.HorizontalFit
+                                    minimumPixelSize: 8
+
+                                    color:
+                                        monitorRowButton.isPressed
+                                        ? Colors.black
+                                        : monitorRowButton.isHovered
+                                          || monitorRowButton.isSelected
+                                        ? Colors.orange
+                                        : cpuPlusWindow.monitorEntryAccent(
+                                              monitorRowButton.modelData
+                                          )
+
+                                    layer.enabled: !monitorRowButton.isPressed
+                                    layer.effect: DropShadow {
+                                        radius: 6
+                                        samples: 5
+                                        opacity:
+                                            monitorRowButton.isHovered
+                                            || monitorRowButton.isSelected
+                                            ? 0.62
+                                            : 0.44
+
+                                        color:
+                                            monitorRowButton.isHovered
+                                            || monitorRowButton.isSelected
+                                            ? Colors.orange
+                                            : cpuPlusWindow.monitorEntryAccent(
+                                                  monitorRowButton.modelData
+                                              )
+
+                                        transparentBorder: true
+                                    }
+                                }
                             }
 
-                            GohuText {
-                                width: parent.width
-
-                                text:
-                                    cpuPlusWindow.monitorEntryMetric(
-                                        monitorRowButton.modelData
+                            Column {
+                                width:
+                                    Math.max(
+                                        0,
+                                        parent.width
+                                        - monitorRowIconBox.width
+                                        - parent.spacing
                                     )
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 3
 
-                                font.pixelSize: 8
-                                color: monitorRowButton.foreground
-                                opacity: 0.88
-                                elide: Text.ElideRight
+                                GohuText {
+                                    width: parent.width
+
+                                    text:
+                                        cpuPlusWindow.monitorEntryTitle(
+                                            monitorRowButton.modelData
+                                        )
+
+                                    font.pixelSize: 10
+                                    color: monitorRowButton.foreground
+                                    elide: Text.ElideRight
+                                }
+
+                                GohuText {
+                                    width: parent.width
+
+                                    text:
+                                        cpuPlusWindow.monitorEntryMetric(
+                                            monitorRowButton.modelData
+                                        )
+
+                                    font.pixelSize: 8
+                                    color: monitorRowButton.foreground
+                                    opacity: 0.88
+                                    elide: Text.ElideRight
+                                }
                             }
                         }
 

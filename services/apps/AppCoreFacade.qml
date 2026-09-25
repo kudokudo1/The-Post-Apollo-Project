@@ -93,6 +93,12 @@ Scope {
         colors: facade.presentationColors
     }
 
+    AppSelectorPresentation {
+        id: selectorPresentation
+        coreProvider: core
+        colors: facade.presentationColors
+    }
+
     AppIdentityAdapter {
         id: identityAdapter
         identityEvidence: facade.identityEvidence
@@ -229,6 +235,43 @@ Scope {
         return selectionPolicy.restoreIndex(
             entries,
             rememberedKey
+        );
+    }
+
+    function sourceSelectorOptions(compact) {
+        return selectorPresentation.sourceOptions(compact);
+    }
+
+    function launchSelectorOptions() {
+        return selectorPresentation.launchOptions();
+    }
+
+    function hiddenSourceFace(emphasized) {
+        return selectorPresentation.hiddenFace(emphasized);
+    }
+
+    function sourceBadge(entry, unavailable) {
+        return selectorPresentation.sourceBadge(
+            entry,
+            unavailable
+        );
+    }
+
+    function sourceGlowSpec(sourceMode, selected, hovered, pressed) {
+        return selectorPresentation.sourceGlowSpec(
+            sourceMode,
+            selected,
+            hovered,
+            pressed
+        );
+    }
+
+    function launchGlowSpec(launchMode, selected, hovered, pressed) {
+        return selectorPresentation.launchGlowSpec(
+            launchMode,
+            selected,
+            hovered,
+            pressed
         );
     }
 

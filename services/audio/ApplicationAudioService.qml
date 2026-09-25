@@ -121,20 +121,32 @@ Scope {
         return tokens;
     }
 
+    function descriptorPids(descriptor) {
+        const source = descriptor && Array.isArray(descriptor.pids)
+            ? descriptor.pids
+            : [];
+        const pids = [];
+
+        for (let i = 0; i < source.length; i++) {
+            const pid = Number(source[i]);
+
+            if (isNaN(pid)
+                    || Math.floor(pid) !== pid
+                    || pid <= 1
+                    || pids.indexOf(pid) !== -1)
+                continue;
+
+            pids.push(pid);
+        }
+
+        return pids;
+    }
+
     function copyDescriptor(descriptor) {
         if (!descriptor)
             return null;
 
-        const pids = [];
-        const rawPids = Array.isArray(descriptor.pids)
-            ? descriptor.pids
-            : [];
-
-        for (let i = 0; i < rawPids.length; i++) {
-            const pid = Number(rawPids[i] || 0);
-            if (pid > 1 && pids.indexOf(pid) === -1)
-                pids.push(pid);
-        }
+        const pids = descriptorPids(descriptor);
 
         const tokens = [];
         const rawTokens = Array.isArray(descriptor.tokens)
@@ -183,9 +195,7 @@ Scope {
         const props = sinkInput.properties || {};
         const processId = Number(props["application.process.id"] || 0);
         const streamIndex = Number(sinkInput.index);
-        const pids = Array.isArray(descriptor.pids)
-            ? descriptor.pids
-            : [];
+        const pids = descriptorPids(descriptor);
 
         result.processId = processId > 0 ? processId : 0;
         result.streamIndex = isNaN(streamIndex) ? -1 : streamIndex;
@@ -554,9 +564,7 @@ Scope {
                 continue;
 
             const descriptor = policy.descriptor || {};
-            const pids = Array.isArray(descriptor.pids)
-                ? descriptor.pids
-                : [];
+            const pids = descriptorPids(descriptor);
 
             if (pids.indexOf(targetPid) !== -1)
                 matches.push(keys[i]);

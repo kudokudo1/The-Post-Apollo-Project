@@ -52,6 +52,7 @@ QtObject {
         return {
             kind: planDesktopAction,
             action: action,
+            entry: entry || null,
             stableId: stableActionId(action, fallbackIndex)
         };
     }
@@ -79,6 +80,7 @@ QtObject {
                 browserKind: browser,
                 action: id,
                 sequence: shortcut.slice(),
+                entry: entry || null,
                 stableId: stableId
             };
         }
@@ -91,6 +93,7 @@ QtObject {
                 browserKind: browser,
                 action: id,
                 extraArgs: ["--new-tab", "about:downloads"],
+                entry: entry || null,
                 stableId: stableId
             };
         }
@@ -103,6 +106,7 @@ QtObject {
                 browserKind: browser,
                 action: id,
                 extraArgs: extra.slice(),
+                entry: entry || null,
                 stableId: stableId
             };
         }
@@ -137,6 +141,7 @@ QtObject {
         return {
             kind: planDesktopAction,
             action: action,
+            entry: entry || null,
             stableId: stableActionId(action, fallbackIndex)
         };
     }

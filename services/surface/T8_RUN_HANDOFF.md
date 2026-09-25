@@ -64,6 +64,12 @@ startupClass
 executable
 argv[]
 stableHint
+
+optional pre-parsed existing bootstrap:
+existingDebugPort
+existingDebugAddress
+existingKittyListenOn
+existingKittyRemoteControlMode
 ```
 
 Not every field is required.
@@ -129,12 +135,31 @@ program token. `argvAppend` belongs with ordinary app arguments.
 ### Shell command
 
 The shell-launch owner must quote/compose the supplied values safely. T5 does
-not construct shell syntax.
+not construct or parse shell syntax.
+
+If the mechanism already contains instrumentation inside shell text, the launch
+domain should expose that fact through the neutral pre-parsed existing-bootstrap
+fields instead of asking T5 to inspect shell source.
+
+Example:
+
+```text
+executable: "brave-browser"
+existingDebugPort: 9444
+existingDebugAddress: "127.0.0.1"
+```
+
+This keeps shell parsing with the shell owner while allowing the one shared
+SurfaceLaunch authority to coordinate the endpoint.
 
 ### Toolbox
 
 T8/RUN decide whether env/argv augmentation belongs outside or inside the
 Toolbox boundary according to the actual process that must expose the surface.
+
+If the inner launch already supplies a debug/socket coordinate, the Toolbox
+adapter should surface that coordinate through the same neutral pre-parsed
+fields before requesting augmentation.
 
 ### Bottles/Wine
 

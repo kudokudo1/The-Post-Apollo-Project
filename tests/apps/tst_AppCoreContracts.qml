@@ -498,6 +498,49 @@ TestCase {
         compare(plan.surfaceLaunchAugmentation.conflicts.length, 1);
     }
 
+    function test_surfaceLaunchFlatpakTransportAvoidsWrapperOptionSpace() {
+        const kittyFlatpak = {
+            id: "net.kovidgoyal.kitty.desktop",
+            name: "Kitty",
+            command: [
+                "flatpak",
+                "run",
+                "net.kovidgoyal.kitty",
+                "%U"
+            ]
+        };
+
+        const plan = launchPlanner.plan(
+            kittyFlatpak,
+            core.sourceFlatpak,
+            core.launchNormal,
+            "",
+            {
+                ready: true,
+                argvAfterExecutable: [
+                    "-o",
+                    "allow_remote_control=socket-only",
+                    "--listen-on",
+                    "unix:@surface-kitty"
+                ],
+                argvAppend: []
+            }
+        );
+
+        compare(plan.kind, launchPlanner.planDesktopEntry);
+        compare(
+            plan.commandTokens.join(" "),
+            "flatpak run net.kovidgoyal.kitty "
+            + "-o allow_remote_control=socket-only "
+            + "--listen-on unix:@surface-kitty"
+        );
+
+        // Most importantly, Team 8 must not produce:
+        //   flatpak -o ... run APP_ID
+        compare(plan.commandTokens[0], "flatpak");
+        compare(plan.commandTokens[1], "run");
+    }
+
     function test_surfaceLaunchAugmentsToolboxArgvStructurally() {
         const native = nativeEntry();
 

@@ -20,6 +20,7 @@ APP_DIR = ROOT / "services" / "apps"
 FILES = {
     "core": APP_DIR / "AppCoreProvider.qml",
     "launch": APP_DIR / "AppLaunchPlanner.qml",
+    "commandBuilder": APP_DIR / "AppLaunchCommandBuilder.qml",
     "bottles": APP_DIR / "AppBottleProvider.qml",
     "actions": APP_DIR / "AppActionCatalog.qml",
     "actionPlanner": APP_DIR / "AppActionPlanner.qml",
@@ -58,7 +59,6 @@ required_functions = {
     "launch": {
         "cleanedCommandTokens",
         "launchExecutableName",
-        "bottleNamesFromPayload",
         "bottleProgramName",
         "normalPlan",
         "toolboxPlan",
@@ -69,6 +69,20 @@ required_functions = {
         "augmentedArgv",
         "copyStringArray",
         "copyStringMap",
+    },
+    "commandBuilder": {
+        "hasEntries",
+        "hasArgMutation",
+        "envArgv",
+        "shellQuote",
+        "unavailable",
+        "buildDesktopEntry",
+        "buildToolboxArgv",
+        "buildToolboxShell",
+        "bottleScript",
+        "buildBottle",
+        "buildHidden",
+        "build",
     },
     "bottles": {
         "collectNames",
@@ -131,6 +145,7 @@ required_functions = {
         "actionsFor",
         "planAction",
         "planLaunch",
+        "buildLaunchCommand",
         "rememberedKeyFor",
         "restoreIndex",
         "identityObservation",
@@ -185,7 +200,7 @@ for key, text in texts.items():
 # Planning/catalog files must remain pure. They describe intent; they do not
 # launch processes, create workers/timers, or mutate the desktop. Bottles is a
 # discovery provider and therefore may own its bottles-cli Process.
-for key in ("launch", "actions", "actionPlanner", "catalog", "hidden", "selection", "identity", "facade"):
+for key in ("launch", "commandBuilder", "actions", "actionPlanner", "catalog", "hidden", "selection", "identity", "facade"):
     text = texts.get(key, "")
     for token in (
         "Quickshell.execDetached",
@@ -272,3 +287,4 @@ print(" HIDDEN adaptation: pure Team 8 adapter over external RUN rows")
 print(" APPS selection remembrance: pure Team 8 lookup policy")
 print(" DesktopEntry identity evidence: delegated to Team 7")
 print(" standalone facade: composition-only Team 8 integration surface")
+print(" launch execution descriptors: pure Team 8 mechanism builder")

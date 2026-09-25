@@ -129,8 +129,41 @@ Examples:
 
 ### Native argv
 
-`argvAfterExecutable` belongs immediately after the launched executable's own
-program token. `argvAppend` belongs with ordinary app arguments.
+`argvAfterExecutable` belongs immediately after the launched application's
+option boundary and before pre-existing application payload arguments.
+`argvAppend` belongs after the existing application arguments.
+
+For a direct process:
+
+```text
+APP <argvAfterExecutable> EXISTING_ARGS <argvAppend>
+```
+
+For a wrapper such as Flatpak, the launch domain must translate the semantic
+application boundary:
+
+```text
+flatpak run APP_ID <argvAfterExecutable> EXISTING_APP_ARGS <argvAppend>
+```
+
+Do **not** implement Flatpak as:
+
+```text
+flatpak run APP_ID EXISTING_APP_ARGS <argvAfterExecutable>
+```
+
+That is observably wrong for Kitty because existing arguments may already begin
+the child command; Kitty remote-control options appended after that boundary can
+be delivered to the child instead of Kitty.
+
+### Wrapper transports
+
+`argvAfterExecutable` is a semantic placement bucket, not literally “after
+token zero.”
+
+Launch domains that own wrappers (Flatpak, container launchers, Wine/Bottles,
+future wrappers) must identify the application-facing option boundary and apply
+the bucket there. T5 intentionally does not learn wrapper grammar.
 
 ### Shell command
 

@@ -15,11 +15,34 @@ QtObject {
     id: coordinator
 
     property int correlationSerial: 0
-    property var leases: ({})
-    property var correlationState: ({})
+
+    // Mutable authority state stays behind underscore-prefixed implementation
+    // properties. Consumers receive defensive snapshots below.
+    property var _leaseState: ({})
+    property var _correlationState: ({})
+
+    readonly property var leases: copyMap(_leaseState)
+    readonly property var correlationState: copyMap(_correlationState)
 
     readonly property int fallbackPortStart: 9300
     readonly property int fallbackPortEnd: 9499
+
+    function copyMap(source) {
+        const result = {};
+        const keys = Object.keys(source || ({}));
+
+        for (let i = 0; i < keys.length; i++) {
+            const key = keys[i];
+            const value = source[key];
+
+            result[key] =
+                value && typeof value === "object"
+                ? Object.assign({}, value)
+                : value;
+        }
+
+        return result;
+    }
 
     function asText(value) {
         return value === undefined || value === null
@@ -169,12 +192,12 @@ QtObject {
     }
 
     function leaseInUse(kind, value) {
-        return !!leases[leaseKey(kind, value)];
+        return !!_leaseState[leaseKey(kind, value)];
     }
 
     function addLease(kind, value, correlationId, capability, source) {
         const key = leaseKey(kind, value);
-        const existing = leases[key];
+        const existing = _leaseState[key];
 
         if (existing) {
             return {
@@ -190,7 +213,7 @@ QtObject {
             };
         }
 
-        const next = Object.assign({}, leases);
+        const next = Object.assign({}, _leaseState);
 
         next[key] = {
             kind: asText(kind),
@@ -201,7 +224,7 @@ QtObject {
             state: "reserved"
         };
 
-        leases = next;
+        _leaseState = next;
 
         return {
             ok: true,
@@ -231,14 +254,14 @@ QtObject {
         if (!id)
             return false;
 
-        const hadState = !!correlationState[id];
+        const hadState = !!_correlationState[id];
         const nextLeases = {};
-        const keys = Object.keys(leases);
+        const keys = Object.keys(_leaseState);
         let removedLease = false;
 
         for (let i = 0; i < keys.length; i++) {
             const key = keys[i];
-            const lease = leases[key];
+            const lease = _leaseState[key];
 
             if (lease && lease.correlationId === id) {
                 removedLease = true;
@@ -250,9 +273,9 @@ QtObject {
 
         leases = nextLeases;
 
-        const states = Object.assign({}, correlationState);
+        const states = Object.assign({}, _correlationState);
         delete states[id];
-        correlationState = states;
+        _correlationState = states;
 
         return removedLease || hadState;
     }
@@ -260,16 +283,16 @@ QtObject {
     function markLaunchSucceeded(correlationId) {
         const id = asText(correlationId);
 
-        if (!id || !correlationState[id])
+        if (!id || !_correlationState[id])
             return false;
 
-        const states = Object.assign({}, correlationState);
+        const states = Object.assign({}, _correlationState);
         const current = states[id];
 
         states[id] = Object.assign({}, current, {
             state: "launched"
         });
-        correlationState = states;
+        _correlationState = states;
         return true;
     }
 
@@ -544,9 +567,9 @@ QtObject {
                 ready: true,
                 metadata: Object.assign({}, metadata)
             };
-            const states = Object.assign({}, correlationState);
+            const states = Object.assign({}, _correlationState);
             states[correlationId] = state;
-            correlationState = states;
+            _correlationState = states;
         }
 
         return {

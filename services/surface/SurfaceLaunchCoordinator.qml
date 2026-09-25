@@ -631,10 +631,23 @@ QtObject {
             appliedCapabilities: ready ? applied.slice() : [],
             unsupportedCapabilities:
                 description.unsupportedCapabilities.slice(),
-            env: env,
-            argvAfterExecutable: argvAfterExecutable,
-            argvAppend: argvAppend,
-            bootstrap: Object.assign({}, metadata),
+
+            // Fail closed: a rejected augmentation carries diagnostics and
+            // correlation context only. It must not carry executable partial
+            // mutations that a weak consumer could accidentally apply.
+            env: ready ? env : {},
+            argvAfterExecutable:
+                ready ? argvAfterExecutable : [],
+            argvAppend: ready ? argvAppend : [],
+            bootstrap:
+                ready
+                ? Object.assign({}, metadata)
+                : {
+                    correlationId: correlationId,
+                    kittyListenOn: "",
+                    debugAddress: "",
+                    debugPort: 0
+                },
             leases: ready ? leaseRows.slice() : [],
             conflicts: conflictRows.slice(),
             ready: ready

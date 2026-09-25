@@ -1,0 +1,170 @@
+import QtQuick
+import QtTest
+import "../../services/tabs"
+
+TestCase {
+    name: "Team5TabSurfaceProviderContracts"
+
+    TabSurfaceProvider {
+        id: provider
+        active: false
+    }
+
+    function test_providerRecordKeyStaysProviderLocal() {
+        compare(provider.providerRecordKey({
+            id: "kitty:7",
+            appName: "Kitty"
+        }), "kitty:7");
+
+        compare(provider.providerRecordKey({
+            appName: "Pretty Name"
+        }), "");
+    }
+
+    function test_identityEvidencePreservesKittyCoordinates() {
+        const evidence = provider.identityEvidence({
+            id: "kitty:7",
+            provider: "KITTY",
+            appName: "Kitty",
+            windowName: "42",
+            kittyAddress: "unix:/tmp/kitty",
+            kittyTabId: 7,
+            processPids: [7002, 7001, 7002]
+        });
+
+        compare(evidence.providerKey, "kitty:7");
+        compare(evidence.provider, "KITTY");
+        compare(evidence.kittyAddress, "unix:/tmp/kitty");
+        compare(evidence.kittyTabId, 7);
+        compare(evidence.processPids.length, 3);
+
+        verify(evidence.canonicalId === undefined);
+        verify(evidence.semanticKey === undefined);
+    }
+
+    function test_identityEvidencePreservesAtSpiCacheCoordinates() {
+        const evidence = provider.identityEvidence({
+            id: "atspi-cache::1.42:/org/a11y/atspi/accessible/7",
+            provider: "AT-SPI-CACHE",
+            appName: "Example",
+            windowName: "Example Window",
+            busName: ":1.42",
+            objectPath: "/org/a11y/atspi/accessible/7"
+        });
+
+        compare(evidence.busName, ":1.42");
+        compare(
+            evidence.objectPath,
+            "/org/a11y/atspi/accessible/7"
+        );
+    }
+
+    function test_identityEvidencePreservesAccessibilityRole() {
+        const evidence = provider.identityEvidence({
+            id: "libatspi:/example/path",
+            provider: "LIBATSPI",
+            path: "/example/path",
+            role: 37,
+            roleName: "page tab"
+        });
+
+        compare(evidence.path, "/example/path");
+        compare(evidence.role, 37);
+        compare(evidence.roleName, "page tab");
+    }
+
+    function test_normalizedProcessPidsForSignature() {
+        const pids = provider.normalizedProcessPids({
+            processPids: [7002, 0, 1, 7001, 7002, "7003"]
+        });
+
+        compare(pids.length, 3);
+        compare(pids[0], 7001);
+        compare(pids[1], 7002);
+        compare(pids[2], 7003);
+    }
+
+    function test_signatureChangesWhenPidEvidenceChanges() {
+        const a = [{
+            provider: "KITTY",
+            id: "kitty:7",
+            tabTitle: "shell",
+            appName: "Kitty",
+            windowName: "42",
+            kittyAddress: "unix:/tmp/kitty",
+            kittyTabId: 7,
+            processPids: [7001]
+        }];
+
+        const b = [{
+            provider: "KITTY",
+            id: "kitty:7",
+            tabTitle: "shell",
+            appName: "Kitty",
+            windowName: "42",
+            kittyAddress: "unix:/tmp/kitty",
+            kittyTabId: 7,
+            processPids: [7002]
+        }];
+
+        verify(
+            provider.tabRowsSignature(a)
+            !== provider.tabRowsSignature(b)
+        );
+    }
+
+    function test_signatureIgnoresPidOrderingAndDuplicates() {
+        const a = [{
+            provider: "KITTY",
+            id: "kitty:7",
+            tabTitle: "shell",
+            processPids: [7002, 7001, 7002]
+        }];
+
+        const b = [{
+            provider: "KITTY",
+            id: "kitty:7",
+            tabTitle: "shell",
+            processPids: [7001, 7002]
+        }];
+
+        compare(
+            provider.tabRowsSignature(a),
+            provider.tabRowsSignature(b)
+        );
+    }
+
+    function test_nativeLifecycleIsProviderSpecific() {
+        verify(provider.hasNativeLifecycleControl({
+            provider: "DEVTOOLS",
+            debugPort: 9222,
+            targetId: "ABC"
+        }));
+
+        verify(!provider.hasNativeLifecycleControl({
+            provider: "LIBATSPI",
+            path: "/tab/1"
+        }));
+
+        verify(!provider.hasNativeLifecycleControl({
+            provider: "DEVTOOLS",
+            debugPort: 0,
+            targetId: "ABC"
+        }));
+    }
+
+    function test_providerDoesNotInventIdentityFromDisplayText() {
+        const evidence = provider.identityEvidence({
+            provider: "DEVTOOLS",
+            appName: "Brave",
+            windowName: "https://example.test",
+            debugPort: 9222,
+            targetId: "ABC"
+        });
+
+        compare(evidence.providerKey, "");
+        verify(evidence.desktopEntryId === undefined);
+        verify(evidence.applicationId === undefined);
+        verify(evidence.canonicalId === undefined);
+    }
+}

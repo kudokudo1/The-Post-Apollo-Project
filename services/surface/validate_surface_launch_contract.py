@@ -93,6 +93,7 @@ for name in required_requirement_functions:
 required_coordinator_functions = (
     "copyValue",
     "copyMap",
+    "kittyListenAddress",
     "normalizedObservedLease",
     "reconcileObservedInstrumentation",
     "buildAugmentation",
@@ -177,6 +178,7 @@ for token in (
     "!correlationState[id]",
     '"requires-socket-only"',
     '"requires-loopback"',
+    "slice(0, 60)",
 ):
     if token not in coordinator:
         errors.append(f"missing augmentation readiness/lease contract token: {token}")

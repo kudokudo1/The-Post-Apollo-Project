@@ -91,7 +91,7 @@ for token, owner in forbidden_tokens.items():
 
 # Preserve current provider-native record namespaces. These are temporary
 # provider identities/evidence, not canonical application identity.
-for prefix in ("libatspi:", "devtools:", "kitty:"):
+for prefix in ("libatspi:", "atspi-cache:", "devtools:", "kitty:"):
     if prefix not in text:
         errors.append(f"missing provider record namespace: {prefix}")
 
@@ -110,6 +110,12 @@ for mutation_token in (
 
 # The provider boundary is consumer-controlled through one neutral activity
 # input rather than AppControl-specific mode knowledge.
+for evidence_field in ("busName", "objectPath"):
+    if evidence_field not in text:
+        errors.append(
+            f"missing Team 7 requested provider evidence field: {evidence_field}"
+        )
+
 if "running: tabSurfaceProvider.active" not in text:
     errors.append("persistent discovery bridge is not governed by neutral active input")
 
@@ -123,5 +129,5 @@ print("TEAM 5 TAB PROVIDER CONTRACT: PASS")
 print(" provider:", PROVIDER.relative_to(ROOT))
 print(" functions:", len(functions))
 print(" properties:", len(properties))
-print(" provider namespaces: LIBATSPI / DEVTOOLS / KITTY")
+print(" provider namespaces: LIBATSPI / AT-SPI-CACHE / DEVTOOLS / KITTY")
 print(" foreign ownership references: none")

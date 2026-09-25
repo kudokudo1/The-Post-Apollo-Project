@@ -101,6 +101,8 @@ for token in (
     "description.requestedCapabilities.length === 0",
     "description.unsupportedCapabilities.length > 0",
     "releaseCorrelation(correlationId)",
+    "removedLease || hadState",
+    "!correlationState[id]",
     '"requires-socket-only"',
 ):
     if token not in coordinator:

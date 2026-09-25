@@ -113,6 +113,8 @@ for mutation_token in (
 # The provider boundary is consumer-controlled through one neutral activity
 # input rather than AppControl-specific mode knowledge.
 for evidence_field in (
+    "role",
+    "roleName",
     "busName",
     "objectPath",
     "processPids",

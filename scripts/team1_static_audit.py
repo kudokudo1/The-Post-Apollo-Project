@@ -345,6 +345,7 @@ def audit_architecture() -> None:
         "test_processIdentityRejectsPidReuseMismatch",
         "test_protectedActionUnlockRelocksAfterCancel",
         "test_confirmedActionRevalidatesCapturedTarget",
+        "test_failedResumePreservesOptimisticFrozenState",
         "test_resourceScopeBlocksProtectedProcesses",
         "test_verifiedKernelResultsRemainPerPidAndMixed",
         "test_partialMutationKeepsSuccessfulKernelTruthOnly",

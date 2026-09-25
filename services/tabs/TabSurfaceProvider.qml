@@ -242,6 +242,7 @@ function tabLifecycleScript() {
             appName: String(entry.appName || ""),
             windowName: String(entry.windowName || ""),
             path: String(entry.path || ""),
+            role: entry.role !== undefined ? entry.role : null,
             roleName: String(entry.roleName || ""),
             busName: String(entry.busName || ""),
             objectPath: String(entry.objectPath || ""),

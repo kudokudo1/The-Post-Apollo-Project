@@ -156,6 +156,21 @@ These are evidence families, not votes.
 A single PID observed by four providers must remain one correlated PID fact, not
 be multiplied into six pairwise confirmations.
 
+## SurfaceLaunch capture invariant
+
+APPS, RUN, and future launch domains consume one shared
+`SurfaceLaunchCoordinator` lease authority.
+
+A fixture may record which launch domain initiated the transaction, but that
+field is provenance only. Do not partition correlation IDs, generated Kitty
+endpoints, or generated DevTools ports into launcher-specific identity
+namespaces.
+
+This matters when comparing launches from different domains: equal or colliding
+instrumentation coordinates must be interpreted against the shared lease
+authority, not dismissed as "different because one came from APPS and one came
+from RUN."
+
 ## Fixture contract gate
 
 Before a captured JSON bundle is used for resolver analysis, run:

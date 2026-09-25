@@ -358,11 +358,24 @@ function tabLifecycleScript() {
         lifecycleFrozenKeys = rollback;
     }
 
+    function clearPendingLifecycle() {
+        lifecyclePendingKey = "";
+        lifecyclePendingFrozen = false;
+        lifecyclePendingPreviousFrozen = false;
+    }
+
     function setLifecycleFrozen(entry, frozen) {
         const key = nativeLifecycleKey(entry);
 
         if (!entry || !key || !hasNativeLifecycleControl(entry))
             return false;
+
+        // One shared optimistic rollback slot means lifecycle mutations must
+        // be serialized. Reject overlap rather than corrupt rollback state.
+        if (tabLifecycleProcess.running) {
+            lifecycleError = "TAB LIFECYCLE BUSY";
+            return false;
+        }
 
         lifecyclePendingKey = key;
         lifecyclePendingFrozen = !!frozen;
@@ -516,6 +529,8 @@ function tabLifecycleScript() {
                             tabSurfaceProvider.lifecycleError
                         );
                     }
+
+                    tabSurfaceProvider.clearPendingLifecycle();
                 } catch (error) {
                     tabSurfaceProvider.rollbackPendingLifecycle();
                     tabSurfaceProvider.lifecycleError =
@@ -524,6 +539,7 @@ function tabLifecycleScript() {
                         false,
                         tabSurfaceProvider.lifecycleError
                     );
+                    tabSurfaceProvider.clearPendingLifecycle();
                 }
             }
         }
@@ -532,11 +548,16 @@ function tabLifecycleScript() {
             onStreamFinished: {
                 const message = String(text || "").trim();
 
-                if (message.length > 0) {
-                    tabSurfaceProvider.rollbackPendingLifecycle();
-                    tabSurfaceProvider.lifecycleError = message;
-                    tabSurfaceProvider.lifecycleFinished(false, message);
-                }
+                // The lifecycle script always reports authoritative status as
+                // JSON on stdout, including caught failures. stderr is
+                // diagnostic only; rolling back here could undo a successful
+                // mutation merely because Python/library code emitted a
+                // warning.
+                if (message.length > 0)
+                    console.log(
+                        "TabSurfaceProvider lifecycle stderr:",
+                        message
+                    );
             }
         }
     }

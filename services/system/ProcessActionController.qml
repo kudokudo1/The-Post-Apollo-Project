@@ -10,18 +10,27 @@ Scope {
     required property var safetyService
     required property var limitsService
     required property var controlService
+    required property var processIdentity
 
     property var frozenOptimistic: ({})
 
     signal confirmationRequested(var request)
     signal refreshRequested()
 
+    function sourceEntry(entry) {
+        return processIdentity.sourceEntry(entry);
+    }
+
     function entryPid(entry) {
-        return Number(entry && entry.pid || 0);
+        const source = sourceEntry(entry);
+        return Number(source && source.pid || 0);
     }
 
     function entryName(entry) {
-        return String(entry && (entry.comm || entry.name) || "").trim();
+        const source = sourceEntry(entry);
+        return String(
+            source && (source.comm || source.name) || ""
+        ).trim();
     }
 
     function validEntry(entry) {
@@ -32,14 +41,14 @@ Scope {
         if (!validEntry(entry) || !request)
             return false;
 
-        const wantedPid = Number(request.pid || 0);
-        const wantedName = String(request.name || "").trim().toLowerCase();
-        const liveName = entryName(entry).toLowerCase();
-
-        if (entryPid(entry) !== wantedPid)
-            return false;
-
-        return !wantedName || liveName === wantedName;
+        return processIdentity.matchesCaptured(
+            entry,
+            request.captured || {
+                pid: Number(request.pid || 0),
+                name: String(request.name || ""),
+                identity: String(request.identity || "")
+            }
+        );
     }
 
     function requiresDangerUnlock(entry) {
@@ -136,8 +145,9 @@ Scope {
 
         const op = String(operation || "").trim().toLowerCase();
         const protectedProcess = requiresDangerUnlock(entry);
-        const name = entryName(entry) || "PROCESS";
-        const pid = entryPid(entry);
+        const captured = processIdentity.capturedIdentity(entry);
+        const name = String(captured.name || entryName(entry) || "PROCESS");
+        const pid = Number(captured.pid || entryPid(entry));
         let title = "";
         let message = "";
         let actionLabel = "";
@@ -204,6 +214,8 @@ Scope {
             actionKind: actionKind,
             pid: pid,
             name: name,
+            identity: String(captured.identity || ""),
+            captured: captured,
             title: title,
             message: message,
             actionLabel: actionLabel

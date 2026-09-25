@@ -32,6 +32,12 @@ Scope {
                 "bridgeReady=" + bridgeReady
             );
 
+            const fixture = {
+                generation: probeRoot.snapshotCount,
+                tabs: [],
+                controls: []
+            };
+
             for (let i = 0; i < tabs.length; i++) {
                 const entry = tabs[i];
                 const evidence = identityEvidence(entry);
@@ -44,7 +50,35 @@ Scope {
                     String(entry.tabTitle || entry.name || ""),
                     "pids=" + evidence.processPids.join(",")
                 );
+
+                fixture.tabs.push({
+                    evidence: evidence,
+                    tabTitle: String(entry.tabTitle || entry.name || ""),
+                    selected: !!entry.selected
+                });
             }
+
+            for (let i = 0; i < controls.length; i++) {
+                const entry = controls[i];
+
+                fixture.controls.push({
+                    provider: String(entry.provider || ""),
+                    providerKey: String(entry.id || ""),
+                    appName: String(entry.appName || ""),
+                    windowName: String(entry.windowName || ""),
+                    controlName: String(entry.controlName || entry.name || ""),
+                    path: String(entry.path || ""),
+                    selected: !!entry.selected
+                });
+            }
+
+            // One JSON object per snapshot for Team 7 fixture capture. This
+            // remains raw provider evidence; it is not a semantic identity
+            // schema and intentionally carries no canonical app id.
+            console.log(
+                "TEAM5 FIXTURE",
+                JSON.stringify(fixture)
+            );
         }
 
         onDiagnosticsChanged: {

@@ -335,3 +335,44 @@ service lifetime integration
 ```
 
 This document is a contract, not a host-integration authorization.
+
+
+## Current isolated Team 1 stack
+
+The prepared parallel-floor stack now includes:
+
+```text
+ProcessIdentity
+ProcessScope
+ProcessSafety
+ProcessControl
+ProcessLimits
+ProcessActionController
+ProcessResourceScope
+ProcessResourceState
+ProcessResourceController
+ProcessPresentation
+SystemControl
+SystemPresentation
+```
+
+`ProcessActionController` requires `ProcessIdentity`. Destructive
+confirmation requests carry a captured process identity, and confirmed
+execution re-validates the live entry through `ProcessIdentity` before
+calling the mutation backend.
+
+For higher-level APP/WINDOW/TAB/RUN resource controls, providers supply a
+semantic `scopeKey` and root PID set. Team 1 owns only the physiology after
+that boundary:
+
+```text
+provider identity + roots
+        -> ProcessScope
+        -> ProcessResourceScope
+        -> ProcessResourceState
+        -> ProcessResourceController
+        -> ProcessControl
+```
+
+The provider-specific rules that discover APP/WINDOW/TAB/RUN roots and generate
+semantic scope keys remain outside Team 1.

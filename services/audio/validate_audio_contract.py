@@ -178,6 +178,9 @@ required_test_cases = {
     "test_volumeMathNeverAmplifiesAboveUnity",
     "test_rawEvidencePreservesPipeWireFields",
     "test_team7ObservationAdapterKeepsProvenance",
+    "test_parseSinkInputsAcceptsPactlArray",
+    "test_parseSinkInputsRejectsInvalidPayloads",
+    "test_sinkInputVolumeSupportsRawPulseValue",
     "test_policyNamespacesNormalizeScopeOnly",
 }
 

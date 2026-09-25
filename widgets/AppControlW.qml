@@ -6,6 +6,7 @@ import Quickshell.Io
 import "../components"
 import "../services/system"
 import "../services/files"
+import "../services/remote"
 import qs.services.favorites
 import "appcontrol"
 import "thermal"
@@ -22,6 +23,10 @@ PanelWindow {
 
     FileService {
         id: fileService
+    }
+
+    RemoteController {
+        id: remoteController
     }
 
     // ============================================================
@@ -76,10 +81,14 @@ PanelWindow {
     readonly property int fileViewSearch: 1
     property int fileViewMode: fileViewBrowse
 
-    readonly property int remoteViewConfigured: 0
-    readonly property int remoteViewKnown: 1
-    readonly property int remoteViewAll: 2
-    property int remoteViewMode: remoteViewConfigured
+    readonly property int remoteViewConfigured:
+        remoteController.viewConfigured
+    readonly property int remoteViewKnown:
+        remoteController.viewKnown
+    readonly property int remoteViewAll:
+        remoteController.viewAll
+    readonly property int remoteViewMode:
+        remoteController.viewMode
 
     // Canonical THERMAL glyph now lives in widgets/thermal so AppControl
     // and CPU++ can render the exact same composition.
@@ -3654,241 +3663,94 @@ PanelWindow {
     // ============================================================
     // REMOTE MODE
     // ============================================================
-    // Parse the effective SSH config into structured records. CONFIGURED hosts
-    // preserve aliases and their HostName/User/Port/IdentityFile/ProxyJump.
-    // KNOWN HOSTS are added separately and deduplicated against aliases.
-    property var remoteEntries: []
-    property bool remoteScanLoading: false
-    property string remoteScanError: ""
+    // SSH discovery, parsing, normalized records, REMOTE submode state, and
+    // SSH/SFTP actions live in RemoteController. AppControl retains shared
+    // search/result/detail/focus routing and clipboard behavior.
+    readonly property var remoteEntries: remoteController.entries
+    readonly property bool remoteScanLoading: remoteController.scanLoading
+    readonly property string remoteScanError: remoteController.scanError
 
-    Process {
-        id: remoteScanProcess
-        stdout: StdioCollector {
-            onStreamFinished: appControlWindow.consumeRemoteScan(text)
-        }
-        stderr: StdioCollector {
-            onStreamFinished: {
-                const message = String(text || "").trim();
-                if (message)
-                    appControlWindow.remoteScanError = message;
-                appControlWindow.remoteScanLoading = false;
-            }
-        }
-    }
-
-    function remoteScanScript() {
-        return [
-            "import json, os, re",
-            "home=os.path.expanduser('~')",
-            "rows=[]; seen=set(); seen_hosts=set()",
-            "cfg=os.path.join(home,'.ssh','config')",
-            "blocks=[]; cur=None",
-            "try:",
-            "  lines=open(cfg,'r',encoding='utf-8',errors='ignore').read().splitlines()",
-            "except Exception:",
-            "  lines=[]",
-            "for raw in lines:",
-            "  line=raw.strip()",
-            "  if not line or line.startswith('#'): continue",
-            "  parts=line.split(None,1)",
-            "  key=parts[0].lower(); value=parts[1].strip() if len(parts)>1 else ''",
-            "  if key=='host':",
-            "    aliases=[a for a in value.split() if not any(c in a for c in '*!?')]",
-            "    cur={'aliases':aliases,'hostname':'','user':'','port':'','identityFile':'','proxyJump':''}",
-            "    blocks.append(cur)",
-            "  elif cur is not None and key in ('hostname','user','port','identityfile','proxyjump'):",
-            "    field={'hostname':'hostname','user':'user','port':'port','identityfile':'identityFile','proxyjump':'proxyJump'}[key]",
-            "    if not cur.get(field): cur[field]=os.path.expanduser(value) if field=='identityFile' else value",
-            "for block in blocks:",
-            "  for alias in block['aliases']:",
-            "    if not alias or alias in seen: continue",
-            "    seen.add(alias)",
-            "    host=block.get('hostname') or alias",
-            "    seen_hosts.add(host.lower())",
-            "    rows.append({'source':'config','alias':alias,'host':host,'hostname':host,'user':block.get('user',''),'port':block.get('port',''),'identityFile':block.get('identityFile',''),'proxyJump':block.get('proxyJump','')})",
-            "kh=os.path.join(home,'.ssh','known_hosts')",
-            "try:",
-            "  lines=open(kh,'r',encoding='utf-8',errors='ignore').read().splitlines()",
-            "except Exception:",
-            "  lines=[]",
-            "for raw in lines:",
-            "  if not raw or raw.startswith('#'): continue",
-            "  first=raw.split(None,1)[0] if raw.split() else ''",
-            "  for token in first.split(','):",
-            "    token=token.strip()",
-            "    if not token or token.startswith('|'): continue",
-            "    host=token",
-            "    port=''",
-            "    m=re.match(r'^\\[([^]]+)\\]:(\\d+)$', token)",
-            "    if m: host=m.group(1); port=m.group(2)",
-            "    key=host.lower()",
-            "    if key in seen or key in seen_hosts: continue",
-            "    seen.add(key); seen_hosts.add(key)",
-            "    rows.append({'source':'known','alias':host,'host':host,'hostname':host,'user':'','port':port,'identityFile':'','proxyJump':''})",
-            "print(json.dumps(rows))"
-        ].join("\n");
-    }
+    // The old in-host parser reset selector state after publishing new rows.
+    // Keep that navigation behavior in the host rather than giving
+    // RemoteController a back-reference into AppControl.
+    onRemoteEntriesChanged: resetResultSelection()
 
     function refreshRemoteEntries() {
-        if (remoteScanLoading)
-            return;
-        remoteScanLoading = true;
-        remoteScanError = "";
-        remoteScanProcess.exec(["/usr/bin/python3", "-c", remoteScanScript()]);
+        return remoteController.refresh();
     }
 
     function setRemoteViewMode(mode) {
-        remoteViewMode = mode === remoteViewKnown
-                         ? remoteViewKnown
-                         : mode === remoteViewAll
-                           ? remoteViewAll
-                           : remoteViewConfigured;
+        remoteController.setViewMode(mode);
+
         keyboardActive = true;
         hoveredResultIndex = -1;
         detailFocused = false;
+
         resetResultSelection();
         resetDetailActionSelection();
     }
 
     function remoteTarget(entry) {
-        if (!entry) return "";
-        if (entry.source === "config")
-            return String(entry.alias || entry.host || "").trim();
-        let target = String(entry.host || entry.hostname || "").trim();
-        if (entry.user)
-            target = String(entry.user) + "@" + target;
-        return target;
+        return remoteController.target(entry);
     }
 
     function remoteCommand(entry, sftp) {
-        if (!entry) return "";
-        const program = sftp ? "sftp" : "ssh";
-        const target = remoteTarget(entry);
-        if (!target) return "";
-        if (entry.source === "config")
-            return program + " " + target;
-        let command = program;
-        if (entry.port)
-            command += (sftp ? " -P " : " -p ") + String(entry.port);
-        command += " " + target;
-        return command;
-    }
-
-    function consumeRemoteScan(text) {
-        let raw = [];
-        try { raw = JSON.parse(String(text || "[]")); }
-        catch (error) {
-            remoteScanError = "SSH CONFIG PARSE FAILED";
-            remoteScanLoading = false;
-            return;
-        }
-        const rows = [];
-        for (let i = 0; i < raw.length; i++) {
-            const item = raw[i] || ({});
-            const source = String(item.source || "known");
-            const alias = String(item.alias || item.host || "").trim();
-            const host = String(item.hostname || item.host || alias).trim();
-            if (!alias || !host) continue;
-            const userHost = (item.user ? String(item.user) + "@" : "") + host;
-            const endpoint = userHost + (item.port ? ":" + String(item.port) : "");
-            rows.push({
-                _remoteRecord: true,
-                id: "ssh:" + source + ":" + alias,
-                name: alias,
-                label: source === "config" ? "⌁  " + alias : "◇  " + alias,
-                alias: alias,
-                host: host,
-                hostname: host,
-                user: String(item.user || ""),
-                port: String(item.port || ""),
-                identityFile: String(item.identityFile || ""),
-                proxyJump: String(item.proxyJump || ""),
-                source: source,
-                endpoint: endpoint,
-                detail: source === "config" ? "CONFIGURED • " + endpoint : "KNOWN HOST • " + endpoint
-            });
-        }
-        rows.sort(function(a, b) {
-            if (a.source !== b.source)
-                return a.source === "config" ? -1 : 1;
-            return String(a.name || "").localeCompare(String(b.name || ""));
-        });
-        remoteEntries = rows;
-        remoteScanLoading = false;
-        resetResultSelection();
+        return remoteController.command(entry, sftp);
     }
 
     ScriptModel {
         id: remoteResults
+
         values: {
-            const query = searchInput.text.trim().toLowerCase();
-            let rows = appControlWindow.remoteEntries || [];
-            if (appControlWindow.remoteViewMode === appControlWindow.remoteViewConfigured)
-                rows = rows.filter(function(entry) { return entry.source === "config"; });
-            else if (appControlWindow.remoteViewMode === appControlWindow.remoteViewKnown)
-                rows = rows.filter(function(entry) { return entry.source === "known"; });
-            if (!query) return rows;
+            const query =
+                searchInput.text.trim().toLowerCase();
+
+            let rows =
+                appControlWindow.remoteEntries || [];
+
+            if (appControlWindow.remoteViewMode
+                    === appControlWindow.remoteViewConfigured) {
+                rows = rows.filter(function(entry) {
+                    return entry.source === "config";
+                });
+            } else if (appControlWindow.remoteViewMode
+                       === appControlWindow.remoteViewKnown) {
+                rows = rows.filter(function(entry) {
+                    return entry.source === "known";
+                });
+            }
+
+            if (!query)
+                return rows;
+
             return rows.filter(function(entry) {
-                return (String(entry.name || "") + " "
-                        + String(entry.host || "") + " "
-                        + String(entry.user || "") + " "
-                        + String(entry.detail || ""))
-                    .toLowerCase().indexOf(query) !== -1;
+                return (
+                    String(entry.name || "")
+                    + " "
+                    + String(entry.host || "")
+                    + " "
+                    + String(entry.user || "")
+                    + " "
+                    + String(entry.detail || "")
+                ).toLowerCase().indexOf(query) !== -1;
             });
         }
     }
 
     function activateRemoteEntry(entry) {
-        if (!entry) return;
-        const target = remoteTarget(entry);
-        if (!target) return;
-        const args = ["kitty", "--", "ssh"];
-        if (entry.source !== "config" && entry.port)
-            args.push("-p", String(entry.port));
-        args.push(target);
-        Quickshell.execDetached(args);
+        return remoteController.activate(entry);
     }
 
     function activateRemoteSftp(entry) {
-        if (!entry) return;
-        const target = remoteTarget(entry);
-        if (!target) return;
-        const args = ["kitty", "--", "sftp"];
-        if (entry.source !== "config" && entry.port)
-            args.push("-P", String(entry.port));
-        args.push(target);
-        Quickshell.execDetached(args);
+        return remoteController.activateSftp(entry);
     }
 
     function testRemoteConnection(entry) {
-        if (!entry) return;
-        const target = remoteTarget(entry);
-        if (!target) return;
-        const args = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5"];
-        if (entry.source !== "config" && entry.port)
-            args.push("-p", String(entry.port));
-        args.push(target, "exit");
-        const quoted = args.map(function(part) {
-            return "'" + String(part).replace(/'/g, "'\"'\"'") + "'";
-        }).join(" ");
-        Quickshell.execDetached([
-            "/bin/sh", "-lc",
-            quoted + " >/dev/null 2>&1 && "
-            + "notify-send 'AppControl • REMOTE' 'SSH connection succeeded' || "
-            + "notify-send -u critical 'AppControl • REMOTE' 'SSH connection failed or needs interactive authentication'"
-        ]);
+        return remoteController.testConnection(entry);
     }
 
     function editSshConfig() {
-        const configPath = String(Quickshell.env("HOME") || "") + "/.ssh/config";
-        Quickshell.execDetached([
-            "/bin/sh", "-lc",
-            "cfg=$1; mkdir -p \"$(dirname \"$cfg\")\"; touch \"$cfg\"; "
-            + "if command -v code >/dev/null 2>&1; then exec code \"$cfg\"; "
-            + "elif command -v nvim >/dev/null 2>&1 && command -v kitty >/dev/null 2>&1; then exec kitty -- nvim \"$cfg\"; "
-            + "else exec xdg-open \"$cfg\"; fi",
-            "appcontrol-edit-ssh", configPath
-        ]);
+        return remoteController.editSshConfig();
     }
 
     // ============================================================

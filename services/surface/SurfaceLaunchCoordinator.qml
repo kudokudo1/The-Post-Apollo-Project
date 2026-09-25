@@ -328,8 +328,12 @@ QtObject {
         return null;
     }
 
-    function reconcileObservedInstrumentation(rows) {
+    function reconcileObservedInstrumentation(rows, options) {
         const source = Array.isArray(rows) ? rows : [];
+        const complete = !!(
+            options
+            && options.complete === true
+        );
         const desired = {};
         const normalized = [];
 
@@ -351,13 +355,18 @@ QtObject {
         const next = {};
         const existingKeys = Object.keys(_leaseState);
 
-        // Preserve launch-transaction/application-instance leases. Only the
-        // "observed" recovery layer is replaced by each reconciliation.
+        // Launch-transaction/application-instance leases always survive
+        // reconciliation. Observed leases survive partial snapshots too:
+        // absence becomes pruning evidence only when the caller explicitly
+        // declares the snapshot complete.
         for (let i = 0; i < existingKeys.length; i++) {
             const key = existingKeys[i];
             const lease = _leaseState[key];
 
-            if (!lease || lease.source === "observed")
+            if (!lease)
+                continue;
+
+            if (lease.source === "observed" && complete)
                 continue;
 
             next[key] = lease;
@@ -395,7 +404,8 @@ QtObject {
         return {
             adopted: adopted,
             shadowed: shadowed,
-            observedCount: normalized.length
+            observedCount: normalized.length,
+            complete: complete
         };
     }
 

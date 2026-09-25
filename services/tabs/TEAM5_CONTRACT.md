@@ -43,6 +43,13 @@ Current donor providers expose different evidence:
 - `targetId`
 - `webSocketDebuggerUrl`
 
+### AT-SPI-CACHE
+- `id` / provider key
+- `busName`
+- `objectPath`
+- `appName`
+- `windowName`
+
 ### KITTY
 - `id` / provider key
 - `kittyAddress`
@@ -54,14 +61,23 @@ These values are discovery evidence. They are not canonical application identity
 
 ## Team 7 handoff
 
-Team 7 owns semantic identity. Team 5 requires an adapter that can consume the raw
-evidence above and relate a surface to the future canonical graph:
+Team 7 owns semantic identity. Its reconnaissance contract currently requires
+Team 5 to preserve provider, provider-local key, appName/windowName exactly as
+observed, provider-native parent/process metadata, processPids when known,
+debugPort/targetId, busName/objectPath, and Kitty address/tab id.
+
+Team 5 requires an adapter that can consume the raw evidence above and relate a
+surface to the future canonical graph:
 
 `DesktopEntry ↔ Application ↔ Sway Window ↔ PID/process scope ↔ Tab/Surface`
 
 Team 5 must not fabricate missing DesktopEntry, application, Sway-window, or PID
 relationships. Temporary provider record IDs remain valid until Team 7 supplies
 canonical mappings.
+
+Team 7's semantic entity/observation schema is not frozen yet. This Team 5
+contract therefore freezes only preservation of raw observations and ownership
+boundaries, not the final cross-provider identity schema.
 
 ## Team 6 handoff
 

@@ -50,6 +50,9 @@ required_functions = {
     "setVolumePolicy",
     "clearVolumePolicy",
     "volumePolicyPercentFor",
+    "mutePolicyTargets",
+    "pendingMuteTargets",
+    "volumePolicyTargets",
     "applyMutePolicies",
     "applyPendingMuteStates",
     "applyVolumePolicies",
@@ -181,6 +184,10 @@ required_test_cases = {
     "test_parseSinkInputsAcceptsPactlArray",
     "test_parseSinkInputsRejectsInvalidPayloads",
     "test_sinkInputVolumeSupportsRawPulseValue",
+    "test_futureStreamMutePolicyPlanning",
+    "test_pendingMutePlannerSupportsOneShotUnmute",
+    "test_latestVolumePolicySerialWinsOverlap",
+    "test_volumePolicyPlannerClampsTarget",
     "test_policyNamespacesNormalizeScopeOnly",
 }
 

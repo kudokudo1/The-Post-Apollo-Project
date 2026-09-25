@@ -177,6 +177,43 @@ It must not implement:
 This keeps Team 8 as DesktopEntry catalog/launch authority while Team 7 remains semantic
 identity authority.
 
+### AppSelectorPresentation.qml
+
+Palette-injected APPS selector/result presentation data.
+
+Owns:
+
+- Native / Flatpak / HIDDEN selector labels and accents
+- compact APPS-source labels used by Favorites copies
+- Normal / Bottles / Toolbox selector presentation descriptors
+- HIDDEN face presentation variant
+- APPS result source-badge label/accent/opacity
+- APPS-specific glow/fill/text/shadow values for source/launch choices
+
+It does **not** own:
+
+- selector widgets
+- MouseArea behavior
+- keyboard/focus routing
+- shared selector layout
+- Favorites UI ownership
+- generic host navigation
+- global theme colors
+
+The future host/shared selector layer may render these descriptors, but Team 8 remains the
+source of APPS-specific presentation constants.
+
+The facade exposes:
+
+```
+sourceSelectorOptions(compact)
+launchSelectorOptions()
+hiddenSourceFace(emphasized)
+sourceBadge(entry, unavailable)
+sourceGlowSpec(...)
+launchGlowSpec(...)
+```
+
 ### AppIconGlowPolicy.qml
 
 Palette-injected APPS presentation policy.

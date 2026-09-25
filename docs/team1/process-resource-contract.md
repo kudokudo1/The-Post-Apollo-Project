@@ -412,3 +412,27 @@ behavioral rewrite.
 `ProcessResourceController` already requires `limitMutation` and uses that
 same verified batch backend for APP/WINDOW/TAB/RUN-style resolved resource
 scopes.
+
+
+## Favorite-wrapper normalization invariant
+
+Process actions may be invoked from a Favorites-backed UI record. Such records
+can wrap the real process row in `_sourceItem`.
+
+The shared action path must therefore apply one invariant:
+
+```text
+UI/favorite record
+      -> ProcessIdentity.sourceEntry(...)
+      -> safety / limit / state policy
+      -> captured identity
+      -> mutation
+```
+
+`ProcessActionController` now normalizes entries before every call into
+`ProcessSafety` and `ProcessLimits`, and before reading process state. PID,
+name, and confirmation identity continue to flow through `ProcessIdentity`.
+
+This prevents a favorite wrapper with no direct PID/comm/vsz fields from
+silently bypassing protected-process classification or producing incorrect
+resource-limit policy.

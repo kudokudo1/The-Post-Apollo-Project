@@ -5,6 +5,7 @@ import Quickshell.I3
 import Quickshell.Io
 import "../components"
 import "../services/system"
+import "../services/files"
 import "appcontrol"
 import "thermal"
 import QtQuick.Effects
@@ -17,6 +18,10 @@ PanelWindow {
     // AppControl keeps only host/view state and a lightweight ThermalController.
     required property var systemTelemetry
     required property var fanControl
+
+    FileService {
+        id: fileService
+    }
 
     // ============================================================
     // STATE
@@ -3460,293 +3465,144 @@ PanelWindow {
     // ============================================================
     // FILES MODE
     // ============================================================
-    // BROWSE mirrors a traditional file picker and scans only the current
-    // directory. SEARCH is a bounded recursive search rooted at $HOME. Both
-    // models carry enough metadata for the control pane without a second
-    // stat/mime round trip.
-    property string fileCurrentDir: String(Quickshell.env("HOME") || "/")
-    property var fileEntries: []
-    property var fileSearchEntries: []
-    property bool fileScanLoading: false
-    property bool fileSearchLoading: false
-    property string fileScanError: ""
-    property string fileSearchError: ""
-    property string fileSearchActiveQuery: ""
-    readonly property int fileSearchResultLimit: 700
-
-    Process {
-        id: fileScanProcess
-        stdout: StdioCollector {
-            onStreamFinished: appControlWindow.consumeFileScan(text, false)
-        }
-        stderr: StdioCollector {
-            onStreamFinished: {
-                const message = String(text || "").trim();
-                if (message)
-                    appControlWindow.fileScanError = message;
-                appControlWindow.fileScanLoading = false;
-            }
-        }
-    }
-
-    Process {
-        id: fileSearchProcess
-        stdout: StdioCollector {
-            onStreamFinished: appControlWindow.consumeFileScan(text, true)
-        }
-        stderr: StdioCollector {
-            onStreamFinished: {
-                const message = String(text || "").trim();
-                if (message)
-                    appControlWindow.fileSearchError = message;
-                appControlWindow.fileSearchLoading = false;
-            }
-        }
-    }
+    // Filesystem behavior/data lives in FileService. AppControl retains only
+    // view mode, presentation, generic selection/detail integration, Favorites
+    // pinning, and the navigation glue that binds the shared search field to
+    // the provider.
+    readonly property string fileCurrentDir: fileService.currentDir
+    readonly property var fileEntries: fileService.entries
+    readonly property var fileSearchEntries: fileService.searchEntries
+    readonly property bool fileScanLoading: fileService.scanLoading
+    readonly property bool fileSearchLoading: fileService.searchLoading
+    readonly property string fileScanError: fileService.scanError
+    readonly property string fileSearchError: fileService.searchError
 
     function fileHumanBytes(value) {
-        let bytes = Math.max(0, Number(value || 0));
-        const units = ["B", "KiB", "MiB", "GiB", "TiB"];
-        let index = 0;
-        while (bytes >= 1024 && index < units.length - 1) {
-            bytes /= 1024;
-            index += 1;
-        }
-        if (index === 0)
-            return Math.round(bytes) + " " + units[index];
-        return bytes.toFixed(bytes >= 100 ? 0 : bytes >= 10 ? 1 : 2)
-               + " " + units[index];
+        return fileService.humanBytes(value);
     }
 
     function fileParentPath(path) {
-        const current = String(path || "/").replace(/\/+$/, "") || "/";
-        if (current === "/") return "/";
-        const slash = current.lastIndexOf("/");
-        return slash <= 0 ? "/" : current.slice(0, slash);
+        return fileService.parentPath(path);
     }
 
     function fileBreadcrumbText() {
-        const home = String(Quickshell.env("HOME") || "");
-        const current = String(fileCurrentDir || "/");
-        if (home && current.indexOf(home) === 0)
-            return "~" + current.slice(home.length);
-        return current;
+        return fileService.breadcrumbText();
     }
 
     function fileKindLabel(entry) {
-        if (!entry) return "FILE";
-        if (entry.isParent) return "PARENT DIRECTORY";
-        if (entry.isDir) return "DIRECTORY";
-        if (entry.kind === "l") return "SYMLINK";
-        return String(entry.mime || "FILE").toUpperCase();
+        return fileService.kindLabel(entry);
     }
 
     function fileModifiedText(entry) {
-        const epoch = Number(entry && entry.modifiedEpoch || 0);
-        if (!(epoch > 0)) return "UNKNOWN";
-        return Qt.formatDateTime(new Date(epoch * 1000), "yyyy-MM-dd  HH:mm:ss");
+        return fileService.modifiedText(entry);
     }
 
     function setFileViewMode(mode) {
-        fileViewMode = mode === fileViewSearch ? fileViewSearch : fileViewBrowse;
+        fileViewMode =
+            mode === fileViewSearch
+            ? fileViewSearch
+            : fileViewBrowse;
+
         keyboardActive = true;
         hoveredResultIndex = -1;
         detailFocused = false;
         resetDetailActionSelection();
+
         if (fileViewMode === fileViewBrowse)
             refreshFileEntries();
         else
             refreshFileSearch();
+
         resetResultSelection();
     }
 
     function refreshFileEntries() {
-        if (fileScanLoading)
-            return;
-        fileScanLoading = true;
-        fileScanError = "";
-        // %y type, %f basename, %p full path, %s bytes, %M perms, %T@ mtime.
-        fileScanProcess.exec([
-            "find", fileCurrentDir,
-            "-mindepth", "1", "-maxdepth", "1",
-            "-printf", "%y\\t%f\\t%p\\t%s\\t%M\\t%T@\\n"
-        ]);
+        return fileService.refreshBrowse();
     }
 
     function refreshFileSearch() {
         if (fileViewMode !== fileViewSearch)
-            return;
-        if (fileSearchLoading) {
-            fileSearchDebounce.restart();
-            return;
-        }
-        const query = String(searchInput.text || "").trim();
-        if (!query) {
-            fileSearchEntries = [];
-            fileSearchError = "";
-            resetResultSelection();
-            return;
-        }
-        fileSearchLoading = true;
-        fileSearchError = "";
-        fileSearchActiveQuery = query;
-        fileSearchEntries = [];
-        const root = String(Quickshell.env("HOME") || "/");
-        fileSearchProcess.exec([
-            "/bin/sh", "-lc",
-            "root=$1; q=$2; lim=$3; pattern=\"*$q*\"; "
-            + "find \"$root\" -mindepth 1 "
-            + "\\( -path \"$root/.cache\" -o -path \"$root/.local/share/Trash\" \\) -prune -o "
-            + "\\( -type d -o -type f -o -type l \\) -iname \"$pattern\" "
-            + "-printf '%y\\t%f\\t%p\\t%s\\t%M\\t%T@\\n' 2>/dev/null | head -n \"$lim\"",
-            "appcontrol-files", root, query, String(fileSearchResultLimit)
-        ]);
-    }
+            return false;
 
-    Timer {
-        id: fileSearchDebounce
-        interval: 180
-        repeat: false
-        onTriggered: appControlWindow.refreshFileSearch()
-    }
-
-    function consumeFileScan(text, recursive) {
-        const rows = [];
-        const current = String(fileCurrentDir || "/");
-        if (!recursive && current !== "/") {
-            const parent = fileParentPath(current);
-            rows.push({
-                _fileRecord: true,
-                id: "file:parent:" + current,
-                name: "..",
-                label: "⌯🗁๋࣭⭑  ..",
-                path: parent,
-                isDir: true,
-                isParent: true,
-                kind: "d",
-                sizeBytes: 0,
-                permissions: "",
-                modifiedEpoch: 0,
-                mime: "inode/directory",
-                detail: parent
-            });
-        }
-
-        const lines = String(text || "").split("\n");
-        for (let i = 0; i < lines.length; i++) {
-            if (!lines[i]) continue;
-            const fields = lines[i].split("\t");
-            if (fields.length < 3) continue;
-            const kind = fields[0];
-            const name = fields[1];
-            const path = fields[2];
-            const isDir = kind === "d";
-            const sizeBytes = Number(fields[3] || 0);
-            const permissions = String(fields[4] || "");
-            const modifiedEpoch = Number(fields[5] || 0);
-            const suffix = name.indexOf(".") >= 0
-                           ? name.slice(name.lastIndexOf(".") + 1).toLowerCase()
-                           : "";
-            let mime = isDir ? "inode/directory" : "file";
-            if (!isDir && ["png","jpg","jpeg","gif","webp","svg"].indexOf(suffix) >= 0)
-                mime = "image/" + (suffix === "jpg" ? "jpeg" : suffix);
-            else if (!isDir && ["mp4","mkv","webm","mov","avi"].indexOf(suffix) >= 0)
-                mime = "video/" + suffix;
-            else if (!isDir && ["mp3","flac","wav","ogg","m4a"].indexOf(suffix) >= 0)
-                mime = "audio/" + suffix;
-            else if (!isDir && ["txt","md","qml","js","ts","py","lua","sh","json","yaml","yml","toml","conf","ini"].indexOf(suffix) >= 0)
-                mime = "text/" + (suffix || "plain");
-
-            rows.push({
-                _fileRecord: true,
-                id: "file:" + path,
-                name: name,
-                label: (isDir ? "⌯🗁๋࣭⭑  " : kind === "l" ? "↗  " : "◇  ")
-                       + name + (isDir ? "/" : ""),
-                path: path,
-                isDir: isDir,
-                isParent: false,
-                kind: kind,
-                sizeBytes: sizeBytes,
-                permissions: permissions,
-                modifiedEpoch: modifiedEpoch,
-                mime: mime,
-                detail: path
-            });
-        }
-        rows.sort(function(a, b) {
-            if (a.isParent !== b.isParent) return a.isParent ? -1 : 1;
-            if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
-            return String(a.name || "").localeCompare(String(b.name || ""));
-        });
-        if (recursive) {
-            fileSearchEntries = rows;
-            fileSearchLoading = false;
-            if (fileViewMode === fileViewSearch
-                    && String(searchInput.text || "").trim() !== fileSearchActiveQuery)
-                fileSearchDebounce.restart();
-        } else {
-            fileEntries = rows;
-            fileScanLoading = false;
-        }
-        resetResultSelection();
+        return fileService.refreshSearch(searchInput.text);
     }
 
     function fileRowsPinnedFavorites(rows) {
         const source = (rows || []).slice();
-        // Touch the favorites array explicitly so this sort is rebound as soon as
-        // a file is starred/unstarred; no directory rescan is required.
+
+        // FILES provider identity/reconstruction belongs to the coordinated
+        // Team 2 / Team 3-F wave. Preserve the existing favoriteKeys semantics
+        // here until that contract lands.
         const favoriteRevision = favoriteStore.favoriteKeys;
+
         source.sort(function(a, b) {
             if (!!a.isParent !== !!b.isParent)
                 return a.isParent ? -1 : 1;
 
             const aFavorite = appControlWindow.isFavoriteItem(
-                a, appControlWindow.filesModeIndex
+                a,
+                appControlWindow.filesModeIndex
             );
             const bFavorite = appControlWindow.isFavoriteItem(
-                b, appControlWindow.filesModeIndex
+                b,
+                appControlWindow.filesModeIndex
             );
+
             if (aFavorite !== bFavorite)
                 return aFavorite ? -1 : 1;
 
             if (!!a.isDir !== !!b.isDir)
                 return a.isDir ? -1 : 1;
 
-            return String(a.name || "").localeCompare(String(b.name || ""));
+            return String(a.name || "")
+                .localeCompare(String(b.name || ""));
         });
+
         return source;
     }
 
     ScriptModel {
         id: fileResults
+
         values: {
-            let rows = appControlWindow.fileViewMode === appControlWindow.fileViewSearch
-                       ? (appControlWindow.fileSearchEntries || [])
-                       : (appControlWindow.fileEntries || []);
-            const query = searchInput.text.trim().toLowerCase();
-            if (appControlWindow.fileViewMode !== appControlWindow.fileViewSearch
+            let rows =
+                appControlWindow.fileViewMode
+                === appControlWindow.fileViewSearch
+                ? (appControlWindow.fileSearchEntries || [])
+                : (appControlWindow.fileEntries || []);
+
+            const query =
+                searchInput.text.trim().toLowerCase();
+
+            if (appControlWindow.fileViewMode
+                    !== appControlWindow.fileViewSearch
                     && query) {
                 rows = rows.filter(function(entry) {
-                    if (entry.isParent) return true;
-                    return (String(entry.name || "") + " " + String(entry.path || ""))
-                        .toLowerCase().indexOf(query) !== -1;
+                    if (entry.isParent)
+                        return true;
+
+                    return (
+                        String(entry.name || "")
+                        + " "
+                        + String(entry.path || "")
+                    ).toLowerCase().indexOf(query) !== -1;
                 });
             }
+
             return appControlWindow.fileRowsPinnedFavorites(rows);
         }
     }
 
     function activateFileEntry(entry) {
-        if (!entry) return;
+        if (!entry)
+            return;
+
         if (entry.isDir) {
-            fileCurrentDir = String(entry.path || "/");
             fileViewMode = fileViewBrowse;
             searchInput.text = "";
-            refreshFileEntries();
-            return;
         }
-        Quickshell.execDetached(["xdg-open", String(entry.path || "")]);
+
+        fileService.openEntry(entry);
     }
 
     function fileGoUp() {
@@ -3754,13 +3610,19 @@ PanelWindow {
             setFileViewMode(fileViewBrowse);
             return;
         }
-        const parent = fileParentPath(fileCurrentDir);
-        if (parent === fileCurrentDir) return;
-        fileCurrentDir = parent;
+
+        const parent =
+            fileService.parentPath(fileService.currentDir);
+
+        if (parent === fileService.currentDir)
+            return;
+
         searchInput.text = "";
-        refreshFileEntries();
+        fileService.goUp();
     }
 
+    // Shared host utility: REMOTE also consumes this. It intentionally remains
+    // outside FileService until a shared desktop/clipboard service owns it.
     function copyTextToClipboard(text) {
         const value = String(text || "");
         if (!value) return;
@@ -3775,35 +3637,11 @@ PanelWindow {
     }
 
     function revealFileEntry(entry) {
-        if (!entry) return;
-        const path = String(entry.path || "");
-        if (!path) return;
-        const parent = entry.isDir ? path : fileParentPath(path);
-        Quickshell.execDetached([
-            "/bin/sh", "-lc",
-            "p=$1; f=$2; "
-            + "if command -v nautilus >/dev/null 2>&1 && [ -n \"$f\" ]; then nautilus --select \"$f\"; "
-            + "elif command -v dolphin >/dev/null 2>&1 && [ -n \"$f\" ]; then dolphin --select \"$f\"; "
-            + "elif command -v thunar >/dev/null 2>&1; then thunar \"$p\"; "
-            + "else xdg-open \"$p\"; fi",
-            "appcontrol-reveal", parent, entry.isDir ? "" : path
-        ]);
+        fileService.revealEntry(entry);
     }
 
     function openFileTerminalHere(entry) {
-        if (!entry) return;
-        const path = String(entry.path || "");
-        if (!path) return;
-        const cwd = entry.isDir ? path : fileParentPath(path);
-        Quickshell.execDetached([
-            "/bin/sh", "-lc",
-            "cwd=$1; "
-            + "if command -v kitty >/dev/null 2>&1; then exec kitty --directory \"$cwd\"; "
-            + "elif command -v foot >/dev/null 2>&1; then exec foot --working-directory=\"$cwd\"; "
-            + "elif command -v wezterm >/dev/null 2>&1; then exec wezterm start --cwd \"$cwd\"; "
-            + "else notify-send 'AppControl' 'No supported terminal found for OPEN TERMINAL HERE'; fi",
-            "appcontrol-file-terminal", cwd
-        ]);
+        fileService.openTerminalHere(entry);
     }
 
     // ============================================================
@@ -14115,7 +13953,7 @@ PanelWindow {
 
                     if (appControlWindow.selectedModeIndex === appControlWindow.filesModeIndex
                             && appControlWindow.fileViewMode === appControlWindow.fileViewSearch)
-                        fileSearchDebounce.restart();
+                        fileService.scheduleSearch(searchInput.text);
 
                     if (appControlWindow.selectedModeIndex
                             === appControlWindow.appsModeIndex

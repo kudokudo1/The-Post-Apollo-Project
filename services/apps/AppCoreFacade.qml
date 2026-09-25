@@ -18,6 +18,7 @@ Scope {
     property var hiddenCommandNames: []
     property var preferencePredicate: null
     property var appOverrides: ({})
+    property var presentationColors: null
 
     readonly property int sourceNative: core.sourceNative
     readonly property int sourceFlatpak: core.sourceFlatpak
@@ -85,6 +86,11 @@ Scope {
     AppModePolicy {
         id: modePolicy
         coreProvider: core
+    }
+
+    AppIconGlowPolicy {
+        id: iconGlowPolicy
+        colors: facade.presentationColors
     }
 
     AppIdentityAdapter {
@@ -224,6 +230,22 @@ Scope {
             entries,
             rememberedKey
         );
+    }
+
+    function cachedIconGlow(source) {
+        return iconGlowPolicy.cached(source);
+    }
+
+    function rememberIconGlow(source, color, forceOverwrite) {
+        return iconGlowPolicy.remember(
+            source,
+            color,
+            forceOverwrite
+        );
+    }
+
+    function classifyIconGlow(pixelData) {
+        return iconGlowPolicy.classify(pixelData);
     }
 
     function identityObservation(entry) {

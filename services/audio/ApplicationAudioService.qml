@@ -653,59 +653,69 @@ Scope {
         return Number(volumePolicies[policyKey].percent);
     }
 
-    function applyMutePolicies(inputs) {
-        const keys = Object.keys(mutePolicies);
+    // Pure policy planners keep matching/arbitration testable without issuing
+    // mutations. The apply* functions below are the only layer that turns a
+    // plan into pactl side effects.
+    function mutePolicyTargets(inputs, policies) {
+        const source = Array.isArray(inputs) ? inputs : [];
+        const policyMap = policies || ({});
+        const keys = Object.keys(policyMap);
+        const targets = [];
 
-        if (keys.length === 0)
-            return;
-
-        for (let i = 0; i < inputs.length; i++) {
-            const input = inputs[i];
+        for (let i = 0; i < source.length; i++) {
+            const input = source[i];
             const index = Number(input.index);
 
             if (isNaN(index) || input.mute)
                 continue;
 
             for (let p = 0; p < keys.length; p++) {
-                const policy = mutePolicies[keys[p]] || {};
-                if (matchesDescriptor(policy.descriptor, input)) {
-                    setSinkInputMute([index], true);
-                    break;
-                }
+                const policy = policyMap[keys[p]] || {};
+                if (!matchesDescriptor(policy.descriptor, input))
+                    continue;
+
+                targets.push(index);
+                break;
             }
         }
+
+        return targets;
     }
 
-    function applyPendingMuteStates(inputs) {
-        const keys = Object.keys(pendingMuteStates);
-
-        if (keys.length === 0)
-            return;
+    function pendingMuteTargets(inputs, policies) {
+        const source = Array.isArray(inputs) ? inputs : [];
+        const policyMap = policies || ({});
+        const keys = Object.keys(policyMap);
+        const targets = [];
 
         for (let k = 0; k < keys.length; k++) {
-            const policy = pendingMuteStates[keys[k]];
+            const policy = policyMap[keys[k]] || {};
 
-            for (let i = 0; i < inputs.length; i++) {
-                const input = inputs[i];
+            for (let i = 0; i < source.length; i++) {
+                const input = source[i];
                 const index = Number(input.index);
 
                 if (isNaN(index)
                         || !matchesDescriptor(policy.descriptor, input))
                     continue;
 
-                if (!!input.mute !== !!policy.muted)
-                    setSinkInputMute([index], !!policy.muted);
+                if (!!input.mute !== !!policy.muted) {
+                    targets.push({
+                        index: index,
+                        muted: !!policy.muted
+                    });
+                }
             }
         }
 
-        // One-shot synchronization: persistent mute behavior lives in
-        // mutePolicies, just as in the donor.
-        pendingMuteStates = ({});
+        return targets;
     }
 
-    function applyVolumePolicies(inputs) {
+    function volumePolicyTargets(inputs, policies) {
+        const source = Array.isArray(inputs) ? inputs : [];
+        const policyMap = policies || ({});
         const targets = ({});
-        const keys = Object.keys(volumePolicies);
+        const keys = Object.keys(policyMap);
 
         function consider(index, percent, serial) {
             const key = String(index);
@@ -722,10 +732,10 @@ Scope {
         }
 
         for (let p = 0; p < keys.length; p++) {
-            const policy = volumePolicies[keys[p]];
+            const policy = policyMap[keys[p]] || {};
 
-            for (let i = 0; i < inputs.length; i++) {
-                const input = inputs[i];
+            for (let i = 0; i < source.length; i++) {
+                const input = source[i];
                 const index = Number(input.index);
 
                 if (isNaN(index)
@@ -736,6 +746,29 @@ Scope {
             }
         }
 
+        return targets;
+    }
+
+    function applyMutePolicies(inputs) {
+        const targets = mutePolicyTargets(inputs, mutePolicies);
+
+        for (let i = 0; i < targets.length; i++)
+            setSinkInputMute([targets[i]], true);
+    }
+
+    function applyPendingMuteStates(inputs) {
+        const targets = pendingMuteTargets(inputs, pendingMuteStates);
+
+        for (let i = 0; i < targets.length; i++)
+            setSinkInputMute([targets[i].index], targets[i].muted);
+
+        // One-shot synchronization: persistent mute behavior lives in
+        // mutePolicies, just as in the donor.
+        pendingMuteStates = ({});
+    }
+
+    function applyVolumePolicies(inputs) {
+        const targets = volumePolicyTargets(inputs, volumePolicies);
         const targetIndexes = Object.keys(targets);
 
         for (let i = 0; i < targetIndexes.length; i++) {

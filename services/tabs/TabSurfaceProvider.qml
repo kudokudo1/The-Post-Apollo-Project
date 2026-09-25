@@ -66,18 +66,61 @@ function tabLifecycleScript() {
     return "import base64\nimport hashlib\nimport json\nimport os\nimport socket\nimport struct\nimport sys\nimport urllib.parse\nimport urllib.request\n\nentry = json.loads(sys.argv[1])\nstate = sys.argv[2] if len(sys.argv) > 2 else \"active\"\nport = int(entry.get(\"debugPort\") or 0)\ntarget_id = str(entry.get(\"targetId\") or \"\")\nws_url = str(entry.get(\"webSocketDebuggerUrl\") or \"\")\n\ntry:\n    if (not ws_url) and port and target_id:\n        with urllib.request.urlopen(\"http://127.0.0.1:%d/json/list\" % port, timeout=0.8) as response:\n            for target in json.loads(response.read().decode(\"utf-8\", \"ignore\")):\n                if str(target.get(\"id\") or \"\") == target_id:\n                    ws_url = str(target.get(\"webSocketDebuggerUrl\") or \"\")\n                    break\n    if not ws_url:\n        raise RuntimeError(\"NO DEVTOOLS WEBSOCKET FOR TAB\")\n\n    parsed = urllib.parse.urlparse(ws_url)\n    if parsed.scheme != \"ws\":\n        raise RuntimeError(\"UNSUPPORTED DEVTOOLS WEBSOCKET SCHEME\")\n    host = parsed.hostname or \"127.0.0.1\"\n    port_num = parsed.port or 80\n    path = parsed.path or \"/\"\n    if parsed.query:\n        path += \"?\" + parsed.query\n\n    sock = socket.create_connection((host, port_num), timeout=1.5)\n    key = base64.b64encode(os.urandom(16)).decode(\"ascii\")\n    request = (\n        \"GET %s HTTP/1.1\\r\\nHost: %s:%d\\r\\nUpgrade: websocket\\r\\nConnection: Upgrade\\r\\n\"\n        \"Sec-WebSocket-Key: %s\\r\\nSec-WebSocket-Version: 13\\r\\n\\r\\n\"\n    ) % (path, host, port_num, key)\n    sock.sendall(request.encode(\"ascii\"))\n    response = b\"\"\n    while b\"\\r\\n\\r\\n\" not in response:\n        chunk = sock.recv(4096)\n        if not chunk:\n            break\n        response += chunk\n    if b\" 101 \" not in response.split(b\"\\r\\n\", 1)[0]:\n        raise RuntimeError(\"DEVTOOLS WEBSOCKET HANDSHAKE FAILED\")\n\n    def send_text(text):\n        payload = text.encode(\"utf-8\")\n        mask = os.urandom(4)\n        header = bytearray([0x81])\n        length = len(payload)\n        if length < 126:\n            header.append(0x80 | length)\n        elif length < 65536:\n            header.append(0x80 | 126)\n            header.extend(struct.pack(\"!H\", length))\n        else:\n            header.append(0x80 | 127)\n            header.extend(struct.pack(\"!Q\", length))\n        header.extend(mask)\n        masked = bytes(payload[i] ^ mask[i % 4] for i in range(length))\n        sock.sendall(bytes(header) + masked)\n\n    def recv_exact(count):\n        data = b\"\"\n        while len(data) < count:\n            chunk = sock.recv(count - len(data))\n            if not chunk:\n                raise RuntimeError(\"DEVTOOLS WEBSOCKET CLOSED\")\n            data += chunk\n        return data\n\n    def recv_frame():\n        first, second = recv_exact(2)\n        opcode = first & 0x0f\n        masked = bool(second & 0x80)\n        length = second & 0x7f\n        if length == 126:\n            length = struct.unpack(\"!H\", recv_exact(2))[0]\n        elif length == 127:\n            length = struct.unpack(\"!Q\", recv_exact(8))[0]\n        mask = recv_exact(4) if masked else b\"\"\n        payload = recv_exact(length) if length else b\"\"\n        if masked:\n            payload = bytes(payload[i] ^ mask[i % 4] for i in range(len(payload)))\n        if opcode == 0x9:\n            return None\n        if opcode == 0x8:\n            raise RuntimeError(\"DEVTOOLS WEBSOCKET CLOSED\")\n        return payload.decode(\"utf-8\", \"ignore\")\n\n    send_text(json.dumps({\n        \"id\": 1,\n        \"method\": \"Page.setWebLifecycleState\",\n        \"params\": {\"state\": \"frozen\" if state == \"frozen\" else \"active\"}\n    }))\n\n    result = None\n    for _ in range(40):\n        raw = recv_frame()\n        if not raw:\n            continue\n        message = json.loads(raw)\n        if message.get(\"id\") == 1:\n            result = message\n            break\n    sock.close()\n    if result is None:\n        raise RuntimeError(\"NO DEVTOOLS LIFECYCLE RESPONSE\")\n    if result.get(\"error\"):\n        raise RuntimeError(str(result[\"error\"]))\n    print(json.dumps({\"ok\": True, \"state\": state}))\nexcept Exception as exc:\n    print(json.dumps({\"ok\": False, \"state\": state, \"error\": str(exc)}))\n";
 }
 
+    function normalizedProcessPids(entry) {
+        const raw = entry && Array.isArray(entry.processPids)
+            ? entry.processPids
+            : [];
+        const result = [];
+
+        for (let i = 0; i < raw.length; i++) {
+            const pid = Number(raw[i] || 0);
+
+            if (pid > 1 && result.indexOf(pid) === -1)
+                result.push(pid);
+        }
+
+        result.sort(function(left, right) {
+            return left - right;
+        });
+
+        return result;
+    }
+
+    function tabObservationSignature(row) {
+        row = row || ({});
+
+        // Heartbeat suppression must include every provider observation that
+        // downstream identity/process consumers may rely on. Human-visible
+        // title/selection alone is insufficient: e.g. a Kitty tab can keep
+        // the same title while its foreground PID set changes.
+        return [
+            String(row.provider || ""),
+            String(row.id || row.path || ""),
+            String(row.path || ""),
+            String(row.tabTitle || row.name || ""),
+            String(row.appName || ""),
+            String(row.windowName || ""),
+            String(row.role || ""),
+            String(row.roleName || ""),
+            !!row.selected,
+            String(row.busName || ""),
+            String(row.objectPath || ""),
+            Number(row.debugPort || 0),
+            String(row.targetId || ""),
+            String(row.webSocketDebuggerUrl || ""),
+            String(row.kittyAddress || ""),
+            row.kittyTabId !== undefined
+                ? String(row.kittyTabId)
+                : "",
+            normalizedProcessPids(row).join(",")
+        ];
+    }
+
     function tabRowsSignature(rows) {
         const normalized = [];
 
-        for (let i = 0; i < rows.length; i++) {
-            const row = rows[i] || ({});
-            normalized.push([
-                String(row.provider || ""),
-                String(row.id || row.path || ""),
-                String(row.tabTitle || row.name || ""),
-                !!row.selected
-            ]);
-        }
+        for (let i = 0; i < rows.length; i++)
+            normalized.push(tabObservationSignature(rows[i]));
 
         return JSON.stringify(normalized);
     }

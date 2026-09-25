@@ -16,6 +16,11 @@ PanelWindow {
     property int thermalSelectedIndex: 0
     property int systemSelectedIndex: 0
 
+    // Rail-face animation state, matching AppControl's FAVORITES behavior.
+    property bool favoritesFaceClickPulse: false
+    property bool favoritesFaceBlinking: false
+    property bool favoritesFaceDoubleBlinkPending: false
+
     readonly property var thermalRows:
         appControlWindow && appControlWindow.thermalRows
         ? appControlWindow.thermalRows
@@ -51,6 +56,7 @@ PanelWindow {
 
     function open() {
         menuOpen = true;
+        scheduleFavoritesFaceBlink();
 
         if (selectedModeIndex === 2 || selectedModeIndex === 3)
             refreshSharedMonitors();
@@ -58,15 +64,32 @@ PanelWindow {
 
     function close() {
         menuOpen = false;
+        favoritesFaceBlinkTimer.stop();
+        favoritesFaceBlinkEndTimer.stop();
+        favoritesFaceSecondBlinkGapTimer.stop();
+        favoritesFaceSecondBlinkEndTimer.stop();
+        favoritesFaceClickPulseTimer.stop();
+        favoritesFaceBlinking = false;
+        favoritesFaceClickPulse = false;
     }
 
     function toggle() {
         menuOpen = !menuOpen;
 
-        if (menuOpen
-                && (selectedModeIndex === 2
-                    || selectedModeIndex === 3))
-            refreshSharedMonitors();
+        if (menuOpen) {
+            scheduleFavoritesFaceBlink();
+
+            if (selectedModeIndex === 2 || selectedModeIndex === 3)
+                refreshSharedMonitors();
+        } else {
+            favoritesFaceBlinkTimer.stop();
+            favoritesFaceBlinkEndTimer.stop();
+            favoritesFaceSecondBlinkGapTimer.stop();
+            favoritesFaceSecondBlinkEndTimer.stop();
+            favoritesFaceClickPulseTimer.stop();
+            favoritesFaceBlinking = false;
+            favoritesFaceClickPulse = false;
+        }
     }
 
     function selectMode(index) {
@@ -152,6 +175,74 @@ PanelWindow {
         }
 
         return String(entry.metric || entry.secondary || "");
+    }
+
+    function scheduleFavoritesFaceBlink() {
+        if (!menuOpen)
+            return;
+
+        favoritesFaceBlinkTimer.interval =
+            6500 + Math.floor(Math.random() * 6000);
+        favoritesFaceBlinkTimer.restart();
+    }
+
+    Timer {
+        id: favoritesFaceBlinkTimer
+        repeat: false
+
+        onTriggered: {
+            cpuPlusWindow.favoritesFaceDoubleBlinkPending =
+                Math.random() < 0.38;
+            cpuPlusWindow.favoritesFaceBlinking = true;
+            favoritesFaceBlinkEndTimer.restart();
+        }
+    }
+
+    Timer {
+        id: favoritesFaceBlinkEndTimer
+        interval: 170
+        repeat: false
+
+        onTriggered: {
+            cpuPlusWindow.favoritesFaceBlinking = false;
+
+            if (cpuPlusWindow.favoritesFaceDoubleBlinkPending) {
+                cpuPlusWindow.favoritesFaceDoubleBlinkPending = false;
+                favoritesFaceSecondBlinkGapTimer.restart();
+            } else {
+                cpuPlusWindow.scheduleFavoritesFaceBlink();
+            }
+        }
+    }
+
+    Timer {
+        id: favoritesFaceSecondBlinkGapTimer
+        interval: 125
+        repeat: false
+
+        onTriggered: {
+            cpuPlusWindow.favoritesFaceBlinking = true;
+            favoritesFaceSecondBlinkEndTimer.restart();
+        }
+    }
+
+    Timer {
+        id: favoritesFaceSecondBlinkEndTimer
+        interval: 170
+        repeat: false
+
+        onTriggered: {
+            cpuPlusWindow.favoritesFaceBlinking = false;
+            cpuPlusWindow.scheduleFavoritesFaceBlink();
+        }
+    }
+
+    Timer {
+        id: favoritesFaceClickPulseTimer
+        interval: 420
+        repeat: false
+
+        onTriggered: cpuPlusWindow.favoritesFaceClickPulse = false
     }
 
     // ============================================================
@@ -371,10 +462,13 @@ PanelWindow {
     // ============================================================
     // WINDOW
     // AppControlW: 834 wide x 674 tall
-    // CPU++:       674 wide x 834 tall
+    // CPU++:       814 wide x 834 tall
+    //
+    // Lower body: 390 instrument | 180 target | 220 actuator.
+    // The chassis remains slightly taller than it is wide.
     // ============================================================
 
-    implicitWidth: 674
+    implicitWidth: 814
     implicitHeight: 834
 
     anchors {
@@ -560,7 +654,10 @@ PanelWindow {
                         : Colors.black
 
                     border.width: 1
-                    border.color: Colors.cyan
+                    border.color:
+                        isHovered || isPressed || isSelected
+                        ? Colors.orange
+                        : Colors.cyan
 
                     Behavior on scale {
                         NumberAnimation {
@@ -595,10 +692,15 @@ PanelWindow {
                                     item.iconColor = Qt.binding(function() {
                                         return modeButton.contentColor;
                                     });
+                                    item.glowColor = Qt.binding(function() {
+                                        return modeButton.isHovered
+                                               ? Colors.orange
+                                               : Colors.cyan;
+                                    });
                                     item.pressed = Qt.binding(function() {
                                         return modeButton.isPressed;
                                     });
-                                    item.glowOpacity = 0.34;
+                                    item.glowOpacity = 0.46;
                                 }
                             }
 
@@ -606,17 +708,42 @@ PanelWindow {
                                 id: textModeIcon
 
                                 anchors.centerIn: parent
+                                width: parent.width - 8
+                                horizontalAlignment: Text.AlignHCenter
 
                                 visible: modelData.kind !== "thermal"
+                                opacity: 1.0
 
-                                text: modelData.symbol
+                                text:
+                                    modelData.name === "FAVORITES"
+                                    ? (
+                                          modeButton.isHovered
+                                          || modeButton.isPressed
+                                          || cpuPlusWindow.favoritesFaceClickPulse
+                                          ? "(˶ˆᗜˆ˵)"
+                                          : cpuPlusWindow.favoritesFaceBlinking
+                                          ? "(˵-ᴗ-˵)"
+                                          : "(˵✧ᴗ✧˵)"
+                                      )
+                                    : modelData.name === "PROCESS"
+                                    ? (
+                                          modeButton.isPressed
+                                          ? "(=ᗜ=)デ╾━ ๋࣭⭑"
+                                          : modeButton.isHovered
+                                            || modeButton.isSelected
+                                          ? "ദ്ദി(-_•)︻デ═一"
+                                          : "(-_•)︻デ═一"
+                                      )
+                                    : modelData.symbol
 
                                 font.pixelSize:
                                     modelData.name === "PROCESS"
-                                    ? 12
+                                    ? 15
                                     : modelData.name === "FAVORITES"
-                                    ? 14
+                                    ? 17
                                     : 18
+                                fontSizeMode: Text.HorizontalFit
+                                minimumPixelSize: 10
 
                                 color: modeButton.contentColor
 
@@ -625,16 +752,23 @@ PanelWindow {
                                     horizontalOffset: 0
                                     verticalOffset: 0
 
-                                    radius: 7
-                                    samples: 9
+                                    radius:
+                                        modeButton.isHovered
+                                        ? 14
+                                        : modeButton.isSelected
+                                        ? 12
+                                        : 10
+                                    samples: 11
 
                                     opacity:
                                         modeButton.isHovered
-                                        || modeButton.isSelected
-                                        ? 0.60
-                                        : 0.30
+                                        ? 0.82
+                                        : 0.58
 
-                                    color: Colors.orange
+                                    color:
+                                        modeButton.isHovered
+                                        ? Colors.orange
+                                        : Colors.cyan
 
                                     transparentBorder: true
                                 }
@@ -659,6 +793,11 @@ PanelWindow {
                         hoverEnabled: true
 
                         onClicked: {
+                            if (modelData.name === "FAVORITES") {
+                                cpuPlusWindow.favoritesFaceClickPulse = true;
+                                favoritesFaceClickPulseTimer.restart();
+                            }
+
                             cpuPlusWindow.selectMode(index);
                         }
                     }
@@ -880,18 +1019,18 @@ PanelWindow {
     }
 
     // ============================================================
-    // CPU++ NATIVE EXPANSION / MONITOR SELECTOR BAY
+    // TARGET BAY
     // ============================================================
 
     Rectangle {
-        id: nativeControlPane
+        id: targetPane
+
+        width: 180
 
         anchors.left: sharedInstrumentPane.right
-        anchors.right: parent.right
         anchors.top: modeRail.bottom
         anchors.bottom: parent.bottom
 
-        anchors.rightMargin: 12
         anchors.bottomMargin: 12
 
         color: Colors.black
@@ -901,46 +1040,41 @@ PanelWindow {
 
         RectangularShadow {
             anchors.fill: parent
-
             spread: 4
             z: -1
-
             opacity: 0.18
             color: Colors.orange
         }
 
         GohuText {
-            id: nativeControlHeader
+            id: targetHeader
 
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
-
             anchors.topMargin: 16
 
             text:
                 cpuPlusWindow.selectedModeIndex === 2
-                ? "THERMAL SENSORS"
+                ? "THERMAL TARGET"
                 : cpuPlusWindow.selectedModeIndex === 3
-                ? "SYSTEM COMPONENTS"
-                : "CPU++ CONTROL"
+                ? "SYSTEM TARGET"
+                : "TARGET"
 
-            font.pixelSize: 13
+            font.pixelSize: 12
             color: Colors.magenta
         }
 
         Rectangle {
-            id: nativeHeaderLine
+            id: targetHeaderLine
 
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.top: nativeControlHeader.bottom
-
+            anchors.top: targetHeader.bottom
             anchors.leftMargin: 10
             anchors.rightMargin: 10
             anchors.topMargin: 6
 
             height: 2
-
             color: Colors.cyan
         }
 
@@ -949,7 +1083,7 @@ PanelWindow {
 
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.top: nativeHeaderLine.bottom
+            anchors.top: targetHeaderLine.bottom
             anchors.bottom: parent.bottom
 
             anchors.margins: 8
@@ -985,10 +1119,8 @@ PanelWindow {
 
                         readonly property bool isSelected:
                             index === cpuPlusWindow.selectedMonitorIndex()
-
                         readonly property bool isHovered:
                             monitorRowMouse.containsMouse
-
                         readonly property bool isPressed:
                             monitorRowMouse.pressed
 
@@ -1012,7 +1144,10 @@ PanelWindow {
                             : Colors.black
 
                         border.width: 1
-                        border.color: Colors.cyan
+                        border.color:
+                            isHovered || isPressed || isSelected
+                            ? Colors.orange
+                            : Colors.cyan
 
                         scale:
                             isPressed
@@ -1031,7 +1166,6 @@ PanelWindow {
                         Column {
                             anchors.fill: parent
                             anchors.margins: 7
-
                             spacing: 3
 
                             GohuText {
@@ -1042,7 +1176,7 @@ PanelWindow {
                                         monitorRowButton.modelData
                                     )
 
-                                font.pixelSize: 11
+                                font.pixelSize: 10
                                 color: monitorRowButton.foreground
                                 elide: Text.ElideRight
                             }
@@ -1055,9 +1189,9 @@ PanelWindow {
                                         monitorRowButton.modelData
                                     )
 
-                                font.pixelSize: 9
+                                font.pixelSize: 8
                                 color: monitorRowButton.foreground
-                                opacity: 0.78
+                                opacity: 0.88
                                 elide: Text.ElideRight
                             }
                         }
@@ -1100,22 +1234,63 @@ PanelWindow {
                 }
             }
         }
+    }
+
+    // ============================================================
+    // CPU++ ACTUATOR BAY
+    //
+    // Intentionally kept structurally empty for now. This bay is reserved
+    // for controls that mutate machine state; informational filler does not
+    // belong here.
+    // ============================================================
+
+    Rectangle {
+        id: actuatorPane
+
+        anchors.left: targetPane.right
+        anchors.right: parent.right
+        anchors.top: modeRail.bottom
+        anchors.bottom: parent.bottom
+
+        anchors.rightMargin: 12
+        anchors.bottomMargin: 12
+
+        color: Colors.dark
+
+        border.width: 1
+        border.color: Colors.orange
+
+        RectangularShadow {
+            anchors.fill: parent
+            spread: 4
+            z: -1
+            opacity: 0.18
+            color: Colors.orange
+        }
 
         GohuText {
-            anchors.centerIn: parent
+            id: actuatorHeader
 
-            visible:
-                cpuPlusWindow.selectedModeIndex !== 2
-                && cpuPlusWindow.selectedModeIndex !== 3
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: parent.top
+            anchors.topMargin: 16
 
-            text:
-                cpuPlusWindow.selectedModeIndex === 0
-                ? "FAVORITES"
-                : "PROCESS"
+            text: "CPU++ ACTUATORS"
 
-            font.pixelSize: 13
+            font.pixelSize: 12
             color: Colors.magenta
-            opacity: 0.58
+        }
+
+        Rectangle {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: actuatorHeader.bottom
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+            anchors.topMargin: 6
+
+            height: 2
+            color: Colors.cyan
         }
     }
 }

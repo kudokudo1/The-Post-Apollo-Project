@@ -62,6 +62,26 @@ launch mechanisms, and application of a supplied augmentation. AppLaunchPlanner 
 that supplied augmentation opaquely until the shared T5-domain contract freezes its exact
 payload schema.
 
+### AppSelectionPolicy.qml
+
+Pure APPS selection-remembrance policy.
+
+Owns only:
+
+- deriving the remembered APPS key from the local catalog key
+- resolving a remembered key back to an APPS row index
+- donor fallback semantics: empty catalog -> `-1`, missing key -> first row
+
+It explicitly does **not** mutate:
+
+- `selectedResultIndex`
+- ListView position
+- focus
+- detail pane state
+- generic host navigation
+
+Those remain serialized host concerns.
+
 ### AppHiddenAdapter.qml
 
 Pure HIDDEN-to-APPS adapter.

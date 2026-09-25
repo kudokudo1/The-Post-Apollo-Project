@@ -169,6 +169,32 @@ TestCase {
         compare(plan.commandText, "secret-command --flag");
     }
 
+    function test_suppliedSurfaceLaunchAugmentationIsOpaque() {
+        const native = nativeEntry();
+        const supplied = {
+            capabilities: ["KITTY_REMOTE", "ACCESSIBILITY"],
+            token: "t5-owned-payload"
+        };
+
+        const plan = launchPlanner.plan(
+            native,
+            core.sourceNative,
+            core.launchNormal,
+            "",
+            supplied
+        );
+
+        compare(plan.kind, launchPlanner.planDesktopEntry);
+        compare(plan.surfaceLaunchAugmentation, supplied);
+        compare(plan.surfaceLaunchAugmentation.token, "t5-owned-payload");
+
+        // Team 8 must not infer or rewrite capability semantics here.
+        compare(
+            plan.surfaceLaunchAugmentation.capabilities.join("+"),
+            "KITTY_REMOTE+ACCESSIBILITY"
+        );
+    }
+
     function test_bottlePayloadParsing() {
         let names = launchPlanner.bottleNamesFromPayload({
             bottles: [

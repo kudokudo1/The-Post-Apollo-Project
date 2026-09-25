@@ -6,8 +6,11 @@ import QtQuick
 // AppControl host dependency. It preserves the donor's APPS launch semantics
 // while leaving execution hooks open for sibling providers.
 //
-// Team 5 may later wrap NORMAL execution to inject accessibility / surface
-// discovery flags. Team 7 identity is not used here.
+// Team 5's current published contract owns provider-native discovery and
+// activation, not DesktopEntry-aware launch preparation. The donor's
+// accessibility/debug-port launch instrumentation is therefore an unresolved
+// cross-team seam and is intentionally not implemented here yet.
+// Team 7 identity is not used here.
 QtObject {
     id: planner
 

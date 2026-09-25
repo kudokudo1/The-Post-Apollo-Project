@@ -32,6 +32,8 @@ required_functions = {
     "providerRecordKey",
     "identityEvidence",
     "instrumentationLeaseObservations",
+    "instrumentationObservationCompleteKinds",
+    "instrumentationLeaseSnapshot",
     "normalizedProcessPids",
     "tabObservationSignature",
     "controlObservationSignature",
@@ -204,6 +206,12 @@ if "tabLifecycleProcess.running" not in lifecycle_text:
 
 if "clearPendingLifecycle()" not in text:
     errors.append("native lifecycle pending state is not cleared")
+
+if "KITTY ERROR:NONE" not in text:
+    errors.append("provider does not preserve trusted completeness marker: KITTY ERROR:NONE")
+
+if "DEVTOOLS ERROR:NONE" not in text:
+    errors.append("provider does not preserve trusted completeness marker: DEVTOOLS ERROR:NONE")
 
 if "running: tabSurfaceProvider.active" not in text:
     errors.append("persistent discovery bridge is not governed by neutral active input")

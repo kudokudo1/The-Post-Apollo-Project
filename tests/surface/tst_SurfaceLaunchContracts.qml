@@ -1,18 +1,12 @@
 import QtQuick
 import QtTest
-import "../../services/surface"
+import qs.services.surface
 
 TestCase {
     name: "Team5SurfaceLaunchContracts"
 
-    SurfaceLaunchRequirements {
-        id: requirements
-    }
-
-    SurfaceLaunchCoordinator {
-        id: coordinator
-        requirements: requirements
-    }
+    readonly property var requirements: SurfaceLaunchRequirements
+    readonly property var coordinator: SurfaceLaunchCoordinator
 
     function cleanup() {
         const ids = Object.keys(coordinator.correlationState);

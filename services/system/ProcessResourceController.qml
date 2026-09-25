@@ -8,6 +8,12 @@ QtObject {
     required property var resourceScope
     required property var resourceState
     required property var processControl
+    required property var limitMutation
+
+    property var pendingLimitBatches: ({})
+    property int limitRequestSerial: 0
+
+    signal limitMutationFailed(string scopeKey, string message)
 
     signal refreshRequested()
 
@@ -59,18 +65,30 @@ QtObject {
             : 0;
         const pids = scopedPids(processRows, rootPids);
 
-        if (!processControl.setAddressSpaceLimitBytesMany(
+        limitRequestSerial += 1;
+        const requestId = limitRequestSerial;
+        const context = {
+            consumer: "process-resource",
+            requestId: requestId,
+            kind: "set",
+            scopeKey: String(scopeKey || ""),
+            processRows: processRows,
+            rootPids: rootPids,
+            normalizedMiB: normalized
+        };
+        const batchId =
+            limitMutation.requestLimitMany(
                 pids,
-                capBytes))
+                capBytes,
+                context
+            );
+
+        if (batchId <= 0)
             return false;
 
-        resourceState.rememberLimit(
-            scopeKey,
-            processRows,
-            rootPids,
-            normalized
-        );
-        refreshRequested();
+        const next = Object.assign({}, pendingLimitBatches);
+        next[String(batchId)] = context;
+        pendingLimitBatches = next;
         return true;
     }
 
@@ -116,8 +134,7 @@ QtObject {
             return false;
 
         const rows = scopedRows(processRows, rootPids);
-        const capBytes = Math.floor(desired * 1024 * 1024);
-        let changed = false;
+        const pendingPids = [];
 
         for (let i = 0; i < rows.length; i++) {
             const row = rows[i];
@@ -136,19 +153,88 @@ QtObject {
                     ) <= 0.5)
                 continue;
 
-            if (!processControl.setAddressSpaceLimitBytes(
-                    pid,
-                    capBytes))
-                continue;
-
-            resourceState.noteReconciledPid(row, desired);
-            changed = true;
+            pendingPids.push(pid);
         }
 
-        if (changed)
-            refreshRequested();
+        if (pendingPids.length === 0)
+            return false;
 
-        return changed;
+        limitRequestSerial += 1;
+        const requestId = limitRequestSerial;
+        const context = {
+            consumer: "process-resource",
+            requestId: requestId,
+            kind: "reconcile",
+            scopeKey: String(scopeKey || ""),
+            processRows: processRows,
+            rootPids: rootPids,
+            normalizedMiB: desired
+        };
+        const batchId =
+            limitMutation.requestLimitMany(
+                pendingPids,
+                Math.floor(desired * 1024 * 1024),
+                context
+            );
+
+        if (batchId <= 0)
+            return false;
+
+        const next = Object.assign({}, pendingLimitBatches);
+        next[String(batchId)] = context;
+        pendingLimitBatches = next;
+        return true;
+    }
+
+    function finishLimitBatch(batchId, context, ok, results) {
+        if (!context
+                || String(context.consumer || "")
+                   !== "process-resource")
+            return;
+
+        const next = Object.assign({}, pendingLimitBatches);
+        delete next[String(batchId)];
+        pendingLimitBatches = next;
+
+        if (!ok) {
+            let message = "PROCESS LIMIT MUTATION FAILED";
+            const rows = Array.isArray(results) ? results : [];
+
+            for (let i = 0; i < rows.length; i++) {
+                if (rows[i] && rows[i].error) {
+                    message = String(rows[i].error);
+                    break;
+                }
+            }
+
+            limitMutationFailed(
+                String(context.scopeKey || ""),
+                message
+            );
+            refreshRequested();
+            return;
+        }
+
+        resourceState.rememberLimit(
+            context.scopeKey,
+            context.processRows,
+            context.rootPids,
+            Number(context.normalizedMiB || 0)
+        );
+        refreshRequested();
+    }
+
+    Connections {
+        target: processResourceController.limitMutation
+
+        function onBatchFinished(batchId, context, ok, results) {
+            processResourceController.finishLimitBatch(
+                batchId,
+                context,
+                ok,
+                results
+            );
+        }
     }
 
     function isFrozen(scopeKey, processRows, rootPids) {

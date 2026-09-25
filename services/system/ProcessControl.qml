@@ -54,54 +54,6 @@ Scope {
         return true;
     }
 
-    function setAddressSpaceLimitBytes(pid, capBytes) {
-        const targetPid = Number(pid || 0);
-        const requestedBytes = Number(capBytes || 0);
-
-        if (targetPid <= 1 || !isFinite(requestedBytes) || requestedBytes < 0)
-            return false;
-
-        Quickshell.execDetached(
-            requestedBytes > 0
-            ? [
-                "prlimit",
-                "--pid",
-                String(targetPid),
-                "--as=" + String(Math.floor(requestedBytes)) + ":"
-            ]
-            : [
-                "prlimit",
-                "--pid",
-                String(targetPid),
-                "--as=unlimited:"
-            ]
-        );
-
-        return true;
-    }
-
-    function setAddressSpaceLimitBytesMany(pids, capBytes) {
-        if (!Array.isArray(pids))
-            return false;
-
-        const seen = ({});
-        let applied = false;
-
-        for (let i = 0; i < pids.length; i++) {
-            const pid = Number(pids[i] || 0);
-
-            if (pid <= 1 || seen[String(pid)])
-                continue;
-
-            seen[String(pid)] = true;
-
-            if (setAddressSpaceLimitBytes(pid, capBytes))
-                applied = true;
-        }
-
-        return applied;
-    }
-
     function restart(pid) {
         const targetPid = Number(pid || 0);
 

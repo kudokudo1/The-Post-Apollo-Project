@@ -1489,9 +1489,10 @@ PanelWindow {
                             spread: isHovered || isSelected ? 4 : 2
                             z: -1
                             opacity:
-                                isSpacer
+                                subModeButton.isSpacer
                                 ? 0.0
-                                : isHovered || isSelected
+                                : subModeButton.isHovered
+                                  || subModeButton.isSelected
                                 ? 0.42 : 0.12
                             color:
                                 isSelected
@@ -1574,13 +1575,10 @@ PanelWindow {
                             : Colors.dark
 
                         border.width:
-                            isHovered || isPressed || isSelected
+                            isHovered || isPressed
                             ? 1 : 0
 
-                        border.color:
-                            isSelected
-                            ? Colors.magenta
-                            : Colors.orange
+                        border.color: Colors.orange
 
                         scale:
                             isPressed

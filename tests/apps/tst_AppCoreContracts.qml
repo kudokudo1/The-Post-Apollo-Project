@@ -51,6 +51,11 @@ TestCase {
         catalogPolicy: catalogPolicy
     }
 
+    AppModePolicy {
+        id: modePolicy
+        coreProvider: core
+    }
+
     QtObject {
         id: fakeIdentityEvidence
 
@@ -462,6 +467,123 @@ TestCase {
             ),
             1
         );
+    }
+
+    function test_modePolicyNormalizesSourceAndLaunchModes() {
+        compare(
+            modePolicy.normalizeSourceMode(core.sourceFlatpak),
+            core.sourceFlatpak
+        );
+        compare(
+            modePolicy.normalizeSourceMode(core.sourceHidden),
+            core.sourceHidden
+        );
+        compare(
+            modePolicy.normalizeSourceMode(999),
+            core.sourceNative
+        );
+
+        compare(
+            modePolicy.normalizeLaunchMode(core.launchToolbox),
+            core.launchToolbox
+        );
+        compare(
+            modePolicy.normalizeLaunchMode(core.launchBottle),
+            core.launchBottle
+        );
+        compare(
+            modePolicy.normalizeLaunchMode(999),
+            core.launchNormal
+        );
+    }
+
+    function test_modePolicyRestoresPackageCounterpart() {
+        const native = {
+            id: "org.example.App.desktop",
+            name: "Example App",
+            command: ["/usr/bin/example"]
+        };
+        const flatpak = {
+            id: "org.example.App.Flatpak.desktop",
+            name: "Example App",
+            command: [
+                "flatpak",
+                "run",
+                "org.example.App"
+            ]
+        };
+        const rows = [native, flatpak];
+
+        let change = modePolicy.sourceChangePlan(
+            rows,
+            "Example App",
+            core.sourceFlatpak
+        );
+
+        compare(change.sourceMode, core.sourceFlatpak);
+        compare(change.restoreIndex, 1);
+        compare(change.needsHiddenCatalogRefresh, false);
+
+        change = modePolicy.sourceChangePlan(
+            rows,
+            "Example App",
+            core.sourceNative
+        );
+
+        compare(change.sourceMode, core.sourceNative);
+        compare(change.restoreIndex, 0);
+        compare(change.needsHiddenCatalogRefresh, false);
+
+        change = modePolicy.sourceChangePlan(
+            rows,
+            "Example App",
+            core.sourceHidden
+        );
+
+        compare(change.sourceMode, core.sourceHidden);
+        compare(change.restoreIndex, 0);
+        compare(change.needsHiddenCatalogRefresh, true);
+    }
+
+    function test_facadeOwnsOnlyAppSpecificModeAndBottleState() {
+        compare(facade.setSourceMode(facade.sourceFlatpak),
+                facade.sourceFlatpak);
+        compare(facade.sourceMode, facade.sourceFlatpak);
+
+        compare(facade.setLaunchMode(facade.launchBottle),
+                facade.launchBottle);
+        compare(facade.launchMode, facade.launchBottle);
+
+        compare(facade.selectBottle("Gaming"), "Gaming");
+        compare(facade.selectedBottleName, "Gaming");
+
+        const change = facade.sourceChangePlan(
+            [
+                {
+                    id: "native.desktop",
+                    name: "Same App",
+                    command: ["/usr/bin/same"]
+                },
+                {
+                    id: "flat.desktop",
+                    name: "Same App",
+                    command: [
+                        "flatpak",
+                        "run",
+                        "org.example.Same"
+                    ]
+                }
+            ],
+            "Same App",
+            facade.sourceFlatpak
+        );
+
+        compare(change.restoreIndex, 1);
+
+        // Reset shared test facade state.
+        facade.setSourceMode(facade.sourceNative);
+        facade.setLaunchMode(facade.launchNormal);
+        facade.selectBottle("");
     }
 
     function test_sourceClassification() {

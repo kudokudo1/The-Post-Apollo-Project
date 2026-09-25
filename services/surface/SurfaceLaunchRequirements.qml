@@ -1,3 +1,5 @@
+pragma Singleton
+
 import QtQuick
 
 // T5 domain authority: surface discoverability requirements.

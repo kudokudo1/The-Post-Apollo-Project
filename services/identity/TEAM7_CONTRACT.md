@@ -284,6 +284,57 @@ declines canonical cross-provider identity ownership.
 
 No contract collision found.
 
+## SurfaceLaunch boundary — resolved by T3 Overhead
+
+The launch-time surface instrumentation seam is now owned explicitly.
+
+```text
+T8 / RUN / future launch domains
+    -> launch intent / base plan / launch mechanism
+    -> apply supplied augmentation
+
+T5-domain SurfaceLaunchRequirements / SurfaceLaunchCoordinator
+    -> describe discoverability capabilities
+    -> construct argv/env/bootstrap augmentation
+    -> coordinate transient endpoint / lease / correlation metadata
+
+launched process
+    -> owns runtime socket/debug listener lifetime
+
+T5 TabSurfaceProvider
+    -> post-launch discovery / activation / diagnostics
+
+T7
+    -> semantic interpretation / relationship evidence / joins
+```
+
+SurfaceLaunch is explicit opt-in. The stable boundary is capability-oriented,
+for example:
+
+```text
+KITTY_REMOTE
+ACCESSIBILITY
+DEVTOOLS
+```
+
+Exact API names are not frozen.
+
+Team 7 may consume PID/socket/port/target/correlation output as evidence, but
+must not decide whether those coordinates are injected into a launch and must
+not promote ephemeral bootstrap coordinates into persistent semantic identity.
+
+The following lifetimes remain distinct:
+
+```text
+launch transaction
+instrumentation/application instance
+surface provider
+```
+
+Specifically, `TabSurfaceProvider.active` must not define instrumentation
+lifetime.
+
+
 ## Resolution contract
 
 The first shared semantic resolver must return one of:

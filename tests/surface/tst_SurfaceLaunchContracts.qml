@@ -14,7 +14,10 @@ TestCase {
         for (let i = 0; i < ids.length; i++)
             coordinator.releaseCorrelation(ids[i]);
 
-        coordinator.reconcileObservedInstrumentation([]);
+        coordinator.reconcileObservedInstrumentation(
+            [],
+            { complete: true }
+        );
     }
 
     function braveEvidence() {
@@ -444,6 +447,26 @@ TestCase {
         verify(augmentation.bootstrap.debugPort <= 9499);
     }
 
+    function test_partialObservationDoesNotPruneRecoveredLease() {
+        coordinator.reconcileObservedInstrumentation([
+            {
+                kind: "devtools-port",
+                value: 9222,
+                providerKey: "devtools:9222:LIVE"
+            }
+        ]);
+
+        coordinator.reconcileObservedInstrumentation([]);
+
+        verify(
+            coordinator.leases["devtools-port:9222"] !== undefined
+        );
+        compare(
+            coordinator.leases["devtools-port:9222"].source,
+            "observed"
+        );
+    }
+
     function test_observedLeaseReconciliationCanPruneStaleRecoveryState() {
         coordinator.reconcileObservedInstrumentation([
             {
@@ -457,7 +480,10 @@ TestCase {
             coordinator.leases["devtools-port:9222"] !== undefined
         );
 
-        coordinator.reconcileObservedInstrumentation([]);
+        coordinator.reconcileObservedInstrumentation(
+            [],
+            { complete: true }
+        );
 
         verify(
             coordinator.leases["devtools-port:9222"] === undefined

@@ -13,6 +13,11 @@ requirements = REQ.read_text(encoding="utf-8")
 coordinator = COORD.read_text(encoding="utf-8")
 combined = requirements + "\n" + coordinator
 
+# Comments may name forbidden couplings in order to document their absence.
+# Ownership checks apply to executable QML, not comments.
+executable = re.sub(r"/\\*.*?\\*/", "", combined, flags=re.S)
+executable = re.sub(r"//.*?$", "", executable, flags=re.M)
+
 errors: list[str] = []
 
 required_capabilities = (
@@ -42,7 +47,9 @@ required_coordinator_functions = (
     "markLaunchSucceeded",
     "markLaunchFailed",
     "existingDebugPort",
+    "existingDebugAddress",
     "existingKittyListenOn",
+    "kittyRemoteControlEnabled",
 )
 
 for name in required_coordinator_functions:
@@ -66,7 +73,7 @@ for token, reason in {
     "semanticKey": "semantic identity ownership",
     "augmentEverything": "forbidden global interception",
 }.items():
-    if token in combined:
+    if token in executable:
         errors.append(f"forbidden token {token!r}: {reason}")
 
 # Explicit opt-in: requested capabilities must be an input to augmentation.

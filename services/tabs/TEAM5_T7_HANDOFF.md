@@ -84,3 +84,37 @@ launch transaction
 They must not become persistent semantic application identity.
 
 Team 5's SurfaceLaunch layer does not perform those joins itself.
+
+## Restart-recovery lease provenance
+
+`SurfaceInstrumentationRecovery` may rediscover live endpoint occupancy after
+the shell/coordinator has restarted.
+
+Recovered coordinator entries have:
+
+```text
+source: observed
+state: observed
+correlationId: ""
+```
+
+These records are **not** historical SurfaceLaunch transactions and must not be
+wrapped as Team 7 `SURFACE_LAUNCH` application-instance observations merely
+because they occupy the same debug/socket coordinate vocabulary.
+
+Correct provenance remains:
+
+```text
+actual SurfaceLaunch augmentation
+    + real correlationId
+        -> Team 7 SURFACE_LAUNCH observation
+
+restart occupancy recovery
+    + no historical correlationId
+        -> collision/liveness bookkeeping only
+```
+
+Team 7 may still independently relate the rediscovered runtime surfaces and
+processes using their normal provider evidence (DEVTOOLS debugPort, Kitty
+kittyAddress, PROCFS argv/PID evidence). T5 recovery bookkeeping does not create
+or replace those semantic/evidence observations.

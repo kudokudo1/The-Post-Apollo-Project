@@ -1,7 +1,7 @@
 # Team 7 runtime identity fixtures
 
 This directory is reserved for cross-provider runtime fixtures used to validate
-DesktopEntry / Sway / process / surface / audio joins.
+DesktopEntry / SurfaceLaunch / Sway / process / surface / audio joins.
 
 No fixture is accepted as a canonical identity map merely because it was captured
 from a working desktop.
@@ -74,6 +74,24 @@ Use Team 1-compatible process observations, adapted through
 Capture enough of the process tree to distinguish browser parent/child
 relationships and wrappers.
 
+### SurfaceLaunch instrumentation
+
+Capture T5-domain SurfaceLaunch bootstrap/correlation output whenever the launch
+used one or more discoverability capabilities.
+
+Adapt it through:
+
+```text
+surfaceLaunchObservation(launchMetadata)
+```
+
+This produces an `application-instance` observation. Preserve correlation ID,
+Kitty listen endpoint, debug address/port, and requested/applied capability
+lists.
+
+Do not treat a generated correlation ID, socket, or debug port as persistent
+application identity.
+
 ### Team 5 surfaces
 
 Team 5's standalone probe already prints:
@@ -129,6 +147,7 @@ Review separately:
 explicitEdges
 pidGroups
 debugPortEdges
+kittyEndpointEdges
 aliasEdges
 ```
 

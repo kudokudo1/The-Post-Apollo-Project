@@ -96,6 +96,29 @@ stream index
 
 Do not replace those observations with normalized aliases.
 
+## Stream physiology vs host availability
+
+`resolve(...)` intentionally reports:
+
+```text
+hasStreams
+streamsMuted
+observedVolumePercent
+```
+
+It does **not** define a generic `AudioAvailable` value.
+
+The fused donor uses availability differently by host surface:
+
+- WINDOW treats the selected live window as audio-controllable even before a
+  matching sink-input exists.
+- APP availability depends on the selected application having live Sway windows.
+- TAB availability is a host/provider presentation decision and is not identical
+  to "matching PipeWire stream exists."
+
+Those decisions remain with the future host adapters. Team 6 reports the stream
+facts only.
+
 ## Match evidence
 
 `descriptorMatchEvidence(descriptor, sinkInput)` returns a separate evidence

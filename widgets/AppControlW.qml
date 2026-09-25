@@ -947,6 +947,16 @@ PanelWindow {
         onRefreshRequested: taskRefreshAfterKillTimer.restart()
     }
 
+    GlobalTaskActionController {
+        id: globalTaskActionController
+        host: appControlWindow
+        taskSafetyObject: taskSafety
+        processControlObject: processControl
+        processControllerObject: processPresentationController
+        processLimitsObject: processLimits
+        refreshTimer: taskRefreshAfterKillTimer
+    }
+
     HunterOperationController {
         id: hunterOperationController
         host: appControlWindow
@@ -2347,62 +2357,39 @@ PanelWindow {
     }
 
     function clearTaskDangerActionUnlocks(entry) {
-        taskSafety.clearDangerActionUnlocks(entry);
+        globalTaskActionController.clearTaskDangerActionUnlocks(entry);
     }
 
     function toggleTaskDangerActionUnlock(entry, actionKind) {
-        taskSafety.toggleDangerActionUnlock(entry, actionKind);
+        globalTaskActionController.toggleTaskDangerActionUnlock(entry, actionKind);
     }
 
     function toggleTaskDangerActionStickyUnlock(entry, actionKind) {
-        taskSafety.toggleDangerActionStickyUnlock(entry, actionKind);
+        globalTaskActionController.toggleTaskDangerActionStickyUnlock(entry, actionKind);
     }
 
     function relockTaskDangerAction(entry, actionKind) {
-        taskSafety.relockDangerAction(entry, actionKind);
+        globalTaskActionController.relockTaskDangerAction(entry, actionKind);
     }
 
     function toggleTaskDangerUnlock(entry) {
-        taskSafety.toggleDangerUnlock(entry);
+        globalTaskActionController.toggleTaskDangerUnlock(entry);
     }
 
     function toggleTaskDangerStickyUnlock(entry) {
-        taskSafety.toggleDangerStickyUnlock(entry);
+        globalTaskActionController.toggleTaskDangerStickyUnlock(entry);
     }
 
     function relockTaskDanger(entry) {
-        taskSafety.relockDanger(entry);
+        globalTaskActionController.relockTaskDanger(entry);
     }
 
     function taskEntryForCapturedIdentity(pid, expectedName) {
-        const wantedPid = Number(pid || 0);
-        const wantedName = String(expectedName || "").trim().toLowerCase();
-        if (wantedPid <= 1)
-            return null;
-        for (let i = 0; i < taskRows.length; i++) {
-            const row = taskRows[i];
-            if (Number(row && row.pid || 0) !== wantedPid)
-                continue;
-            const rowName = String(row.comm || row.name || "").trim().toLowerCase();
-            if (wantedName && rowName !== wantedName)
-                return null;
-            return row;
-        }
-        return null;
+        return globalTaskActionController.taskEntryForCapturedIdentity(pid, expectedName);
     }
 
     function executeProtectedTaskSignal(pid, expectedName, signalName) {
-        const entry = taskEntryForCapturedIdentity(pid, expectedName);
-        if (!entry)
-            return;
-        processControl.sendSignal(entry.pid, signalName);
-        if (signalName === "-STOP") {
-            processPresentationController.markFrozen(entry, true);
-            relockTaskDangerAction(entry, "freeze");
-        } else {
-            relockTaskDangerAction(entry, "kill");
-        }
-        taskRefreshAfterKillTimer.restart();
+        globalTaskActionController.executeProtectedTaskSignal(pid, expectedName, signalName);
     }
 
     function taskEligibleForKillAll(entry) {
@@ -2433,58 +2420,15 @@ PanelWindow {
     }
 
     function requestKillAllEligibleTasks() {
-        const rows = killAllEligibleTasks();
-        if (rows.length === 0)
-            return;
-
-        openDestructiveConfirm(
-            "kill-all",
-            "⚠︎ CONFIRM KILL ALL ⚠︎",
-            "TERMINATE " + String(rows.length)
-            + " ELIGIBLE USER PROCESSES?\n"
-            + "SWAY, QUICKSHELL, AUDIO, DBUS AND SESSION SERVICES ARE PROTECTED.",
-            "KILL ALL"
-        );
-        destructiveConfirmTargetPids = rows.map(function(entry) {
-            return Number(entry.pid || 0);
-        });
+        globalTaskActionController.requestKillAllEligibleTasks();
     }
 
     function executeKillAllEligibleTasks(targetPids) {
-        const wanted = Array.isArray(targetPids) ? targetPids : [];
-        const rows = killAllEligibleTasks().filter(function(entry) {
-            return wanted.length === 0
-                   || wanted.indexOf(Number(entry.pid || 0)) !== -1;
-        });
-        if (rows.length === 0)
-            return;
-
-        console.log("AppControl: KILL ALL eligible count", rows.length);
-        processControl.sendSignalMany(
-            rows.map(function(entry) { return Number(entry.pid || 0); }),
-            "-TERM"
-        );
-        taskRefreshAfterKillTimer.restart();
+        globalTaskActionController.executeKillAllEligibleTasks(targetPids);
     }
 
     function executeBulkTaskTermination(targetPids, label) {
-        const wanted = Array.isArray(targetPids) ? targetPids : [];
-        if (wanted.length === 0)
-            return;
-
-        const rows = taskRows.filter(function(entry) {
-            return taskEligibleForKillAll(entry)
-                   && wanted.indexOf(Number(entry.pid || 0)) !== -1;
-        });
-        if (rows.length === 0)
-            return;
-
-        console.log("AppControl:", label || "BULK TERM", rows.length);
-        processControl.sendSignalMany(
-            rows.map(function(entry) { return Number(entry.pid || 0); }),
-            "-TERM"
-        );
-        taskRefreshAfterKillTimer.restart();
+        globalTaskActionController.executeBulkTaskTermination(targetPids, label);
     }
 
     function hunterTargetsFromRows(rows) {
@@ -2980,7 +2924,7 @@ PanelWindow {
     }
 
     function toggleSelectedTaskFreeze() {
-        processPresentationController.toggleFreeze();
+        globalTaskActionController.toggleSelectedTaskFreeze();
     }
 
     function selectedTaskLimitBytes() {
@@ -3008,42 +2952,27 @@ PanelWindow {
     }
 
     function startQueuedTaskMemoryLimitApply() {
-        processLimits.startQueuedApply();
+        globalTaskActionController.startQueuedTaskMemoryLimitApply();
     }
 
-
-
     function setSelectedTaskMemoryLimitMiB(mib) {
-        processPresentationController.setLimitMiB(mib);
+        globalTaskActionController.setSelectedTaskMemoryLimitMiB(mib);
     }
 
     function setSelectedTaskMemoryLimitPercent(percent) {
-        processPresentationController.setLimitPercent(percent);
+        globalTaskActionController.setSelectedTaskMemoryLimitPercent(percent);
     }
 
     function terminateSelectedTask() {
-        processPresentationController.requestTerminate();
+        globalTaskActionController.terminateSelectedTask();
     }
 
-
-
     function executeTaskRestart(pid, expectedName) {
-        const entry = taskEntryForCapturedIdentity(pid, expectedName);
-
-        if (!entry || Number(entry.pid || 0) <= 1)
-            return;
-
-        if (taskRequiresDangerUnlock(entry)
-                && !taskDangerActionUnlocked(entry, "kill"))
-            return;
-
-        processControl.restart(entry.pid);
-        relockTaskDangerAction(entry, "kill");
-        taskRefreshAfterKillTimer.restart();
+        globalTaskActionController.executeTaskRestart(pid, expectedName);
     }
 
     function restartSelectedTask() {
-        processPresentationController.requestRestart();
+        globalTaskActionController.restartSelectedTask();
     }
 
     function taskMiniProbeNeeded() {

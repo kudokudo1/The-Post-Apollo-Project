@@ -1,6 +1,6 @@
 import QtQuick
 import QtTest
-import qs.services.surface
+import "../../services/surface"
 
 TestCase {
     name: "Team5SurfaceLaunchContracts"

@@ -193,6 +193,7 @@ PanelWindow {
             CpuPlusW {
                 id: cpuPlusWindow
                 screen: Quickshell.screens.find(s => s.name === "DP-5")
+                appControlWindow: appControlWindow
             }
         }
 

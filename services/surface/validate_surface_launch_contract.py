@@ -51,15 +51,18 @@ for declaration in (
             f"missing protected authority state declaration: {declaration}"
         )
 
-for forbidden_assignment in (
-    "leases =",
-    "correlationState =",
-    "correlationSerial +=",
+for public_name in (
+    "leases",
+    "correlationState",
+    "correlationSerial",
 ):
-    if forbidden_assignment in coordinator:
+    pattern = re.compile(
+        rf"(?<!_)\\b{re.escape(public_name)}\\s*(?:=|\\+=)"
+    )
+    if pattern.search(coordinator):
         errors.append(
-            f"public SurfaceLaunch authority state remains writable internally: "
-            f"{forbidden_assignment}"
+            "public SurfaceLaunch authority state remains writable internally: "
+            + public_name
         )
 
 if "SurfaceBackend.SurfaceLaunchRequirements." not in coordinator:

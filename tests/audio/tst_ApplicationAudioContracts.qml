@@ -332,6 +332,78 @@ TestCase {
         compare(audio.sinkInputVolumePercent(stream), 50);
     }
 
+    function test_policyLifetimePlannerPrunesOnlyRequestedScope() {
+        const policies = {
+            "window:keep": {
+                scope: "window",
+                semanticKey: "keep",
+                descriptor: { pids: [14001], tokens: [], strictTokens: false }
+            },
+            "window:drop": {
+                scope: "window",
+                semanticKey: "drop",
+                descriptor: { pids: [14002], tokens: [], strictTokens: false }
+            },
+            "app:drop": {
+                scope: "app",
+                semanticKey: "drop",
+                descriptor: { pids: [14003], tokens: [], strictTokens: true }
+            }
+        };
+
+        const stale = audio.policyKeysOutsideLiveSet(
+            policies,
+            " WINDOW ",
+            ["keep"]
+        );
+
+        compare(stale.length, 1);
+        compare(stale[0], "window:drop");
+    }
+
+    function test_pidPolicyPlannerPreservesOtherScopes() {
+        const policies = {
+            "app:demo": {
+                scope: "app",
+                semanticKey: "demo",
+                descriptor: { pids: [15001], tokens: [], strictTokens: true }
+            },
+            "window:demo": {
+                scope: "window",
+                semanticKey: "demo",
+                descriptor: { pids: [15001], tokens: [], strictTokens: false }
+            },
+            "tab:demo": {
+                scope: "tab",
+                semanticKey: "demo",
+                descriptor: { pids: [15001], tokens: [], strictTokens: false }
+            }
+        };
+
+        const removals = audio.mutePolicyKeysWithPid(
+            policies,
+            "app",
+            15001
+        );
+
+        compare(removals.length, 1);
+        compare(removals[0], "app:demo");
+    }
+
+    function test_pidPolicyPlannerRejectsInvalidPid() {
+        const policies = {
+            "app:demo": {
+                scope: "app",
+                semanticKey: "demo",
+                descriptor: { pids: [1], tokens: [], strictTokens: true }
+            }
+        };
+
+        compare(audio.mutePolicyKeysWithPid(policies, "app", 1).length, 0);
+        compare(audio.mutePolicyKeysWithPid(policies, "app", -1).length, 0);
+        compare(audio.mutePolicyKeysWithPid(policies, "app", 1.5).length, 0);
+    }
+
     function test_futureStreamMutePolicyPlanning() {
         const policies = {
             "app:demo": {

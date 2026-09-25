@@ -8,9 +8,11 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 REQ = ROOT / "services" / "surface" / "SurfaceLaunchRequirements.qml"
 COORD = ROOT / "services" / "surface" / "SurfaceLaunchCoordinator.qml"
+QMLDIR = ROOT / "services" / "surface" / "qmldir"
 
 requirements = REQ.read_text(encoding="utf-8")
 coordinator = COORD.read_text(encoding="utf-8")
+qmldir = QMLDIR.read_text(encoding="utf-8")
 combined = requirements + "\n" + coordinator
 
 # Comments may name forbidden couplings in order to document their absence.
@@ -19,6 +21,26 @@ executable = re.sub(r"/\*.*?\*/", "", combined, flags=re.S)
 executable = re.sub(r"//.*?$", "", executable, flags=re.M)
 
 errors: list[str] = []
+
+if not requirements.lstrip().startswith("pragma Singleton"):
+    errors.append("SurfaceLaunchRequirements is not a singleton")
+
+if not coordinator.lstrip().startswith("pragma Singleton"):
+    errors.append("SurfaceLaunchCoordinator is not the shared singleton authority")
+
+for declaration in (
+    "module qs.services.surface",
+    "singleton SurfaceLaunchRequirements 1.0 SurfaceLaunchRequirements.qml",
+    "singleton SurfaceLaunchCoordinator 1.0 SurfaceLaunchCoordinator.qml",
+):
+    if declaration not in qmldir:
+        errors.append(f"missing qmldir singleton declaration: {declaration}")
+
+if re.search(r"\brequired\s+property\s+var\s+requirements\b", coordinator):
+    errors.append("coordinator still permits per-instance requirements injection")
+
+if "SurfaceBackend.SurfaceLaunchRequirements." not in coordinator:
+    errors.append("coordinator is not bound to the shared requirements singleton")
 
 required_capabilities = (
     "KITTY_REMOTE",
@@ -73,6 +95,7 @@ for token, reason in {
     "canonicalId": "semantic identity ownership",
     "semanticKey": "semantic identity ownership",
     "augmentEverything": "forbidden global interception",
+    "SurfaceLaunchCoordinator {": "competing coordinator instance",
 }.items():
     if token in executable:
         errors.append(f"forbidden token {token!r}: {reason}")
@@ -142,6 +165,7 @@ if errors:
 
 print("TEAM 5 SURFACE LAUNCH CONTRACT: PASS")
 print(" capabilities: KITTY_REMOTE / ACCESSIBILITY / DEVTOOLS")
+print(" lease authority: one shared SurfaceLaunchCoordinator singleton")
 print(" execution ownership: external launcher")
 print(" provider lifetime coupling: none")
 print(" semantic identity ownership: none")

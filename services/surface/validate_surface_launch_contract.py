@@ -39,6 +39,29 @@ for declaration in (
 if re.search(r"\brequired\s+property\s+var\s+requirements\b", coordinator):
     errors.append("coordinator still permits per-instance requirements injection")
 
+for declaration in (
+    "property var _leaseState:",
+    "property var _correlationState:",
+    "property int _correlationSerial:",
+    "readonly property var leases: copyMap(_leaseState)",
+    "readonly property var correlationState: copyMap(_correlationState)",
+):
+    if declaration not in coordinator:
+        errors.append(
+            f"missing protected authority state declaration: {declaration}"
+        )
+
+for forbidden_assignment in (
+    "leases =",
+    "correlationState =",
+    "correlationSerial +=",
+):
+    if forbidden_assignment in coordinator:
+        errors.append(
+            f"public SurfaceLaunch authority state remains writable internally: "
+            f"{forbidden_assignment}"
+        )
+
 if "SurfaceBackend.SurfaceLaunchRequirements." not in coordinator:
     errors.append("coordinator is not bound to the shared requirements singleton")
 
@@ -65,6 +88,8 @@ for name in required_requirement_functions:
         errors.append(f"missing requirements function: {name}")
 
 required_coordinator_functions = (
+    "copyValue",
+    "copyMap",
     "buildAugmentation",
     "releaseCorrelation",
     "markLaunchSucceeded",

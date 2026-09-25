@@ -23,6 +23,7 @@ FILES = {
     "bottles": APP_DIR / "AppBottleProvider.qml",
     "actions": APP_DIR / "AppActionCatalog.qml",
     "actionPlanner": APP_DIR / "AppActionPlanner.qml",
+    "catalog": APP_DIR / "AppCatalogPolicy.qml",
 }
 
 errors: list[str] = []
@@ -80,6 +81,16 @@ required_functions = {
         "browserBuiltinPlan",
         "plan",
     },
+    "catalog": {
+        "entryKey",
+        "searchHaystack",
+        "matchesSearch",
+        "hiddenMatchesSearch",
+        "compareEntries",
+        "desktopRows",
+        "hiddenRows",
+        "rows",
+    },
 }
 
 for key, required in required_functions.items():
@@ -129,7 +140,7 @@ for key, text in texts.items():
 # Planning/catalog files must remain pure. They describe intent; they do not
 # launch processes, create workers/timers, or mutate the desktop. Bottles is a
 # discovery provider and therefore may own its bottles-cli Process.
-for key in ("launch", "actions", "actionPlanner"):
+for key in ("launch", "actions", "actionPlanner", "catalog"):
     text = texts.get(key, "")
     for token in (
         "Quickshell.execDetached",
@@ -190,3 +201,4 @@ print(" SurfaceLaunch requirement policy: external / T5-domain-owned")
 print(" supplied augmentation carriage: Team 8 launch-plan responsibility")
 print(" Bottles discovery: isolated Team 8 provider")
 print(" browser/desktop action policy: pure Team 8 planner")
+print(" APPS catalog/search/ranking: pure Team 8 policy")

@@ -204,6 +204,58 @@ Its embedded non-runtime contract check is:
 python3 services/identity/validate_identity_fixtures.py --self-test
 ```
 
+## Evidence diagnostic report
+
+After a fixture passes the contract validator, Team 7 can inspect its
+cross-provider evidence without resolving identity:
+
+```bash
+python3 services/identity/analyze_identity_fixtures.py <fixture.json>
+```
+
+For machine-readable output:
+
+```bash
+python3 services/identity/analyze_identity_fixtures.py --json <fixture.json>
+```
+
+The analyzer reports evidence families separately:
+
+```text
+provider/lifetime inventory
+PID correlation groups
+debug-port ownership edges
+Kitty endpoint edges
+alias evidence
+normalized alias collision groups
+DesktopEntry ambiguity signals
+```
+
+It deliberately emits no resolver verdict.
+
+Its embedded synthetic contract check is:
+
+```bash
+python3 services/identity/analyze_identity_fixtures.py --self-test
+```
+
+Normal workflow:
+
+```text
+T0 runtime package
+      ↓
+validate_identity_fixtures.py
+      ↓
+analyze_identity_fixtures.py
+      ↓
+human review of false positives / ambiguity / missing evidence
+      ↓
+future resolver design
+```
+
+The analyzer does not generate operator capture commands and does not replace
+T0's evidence-packaging authority.
+
 ## Acceptance rule
 
 A fixture may demonstrate that a rule is useful.

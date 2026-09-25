@@ -273,11 +273,10 @@ Scope {
             return false;
 
         if (isFrozen(entry)) {
-            markFrozen(entry, false);
-
             if (!controlService.sendSignal(entryPid(entry), "-CONT"))
                 return false;
 
+            markFrozen(entry, false);
             relockDangerAction(entry, "freeze");
             refreshRequested();
             return true;

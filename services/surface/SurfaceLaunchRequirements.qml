@@ -49,15 +49,38 @@ QtObject {
         return text ? [text] : [];
     }
 
+    function primaryExecutableName(evidence) {
+        evidence = evidence || ({});
+
+        let raw = asText(evidence.executable).trim();
+
+        if (!raw) {
+            const tokens = normalizedCommandTokens(evidence);
+
+            if (tokens.length > 0
+                    && tokens[0] !== "__APPCONTROL_SHELL__")
+                raw = asText(tokens[0]).trim();
+        }
+
+        if (!raw)
+            return "";
+
+        const pieces = raw.split("/");
+        return asText(pieces[pieces.length - 1]).toLowerCase();
+    }
+
     function evidenceHaystack(evidence) {
         evidence = evidence || ({});
 
+        // Provider-family recognition intentionally ignores arbitrary trailing
+        // argv text. RUN/APPS must describe the executable receiving the
+        // augmentation instead of qualifying merely because an inner argument
+        // happens to contain "kitty", "electron", etc.
         return [
             asText(evidence.displayName || evidence.name),
             asText(evidence.localId || evidence.id),
             asText(evidence.startupClass),
-            asText(evidence.executable),
-            normalizedCommandTokens(evidence).join(" ")
+            primaryExecutableName(evidence)
         ].join(" ").toLowerCase();
     }
 

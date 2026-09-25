@@ -31,6 +31,7 @@ APP_DIR = ROOT / "services" / "apps"
 EXTRACTED = {
     "core": APP_DIR / "AppCoreProvider.qml",
     "launch": APP_DIR / "AppLaunchPlanner.qml",
+    "command_builder": APP_DIR / "AppLaunchCommandBuilder.qml",
     "actions": APP_DIR / "AppActionCatalog.qml",
     "action_planner": APP_DIR / "AppActionPlanner.qml",
     "catalog": APP_DIR / "AppCatalogPolicy.qml",
@@ -154,6 +155,31 @@ require_function_anchors(
         r"/^%[fFuUdDnNickvm]$/",
         '"__APPCONTROL_SHELL__"',
         r"/\s+%[fFuUdDnNickvm]\b/g",
+    ),
+)
+
+require_function_anchors(
+    "donor Toolbox launch mechanism",
+    donor_text,
+    "launchAppInToolbox",
+    (
+        '"toolbox"',
+        '"run"',
+        '"bash"',
+        '"-lc"',
+        "Quickshell.execDetached",
+    ),
+)
+
+require_function_anchors(
+    "donor Bottles launch mechanism",
+    donor_text,
+    "launchAppInBottle",
+    (
+        "flatpak run --command=bottles-cli",
+        "com.usebottles.bottles run -b",
+        "bottles-cli run -b",
+        '" -p "',
     ),
 )
 
@@ -319,6 +345,42 @@ require_function_anchors(
         r"/^%[fFuUdDnNickvm]$/",
         '"__APPCONTROL_SHELL__"',
         r"/\s+%[fFuUdDnNickvm]\b/g",
+    ),
+)
+
+require_function_anchors(
+    "extracted Toolbox argv mechanism",
+    texts.get("command_builder", ""),
+    "buildToolboxArgv",
+    (
+        '["toolbox", "run"]',
+        "envArgv",
+        "plan.argv",
+    ),
+)
+
+require_function_anchors(
+    "extracted Toolbox shell mechanism",
+    texts.get("command_builder", ""),
+    "buildToolboxShell",
+    (
+        '["toolbox", "run"]',
+        '"bash"',
+        '"-lc"',
+        "surface-launch-toolbox-shell-argv-transport-unresolved",
+    ),
+)
+
+require_function_anchors(
+    "extracted Bottles mechanism",
+    texts.get("command_builder", ""),
+    "bottleScript",
+    (
+        "flatpak run ",
+        "--command=bottles-cli",
+        "com.usebottles.bottles run -b",
+        "bottles-cli run -b",
+        '" -p "',
     ),
 )
 

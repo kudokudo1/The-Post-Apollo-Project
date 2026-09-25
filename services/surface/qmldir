@@ -2,3 +2,4 @@ module qs.services.surface
 
 singleton SurfaceLaunchRequirements 1.0 SurfaceLaunchRequirements.qml
 singleton SurfaceLaunchCoordinator 1.0 SurfaceLaunchCoordinator.qml
+singleton SurfaceInstrumentationRecovery 1.0 SurfaceInstrumentationRecovery.qml

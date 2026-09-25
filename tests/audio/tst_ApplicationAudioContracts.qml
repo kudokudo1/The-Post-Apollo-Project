@@ -208,7 +208,7 @@ TestCase {
         compare(resolved.indexes[0], 44);
         compare(resolved.matches.length, 1);
         compare(resolved.matches[0].evidence.pidMatch, true);
-        compare(resolved.available, undefined);
+        verify(resolved.available === undefined);
     }
 
     function test_resolveNoStreamUsesUnknownObservedVolume() {
@@ -307,8 +307,8 @@ TestCase {
             "application.process.id"
         );
 
-        compare(observation.semanticKey, undefined);
-        compare(observation.applicationEntity, undefined);
+        verify(observation.semanticKey === undefined);
+        verify(observation.applicationEntity === undefined);
     }
 
     function test_team7ObservationOmitsInvalidPidRelationship() {

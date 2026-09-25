@@ -164,8 +164,11 @@ Scope {
         let message = "";
         let actionLabel = "";
         let actionKind = "kill";
+        let compatibilityKind = "";
 
         if (op === "restart") {
+            compatibilityKind =
+                protectedProcess ? "protected-restart" : "task-restart";
             title = protectedProcess
                     ? "⚠︎ PROTECTED PROCESS • RESTART ⚠︎"
                     : "CONFIRM PROCESS RESTART";
@@ -180,6 +183,8 @@ Scope {
                 );
             actionLabel = "RESTART PROCESS";
         } else if (op === "terminate") {
+            compatibilityKind =
+                protectedProcess ? "protected-term" : "task-term";
             title = protectedProcess
                     ? "⚠︎ PROTECTED PROCESS • TERMINATE ⚠︎"
                     : "CONFIRM PROCESS TERMINATION";
@@ -198,6 +203,8 @@ Scope {
                 );
             actionLabel = "END PROCESS";
         } else if (op === "freeze") {
+            compatibilityKind =
+                protectedProcess ? "protected-freeze" : "task-freeze";
             title = protectedProcess
                     ? "⚠︎ PROTECTED PROCESS • FREEZE ⚠︎"
                     : "CONFIRM PROCESS FREEZE";
@@ -222,6 +229,7 @@ Scope {
 
         return {
             operation: op,
+            kind: compatibilityKind,
             protectedProcess: protectedProcess,
             actionKind: actionKind,
             pid: pid,
@@ -281,6 +289,26 @@ Scope {
             return false;
 
         confirmationRequested(request);
+        return true;
+    }
+
+    function cancelConfirmed(request, liveEntry) {
+        if (!request || !liveEntry)
+            return false;
+
+        if (!targetMatches(liveEntry, request))
+            return false;
+
+        const actionKind = String(
+            request.actionKind
+            || (
+                String(request.operation || "").toLowerCase() === "freeze"
+                ? "freeze"
+                : "kill"
+            )
+        );
+
+        relockDangerAction(liveEntry, actionKind);
         return true;
     }
 

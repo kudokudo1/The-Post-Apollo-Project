@@ -1,3 +1,5 @@
+pragma Singleton
+
 import QtQuick
 
 // T5-domain-owned, launcher-neutral surface instrumentation coordinator.
@@ -10,8 +12,6 @@ import QtQuick
 // Call releaseCorrelation() only from launch/application lifetime bookkeeping.
 QtObject {
     id: coordinator
-
-    required property var requirements
 
     property int correlationSerial: 0
     property var leases: ({})
@@ -57,7 +57,7 @@ QtObject {
     }
 
     function commandTokens(evidence) {
-        return requirements.normalizedCommandTokens(evidence);
+        return SurfaceLaunchRequirements.normalizedCommandTokens(evidence);
     }
 
     function hasArgPrefix(evidence, prefix) {
@@ -265,7 +265,7 @@ QtObject {
 
     function buildAugmentation(evidence, requestedCapabilities) {
         const description =
-            requirements.describe(evidence, requestedCapabilities);
+            SurfaceLaunchRequirements.describe(evidence, requestedCapabilities);
 
         // Explicit opt-in means an empty capability request is a true no-op:
         // no correlation record, no lease state, no launch mutation.
@@ -332,7 +332,7 @@ QtObject {
         const applied = [];
 
         if (supported.indexOf(
-                    requirements.capabilityKittyRemote
+                    SurfaceLaunchRequirements.capabilityKittyRemote
                 ) !== -1) {
             const existingListenOn = existingKittyListenOn(evidence);
             const remoteMode = kittyRemoteControlMode(evidence);
@@ -345,7 +345,7 @@ QtObject {
                     requestedCorrelationId: correlationId,
                     existingCorrelationId: "",
                     capability:
-                        requirements.capabilityKittyRemote,
+                        SurfaceLaunchRequirements.capabilityKittyRemote,
                     reason: "requires-socket-only"
                 });
             } else {
@@ -361,7 +361,7 @@ QtObject {
                         "kitty-listen-on",
                         listenOn,
                         correlationId,
-                        requirements.capabilityKittyRemote,
+                        SurfaceLaunchRequirements.capabilityKittyRemote,
                         "caller-supplied"
                     );
 
@@ -382,7 +382,7 @@ QtObject {
                         "kitty-listen-on",
                         listenOn,
                         correlationId,
-                        requirements.capabilityKittyRemote,
+                        SurfaceLaunchRequirements.capabilityKittyRemote,
                         "generated"
                     );
 
@@ -397,15 +397,15 @@ QtObject {
 
             const kittyConflict = conflictRows.some(function(item) {
                 return item.capability
-                    === requirements.capabilityKittyRemote;
+                    === SurfaceLaunchRequirements.capabilityKittyRemote;
             });
 
             if (!kittyConflict)
-                applied.push(requirements.capabilityKittyRemote);
+                applied.push(SurfaceLaunchRequirements.capabilityKittyRemote);
         }
 
         if (supported.indexOf(
-                    requirements.capabilityAccessibility
+                    SurfaceLaunchRequirements.capabilityAccessibility
                 ) !== -1) {
             env.NO_AT_BRIDGE = "0";
             env.ACCESSIBILITY_ENABLED = "1";
@@ -421,11 +421,11 @@ QtObject {
                 );
             }
 
-            applied.push(requirements.capabilityAccessibility);
+            applied.push(SurfaceLaunchRequirements.capabilityAccessibility);
         }
 
         if (supported.indexOf(
-                    requirements.capabilityDevTools
+                    SurfaceLaunchRequirements.capabilityDevTools
                 ) !== -1) {
             const existingPort = existingDebugPort(evidence);
             const existingAddress = existingDebugAddress(evidence);
@@ -437,7 +437,7 @@ QtObject {
                     "devtools-port",
                     port,
                     correlationId,
-                    requirements.capabilityDevTools,
+                    SurfaceLaunchRequirements.capabilityDevTools,
                     "caller-supplied"
                 );
 
@@ -447,7 +447,7 @@ QtObject {
                     conflictRows.push(reservation.conflict);
             } else {
                 port = allocateDebugPort(
-                    requirements.preferredDebugPort(evidence),
+                    SurfaceLaunchRequirements.preferredDebugPort(evidence),
                     correlationId
                 );
 
@@ -467,7 +467,7 @@ QtObject {
                         "devtools-port",
                         port,
                         correlationId,
-                        requirements.capabilityDevTools,
+                        SurfaceLaunchRequirements.capabilityDevTools,
                         "generated"
                     );
 
@@ -482,7 +482,7 @@ QtObject {
                         requestedCorrelationId: correlationId,
                         existingCorrelationId: "",
                         capability:
-                            requirements.capabilityDevTools,
+                            SurfaceLaunchRequirements.capabilityDevTools,
                         reason: "no-available-port"
                     });
                 }
@@ -493,11 +493,11 @@ QtObject {
 
             const devToolsConflict = conflictRows.some(function(item) {
                 return item.capability
-                    === requirements.capabilityDevTools;
+                    === SurfaceLaunchRequirements.capabilityDevTools;
             });
 
             if (port > 0 && !devToolsConflict)
-                applied.push(requirements.capabilityDevTools);
+                applied.push(SurfaceLaunchRequirements.capabilityDevTools);
         }
 
         const ready = conflictRows.length === 0;

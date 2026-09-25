@@ -28,6 +28,7 @@ FILES = {
     "catalog": APP_DIR / "AppCatalogPolicy.qml",
     "hidden": APP_DIR / "AppHiddenAdapter.qml",
     "selection": APP_DIR / "AppSelectionPolicy.qml",
+    "mode": APP_DIR / "AppModePolicy.qml",
     "identity": APP_DIR / "AppIdentityAdapter.qml",
     "facade": APP_DIR / "AppCoreFacade.qml",
 }
@@ -139,6 +140,13 @@ required_functions = {
         "rememberedKeyFor",
         "restoreIndex",
     },
+    "mode": {
+        "normalizeSourceMode",
+        "normalizeLaunchMode",
+        "counterpartIndex",
+        "sourceChangePlan",
+        "launchChangePlan",
+    },
     "identity": {
         "available",
         "observationForEntry",
@@ -149,6 +157,10 @@ required_functions = {
         "desktopEntries",
         "hiddenEntries",
         "resultRows",
+        "sourceChangePlan",
+        "setSourceMode",
+        "setLaunchMode",
+        "selectBottle",
         "sourceLabel",
         "entryLaunchableForSource",
         "actionsAvailableForSource",
@@ -215,7 +227,7 @@ for key, text in texts.items():
 # Planning/catalog files must remain pure. They describe intent; they do not
 # launch processes, create workers/timers, or mutate the desktop. Bottles is a
 # discovery provider and therefore may own its bottles-cli Process.
-for key in ("launch", "commandBuilder", "actions", "actionPlanner", "actionCommandBuilder", "catalog", "hidden", "selection", "identity", "facade"):
+for key in ("launch", "commandBuilder", "actions", "actionPlanner", "actionCommandBuilder", "catalog", "hidden", "selection", "mode", "identity", "facade"):
     text = texts.get(key, "")
     for token in (
         "Quickshell.execDetached",
@@ -320,6 +332,7 @@ print(" browser/desktop action execution: neutral Team 8 descriptors")
 print(" APPS catalog/search/ranking: pure Team 8 policy")
 print(" HIDDEN adaptation: pure Team 8 adapter over external RUN rows")
 print(" APPS selection remembrance: pure Team 8 lookup policy")
+print(" APPS source/launch modes: pure Team 8 policy")
 print(" DesktopEntry identity evidence: delegated to Team 7")
 print(" standalone facade: composition-only Team 8 integration surface")
 print(" launch execution descriptors: pure Team 8 mechanism builder")

@@ -159,32 +159,60 @@ Scope {
         return scopeText + ":" + keyText;
     }
 
-    function matchesDescriptor(descriptor, sinkInput) {
+    // Matching is evidence, not semantic identity. Team 7 owns the latter.
+    // Keep the evidence inspectable so callers can distinguish an exact PID
+    // attachment from a weaker token heuristic.
+    function descriptorMatchEvidence(descriptor, sinkInput) {
+        const result = {
+            matched: false,
+            pidMatch: false,
+            processId: 0,
+            streamIndex: -1,
+            strictTokens: !!(descriptor && descriptor.strictTokens),
+            tokenMatches: []
+        };
+
         if (!descriptor || !sinkInput)
-            return false;
+            return result;
 
         const props = sinkInput.properties || {};
         const processId = Number(props["application.process.id"] || 0);
+        const streamIndex = Number(sinkInput.index);
         const pids = descriptor.pids || [];
 
-        if (processId > 1 && pids.indexOf(processId) !== -1)
-            return true;
+        result.processId = processId > 0 ? processId : 0;
+        result.streamIndex = isNaN(streamIndex) ? -1 : streamIndex;
+
+        if (processId > 1 && pids.indexOf(processId) !== -1) {
+            result.pidMatch = true;
+            result.matched = true;
+        }
 
         const wanted = descriptor.tokens || [];
         if (wanted.length === 0)
-            return false;
+            return result;
 
         const strict = !!descriptor.strictTokens;
         const available = streamPropertyTokens(props, strict);
 
         for (let i = 0; i < wanted.length; i++) {
             for (let j = 0; j < available.length; j++) {
-                if (tokensMatch(wanted[i], available[j], strict))
-                    return true;
+                if (!tokensMatch(wanted[i], available[j], strict))
+                    continue;
+
+                const pair = String(wanted[i]) + "|" + String(available[j]);
+                if (result.tokenMatches.indexOf(pair) === -1)
+                    result.tokenMatches.push(pair);
+
+                result.matched = true;
             }
         }
 
-        return false;
+        return result;
+    }
+
+    function matchesDescriptor(descriptor, sinkInput) {
+        return descriptorMatchEvidence(descriptor, sinkInput).matched;
     }
 
     function sinkInputVolumePercent(input) {
@@ -241,15 +269,21 @@ Scope {
         const source = inputs || sinkInputs || [];
         const matchingInputs = [];
         const indexes = [];
+        const matches = [];
         let allMuted = true;
 
         for (let i = 0; i < source.length; i++) {
             const input = source[i];
+            const evidence = descriptorMatchEvidence(descriptor, input);
 
-            if (!matchesDescriptor(descriptor, input))
+            if (!evidence.matched)
                 continue;
 
             matchingInputs.push(input);
+            matches.push({
+                streamIndex: evidence.streamIndex,
+                evidence: evidence
+            });
 
             const index = Number(input.index);
             if (!isNaN(index))
@@ -260,7 +294,10 @@ Scope {
         }
 
         return {
+            // Raw pactl records remain intact for Team 7 fixture capture and
+            // future diagnostics. The matches list carries separate join evidence.
             inputs: matchingInputs,
+            matches: matches,
             indexes: indexes,
             available: matchingInputs.length > 0,
             muted: indexes.length > 0 && allMuted,

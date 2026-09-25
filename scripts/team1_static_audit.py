@@ -19,6 +19,8 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
+CONTRACT_TEST = ROOT / "tests/system/tst_Team1ProcessSystemContracts.qml"
+
 QML_FILES = {
     "process_identity": ROOT / "services/system/ProcessIdentity.qml",
     "process_scope": ROOT / "services/system/ProcessScope.qml",
@@ -40,6 +42,7 @@ ALLOWED_TEAM1_DIFF_PREFIXES = (
     "services/system/",
     "widgets/system/",
     "docs/team1/",
+    "tests/system/",
     "scripts/team1_static_audit.py",
 )
 
@@ -113,6 +116,15 @@ def audit_architecture() -> None:
     system_control = read("system_control")
     system_presentation = read("system_presentation")
     system_monitor = read("system_monitor_controller")
+
+    if not CONTRACT_TEST.exists():
+        fail(
+            "missing Team 1 behavioral contract suite: "
+            + str(CONTRACT_TEST.relative_to(ROOT))
+        )
+        contract_test = ""
+    else:
+        contract_test = CONTRACT_TEST.read_text(encoding="utf-8")
 
     require_functions(
         identity,
@@ -325,6 +337,36 @@ def audit_architecture() -> None:
         system_monitor,
         "readonly property bool systemRebootArmed: false",
         "SystemMonitorController",
+    )
+
+    # The behavioral suite must lock the safety/accounting invariants that a
+    # string-only architecture audit cannot prove by itself.
+    for test_name in (
+        "test_processIdentityRejectsPidReuseMismatch",
+        "test_protectedActionUnlockRelocksAfterCancel",
+        "test_confirmedActionRevalidatesCapturedTarget",
+        "test_resourceScopeBlocksProtectedProcesses",
+        "test_verifiedKernelResultsRemainPerPidAndMixed",
+        "test_partialMutationKeepsSuccessfulKernelTruthOnly",
+        "test_successfulBatchDoesNotOverwriteClampedPidTruth",
+        "test_freezeOptimismLesionRemainsExplicitCompatibility",
+        "test_rssCriticalMetricPreservesDonorMemBehavior",
+    ):
+        require(
+            contract_test,
+            "function " + test_name + "(",
+            "Team1ProcessSystemContracts",
+        )
+
+    forbid(
+        contract_test,
+        "Quickshell.execDetached(",
+        "Team1ProcessSystemContracts",
+    )
+    forbid(
+        contract_test,
+        "ProcessLimitMutation {",
+        "Team1ProcessSystemContracts",
     )
 
     # Prepared shared organs must not treat AppControl itself as a backend.

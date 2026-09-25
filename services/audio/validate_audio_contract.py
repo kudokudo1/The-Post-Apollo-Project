@@ -15,8 +15,10 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 SERVICE = ROOT / "services" / "audio" / "ApplicationAudioService.qml"
+TEST_SUITE = ROOT / "tests" / "audio" / "tst_ApplicationAudioContracts.qml"
 
 text = SERVICE.read_text(encoding="utf-8")
+test_text = TEST_SUITE.read_text(encoding="utf-8")
 errors: list[str] = []
 
 required_functions = {
@@ -162,6 +164,48 @@ for observation_token in (
 if "Math.floor(index) !== index" not in text:
     errors.append("sink-input mutation indexes are not constrained to integers")
 
+
+required_test_cases = {
+    "test_normalizeTokenPreservesDonorShape",
+    "test_tokenMatchingRiskModes",
+    "test_descriptorCopySanitizesEvidence",
+    "test_exactPidEvidenceIsSeparateFromTokenEvidence",
+    "test_strictAppMatchingRejectsSuffixOnlyAlias",
+    "test_fuzzyWindowTabMatchingAllowsSuffixEvidence",
+    "test_strictPropertyTokensBlockGenericAliases",
+    "test_resolveReportsPhysiologyNotHostAvailability",
+    "test_resolveNoStreamUsesUnknownObservedVolume",
+    "test_volumeMathNeverAmplifiesAboveUnity",
+    "test_rawEvidencePreservesPipeWireFields",
+    "test_team7ObservationAdapterKeepsProvenance",
+    "test_policyNamespacesNormalizeScopeOnly",
+}
+
+test_cases = set(
+    re.findall(
+        r"^\s*function\s+(test_[A-Za-z_][A-Za-z0-9_]*)\s*\(",
+        test_text,
+        re.M,
+    )
+)
+
+missing_test_cases = sorted(required_test_cases - test_cases)
+if missing_test_cases:
+    errors.append(
+        "missing isolated audio test cases: " + ", ".join(missing_test_cases)
+    )
+
+# The QtTest suite is intentionally physiology-only. It must never become a
+# convenient way to mutate the operator's live PipeWire session.
+for mutator in (
+    "setSinkInputMute(",
+    "setSinkInputVolumes(",
+    "setMutePolicy(",
+    "setVolumePolicy(",
+):
+    if mutator in test_text:
+        errors.append(f"isolated test suite calls live mutator: {mutator}")
+
 if errors:
     print("TEAM 6 APPLICATION AUDIO CONTRACT: FAIL")
     for error in errors:
@@ -172,6 +216,7 @@ print("TEAM 6 APPLICATION AUDIO CONTRACT: PASS")
 print(" service:", SERVICE.relative_to(ROOT))
 print(" functions:", len(functions))
 print(" properties:", len(properties))
+print(" isolated QtTest cases:", len(test_cases))
 print(" raw PipeWire evidence: preserved")
 print(" semantic identity authority: external / Team 7")
 print(" foreign ownership references: none")

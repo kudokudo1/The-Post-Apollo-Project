@@ -59,6 +59,11 @@ Scope {
         actionCatalog: actionCatalog
     }
 
+    AppActionCommandBuilder {
+        id: actionCommandBuilder
+        launchPlanner: launchPlanner
+    }
+
     AppCatalogPolicy {
         id: catalogPolicy
         coreProvider: core
@@ -148,6 +153,10 @@ Scope {
             entry,
             fallbackIndex
         );
+    }
+
+    function buildActionCommand(plan) {
+        return actionCommandBuilder.build(plan);
     }
 
     function planLaunch(entry, sourceMode, launchMode,

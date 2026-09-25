@@ -307,6 +307,34 @@ Scope {
         };
     }
 
+    // Raw observation adapter for Team 7 fixture capture. Values remain
+    // exactly as reported by pactl; this is evidence, not semantic identity.
+    function streamEvidence(input) {
+        const props = input && input.properties || {};
+
+        return {
+            streamIndex: input ? input.index : undefined,
+            mute: input ? !!input.mute : false,
+            volume: input ? input.volume : undefined,
+            applicationProcessId: props["application.process.id"],
+            applicationProcessBinary: props["application.process.binary"],
+            applicationId: props["application.id"],
+            applicationName: props["application.name"],
+            mediaName: props["media.name"],
+            properties: props
+        };
+    }
+
+    function evidenceSnapshot(inputs) {
+        const source = inputs || sinkInputs || [];
+        const snapshot = [];
+
+        for (let i = 0; i < source.length; i++)
+            snapshot.push(streamEvidence(source[i]));
+
+        return snapshot;
+    }
+
     function parseSinkInputs(text) {
         const parsed = JSON.parse(String(text || "[]"));
 

@@ -134,6 +134,70 @@ TestCase {
         );
     }
 
+    function test_controlSignatureSuppressesIdenticalHeartbeats() {
+        const a = [{
+            _tabControlRecord: true,
+            provider: "LIBATSPI",
+            id: "libatspi-control:/a/b",
+            path: "/a/b",
+            controlName: "New Tab",
+            appName: "Example",
+            windowName: "Example Window",
+            role: 43,
+            roleName: "push button",
+            selected: false
+        }];
+
+        const b = [{
+            _tabControlRecord: true,
+            provider: "LIBATSPI",
+            id: "libatspi-control:/a/b",
+            path: "/a/b",
+            controlName: "New Tab",
+            appName: "Example",
+            windowName: "Example Window",
+            role: 43,
+            roleName: "push button",
+            selected: false
+        }];
+
+        compare(
+            provider.controlRowsSignature(a),
+            provider.controlRowsSignature(b)
+        );
+    }
+
+    function test_controlSignatureTracksMeaningfulEvidence() {
+        const base = [{
+            provider: "LIBATSPI",
+            id: "libatspi-control:/a/b",
+            path: "/a/b",
+            controlName: "New Tab",
+            appName: "Example",
+            windowName: "Example Window",
+            role: 43,
+            roleName: "push button",
+            selected: false
+        }];
+
+        const selected = [{
+            provider: "LIBATSPI",
+            id: "libatspi-control:/a/b",
+            path: "/a/b",
+            controlName: "New Tab",
+            appName: "Example",
+            windowName: "Example Window",
+            role: 43,
+            roleName: "push button",
+            selected: true
+        }];
+
+        verify(
+            provider.controlRowsSignature(base)
+            !== provider.controlRowsSignature(selected)
+        );
+    }
+
     function test_nativeLifecycleIsProviderSpecific() {
         verify(provider.hasNativeLifecycleControl({
             provider: "DEVTOOLS",

@@ -139,7 +139,7 @@ QtObject {
         );
     }
 
-    function rememberLimit(
+    function rememberScopeLimit(
             scopeKey,
             processRows,
             rootPids,
@@ -161,7 +161,6 @@ QtObject {
             requestedMiB,
             previous
         );
-
         const nextScopes = Object.assign({}, memoryLimitPolicies);
 
         if (normalized > 0)
@@ -170,7 +169,103 @@ QtObject {
             delete nextScopes[key];
 
         memoryLimitPolicies = nextScopes;
+        return normalized;
+    }
 
+    function rowForMutationPid(processRows, pid) {
+        const wanted = Number(pid || 0);
+        const rows = Array.isArray(processRows) ? processRows : [];
+
+        if (wanted <= 1)
+            return null;
+
+        for (let i = 0; i < rows.length; i++) {
+            if (Number(rows[i] && rows[i].pid || 0) === wanted)
+                return rows[i];
+        }
+
+        return null;
+    }
+
+    function verifiedMiBFromResult(result) {
+        if (!result || !result.ok)
+            return -1;
+
+        const soft = Number(result.soft);
+
+        // ProcessLimitMutation reports RLIM_INFINITY as -1.
+        if (!isFinite(soft) || soft < 0)
+            return 0;
+
+        return soft / (1024 * 1024);
+    }
+
+    function noteMutationResults(processRows, results) {
+        const source = Array.isArray(results) ? results : [];
+        const next = Object.assign({}, memoryLimitPidPolicies);
+        let changed = false;
+        let successCount = 0;
+        let failureCount = 0;
+
+        for (let i = 0; i < source.length; i++) {
+            const result = source[i];
+
+            if (!result || !result.ok) {
+                failureCount++;
+                continue;
+            }
+
+            const row = rowForMutationPid(
+                processRows,
+                Number(result.pid || 0)
+            );
+            const key = pidPolicyKey(row);
+
+            if (!key) {
+                failureCount++;
+                continue;
+            }
+
+            const verifiedMiB = verifiedMiBFromResult(result);
+
+            if (verifiedMiB < 0) {
+                failureCount++;
+                continue;
+            }
+
+            successCount++;
+
+            if (next[key] === undefined
+                    || Math.abs(
+                        Number(next[key] || 0) - verifiedMiB
+                    ) > 0.5) {
+                next[key] = verifiedMiB;
+                changed = true;
+            }
+        }
+
+        if (changed)
+            memoryLimitPidPolicies = next;
+
+        return {
+            successCount: successCount,
+            failureCount: failureCount,
+            changed: changed
+        };
+    }
+
+    function rememberLimit(
+            scopeKey,
+            processRows,
+            rootPids,
+            requestedMiB) {
+        const normalized = rememberScopeLimit(
+            scopeKey,
+            processRows,
+            rootPids,
+            requestedMiB
+        );
+        const scopedRows = resourceScope.rows(processRows, rootPids);
         const nextPids = Object.assign({}, memoryLimitPidPolicies);
 
         for (let i = 0; i < scopedRows.length; i++) {

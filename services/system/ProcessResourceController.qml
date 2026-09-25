@@ -197,30 +197,48 @@ Scope {
         delete next[String(batchId)];
         pendingLimitBatches = next;
 
-        if (!ok) {
-            let message = "PROCESS LIMIT MUTATION FAILED";
-            const rows = Array.isArray(results) ? results : [];
+        const rows = Array.isArray(results) ? results : [];
+        const mutationSummary =
+            resourceState.noteMutationResults(
+                context.processRows,
+                rows
+            );
 
-            for (let i = 0; i < rows.length; i++) {
-                if (rows[i] && rows[i].error) {
-                    message = String(rows[i].error);
-                    break;
-                }
+        if (ok) {
+            // Persist the caller's desired scope policy only when every
+            // requested PID completed successfully. Per-PID mirrors above
+            // still retain the verified kernel values, including hard-limit
+            // clamping that differs between processes.
+            if (String(context.kind || "") === "set") {
+                resourceState.rememberScopeLimit(
+                    context.scopeKey,
+                    context.processRows,
+                    context.rootPids,
+                    Number(context.normalizedMiB || 0)
+                );
             }
 
-            limitMutationFailed(
-                String(context.scopeKey || ""),
-                message
-            );
             refreshRequested();
             return;
         }
 
-        resourceState.rememberLimit(
-            context.scopeKey,
-            context.processRows,
-            context.rootPids,
-            Number(context.normalizedMiB || 0)
+        let message = "PROCESS LIMIT MUTATION PARTIALLY FAILED";
+
+        for (let i = 0; i < rows.length; i++) {
+            if (rows[i] && rows[i].error) {
+                message = String(rows[i].error);
+                break;
+            }
+        }
+
+        if (mutationSummary.successCount <= 0)
+            message = rows.length > 0
+                      ? message
+                      : "PROCESS LIMIT MUTATION FAILED";
+
+        limitMutationFailed(
+            String(context.scopeKey || ""),
+            message
         );
         refreshRequested();
     }

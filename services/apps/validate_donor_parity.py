@@ -39,6 +39,7 @@ EXTRACTED = {
     "hidden": APP_DIR / "AppHiddenAdapter.qml",
     "bottles": APP_DIR / "AppBottleProvider.qml",
     "selection": APP_DIR / "AppSelectionPolicy.qml",
+    "mode": APP_DIR / "AppModePolicy.qml",
 }
 
 errors: list[str] = []
@@ -311,6 +312,41 @@ require_function_anchors(
     ),
 )
 
+require_function_anchors(
+    "donor APPS source-mode normalization",
+    donor_text,
+    "setAppSourceMode",
+    (
+        "appSourceHidden",
+        "appSourceFlatpak",
+        "appSourceNative",
+        "refreshRunAllCommands(false)",
+        "restoreMatchingAppForSource(previousName)",
+    ),
+)
+
+require_function_anchors(
+    "donor APPS launch-mode normalization",
+    donor_text,
+    "setAppLaunchMode",
+    (
+        "appLaunchToolbox",
+        "appLaunchBottle",
+        "appLaunchNormal",
+    ),
+)
+
+require_function_anchors(
+    "donor APPS package-counterpart restoration",
+    donor_text,
+    "restoreMatchingAppForSource",
+    (
+        "appEntryMatchesSelectedSource(entry)",
+        "String(entry.name || \"\").trim().toLowerCase()",
+        "match = 0",
+    ),
+)
+
 # filteredApps is a ScriptModel rather than a function, so guard the distinctive
 # donor semantics directly in the containing source.
 require_all(
@@ -559,6 +595,41 @@ require_function_anchors(
     (
         "rows.length === 0",
         "catalogPolicy.entryKey(rows[i]) === key",
+        "return 0",
+        "return -1",
+    ),
+)
+
+require_function_anchors(
+    "extracted APPS source-mode normalization",
+    texts.get("mode", ""),
+    "normalizeSourceMode",
+    (
+        "sourceHidden",
+        "sourceFlatpak",
+        "sourceNative",
+    ),
+)
+
+require_function_anchors(
+    "extracted APPS launch-mode normalization",
+    texts.get("mode", ""),
+    "normalizeLaunchMode",
+    (
+        "launchToolbox",
+        "launchBottle",
+        "launchNormal",
+    ),
+)
+
+require_function_anchors(
+    "extracted APPS package-counterpart restoration",
+    texts.get("mode", ""),
+    "counterpartIndex",
+    (
+        "entryMatchesSource",
+        ".trim()",
+        ".toLowerCase()",
         "return 0",
         "return -1",
     ),

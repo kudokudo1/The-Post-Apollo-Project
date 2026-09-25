@@ -194,6 +194,11 @@ mode is a preparation conflict rather than being treated as equivalent.
 Generated endpoint metadata remains discoverable because Kitty exposes the
 listen address through its running process environment.
 
+Generated abstract socket names are also length-bounded by the coordinator.
+The correlation's timestamp/serial portion remains at the front of the bounded
+token so uniqueness does not depend on carrying an arbitrarily long human hint
+into the socket coordinate.
+
 ### ACCESSIBILITY
 
 When requested for a supported Chromium/Electron-family launch:

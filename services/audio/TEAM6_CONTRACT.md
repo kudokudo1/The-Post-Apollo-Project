@@ -160,13 +160,30 @@ providerKey     = sink-input:<index>
 lifetimeClass   = ephemeral
 generation
 raw
-aliases[]
-relationships[]
+aliases[]       = kind / value / normalized / provider
+relationships[] = evidence edges
 ```
 
 This is deliberately an **observation**, not an `ApplicationEntity`.
 `providerKey` is only an ephemeral PipeWire coordinate. Aliases preserve their
 source kind and raw value; normalization is included only as matching evidence.
+
+Team 7's frozen evidence envelope requires every alias to retain its provider.
+Team 6 therefore emits `provider: PIPEWIRE` on each PipeWire alias.
+
+When `application.process.id` is a valid PID, Team 6 also emits one explicit
+relationship:
+
+```text
+kind           = EXACT_PID
+targetProvider = PROCFS
+targetKey      = pid:<n>
+strength       = exact
+sourceField    = application.process.id
+```
+
+That relationship is exact provider evidence about process attachment. It is
+**not** a declaration that PID equals persistent application identity.
 
 ## Match evidence
 

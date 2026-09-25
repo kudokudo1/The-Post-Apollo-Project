@@ -32,6 +32,8 @@ required_functions = {
     "resolve",
     "streamEvidence",
     "evidenceSnapshot",
+    "streamObservation",
+    "observationSnapshot",
     "parseSinkInputs",
     "refresh",
     "requestPolicyRefresh",
@@ -55,6 +57,7 @@ required_functions = {
 required_properties = {
     "volumeMaxPercent",
     "sinkInputs",
+    "observationGeneration",
     "loading",
     "errorText",
     "mutePolicies",
@@ -143,6 +146,18 @@ for evidence_field in (
 ):
     if evidence_field not in text:
         errors.append(f"missing separate match-evidence field: {evidence_field}")
+
+
+for observation_token in (
+    'provider: "PIPEWIRE"',
+    '"sink-input:"',
+    'lifetimeClass: "ephemeral"',
+    "generation: observationGeneration",
+    "aliases: aliases",
+    "relationships: []",
+):
+    if observation_token not in text:
+        errors.append(f"missing Team 7 observation adapter token: {observation_token}")
 
 if "Math.floor(index) !== index" not in text:
     errors.append("sink-input mutation indexes are not constrained to integers")

@@ -200,6 +200,8 @@ function tabLifecycleScript() {
             windowName: String(entry.windowName || ""),
             path: String(entry.path || ""),
             roleName: String(entry.roleName || ""),
+            busName: String(entry.busName || ""),
+            objectPath: String(entry.objectPath || ""),
             processPids: Array.isArray(entry.processPids)
                          ? entry.processPids.slice()
                          : [],

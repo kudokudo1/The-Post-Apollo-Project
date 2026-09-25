@@ -166,7 +166,10 @@ Expected:
 
 - provider key is treated as ephemeral object identity
 - raw PipeWire evidence is not overwritten by normalized aliases
-- aliases keep their source field/kind
+- aliases keep their source field/kind and `provider=PIPEWIRE`
+- a valid `application.process.id` produces an exact
+  `EXACT_PID -> PROCFS pid:<n>` relationship
+- invalid/system-like PIDs do not produce that relationship
 - no canonical application key is manufactured
 - every accepted live snapshot advances the observation generation
 

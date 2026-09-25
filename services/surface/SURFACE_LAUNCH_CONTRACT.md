@@ -297,6 +297,28 @@ TabSurfaceProvider.active lifetime
 No SurfaceLaunch object reads `TabSurfaceProvider.active`, and provider
 deactivation must never release a running application's instrumentation.
 
+## Correlation uniqueness across shell restarts
+
+The coordinator's in-memory serial resets when the shell restarts. Correlation
+IDs therefore include a per-shell session nonce before the timestamp/serial
+portion used by generated endpoint names.
+
+Conceptually:
+
+```text
+surface
+  + session nonce
+  + timestamp
+  + serial
+  + human hint
+```
+
+This prevents a fast restart from reproducing the same correlation/socket merely
+because a new singleton starts again at serial 1 in the same millisecond.
+
+The nonce is uniqueness bookkeeping, not security material and not semantic
+identity.
+
 ## Restart / recovery seam
 
 The shared singleton lease map is process-local state. A Quickshell restart can

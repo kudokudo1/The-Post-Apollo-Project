@@ -164,3 +164,29 @@ a shell/coordinator restart.
 
 Provider inactivity is not a release signal. The provider therefore does not
 automatically clear SurfaceLaunch observations when `active` becomes false.
+
+
+## Provider-scoped recovery completeness
+
+Runtime lease observations now have a conservative completeness companion:
+
+```text
+instrumentationLeaseSnapshot(rows, diagnostics)
+    -> {
+         observations,
+         completeKinds
+       }
+```
+
+Trusted bridge diagnostics determine which absence claims are safe:
+
+```text
+DEVTOOLS ERROR:NONE  -> "devtools-port"
+KITTY ERROR:NONE     -> "kitty-listen-on"
+```
+
+Fallback scanner count lines do not authorize pruning because that scanner
+suppresses provider failures by design.
+
+This lets the shared SurfaceLaunch authority reconcile one provider family
+without treating an unrelated provider's temporary absence as endpoint death.

@@ -225,6 +225,70 @@ TestCase {
         );
     }
 
+    function test_instrumentationLeaseObservationsExposeOnlyRuntimeCoordinates() {
+        const observations = provider.instrumentationLeaseObservations([
+            {
+                id: "devtools:9222:ABC",
+                provider: "DEVTOOLS",
+                debugPort: 9222,
+                targetId: "ABC",
+                appName: "Brave"
+            },
+            {
+                id: "kitty:7",
+                provider: "KITTY",
+                kittyAddress: "unix:@kitty-seven",
+                kittyTabId: 7,
+                processPids: [7001]
+            },
+            {
+                id: "libatspi:/tab/1",
+                provider: "LIBATSPI",
+                path: "/tab/1"
+            }
+        ]);
+
+        compare(observations.length, 2);
+
+        compare(observations[0].kind, "devtools-port");
+        compare(observations[0].value, 9222);
+        compare(observations[0].providerKey, "devtools:9222:ABC");
+
+        compare(observations[1].kind, "kitty-listen-on");
+        compare(observations[1].value, "unix:@kitty-seven");
+        compare(observations[1].providerKey, "kitty:7");
+
+        verify(observations[0].canonicalId === undefined);
+        verify(observations[1].applicationId === undefined);
+    }
+
+    function test_instrumentationLeaseObservationsDeduplicateCoordinates() {
+        const observations = provider.instrumentationLeaseObservations([
+            {
+                id: "devtools:9222:A",
+                provider: "DEVTOOLS",
+                debugPort: 9222
+            },
+            {
+                id: "devtools:9222:B",
+                provider: "DEVTOOLS",
+                debugPort: 9222
+            },
+            {
+                id: "kitty:1",
+                provider: "KITTY",
+                kittyAddress: "unix:@same"
+            },
+            {
+                id: "kitty:2",
+                provider: "KITTY",
+                kittyAddress: "unix:@same"
+            }
+        ]);
+
+        compare(observations.length, 2);
+    }
+
     function test_nativeLifecycleIsProviderSpecific() {
         verify(provider.hasNativeLifecycleControl({
             provider: "DEVTOOLS",

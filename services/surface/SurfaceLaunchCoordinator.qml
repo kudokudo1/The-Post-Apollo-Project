@@ -180,11 +180,30 @@ QtObject {
         // Missing address preserves current donor behavior when a caller
         // already supplied its own debug port. Explicit broad/non-loopback
         // addresses are not equivalent to T5's loopback-only bootstrap.
-        return !address
-            || address === "127.0.0.1"
-            || address === "localhost"
-            || address === "::1"
-            || address === "[::1]";
+        if (!address
+                || address === "localhost"
+                || address === "::1"
+                || address === "[::1]")
+            return true;
+
+        // IPv4 loopback is the complete 127.0.0.0/8 block, not only
+        // 127.0.0.1. Parse octets so strings such as 127.example are not
+        // accepted merely because they share the textual prefix.
+        const match = address.match(
+            /^(127)\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/
+        );
+
+        if (!match)
+            return false;
+
+        for (let i = 2; i <= 4; i++) {
+            const octet = Number(match[i]);
+
+            if (octet < 0 || octet > 255)
+                return false;
+        }
+
+        return true;
     }
 
     function existingKittyListenOn(evidence) {

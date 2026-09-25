@@ -87,9 +87,11 @@ The coordinator returns launch data rather than executing it:
 
 ```text
 correlationId
+ready
 requestedCapabilities[]
 appliedCapabilities[]
 unsupportedCapabilities[]
+conflicts[]
 
 env {}
 
@@ -166,8 +168,16 @@ The coordinator treats these as preferred coordinates, not persistent identity.
 If a preferred port is already logically leased by this coordinator, another
 free slot in 9300-9499 is selected.
 
-A caller-supplied `--remote-debugging-port` is preserved and is not claimed as
-a coordinator-owned lease.
+A caller-supplied `--remote-debugging-port` is preserved. The coordinator
+registers that coordinate as a `caller-supplied` logical lease so later
+generated augmentations do not unknowingly reuse it. This is coordination
+bookkeeping, not a claim that T5 created or owns the runtime listener.
+
+Caller-supplied Kitty listen addresses are handled the same way.
+
+If a caller-supplied coordinate conflicts with an existing logical lease, the
+augmentation returns `ready: false` plus a conflict record. A launcher should
+not execute a non-ready augmentation unchanged.
 
 The coordinator does not claim that logical lease availability proves the OS
 TCP port is free. The launched application owns the actual listener and runtime
@@ -219,7 +229,11 @@ deactivation must never release a running application's instrumentation.
 
 ## Lease bookkeeping
 
-`buildAugmentation(...)` may reserve generated endpoint coordinates.
+`buildAugmentation(...)` may reserve generated or caller-supplied endpoint
+coordinates for logical collision avoidance.
+
+`ready` is true only when every explicitly requested capability is supported
+and no endpoint conflict occurred.
 
 `markLaunchSucceeded(...)` keeps those logical leases.
 

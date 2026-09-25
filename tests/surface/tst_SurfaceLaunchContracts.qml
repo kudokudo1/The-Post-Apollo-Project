@@ -467,6 +467,87 @@ TestCase {
         );
     }
 
+    function test_completeDevToolsSnapshotDoesNotPruneKittyObservation() {
+        coordinator.reconcileObservedInstrumentation([
+            {
+                kind: "devtools-port",
+                value: 9222,
+                providerKey: "devtools:9222:LIVE"
+            },
+            {
+                kind: "kitty-listen-on",
+                value: "unix:@live-kitty",
+                providerKey: "kitty:7"
+            }
+        ]);
+
+        const result = coordinator.reconcileObservedInstrumentation(
+            [],
+            { completeKinds: ["devtools-port"] }
+        );
+
+        compare(result.completeKinds.length, 1);
+        compare(result.completeKinds[0], "devtools-port");
+
+        verify(
+            coordinator.leases["devtools-port:9222"] === undefined
+        );
+        verify(
+            coordinator.leases[
+                "kitty-listen-on:unix:@live-kitty"
+            ] !== undefined
+        );
+    }
+
+    function test_completeKittySnapshotDoesNotPruneDevToolsObservation() {
+        coordinator.reconcileObservedInstrumentation([
+            {
+                kind: "devtools-port",
+                value: 9222,
+                providerKey: "devtools:9222:LIVE"
+            },
+            {
+                kind: "kitty-listen-on",
+                value: "unix:@live-kitty",
+                providerKey: "kitty:7"
+            }
+        ]);
+
+        coordinator.reconcileObservedInstrumentation(
+            [],
+            { completeKinds: ["kitty-listen-on"] }
+        );
+
+        verify(
+            coordinator.leases["devtools-port:9222"] !== undefined
+        );
+        verify(
+            coordinator.leases[
+                "kitty-listen-on:unix:@live-kitty"
+            ] === undefined
+        );
+    }
+
+    function test_unknownCompleteKindsDoNotPruneObservedState() {
+        coordinator.reconcileObservedInstrumentation([
+            {
+                kind: "devtools-port",
+                value: 9222,
+                providerKey: "devtools:9222:LIVE"
+            }
+        ]);
+
+        const result = coordinator.reconcileObservedInstrumentation(
+            [],
+            { completeKinds: ["unknown-kind"] }
+        );
+
+        compare(result.completeKinds.length, 0);
+        verify(
+            coordinator.leases["devtools-port:9222"] !== undefined
+        );
+    }
+
     function test_observedLeaseReconciliationCanPruneStaleRecoveryState() {
         coordinator.reconcileObservedInstrumentation([
             {

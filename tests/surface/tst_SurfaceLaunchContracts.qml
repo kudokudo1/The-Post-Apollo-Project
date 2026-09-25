@@ -543,6 +543,60 @@ TestCase {
         );
     }
 
+    function test_partialRecoveryIsUsableWithoutClaimingCompleteness() {
+        const snapshot = recovery.applySnapshot({
+            ok: true,
+            partial: true,
+            observations: [
+                {
+                    kind: "devtools-port",
+                    value: 9555
+                }
+            ],
+            completeKinds: [],
+            errors: ["KITTY ENV PID 42: permission denied"]
+        });
+
+        verify(snapshot.partial);
+        verify(recovery.partial);
+        compare(snapshot.observations.length, 1);
+        compare(snapshot.completeKinds.length, 0);
+        verify(recovery.errorText.length > 0);
+
+        const result = recovery.reconcileSharedAuthority();
+
+        compare(result.adopted, 1);
+        verify(
+            coordinator.leases["devtools-port:9555"] !== undefined
+        );
+    }
+
+    function test_completeRecoveryClearsPartialFlag() {
+        recovery.applySnapshot({
+            ok: true,
+            partial: true,
+            observations: [],
+            completeKinds: [],
+            errors: ["temporary"]
+        });
+
+        verify(recovery.partial);
+
+        recovery.applySnapshot({
+            ok: true,
+            partial: false,
+            observations: [],
+            completeKinds: [
+                "devtools-port",
+                "kitty-listen-on"
+            ],
+            errors: []
+        });
+
+        verify(!recovery.partial);
+        compare(recovery.errorText, "");
+    }
+
     function test_recoverySnapshotFiltersUnknownKinds() {
         const snapshot = recovery.applySnapshot({
             observations: [

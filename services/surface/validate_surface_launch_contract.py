@@ -163,6 +163,7 @@ for token in (
     '"caller-supplied"',
     '"generated"',
     '"observed"',
+    "options.complete === true",
     "description.requestedCapabilities.length === 0",
     "description.unsupportedCapabilities.length > 0",
     "releaseCorrelation(correlationId)",

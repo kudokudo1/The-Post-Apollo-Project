@@ -128,7 +128,12 @@ TestCase {
             augmentation.bootstrap.kittyListenOn,
             "unix:@caller-owned"
         );
-        compare(augmentation.argvAfterExecutable.length, 0);
+        compare(augmentation.argvAfterExecutable.length, 2);
+        compare(augmentation.argvAfterExecutable[0], "-o");
+        compare(
+            augmentation.argvAfterExecutable[1],
+            "allow_remote_control=socket-only"
+        );
         compare(augmentation.leases.length, 0);
     }
 
@@ -289,6 +294,28 @@ TestCase {
         compare(augmentation.appliedCapabilities.length, 0);
         compare(augmentation.unsupportedCapabilities.length, 2);
         compare(Object.keys(augmentation.env).length, 0);
+        compare(augmentation.argvAppend.length, 0);
+    }
+
+    function test_existingDebugAddressIsPreserved() {
+        const evidence = braveEvidence();
+        evidence.argv = [
+            "brave-browser",
+            "--remote-debugging-address=127.0.0.2",
+            "--remote-debugging-port=9444"
+        ];
+
+        const augmentation = coordinator.buildAugmentation(
+            evidence,
+            [requirements.capabilityDevTools]
+        );
+
+        compare(
+            augmentation.bootstrap.debugAddress,
+            "127.0.0.2"
+        );
+        compare(augmentation.bootstrap.debugPort, 9444);
+        compare(augmentation.leases.length, 0);
         compare(augmentation.argvAppend.length, 0);
     }
 

@@ -62,6 +62,31 @@ launch mechanisms, and application of a supplied augmentation. AppLaunchPlanner 
 that supplied augmentation opaquely until the shared T5-domain contract freezes its exact
 payload schema.
 
+### AppIdentityAdapter.qml
+
+Thin Team 7 identity handoff.
+
+Expected injected contract:
+
+```
+desktopEntryObservation(entry) -> Team 7 observation envelope
+```
+
+The adapter may expose the resulting `providerKey` and `raw` fields for APPS consumers,
+but it does not recreate Team 7 semantics.
+
+It must not implement:
+
+- alias normalization
+- relationship kinds
+- lifetime classification
+- resolver scoring
+- canonical application keys
+- ambiguity resolution
+
+This keeps Team 8 as DesktopEntry catalog/launch authority while Team 7 remains semantic
+identity authority.
+
 ### AppSelectionPolicy.qml
 
 Pure APPS selection-remembrance policy.
@@ -366,6 +391,16 @@ conflicts
 
 Team 8 consumes this generic structure and applies its argv/env transport semantics
 without interpreting capability-domain policy.
+
+Wrapper transport is mechanism-aware. In particular, `argvAfterExecutable` must not be
+blindly inserted after token 0 for a Flatpak DesktopEntry because token 0 is `flatpak`,
+not the application executable. Team 8 currently keeps Flatpak application-facing
+augmentation after the existing wrapper/application coordinates, while direct/native argv
+places `argvAfterExecutable` immediately after the executable token.
+
+Shell and Bottles plans retain normalized SurfaceLaunch augmentation for their
+mechanism-specific executors; Team 8 does not invent shell quoting or Bottles argument
+transport before those executors are defined.
 
 Conceptually:
 

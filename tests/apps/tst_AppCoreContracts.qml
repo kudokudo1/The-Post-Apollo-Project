@@ -22,6 +22,11 @@ TestCase {
         id: actionCatalog
     }
 
+    AppActionPlanner {
+        id: actionPlanner
+        actionCatalog: actionCatalog
+    }
+
     function nativeEntry() {
         return {
             id: "org.example.Native.desktop",
@@ -253,6 +258,49 @@ TestCase {
         verify(firefoxKinds.indexOf("passwords") !== -1);
         verify(firefoxKinds.indexOf("profile-manager") !== -1);
         compare(firefoxKinds.indexOf("task-manager"), -1);
+    }
+
+    function test_actionPlannerPreservesDonorPolicy() {
+        const brave = braveEntry();
+        const firefox = firefoxEntry();
+
+        let plan = actionPlanner.browserBuiltinPlan(
+            "history",
+            brave,
+            0
+        );
+
+        compare(plan.kind, actionPlanner.planBrowserShortcut);
+        compare(plan.sequence.join("+"), "ctrl+h");
+        compare(plan.stableId, "builtin|history");
+
+        plan = actionPlanner.browserBuiltinPlan(
+            "downloads",
+            firefox,
+            0
+        );
+
+        compare(plan.kind, actionPlanner.planBrowserLaunch);
+        compare(plan.extraArgs.join(" "), "--new-tab about:downloads");
+
+        plan = actionPlanner.browserBuiltinPlan(
+            "settings",
+            firefox,
+            0
+        );
+
+        compare(plan.kind, actionPlanner.planBrowserLaunch);
+        compare(plan.extraArgs.join(" "), "--preferences");
+
+        const rawAction = {
+            name: "OPEN PROFILE"
+        };
+
+        plan = actionPlanner.plan(rawAction, firefox, 3);
+
+        compare(plan.kind, actionPlanner.planDesktopAction);
+        compare(plan.action, rawAction);
+        compare(plan.stableId, "desktop|OPEN%20PROFILE");
     }
 
     function test_browserActionPlans() {

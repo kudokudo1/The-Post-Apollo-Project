@@ -5,6 +5,28 @@ Baseline: `943d27310f68d9941e7b19631fbd56aa9bd633e8`
 This matrix defines Team 6 validation without requiring AppControl host wiring. It
 separates deterministic service-contract checks from later live/runtime checks.
 
+## Executable guard layers
+
+Team 6 currently carries four distinct validation layers:
+
+```text
+services/audio/validate_audio_contract.py
+    static ownership/API/test-suite guard
+
+services/audio/validate_donor_audio_anatomy.py
+    pre-integration AppControl donor-anatomy guard
+
+tests/audio/tst_ApplicationAudioContracts.qml
+    isolated QtTest suite for pure audio behavior
+
+services/audio/ApplicationAudioServiceProbe.qml
+    standalone live/read-only PipeWire probe
+```
+
+These layers are intentionally different. Static or isolated passes are not
+runtime certification. Operator-launched runtime evidence is routed through
+T0 Manager, and T3 Overhead alone certifies a patient.
+
 ## A. Deterministic descriptor matching
 
 ### A1 — exact PID evidence

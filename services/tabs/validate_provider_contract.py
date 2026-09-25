@@ -134,8 +134,12 @@ signature_text = (
     else ""
 )
 
+if "normalizedProcessPids(row)" not in signature_text:
+    errors.append(
+        "stable snapshot signature ignores normalized process PID evidence"
+    )
+
 for evidence_field in (
-    "processPids",
     "busName",
     "objectPath",
     "debugPort",

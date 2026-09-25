@@ -108,6 +108,16 @@ QtObject {
     }
 
     function existingDebugPort(evidence) {
+        const explicit = Number(
+            evidence && (
+                evidence.existingDebugPort
+                || evidence.debugPort
+            ) || 0
+        );
+
+        if (explicit > 0)
+            return explicit;
+
         const tokens = commandTokens(evidence);
 
         for (let i = 0; i < tokens.length; i++) {
@@ -129,6 +139,16 @@ QtObject {
     }
 
     function existingDebugAddress(evidence) {
+        const explicit = asText(
+            evidence && (
+                evidence.existingDebugAddress
+                || evidence.debugAddress
+            )
+        ).trim();
+
+        if (explicit)
+            return explicit;
+
         const tokens = commandTokens(evidence);
 
         for (let i = 0; i < tokens.length; i++) {
@@ -159,6 +179,16 @@ QtObject {
     }
 
     function existingKittyListenOn(evidence) {
+        const explicit = asText(
+            evidence && (
+                evidence.existingKittyListenOn
+                || evidence.kittyListenOn
+            )
+        ).trim();
+
+        if (explicit)
+            return explicit;
+
         const tokens = commandTokens(evidence);
 
         for (let i = 0; i < tokens.length; i++) {
@@ -175,6 +205,16 @@ QtObject {
     }
 
     function kittyRemoteControlMode(evidence) {
+        const explicit = asText(
+            evidence && (
+                evidence.existingKittyRemoteControlMode
+                || evidence.kittyRemoteControlMode
+            )
+        ).trim();
+
+        if (explicit)
+            return explicit;
+
         const tokens = commandTokens(evidence);
 
         for (let i = 0; i < tokens.length; i++) {

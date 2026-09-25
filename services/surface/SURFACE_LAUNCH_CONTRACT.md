@@ -292,6 +292,54 @@ TabSurfaceProvider.active lifetime
 No SurfaceLaunch object reads `TabSurfaceProvider.active`, and provider
 deactivation must never release a running application's instrumentation.
 
+## Restart / recovery seam
+
+The shared singleton lease map is process-local state. A Quickshell restart can
+therefore outlive its bookkeeping while applications launched earlier keep
+their Kitty sockets or DevTools listeners alive.
+
+SurfaceLaunch supports recovery through runtime observations:
+
+```text
+TabSurfaceProvider
+    instrumentationLeaseObservations(...)
+              |
+              v
+SurfaceLaunchCoordinator
+    reconcileObservedInstrumentation(...)
+```
+
+The provider emits only observed coordinates:
+
+```text
+devtools-port
+kitty-listen-on
+providerKey
+```
+
+The coordinator records unknown live coordinates as:
+
+```text
+source: observed
+state: observed
+correlationId: ""
+```
+
+These recovered leases participate in collision avoidance but do not fabricate
+a historical launch correlation.
+
+Reconciliation replaces only prior `observed` leases. Generated and
+caller-supplied transaction leases remain authoritative and are never
+overwritten by discovery.
+
+An empty observed snapshot may prune previously recovered observational leases.
+That pruning must come from a deliberate current-runtime reconciliation; merely
+setting `TabSurfaceProvider.active = false` is not a release/reconciliation
+event.
+
+This seam reduces post-restart reuse risk without coupling instrumentation
+lifetime to provider activity.
+
 ## Lease bookkeeping
 
 `buildAugmentation(...)` may reserve generated or caller-supplied endpoint

@@ -49,6 +49,7 @@ TestCase {
         );
 
         compare(augmentation.appliedCapabilities.length, 0);
+        verify(augmentation.ready);
         compare(Object.keys(augmentation.env).length, 0);
         compare(augmentation.argvAppend.length, 0);
         compare(augmentation.argvAfterExecutable.length, 0);
@@ -128,6 +129,24 @@ TestCase {
             augmentation.bootstrap.kittyListenOn,
             "unix:@caller-owned"
         );
+        compare(augmentation.argvAfterExecutable.length, 0);
+        compare(augmentation.leases.length, 1);
+        compare(augmentation.leases[0].source, "caller-supplied");
+    }
+
+    function test_existingKittyEndpointGetsRemoteControlIfMissing() {
+        const evidence = kittyEvidence();
+        evidence.argv = [
+            "kitty",
+            "--listen-on",
+            "unix:@caller-owned-no-remote"
+        ];
+
+        const augmentation = coordinator.buildAugmentation(
+            evidence,
+            [requirements.capabilityKittyRemote]
+        );
+
         compare(augmentation.argvAfterExecutable.length, 2);
         compare(augmentation.argvAfterExecutable[0], "-o");
         compare(
@@ -136,6 +155,7 @@ TestCase {
         );
         compare(augmentation.leases.length, 1);
         compare(augmentation.leases[0].source, "caller-supplied");
+        verify(augmentation.ready);
     }
 
     function test_accessibilityAugmentationPreservesDonorFlags() {
@@ -294,6 +314,7 @@ TestCase {
 
         compare(augmentation.appliedCapabilities.length, 0);
         compare(augmentation.unsupportedCapabilities.length, 2);
+        verify(!augmentation.ready);
         compare(Object.keys(augmentation.env).length, 0);
         compare(augmentation.argvAppend.length, 0);
     }
@@ -366,7 +387,12 @@ TestCase {
         );
 
         compare(first.conflicts.length, 0);
+        verify(first.ready);
+        compare(first.appliedCapabilities.length, 1);
+
         compare(second.conflicts.length, 1);
+        verify(!second.ready);
+        compare(second.appliedCapabilities.length, 0);
         compare(second.conflicts[0].value, 9444);
         compare(
             second.conflicts[0].existingCorrelationId,

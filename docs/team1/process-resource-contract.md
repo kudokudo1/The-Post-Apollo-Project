@@ -241,6 +241,7 @@ services/system/ProcessScope.qml
 services/system/ProcessControl.qml
 services/system/ProcessLimits.qml
 services/system/TaskSafety.qml
+services/system/ProcessActionController.qml
 
 services/system/SystemControl.qml
 widgets/system/SystemPresentation.qml
@@ -248,6 +249,40 @@ widgets/system/SystemPresentation.qml
 
 The new SYSTEM/Process files on this branch are isolated preparation only.
 AppControl host rewiring is still serialized through T3 Overhead.
+
+### ProcessActionController contract
+
+`ProcessActionController.qml` is the generic entry-driven action-policy layer.
+It takes explicit process records and requires only the shared safety, limits,
+and mutation services.
+
+It deliberately does **not** own:
+
+```text
+currentTask
+taskRows
+AppControl selection
+mode indexes
+host focus/navigation
+semantic application/window/tab identity
+```
+
+It provides:
+
+```text
+freeze/resume policy
+terminate/restart confirmation requests
+memory-limit policy
+optimistic freeze state
+captured PID/name validation before confirmed mutation
+shared safety unlock enforcement
+refresh/reconciliation signals
+```
+
+Confirmation requests are structured data. The host/provider must re-resolve a
+live process entry and pass it back for execution; the controller verifies that
+the live PID and captured process name still match before mutating. This keeps
+host UI outside the shared organ while preserving target-identity safety.
 
 ## Future consumer acceptance test
 

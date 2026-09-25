@@ -139,7 +139,7 @@ else:
         errors.append(f"recovery probe Python syntax invalid: {exc}")
 
 for token in (
-    "\"partial\": bool(errors)",
+    "'partial': bool(errors)",
     "os.getuid()",
     "os.stat('/proc/%s' % pid).st_uid == uid",
     "KITTY_LISTEN_ON=",

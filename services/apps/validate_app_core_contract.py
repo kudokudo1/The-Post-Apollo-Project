@@ -20,6 +20,7 @@ APP_DIR = ROOT / "services" / "apps"
 FILES = {
     "core": APP_DIR / "AppCoreProvider.qml",
     "launch": APP_DIR / "AppLaunchPlanner.qml",
+    "bottles": APP_DIR / "AppBottleProvider.qml",
     "actions": APP_DIR / "AppActionCatalog.qml",
 }
 
@@ -58,6 +59,13 @@ required_functions = {
         "bottlePlan",
         "plan",
         "withSuppliedAugmentation",
+    },
+    "bottles": {
+        "collectNames",
+        "namesFromPayload",
+        "namesFromText",
+        "parseNames",
+        "refresh",
     },
     "actions": {
         "browserKind",
@@ -112,7 +120,8 @@ for key, text in texts.items():
             errors.append(f"{key}: forbidden token {token!r}: {owner}")
 
 # Planning/catalog files must remain pure. They describe intent; they do not
-# launch processes, create workers/timers, or mutate the desktop.
+# launch processes, create workers/timers, or mutate the desktop. Bottles is a
+# discovery provider and therefore may own its bottles-cli Process.
 for key in ("launch", "actions"):
     text = texts.get(key, "")
     for token in (
@@ -172,3 +181,4 @@ print(" host coupling: none")
 print(" Team 1/5/6/7 physiology: none")
 print(" SurfaceLaunch requirement policy: external / T5-domain-owned")
 print(" supplied augmentation carriage: Team 8 launch-plan responsibility")
+print(" Bottles discovery: isolated Team 8 provider")

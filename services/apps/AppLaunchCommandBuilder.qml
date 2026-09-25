@@ -51,6 +51,90 @@ QtObject {
         return result;
     }
 
+    function surfaceArgTokens(augmentation) {
+        if (!augmentation)
+            return [];
+
+        const result = [];
+        const after = Array.isArray(
+            augmentation.argvAfterExecutable
+        ) ? augmentation.argvAfterExecutable : [];
+        const append = Array.isArray(
+            augmentation.argvAppend
+        ) ? augmentation.argvAppend : [];
+
+        for (let i = 0; i < after.length; i++)
+            result.push(String(after[i] || ""));
+
+        for (let i = 0; i < append.length; i++)
+            result.push(String(append[i] || ""));
+
+        return result;
+    }
+
+    function bottleArgTokensSafe(tokens) {
+        if (!Array.isArray(tokens))
+            return true;
+
+        // The published Bottles CLI accepts one --args string. Current T5
+        // SurfaceLaunch output consists of flag-style tokens with no spaces.
+        // Fail closed for complex quoting instead of guessing Windows argv
+        // semantics.
+        for (let i = 0; i < tokens.length; i++) {
+            const token = String(tokens[i] || "");
+
+            if (!token || /\s/.test(token))
+                return false;
+        }
+
+        return true;
+    }
+
+    function flatpakEnvOptions(map) {
+        if (!hasEntries(map))
+            return "";
+
+        const keys = Object.keys(map).sort();
+        const parts = [];
+
+        for (let i = 0; i < keys.length; i++) {
+            const key = String(keys[i]);
+            parts.push(
+                shellQuote(
+                    "--env="
+                    + key
+                    + "="
+                    + String(map[key] || "")
+                )
+            );
+        }
+
+        return parts.length > 0
+            ? parts.join(" ") + " "
+            : "";
+    }
+
+    function nativeEnvPrefix(map) {
+        if (!hasEntries(map))
+            return "";
+
+        const keys = Object.keys(map).sort();
+        const parts = ["env"];
+
+        for (let i = 0; i < keys.length; i++) {
+            const key = String(keys[i]);
+            parts.push(
+                shellQuote(
+                    key
+                    + "="
+                    + String(map[key] || "")
+                )
+            );
+        }
+
+        return parts.join(" ") + " ";
+    }
+
     function shellQuote(value) {
         return "'"
             + String(value || "").replace(/'/g, "'\"'\"'")
@@ -185,19 +269,32 @@ QtObject {
     function bottleScript(plan) {
         const bottle = shellQuote(plan.bottleName);
         const program = shellQuote(plan.programName);
+        const augmentation =
+            plan.surfaceLaunchAugmentation || null;
+        const env = plan.launchEnv || {};
+        const childArgs = surfaceArgTokens(augmentation);
+        const argsSuffix = childArgs.length > 0
+            ? " --args " + shellQuote(childArgs.join(" "))
+            : "";
 
         return (
             "if command -v flatpak >/dev/null 2>&1 "
             + "&& flatpak info com.usebottles.bottles >/dev/null 2>&1; then "
-            + "exec flatpak run --command=bottles-cli "
+            + "exec flatpak run "
+            + flatpakEnvOptions(env)
+            + "--command=bottles-cli "
             + "com.usebottles.bottles run -b "
             + bottle
             + " -p "
             + program
-            + "; else exec bottles-cli run -b "
+            + argsSuffix
+            + "; else exec "
+            + nativeEnvPrefix(env)
+            + "bottles-cli run -b "
             + bottle
             + " -p "
             + program
+            + argsSuffix
             + "; fi"
         );
     }
@@ -205,19 +302,11 @@ QtObject {
     function buildBottle(plan) {
         const augmentation =
             plan.surfaceLaunchAugmentation || null;
+        const childArgs = surfaceArgTokens(augmentation);
 
-        // The donor Bottles mechanism launches a configured program by bottle
-        // and program name. It does not expose an application argv/env channel
-        // in the code we are preserving. Do not silently drop SurfaceLaunch
-        // mutation. Keep this closed until the mechanism-specific transport is
-        // explicitly implemented/tested.
-        if (augmentation
-                && (
-                    hasEntries(plan.launchEnv)
-                    || hasArgMutation(augmentation)
-                )) {
+        if (!bottleArgTokensSafe(childArgs)) {
             return unavailable(
-                "surface-launch-bottle-transport-unresolved",
+                "surface-launch-bottle-arg-quoting-unresolved",
                 plan
             );
         }

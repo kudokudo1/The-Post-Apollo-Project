@@ -1002,6 +1002,32 @@ TestCase {
         );
     }
 
+    function test_fullIpv4LoopbackRangeIsAccepted() {
+        const addresses = [
+            "127.0.0.1",
+            "127.0.0.2",
+            "127.12.34.56",
+            "127.255.255.254"
+        ];
+
+        for (let i = 0; i < addresses.length; i++)
+            verify(coordinator.debugAddressIsLoopback(addresses[i]));
+    }
+
+    function test_invalidIpv4LoopbackLookalikesAreRejected() {
+        const addresses = [
+            "127.0.0.256",
+            "127.0.0",
+            "127.example",
+            "127.0.0.1.example",
+            "128.0.0.1",
+            "0.0.0.0"
+        ];
+
+        for (let i = 0; i < addresses.length; i++)
+            verify(!coordinator.debugAddressIsLoopback(addresses[i]));
+    }
+
     function test_existingDebugAddressIsPreserved() {
         const evidence = braveEvidence();
         evidence.argv = [

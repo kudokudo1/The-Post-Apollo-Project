@@ -125,7 +125,9 @@ Scope {
             return null;
 
         const pids = [];
-        const rawPids = descriptor.pids || [];
+        const rawPids = Array.isArray(descriptor.pids)
+            ? descriptor.pids
+            : [];
 
         for (let i = 0; i < rawPids.length; i++) {
             const pid = Number(rawPids[i] || 0);
@@ -134,7 +136,9 @@ Scope {
         }
 
         const tokens = [];
-        const rawTokens = descriptor.tokens || [];
+        const rawTokens = Array.isArray(descriptor.tokens)
+            ? descriptor.tokens
+            : [];
 
         for (let i = 0; i < rawTokens.length; i++) {
             const token = normalizeToken(rawTokens[i]);
@@ -178,7 +182,9 @@ Scope {
         const props = sinkInput.properties || {};
         const processId = Number(props["application.process.id"] || 0);
         const streamIndex = Number(sinkInput.index);
-        const pids = descriptor.pids || [];
+        const pids = Array.isArray(descriptor.pids)
+            ? descriptor.pids
+            : [];
 
         result.processId = processId > 0 ? processId : 0;
         result.streamIndex = isNaN(streamIndex) ? -1 : streamIndex;
@@ -188,7 +194,9 @@ Scope {
             result.matched = true;
         }
 
-        const wanted = descriptor.tokens || [];
+        const wanted = Array.isArray(descriptor.tokens)
+            ? descriptor.tokens
+            : [];
         if (wanted.length === 0)
             return result;
 
@@ -364,7 +372,7 @@ Scope {
 
         for (let i = 0; i < indexes.length; i++) {
             const index = Number(indexes[i]);
-            if (isNaN(index))
+            if (isNaN(index) || index < 0 || Math.floor(index) !== index)
                 continue;
 
             valid.push(index);
@@ -392,7 +400,7 @@ Scope {
 
         for (let i = 0; i < indexes.length; i++) {
             const index = Number(indexes[i]);
-            if (isNaN(index))
+            if (isNaN(index) || index < 0 || Math.floor(index) !== index)
                 continue;
 
             valid.push(index);
@@ -549,13 +557,7 @@ Scope {
     }
 
     function volumePolicyKey(scope, key) {
-        const scopeText = String(scope || "");
-        const keyText = String(key || "");
-
-        if (!scopeText || !keyText)
-            return "";
-
-        return scopeText + ":" + keyText;
+        return policyStorageKey(scope, key);
     }
 
     function setVolumePolicy(scope, key, descriptor, percent) {

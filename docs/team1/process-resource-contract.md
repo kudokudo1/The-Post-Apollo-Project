@@ -376,3 +376,39 @@ provider identity + roots
 
 The provider-specific rules that discover APP/WINDOW/TAB/RUN roots and generate
 semantic scope keys remain outside Team 1.
+
+
+## Verified process-limit mutation authority
+
+Team 1 carries one new shared RLIMIT_AS mutation authority:
+
+```text
+ProcessLimitMutation
+```
+
+It owns verified queued/batched RLIMIT_AS application. It is the future shared
+mutation backend for both single-process limits and higher-level resolved
+resource scopes.
+
+`ProcessControl` no longer carries address-space-limit mutation.
+
+The existing live `ProcessLimits.qml` donor retains its historical verified
+`resource.prlimit` implementation only as a compatibility fallback. It now
+accepts an optional `mutationService`:
+
+```text
+mutationService supplied
+        -> ProcessLimitMutation is authoritative
+
+mutationService absent
+        -> historical ProcessLimits fallback remains active
+```
+
+This permits parallel preparation without changing current service lifetime.
+When Team 1 receives a serialized host-integration slot, T3 can wire one shared
+`ProcessLimitMutation` lifetime and the fallback becomes cold without a
+behavioral rewrite.
+
+`ProcessResourceController` already requires `limitMutation` and uses that
+same verified batch backend for APP/WINDOW/TAB/RUN-style resolved resource
+scopes.

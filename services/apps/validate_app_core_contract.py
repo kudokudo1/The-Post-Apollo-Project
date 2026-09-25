@@ -24,6 +24,7 @@ FILES = {
     "actions": APP_DIR / "AppActionCatalog.qml",
     "actionPlanner": APP_DIR / "AppActionPlanner.qml",
     "catalog": APP_DIR / "AppCatalogPolicy.qml",
+    "hidden": APP_DIR / "AppHiddenAdapter.qml",
 }
 
 errors: list[str] = []
@@ -91,6 +92,13 @@ required_functions = {
         "hiddenRows",
         "rows",
     },
+    "hidden": {
+        "knownIcon",
+        "desktopEntryIcon",
+        "iconForCommand",
+        "recordForCommand",
+        "records",
+    },
 }
 
 for key, required in required_functions.items():
@@ -140,7 +148,7 @@ for key, text in texts.items():
 # Planning/catalog files must remain pure. They describe intent; they do not
 # launch processes, create workers/timers, or mutate the desktop. Bottles is a
 # discovery provider and therefore may own its bottles-cli Process.
-for key in ("launch", "actions", "actionPlanner", "catalog"):
+for key in ("launch", "actions", "actionPlanner", "catalog", "hidden"):
     text = texts.get(key, "")
     for token in (
         "Quickshell.execDetached",
@@ -202,3 +210,4 @@ print(" supplied augmentation carriage: Team 8 launch-plan responsibility")
 print(" Bottles discovery: isolated Team 8 provider")
 print(" browser/desktop action policy: pure Team 8 planner")
 print(" APPS catalog/search/ranking: pure Team 8 policy")
+print(" HIDDEN adaptation: pure Team 8 adapter over external RUN rows")

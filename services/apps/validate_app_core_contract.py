@@ -27,6 +27,7 @@ FILES = {
     "hidden": APP_DIR / "AppHiddenAdapter.qml",
     "selection": APP_DIR / "AppSelectionPolicy.qml",
     "identity": APP_DIR / "AppIdentityAdapter.qml",
+    "facade": APP_DIR / "AppCoreFacade.qml",
 }
 
 errors: list[str] = []
@@ -115,6 +116,26 @@ required_functions = {
         "providerKeyForEntry",
         "rawForEntry",
     },
+    "facade": {
+        "desktopEntries",
+        "hiddenEntries",
+        "resultRows",
+        "sourceLabel",
+        "entryLaunchableForSource",
+        "actionsAvailableForSource",
+        "entryKey",
+        "displayName",
+        "displayDescription",
+        "longDescription",
+        "iconSource",
+        "actionsFor",
+        "planAction",
+        "planLaunch",
+        "rememberedKeyFor",
+        "restoreIndex",
+        "identityObservation",
+        "refreshBottles",
+    },
 }
 
 for key, required in required_functions.items():
@@ -164,7 +185,7 @@ for key, text in texts.items():
 # Planning/catalog files must remain pure. They describe intent; they do not
 # launch processes, create workers/timers, or mutate the desktop. Bottles is a
 # discovery provider and therefore may own its bottles-cli Process.
-for key in ("launch", "actions", "actionPlanner", "catalog", "hidden", "selection", "identity"):
+for key in ("launch", "actions", "actionPlanner", "catalog", "hidden", "selection", "identity", "facade"):
     text = texts.get(key, "")
     for token in (
         "Quickshell.execDetached",
@@ -250,3 +271,4 @@ print(" APPS catalog/search/ranking: pure Team 8 policy")
 print(" HIDDEN adaptation: pure Team 8 adapter over external RUN rows")
 print(" APPS selection remembrance: pure Team 8 lookup policy")
 print(" DesktopEntry identity evidence: delegated to Team 7")
+print(" standalone facade: composition-only Team 8 integration surface")

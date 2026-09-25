@@ -125,24 +125,29 @@ QtObject {
         return "";
     }
 
-    function kittyRemoteControlEnabled(evidence) {
+    function kittyRemoteControlMode(evidence) {
         const tokens = commandTokens(evidence);
 
         for (let i = 0; i < tokens.length; i++) {
             const token = asText(tokens[i]);
 
             if (token.indexOf("allow_remote_control=") === 0)
-                return true;
+                return token.split("=", 2)[1] || "";
 
             if (token === "-o"
-                    && i + 1 < tokens.length
-                    && asText(tokens[i + 1]).indexOf(
-                        "allow_remote_control="
-                    ) === 0)
-                return true;
+                    && i + 1 < tokens.length) {
+                const option = asText(tokens[i + 1]);
+
+                if (option.indexOf("allow_remote_control=") === 0)
+                    return option.split("=", 2)[1] || "";
+            }
         }
 
-        return false;
+        return "";
+    }
+
+    function kittyRemoteControlEnabled(evidence) {
+        return kittyRemoteControlMode(evidence) === "socket-only";
     }
 
     function leaseKey(kind, value) {
@@ -328,53 +333,65 @@ QtObject {
                     requirements.capabilityKittyRemote
                 ) !== -1) {
             const existingListenOn = existingKittyListenOn(evidence);
-            const remoteEnabled = kittyRemoteControlEnabled(evidence);
+            const remoteMode = kittyRemoteControlMode(evidence);
             let listenOn = existingListenOn;
 
-            if (!remoteEnabled) {
-                argvAfterExecutable.push(
-                    "-o",
-                    "allow_remote_control=socket-only"
-                );
-            }
-
-            if (listenOn) {
-                const reservation = addLease(
-                    "kitty-listen-on",
-                    listenOn,
-                    correlationId,
-                    requirements.capabilityKittyRemote,
-                    "caller-supplied"
-                );
-
-                if (reservation.ok)
-                    leaseRows.push(reservation.lease);
-                else
-                    conflictRows.push(reservation.conflict);
+            if (remoteMode && remoteMode !== "socket-only") {
+                conflictRows.push({
+                    kind: "kitty-remote-control-mode",
+                    value: remoteMode,
+                    requestedCorrelationId: correlationId,
+                    existingCorrelationId: "",
+                    capability:
+                        requirements.capabilityKittyRemote,
+                    reason: "requires-socket-only"
+                });
             } else {
-                listenOn =
-                    "unix:@appcontrol-kitty-" + correlationId;
+                if (!kittyRemoteControlEnabled(evidence)) {
+                    argvAfterExecutable.push(
+                        "-o",
+                        "allow_remote_control=socket-only"
+                    );
+                }
 
-                argvAfterExecutable.push(
-                    "--listen-on",
-                    listenOn
-                );
+                if (listenOn) {
+                    const reservation = addLease(
+                        "kitty-listen-on",
+                        listenOn,
+                        correlationId,
+                        requirements.capabilityKittyRemote,
+                        "caller-supplied"
+                    );
 
-                const reservation = addLease(
-                    "kitty-listen-on",
-                    listenOn,
-                    correlationId,
-                    requirements.capabilityKittyRemote,
-                    "generated"
-                );
+                    if (reservation.ok)
+                        leaseRows.push(reservation.lease);
+                    else
+                        conflictRows.push(reservation.conflict);
+                } else {
+                    listenOn =
+                        "unix:@appcontrol-kitty-" + correlationId;
 
-                if (reservation.ok)
-                    leaseRows.push(reservation.lease);
-                else
-                    conflictRows.push(reservation.conflict);
+                    argvAfterExecutable.push(
+                        "--listen-on",
+                        listenOn
+                    );
+
+                    const reservation = addLease(
+                        "kitty-listen-on",
+                        listenOn,
+                        correlationId,
+                        requirements.capabilityKittyRemote,
+                        "generated"
+                    );
+
+                    if (reservation.ok)
+                        leaseRows.push(reservation.lease);
+                    else
+                        conflictRows.push(reservation.conflict);
+                }
+
+                metadata.kittyListenOn = listenOn;
             }
-
-            metadata.kittyListenOn = listenOn;
 
             const kittyConflict = conflictRows.some(function(item) {
                 return item.capability

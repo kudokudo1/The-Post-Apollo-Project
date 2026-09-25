@@ -156,6 +156,39 @@ These are evidence families, not votes.
 A single PID observed by four providers must remain one correlated PID fact, not
 be multiplied into six pairwise confirmations.
 
+## Fixture contract gate
+
+Before a captured JSON bundle is used for resolver analysis, run:
+
+```bash
+python3 services/identity/validate_identity_fixtures.py <fixture.json>
+```
+
+Or, once runtime fixtures exist in this directory:
+
+```bash
+python3 services/identity/validate_identity_fixtures.py
+```
+
+The validator checks structural provenance rules including:
+
+- known observation lifetime classes
+- unique provider/providerKey coordinates
+- alias and relationship record shape
+- exact/heuristic strength vocabulary
+- presence of ground-truth annotation buckets
+- rejection of captured `canonicalId`, `semanticKey`, or
+  `ApplicationEntity` claims
+
+The validator is not a resolver and does not judge whether two observations
+belong to the same application.
+
+Its embedded non-runtime contract check is:
+
+```bash
+python3 services/identity/validate_identity_fixtures.py --self-test
+```
+
 ## Acceptance rule
 
 A fixture may demonstrate that a rule is useful.

@@ -25,6 +25,7 @@ FILES = {
     "actionPlanner": APP_DIR / "AppActionPlanner.qml",
     "catalog": APP_DIR / "AppCatalogPolicy.qml",
     "hidden": APP_DIR / "AppHiddenAdapter.qml",
+    "selection": APP_DIR / "AppSelectionPolicy.qml",
 }
 
 errors: list[str] = []
@@ -99,6 +100,10 @@ required_functions = {
         "recordForCommand",
         "records",
     },
+    "selection": {
+        "rememberedKeyFor",
+        "restoreIndex",
+    },
 }
 
 for key, required in required_functions.items():
@@ -148,7 +153,7 @@ for key, text in texts.items():
 # Planning/catalog files must remain pure. They describe intent; they do not
 # launch processes, create workers/timers, or mutate the desktop. Bottles is a
 # discovery provider and therefore may own its bottles-cli Process.
-for key in ("launch", "actions", "actionPlanner", "catalog", "hidden"):
+for key in ("launch", "actions", "actionPlanner", "catalog", "hidden", "selection"):
     text = texts.get(key, "")
     for token in (
         "Quickshell.execDetached",
@@ -211,3 +216,4 @@ print(" Bottles discovery: isolated Team 8 provider")
 print(" browser/desktop action policy: pure Team 8 planner")
 print(" APPS catalog/search/ranking: pure Team 8 policy")
 print(" HIDDEN adaptation: pure Team 8 adapter over external RUN rows")
+print(" APPS selection remembrance: pure Team 8 lookup policy")

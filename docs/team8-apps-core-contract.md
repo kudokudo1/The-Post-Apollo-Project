@@ -126,6 +126,17 @@ preferencePredicate   optional Favorites/host ranking signal
 surface augmentation  T5-domain shared contract
 ```
 
+APPS-local mutable state is also explicit inside the facade:
+
+```
+sourceMode
+launchMode
+selectedBottleName
+```
+
+These are APPS-specific state only. Generic host selection, focus, result routing, and
+navigation remain outside Team 8.
+
 The facade deliberately contains no:
 
 - AppControl mode or selection state
@@ -164,6 +175,43 @@ It must not implement:
 
 This keeps Team 8 as DesktopEntry catalog/launch authority while Team 7 remains semantic
 identity authority.
+
+### AppModePolicy.qml
+
+Pure APPS source/launch mode policy.
+
+Owns:
+
+- Native / Flatpak / HIDDEN mode normalization
+- Normal / Toolbox / Bottles launch-mode normalization
+- same-name Native/Flatpak counterpart lookup
+- a `needsHiddenCatalogRefresh` signal when switching to HIDDEN
+
+It does not perform the side effects currently coupled to the donor setters:
+
+- no RUN catalog refresh
+- no `selectedResultIndex` mutation
+- no hover/keyboard state mutation
+- no list positioning
+- no Favorites result reset
+- no generic detail reset
+
+The future integration sequence for HIDDEN should therefore be:
+
+```
+Team 8 source change plan
+    -> says HIDDEN + refresh required
+RUN provider
+    -> refresh command catalog
+Team 8 HIDDEN adapter/catalog policy
+    -> rebuild target rows
+Team 8 counterpart/selection policy
+    -> compute target row
+host
+    -> apply generic selection/focus/navigation effects
+```
+
+This preserves the donor behavior without making Team 8 own RUN or generic navigation.
 
 ### AppSelectionPolicy.qml
 

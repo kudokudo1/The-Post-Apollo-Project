@@ -71,6 +71,7 @@ DEVTOOLS
 LIBATSPI
 AT-SPI-CACHE
 PIPEWIRE
+SURFACE_LAUNCH
 ```
 
 Provider names identify evidence origin, not semantic ownership.
@@ -100,8 +101,14 @@ Current vocabulary:
 ```text
 persistent
 session
+application-instance
 ephemeral
 ```
+
+`application-instance` is used for instrumentation/bootstrap coordinates such
+as SurfaceLaunch correlation, sockets, and debug endpoints whose lifetime is
+tied to a running application instance rather than to the launch transaction or
+the surface provider's active state.
 
 This describes the lifetime of the observation coordinate, not the lifetime of
 the application the observation may describe.
@@ -222,7 +229,8 @@ It preserves:
 - provider
 - providerKey
 - appName/windowName
-- path / role
+- path
+- numeric role and roleName
 - busName/objectPath
 - processPids
 - debugPort/targetId/webSocketDebuggerUrl
@@ -230,6 +238,42 @@ It preserves:
 
 `processPids` become explicit provider→PROCFS relationships. Provider-local
 surface IDs remain surface coordinates.
+
+### SurfaceLaunch / instrumentation
+
+`surfaceLaunchObservation(launchMetadata)` consumes the T5-domain
+SurfaceLaunch bootstrap/correlation output without taking ownership of launch
+mutation.
+
+It preserves:
+
+- correlationId
+- kittyListenOn
+- debugAddress / debugPort
+- requested capabilities
+- applied capabilities
+- unsupported capabilities
+
+The observation uses provider `SURFACE_LAUNCH` and lifetime class
+`application-instance`.
+
+A correlation ID, socket address, or debug port is never a persistent semantic
+application key merely because it was generated during launch.
+
+The relation layer may derive exact evidence such as:
+
+```text
+SurfaceLaunch.debugPort
+    <-> process --remote-debugging-port
+    = EXACT_DEBUG_PORT_OWNER
+
+SurfaceLaunch.kittyListenOn
+    <-> KITTY.kittyAddress
+    = EXACT_KITTY_ENDPOINT
+```
+
+These relationships connect bootstrap instrumentation to later observations.
+They do not decide that either endpoint is the complete application identity.
 
 ## Existing sibling contracts checked
 
@@ -247,6 +291,9 @@ identityEvidence(entry)
 
 and explicitly states that its records are discovery evidence, not canonical
 application identity.
+
+Team 5's handoff also identified that AT-SPI exposes both numeric `role` and
+human `roleName`. Team 7 now preserves both values in raw surface evidence.
 
 No contract collision found.
 
@@ -371,6 +418,7 @@ EXACT_STARTUP_CLASS
 EXACT_APP_ID
 EXACT_PROVIDER_PARENT
 EXACT_DEBUG_PORT_OWNER
+EXACT_KITTY_ENDPOINT
 EXACT_KITTY_PROCESS
 EXACT_PIPEWIRE_APP_ID
 ALIAS_EXACT

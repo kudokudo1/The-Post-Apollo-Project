@@ -296,14 +296,18 @@ Scope {
         return {
             // Raw pactl records remain intact for Team 7 fixture capture and
             // future diagnostics. The matches list carries separate join evidence.
+            //
+            // Do not expose donor-style "AudioAvailable" here. In AppControl
+            // that flag means different host/UI things for APP, WINDOW and TAB.
+            // Team 6 reports only observable stream physiology.
             inputs: matchingInputs,
             matches: matches,
             indexes: indexes,
-            available: matchingInputs.length > 0,
-            muted: indexes.length > 0 && allMuted,
-            volumePercent: matchingInputs.length > 0
+            hasStreams: matchingInputs.length > 0,
+            streamsMuted: indexes.length > 0 && allMuted,
+            observedVolumePercent: matchingInputs.length > 0
                 ? averagedSinkVolume(matchingInputs)
-                : 100
+                : -1
         };
     }
 

@@ -203,6 +203,36 @@ TestCase {
         verify(augmentation.ready);
     }
 
+    function test_nonSocketOnlyKittyRemoteModeIsRejected() {
+        const evidence = kittyEvidence();
+        evidence.argv = [
+            "kitty",
+            "-o",
+            "allow_remote_control=yes",
+            "--listen-on",
+            "unix:@broad-remote"
+        ];
+
+        const augmentation = coordinator.buildAugmentation(
+            evidence,
+            [requirements.capabilityKittyRemote]
+        );
+
+        verify(!augmentation.ready);
+        compare(augmentation.appliedCapabilities.length, 0);
+        compare(augmentation.leases.length, 0);
+        compare(augmentation.conflicts.length, 1);
+        compare(
+            augmentation.conflicts[0].kind,
+            "kitty-remote-control-mode"
+        );
+        compare(
+            augmentation.conflicts[0].reason,
+            "requires-socket-only"
+        );
+        compare(Object.keys(coordinator.leases).length, 0);
+    }
+
     function test_accessibilityAugmentationPreservesDonorFlags() {
         const augmentation = coordinator.buildAugmentation(
             braveEvidence(),

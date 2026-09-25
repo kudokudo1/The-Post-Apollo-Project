@@ -62,6 +62,42 @@ TestCase {
         compare(descriptor.strictTokens, true);
     }
 
+    function test_descriptorPidEvidenceNormalizesNumericStrings() {
+        const stream = sinkInput(
+            40,
+            4242,
+            "demo",
+            "org.example.demo",
+            "Demo",
+            "Playback",
+            false,
+            50
+        );
+
+        const evidence = audio.descriptorMatchEvidence({
+            pids: ["4242"],
+            tokens: [],
+            strictTokens: true
+        }, stream);
+
+        compare(evidence.matched, true);
+        compare(evidence.pidMatch, true);
+        compare(evidence.processId, 4242);
+    }
+
+    function test_descriptorPidEvidenceRejectsInvalidValues() {
+        const descriptor = {
+            pids: ["nope", 0, 1, -5, 4.5, "5151", 5151],
+            tokens: [],
+            strictTokens: true
+        };
+
+        const pids = audio.descriptorPids(descriptor);
+
+        compare(pids.length, 1);
+        compare(pids[0], 5151);
+    }
+
     function test_exactPidEvidenceIsSeparateFromTokenEvidence() {
         const stream = sinkInput(
             41,

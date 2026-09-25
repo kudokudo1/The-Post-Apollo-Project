@@ -86,12 +86,20 @@ if not re.search(
 if "requirements.describe(evidence, requestedCapabilities)" not in coordinator:
     errors.append("coordinator does not route explicit requests through requirements")
 
+if "knownCapabilities.indexOf(value) === -1" in requirements:
+    errors.append(
+        "unknown capability requests are silently discarded before validation"
+    )
+
 for token in (
     "ready: ready",
     "conflicts: conflictRows.slice()",
-    "appliedCapabilities: applied.slice()",
+    "appliedCapabilities: ready ? applied.slice() : []",
     '"caller-supplied"',
     '"generated"',
+    "description.requestedCapabilities.length === 0",
+    "description.unsupportedCapabilities.length > 0",
+    "releaseCorrelation(correlationId)",
 ):
     if token not in coordinator:
         errors.append(f"missing augmentation readiness/lease contract token: {token}")

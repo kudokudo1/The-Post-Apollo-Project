@@ -134,7 +134,8 @@ TestCase {
             augmentation.argvAfterExecutable[1],
             "allow_remote_control=socket-only"
         );
-        compare(augmentation.leases.length, 0);
+        compare(augmentation.leases.length, 1);
+        compare(augmentation.leases[0].source, "caller-supplied");
     }
 
     function test_accessibilityAugmentationPreservesDonorFlags() {
@@ -315,11 +316,12 @@ TestCase {
             "127.0.0.2"
         );
         compare(augmentation.bootstrap.debugPort, 9444);
-        compare(augmentation.leases.length, 0);
+        compare(augmentation.leases.length, 1);
+        compare(augmentation.leases[0].source, "caller-supplied");
         compare(augmentation.argvAppend.length, 0);
     }
 
-    function test_existingDebugPortIsPreservedWithoutLease() {
+    function test_existingDebugPortIsPreservedAndRegistered() {
         const evidence = braveEvidence();
         evidence.argv = [
             "brave-browser",
@@ -332,11 +334,43 @@ TestCase {
         );
 
         compare(augmentation.bootstrap.debugPort, 9444);
-        compare(augmentation.leases.length, 0);
+        compare(augmentation.leases.length, 1);
+        compare(augmentation.leases[0].source, "caller-supplied");
         verify(
             augmentation.argvAppend.indexOf(
                 "--remote-debugging-port=9444"
             ) === -1
+        );
+    }
+
+    function test_callerSuppliedEndpointCollisionIsReported() {
+        const firstEvidence = braveEvidence();
+        firstEvidence.argv = [
+            "brave-browser",
+            "--remote-debugging-port=9444"
+        ];
+
+        const secondEvidence = braveEvidence();
+        secondEvidence.argv = [
+            "brave-browser",
+            "--remote-debugging-port=9444"
+        ];
+
+        const first = coordinator.buildAugmentation(
+            firstEvidence,
+            [requirements.capabilityDevTools]
+        );
+        const second = coordinator.buildAugmentation(
+            secondEvidence,
+            [requirements.capabilityDevTools]
+        );
+
+        compare(first.conflicts.length, 0);
+        compare(second.conflicts.length, 1);
+        compare(second.conflicts[0].value, 9444);
+        compare(
+            second.conflicts[0].existingCorrelationId,
+            first.correlationId
         );
     }
 

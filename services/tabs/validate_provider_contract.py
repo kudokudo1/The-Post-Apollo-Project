@@ -32,6 +32,9 @@ required_functions = {
     "identityEvidence",
     "normalizedProcessPids",
     "tabObservationSignature",
+    "controlObservationSignature",
+    "controlRowsSignature",
+    "updateControlsStable",
     "setLifecycleFrozen",
 }
 
@@ -155,6 +158,34 @@ for evidence_field in (
         errors.append(
             f"stable snapshot signature ignores evidence field: {evidence_field}"
         )
+
+control_signature_start = text.find("function controlObservationSignature")
+control_signature_end = text.find("function controlRowsSignature", control_signature_start)
+control_signature_text = (
+    text[control_signature_start:control_signature_end]
+    if control_signature_start >= 0
+    and control_signature_end > control_signature_start
+    else ""
+)
+
+for control_field in (
+    "provider",
+    "id",
+    "path",
+    "controlName",
+    "appName",
+    "windowName",
+    "role",
+    "roleName",
+    "selected",
+):
+    if control_field not in control_signature_text:
+        errors.append(
+            f"stable control signature ignores evidence field: {control_field}"
+        )
+
+if "updateControlsStable(" not in text:
+    errors.append("persistent bridge does not use stable control reconciliation")
 
 if "running: tabSurfaceProvider.active" not in text:
     errors.append("persistent discovery bridge is not governed by neutral active input")

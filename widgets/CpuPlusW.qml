@@ -33,7 +33,9 @@ PanelWindow {
         { name: "GPU", key: "GPU", symbol: "󰢮" },
         { name: "DISK", key: "STORAGE", symbol: "" },
         { name: "NET", key: "NETWORK", symbol: "🛰" },
-        { name: "SWAP", key: "SWAP", symbol: "⇄" }
+        { name: "", key: "__SPACER_LEFT__", symbol: "", spacer: true },
+        { name: "SWAP", key: "SWAP", symbol: "⇄" },
+        { name: "", key: "__SPACER_RIGHT__", symbol: "", spacer: true }
     ]
 
     // Rail-face animation state, matching AppControl's FAVORITES behavior.
@@ -118,8 +120,11 @@ PanelWindow {
             Math.min(modes.length - 1, Number(index || 0))
         );
 
-        if (selectedModeIndex === 2 || selectedModeIndex === 3)
+        if (selectedModeIndex === 2 || selectedModeIndex === 3) {
+            monitorSelectorScroll.contentY = 0;
+            sharedInstrumentScroll.contentY = 0;
             refreshSharedMonitors();
+        }
     }
 
     function refreshSharedMonitors() {
@@ -151,12 +156,20 @@ PanelWindow {
     function selectThermalSubMode(mode) {
         thermalSubMode = Number(mode) === 1 ? 1 : 0;
         thermalSelectedIndex = 0;
+        monitorSelectorScroll.contentY = 0;
+        sharedInstrumentScroll.contentY = 0;
         refreshSharedMonitors();
     }
 
     function selectSystemSubMode(category) {
-        systemSubMode = String(category || "ALL").toUpperCase();
+        const next = String(category || "ALL").toUpperCase();
+        if (next.indexOf("__SPACER_") === 0)
+            return;
+
+        systemSubMode = next;
         systemSelectedIndex = 0;
+        monitorSelectorScroll.contentY = 0;
+        sharedInstrumentScroll.contentY = 0;
         refreshSharedMonitors();
     }
 
@@ -1272,7 +1285,7 @@ PanelWindow {
 
             height:
                 cpuPlusWindow.selectedModeIndex === 2
-                ? 58
+                ? 52
                 : cpuPlusWindow.selectedModeIndex === 3
                 ? 92
                 : 0
@@ -1308,6 +1321,9 @@ PanelWindow {
                         readonly property bool isPressed:
                             subModeMouse.pressed
 
+                        readonly property bool isSpacer:
+                            !!modelData.spacer
+
                         width:
                             cpuPlusWindow.selectedModeIndex === 2
                             ? (targetSubModeStrip.width - 4) / 2
@@ -1315,17 +1331,21 @@ PanelWindow {
 
                         height:
                             cpuPlusWindow.selectedModeIndex === 2
-                            ? 44
+                            ? 38
                             : 27
 
                         color:
-                            isPressed
+                            isSpacer
+                            ? "transparent"
+                            : isPressed
                             ? Colors.magenta
                             : isHovered || isSelected
                             ? Colors.yellow
                             : Colors.dark
 
-                        border.width: 1
+                        border.width:
+                            isSpacer ? 0 : 1
+
                         border.color:
                             isSelected
                             ? Colors.magenta
@@ -1394,7 +1414,10 @@ PanelWindow {
                                         cpuPlusWindow.selectedModeIndex === 3
                                         ? (
                                               String(subModeButton.modelData.key)
-                                              === "NETWORK" ? 20 : 19
+                                              === "ALL" ? 15
+                                              : String(subModeButton.modelData.key)
+                                                === "NETWORK" ? 16
+                                              : 17
                                           )
                                         : 20
 
@@ -1450,7 +1473,8 @@ PanelWindow {
                             id: subModeMouse
 
                             anchors.fill: parent
-                            hoverEnabled: true
+                            enabled: !subModeButton.isSpacer
+                            hoverEnabled: enabled
 
                             onClicked: {
                                 if (cpuPlusWindow.selectedModeIndex === 2)
@@ -1464,7 +1488,11 @@ PanelWindow {
                             anchors.fill: parent
                             spread: isHovered || isSelected ? 4 : 2
                             z: -1
-                            opacity: isHovered || isSelected ? 0.42 : 0.12
+                            opacity:
+                                isSpacer
+                                ? 0.0
+                                : isHovered || isSelected
+                                ? 0.42 : 0.12
                             color:
                                 isSelected
                                 ? Colors.magenta
@@ -1507,6 +1535,10 @@ PanelWindow {
                 Repeater {
                     model: cpuPlusWindow.selectedMonitorRows()
 
+                    onModelChanged: {
+                        monitorSelectorScroll.contentY = 0;
+                    }
+
                     Rectangle {
                         id: monitorRowButton
 
@@ -1539,13 +1571,16 @@ PanelWindow {
                             ? Colors.magenta
                             : isSelected || isHovered
                             ? Colors.yellow
-                            : Colors.black
+                            : Colors.dark
 
-                        border.width: 1
-                        border.color:
+                        border.width:
                             isHovered || isPressed || isSelected
-                            ? Colors.orange
-                            : Colors.cyan
+                            ? 1 : 0
+
+                        border.color:
+                            isSelected
+                            ? Colors.magenta
+                            : Colors.orange
 
                         scale:
                             isPressed
@@ -1572,13 +1607,64 @@ PanelWindow {
                                 width:
                                     monitorRowButton.modelData
                                     && monitorRowButton.modelData._systemRecord
-                                    ? 58 : 42
+                                    ? 58
+                                    : monitorRowButton.modelData
+                                      && monitorRowButton.modelData._thermalRecord
+                                      && monitorRowButton.modelData.sensorKind !== "fan"
+                                    ? 56
+                                    : 42
+
                                 height: parent.height
+
+                                Loader {
+                                    anchors.centerIn: parent
+
+                                    visible:
+                                        monitorRowButton.modelData
+                                        && monitorRowButton.modelData._thermalRecord
+                                        && monitorRowButton.modelData.sensorKind !== "fan"
+
+                                    sourceComponent:
+                                        visible ? thermalIconComponent : undefined
+
+                                    onLoaded: {
+                                        item.iconScale = 0.86;
+                                        item.iconColor = Qt.binding(function() {
+                                            return monitorRowButton.isPressed
+                                                   ? Colors.black
+                                                   : monitorRowButton.isHovered
+                                                     || monitorRowButton.isSelected
+                                                   ? Colors.orange
+                                                   : cpuPlusWindow.monitorEntryAccent(
+                                                         monitorRowButton.modelData
+                                                     );
+                                        });
+                                        item.glowColor = Qt.binding(function() {
+                                            return monitorRowButton.isHovered
+                                                   || monitorRowButton.isSelected
+                                                   ? Colors.orange
+                                                   : cpuPlusWindow.monitorEntryAccent(
+                                                         monitorRowButton.modelData
+                                                     );
+                                        });
+                                        item.pressed = Qt.binding(function() {
+                                            return monitorRowButton.isPressed;
+                                        });
+                                        item.glowOpacity = 0.52;
+                                    }
+                                }
 
                                 GohuText {
                                     anchors.centerIn: parent
                                     width: parent.width
                                     horizontalAlignment: Text.AlignHCenter
+
+                                    visible:
+                                        !(
+                                            monitorRowButton.modelData
+                                            && monitorRowButton.modelData._thermalRecord
+                                            && monitorRowButton.modelData.sensorKind !== "fan"
+                                         )
 
                                     text:
                                         cpuPlusWindow.monitorEntryIcon(
@@ -1588,10 +1674,7 @@ PanelWindow {
                                     font.pixelSize:
                                         monitorRowButton.modelData
                                         && monitorRowButton.modelData._thermalRecord
-                                        ? (
-                                              monitorRowButton.modelData.sensorKind
-                                              === "fan" ? 15 : 10
-                                          )
+                                        ? 17
                                         : String(
                                               monitorRowButton.modelData
                                               && monitorRowButton.modelData.category
@@ -1720,11 +1803,12 @@ PanelWindow {
     Rectangle {
         id: targetScrollTrack
 
+        parent: targetPane
         width: 10
 
         anchors.top: targetSubModeStrip.bottom
-        anchors.bottom: targetPane.bottom
-        anchors.right: targetPane.right
+        anchors.bottom: parent.bottom
+        anchors.right: parent.right
 
         anchors.topMargin: 10
         anchors.bottomMargin: 8

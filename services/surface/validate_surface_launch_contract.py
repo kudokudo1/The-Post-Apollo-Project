@@ -8,12 +8,14 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 REQ = ROOT / "services" / "surface" / "SurfaceLaunchRequirements.qml"
 COORD = ROOT / "services" / "surface" / "SurfaceLaunchCoordinator.qml"
+RECOVERY = ROOT / "services" / "surface" / "SurfaceInstrumentationRecovery.qml"
 QMLDIR = ROOT / "services" / "surface" / "qmldir"
 
 requirements = REQ.read_text(encoding="utf-8")
 coordinator = COORD.read_text(encoding="utf-8")
+recovery = RECOVERY.read_text(encoding="utf-8")
 qmldir = QMLDIR.read_text(encoding="utf-8")
-combined = requirements + "\n" + coordinator
+combined = requirements + "\n" + coordinator + "\n" + recovery
 
 # Comments may name forbidden couplings in order to document their absence.
 # Ownership checks apply to executable QML, not comments.
@@ -28,10 +30,14 @@ if not requirements.lstrip().startswith("pragma Singleton"):
 if not coordinator.lstrip().startswith("pragma Singleton"):
     errors.append("SurfaceLaunchCoordinator is not the shared singleton authority")
 
+if not recovery.lstrip().startswith("pragma Singleton"):
+    errors.append("SurfaceInstrumentationRecovery is not a shared singleton")
+
 for declaration in (
     "module qs.services.surface",
     "singleton SurfaceLaunchRequirements 1.0 SurfaceLaunchRequirements.qml",
     "singleton SurfaceLaunchCoordinator 1.0 SurfaceLaunchCoordinator.qml",
+    "singleton SurfaceInstrumentationRecovery 1.0 SurfaceInstrumentationRecovery.qml",
 ):
     if declaration not in qmldir:
         errors.append(f"missing qmldir singleton declaration: {declaration}")
@@ -90,6 +96,29 @@ for name in required_requirement_functions:
     if not re.search(rf"\bfunction\s+{re.escape(name)}\s*\(", requirements):
         errors.append(f"missing requirements function: {name}")
 
+required_recovery_functions = (
+    "probeScript",
+    "normalizedSnapshot",
+    "applySnapshot",
+    "reconcileSharedAuthority",
+    "refresh",
+)
+
+for name in required_recovery_functions:
+    if not re.search(rf"\\bfunction\\s+{re.escape(name)}\\s*\\(", recovery):
+        errors.append(f"missing recovery function: {name}")
+
+for token in (
+    "os.getuid()",
+    "os.stat('/proc/%s' % pid).st_uid == uid",
+    "KITTY_LISTEN_ON=",
+    "--remote-debugging-port=",
+    "completeKinds",
+    "reconcileObservedInstrumentation",
+):
+    if token not in recovery:
+        errors.append(f"missing recovery contract token: {token}")
+
 required_coordinator_functions = (
     "copyValue",
     "copyMap",
@@ -129,6 +158,7 @@ for token, reason in {
     "semanticKey": "semantic identity ownership",
     "augmentEverything": "forbidden global interception",
     "SurfaceLaunchCoordinator {": "competing coordinator instance",
+    "AppControlW": "AppControl host coupling",
 }.items():
     if token in executable:
         errors.append(f"forbidden token {token!r}: {reason}")
@@ -218,6 +248,7 @@ if errors:
 print("TEAM 5 SURFACE LAUNCH CONTRACT: PASS")
 print(" capabilities: KITTY_REMOTE / ACCESSIBILITY / DEVTOOLS")
 print(" lease authority: one shared SurfaceLaunchCoordinator singleton")
+print(" recovery probe: shared SurfaceInstrumentationRecovery singleton")
 print(" execution ownership: external launcher")
 print(" provider lifetime coupling: none")
 print(" semantic identity ownership: none")

@@ -1,6 +1,7 @@
 import QtQuick
+import Quickshell
 
-QtObject {
+Scope {
     id: processResourceController
 
     // Shared higher-level resource orchestration for an already-resolved

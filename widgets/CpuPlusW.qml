@@ -3,12 +3,28 @@ import QtQuick
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 import "../components"
+import "appcontrol"
+import "cpuplus"
 
 PanelWindow {
     id: cpuPlusWindow
 
+    property var appControlWindow
+
     property bool menuOpen: false
     property int selectedModeIndex: 0
+    property int thermalSelectedIndex: 0
+    property int systemSelectedIndex: 0
+
+    readonly property var thermalRows:
+        appControlWindow && appControlWindow.thermalRows
+        ? appControlWindow.thermalRows
+        : []
+
+    readonly property var systemRows:
+        appControlWindow && appControlWindow.systemRows
+        ? appControlWindow.systemRows
+        : []
 
     readonly property var modes: [
         {
@@ -35,6 +51,9 @@ PanelWindow {
 
     function open() {
         menuOpen = true;
+
+        if (selectedModeIndex === 2 || selectedModeIndex === 3)
+            refreshSharedMonitors();
     }
 
     function close() {
@@ -43,6 +62,11 @@ PanelWindow {
 
     function toggle() {
         menuOpen = !menuOpen;
+
+        if (menuOpen
+                && (selectedModeIndex === 2
+                    || selectedModeIndex === 3))
+            refreshSharedMonitors();
     }
 
     function selectMode(index) {
@@ -50,6 +74,84 @@ PanelWindow {
             0,
             Math.min(modes.length - 1, Number(index || 0))
         );
+
+        if (selectedModeIndex === 2 || selectedModeIndex === 3)
+            refreshSharedMonitors();
+    }
+
+    function refreshSharedMonitors() {
+        if (appControlWindow)
+            appControlWindow.refreshKillMonitor();
+    }
+
+    function selectedMonitorRows() {
+        if (selectedModeIndex === 2)
+            return thermalRows;
+
+        if (selectedModeIndex === 3)
+            return systemRows;
+
+        return [];
+    }
+
+    function selectedMonitorIndex() {
+        return selectedModeIndex === 2
+               ? thermalSelectedIndex
+               : systemSelectedIndex;
+    }
+
+    function selectMonitorRow(index) {
+        const rows = selectedMonitorRows();
+        if (!rows || rows.length <= 0)
+            return;
+
+        const next = Math.max(
+            0,
+            Math.min(rows.length - 1, Number(index || 0))
+        );
+
+        if (selectedModeIndex === 2)
+            thermalSelectedIndex = next;
+        else if (selectedModeIndex === 3)
+            systemSelectedIndex = next;
+    }
+
+    function selectedMonitorEntry() {
+        const rows = selectedMonitorRows();
+
+        if (!rows || rows.length <= 0)
+            return null;
+
+        const index = Math.max(
+            0,
+            Math.min(rows.length - 1, selectedMonitorIndex())
+        );
+
+        return rows[index] || null;
+    }
+
+    function monitorEntryTitle(entry) {
+        return String(
+            entry && (entry.label || entry.name) || "UNKNOWN"
+        ).toUpperCase();
+    }
+
+    function monitorEntryMetric(entry) {
+        if (!entry)
+            return "";
+
+        if (entry._thermalRecord) {
+            if (entry.sensorKind === "fan") {
+                if (entry.rpmAvailable === false)
+                    return "RPM N/A";
+
+                return Number(entry.rpm || 0).toFixed(0) + " RPM";
+            }
+
+            return Number(entry.tempC || 0).toFixed(1) + "°C";
+        }
+
+        return String(entry.metric || entry.secondary || "");
     }
 
     // ============================================================
@@ -284,7 +386,7 @@ PanelWindow {
     // entire CPU++ chassis left without changing its dimensions.
     margins {
         top: -3
-        right: 182
+        right: 200
     }
 
     color: "transparent"
@@ -615,6 +717,31 @@ PanelWindow {
     }
 
     // ============================================================
+    // TWO-BODY MONITOR ADAPTER + SHARED REFRESH PACEMAKER
+    // ============================================================
+
+    CpuPlusMonitorHost {
+        id: monitorHost
+
+        appControlWindow: cpuPlusWindow.appControlWindow
+        cpuPlusWindow: cpuPlusWindow
+    }
+
+    Timer {
+        id: sharedMonitorRefreshTimer
+
+        interval: 1900
+        repeat: true
+
+        running:
+            cpuPlusWindow.menuOpen
+            && (cpuPlusWindow.selectedModeIndex === 2
+                || cpuPlusWindow.selectedModeIndex === 3)
+
+        onTriggered: cpuPlusWindow.refreshSharedMonitors()
+    }
+
+    // ============================================================
     // SHARED APPCONTROL INSTRUMENT BAY
     // ============================================================
 
@@ -659,13 +786,20 @@ PanelWindow {
             anchors.leftMargin: 16
             anchors.topMargin: 16
 
-            text: "SHARED INSTRUMENT"
+            text:
+                cpuPlusWindow.selectedModeIndex === 2
+                ? "THERMAL MONITOR"
+                : cpuPlusWindow.selectedModeIndex === 3
+                ? "SYSTEM MONITOR"
+                : "SHARED INSTRUMENT"
 
             font.pixelSize: 13
             color: Colors.magenta
         }
 
         Rectangle {
+            id: sharedHeaderLine
+
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: sharedInstrumentHeader.bottom
@@ -678,10 +812,75 @@ PanelWindow {
 
             color: Colors.cyan
         }
+
+        Flickable {
+            id: sharedInstrumentScroll
+
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: sharedHeaderLine.bottom
+            anchors.bottom: parent.bottom
+
+            anchors.leftMargin: 8
+            anchors.rightMargin: 8
+            anchors.topMargin: 10
+            anchors.bottomMargin: 8
+
+            clip: true
+            contentWidth: width
+            contentHeight:
+                cpuPlusWindow.selectedModeIndex === 2
+                ? Math.max(
+                      height,
+                      thermalMonitorBody.implicitHeight
+                  )
+                : cpuPlusWindow.selectedModeIndex === 3
+                ? Math.max(
+                      height,
+                      systemMonitorBody.implicitHeight
+                  )
+                : height
+
+            Item {
+                width: sharedInstrumentScroll.width
+                height: sharedInstrumentScroll.contentHeight
+
+                ThermalMonitorView {
+                    id: thermalMonitorBody
+
+                    width: parent.width
+                    controller: monitorHost
+                }
+
+                SystemMonitorView {
+                    id: systemMonitorBody
+
+                    width: parent.width
+                    controller: monitorHost
+                }
+
+                GohuText {
+                    anchors.centerIn: parent
+
+                    visible:
+                        cpuPlusWindow.selectedModeIndex !== 2
+                        && cpuPlusWindow.selectedModeIndex !== 3
+
+                    text:
+                        cpuPlusWindow.selectedModeIndex === 0
+                        ? "FAVORITES BAY"
+                        : "PROCESS BAY"
+
+                    font.pixelSize: 14
+                    color: Colors.magenta
+                    opacity: 0.62
+                }
+            }
+        }
     }
 
     // ============================================================
-    // CPU++ NATIVE EXPANSION BAY
+    // CPU++ NATIVE EXPANSION / MONITOR SELECTOR BAY
     // ============================================================
 
     Rectangle {
@@ -695,7 +894,6 @@ PanelWindow {
         anchors.rightMargin: 12
         anchors.bottomMargin: 12
 
-        // Swapped with the top mode selector panel.
         color: Colors.black
 
         border.width: 1
@@ -719,13 +917,20 @@ PanelWindow {
 
             anchors.topMargin: 16
 
-            text: "CPU++ CONTROL"
+            text:
+                cpuPlusWindow.selectedModeIndex === 2
+                ? "THERMAL SENSORS"
+                : cpuPlusWindow.selectedModeIndex === 3
+                ? "SYSTEM COMPONENTS"
+                : "CPU++ CONTROL"
 
             font.pixelSize: 13
             color: Colors.magenta
         }
 
         Rectangle {
+            id: nativeHeaderLine
+
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: nativeControlHeader.bottom
@@ -737,6 +942,180 @@ PanelWindow {
             height: 2
 
             color: Colors.cyan
+        }
+
+        Flickable {
+            id: monitorSelectorScroll
+
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: nativeHeaderLine.bottom
+            anchors.bottom: parent.bottom
+
+            anchors.margins: 8
+            anchors.topMargin: 10
+
+            visible:
+                cpuPlusWindow.selectedModeIndex === 2
+                || cpuPlusWindow.selectedModeIndex === 3
+
+            clip: true
+            contentWidth: width
+            contentHeight: monitorSelectorColumn.implicitHeight
+
+            Column {
+                id: monitorSelectorColumn
+
+                width: monitorSelectorScroll.width
+                spacing: 7
+
+                Repeater {
+                    model:
+                        cpuPlusWindow.selectedModeIndex === 2
+                        ? cpuPlusWindow.thermalRows
+                        : cpuPlusWindow.selectedModeIndex === 3
+                        ? cpuPlusWindow.systemRows
+                        : []
+
+                    Rectangle {
+                        id: monitorRowButton
+
+                        required property int index
+                        required property var modelData
+
+                        readonly property bool isSelected:
+                            index === cpuPlusWindow.selectedMonitorIndex()
+
+                        readonly property bool isHovered:
+                            monitorRowMouse.containsMouse
+
+                        readonly property bool isPressed:
+                            monitorRowMouse.pressed
+
+                        readonly property color foreground:
+                            isPressed
+                            ? Colors.black
+                            : isSelected
+                            ? Colors.magenta
+                            : isHovered
+                            ? Colors.orange
+                            : Colors.cyan
+
+                        width: monitorSelectorColumn.width
+                        height: 56
+
+                        color:
+                            isPressed
+                            ? Colors.magenta
+                            : isSelected || isHovered
+                            ? Colors.yellow
+                            : Colors.black
+
+                        border.width: 1
+                        border.color: Colors.cyan
+
+                        scale:
+                            isPressed
+                            ? 0.99
+                            : isHovered
+                            ? 1.015
+                            : 1.0
+
+                        Behavior on scale {
+                            NumberAnimation {
+                                duration: 90
+                                easing.type: Easing.OutQuad
+                            }
+                        }
+
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 7
+
+                            spacing: 3
+
+                            GohuText {
+                                width: parent.width
+
+                                text:
+                                    cpuPlusWindow.monitorEntryTitle(
+                                        monitorRowButton.modelData
+                                    )
+
+                                font.pixelSize: 11
+                                color: monitorRowButton.foreground
+                                elide: Text.ElideRight
+                            }
+
+                            GohuText {
+                                width: parent.width
+
+                                text:
+                                    cpuPlusWindow.monitorEntryMetric(
+                                        monitorRowButton.modelData
+                                    )
+
+                                font.pixelSize: 9
+                                color: monitorRowButton.foreground
+                                opacity: 0.78
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        MouseArea {
+                            id: monitorRowMouse
+
+                            anchors.fill: parent
+                            hoverEnabled: true
+
+                            onClicked: {
+                                cpuPlusWindow.selectMonitorRow(index);
+                            }
+                        }
+
+                        RectangularShadow {
+                            anchors.fill: parent
+
+                            spread:
+                                monitorRowButton.isHovered
+                                ? 6
+                                : monitorRowButton.isSelected
+                                ? 4
+                                : 2
+
+                            z: -1
+
+                            opacity:
+                                monitorRowButton.isPressed
+                                ? 0.58
+                                : monitorRowButton.isHovered
+                                ? 0.48
+                                : monitorRowButton.isSelected
+                                ? 0.38
+                                : 0.08
+
+                            color: Colors.orange
+                        }
+                    }
+                }
+            }
+        }
+
+        GohuText {
+            anchors.centerIn: parent
+
+            visible:
+                cpuPlusWindow.selectedModeIndex !== 2
+                && cpuPlusWindow.selectedModeIndex !== 3
+
+            text:
+                cpuPlusWindow.selectedModeIndex === 0
+                ? "FAVORITES"
+                : "PROCESS"
+
+            font.pixelSize: 13
+            color: Colors.magenta
+            opacity: 0.58
         }
     }
 }

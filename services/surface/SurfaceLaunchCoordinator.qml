@@ -273,6 +273,7 @@ QtObject {
         };
 
         const supported = description.supportedCapabilities;
+        const applied = [];
 
         if (supported.indexOf(
                     requirements.capabilityKittyRemote
@@ -325,6 +326,14 @@ QtObject {
             }
 
             metadata.kittyListenOn = listenOn;
+
+            const kittyConflict = conflictRows.some(function(item) {
+                return item.capability
+                    === requirements.capabilityKittyRemote;
+            });
+
+            if (!kittyConflict)
+                applied.push(requirements.capabilityKittyRemote);
         }
 
         if (supported.indexOf(
@@ -343,6 +352,8 @@ QtObject {
                     "--force-renderer-accessibility=complete"
                 );
             }
+
+            applied.push(requirements.capabilityAccessibility);
         }
 
         if (supported.indexOf(
@@ -396,12 +407,34 @@ QtObject {
                         leaseRows.push(reservation.lease);
                     else
                         conflictRows.push(reservation.conflict);
+                } else {
+                    conflictRows.push({
+                        kind: "devtools-port",
+                        value: 0,
+                        requestedCorrelationId: correlationId,
+                        existingCorrelationId: "",
+                        capability:
+                            requirements.capabilityDevTools,
+                        reason: "no-available-port"
+                    });
                 }
             }
 
             metadata.debugAddress = port > 0 ? address : "";
             metadata.debugPort = port;
+
+            const devToolsConflict = conflictRows.some(function(item) {
+                return item.capability
+                    === requirements.capabilityDevTools;
+            });
+
+            if (port > 0 && !devToolsConflict)
+                applied.push(requirements.capabilityDevTools);
         }
+
+        const ready =
+            description.unsupportedCapabilities.length === 0
+            && conflictRows.length === 0;
 
         const state = {
             state: "prepared",
@@ -409,6 +442,8 @@ QtObject {
                 description.requestedCapabilities.slice(),
             supportedCapabilities:
                 description.supportedCapabilities.slice(),
+            appliedCapabilities: applied.slice(),
+            ready: ready,
             metadata: Object.assign({}, metadata)
         };
         const states = Object.assign({}, correlationState);
@@ -419,8 +454,7 @@ QtObject {
             correlationId: correlationId,
             requestedCapabilities:
                 description.requestedCapabilities.slice(),
-            appliedCapabilities:
-                description.supportedCapabilities.slice(),
+            appliedCapabilities: applied.slice(),
             unsupportedCapabilities:
                 description.unsupportedCapabilities.slice(),
             env: env,
@@ -428,7 +462,8 @@ QtObject {
             argvAppend: argvAppend,
             bootstrap: Object.assign({}, metadata),
             leases: leaseRows.slice(),
-            conflicts: conflictRows.slice()
+            conflicts: conflictRows.slice(),
+            ready: ready
         };
     }
 }

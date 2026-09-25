@@ -151,6 +151,10 @@ if "knownCapabilities.indexOf(value) === -1" in requirements:
     )
 
 for token in (
+    "existingDebugPort",
+    "existingDebugAddress",
+    "existingKittyListenOn",
+    "existingKittyRemoteControlMode",
     "ready: ready",
     "conflicts: conflictRows.slice()",
     "appliedCapabilities: ready ? applied.slice() : []",

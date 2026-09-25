@@ -32,6 +32,26 @@ It does **not** own:
 - AppControl navigation/detail/result state
 - service lifetime integration into `shell.qml` or `AppControlW.qml`
 
+## Descriptor PID boundary
+
+Team 6 accepts PID evidence in descriptors as either integer values or numeric
+strings. `descriptorPids(...)` canonicalizes those values to unique positive
+integers before any exact-PID comparison.
+
+This is a transport-tolerance rule, not an identity rule. It prevents providers
+from losing an otherwise exact PID relationship merely because JSON/QML carried
+the PID as `"4242"` instead of `4242`.
+
+Rejected PID evidence includes:
+
+```text
+NaN / non-numeric strings
+0 / 1
+negative values
+fractional values
+duplicates
+```
+
 ## Target descriptor
 
 Team 6 accepts provider/identity evidence rather than inventing identity.

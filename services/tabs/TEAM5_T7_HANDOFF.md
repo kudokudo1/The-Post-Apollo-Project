@@ -55,3 +55,32 @@ raw evidence envelope preserves provenance and avoids forcing later consumers
 to reverse-map localized/human role names.
 
 Team 5 will continue preserving both values as raw observations.
+
+
+## SurfaceLaunch correlation evidence
+
+The resolved SurfaceLaunch seam adds launcher-neutral bootstrap evidence that
+Team 7 may consume later:
+
+```text
+correlationId
+kittyListenOn
+debugAddress
+debugPort
+lease source (generated / caller-supplied)
+```
+
+These are transient launch/application-instance coordinates.
+
+Team 7 may use them to explain joins such as:
+
+```text
+launch transaction
+    ↔ running process
+    ↔ Kitty socket / DevTools endpoint
+    ↔ discovered surface
+```
+
+They must not become persistent semantic application identity.
+
+Team 5's SurfaceLaunch layer does not perform those joins itself.

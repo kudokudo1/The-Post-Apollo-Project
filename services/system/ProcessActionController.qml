@@ -52,15 +52,21 @@ Scope {
     }
 
     function requiresDangerUnlock(entry) {
-        return safetyService.requiresDangerUnlock(entry);
+        return safetyService.requiresDangerUnlock(sourceEntry(entry));
     }
 
     function dangerActionUnlocked(entry, actionKind) {
-        return safetyService.dangerActionUnlocked(entry, actionKind);
+        return safetyService.dangerActionUnlocked(
+            sourceEntry(entry),
+            actionKind
+        );
     }
 
     function relockDangerAction(entry, actionKind) {
-        safetyService.relockDangerAction(entry, actionKind);
+        safetyService.relockDangerAction(
+            sourceEntry(entry),
+            actionKind
+        );
     }
 
     function actionAllowed(entry, actionKind) {
@@ -80,7 +86,8 @@ Scope {
         if (frozenOptimistic[key] !== undefined)
             return !!frozenOptimistic[key];
 
-        return String(entry.state || "").indexOf("T") !== -1;
+        const source = sourceEntry(entry);
+        return String(source && source.state || "").indexOf("T") !== -1;
     }
 
     function markFrozen(entry, frozen) {
@@ -95,30 +102,31 @@ Scope {
     }
 
     function hasSoftLimit(entry) {
-        return validEntry(entry) && limitsService.hasSoftLimit(entry);
+        const source = sourceEntry(entry);
+        return validEntry(source) && limitsService.hasSoftLimit(source);
     }
 
     function limitMinimumMiB(entry) {
-        return limitsService.minimumMiB(entry);
+        return limitsService.minimumMiB(sourceEntry(entry));
     }
 
     function limitMaximumMiB(entry) {
-        return limitsService.maximumMiB(entry);
+        return limitsService.maximumMiB(sourceEntry(entry));
     }
 
     function limitMiB(entry) {
-        return limitsService.limitMiB(entry);
+        return limitsService.limitMiB(sourceEntry(entry));
     }
 
     function limitPercent(entry) {
-        return limitsService.limitPercent(entry);
+        return limitsService.limitPercent(sourceEntry(entry));
     }
 
     function setLimitMiB(entry, mib) {
         if (!actionAllowed(entry, "limit"))
             return false;
 
-        limitsService.setLimitMiB(entry, mib);
+        limitsService.setLimitMiB(sourceEntry(entry), mib);
         return true;
     }
 
@@ -129,10 +137,14 @@ Scope {
         const pct = Math.max(0, Math.min(100, Number(percent || 0)));
 
         if (pct >= 99.5)
-            return setLimitMiB(entry, limitsService.maximumMiB(entry));
+            return setLimitMiB(
+                entry,
+                limitsService.maximumMiB(sourceEntry(entry))
+            );
 
-        const minMiB = limitsService.minimumMiB(entry);
-        const maxMiB = limitsService.maximumMiB(entry);
+        const source = sourceEntry(entry);
+        const minMiB = limitsService.minimumMiB(source);
+        const maxMiB = limitsService.maximumMiB(source);
         const capMiB =
             minMiB + (maxMiB - minMiB) * (pct / 98.5);
 
@@ -162,7 +174,7 @@ Scope {
                 + "THIS TERMINATES THE CAPTURED PROCESS, THEN RELAUNCHES ITS ORIGINAL /proc CMDLINE.\n\n"
                 + (
                     protectedProcess
-                    ? safetyService.dangerReason(entry)
+                    ? safetyService.dangerReason(sourceEntry(entry))
                       + "\n\nTHE KILL ACTION IS UNLOCKED FOR THIS TARGET. CONFIRM RESTART?"
                     : "CONFIRM RESTART?"
                 );
@@ -175,7 +187,7 @@ Scope {
                 name + "  [PID " + String(pid) + "]\n\n"
                 + (
                     protectedProcess
-                    ? safetyService.dangerReason(entry)
+                    ? safetyService.dangerReason(sourceEntry(entry))
                       + "\n\nTERMINATING THIS PROCESS CAN END OR DESTABILIZE THE CURRENT DESKTOP SESSION.\n\n"
                     : "THIS SENDS SIGTERM TO ONLY THE CAPTURED PROCESS TARGET.\n\n"
                 )
@@ -193,7 +205,7 @@ Scope {
                 name + "  [PID " + String(pid) + "]\n\n"
                 + (
                     protectedProcess
-                    ? safetyService.dangerReason(entry)
+                    ? safetyService.dangerReason(sourceEntry(entry))
                       + "\n\nFREEZING A SESSION-CRITICAL PROCESS CAN MAKE THE DESKTOP UNRESPONSIVE OR REMOVE THE CONTROLS NEEDED TO RESUME IT.\n\n"
                     : "FREEZING STOPS THIS PROCESS FROM EXECUTING UNTIL IT IS RESUMED.\n\n"
                 )

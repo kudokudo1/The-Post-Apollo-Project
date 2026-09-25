@@ -77,9 +77,12 @@ For APPS:
   semantic identity
 
 For RUN:
-- evidence should describe the executable that receives the augmentation
+- evidence must describe the executable that receives the augmentation
+- arbitrary trailing command arguments are not provider-family evidence
 - if RUN is launching a command *inside Kitty*, describe the Kitty launcher
   when requesting `KITTY_REMOTE`; do not pretend the inner workload is Kitty
+- a command such as `bash -lc "echo kitty"` must remain a Bash launch unless
+  the actual launcher executable is Kitty
 
 ## Explicit capability request
 

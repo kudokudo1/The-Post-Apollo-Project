@@ -901,6 +901,52 @@ PanelWindow {
         }
     }
 
+    TaskGraphController {
+        id: taskGraphController
+        presentationState: processPresentationState
+        telemetry: processTelemetry
+        hunterPresentation: hunterPresentation
+
+        onPrepareCpuMemAppend: {
+            if (taskManagerBody.cpuCanvas)
+                taskManagerBody.cpuCanvas.requestPaint(true);
+            if (taskManagerBody.memCanvas)
+                taskManagerBody.memCanvas.requestPaint(true);
+        }
+
+        onPrepareCombiAppend: {
+            if (taskManagerBody.combiScoreCanvas)
+                taskManagerBody.combiScoreCanvas.requestPaint(true);
+        }
+
+        onRepaintCpuMem: function(forceReset) {
+            if (taskManagerBody.cpuCanvas)
+                taskManagerBody.cpuCanvas.requestPaint(false, !!forceReset);
+            if (taskManagerBody.memCanvas)
+                taskManagerBody.memCanvas.requestPaint(false, !!forceReset);
+        }
+
+        onRepaintCpu: function(forceReset) {
+            if (taskManagerBody.cpuCanvas)
+                taskManagerBody.cpuCanvas.requestPaint(false, !!forceReset);
+        }
+
+        onRepaintAll: function(forceReset) {
+            if (taskManagerBody.cpuCanvas)
+                taskManagerBody.cpuCanvas.requestPaint(false, !!forceReset);
+            if (taskManagerBody.memCanvas)
+                taskManagerBody.memCanvas.requestPaint(false, !!forceReset);
+            if (taskManagerBody.combiScoreCanvas)
+                taskManagerBody.combiScoreCanvas.requestPaint(false, !!forceReset);
+        }
+
+        onRetryRequested: {
+            if (appControlWindow.menuOpen
+                    && appControlWindow.selectedResultIsTask())
+                appControlWindow.refreshSelectedTaskGraph();
+        }
+    }
+
     TaskSafety {
         id: taskSafety
     }
@@ -1873,107 +1919,15 @@ PanelWindow {
     }
 
     function seedHunterDetailHistories(entry) {
-        const pid = Number(entry && entry.pid || 0);
-        const seed = function(metric) {
-            if (pid <= 0)
-                return [];
-            const values =
-                taskMiniHunterMetricHistories[
-                    metric + ":pid:" + String(pid)
-                ];
-            return Array.isArray(values)
-                   ? values.slice(-taskHistoryLimit)
-                   : [];
-        };
-
-        taskHunterDetailHistories = {
-            cpu: seed("cpu"),
-            mem: seed("mem"),
-            io: seed("io"),
-            age: seed("age"),
-            combined: seed("combined")
-        };
-        taskHunterDetailHistoryRevision += 1;
+        taskGraphController.seedHunterDetailHistories(entry);
     }
 
-    function appendSelectedTaskHunterHistories(
-        entry,
-        cpuPercent,
-        rssKiB,
-        memPercent,
-        ioRateBytes,
-        ageSeconds
-    ) {
-        if (!entry)
-            return;
-
-        const pid = Number(entry.pid || 0);
-        if (pid <= 1)
-            return;
-
-        const ioBytesPerSecond =
-            Math.max(
-                0,
-                Number(
-                    ioRateBytes !== undefined
-                    ? ioRateBytes
-                    : hunterTaskIoRate(entry)
-                )
-            );
-        const ioMiB = ioBytesPerSecond / (1024.0 * 1024.0);
-        const ageMinutes =
-            Math.max(
-                0,
-                Number(
-                    ageSeconds !== undefined
-                    ? ageSeconds
-                    : taskElapsedSeconds(entry.elapsed)
-                )
-            ) / 60.0;
-        const memoryMiB = Math.max(0, Number(rssKiB || 0)) / 1024.0;
-        const combined =
-            Math.max(0, Number(cpuPercent || 0))
-            + Math.max(0, Number(memPercent || 0)) * 0.35
-            + Math.log(1 + ioMiB) * 3.0;
-
-        // The right-panel filtered graph gets the same full-width 132 slots
-        // and the same live detail-probe cadence as the original CPU/MEM graphs.
-        const detailPrevious = taskHunterDetailHistories;
-        const detailNext = ({
-            cpu: Array.isArray(detailPrevious.cpu)
-                 ? detailPrevious.cpu.slice() : [],
-            mem: Array.isArray(detailPrevious.mem)
-                 ? detailPrevious.mem.slice() : [],
-            io: Array.isArray(detailPrevious.io)
-                 ? detailPrevious.io.slice() : [],
-            age: Array.isArray(detailPrevious.age)
-                 ? detailPrevious.age.slice() : [],
-            combined: Array.isArray(detailPrevious.combined)
-                      ? detailPrevious.combined.slice() : []
-        });
-
-        function appendDetail(metric, value) {
-            detailNext[metric].push(Math.max(0, Number(value || 0)));
-            while (detailNext[metric].length > taskHistoryLimit)
-                detailNext[metric].shift();
-        }
-
-        appendDetail("cpu", cpuPercent);
-        appendDetail("mem", memoryMiB);
-        appendDetail("io", ioMiB);
-        appendDetail("age", ageMinutes);
-        appendDetail("combined", combined);
-
-        if (taskManagerBody.combiScoreCanvas)
-            taskManagerBody.combiScoreCanvas.requestPaint(true);
-
-        taskHunterDetailHistories = detailNext;
-        taskHunterDetailHistoryRevision += 1;
-
-        Qt.callLater(function() {
-            if (taskManagerBody.cpuCanvas)
-                taskManagerBody.cpuCanvas.requestPaint();
-        });
+    function appendSelectedTaskHunterHistories(entry, cpuPercent, rssKiB,
+                                               memPercent, ioRateBytes,
+                                               ageSeconds) {
+        taskGraphController.appendSelectedTaskHunterHistories(
+            entry, cpuPercent, rssKiB, memPercent, ioRateBytes, ageSeconds
+        );
     }
 
     property alias taskGraphProbeLoading: processTelemetry.detailProbeLoading
@@ -2040,16 +1994,7 @@ PanelWindow {
     }
 
     function clearTaskDetailHistory() {
-        taskHistoryPid = 0;
-        taskCpuHistory = [];
-        taskMemHistory = [];
-        taskHunterDetailHistories = ({
-            cpu: [], mem: [], io: [], age: [], combined: []
-        });
-        taskHunterDetailHistoryRevision += 1;
-        processTelemetry.resetDetailProbe(0);
-        // A previous hovered PID may still own the service Process. Its stale
-        // generation is discarded and the newly selected PID will be sampled.
+        taskGraphController.clearDetailHistory();
     }
 
     function rebindTaskDetailGraph(forceReset) {
@@ -2076,147 +2021,28 @@ PanelWindow {
 
     function resetTaskHistoryForSelection(forceReset) {
         const entry = selectedTask();
-
-        if (!entry) {
-            clearTaskDetailHistory();
-            return;
-        }
-
-        if (taskHistoryPid === Number(entry.pid || 0)) {
-            if (forceReset) {
-                taskMiniHistoryRevision += 1;
-                taskHunterDetailHistoryRevision += 1;
-                Qt.callLater(function() {
-                    if (taskManagerBody.cpuCanvas)
-                        taskManagerBody.cpuCanvas.requestPaint(false, true);
-                    if (taskManagerBody.memCanvas)
-                        taskManagerBody.memCanvas.requestPaint(false, true);
-                });
-            }
-            return;
-        }
-
-        taskHistoryPid = Number(entry.pid || 0);
-
-        // Seed the large CPU graph from this task's already-preloaded mini
-        // history. Besides making mode changes feel immediate, this guarantees
-        // that a KILL <-> FAVORITES transition cannot visually inherit the
-        // previous task's trace for even one frame.
-        const preloadedCpu = taskMiniCpuHistory(entry);
-        taskCpuHistory = Array.isArray(preloadedCpu) && preloadedCpu.length > 0
-                         ? preloadedCpu.slice(-taskHistoryLimit)
-                         : [Math.max(0, Math.min(100, Number(entry.cpu || 0)))];
-
-        // CPU is seeded from the preloaded mini-history. Seed MEMORY to the
-        // exact same sample count so both large graphs share one time axis
-        // immediately after a task/mode switch instead of one trace starting
-        // dozens of samples farther to the right.
-        const memorySeed = Math.max(0, Number(entry.mem || 0));
-        taskMemHistory = [];
-        for (let i = 0; i < Math.max(1, taskCpuHistory.length); i++)
-            taskMemHistory.push(memorySeed);
-
-        seedHunterDetailHistories(entry);
-
-        processTelemetry.resetDetailProbe(taskHistoryPid);
-
-        // Paint the newly selected PID's seeded histories immediately. Waiting
-        // for the next 450 ms /proc probe lets the previous row's pixels linger
-        // during fast mouse movement and makes graph handoff look incorrect.
-        Qt.callLater(function() {
-            if (taskManagerBody.cpuCanvas)
-                taskManagerBody.cpuCanvas.requestPaint(false, true);
-            if (taskManagerBody.memCanvas)
-                taskManagerBody.memCanvas.requestPaint(false, true);
-            if (taskManagerBody.combiScoreCanvas)
-                taskManagerBody.combiScoreCanvas.requestPaint(false, true);
-        });
-
-        // Do not pretend the shared probe Process is idle during a hover handoff.
+        const preloadedCpu = entry ? taskMiniCpuHistory(entry) : [];
+        taskGraphController.resetForSelection(
+            entry,
+            preloadedCpu,
+            !!forceReset
+        );
     }
 
     function appendTaskHistoryValues(cpuValue, memValue) {
-        const cpu = taskCpuHistory.slice();
-        const mem = taskMemHistory.slice();
-
-        cpu.push(Math.max(0, Math.min(100, Number(cpuValue || 0))));
-        mem.push(Math.max(0, Number(memValue || 0)));
-
-        while (cpu.length > taskHistoryLimit)
-            cpu.shift();
-
-        while (mem.length > taskHistoryLimit)
-            mem.shift();
-
-        // Prepare the one-slot scroll before exposing the new history arrays.
-        // This keeps the old trace visually aligned at the first frame of the
-        // update instead of snapping to the new slot and animating afterward.
-        if (taskManagerBody.cpuCanvas)
-            taskManagerBody.cpuCanvas.requestPaint(true);
-        if (taskManagerBody.memCanvas)
-            taskManagerBody.memCanvas.requestPaint(true);
-
-        taskCpuHistory = cpu;
-        taskMemHistory = mem;
-
-        // Canvas bindings can lag behind fast ScriptModel refreshes. Request
-        // the repaint explicitly after replacing the history arrays.
-        Qt.callLater(function() {
-            if (taskManagerBody.cpuCanvas)
-                taskManagerBody.cpuCanvas.requestPaint();
-
-            if (taskManagerBody.memCanvas)
-                taskManagerBody.memCanvas.requestPaint();
-        });
+        taskGraphController.appendTaskHistoryValues(cpuValue, memValue);
     }
 
     function appendTaskHistory(entry) {
-        if (!entry || Number(entry.pid || 0) !== taskHistoryPid)
-            return;
-
-        appendTaskHistoryValues(Number(entry.cpu || 0), Number(entry.mem || 0));
+        taskGraphController.appendTaskHistory(entry);
     }
 
     function refreshSelectedTaskGraph() {
-        const entry = selectedTask();
-
-        if (!entry || Number(entry.pid || 0) <= 1 || taskGraphProbeLoading)
-            return;
-
-        processTelemetry.refreshDetailProbe({
-            pid: Number(entry.pid || 0),
-            fallbackCpu: Math.max(0, Math.min(100, Number(entry.cpu || 0))),
-            fallbackIoRate: Math.max(0, hunterTaskIoRate(entry)),
-            fallbackAgeSeconds: Math.max(0, taskElapsedSeconds(entry.elapsed))
-        });
+        taskGraphController.refreshDetailProbe(selectedTask());
     }
 
     function applyTaskDetailProbe(sample) {
-        const data = sample || ({});
-        const pid = Number(data.pid || 0);
-
-        if (pid !== taskHistoryPid) {
-            Qt.callLater(function() {
-                if (appControlWindow.menuOpen
-                        && appControlWindow.selectedResultIsTask())
-                    appControlWindow.refreshSelectedTaskGraph();
-            });
-            return;
-        }
-
-        appendTaskHistoryValues(
-            Number(data.cpuPercent || 0),
-            Number(data.memPercent || 0)
-        );
-
-        appendSelectedTaskHunterHistories(
-            selectedTask(),
-            Number(data.cpuPercent || 0),
-            Number(data.rssKiB || 0),
-            Number(data.memPercent || 0),
-            Number(data.ioRateBytes || 0),
-            Number(data.ageSeconds || 0)
-        );
+        taskGraphController.applyDetailProbe(sample, selectedTask());
     }
 
     Timer {

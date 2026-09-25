@@ -328,12 +328,38 @@ QtObject {
         return null;
     }
 
+    function normalizedCompleteObservationKinds(options) {
+        const known = [
+            "devtools-port",
+            "kitty-listen-on"
+        ];
+
+        if (options && options.complete === true)
+            return known.slice();
+
+        const raw =
+            options && Array.isArray(options.completeKinds)
+            ? options.completeKinds
+            : [];
+        const result = [];
+
+        for (let i = 0; i < raw.length; i++) {
+            const kind = asText(raw[i]).trim();
+
+            if (known.indexOf(kind) === -1)
+                continue;
+
+            if (result.indexOf(kind) === -1)
+                result.push(kind);
+        }
+
+        return result;
+    }
+
     function reconcileObservedInstrumentation(rows, options) {
         const source = Array.isArray(rows) ? rows : [];
-        const complete = !!(
-            options
-            && options.complete === true
-        );
+        const completeKinds =
+            normalizedCompleteObservationKinds(options);
         const desired = {};
         const normalized = [];
 
@@ -366,7 +392,8 @@ QtObject {
             if (!lease)
                 continue;
 
-            if (lease.source === "observed" && complete)
+            if (lease.source === "observed"
+                    && completeKinds.indexOf(lease.kind) !== -1)
                 continue;
 
             next[key] = lease;
@@ -405,7 +432,8 @@ QtObject {
             adopted: adopted,
             shadowed: shadowed,
             observedCount: normalized.length,
-            complete: complete
+            completeKinds: completeKinds.slice(),
+            complete: completeKinds.length === 2
         };
     }
 

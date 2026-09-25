@@ -6,8 +6,12 @@ Status at preparation time:
 Team 1 branch:
 team1/system-liberation
 
-Team 1 HEAD:
-6c179dc2bb8b5e3523f54126563223cea9c48469
+prepared-lineage marker:
+d78f487f5df0932538445960eb081384713f8a0a
+Add Team 1 integration readiness packet
+
+live Team 1 HEAD:
+verify team1/system-liberation at handoff time
 
 current certified host:
 8f5bb8f0cf67b526ed8cac577980e0416c176ed2
@@ -302,6 +306,36 @@ successful PID outcomes retained; scope not falsely reported uniform
 Each hardening remains outside the live host until serialized integration and
 runtime certification.
 
+## Behavioral contract suite
+
+Team 1 now carries a non-destructive QtTest suite:
+
+```text
+tests/system/tst_Team1ProcessSystemContracts.qml
+```
+
+It exercises pure/process-policy behavior only. It does not instantiate the real
+RLIMIT mutation backend or call real `Quickshell.execDetached()` mutations.
+
+The suite locks:
+
+```text
+favorite-wrapper process identity normalization
+PID reuse / captured-target revalidation
+descendant process-scope expansion
+protected-process unlock + cancel/relock behavior
+protected process-resource blocking
+verified per-PID RLIMIT state
+partial RLIMIT result accounting
+hard-limit clamp divergence
+the deliberately preserved freeze-optimism lesion
+the deliberately preserved RSS/mem compatibility lesion
+SYSTEM rate-metric presentation parsing
+```
+
+Run it with the repository's Qt 6 QML test runner when available, before an
+integration candidate is offered for certification.
+
 ## Static gate
 
 Before any future Team 1 candidate is offered for host integration:
@@ -320,7 +354,8 @@ one prepared verified RLIMIT mutation authority
 confirmation cancel/relock semantics
 verified per-PID resource result handling
 SYSTEM controller compatibility
-changed-file scope
+presence of the Team 1 behavioral contract suite
+changed-file scope, including Team 1 tests
 no widgets/AppControlW.qml touch on parallel branch
 ```
 

@@ -56,8 +56,10 @@ Produces intent for:
 - HIDDEN dispatch
 - unavailable launch states
 
-Normal execution must remain hookable so Team 5 can add surface/accessibility launch
-preparation without moving tab discovery into APPS.
+Normal execution must remain extensible, but Team 5's current published contract does
+not claim DesktopEntry-aware launch preparation. The donor's launch-time accessibility /
+debug-port instrumentation is tracked as an unresolved cross-team seam rather than being
+assigned to Team 5 by assumption.
 
 ### AppActionCatalog.qml
 
@@ -97,25 +99,33 @@ Until Team 7 freezes a shared contract:
 
 Launch selection belongs to Team 8.
 
-Provider-specific surface preparation may wrap execution, but must not own APPS launch
-policy.
+The donor also contains launch-time instrumentation whose purpose is to make surfaces
+discoverable: Kitty remote-control sockets plus accessibility and DevTools flags for
+Chromium/Electron-family applications. Team 5's published contract currently owns
+discovery/activation and explicitly avoids DesktopEntry ownership; it does not currently
+claim this launch instrumentation.
 
-Conceptually:
+Therefore the permanent owner of that augmentation policy is unresolved. Team 8 must not
+silently assign it to Team 5 or absorb provider discovery into APPS.
+
+Until management resolves the seam, the safe architecture is:
 
 ```
 APPS Core
   -> choose launch intent
-  -> emit/plan execution
+  -> expose a pure launch plan
 
-surface provider hook
-  -> optionally augment normal execution environment/argv
+UNRESOLVED SURFACE-LAUNCH ADAPTER
+  -> may augment environment / argv / provider bootstrap
+  -> must not own APPS launch policy
+  -> must not own cross-provider semantic identity
 
 executor
   -> perform the launch
 ```
 
 This prevents `launchApplicationWithTabProvider()`-style coupling from becoming the
-permanent APPS architecture.
+permanent architecture while preserving the behavior for later reconstruction.
 
 ## Certification state
 

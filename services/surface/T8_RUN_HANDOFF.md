@@ -5,6 +5,27 @@ Status: minimal shared contract frozen by T3 architecture ruling.
 Implementation names in this branch are current working names; the capability
 boundary and ownership invariants are the frozen part.
 
+## Shared authority requirement
+
+All launch domains consume:
+
+```qml
+import qs.services.surface
+```
+
+and use the shared singleton authorities:
+
+```text
+SurfaceLaunchRequirements
+SurfaceLaunchCoordinator
+```
+
+Do not instantiate a private coordinator in APPS, RUN, Toolbox helpers, Bottle
+helpers, or terminal launch adapters. A private coordinator means a private
+lease map and violates the hospital invariant.
+
+The same singleton must see endpoint allocations from every launch domain.
+
 ## Consumer flow
 
 A launch domain keeps ownership of its own base plan:

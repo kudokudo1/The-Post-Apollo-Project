@@ -304,6 +304,121 @@ TestCase {
         compare(audio.sinkInputVolumePercent(stream), 50);
     }
 
+    function test_futureStreamMutePolicyPlanning() {
+        const policies = {
+            "app:demo": {
+                scope: "app",
+                semanticKey: "demo",
+                descriptor: {
+                    pids: [10001],
+                    tokens: [],
+                    strictTokens: true
+                }
+            }
+        };
+
+        const noMatch = sinkInput(
+            60, 10000, "other", "other", "Other", "Playback", false, 50
+        );
+        const futureMatch = sinkInput(
+            61, 10001, "demo", "demo", "Demo", "Playback", false, 50
+        );
+
+        compare(audio.mutePolicyTargets([noMatch], policies).length, 0);
+
+        const targets = audio.mutePolicyTargets([futureMatch], policies);
+        compare(targets.length, 1);
+        compare(targets[0], 61);
+    }
+
+    function test_pendingMutePlannerSupportsOneShotUnmute() {
+        const policies = {
+            "window:demo": {
+                scope: "window",
+                semanticKey: "demo",
+                descriptor: {
+                    pids: [11001],
+                    tokens: [],
+                    strictTokens: false
+                },
+                muted: false
+            }
+        };
+
+        const mutedStream = sinkInput(
+            62, 11001, "demo", "demo", "Demo", "Playback", true, 50
+        );
+
+        const targets = audio.pendingMuteTargets([mutedStream], policies);
+        compare(targets.length, 1);
+        compare(targets[0].index, 62);
+        compare(targets[0].muted, false);
+
+        mutedStream.mute = false;
+        compare(audio.pendingMuteTargets([mutedStream], policies).length, 0);
+    }
+
+    function test_latestVolumePolicySerialWinsOverlap() {
+        const stream = sinkInput(
+            63, 12001, "demo", "demo", "Demo", "Playback", false, 50
+        );
+
+        const policies = {
+            "app:demo": {
+                descriptor: {
+                    pids: [12001],
+                    tokens: [],
+                    strictTokens: true
+                },
+                percent: 25,
+                serial: 4
+            },
+            "window:demo": {
+                descriptor: {
+                    pids: [12001],
+                    tokens: [],
+                    strictTokens: false
+                },
+                percent: 70,
+                serial: 9
+            },
+            "tab:demo": {
+                descriptor: {
+                    pids: [12001],
+                    tokens: [],
+                    strictTokens: false
+                },
+                percent: 40,
+                serial: 7
+            }
+        };
+
+        const targets = audio.volumePolicyTargets([stream], policies);
+
+        compare(targets["63"].percent, 70);
+        compare(targets["63"].serial, 9);
+    }
+
+    function test_volumePolicyPlannerClampsTarget() {
+        const stream = sinkInput(
+            64, 13001, "demo", "demo", "Demo", "Playback", false, 50
+        );
+
+        const targets = audio.volumePolicyTargets([stream], {
+            "app:demo": {
+                descriptor: {
+                    pids: [13001],
+                    tokens: [],
+                    strictTokens: true
+                },
+                percent: 175,
+                serial: 1
+            }
+        });
+
+        compare(targets["64"].percent, 100);
+    }
+
     function test_policyNamespacesNormalizeScopeOnly() {
         compare(audio.policyStorageKey(" APP ", "demo"), "app:demo");
         compare(audio.policyStorageKey("WINDOW", "demo"), "window:demo");

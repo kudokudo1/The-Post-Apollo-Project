@@ -57,6 +57,7 @@ required_functions = {
         "toolboxPlan",
         "bottlePlan",
         "plan",
+        "withSuppliedAugmentation",
     },
     "actions": {
         "browserKind",
@@ -140,9 +141,10 @@ for key, text in texts.items():
                 f"{key}: canonical identity token present: {token!r}"
             )
 
-# The current Team 5 contract does not own DesktopEntry-aware launch
-# augmentation. Keep donor surface-enabling bootstrap out until that seam has an
-# explicit owner.
+# SurfaceLaunch ownership is resolved, but provider-specific requirement
+# construction remains T5-domain-owned. Team 8 may carry/apply a supplied
+# augmentation; it must not recreate Kitty/AT-SPI/DevTools requirement policy
+# inside APPS core.
 for token in (
     "force-renderer-accessibility",
     "remote-debugging-port",
@@ -153,7 +155,7 @@ for token in (
     for key, text in texts.items():
         if token in text:
             errors.append(
-                f"{key}: unresolved surface-launch bootstrap token present: "
+                f"{key}: T5-domain SurfaceLaunch detail leaked into APPS core: "
                 f"{token!r}"
             )
 
@@ -168,4 +170,5 @@ for key, path in FILES.items():
     print(" -", key, path.relative_to(ROOT))
 print(" host coupling: none")
 print(" Team 1/5/6/7 physiology: none")
-print(" unresolved surface-launch bootstrap: not implemented")
+print(" SurfaceLaunch requirement policy: external / T5-domain-owned")
+print(" supplied augmentation carriage: Team 8 launch-plan responsibility")

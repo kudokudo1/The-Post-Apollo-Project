@@ -70,6 +70,7 @@ required_coordinator_functions = (
     "markLaunchFailed",
     "existingDebugPort",
     "existingDebugAddress",
+    "debugAddressIsLoopback",
     "existingKittyListenOn",
     "kittyRemoteControlMode",
     "kittyRemoteControlEnabled",
@@ -127,6 +128,7 @@ for token in (
     "removedLease || hadState",
     "!correlationState[id]",
     '"requires-socket-only"',
+    '"requires-loopback"',
 ):
     if token not in coordinator:
         errors.append(f"missing augmentation readiness/lease contract token: {token}")

@@ -284,6 +284,121 @@ QtObject {
         };
     }
 
+    function normalizedObservedLease(row) {
+        row = row || ({});
+
+        const kind = asText(row.kind).trim();
+        const value = row.value;
+        const providerKey = asText(row.providerKey).trim();
+        const capability = asText(row.capability).trim();
+
+        if (!kind)
+            return null;
+
+        if (kind === "devtools-port") {
+            const port = Number(value || 0);
+
+            if (!(port > 0))
+                return null;
+
+            return {
+                kind: kind,
+                value: port,
+                providerKey: providerKey,
+                capability: capability
+                    || SurfaceBackend.SurfaceLaunchRequirements.capabilityDevTools
+            };
+        }
+
+        if (kind === "kitty-listen-on") {
+            const address = asText(value).trim();
+
+            if (!address)
+                return null;
+
+            return {
+                kind: kind,
+                value: address,
+                providerKey: providerKey,
+                capability: capability
+                    || SurfaceBackend.SurfaceLaunchRequirements.capabilityKittyRemote
+            };
+        }
+
+        return null;
+    }
+
+    function reconcileObservedInstrumentation(rows) {
+        const source = Array.isArray(rows) ? rows : [];
+        const desired = {};
+        const normalized = [];
+
+        for (let i = 0; i < source.length; i++) {
+            const item = normalizedObservedLease(source[i]);
+
+            if (!item)
+                continue;
+
+            const key = leaseKey(item.kind, item.value);
+
+            if (desired[key])
+                continue;
+
+            desired[key] = item;
+            normalized.push(item);
+        }
+
+        const next = {};
+        const existingKeys = Object.keys(_leaseState);
+
+        // Preserve launch-transaction/application-instance leases. Only the
+        // "observed" recovery layer is replaced by each reconciliation.
+        for (let i = 0; i < existingKeys.length; i++) {
+            const key = existingKeys[i];
+            const lease = _leaseState[key];
+
+            if (!lease || lease.source === "observed")
+                continue;
+
+            next[key] = lease;
+        }
+
+        let adopted = 0;
+        let shadowed = 0;
+
+        for (let i = 0; i < normalized.length; i++) {
+            const item = normalized[i];
+            const key = leaseKey(item.kind, item.value);
+
+            if (next[key]) {
+                // A known transaction lease already owns this coordinate.
+                // Runtime observation confirms occupancy but must not rewrite
+                // correlation/source provenance.
+                shadowed += 1;
+                continue;
+            }
+
+            next[key] = {
+                kind: item.kind,
+                value: item.value,
+                correlationId: "",
+                capability: item.capability,
+                providerKey: item.providerKey,
+                source: "observed",
+                state: "observed"
+            };
+            adopted += 1;
+        }
+
+        _leaseState = next;
+
+        return {
+            adopted: adopted,
+            shadowed: shadowed,
+            observedCount: normalized.length
+        };
+    }
+
     function allocateDebugPort(preferred, correlationId) {
         const wanted = Number(preferred || 0);
 

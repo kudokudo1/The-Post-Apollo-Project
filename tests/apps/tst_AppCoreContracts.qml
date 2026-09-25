@@ -624,7 +624,7 @@ TestCase {
         compare(plan.surfaceLaunchAugmentation.conflicts.length, 1);
     }
 
-    function test_surfaceLaunchFlatpakTransportAvoidsWrapperOptionSpace() {
+    function test_surfaceLaunchFlatpakTransportWithoutExistingAppArgv() {
         const kittyFlatpak = {
             id: "net.kovidgoyal.kitty.desktop",
             name: "Kitty",
@@ -665,6 +665,119 @@ TestCase {
         //   flatpak -o ... run APP_ID
         compare(plan.commandTokens[0], "flatpak");
         compare(plan.commandTokens[1], "run");
+    }
+
+    function test_surfaceLaunchFlatpakTransportWithExistingAppArgv() {
+        const kittyFlatpak = {
+            id: "net.kovidgoyal.kitty.desktop",
+            name: "Kitty",
+            command: [
+                "flatpak",
+                "run",
+                "net.kovidgoyal.kitty",
+                "ssh",
+                "host",
+                "%U"
+            ]
+        };
+
+        const plan = launchPlanner.plan(
+            kittyFlatpak,
+            core.sourceFlatpak,
+            core.launchNormal,
+            "",
+            {
+                ready: true,
+                argvAfterExecutable: [
+                    "-o",
+                    "allow_remote_control=socket-only",
+                    "--listen-on",
+                    "unix:@surface-kitty"
+                ],
+                argvAppend: []
+            }
+        );
+
+        compare(plan.kind, launchPlanner.planDesktopEntry);
+        compare(
+            plan.commandTokens.join(" "),
+            "flatpak run net.kovidgoyal.kitty "
+            + "-o allow_remote_control=socket-only "
+            + "--listen-on unix:@surface-kitty "
+            + "ssh host"
+        );
+
+        compare(plan.commandTokens[0], "flatpak");
+        compare(plan.commandTokens[1], "run");
+        compare(plan.commandTokens[2], "net.kovidgoyal.kitty");
+        compare(plan.commandTokens[3], "-o");
+        compare(plan.commandTokens[7], "ssh");
+        compare(plan.commandTokens[8], "host");
+    }
+
+    function test_surfaceLaunchFlatpakBoundarySurvivesWrapperOptions() {
+        const entry = {
+            id: "org.example.App.desktop",
+            name: "Example",
+            command: [
+                "flatpak",
+                "run",
+                "--branch",
+                "stable",
+                "--arch=x86_64",
+                "org.example.App",
+                "--existing",
+                "%U"
+            ]
+        };
+
+        const plan = launchPlanner.plan(
+            entry,
+            core.sourceFlatpak,
+            core.launchNormal,
+            "",
+            {
+                ready: true,
+                argvAfterExecutable: ["--surface"],
+                argvAppend: ["--tail"]
+            }
+        );
+
+        compare(plan.kind, launchPlanner.planDesktopEntry);
+        compare(
+            plan.commandTokens.join(" "),
+            "flatpak run --branch stable --arch=x86_64 "
+            + "org.example.App --surface --existing --tail"
+        );
+    }
+
+    function test_surfaceLaunchFlatpakUnknownBoundaryFailsClosed() {
+        const entry = {
+            id: "",
+            name: "Broken Flatpak",
+            command: [
+                "flatpak",
+                "run",
+                "--branch"
+            ]
+        };
+
+        const plan = launchPlanner.plan(
+            entry,
+            core.sourceFlatpak,
+            core.launchNormal,
+            "",
+            {
+                ready: true,
+                argvAfterExecutable: ["--surface"]
+            }
+        );
+
+        compare(plan.kind, launchPlanner.planUnavailable);
+        compare(
+            plan.reason,
+            "flatpak-application-boundary-unresolved"
+        );
     }
 
     function test_surfaceLaunchAugmentsToolboxArgvStructurally() {

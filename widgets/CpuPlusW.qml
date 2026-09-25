@@ -543,13 +543,18 @@ PanelWindow {
     // ============================================================
     // WINDOW
     // AppControlW: 834 wide x 674 tall
-    // CPU++:       814 wide x 834 tall
+    // CPU++:       1000 wide x 834 tall
     //
-    // Lower body: 390 instrument | 180 target | 220 actuator.
-    // The chassis remains slightly taller than it is wide.
+    // Lower body:
+    //   390px shared instrument
+    //   260px target/selector
+    //   ~326px CPU++ actuator surface
+    //
+    // The wider chassis deliberately gives target names, monitor icons,
+    // filters, and future actuator controls room to breathe.
     // ============================================================
 
-    implicitWidth: 814
+    implicitWidth: 1000
     implicitHeight: 834
 
     anchors {
@@ -557,8 +562,8 @@ PanelWindow {
         right: true
     }
 
-    // Original right margin was 2. Increase by 80px to move the
-    // entire CPU++ chassis left without changing its dimensions.
+    // Keep the established CPU++ right-edge position. Growing the chassis
+    // now expands it leftward into the available DP-5 workspace.
     margins {
         top: -3
         right: 220
@@ -1106,7 +1111,7 @@ PanelWindow {
     Rectangle {
         id: targetPane
 
-        width: 180
+        width: 260
 
         anchors.left: sharedInstrumentPane.right
         anchors.top: modeRail.bottom
@@ -1174,7 +1179,7 @@ PanelWindow {
                 cpuPlusWindow.selectedModeIndex === 2
                 ? 38
                 : cpuPlusWindow.selectedModeIndex === 3
-                ? 122
+                ? 92
                 : 0
 
             visible:
@@ -1211,7 +1216,7 @@ PanelWindow {
                         width:
                             cpuPlusWindow.selectedModeIndex === 2
                             ? (targetSubModeStrip.width - 4) / 2
-                            : (targetSubModeStrip.width - 4) / 2
+                            : (targetSubModeStrip.width - 8) / 3
 
                         height: 27
 

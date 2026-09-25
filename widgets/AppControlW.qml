@@ -947,6 +947,14 @@ PanelWindow {
         onRefreshRequested: taskRefreshAfterKillTimer.restart()
     }
 
+    HunterOperationController {
+        id: hunterOperationController
+        host: appControlWindow
+        favoriteStoreObject: favoriteStore
+        executor: hunterExecutor
+        refreshTimer: taskRefreshAfterKillTimer
+    }
+
     HunterExecutor {
         id: hunterExecutor
 
@@ -1307,16 +1315,15 @@ PanelWindow {
     // the live task snapshot remains the authority after this short window.
     property alias taskFrozenOptimistic: processPresentationController.frozenOptimistic
 
-    // HUNTER bulk actions are deliberately single-flight. A captured target is
-    // sent SIGTERM at most once; repeated button presses only reopen the same
-    // progress/report window and never fire another termination pass.
-    property string hunterOperationPhase: "idle" // idle, running, report
-    property string hunterOperationKind: ""
-    property var hunterOperationTargets: []
-    property var hunterOperationResults: []
-    property int hunterOperationCompleted: 0
-    property int hunterOperationTotal: 0
-    property var hunterPendingTargets: []
+    // HUNTER operation state lives in a cold-path controller. Keep aliases
+    // here so the rest of AppControl and its overlay retain the same contract.
+    property alias hunterOperationPhase: hunterOperationController.phase
+    property alias hunterOperationKind: hunterOperationController.kind
+    property alias hunterOperationTargets: hunterOperationController.targets
+    property alias hunterOperationResults: hunterOperationController.results
+    property alias hunterOperationCompleted: hunterOperationController.completed
+    property alias hunterOperationTotal: hunterOperationController.total
+    property alias hunterPendingTargets: hunterOperationController.pendingTargets
     readonly property bool hunterOperationActive:
         hunterOperationPhase === "running"
     readonly property color hunterOperationAccent:
@@ -2481,215 +2488,39 @@ PanelWindow {
     }
 
     function hunterTargetsFromRows(rows) {
-        return rows.map(function(entry) {
-            return {
-                pid: Number(entry.pid || 0),
-                name: String(entry.comm || entry.name || "PROCESS").trim(),
-                identity: taskPersistentIdentity(entry)
-            };
-        });
+        return hunterOperationController.targetsFromRows(rows);
     }
 
     function hunterTargetIsFavorite(target) {
-        if (!target)
-            return false;
-
-        const identity = String(target.identity || "").trim().toLowerCase();
-        if (!identity)
-            return false;
-
-        const key = "task|" + encodeURIComponent(identity);
-        return favoriteStore.favoriteKeys.indexOf(key) !== -1;
+        return hunterOperationController.targetIsFavorite(target);
     }
 
-
-
     function hunterOperationLabel() {
-        return hunterOperationKind === "kill-mice" ? "MICE" : "HOGS";
+        return hunterOperationController.operationLabel();
     }
 
     function hunterOperationStatusLine(result) {
-        const status = String(result && result.status || "");
-        const name = String(result && result.name || "PROCESS");
-        const pid = String(result && result.pid || "?");
-        const detail = String(result && result.detail || "");
-        const mark = status === "killed" ? "✓"
-                     : status === "gone" ? "◇"
-                     : status === "favorite" ? "♥"
-                     : "⚠︎";
-        return mark + " " + name + "  [PID " + pid + "] — " + detail;
+        return hunterOperationController.operationStatusLine(result);
     }
 
     function refreshHunterOperationMessage() {
-        const label = hunterOperationLabel();
-        const lines = [];
-
-        if (hunterOperationPhase === "running") {
-            lines.push(
-                "HUNTING " + label + " • "
-                + String(hunterOperationCompleted) + " / "
-                + String(hunterOperationTotal) + " CHECKED"
-            );
-            lines.push("");
-
-            for (let i = 0; i < hunterOperationResults.length; i++)
-                lines.push(hunterOperationStatusLine(hunterOperationResults[i]));
-
-            if (hunterOperationCompleted < hunterOperationTotal) {
-                lines.push("");
-                lines.push("… HUNTER STILL TRACKING "
-                           + String(hunterOperationTotal - hunterOperationCompleted)
-                           + " TARGET(S)");
-            }
-        } else if (hunterOperationPhase === "report") {
-            let killed = 0;
-            let escaped = 0;
-            let gone = 0;
-            let favoritesReleased = 0;
-            for (let i = 0; i < hunterOperationResults.length; i++) {
-                const status = String(hunterOperationResults[i].status || "");
-                if (status === "killed") killed += 1;
-                else if (status === "gone") gone += 1;
-                else if (status === "favorite") favoritesReleased += 1;
-                else escaped += 1;
-            }
-
-            lines.push(
-                label + " HUNT REPORT • " + String(hunterOperationTotal)
-                + " TARGET(S)"
-            );
-            lines.push(
-                "KILLED " + String(killed)
-                + " • GOT AWAY " + String(escaped)
-                + " • ALREADY GONE " + String(gone)
-                + " • LET LOOSE FAVORITES " + String(favoritesReleased)
-            );
-            lines.push("");
-
-            for (let i = 0; i < hunterOperationResults.length; i++)
-                lines.push(hunterOperationStatusLine(hunterOperationResults[i]));
-        }
-
-        destructiveConfirmMessage = lines.join("\n");
+        hunterOperationController.refreshMessage();
     }
 
     function showHunterOperationWindow() {
-        if (hunterOperationPhase !== "running"
-                && hunterOperationPhase !== "report")
-            return false;
-
-        destructiveConfirmKind = hunterOperationKind;
-        destructiveConfirmChoice = 0;
-        destructiveConfirmOpen = true;
-        refreshHunterOperationMessage();
-        return true;
+        return hunterOperationController.showWindow();
     }
 
     function startHunterOperation(kind, targets) {
-        if (hunterOperationActive) {
-            showHunterOperationWindow();
-            return;
-        }
-
-        const captured = Array.isArray(targets) ? targets.slice() : [];
-        if (captured.length === 0) {
-            cancelDestructiveConfirm();
-            return;
-        }
-
-        const activeTargets = [];
-        const releasedFavorites = [];
-
-        for (let i = 0; i < captured.length; i++) {
-            const target = captured[i];
-            if (hunterTargetIsFavorite(target)) {
-                releasedFavorites.push({
-                    type: "result",
-                    pid: Number(target.pid || 0),
-                    name: String(target.name || "PROCESS"),
-                    status: "favorite",
-                    detail: "LET LOOSE • FAVORITE PROTECTED BEFORE FIRING"
-                });
-            } else {
-                activeTargets.push(target);
-            }
-        }
-
-        hunterOperationPhase = "running";
-        hunterOperationKind = String(kind || "kill-hogs");
-        hunterOperationTargets = captured;
-        hunterOperationResults = releasedFavorites;
-        hunterOperationCompleted = releasedFavorites.length;
-        hunterOperationTotal = captured.length;
-        hunterPendingTargets = [];
-        destructiveConfirmTargetPids = [];
-        destructiveConfirmKind = hunterOperationKind;
-        destructiveConfirmChoice = 0;
-        destructiveConfirmTitle =
-            hunterOperationKind === "kill-mice"
-            ? "⚠︎ (-_•)デ╾━  (ᐢ..ᐢ)౨  HUNTING MICE…  ⚠︎" : "⚠︎ (-_•)デ╾━  ₍˄·͈⚇·͈˄₎  HUNTING HOGS…  ⚠︎";
-        destructiveConfirmOpen = true;
-        refreshHunterOperationMessage();
-
-        if (activeTargets.length === 0) {
-            finishHunterOperation();
-            return;
-        }
-
-        hunterExecutor.start(activeTargets);
+        hunterOperationController.start(kind, targets);
     }
 
     function applyHunterOperationResult(result) {
-        if (hunterOperationPhase !== "running")
-            return;
-
-        const payload = result || ({});
-        const next = hunterOperationResults.slice();
-        next.push(payload);
-        hunterOperationResults = next;
-        hunterOperationCompleted = Math.min(
-            hunterOperationTotal,
-            next.length
-        );
-        refreshHunterOperationMessage();
-        taskRefreshAfterKillTimer.restart();
+        hunterOperationController.applyResult(result);
     }
 
     function finishHunterOperation() {
-        if (hunterOperationPhase !== "running")
-            return;
-
-        // Never retry missing results. A bulk target receives SIGTERM at most
-        // once per hunt; an unreported target is explicitly marked unknown.
-        const seen = ({});
-        for (let i = 0; i < hunterOperationResults.length; i++)
-            seen[String(hunterOperationResults[i].pid || 0)] = true;
-
-        const completed = hunterOperationResults.slice();
-        for (let i = 0; i < hunterOperationTargets.length; i++) {
-            const target = hunterOperationTargets[i];
-            const key = String(target.pid || 0);
-            if (!seen[key]) {
-                completed.push({
-                    type: "result",
-                    pid: Number(target.pid || 0),
-                    name: String(target.name || "PROCESS"),
-                    status: "escaped",
-                    detail: "NO VERIFIED RESULT • NOT RETRIED"
-                });
-            }
-        }
-
-        hunterOperationResults = completed;
-        hunterOperationCompleted = hunterOperationTotal;
-        hunterOperationPhase = "report";
-        destructiveConfirmTitle =
-            hunterOperationKind === "kill-mice"
-            ? "⚠︎ (-_•)デ╾━  (ᐢ××ᐢ)౨  MICE HUNT COMPLETE  ⚠︎" : "⚠︎ (-_•)デ╾━  ₍˄×⚇×˄₎  HOG HUNT COMPLETE  ⚠︎";
-        destructiveConfirmKind = hunterOperationKind;
-        destructiveConfirmOpen = true;
-        refreshHunterOperationMessage();
-        taskRefreshAfterKillTimer.restart();
+        hunterOperationController.finish();
     }
 
     function taskHistoryValuesForHunter(entry) {

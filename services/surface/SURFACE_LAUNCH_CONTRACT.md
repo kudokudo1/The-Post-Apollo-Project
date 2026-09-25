@@ -111,9 +111,19 @@ startupClass
 executable
 argv[]
 stableHint
+
+optional caller-owned bootstrap observations:
+existingDebugPort
+existingDebugAddress
+existingKittyListenOn
+existingKittyRemoteControlMode
 ```
 
 These are launch observations/hints, not semantic identity.
+
+The optional existing-bootstrap fields let shell/Toolbox/Bottle/future launch
+domains report coordinates they have already parsed from their own mechanism.
+SurfaceLaunch does not parse mechanism-specific shell syntax to recover them.
 
 T8 may adapt DesktopEntry data into this record. RUN may adapt command/executable
 data into the same record. Future launch domains may do likewise.

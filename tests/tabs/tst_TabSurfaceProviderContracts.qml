@@ -198,6 +198,33 @@ TestCase {
         );
     }
 
+    function test_activationResultHonorsProviderFailure() {
+        const failed = provider.parseActivationResult(
+            '{"ok": false, "error": "TARGET GONE"}'
+        );
+
+        verify(!failed.ok);
+        compare(failed.message, "TARGET GONE");
+    }
+
+    function test_activationResultHonorsProviderSuccess() {
+        const passed = provider.parseActivationResult(
+            '{"ok": true, "error": ""}'
+        );
+
+        verify(passed.ok);
+        compare(passed.message, "");
+    }
+
+    function test_activationResultRejectsMalformedOutput() {
+        const malformed = provider.parseActivationResult("not-json");
+
+        verify(!malformed.ok);
+        verify(
+            malformed.message.indexOf("TAB ACTIVATION PARSE:") === 0
+        );
+    }
+
     function test_nativeLifecycleIsProviderSpecific() {
         verify(provider.hasNativeLifecycleControl({
             provider: "DEVTOOLS",

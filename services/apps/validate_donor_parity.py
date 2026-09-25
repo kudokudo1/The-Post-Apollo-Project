@@ -40,6 +40,7 @@ EXTRACTED = {
     "bottles": APP_DIR / "AppBottleProvider.qml",
     "selection": APP_DIR / "AppSelectionPolicy.qml",
     "mode": APP_DIR / "AppModePolicy.qml",
+    "icon_glow": APP_DIR / "AppIconGlowPolicy.qml",
 }
 
 errors: list[str] = []
@@ -262,6 +263,48 @@ require_function_anchors(
         '"about:logins"',
         '"--ProfileManager"',
         '"about:firefoxview"',
+    ),
+)
+
+require_function_anchors(
+    "donor icon glow cache lookup",
+    donor_text,
+    "cachedIconGlow",
+    (
+        "iconGlowCache[key]",
+        "return null",
+    ),
+)
+
+require_function_anchors(
+    "donor icon glow cache update",
+    donor_text,
+    "rememberIconGlow",
+    (
+        "Object.assign({}, iconGlowCache)",
+        "nextCache[key] = color",
+        "iconGlowCache = nextCache",
+    ),
+)
+
+require_function_anchors(
+    "donor icon glow classification",
+    donor_text,
+    "classifyIconGlow",
+    (
+        "saturation >= 0.18",
+        "delta >= 0.035",
+        "accentPresence >= 0.04",
+        "hue < 15.0",
+        "hue < 75.0",
+        "hue < 170.0",
+        "hue < 245.0",
+        "Colors.red",
+        "Colors.omnitrix",
+        "Colors.cyan",
+        "Colors.magenta",
+        "Colors.orange",
+        "Colors.white",
     ),
 )
 
@@ -544,6 +587,48 @@ require_function_anchors(
         'id === "downloads"',
         '"about:downloads"',
         "launchArguments",
+    ),
+)
+
+require_function_anchors(
+    "extracted icon glow cache lookup",
+    texts.get("icon_glow", ""),
+    "cached",
+    (
+        "cache[key]",
+        "return null",
+    ),
+)
+
+require_function_anchors(
+    "extracted icon glow cache update",
+    texts.get("icon_glow", ""),
+    "remember",
+    (
+        "Object.assign({}, cache)",
+        "next[key] = color",
+        "cache = next",
+    ),
+)
+
+require_function_anchors(
+    "extracted icon glow classification",
+    texts.get("icon_glow", ""),
+    "classify",
+    (
+        "saturation >= 0.18",
+        "delta >= 0.035",
+        "accentPresence >= 0.04",
+        "hue < 15.0",
+        "hue < 75.0",
+        "hue < 170.0",
+        "hue < 245.0",
+        'palette("red")',
+        'palette("omnitrix")',
+        'palette("cyan")',
+        'palette("magenta")',
+        'palette("orange")',
+        'palette("white")',
     ),
 )
 

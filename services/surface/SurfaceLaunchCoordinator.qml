@@ -70,6 +70,15 @@ QtObject {
             .slice(0, 48);
     }
 
+    function kittyListenAddress(correlationId) {
+        // Keep generated abstract socket names bounded even if correlation
+        // hints or serials grow. The unique timestamp/serial portion appears
+        // at the front of the correlation id before the human hint.
+        const token = safeToken(correlationId).slice(0, 60);
+
+        return "unix:@appcontrol-kitty-" + token;
+    }
+
     function newCorrelationId(evidence) {
         _correlationSerial += 1;
 

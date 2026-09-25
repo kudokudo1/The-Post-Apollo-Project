@@ -592,6 +592,87 @@ TestCase {
         compare(augmentation.conflicts.length, 0);
     }
 
+    function test_shellMechanismCanSupplyPreparsedDevToolsEvidence() {
+        const evidence = {
+            displayName: "Brave",
+            executable: "brave-browser",
+            argv: [
+                "__APPCONTROL_SHELL__",
+                "brave-browser --remote-debugging-port=9444"
+            ],
+            existingDebugPort: 9444,
+            existingDebugAddress: "127.0.0.1"
+        };
+
+        const augmentation = coordinator.buildAugmentation(
+            evidence,
+            [requirements.capabilityDevTools]
+        );
+
+        verify(augmentation.ready);
+        compare(augmentation.bootstrap.debugPort, 9444);
+        compare(
+            augmentation.bootstrap.debugAddress,
+            "127.0.0.1"
+        );
+        compare(augmentation.argvAppend.length, 0);
+        compare(augmentation.leases.length, 1);
+        compare(augmentation.leases[0].source, "caller-supplied");
+    }
+
+    function test_shellMechanismCanSupplyPreparsedKittyEvidence() {
+        const evidence = {
+            displayName: "Kitty",
+            executable: "kitty",
+            argv: [
+                "__APPCONTROL_SHELL__",
+                "kitty --listen-on unix:@shell-owned"
+            ],
+            existingKittyListenOn: "unix:@shell-owned",
+            existingKittyRemoteControlMode: "socket-only"
+        };
+
+        const augmentation = coordinator.buildAugmentation(
+            evidence,
+            [requirements.capabilityKittyRemote]
+        );
+
+        verify(augmentation.ready);
+        compare(
+            augmentation.bootstrap.kittyListenOn,
+            "unix:@shell-owned"
+        );
+        compare(augmentation.argvAfterExecutable.length, 0);
+        compare(augmentation.leases.length, 1);
+        compare(augmentation.leases[0].source, "caller-supplied");
+    }
+
+    function test_preparsedBroadDebugAddressStillRejected() {
+        const evidence = {
+            displayName: "Brave",
+            executable: "brave-browser",
+            argv: [
+                "__APPCONTROL_SHELL__",
+                "opaque-launcher-text"
+            ],
+            existingDebugPort: 9444,
+            existingDebugAddress: "0.0.0.0"
+        };
+
+        const augmentation = coordinator.buildAugmentation(
+            evidence,
+            [requirements.capabilityDevTools]
+        );
+
+        verify(!augmentation.ready);
+        compare(augmentation.leases.length, 0);
+        compare(augmentation.conflicts.length, 1);
+        compare(
+            augmentation.conflicts[0].reason,
+            "requires-loopback"
+        );
+    }
+
     function test_existingDebugAddressIsPreserved() {
         const evidence = braveEvidence();
         evidence.argv = [

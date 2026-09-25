@@ -372,6 +372,49 @@ TestCase {
         );
     }
 
+    function test_publicAuthoritySnapshotsAreDefensiveCopies() {
+        const augmentation = coordinator.buildAugmentation(
+            braveEvidence(),
+            [
+                requirements.capabilityAccessibility,
+                requirements.capabilityDevTools
+            ]
+        );
+
+        verify(augmentation.ready);
+
+        const leaseSnapshot = coordinator.leases;
+        const stateSnapshot = coordinator.correlationState;
+
+        const leaseKey =
+            "devtools-port:"
+            + String(augmentation.bootstrap.debugPort);
+
+        leaseSnapshot[leaseKey].value = 1;
+        stateSnapshot[augmentation.correlationId]
+            .metadata.debugPort = 1;
+        stateSnapshot[augmentation.correlationId]
+            .appliedCapabilities.push("BROKEN");
+
+        const freshLeases = coordinator.leases;
+        const freshState = coordinator.correlationState;
+
+        compare(
+            freshLeases[leaseKey].value,
+            augmentation.bootstrap.debugPort
+        );
+        compare(
+            freshState[augmentation.correlationId]
+                .metadata.debugPort,
+            augmentation.bootstrap.debugPort
+        );
+        verify(
+            freshState[augmentation.correlationId]
+                .appliedCapabilities
+                .indexOf("BROKEN") === -1
+        );
+    }
+
     function test_releaseAllowsPreferredPortReuse() {
         const first = coordinator.buildAugmentation(
             braveEvidence(),

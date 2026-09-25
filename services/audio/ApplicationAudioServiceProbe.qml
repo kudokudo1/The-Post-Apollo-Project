@@ -149,19 +149,23 @@ Scope {
 
         onRefreshed: function(inputs) {
             probeRoot.liveSnapshotSeen = true;
-            const evidence = evidenceSnapshot(inputs);
+            const observations = observationSnapshot(inputs);
 
             console.log(
                 "TEAM6 PROBE live snapshot",
-                "streams=" + evidence.length
+                "streams=" + observations.length,
+                "generation=" + audio.observationGeneration
             );
 
-            for (let i = 0; i < evidence.length; i++) {
-                const row = evidence[i];
+            for (let i = 0; i < observations.length; i++) {
+                const observation = observations[i];
+                const row = observation.raw;
 
                 console.log(
                     "TEAM6 PROBE stream",
-                    row.streamIndex,
+                    observation.provider,
+                    observation.providerKey,
+                    "lifetime=" + observation.lifetimeClass,
                     "pid=" + String(row.applicationProcessId || ""),
                     "binary=" + String(row.applicationProcessBinary || ""),
                     "appId=" + String(row.applicationId || ""),

@@ -51,8 +51,9 @@ QtObject {
                 && id.indexOf(parentPrefix) !== 0)
             return id;
 
-        const path = stringValue(entry.path);
-        return path ? providerPrefix + path : "";
+        // Do not synthesize provider identity from path here. A FILE record
+        // without a FileService-owned id is not canonical yet.
+        return "";
     }
 
     function canonicalFavoriteKey(entry) {

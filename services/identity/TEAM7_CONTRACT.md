@@ -366,6 +366,21 @@ DEVTOOLS
 
 Exact API names are not frozen.
 
+All launch domains consume **one shared SurfaceLaunch lease authority**:
+
+```text
+APPS
+   \\
+    -> shared SurfaceLaunchCoordinator / lease state
+   /
+RUN
+```
+
+Team 7 must therefore treat correlation IDs, generated Kitty endpoints, and
+generated DevTools ports as coordinates from one shared instrumentation
+namespace. The launcher that requested the augmentation is provenance, not a
+separate lease universe or semantic identity namespace.
+
 Team 7 may consume PID/socket/port/target/correlation output as evidence, but
 must not decide whether those coordinates are injected into a launch and must
 not promote ephemeral bootstrap coordinates into persistent semantic identity.

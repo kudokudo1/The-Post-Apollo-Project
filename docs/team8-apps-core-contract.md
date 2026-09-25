@@ -62,6 +62,30 @@ launch mechanisms, and application of a supplied augmentation. AppLaunchPlanner 
 that supplied augmentation opaquely until the shared T5-domain contract freezes its exact
 payload schema.
 
+### AppActionPlanner.qml
+
+Pure DesktopEntry/browser action planner.
+
+Owns:
+
+- stable APPS action IDs compatible with the current Favorites detail-action shape
+- browser action precedence
+- browser shortcut intent
+- browser launch-argument intent
+- raw DesktopEntry action pass-through intent
+
+It does not:
+
+- focus Sway windows
+- invoke `wtype`
+- execute DesktopEntry actions
+- launch browser processes
+- own Favorites persistence
+- own semantic application/window identity
+
+That keeps browser action policy in Team 8 while execution/focus mechanics remain separately
+integratable.
+
 ### AppBottleProvider.qml
 
 Standalone Bottles discovery/state provider.

@@ -27,6 +27,7 @@ required_functions = {
     "warmRefresh",
     "activate",
     "activateControl",
+    "parseActivationResult",
     "hasNativeLifecycleControl",
     "providerRecordKey",
     "identityEvidence",
@@ -47,6 +48,7 @@ required_properties = {
     "diagnostics",
     "bridgeReady",
     "bridgeError",
+    "activationError",
     "lifecycleFrozenKeys",
     "lifecycleError",
 }

@@ -670,6 +670,14 @@ PanelWindow {
             height: 2
 
             color: Colors.cyan
+
+            RectangularShadow {
+                anchors.fill: parent
+                spread: 3
+                z: -1
+                opacity: 0.34
+                color: Colors.cyan
+            }
         }
 
         Row {
@@ -1035,7 +1043,83 @@ PanelWindow {
 
             height: 2
 
-            color: Colors.cyan
+            color:
+                cpuPlusWindow.selectedModeIndex === 2
+                ? Colors.orange
+                : Colors.cyan
+
+            RectangularShadow {
+                anchors.fill: parent
+                spread: 3
+                z: -1
+                opacity: 0.38
+                color: parent.color
+            }
+        }
+
+        Item {
+            id: sharedStateHeader
+
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: sharedHeaderLine.bottom
+
+            anchors.leftMargin: 8
+            anchors.rightMargin: 8
+            anchors.topMargin: 8
+
+            height: 30
+
+            GohuText {
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.leftMargin: 8
+
+                text:
+                    cpuPlusWindow.selectedModeIndex === 2
+                    ? "THERMAL STATE"
+                    : cpuPlusWindow.selectedModeIndex === 3
+                    ? "SYSTEM STATE"
+                    : "INSTRUMENT STATE"
+
+                font.pixelSize: 13
+                color:
+                    cpuPlusWindow.selectedModeIndex === 2
+                    ? Colors.orange
+                    : Colors.cyan
+
+                layer.enabled: true
+                layer.effect: DropShadow {
+                    radius: 10
+                    samples: 9
+                    opacity: 0.84
+                    color:
+                        cpuPlusWindow.selectedModeIndex === 2
+                        ? Colors.orange
+                        : Colors.cyan
+                    transparentBorder: true
+                }
+            }
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+
+                height: 1
+                color:
+                    cpuPlusWindow.selectedModeIndex === 2
+                    ? Colors.orange
+                    : Colors.cyan
+
+                RectangularShadow {
+                    anchors.fill: parent
+                    spread: 2
+                    z: -1
+                    opacity: 0.30
+                    color: parent.color
+                }
+            }
         }
 
         Flickable {
@@ -1043,11 +1127,11 @@ PanelWindow {
 
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.top: sharedHeaderLine.bottom
+            anchors.top: sharedStateHeader.bottom
             anchors.bottom: parent.bottom
 
             anchors.leftMargin: 8
-            anchors.rightMargin: 8
+            anchors.rightMargin: 18
             anchors.topMargin: 10
             anchors.bottomMargin: 8
 
@@ -1161,7 +1245,18 @@ PanelWindow {
             anchors.topMargin: 6
 
             height: 2
-            color: Colors.cyan
+            color:
+                cpuPlusWindow.selectedModeIndex === 2
+                ? Colors.orange
+                : Colors.cyan
+
+            RectangularShadow {
+                anchors.fill: parent
+                spread: 3
+                z: -1
+                opacity: 0.38
+                color: parent.color
+            }
         }
 
         Item {
@@ -1177,7 +1272,7 @@ PanelWindow {
 
             height:
                 cpuPlusWindow.selectedModeIndex === 2
-                ? 38
+                ? 58
                 : cpuPlusWindow.selectedModeIndex === 3
                 ? 92
                 : 0
@@ -1218,7 +1313,10 @@ PanelWindow {
                             ? (targetSubModeStrip.width - 4) / 2
                             : (targetSubModeStrip.width - 8) / 3
 
-                        height: 27
+                        height:
+                            cpuPlusWindow.selectedModeIndex === 2
+                            ? 44
+                            : 27
 
                         color:
                             isPressed
@@ -1242,40 +1340,92 @@ PanelWindow {
                             anchors.centerIn: parent
                             spacing: 4
 
-                            GohuText {
+                            Item {
                                 anchors.verticalCenter: parent.verticalCenter
 
-                                text: String(modelData.symbol || "")
-                                font.pixelSize:
-                                    cpuPlusWindow.selectedModeIndex === 3
-                                    && String(modelData.key) === "NETWORK"
-                                    ? 13
-                                    : 12
+                                width:
+                                    cpuPlusWindow.selectedModeIndex === 2
+                                    && Number(subModeButton.modelData.key) === 0
+                                    ? 48 : 28
 
-                                color:
-                                    subModeButton.isPressed
-                                    ? Colors.black
-                                    : subModeButton.isSelected
-                                    ? Colors.magenta
-                                    : subModeButton.isHovered
-                                    ? Colors.orange
-                                    : cpuPlusWindow.selectedModeIndex === 2
-                                      && Number(subModeButton.modelData.key) === 1
-                                    ? Colors.omnitrix
-                                    : Colors.cyan
+                                height: parent.height
 
-                                layer.enabled: !subModeButton.isPressed
-                                layer.effect: DropShadow {
-                                    radius: 5
-                                    samples: 5
-                                    opacity: 0.50
+                                Loader {
+                                    anchors.centerIn: parent
+
+                                    visible:
+                                        cpuPlusWindow.selectedModeIndex === 2
+                                        && Number(subModeButton.modelData.key) === 0
+
+                                    sourceComponent:
+                                        visible ? thermalIconComponent : undefined
+
+                                    onLoaded: {
+                                        item.iconScale = 0.76;
+                                        item.iconColor = Qt.binding(function() {
+                                            return subModeButton.isPressed
+                                                   ? Colors.black
+                                                   : subModeButton.isSelected
+                                                   ? Colors.magenta
+                                                   : Colors.orange;
+                                        });
+                                        item.glowColor = Qt.binding(function() {
+                                            return subModeButton.isSelected
+                                                   ? Colors.magenta
+                                                   : Colors.orange;
+                                        });
+                                        item.pressed = Qt.binding(function() {
+                                            return subModeButton.isPressed;
+                                        });
+                                        item.glowOpacity = 0.54;
+                                    }
+                                }
+
+                                GohuText {
+                                    anchors.centerIn: parent
+
+                                    visible:
+                                        !(cpuPlusWindow.selectedModeIndex === 2
+                                          && Number(subModeButton.modelData.key) === 0)
+
+                                    text: String(subModeButton.modelData.symbol || "")
+
+                                    font.pixelSize:
+                                        cpuPlusWindow.selectedModeIndex === 3
+                                        ? (
+                                              String(subModeButton.modelData.key)
+                                              === "NETWORK" ? 20 : 19
+                                          )
+                                        : 20
+
                                     color:
-                                        subModeButton.isHovered
-                                        ? Colors.orange
+                                        subModeButton.isPressed
+                                        ? Colors.black
                                         : subModeButton.isSelected
                                         ? Colors.magenta
+                                        : subModeButton.isHovered
+                                        ? Colors.orange
+                                        : cpuPlusWindow.selectedModeIndex === 2
+                                          && Number(subModeButton.modelData.key) === 1
+                                        ? Colors.omnitrix
                                         : Colors.cyan
-                                    transparentBorder: true
+
+                                    layer.enabled: !subModeButton.isPressed
+                                    layer.effect: DropShadow {
+                                        radius: 7
+                                        samples: 7
+                                        opacity: 0.60
+                                        color:
+                                            subModeButton.isHovered
+                                            ? Colors.orange
+                                            : subModeButton.isSelected
+                                            ? Colors.magenta
+                                            : cpuPlusWindow.selectedModeIndex === 2
+                                              && Number(subModeButton.modelData.key) === 1
+                                            ? Colors.omnitrix
+                                            : Colors.cyan
+                                        transparentBorder: true
+                                    }
                                 }
                             }
 
@@ -1378,7 +1528,9 @@ PanelWindow {
                             : Colors.cyan
 
                         width: monitorSelectorColumn.width
-                        height: 56
+                        height:
+                            modelData && modelData._systemRecord
+                            ? 64 : 56
 
                         color:
                             isPressed
@@ -1415,7 +1567,10 @@ PanelWindow {
                             Item {
                                 id: monitorRowIconBox
 
-                                width: 42
+                                width:
+                                    monitorRowButton.modelData
+                                    && monitorRowButton.modelData._systemRecord
+                                    ? 58 : 42
                                 height: parent.height
 
                                 GohuText {
@@ -1440,8 +1595,8 @@ PanelWindow {
                                               && monitorRowButton.modelData.category
                                               || ""
                                           ).toUpperCase() === "NETWORK"
-                                        ? 17
-                                        : 20
+                                        ? 25
+                                        : 31
 
                                     fontSizeMode: Text.HorizontalFit
                                     minimumPixelSize: 8
@@ -1559,6 +1714,154 @@ PanelWindow {
         }
     }
 
+    // AppControl selector scrollbar geometry.
+    Rectangle {
+        id: targetScrollTrack
+
+        width: 10
+
+        anchors.top: targetSubModeStrip.bottom
+        anchors.bottom: targetPane.bottom
+        anchors.right: targetPane.right
+
+        anchors.topMargin: 10
+        anchors.bottomMargin: 8
+        anchors.rightMargin: 3
+
+        color:
+            cpuPlusWindow.selectedModeIndex === 2
+            ? Colors.orange
+            : Colors.cyan
+
+        opacity:
+            monitorSelectorScroll.contentHeight
+            > monitorSelectorScroll.height
+            ? 0.90 : 0.0
+
+        visible:
+            (cpuPlusWindow.selectedModeIndex === 2
+             || cpuPlusWindow.selectedModeIndex === 3)
+            && opacity > 0.0
+
+        z: 300
+
+        property real maxContentY:
+            Math.max(
+                0,
+                monitorSelectorScroll.contentHeight
+                - monitorSelectorScroll.height
+            )
+
+        property real handleTravel:
+            Math.max(
+                0,
+                height - targetScrollHandle.height
+            )
+
+        function setScrollFromHandleY(handleY) {
+            if (maxContentY <= 0 || handleTravel <= 0)
+                return;
+
+            const clampedY =
+                Math.max(
+                    0,
+                    Math.min(handleTravel, handleY)
+                );
+
+            monitorSelectorScroll.contentY =
+                (clampedY / handleTravel) * maxContentY;
+        }
+
+        RectangularShadow {
+            anchors.fill: parent
+            spread: 2
+            z: -1
+            opacity: 0.24
+            color: parent.color
+        }
+
+        Rectangle {
+            id: targetScrollHandle
+
+            width: 6
+            anchors.horizontalCenter: parent.horizontalCenter
+
+            height:
+                Math.max(
+                    30,
+                    parent.height
+                    * Math.min(
+                        1.0,
+                        monitorSelectorScroll.visibleArea.heightRatio
+                    )
+                )
+
+            y: {
+                if (targetScrollTrack.maxContentY <= 0
+                        || targetScrollTrack.handleTravel <= 0)
+                    return 0;
+
+                const clampedContentY =
+                    Math.max(
+                        0,
+                        Math.min(
+                            targetScrollTrack.maxContentY,
+                            monitorSelectorScroll.contentY
+                        )
+                    );
+
+                return (
+                    clampedContentY
+                    / targetScrollTrack.maxContentY
+                ) * targetScrollTrack.handleTravel;
+            }
+
+            color: Colors.magenta
+
+            RectangularShadow {
+                anchors.fill: parent
+                spread: 2
+                z: -1
+                opacity: 0.28
+                color: Colors.magenta
+            }
+        }
+
+        MouseArea {
+            id: targetScrollMouse
+
+            anchors.fill: parent
+            hoverEnabled: true
+            acceptedButtons: Qt.LeftButton
+
+            property real dragOffset: 0
+
+            onPressed: function(mouse) {
+                const handleTop = targetScrollHandle.y;
+                const handleBottom =
+                    targetScrollHandle.y
+                    + targetScrollHandle.height;
+
+                dragOffset =
+                    mouse.y >= handleTop
+                    && mouse.y <= handleBottom
+                    ? mouse.y - handleTop
+                    : targetScrollHandle.height / 2;
+
+                targetScrollTrack.setScrollFromHandleY(
+                    mouse.y - dragOffset
+                );
+            }
+
+            onPositionChanged: function(mouse) {
+                if (pressed)
+                    targetScrollTrack.setScrollFromHandleY(
+                        mouse.y - dragOffset
+                    );
+            }
+        }
+    }
+
     // ============================================================
     // CPU++ ACTUATOR BAY
     //
@@ -1614,6 +1917,14 @@ PanelWindow {
 
             height: 2
             color: Colors.cyan
+
+            RectangularShadow {
+                anchors.fill: parent
+                spread: 3
+                z: -1
+                opacity: 0.38
+                color: Colors.cyan
+            }
         }
     }
 }

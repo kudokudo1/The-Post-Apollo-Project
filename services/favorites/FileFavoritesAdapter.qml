@@ -1,0 +1,166 @@
+pragma Singleton
+
+import QtQuick
+
+QtObject {
+    id: root
+
+    // FILES owns semantic file identity. Favorites only translates that
+    // provider-owned identity into persisted membership/reconstruction refs.
+    readonly property string providerPrefix: "file:"
+    readonly property string parentPrefix: "file:parent:"
+
+    function stringValue(value) {
+        if (value === undefined || value === null)
+            return "";
+        return String(value);
+    }
+
+    function isFileRecord(entry) {
+        return !!entry && entry._fileRecord === true;
+    }
+
+    function isParentRecord(entry) {
+        if (!entry)
+            return false;
+
+        if (entry.isParent === true)
+            return true;
+
+        const id = stringValue(entry.id);
+        return id.indexOf(parentPrefix) === 0;
+    }
+
+    function canPersist(entry) {
+        if (!isFileRecord(entry) || isParentRecord(entry))
+            return false;
+
+        return providerIdentity(entry).length > 0;
+    }
+
+    // Prefer the identity emitted by FileService. The path fallback preserves
+    // the same provider namespace for compatible FILE records without making
+    // Favorites responsible for filesystem identity semantics.
+    function providerIdentity(entry) {
+        if (!isFileRecord(entry) || isParentRecord(entry))
+            return "";
+
+        const id = stringValue(entry.id);
+
+        if (id.indexOf(providerPrefix) === 0
+                && id.indexOf(parentPrefix) !== 0)
+            return id;
+
+        const path = stringValue(entry.path);
+        return path ? providerPrefix + path : "";
+    }
+
+    function canonicalFavoriteKey(entry) {
+        return providerIdentity(entry);
+    }
+
+    function isCanonicalFavoriteKey(key) {
+        const value = stringValue(key);
+
+        return value.indexOf(providerPrefix) === 0
+               && value.indexOf(parentPrefix) !== 0
+               && value.length > providerPrefix.length;
+    }
+
+    function pathFromCanonicalKey(key) {
+        const value = stringValue(key);
+
+        if (!isCanonicalFavoriteKey(value))
+            return "";
+
+        return value.slice(providerPrefix.length);
+    }
+
+    // Historical FILE favorites use AppControl's generic fallback:
+    //     mode:<FILES mode index>:<display label>
+    // Keep construction explicit and caller-supplied because the numeric mode
+    // index remains host navigation state, not provider identity.
+    function legacyFavoriteKey(entry, filesModeIndex) {
+        if (!isFileRecord(entry) || isParentRecord(entry))
+            return "";
+
+        const label = stringValue(entry.label || entry.name);
+        const modeIndex = Number(filesModeIndex);
+
+        if (!label || !isFinite(modeIndex))
+            return "";
+
+        return "mode:" + String(modeIndex) + ":" + label;
+    }
+
+    function isLegacyFavoriteKeyForEntry(key, entry, filesModeIndex) {
+        const legacy = legacyFavoriteKey(entry, filesModeIndex);
+        return legacy.length > 0 && stringValue(key) === legacy;
+    }
+
+    function matchingFavoriteKey(entry, filesModeIndex, favoriteKeys) {
+        if (!entry || !favoriteKeys)
+            return "";
+
+        const canonical = canonicalFavoriteKey(entry);
+
+        if (canonical && favoriteKeys.indexOf(canonical) !== -1)
+            return canonical;
+
+        const legacy = legacyFavoriteKey(entry, filesModeIndex);
+
+        if (legacy && favoriteKeys.indexOf(legacy) !== -1)
+            return legacy;
+
+        return "";
+    }
+
+    function isFavorite(entry, filesModeIndex, favoriteKeys) {
+        return matchingFavoriteKey(
+            entry,
+            filesModeIndex,
+            favoriteKeys
+        ).length > 0;
+    }
+
+    // Pure migration helper. It does not write FavoritesStore itself.
+    // The eventual integration owner can apply the returned array at a
+    // controlled point after FILE reconstruction behavior is certified.
+    function migratedKeysForEntry(entry, filesModeIndex, favoriteKeys) {
+        const source = favoriteKeys ? favoriteKeys.slice() : [];
+        const canonical = canonicalFavoriteKey(entry);
+        const legacy = legacyFavoriteKey(entry, filesModeIndex);
+
+        if (!canonical || !legacy)
+            return source;
+
+        const canonicalIndex = source.indexOf(canonical);
+        const legacyIndex = source.indexOf(legacy);
+
+        if (legacyIndex < 0)
+            return source;
+
+        if (canonicalIndex >= 0) {
+            source.splice(legacyIndex, 1);
+            return source;
+        }
+
+        source[legacyIndex] = canonical;
+        return source;
+    }
+
+    // Stable reconstruction reference only. Resolving this path into a live
+    // FILE row belongs to FileService; Favorites must not stat/probe files.
+    function reconstructionReference(key) {
+        const path = pathFromCanonicalKey(key);
+
+        if (!path)
+            return null;
+
+        return {
+            provider: "files",
+            identity: stringValue(key),
+            path: path
+        };
+    }
+}

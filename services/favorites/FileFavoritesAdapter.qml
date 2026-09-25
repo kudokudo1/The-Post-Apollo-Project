@@ -123,30 +123,23 @@ QtObject {
         ).length > 0;
     }
 
-    // Pure migration helper. It does not write FavoritesStore itself.
-    // The eventual integration owner can apply the returned array at a
-    // controlled point after FILE reconstruction behavior is certified.
-    function migratedKeysForEntry(entry, filesModeIndex, favoriteKeys) {
-        const source = favoriteKeys ? favoriteKeys.slice() : [];
+    // Provider-specific migration proposal only. FavoritesService owns the
+    // actual key replacement/deduplication and persistence.
+    function migrationPlan(entry, filesModeIndex, favoriteKeys) {
+        const source = favoriteKeys || [];
         const canonical = canonicalFavoriteKey(entry);
         const legacy = legacyFavoriteKey(entry, filesModeIndex);
 
         if (!canonical || !legacy)
-            return source;
+            return null;
 
-        const canonicalIndex = source.indexOf(canonical);
-        const legacyIndex = source.indexOf(legacy);
+        if (source.indexOf(legacy) < 0)
+            return null;
 
-        if (legacyIndex < 0)
-            return source;
-
-        if (canonicalIndex >= 0) {
-            source.splice(legacyIndex, 1);
-            return source;
-        }
-
-        source[legacyIndex] = canonical;
-        return source;
+        return {
+            oldKey: legacy,
+            newKey: canonical
+        };
     }
 
     // Stable reconstruction reference only. Resolving this path into a live

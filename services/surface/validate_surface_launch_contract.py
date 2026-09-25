@@ -53,6 +53,7 @@ for capability in required_capabilities:
         errors.append(f"missing capability: {capability}")
 
 required_requirement_functions = (
+    "primaryExecutableName",
     "suggestedCapabilities",
     "requirementFor",
     "describe",
@@ -110,6 +111,11 @@ if not re.search(
 
 if "requirements.describe(evidence, requestedCapabilities)" not in coordinator:
     errors.append("coordinator does not route explicit requests through requirements")
+
+if 'normalizedCommandTokens(evidence).join(" ")' in requirements:
+    errors.append(
+        "surface family recognition still depends on arbitrary trailing argv text"
+    )
 
 if "knownCapabilities.indexOf(value) === -1" in requirements:
     errors.append(

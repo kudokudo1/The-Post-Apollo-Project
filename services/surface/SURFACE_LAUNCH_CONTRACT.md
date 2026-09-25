@@ -334,19 +334,43 @@ never overwritten by discovery.
 Observed reconciliation is additive by default. Missing coordinates in a
 partial snapshot do **not** remove previously recovered leases.
 
-Pruning requires an explicit complete snapshot:
+Pruning requires explicit completeness evidence.
+
+Global completeness is still available:
 
 ```text
 reconcileObservedInstrumentation(rows, { complete: true })
 ```
 
-Only then does absence become evidence that a previously observed coordinate is
-no longer present.
+but provider-scoped completeness is preferred:
+
+```text
+reconcileObservedInstrumentation(
+    rows,
+    { completeKinds: ["devtools-port"] }
+)
+```
+
+Only the named provider kinds may interpret absence as evidence. A complete
+DEVTOOLS snapshot must not prune recovered Kitty occupancy, and a complete Kitty
+snapshot must not prune recovered DevTools occupancy.
+
+`TabSurfaceProvider.instrumentationLeaseSnapshot(...)` derives
+`completeKinds` conservatively from bridge diagnostics:
+
+```text
+DEVTOOLS ERROR:NONE  -> devtools-port complete
+KITTY ERROR:NONE     -> kitty-listen-on complete
+```
+
+Fallback count diagnostics such as `DEVTOOLS:4` / `KITTY:2` do not claim
+completeness because that fallback path deliberately suppresses provider
+errors.
 
 An empty partial snapshot therefore preserves recovered occupancy; an empty
-complete snapshot may prune it. Merely setting
-`TabSurfaceProvider.active = false` is not a complete reconciliation or a
-release event.
+trusted scoped-complete snapshot may prune only its declared provider family.
+Merely setting `TabSurfaceProvider.active = false` is not a complete
+reconciliation or a release event.
 
 This seam reduces post-restart reuse risk without coupling instrumentation
 lifetime to provider activity.

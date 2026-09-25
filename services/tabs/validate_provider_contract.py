@@ -31,6 +31,7 @@ required_functions = {
     "hasNativeLifecycleControl",
     "providerRecordKey",
     "identityEvidence",
+    "instrumentationLeaseObservations",
     "normalizedProcessPids",
     "tabObservationSignature",
     "controlObservationSignature",

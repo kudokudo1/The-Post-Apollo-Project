@@ -328,14 +328,25 @@ correlationId: ""
 These recovered leases participate in collision avoidance but do not fabricate
 a historical launch correlation.
 
-Reconciliation replaces only prior `observed` leases. Generated and
-caller-supplied transaction leases remain authoritative and are never
-overwritten by discovery.
+Generated and caller-supplied transaction leases remain authoritative and are
+never overwritten by discovery.
 
-An empty observed snapshot may prune previously recovered observational leases.
-That pruning must come from a deliberate current-runtime reconciliation; merely
-setting `TabSurfaceProvider.active = false` is not a release/reconciliation
-event.
+Observed reconciliation is additive by default. Missing coordinates in a
+partial snapshot do **not** remove previously recovered leases.
+
+Pruning requires an explicit complete snapshot:
+
+```text
+reconcileObservedInstrumentation(rows, { complete: true })
+```
+
+Only then does absence become evidence that a previously observed coordinate is
+no longer present.
+
+An empty partial snapshot therefore preserves recovered occupancy; an empty
+complete snapshot may prune it. Merely setting
+`TabSurfaceProvider.active = false` is not a complete reconciliation or a
+release event.
 
 This seam reduces post-restart reuse risk without coupling instrumentation
 lifetime to provider activity.

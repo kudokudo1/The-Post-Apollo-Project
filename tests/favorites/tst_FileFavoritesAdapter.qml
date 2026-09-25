@@ -63,6 +63,23 @@ TestCase {
         );
     }
 
+    function test_path_without_provider_id_is_not_canonical() {
+        const pathOnlyEntry = {
+            _fileRecord: true,
+            name: "report.txt",
+            label: "◇  report.txt",
+            path: "/home/mapple/Documents/report.txt",
+            isDir: false,
+            isParent: false
+        };
+
+        verify(!FavoritesBackend.FileFavoritesAdapter.canPersist(pathOnlyEntry));
+        compare(
+            FavoritesBackend.FileFavoritesAdapter.providerIdentity(pathOnlyEntry),
+            ""
+        );
+    }
+
     function test_legacy_key_matches_certified_fallback_shape() {
         compare(
             FavoritesBackend.FileFavoritesAdapter.legacyFavoriteKey(fileEntry, 2),

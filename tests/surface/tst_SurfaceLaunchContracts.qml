@@ -167,6 +167,48 @@ TestCase {
         compare(Object.keys(coordinator.leases).length, 0);
     }
 
+    function test_restartSessionNonceSeparatesSameMomentCorrelations() {
+        const evidence = kittyEvidence();
+
+        const first = coordinator.correlationIdFor(
+            evidence,
+            123456789,
+            1,
+            "session-a"
+        );
+        const second = coordinator.correlationIdFor(
+            evidence,
+            123456789,
+            1,
+            "session-b"
+        );
+
+        verify(first !== second);
+        verify(
+            coordinator.kittyListenAddress(first)
+            !== coordinator.kittyListenAddress(second)
+        );
+    }
+
+    function test_sameSessionSerialSeparatesSameMomentCorrelations() {
+        const evidence = kittyEvidence();
+
+        const first = coordinator.correlationIdFor(
+            evidence,
+            123456789,
+            1,
+            "session-a"
+        );
+        const second = coordinator.correlationIdFor(
+            evidence,
+            123456789,
+            2,
+            "session-a"
+        );
+
+        verify(first !== second);
+    }
+
     function test_generatedKittyEndpointIsBoundedAndDistinct() {
         const first = coordinator.buildAugmentation(
             {

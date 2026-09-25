@@ -62,6 +62,28 @@ launch mechanisms, and application of a supplied augmentation. AppLaunchPlanner 
 that supplied augmentation opaquely until the shared T5-domain contract freezes its exact
 payload schema.
 
+### AppCatalogPolicy.qml
+
+Pure APPS catalog/search/ranking policy.
+
+Owns:
+
+- local DesktopEntry key fallback (id, then name)
+- APPS search haystack semantics
+- HIDDEN-row search over externally supplied RUN rows
+- APPS result ordering
+- Native/Flatpak source-match ranking
+
+Important donor behavior preserved:
+
+- Native/Flatpak source selection does **not** hide the other source from the catalog.
+- HIDDEN switches to the externally supplied hidden-command catalog.
+- Favorites may pin rows through an injected preference predicate, but Team 8 has no
+  knowledge of Favorites persistence, keys, or reconstruction.
+
+This keeps APPS result behavior reusable without creating an APPS -> Favorites or
+APPS -> RUN implementation dependency.
+
 ### AppActionPlanner.qml
 
 Pure DesktopEntry/browser action planner.

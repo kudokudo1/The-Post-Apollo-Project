@@ -159,6 +159,18 @@ Verify:
 
 ---
 
+
+## Activation result integrity
+
+Verify:
+- provider activation JSON `{"ok": true}` emits success
+- provider activation JSON `{"ok": false, "error": ...}` emits failure
+- malformed/empty activation output is failure, not success
+- stderr is surfaced diagnostically without converting failed JSON to success
+
+This protects the standalone provider from treating "the worker printed
+something" as proof that the target actually activated.
+
 # 4. Native lifecycle vs Team 1 process control
 
 ## DEVTOOLS native suspend/resume
@@ -169,6 +181,9 @@ Verify:
 - `setLifecycleFrozen(entry, true)` performs provider-native target suspend
 - `setLifecycleFrozen(entry, false)` performs provider-native target resume
 - optimistic state rolls back when the provider mutation fails
+- a second lifecycle request is rejected while one mutation is running
+- pending rollback state is cleared after the authoritative JSON result
+- stderr diagnostics alone do not roll back an otherwise successful mutation
 
 This operation belongs to Team 5 because it mutates the surface through its
 provider-native API.

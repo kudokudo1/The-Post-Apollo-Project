@@ -102,6 +102,60 @@ Scope {
         }
     }
 
+    function humanBytes(value) {
+        let bytes = Math.max(0, Number(value || 0));
+        const units = ["B", "KiB", "MiB", "GiB", "TiB"];
+        let index = 0;
+
+        while (bytes >= 1024 && index < units.length - 1) {
+            bytes /= 1024;
+            index += 1;
+        }
+
+        if (index === 0)
+            return Math.round(bytes) + " " + units[index];
+
+        return bytes.toFixed(bytes >= 100 ? 0 : bytes >= 10 ? 1 : 2)
+               + " " + units[index];
+    }
+
+    function breadcrumbText() {
+        const current = String(currentDir || "/");
+
+        if (homeDir && current.indexOf(homeDir) === 0)
+            return "~" + current.slice(homeDir.length);
+
+        return current;
+    }
+
+    function kindLabel(entry) {
+        if (!entry)
+            return "FILE";
+
+        if (entry.isParent)
+            return "PARENT DIRECTORY";
+
+        if (entry.isDir)
+            return "DIRECTORY";
+
+        if (entry.kind === "l")
+            return "SYMLINK";
+
+        return String(entry.mime || "FILE").toUpperCase();
+    }
+
+    function modifiedText(entry) {
+        const epoch = Number(entry && entry.modifiedEpoch || 0);
+
+        if (!(epoch > 0))
+            return "UNKNOWN";
+
+        return Qt.formatDateTime(
+            new Date(epoch * 1000),
+            "yyyy-MM-dd  HH:mm:ss"
+        );
+    }
+
     function parentPath(path) {
         const current =
             String(path || "/").replace(/\/+$/, "") || "/";

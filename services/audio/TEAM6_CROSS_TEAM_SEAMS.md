@@ -68,6 +68,11 @@ it does not own stream matching, mute policy, volume policy, or mutation.
 
 Team 7 remains semantic identity authority.
 
+Team 7 has now frozen the common observation/evidence envelope. Team 6's
+PipeWire observation adapter is compatible with that envelope and now follows
+its alias/relationship vocabulary directly. Team 6 does not wrap itself in or
+import Team 7's service; compatibility is structural.
+
 Current Team 7 recon distinguishes:
 
 ```text

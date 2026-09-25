@@ -62,6 +62,47 @@ launch mechanisms, and application of a supplied augmentation. AppLaunchPlanner 
 that supplied augmentation opaquely until the shared T5-domain contract freezes its exact
 payload schema.
 
+### AppCoreFacade.qml
+
+Standalone composition surface for future host integration.
+
+It owns no new physiology. It instantiates and routes the isolated Team 8 organs behind one
+host-neutral API:
+
+- DesktopEntries catalog access
+- HIDDEN adaptation from externally supplied RUN command names
+- catalog/search/result policy
+- source labels / launchability
+- APPS presentation metadata
+- action catalog + action planning
+- launch planning + supplied SurfaceLaunch augmentation transport
+- remembered-selection lookup
+- Team 7 DesktopEntry evidence delegation
+- Bottles discovery refresh/state
+
+External inputs remain explicit:
+
+```
+identityEvidence      Team 7 contract
+hiddenCommandNames    future RunService
+preferencePredicate   optional Favorites/host ranking signal
+surface augmentation  T5-domain shared contract
+```
+
+The facade deliberately contains no:
+
+- AppControl mode or selection state
+- generic navigation/detail wiring
+- Team 1 process/resource implementation
+- Team 5 TabSurfaceProvider lifecycle
+- Team 6 audio implementation
+- Team 7 semantic resolver implementation
+- Team 2 persistence implementation
+
+This is the preferred Team 8 integration surface when T3 eventually releases an APPS host
+slot. The future host should not need to instantiate every Team 8 organ separately unless a
+specific architectural reason emerges.
+
 ### AppIdentityAdapter.qml
 
 Thin Team 7 identity handoff.

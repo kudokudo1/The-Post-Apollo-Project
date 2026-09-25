@@ -12,6 +12,7 @@ import "widgets/weather"
 import "widgets/notifications"
 
 import "services/weather"
+import "services/system"
 
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
@@ -48,6 +49,26 @@ PanelWindow {
 
     SpaceService {
         id: spaceService
+    }
+
+    // One session-wide hardware state. AppControl and CPU++ consume these
+    // same instances instead of starting independent telemetry/control stacks.
+    SystemTelemetry {
+        id: sharedSystemTelemetry
+
+        onFanRowsChanged: {
+            sharedFanControl.reconcilePendingPercent(fanRows);
+        }
+    }
+
+    FanControl {
+        id: sharedFanControl
+
+        onRefreshRequested: sharedSystemTelemetry.refresh()
+
+        onErrorRaised: function(message) {
+            sharedSystemTelemetry.errorText = String(message || "");
+        }
     }
 
     // ===== BAR DECORATION =======================================
@@ -130,6 +151,9 @@ PanelWindow {
 
             AppControlW {
                 id: appControlWindow
+
+                systemTelemetry: sharedSystemTelemetry
+                fanControl: sharedFanControl
             }
         }
 
@@ -180,7 +204,10 @@ PanelWindow {
 
         // CPU
 
-        Cpu {}
+        Cpu {
+            systemTelemetry: sharedSystemTelemetry
+            fanControl: sharedFanControl
+        }
 
         // Weather
 

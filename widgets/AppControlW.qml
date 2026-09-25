@@ -13,6 +13,11 @@ import Qt5Compat.GraphicalEffects
 PanelWindow {
     id: appControlWindow
 
+    // Long-lived machine state is owned by shell.qml and shared with CPU++.
+    // AppControl keeps only host/view state and a lightweight ThermalController.
+    required property var systemTelemetry
+    required property var fanControl
+
     // ============================================================
     // STATE
     // ============================================================
@@ -875,20 +880,26 @@ PanelWindow {
         }
     }
 
-    property alias thermalRows: systemTelemetry.thermalRows
-    property alias fanRows: systemTelemetry.fanRows
-    property alias systemRows: systemTelemetry.systemRows
-    property alias killMonitorLoading: systemTelemetry.loading
-    property alias killMonitorError: systemTelemetry.errorText
+    readonly property var thermalRows:
+        systemTelemetry && Array.isArray(systemTelemetry.thermalRows)
+        ? systemTelemetry.thermalRows : []
+    readonly property var fanRows:
+        systemTelemetry && Array.isArray(systemTelemetry.fanRows)
+        ? systemTelemetry.fanRows : []
+    readonly property var systemRows:
+        systemTelemetry && Array.isArray(systemTelemetry.systemRows)
+        ? systemTelemetry.systemRows : []
+    readonly property bool killMonitorLoading:
+        systemTelemetry ? !!systemTelemetry.loading : false
+    readonly property string killMonitorError:
+        systemTelemetry ? String(systemTelemetry.errorText || "") : ""
 
-    SystemTelemetry {
-        id: systemTelemetry
+    // Selection repair remains AppControl-specific even though the telemetry
+    // instance itself now lives at shell scope.
+    Connections {
+        target: appControlWindow.systemTelemetry
 
-        onFanRowsChanged: {
-            thermalController.reconcileFanRows(fanRows);
-        }
-
-        onRefreshed: {
+        function onRefreshed() {
             if (appControlWindow.selectedModeIndex
                     === appControlWindow.thermalModeIndex
                     || appControlWindow.selectedModeIndex
@@ -913,24 +924,13 @@ PanelWindow {
         }
     }
 
-    // Fan mutation is intentionally separate from read-only telemetry.
-    // Keep this compatibility facade while the existing AppControl UI is
-    // extracted incrementally; CPU++ and future views can consume FanControl
-    // directly without owning the privileged write machinery.
-    FanControl {
-        id: fanControl
-
-        onRefreshRequested: systemTelemetry.refresh()
-
-        onErrorRaised: function(message) {
-            systemTelemetry.errorText = String(message || "");
-        }
-    }
-
+    // This controller is intentionally per-view: its THERMAL/FANS selection
+    // belongs to AppControl. The expensive telemetry and mutable PWM state
+    // underneath it are shared session-wide.
     ThermalController {
         id: thermalController
-        telemetry: systemTelemetry
-        fanControl: fanControl
+        telemetry: appControlWindow.systemTelemetry
+        fanControl: appControlWindow.fanControl
     }
 
     // Host-only glue: shared thermal state changes in ThermalController;

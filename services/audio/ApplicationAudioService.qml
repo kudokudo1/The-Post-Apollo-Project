@@ -16,8 +16,9 @@ Scope {
     property bool loading: false
     property string errorText: ""
 
-    // Persistent future-stream mute policies. A policy being present means
-    // "keep matching streams muted"; unmute removes the persistent policy.
+    // Persistent future-stream mute policies. APP / WINDOW / TAB remain
+    // separate semantic scopes even though they share one storage object.
+    // Composite storage keys preserve the donor's separate policy namespaces.
     property var mutePolicies: ({})
 
     // One-shot synchronization requests, used when an existing stream must be
@@ -146,6 +147,16 @@ Scope {
             tokens: tokens,
             strictTokens: !!descriptor.strictTokens
         };
+    }
+
+    function policyStorageKey(scope, key) {
+        const scopeText = String(scope || "").trim().toLowerCase();
+        const keyText = String(key || "");
+
+        if (!scopeText || !keyText)
+            return "";
+
+        return scopeText + ":" + keyText;
     }
 
     function matchesDescriptor(descriptor, sinkInput) {
@@ -330,8 +341,8 @@ Scope {
         return valid.length > 0;
     }
 
-    function setMutePolicy(key, descriptor, enabled) {
-        const policyKey = String(key || "");
+    function setMutePolicy(scope, key, descriptor, enabled) {
+        const policyKey = policyStorageKey(scope, key);
         if (!policyKey)
             return false;
 
@@ -342,7 +353,11 @@ Scope {
             if (!stored)
                 return false;
 
-            next[policyKey] = stored;
+            next[policyKey] = {
+                scope: String(scope || "").trim().toLowerCase(),
+                semanticKey: String(key || ""),
+                descriptor: stored
+            };
         } else {
             delete next[policyKey];
         }
@@ -352,13 +367,13 @@ Scope {
         return true;
     }
 
-    function mutePolicyActive(key) {
-        const policyKey = String(key || "");
+    function mutePolicyActive(scope, key) {
+        const policyKey = policyStorageKey(scope, key);
         return !!policyKey && mutePolicies[policyKey] !== undefined;
     }
 
-    function queueMuteState(key, descriptor, muted) {
-        const policyKey = String(key || "");
+    function queueMuteState(scope, key, descriptor, muted) {
+        const policyKey = policyStorageKey(scope, key);
         const stored = copyDescriptor(descriptor);
 
         if (!policyKey || !stored)
@@ -366,6 +381,8 @@ Scope {
 
         const next = Object.assign({}, pendingMuteStates);
         next[policyKey] = {
+            scope: String(scope || "").trim().toLowerCase(),
+            semanticKey: String(key || ""),
             descriptor: stored,
             muted: !!muted
         };
@@ -375,9 +392,14 @@ Scope {
         return true;
     }
 
-    function clearPoliciesWithPid(pid) {
+    // Preserve the donor's WINDOW-unmute rule: a narrow WINDOW action may
+    // clear a broader APP mute policy that contains the same live PID, but it
+    // must not erase unrelated WINDOW/TAB rules.
+    function clearMutePoliciesWithPid(scope, pid) {
+        const scopeText = String(scope || "").trim().toLowerCase();
         const targetPid = Number(pid || 0);
-        if (targetPid <= 1)
+
+        if (!scopeText || targetPid <= 1)
             return false;
 
         const keys = Object.keys(mutePolicies);
@@ -385,7 +407,11 @@ Scope {
         let changed = false;
 
         for (let i = 0; i < keys.length; i++) {
-            const descriptor = mutePolicies[keys[i]] || {};
+            const policy = mutePolicies[keys[i]] || {};
+            if (String(policy.scope || "") !== scopeText)
+                continue;
+
+            const descriptor = policy.descriptor || {};
             const pids = descriptor.pids || [];
 
             if (pids.indexOf(targetPid) !== -1) {
@@ -397,6 +423,57 @@ Scope {
         if (changed) {
             mutePolicies = next;
             requestPolicyRefresh();
+        }
+
+        return changed;
+    }
+
+    // Provider-owned lifetimes stay outside Team 6. A provider can explicitly
+    // tell the service which semantic keys remain live for one scope; the
+    // service only removes audio policies tied to identities that disappeared.
+    function retainPolicyKeys(scope, liveKeys) {
+        const scopeText = String(scope || "").trim().toLowerCase();
+        if (!scopeText)
+            return false;
+
+        const live = ({});
+        const source = Array.isArray(liveKeys) ? liveKeys : [];
+
+        for (let i = 0; i < source.length; i++) {
+            const key = String(source[i] || "");
+            if (key)
+                live[key] = true;
+        }
+
+        let changed = false;
+
+        const muteNext = Object.assign({}, mutePolicies);
+        const muteKeys = Object.keys(mutePolicies);
+        for (let i = 0; i < muteKeys.length; i++) {
+            const policy = mutePolicies[muteKeys[i]] || {};
+            if (String(policy.scope || "") !== scopeText)
+                continue;
+            if (!live[String(policy.semanticKey || "")]) {
+                delete muteNext[muteKeys[i]];
+                changed = true;
+            }
+        }
+
+        const volumeNext = Object.assign({}, volumePolicies);
+        const volumeKeys = Object.keys(volumePolicies);
+        for (let i = 0; i < volumeKeys.length; i++) {
+            const policy = volumePolicies[volumeKeys[i]] || {};
+            if (String(policy.scope || "") !== scopeText)
+                continue;
+            if (!live[String(policy.semanticKey || "")]) {
+                delete volumeNext[volumeKeys[i]];
+                changed = true;
+            }
+        }
+
+        if (changed) {
+            mutePolicies = muteNext;
+            volumePolicies = volumeNext;
         }
 
         return changed;
@@ -423,6 +500,8 @@ Scope {
 
         const next = Object.assign({}, volumePolicies);
         next[policyKey] = {
+            scope: String(scope || "").trim().toLowerCase(),
+            semanticKey: String(key || ""),
             descriptor: stored,
             percent: clampVolume(percent),
             serial: volumePolicySerial
@@ -466,7 +545,8 @@ Scope {
                 continue;
 
             for (let p = 0; p < keys.length; p++) {
-                if (matchesDescriptor(mutePolicies[keys[p]], input)) {
+                const policy = mutePolicies[keys[p]] || {};
+                if (matchesDescriptor(policy.descriptor, input)) {
                     setSinkInputMute([index], true);
                     break;
                 }

@@ -2,6 +2,8 @@
 """Static ownership guard for the shared SurfaceLaunch contract."""
 
 from pathlib import Path
+import ast
+import json
 import re
 import sys
 
@@ -118,6 +120,22 @@ required_recovery_functions = (
 for name in required_recovery_functions:
     if not re.search(rf"\bfunction\s+{re.escape(name)}\s*\(", recovery):
         errors.append(f"missing recovery function: {name}")
+
+probe_match = re.search(
+    r'function\s+probeScript\s*\(\s*\)\s*\{\s*'
+    r'return\s+("(?:\\.|[^"\\])*");\s*\}',
+    recovery,
+    re.S,
+)
+
+if not probe_match:
+    errors.append("unable to extract recovery probe Python")
+else:
+    try:
+        probe_python = json.loads(probe_match.group(1))
+        ast.parse(probe_python)
+    except Exception as exc:
+        errors.append(f"recovery probe Python syntax invalid: {exc}")
 
 for token in (
     "os.getuid()",

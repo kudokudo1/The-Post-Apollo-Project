@@ -338,8 +338,10 @@ TestCase {
         const before = Object.keys(coordinator.leases).length;
         compare(before, 1);
 
-        coordinator.markLaunchSucceeded(
-            augmentation.correlationId
+        verify(
+            coordinator.markLaunchSucceeded(
+                augmentation.correlationId
+            )
         );
 
         compare(
@@ -354,6 +356,45 @@ TestCase {
         );
     }
 
+    function test_accessibilityOnlyCorrelationCanReleaseWithoutLease() {
+        const augmentation = coordinator.buildAugmentation(
+            braveEvidence(),
+            [requirements.capabilityAccessibility]
+        );
+
+        verify(augmentation.ready);
+        compare(augmentation.leases.length, 0);
+        verify(
+            coordinator.correlationState[
+                augmentation.correlationId
+            ] !== undefined
+        );
+
+        verify(
+            coordinator.releaseCorrelation(
+                augmentation.correlationId
+            )
+        );
+        verify(
+            coordinator.correlationState[
+                augmentation.correlationId
+            ] === undefined
+        );
+    }
+
+    function test_unknownCorrelationCannotBecomeLaunchedState() {
+        verify(
+            !coordinator.markLaunchSucceeded(
+                "surface-not-prepared"
+            )
+        );
+        verify(
+            coordinator.correlationState[
+                "surface-not-prepared"
+            ] === undefined
+        );
+    }
+
     function test_launchFailureReleasesInstrumentationLease() {
         const augmentation = coordinator.buildAugmentation(
             kittyEvidence(),
@@ -362,8 +403,10 @@ TestCase {
 
         compare(Object.keys(coordinator.leases).length, 1);
 
-        coordinator.markLaunchFailed(
-            augmentation.correlationId
+        verify(
+            coordinator.markLaunchFailed(
+                augmentation.correlationId
+            )
         );
 
         compare(Object.keys(coordinator.leases).length, 0);

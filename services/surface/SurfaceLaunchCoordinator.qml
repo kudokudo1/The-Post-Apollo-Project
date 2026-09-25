@@ -110,6 +110,19 @@ QtObject {
         return "";
     }
 
+    function debugAddressIsLoopback(value) {
+        const address = asText(value).trim().toLowerCase();
+
+        // Missing address preserves current donor behavior when a caller
+        // already supplied its own debug port. Explicit broad/non-loopback
+        // addresses are not equivalent to T5's loopback-only bootstrap.
+        return !address
+            || address === "127.0.0.1"
+            || address === "localhost"
+            || address === "::1"
+            || address === "[::1]";
+    }
+
     function existingKittyListenOn(evidence) {
         const tokens = commandTokens(evidence);
 
@@ -434,18 +447,30 @@ QtObject {
             let address = existingAddress;
 
             if (port > 0) {
-                const reservation = addLease(
-                    "devtools-port",
-                    port,
-                    correlationId,
-                    SurfaceBackend.SurfaceLaunchRequirements.capabilityDevTools,
-                    "caller-supplied"
-                );
+                if (!debugAddressIsLoopback(existingAddress)) {
+                    conflictRows.push({
+                        kind: "devtools-debug-address",
+                        value: existingAddress,
+                        requestedCorrelationId: correlationId,
+                        existingCorrelationId: "",
+                        capability:
+                            SurfaceBackend.SurfaceLaunchRequirements.capabilityDevTools,
+                        reason: "requires-loopback"
+                    });
+                } else {
+                    const reservation = addLease(
+                        "devtools-port",
+                        port,
+                        correlationId,
+                        SurfaceBackend.SurfaceLaunchRequirements.capabilityDevTools,
+                        "caller-supplied"
+                    );
 
-                if (reservation.ok)
-                    leaseRows.push(reservation.lease);
-                else
-                    conflictRows.push(reservation.conflict);
+                    if (reservation.ok)
+                        leaseRows.push(reservation.lease);
+                    else
+                        conflictRows.push(reservation.conflict);
+                }
             } else {
                 port = allocateDebugPort(
                     SurfaceBackend.SurfaceLaunchRequirements.preferredDebugPort(evidence),

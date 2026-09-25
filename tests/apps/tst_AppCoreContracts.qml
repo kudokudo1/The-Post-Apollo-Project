@@ -72,6 +72,12 @@ TestCase {
         colors: fakePresentationColors
     }
 
+    AppSelectorPresentation {
+        id: selectorPresentation
+        coreProvider: core
+        colors: fakePresentationColors
+    }
+
     QtObject {
         id: fakeIdentityEvidence
 
@@ -696,6 +702,151 @@ TestCase {
             facade.cachedIconGlow("icon://facade"),
             "cyan"
         );
+    }
+
+    function test_selectorPresentationPreservesDonorModels() {
+        let source = selectorPresentation.sourceOptions(false);
+
+        compare(source.length, 3);
+        compare(source[0].value, core.sourceNative);
+        compare(source[0].label, "-⋆♱⋆-");
+        compare(source[0].accent, "cyan");
+
+        compare(source[1].value, core.sourceFlatpak);
+        compare(source[1].label, "⋆˙⟡ ⌯⛟\nFLATPACK");
+        compare(source[1].accent, "magenta");
+        compare(source[1].size, 10);
+
+        compare(source[2].value, core.sourceHidden);
+        compare(source[2].label, "HIDDEN");
+        compare(source[2].accent, "yellow");
+
+        source = selectorPresentation.sourceOptions(true);
+
+        compare(source[1].label, "⋆˙⟡ ⌯⛟");
+        compare(source[1].size, 16);
+        compare(source[2].label, "|ω-ς)");
+
+        const launch = selectorPresentation.launchOptions();
+
+        compare(launch.length, 3);
+        compare(launch[0].value, core.launchNormal);
+        compare(launch[0].label, "⌯♱ ๋࣭⭑");
+        compare(launch[0].accent, "cyan");
+
+        compare(launch[1].value, core.launchBottle);
+        compare(launch[1].bottleIcon, true);
+        compare(launch[1].accent, "magenta");
+
+        compare(launch[2].value, core.launchToolbox);
+        compare(launch[2].toolboxIcon, true);
+        compare(launch[2].accent, "green");
+    }
+
+    function test_selectorPresentationPreservesHiddenFaceAndBadge() {
+        compare(
+            selectorPresentation.hiddenFace(false),
+            "|ω-ς)"
+        );
+        compare(
+            selectorPresentation.hiddenFace(true),
+            "|ω･`ς)"
+        );
+
+        let badge = selectorPresentation.sourceBadge(
+            nativeEntry(),
+            false
+        );
+
+        compare(badge.label, "NORMAL");
+        compare(badge.accent, "cyan");
+        compare(badge.opacity, 0.82);
+
+        badge = selectorPresentation.sourceBadge(
+            flatpakEntry(),
+            false
+        );
+
+        compare(badge.label, "FLATPAK");
+        compare(badge.accent, "magenta");
+        compare(badge.opacity, 0.82);
+
+        badge = selectorPresentation.sourceBadge(
+            flatpakEntry(),
+            true
+        );
+
+        compare(badge.accent, "white");
+        compare(badge.opacity, 0.58);
+    }
+
+    function test_selectorGlowSpecsPreserveDonorAPPSStyle() {
+        let spec = selectorPresentation.sourceGlowSpec(
+            core.sourceNative,
+            false,
+            false,
+            false
+        );
+
+        compare(spec.glowColor, "cyan");
+        compare(spec.fillColor, undefined === spec.fillColor ? "" : spec.fillColor);
+        compare(spec.glowRadius, 12);
+        compare(spec.glowSamples, 11);
+        compare(spec.glowOpacity, 0.66);
+        compare(spec.shadowOpacity, 0.52);
+
+        spec = selectorPresentation.sourceGlowSpec(
+            core.sourceFlatpak,
+            true,
+            false,
+            false
+        );
+
+        compare(spec.glowColor, "magenta");
+        compare(spec.fillColor, undefined === spec.fillColor ? "" : spec.fillColor);
+        compare(spec.glowRadius, 8);
+        compare(spec.glowSamples, 7);
+        compare(spec.glowOpacity, 0.64);
+        compare(spec.shadowOpacity, 0.52);
+
+        spec = selectorPresentation.launchGlowSpec(
+            core.launchToolbox,
+            false,
+            true,
+            false
+        );
+
+        compare(spec.glowColor, "orange");
+        compare(spec.glowRadius, 8);
+        compare(spec.glowSamples, 7);
+        compare(spec.glowOpacity, 0.60);
+        compare(spec.shadowOpacity, 0.52);
+    }
+
+    function test_facadeExposesSelectorPresentation() {
+        const source = facade.sourceSelectorOptions(false);
+        const launch = facade.launchSelectorOptions();
+
+        compare(source[0].value, facade.sourceNative);
+        compare(source[1].value, facade.sourceFlatpak);
+        compare(source[2].value, facade.sourceHidden);
+
+        compare(launch[0].value, facade.launchNormal);
+        compare(launch[1].value, facade.launchBottle);
+        compare(launch[2].value, facade.launchToolbox);
+
+        compare(
+            facade.hiddenSourceFace(true),
+            "|ω･`ς)"
+        );
+
+        const badge = facade.sourceBadge(
+            flatpakEntry(),
+            false
+        );
+
+        compare(badge.label, "FLATPAK");
+        compare(badge.accent, "magenta");
     }
 
     function test_sourceClassification() {

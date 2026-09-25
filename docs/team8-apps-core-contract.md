@@ -62,6 +62,24 @@ launch mechanisms, and application of a supplied augmentation. AppLaunchPlanner 
 that supplied augmentation opaquely until the shared T5-domain contract freezes its exact
 payload schema.
 
+### AppBottleProvider.qml
+
+Standalone Bottles discovery/state provider.
+
+Owns:
+
+- Bottles CLI discovery
+- JSON payload parsing
+- legacy text-output fallback
+- available bottle names
+- default/current bottle selection state
+- loading/error state
+
+It does not launch applications and has no AppControl host dependency.
+
+Bottles launch intent remains in `AppLaunchPlanner.qml`, so discovery/state and launch
+mechanism stay separately testable.
+
 ### AppActionCatalog.qml
 
 Pure action-description layer.

@@ -49,6 +49,7 @@ required_coordinator_functions = (
     "existingDebugPort",
     "existingDebugAddress",
     "existingKittyListenOn",
+    "kittyRemoteControlMode",
     "kittyRemoteControlEnabled",
 )
 
@@ -100,6 +101,7 @@ for token in (
     "description.requestedCapabilities.length === 0",
     "description.unsupportedCapabilities.length > 0",
     "releaseCorrelation(correlationId)",
+    '"requires-socket-only"',
 ):
     if token not in coordinator:
         errors.append(f"missing augmentation readiness/lease contract token: {token}")

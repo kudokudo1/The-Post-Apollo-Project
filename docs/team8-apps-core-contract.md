@@ -56,10 +56,11 @@ Produces intent for:
 - HIDDEN dispatch
 - unavailable launch states
 
-Normal execution must remain extensible, but Team 5's current published contract does
-not claim DesktopEntry-aware launch preparation. The donor's launch-time accessibility /
-debug-port instrumentation is tracked as an unresolved cross-team seam rather than being
-assigned to Team 5 by assumption.
+Surface-launch ownership is now resolved. Team 5 owns the shared launcher-neutral
+SurfaceLaunch requirements/coordinator domain; Team 8 owns launch intent, base plans,
+launch mechanisms, and application of a supplied augmentation. AppLaunchPlanner carries
+that supplied augmentation opaquely until the shared T5-domain contract freezes its exact
+payload schema.
 
 ### AppActionCatalog.qml
 
@@ -97,35 +98,98 @@ Until Team 7 freezes a shared contract:
 
 ## Launch rule
 
-Launch selection belongs to Team 8.
+T3 Overhead resolved the SurfaceLaunch seam.
 
-The donor also contains launch-time instrumentation whose purpose is to make surfaces
-discoverable: Kitty remote-control sockets plus accessibility and DevTools flags for
-Chromium/Electron-family applications. Team 5's published contract currently owns
-discovery/activation and explicitly avoids DesktopEntry ownership; it does not currently
-claim this launch instrumentation.
+### Team 8 / launch domains own
 
-Therefore the permanent owner of that augmentation policy is unresolved. Team 8 must not
-silently assign it to Team 5 or absorb provider discovery into APPS.
+- launch intent
+- base launch plan
+- Native / Toolbox / Bottles mechanism choice
+- actual process-launch mechanism
+- application of augmentation supplied by the shared SurfaceLaunch layer
 
-Until management resolves the seam, the safe architecture is:
+### T5-domain-owned shared SurfaceLaunch layer owns
+
+- discoverability requirement descriptions
+- capability selection / requirement construction
+- argv/env/bootstrap augmentation construction
+- transient endpoint / lease coordination
+- correlation/bootstrap metadata
+
+This shared implementation is launcher-neutral and need not live physically under
+TabSurfaceProvider.
+
+### TabSurfaceProvider owns
+
+- post-launch surface discovery
+- activation
+- provider lifecycle
+- diagnostics
+
+### Team 7 owns
+
+- semantic interpretation of the resulting observations
+- relationship evidence / joins
+
+Team 7 must not turn ephemeral launch coordinates such as sockets, debug ports, leases,
+or correlation tokens into persistent semantic identity.
+
+### Lifetime separation
+
+Keep these clocks separate:
+
+```
+launch transaction
+    -> argv/env transformation
+
+instrumentation/application instance
+    -> socket / debug endpoint / lease / correlation state
+
+surface provider
+    -> scans / records / activation / diagnostics
+```
+
+In particular, SurfaceLaunch instrumentation lifetime is not governed by
+`TabSurfaceProvider.active`.
+
+### Capability rule
+
+Surface instrumentation is explicit opt-in. The capability boundary currently includes
+concepts such as:
+
+```
+KITTY_REMOTE
+ACCESSIBILITY
+DEVTOOLS
+```
+
+Team 8 must not implement an `augmentEverything`-style global interceptor.
+
+The exact shared API/schema is not frozen yet. Until T5 publishes it, Team 8 carries the
+supplied augmentation opaquely on its launch plans and does not infer provider-specific
+requirements itself.
+
+Conceptually:
 
 ```
 APPS Core
-  -> choose launch intent
-  -> expose a pure launch plan
+  -> choose launch intent / base plan
+  -> request or receive T5-domain SurfaceLaunch augmentation
+  -> apply/carry supplied augmentation through Native / Toolbox / Bottles
+  -> execute
 
-UNRESOLVED SURFACE-LAUNCH ADAPTER
-  -> may augment environment / argv / provider bootstrap
-  -> must not own APPS launch policy
-  -> must not own cross-provider semantic identity
+launched application
+  -> owns actual runtime socket/debug listener lifetime
 
-executor
-  -> perform the launch
+TabSurfaceProvider
+  -> discovers / activates / diagnoses
+
+Team 7
+  -> interprets relationships
 ```
 
-This prevents `launchApplicationWithTabProvider()`-style coupling from becoming the
-permanent architecture while preserving the behavior for later reconstruction.
+This replaces the donor's `launchApplicationWithTabProvider()` coupling without turning
+Team 5 into a launcher or Team 8 into the authority on provider instrumentation.
 
 ## Certification state
 

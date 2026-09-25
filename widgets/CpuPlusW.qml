@@ -1131,7 +1131,7 @@ PanelWindow {
             anchors.bottom: parent.bottom
 
             anchors.leftMargin: 8
-            anchors.rightMargin: 18
+            anchors.rightMargin: 8
             anchors.topMargin: 10
             anchors.bottomMargin: 8
 
@@ -1485,7 +1485,9 @@ PanelWindow {
             anchors.top: targetSubModeStrip.bottom
             anchors.bottom: parent.bottom
 
-            anchors.margins: 8
+            anchors.leftMargin: 8
+            anchors.rightMargin: 18
+            anchors.bottomMargin: 8
             anchors.topMargin: 10
 
             visible:

@@ -1,12 +1,39 @@
 # Team 7 — Surface launch ownership seam
 
-Status: architecture escalation note only.
+Status: **CLOSED / RESOLVED by T3 Overhead**.
 
 Current certified patient when observed:
 `6c74628baeaf7cf2f37808f9e57293aaad7e1788`
 
-Team 8 has documented an unresolved ownership seam around launch-time
-instrumentation whose purpose is making Team 5 surfaces discoverable.
+Team 8 documented an ownership seam around launch-time instrumentation whose
+purpose is making Team 5 surfaces discoverable. T3 Overhead has now resolved
+that seam.
+
+Approved ownership:
+
+```text
+T8 / RUN / future launch domains
+    own launch intent, launch mechanism, and application of supplied augmentation
+
+T5-domain SurfaceLaunchRequirements / SurfaceLaunchCoordinator
+    own discoverability requirement descriptions
+    own argv/env/bootstrap augmentation construction
+    own transient endpoint / lease coordination
+    own correlation/bootstrap metadata
+
+launched process
+    owns actual runtime socket/debug listener lifetime
+
+T5 TabSurfaceProvider
+    owns post-launch discovery, activation, provider lifecycle, diagnostics
+
+T7
+    owns semantic interpretation, relationship evidence, and joins
+```
+
+The SurfaceLaunch components are T5-domain-owned but physically launcher-neutral
+shared siblings. They do not make Team 5 the launcher and do not require APPS→Tabs
+or RUN→APPS coupling.
 
 Examples currently preserved in donor behavior include:
 
@@ -29,35 +56,84 @@ That evidence can help an authorized launch/provider adapter decide whether an
 augmentation applies. It does not make Team 7 the owner of argv/environment
 mutation or provider bootstrap policy.
 
-## Why this is an event
+## Resolved capability boundary
 
-The seam crosses Team 5 and Team 8 ownership and neither published contract
-currently owns the middle augmentation step.
+Surface instrumentation is explicit opt-in, never a global launch interceptor.
 
-That makes it an ownership ambiguity under the hospital's event-driven reporting
-rules.
-
-No Team 7 code should silently solve the ambiguity by adding launch mutation to
-the identity service.
-
-## Safe architecture invariant
-
-Whatever owner management selects, preserve this separation:
+Conceptually:
 
 ```text
-APPS launch intent                 Team 8
-        |
-        v
-surface-discovery augmentation     explicit owner required
-        |
-        v
-execution
-        |
-        v
-surface observation               Team 5
-        |
-        v
-semantic joins                    Team 7
+surfaceCapabilitiesRequested:
+    KITTY_REMOTE
+    ACCESSIBILITY
+    DEVTOOLS
 ```
 
-Team 7 remains downstream of observations and upstream of semantic consumers.
+Exact API names are not frozen. The capability boundary is.
+
+## Lifetime invariant
+
+Keep these clocks independent:
+
+```text
+launch transaction
+    -> argv/env transformation
+
+instrumentation/application instance
+    -> socket / debug endpoint / lease / correlation state
+
+surface provider
+    -> scans / records / activation / diagnostics
+```
+
+In particular:
+
+```text
+instrumentation lifetime
+!=
+TabSurfaceProvider.active lifetime
+```
+
+Provider inactivity must not destroy instrumentation still required by the
+running application.
+
+## Team 7 consequence
+
+Team 7 may consume resulting:
+
+- PID
+- socket/listener coordinate
+- debug port
+- DevTools target
+- launch correlation/lease metadata
+
+as relationship evidence.
+
+Team 7 must not:
+
+- decide whether launch augmentation is injected
+- own argv/environment mutation
+- own provider bootstrap policy
+- make socket/port/target/correlation coordinates persistent semantic identity
+- conflate instrumentation lifetime with surface-provider lifetime
+
+The safe architecture is now:
+
+```text
+launch intent / mechanism              T8 / RUN / launch domain
+        |
+        v
+surface requirement + augmentation     T5-domain shared SurfaceLaunch
+        |
+        v
+execution / running process
+        |
+        v
+surface observation                    T5 TabSurfaceProvider
+        |
+        v
+semantic interpretation                T7
+```
+
+Ownership is resolved. Future disagreement here is a contract implementation
+issue rather than an ownership ambiguity.

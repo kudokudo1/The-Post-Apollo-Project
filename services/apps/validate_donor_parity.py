@@ -36,6 +36,7 @@ EXTRACTED = {
     "catalog": APP_DIR / "AppCatalogPolicy.qml",
     "hidden": APP_DIR / "AppHiddenAdapter.qml",
     "bottles": APP_DIR / "AppBottleProvider.qml",
+    "selection": APP_DIR / "AppSelectionPolicy.qml",
 }
 
 errors: list[str] = []
@@ -256,6 +257,19 @@ require_function_anchors(
     ("entry.id", "entry.name"),
 )
 
+require_function_anchors(
+    "donor remembered APPS selection",
+    donor_text,
+    "restoreRememberedAppSelection",
+    (
+        "currentApplicationValues()",
+        "rememberedAppKey",
+        "appEntryKey(apps[i]) === rememberedAppKey",
+        "restoredIndex = 0",
+        "selectedResultIndex = restoredIndex",
+    ),
+)
+
 # filteredApps is a ScriptModel rather than a function, so guard the distinctive
 # donor semantics directly in the containing source.
 require_all(
@@ -425,6 +439,18 @@ require_function_anchors(
     texts.get("catalog", ""),
     "entryKey",
     ("entry.id", "entry.name"),
+)
+
+require_function_anchors(
+    "extracted remembered APPS selection",
+    texts.get("selection", ""),
+    "restoreIndex",
+    (
+        "rows.length === 0",
+        "catalogPolicy.entryKey(rows[i]) === key",
+        "return 0",
+        "return -1",
+    ),
 )
 
 require_function_anchors(

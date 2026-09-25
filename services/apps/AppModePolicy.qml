@@ -3,7 +3,7 @@ import QtQuick
 // Team 8 — APPS Core mode policy.
 //
 // Pure APPS-specific state policy only. It does not refresh RUN, mutate host
-// selection, move a ListView, change focus, or reset generic detail state.
+// selection, move a host result view, change focus, or reset generic detail state.
 QtObject {
     id: policy
 

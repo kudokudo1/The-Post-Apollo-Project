@@ -138,9 +138,12 @@ QtObject {
         const result = [];
 
         for (let i = 0; i < values.length; i++) {
-            const value = asText(values[i]).toUpperCase();
+            const value = asText(values[i]).trim().toUpperCase();
 
-            if (knownCapabilities.indexOf(value) === -1)
+            // Preserve unknown requests so the contract can reject them
+            // explicitly. Silently dropping a typo would turn an invalid
+            // explicit request into a misleading ready no-op.
+            if (!value)
                 continue;
 
             if (result.indexOf(value) === -1)

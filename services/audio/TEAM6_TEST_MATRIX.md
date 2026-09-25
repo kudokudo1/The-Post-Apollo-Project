@@ -29,6 +29,17 @@ T0 Manager, and T3 Overhead alone certifies a patient.
 
 ## A. Deterministic descriptor matching
 
+### A0 — descriptor PID normalization
+
+Descriptor PID evidence may arrive through JSON/QML as numeric strings.
+
+Expected:
+
+- `"4242"` and `4242` compare as the same exact PID evidence
+- normalization returns positive unique integers
+- PID 0/1, negative values, fractions, and non-numeric strings are rejected
+- normalization does not create semantic application identity
+
 ### A1 — exact PID evidence
 
 Descriptor:

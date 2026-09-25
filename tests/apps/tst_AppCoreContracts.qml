@@ -31,6 +31,11 @@ TestCase {
         actionCatalog: actionCatalog
     }
 
+    AppActionCommandBuilder {
+        id: actionCommandBuilder
+        launchPlanner: launchPlanner
+    }
+
     AppCatalogPolicy {
         id: catalogPolicy
         coreProvider: core
@@ -398,6 +403,19 @@ TestCase {
         compare(
             actionPlan.extraArgs.join(" "),
             "--new-tab brave://newtab/"
+        );
+
+        const actionCommand = facade.buildActionCommand(
+            actionPlan
+        );
+
+        compare(
+            actionCommand.kind,
+            actionCommandBuilder.commandBrowserLaunch
+        );
+        compare(
+            actionCommand.argv.join(" "),
+            "/usr/bin/brave-browser --new-tab brave://newtab/"
         );
 
         const launchPlan = facade.planLaunch(
@@ -1066,6 +1084,135 @@ TestCase {
         compare(plan.kind, actionPlanner.planDesktopAction);
         compare(plan.action, rawAction);
         compare(plan.stableId, "desktop|OPEN%20PROFILE");
+    }
+
+    function test_actionCommandBuilderPreservesDesktopEntryAction() {
+        const action = {
+            name: "OPEN PROFILE",
+            execute: function() {}
+        };
+
+        const plan = actionPlanner.plan(
+            action,
+            firefoxEntry(),
+            2
+        );
+
+        const command = actionCommandBuilder.build(plan);
+
+        compare(
+            command.kind,
+            actionCommandBuilder.commandDesktopAction
+        );
+        compare(command.action, action);
+        compare(command.entry.name, "Firefox");
+        compare(command.stableId, "desktop|OPEN%20PROFILE");
+    }
+
+    function test_actionCommandBuilderBuildsBrowserLaunchArgv() {
+        const actions = actionCatalog.desktopActions(braveEntry());
+        let target = null;
+
+        for (let i = 0; i < actions.length; i++) {
+            if (actions[i]
+                    && actions[i]._appControlBuiltin === "settings") {
+                target = actions[i];
+                break;
+            }
+        }
+
+        verify(target !== null);
+
+        const plan = actionPlanner.plan(
+            target,
+            braveEntry(),
+            0
+        );
+
+        const command = actionCommandBuilder.build(plan);
+
+        compare(
+            command.kind,
+            actionCommandBuilder.commandBrowserLaunch
+        );
+        compare(
+            command.argv.join(" "),
+            "/usr/bin/brave-browser brave://settings/"
+        );
+        compare(command.browserKind, "brave");
+        compare(command.action, "settings");
+    }
+
+    function test_actionCommandBuilderKeepsShortcutNeutral() {
+        const actions = actionCatalog.desktopActions(braveEntry());
+        let target = null;
+
+        for (let i = 0; i < actions.length; i++) {
+            if (actions[i]
+                    && actions[i]._appControlBuiltin === "history") {
+                target = actions[i];
+                break;
+            }
+        }
+
+        verify(target !== null);
+
+        const plan = actionPlanner.plan(
+            target,
+            braveEntry(),
+            0
+        );
+
+        const command = actionCommandBuilder.build(plan);
+
+        compare(
+            command.kind,
+            actionCommandBuilder.commandBrowserShortcut
+        );
+        compare(command.browserKind, "brave");
+        compare(command.sequence.join("+"), "ctrl+h");
+        compare(command.entry.name, "Brave Browser");
+
+        compare(command.swayCriteria, undefined);
+        compare(command.wtypeCommand, undefined);
+    }
+
+    function test_browserShellLaunchActionFailsClosed() {
+        const shellBrowser = {
+            id: "firefox-shell.desktop",
+            name: "Firefox",
+            startupClass: "firefox",
+            command: "firefox %U",
+            actions: []
+        };
+
+        const actions = actionCatalog.desktopActions(shellBrowser);
+        let target = null;
+
+        for (let i = 0; i < actions.length; i++) {
+            if (actions[i]
+                    && actions[i]._appControlBuiltin === "settings") {
+                target = actions[i];
+                break;
+            }
+        }
+
+        const plan = actionPlanner.plan(
+            target,
+            shellBrowser,
+            0
+        );
+
+        const command = actionCommandBuilder.build(plan);
+
+        compare(
+            command.kind,
+            actionCommandBuilder.commandUnavailable
+        );
+        compare(
+            command.reason,
+            "browser-launch-shell-command-unresolved"
+        );
     }
 
     function test_browserActionPlans() {

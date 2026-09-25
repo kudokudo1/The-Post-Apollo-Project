@@ -259,6 +259,55 @@ QtObject {
     function buildAugmentation(evidence, requestedCapabilities) {
         const description =
             requirements.describe(evidence, requestedCapabilities);
+
+        // Explicit opt-in means an empty capability request is a true no-op:
+        // no correlation record, no lease state, no launch mutation.
+        if (description.requestedCapabilities.length === 0) {
+            return {
+                correlationId: "",
+                requestedCapabilities: [],
+                appliedCapabilities: [],
+                unsupportedCapabilities: [],
+                env: {},
+                argvAfterExecutable: [],
+                argvAppend: [],
+                bootstrap: {
+                    correlationId: "",
+                    kittyListenOn: "",
+                    debugAddress: "",
+                    debugPort: 0
+                },
+                leases: [],
+                conflicts: [],
+                ready: true
+            };
+        }
+
+        // Unsupported/unknown explicit requests fail before any endpoint
+        // allocation so rejected preparation cannot strand lease state.
+        if (description.unsupportedCapabilities.length > 0) {
+            return {
+                correlationId: "",
+                requestedCapabilities:
+                    description.requestedCapabilities.slice(),
+                appliedCapabilities: [],
+                unsupportedCapabilities:
+                    description.unsupportedCapabilities.slice(),
+                env: {},
+                argvAfterExecutable: [],
+                argvAppend: [],
+                bootstrap: {
+                    correlationId: "",
+                    kittyListenOn: "",
+                    debugAddress: "",
+                    debugPort: 0
+                },
+                leases: [],
+                conflicts: [],
+                ready: false
+            };
+        }
+
         const correlationId = newCorrelationId(evidence);
         const env = {};
         const argvAfterExecutable = [];
@@ -432,36 +481,41 @@ QtObject {
                 applied.push(requirements.capabilityDevTools);
         }
 
-        const ready =
-            description.unsupportedCapabilities.length === 0
-            && conflictRows.length === 0;
+        const ready = conflictRows.length === 0;
 
-        const state = {
-            state: "prepared",
-            requestedCapabilities:
-                description.requestedCapabilities.slice(),
-            supportedCapabilities:
-                description.supportedCapabilities.slice(),
-            appliedCapabilities: applied.slice(),
-            ready: ready,
-            metadata: Object.assign({}, metadata)
-        };
-        const states = Object.assign({}, correlationState);
-        states[correlationId] = state;
-        correlationState = states;
+        if (!ready) {
+            // Preparation never reached an executable state. Any successful
+            // sibling reservations created earlier in this transaction must
+            // be released immediately; there is no application lifetime yet.
+            releaseCorrelation(correlationId);
+        } else {
+            const state = {
+                state: "prepared",
+                requestedCapabilities:
+                    description.requestedCapabilities.slice(),
+                supportedCapabilities:
+                    description.supportedCapabilities.slice(),
+                appliedCapabilities: applied.slice(),
+                ready: true,
+                metadata: Object.assign({}, metadata)
+            };
+            const states = Object.assign({}, correlationState);
+            states[correlationId] = state;
+            correlationState = states;
+        }
 
         return {
             correlationId: correlationId,
             requestedCapabilities:
                 description.requestedCapabilities.slice(),
-            appliedCapabilities: applied.slice(),
+            appliedCapabilities: ready ? applied.slice() : [],
             unsupportedCapabilities:
                 description.unsupportedCapabilities.slice(),
             env: env,
             argvAfterExecutable: argvAfterExecutable,
             argvAppend: argvAppend,
             bootstrap: Object.assign({}, metadata),
-            leases: leaseRows.slice(),
+            leases: ready ? leaseRows.slice() : [],
             conflicts: conflictRows.slice(),
             ready: ready
         };

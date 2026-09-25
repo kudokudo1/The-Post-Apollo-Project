@@ -123,6 +123,7 @@ External inputs remain explicit:
 identityEvidence      Team 7 contract
 hiddenCommandNames    future RunService
 preferencePredicate   optional Favorites/host ranking signal
+presentationColors    injected theme palette
 surface augmentation  T5-domain shared contract
 ```
 
@@ -175,6 +176,35 @@ It must not implement:
 
 This keeps Team 8 as DesktopEntry catalog/launch authority while Team 7 remains semantic
 identity authority.
+
+### AppIconGlowPolicy.qml
+
+Palette-injected APPS presentation policy.
+
+Owns:
+
+- icon-source keyed glow cache
+- cache update semantics that reassign the object for QML binding visibility
+- donor chromatic accent classifier
+- donor monochrome fallback behavior
+
+It does not:
+
+- capture/read icon pixels
+- own global theme colors
+- mutate generic host UI
+- infer semantic application identity
+
+The facade receives `presentationColors` as an explicit palette input and exposes:
+
+```
+cachedIconGlow(source)
+rememberIconGlow(source, color, forceOverwrite)
+classifyIconGlow(pixelData)
+```
+
+This keeps APPS-specific visual behavior out of the host while leaving the theme and image
+capture mechanisms independently owned.
 
 ### AppModePolicy.qml
 

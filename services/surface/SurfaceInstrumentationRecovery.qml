@@ -21,6 +21,7 @@ QtObject {
 
     property bool loading: false
     property string errorText: ""
+    property bool partial: false
     property var observations: []
     property var completeKinds: []
     property int generation: 0
@@ -81,6 +82,7 @@ QtObject {
         return {
             observations: rows,
             completeKinds: kinds,
+            partial: !!payload.partial,
             errorText:
                 Array.isArray(payload.errors)
                 ? payload.errors.join(" | ")
@@ -93,6 +95,7 @@ QtObject {
 
         observations = snapshot.observations;
         completeKinds = snapshot.completeKinds;
+        partial = snapshot.partial;
         errorText = snapshot.errorText;
         generation += 1;
         snapshotChanged();
@@ -114,6 +117,7 @@ QtObject {
 
         loading = true;
         errorText = "";
+        partial = false;
 
         probeProcess.exec([
             "python3",

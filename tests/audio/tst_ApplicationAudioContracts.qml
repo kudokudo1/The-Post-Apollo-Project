@@ -246,7 +246,6 @@ TestCase {
         compare(observation.lifetimeClass, "ephemeral");
         compare(observation.generation, 12);
         compare(observation.raw.streamIndex, 48);
-        compare(observation.relationships.length, 0);
         verify(observation.aliases.length > 0);
 
         let sawBinary = false;
@@ -256,12 +255,41 @@ TestCase {
                 sawBinary = true;
                 compare(alias.value, "kitty");
                 compare(alias.normalized, "kitty");
+                compare(alias.provider, "PIPEWIRE");
             }
         }
 
         verify(sawBinary);
+
+        compare(observation.relationships.length, 1);
+        compare(observation.relationships[0].kind, "EXACT_PID");
+        compare(observation.relationships[0].targetProvider, "PROCFS");
+        compare(observation.relationships[0].targetKey, "pid:9100");
+        compare(observation.relationships[0].strength, "exact");
+        compare(
+            observation.relationships[0].sourceField,
+            "application.process.id"
+        );
+
         compare(observation.semanticKey, undefined);
         compare(observation.applicationEntity, undefined);
+    }
+
+    function test_team7ObservationOmitsInvalidPidRelationship() {
+        const stream = sinkInput(
+            49,
+            1,
+            "demo",
+            "org.example.demo",
+            "Demo",
+            "Playback",
+            false,
+            50
+        );
+
+        const observation = audio.streamObservation(stream);
+
+        compare(observation.relationships.length, 0);
     }
 
     function test_parseSinkInputsAcceptsPactlArray() {

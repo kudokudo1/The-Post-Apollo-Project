@@ -13,6 +13,8 @@ TestCase {
 
         for (let i = 0; i < ids.length; i++)
             coordinator.releaseCorrelation(ids[i]);
+
+        coordinator.reconcileObservedInstrumentation([]);
     }
 
     function braveEvidence() {
@@ -412,6 +414,120 @@ TestCase {
             freshState[augmentation.correlationId]
                 .appliedCapabilities
                 .indexOf("BROKEN") === -1
+        );
+    }
+
+    function test_observedDevToolsLeaseSurvivesCoordinatorRestartRecovery() {
+        const recovery = coordinator.reconcileObservedInstrumentation([
+            {
+                kind: "devtools-port",
+                value: 9222,
+                providerKey: "devtools:9222:LIVE"
+            }
+        ]);
+
+        compare(recovery.adopted, 1);
+        compare(recovery.shadowed, 0);
+        compare(
+            coordinator.leases["devtools-port:9222"].source,
+            "observed"
+        );
+
+        const augmentation = coordinator.buildAugmentation(
+            braveEvidence(),
+            [requirements.capabilityDevTools]
+        );
+
+        verify(augmentation.ready);
+        verify(augmentation.bootstrap.debugPort !== 9222);
+        verify(augmentation.bootstrap.debugPort >= 9300);
+        verify(augmentation.bootstrap.debugPort <= 9499);
+    }
+
+    function test_observedLeaseReconciliationCanPruneStaleRecoveryState() {
+        coordinator.reconcileObservedInstrumentation([
+            {
+                kind: "devtools-port",
+                value: 9222,
+                providerKey: "devtools:9222:LIVE"
+            }
+        ]);
+
+        verify(
+            coordinator.leases["devtools-port:9222"] !== undefined
+        );
+
+        coordinator.reconcileObservedInstrumentation([]);
+
+        verify(
+            coordinator.leases["devtools-port:9222"] === undefined
+        );
+
+        const augmentation = coordinator.buildAugmentation(
+            braveEvidence(),
+            [requirements.capabilityDevTools]
+        );
+
+        compare(augmentation.bootstrap.debugPort, 9222);
+    }
+
+    function test_observationDoesNotOverwriteKnownTransactionLease() {
+        const augmentation = coordinator.buildAugmentation(
+            braveEvidence(),
+            [requirements.capabilityDevTools]
+        );
+
+        compare(augmentation.bootstrap.debugPort, 9222);
+
+        const recovery = coordinator.reconcileObservedInstrumentation([
+            {
+                kind: "devtools-port",
+                value: 9222,
+                providerKey: "devtools:9222:ABC"
+            }
+        ]);
+
+        compare(recovery.adopted, 0);
+        compare(recovery.shadowed, 1);
+        compare(
+            coordinator.leases["devtools-port:9222"].source,
+            "generated"
+        );
+        compare(
+            coordinator.leases["devtools-port:9222"].correlationId,
+            augmentation.correlationId
+        );
+    }
+
+    function test_observedKittyEndpointBlocksCallerReuse() {
+        coordinator.reconcileObservedInstrumentation([
+            {
+                kind: "kitty-listen-on",
+                value: "unix:@live-kitty",
+                providerKey: "kitty:11"
+            }
+        ]);
+
+        const evidence = kittyEvidence();
+        evidence.argv = [
+            "kitty",
+            "-o",
+            "allow_remote_control=socket-only",
+            "--listen-on",
+            "unix:@live-kitty"
+        ];
+
+        const augmentation = coordinator.buildAugmentation(
+            evidence,
+            [requirements.capabilityKittyRemote]
+        );
+
+        verify(!augmentation.ready);
+        compare(augmentation.leases.length, 0);
+        compare(augmentation.conflicts.length, 1);
+        compare(
+            augmentation.conflicts[0].value,
+            "unix:@live-kitty"
         );
     }
 

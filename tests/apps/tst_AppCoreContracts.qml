@@ -14,6 +14,10 @@ TestCase {
         coreProvider: core
     }
 
+    AppBottleProvider {
+        id: bottleProvider
+    }
+
     AppActionCatalog {
         id: actionCatalog
     }
@@ -196,7 +200,7 @@ TestCase {
     }
 
     function test_bottlePayloadParsing() {
-        let names = launchPlanner.bottleNamesFromPayload({
+        let names = bottleProvider.namesFromPayload({
             bottles: [
                 { name: "Gaming" },
                 { Name: "Legacy" },
@@ -209,7 +213,7 @@ TestCase {
         verify(names.indexOf("Legacy") !== -1);
         verify(names.indexOf("Work") !== -1);
 
-        names = launchPlanner.bottleNamesFromPayload({
+        names = bottleProvider.namesFromPayload({
             Gaming: { path: "/tmp/gaming" },
             Work: { path: "/tmp/work" }
         });
@@ -217,6 +221,17 @@ TestCase {
         compare(names.length, 2);
         verify(names.indexOf("Gaming") !== -1);
         verify(names.indexOf("Work") !== -1);
+    }
+
+    function test_bottleTextFallbackParsing() {
+        const names = bottleProvider.parseNames(
+            "Bottles\n- Gaming\n* Legacy\nWork\n"
+        );
+
+        compare(names.length, 3);
+        compare(names[0], "Gaming");
+        compare(names[1], "Legacy");
+        compare(names[2], "Work");
     }
 
     function test_browserActionCatalog() {

@@ -4,7 +4,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-Singleton {
+Scope {
     id: root
 
     // Keep the donor path and JsonAdapter field names unchanged during the

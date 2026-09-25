@@ -13,6 +13,7 @@ Scope {
     readonly property real volumeMaxPercent: 100
 
     property var sinkInputs: []
+    property int observationGeneration: 0
     property bool loading: false
     property string errorText: ""
 
@@ -343,6 +344,56 @@ Scope {
 
         for (let i = 0; i < source.length; i++)
             snapshot.push(streamEvidence(source[i]));
+
+        return snapshot;
+    }
+
+    // Team 7 compatibility adapter. This is an observation record, not a
+    // canonical ApplicationEntity. The exact Team 7 schema is still under
+    // reconnaissance, so keep this adapter additive and provenance-rich.
+    function streamObservation(input) {
+        const evidence = streamEvidence(input);
+        const aliases = [];
+
+        function addAlias(kind, value) {
+            const rawValue = String(value || "");
+            if (!rawValue)
+                return;
+
+            aliases.push({
+                kind: String(kind || ""),
+                value: rawValue,
+                normalized: applicationAudioService.normalizeToken(rawValue)
+            });
+        }
+
+        addAlias("application.process.binary", evidence.applicationProcessBinary);
+        addAlias("application.id", evidence.applicationId);
+        addAlias("application.name", evidence.applicationName);
+        addAlias("media.name", evidence.mediaName);
+
+        const providerKey = evidence.streamIndex === undefined
+            || evidence.streamIndex === null
+            ? ""
+            : "sink-input:" + String(evidence.streamIndex);
+
+        return {
+            provider: "PIPEWIRE",
+            providerKey: providerKey,
+            lifetimeClass: "ephemeral",
+            generation: observationGeneration,
+            raw: evidence,
+            aliases: aliases,
+            relationships: []
+        };
+    }
+
+    function observationSnapshot(inputs) {
+        const source = inputs || sinkInputs || [];
+        const snapshot = [];
+
+        for (let i = 0; i < source.length; i++)
+            snapshot.push(streamObservation(source[i]));
 
         return snapshot;
     }
@@ -736,6 +787,7 @@ Scope {
             onStreamFinished: {
                 try {
                     const inputs = applicationAudioService.parseSinkInputs(text);
+                    applicationAudioService.observationGeneration += 1;
                     applicationAudioService.sinkInputs = inputs;
                     applicationAudioService.errorText = "";
                     applicationAudioService.refreshed(inputs);
@@ -802,6 +854,7 @@ Scope {
             onStreamFinished: {
                 try {
                     const inputs = applicationAudioService.parseSinkInputs(text);
+                    applicationAudioService.observationGeneration += 1;
                     applicationAudioService.sinkInputs = inputs;
                     applicationAudioService.errorText = "";
                     applicationAudioService.applyPolicies(inputs);

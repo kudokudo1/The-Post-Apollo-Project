@@ -220,7 +220,10 @@ def audit_architecture() -> None:
         (
             "rootLimitState",
             "limitMiB",
+            "rememberScopeLimit",
             "rememberLimit",
+            "verifiedMiBFromResult",
+            "noteMutationResults",
             "reconciliationTargetMiB",
             "isFrozen",
             "markFrozen",
@@ -232,6 +235,21 @@ def audit_architecture() -> None:
         "required property var limitMutation",
         "ProcessResourceController",
     )
+    require(
+        resource_controller,
+        "resourceState.noteMutationResults",
+        "ProcessResourceController",
+    )
+    require(
+        resource_controller,
+        "resourceState.rememberScopeLimit",
+        "ProcessResourceController",
+    )
+    if "resourceState.rememberLimit(" in resource_controller:
+        fail(
+            "ProcessResourceController: batch completion must not overwrite "
+            "verified per-PID state with uniform requested policy"
+        )
     require_functions(
         resource_controller,
         (

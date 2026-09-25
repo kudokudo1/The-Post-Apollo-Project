@@ -15,12 +15,23 @@ requirements = REQ.read_text(encoding="utf-8")
 coordinator = COORD.read_text(encoding="utf-8")
 recovery = RECOVERY.read_text(encoding="utf-8")
 qmldir = QMLDIR.read_text(encoding="utf-8")
-combined = requirements + "\n" + coordinator + "\n" + recovery
+authority_combined = requirements + "\n" + coordinator
+combined = authority_combined + "\n" + recovery
 
 # Comments may name forbidden couplings in order to document their absence.
 # Ownership checks apply to executable QML, not comments.
-executable = re.sub(r"/\*.*?\*/", "", combined, flags=re.S)
-executable = re.sub(r"//.*?$", "", executable, flags=re.M)
+authority_executable = re.sub(
+    r"/\*.*?\*/", "", authority_combined, flags=re.S
+)
+authority_executable = re.sub(
+    r"//.*?$", "", authority_executable, flags=re.M
+)
+recovery_executable = re.sub(
+    r"/\*.*?\*/", "", recovery, flags=re.S
+)
+recovery_executable = re.sub(
+    r"//.*?$", "", recovery_executable, flags=re.M
+)
 
 errors: list[str] = []
 
@@ -63,7 +74,7 @@ for public_name in (
     "correlationSerial",
 ):
     pattern = re.compile(
-        rf"(?<!_)\\b{re.escape(public_name)}\\s*(?:=|\\+=)"
+        rf"(?<!_)\b{re.escape(public_name)}\s*(?:=|\+=)"
     )
     if pattern.search(coordinator):
         errors.append(
@@ -105,7 +116,7 @@ required_recovery_functions = (
 )
 
 for name in required_recovery_functions:
-    if not re.search(rf"\\bfunction\\s+{re.escape(name)}\\s*\\(", recovery):
+    if not re.search(rf"\bfunction\s+{re.escape(name)}\s*\(", recovery):
         errors.append(f"missing recovery function: {name}")
 
 for token in (
@@ -160,8 +171,28 @@ for token, reason in {
     "SurfaceLaunchCoordinator {": "competing coordinator instance",
     "AppControlW": "AppControl host coupling",
 }.items():
-    if token in executable:
+    if token in authority_executable:
         errors.append(f"forbidden token {token!r}: {reason}")
+
+# Recovery may execute its diagnostic probe, but it remains outside host,
+# launcher, semantic-identity, audio, and process-control ownership.
+for token, reason in {
+    "appControlWindow": "AppControl host coupling",
+    "AppControlW": "AppControl host coupling",
+    "DesktopEntries": "DesktopEntry catalog ownership",
+    "TabSurfaceProvider.active": "provider activity/lifetime coupling",
+    "Quickshell.execDetached": "application/process launch ownership",
+    "ShellCommand": "shell execution ownership",
+    "pactl": "audio ownership",
+    "wpctl": "audio ownership",
+    "ProcessControl": "process/resource ownership",
+    "ProcessLimits": "process/resource ownership",
+    "canonicalId": "semantic identity ownership",
+    "semanticKey": "semantic identity ownership",
+    "augmentEverything": "forbidden global interception",
+}.items():
+    if token in recovery_executable:
+        errors.append(f"forbidden recovery token {token!r}: {reason}")
 
 # Explicit opt-in: requested capabilities must be an input to augmentation.
 if not re.search(
@@ -170,8 +201,14 @@ if not re.search(
 ):
     errors.append("buildAugmentation is not explicitly capability-driven")
 
-if "requirements.describe(evidence, requestedCapabilities)" not in coordinator:
-    errors.append("coordinator does not route explicit requests through requirements")
+if (
+    "SurfaceBackend.SurfaceLaunchRequirements.describe("
+    "evidence, requestedCapabilities)"
+    not in coordinator
+):
+    errors.append(
+        "coordinator does not route explicit requests through shared requirements"
+    )
 
 if 'normalizedCommandTokens(evidence).join(" ")' in requirements:
     errors.append(
@@ -205,7 +242,7 @@ for token in (
     "ready ? argvAppend : []",
     "removedLease || hadState",
     'lease.source === "observed"',
-    "!correlationState[id]",
+    "!_correlationState[id]",
     '"requires-socket-only"',
     '"requires-loopback"',
     "slice(0, 60)",

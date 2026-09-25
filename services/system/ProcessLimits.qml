@@ -11,6 +11,12 @@ Scope {
     property var softLimitPids: ({})
     property var queuedRequest: null
     property var activeRequest: null
+
+    // Optional compatibility bridge. Until T3 wires the shared mutation
+    // lifetime, ProcessLimits keeps its original verified fallback backend.
+    property var mutationService: null
+    property int activeMutationBatchId: 0
+
     property bool applyLoading: false
     property int requestSerial: 0
     property string applyError: ""
@@ -129,6 +135,24 @@ Scope {
         applyLoading = true;
         applyError = "";
 
+        if (mutationService && mutationService.requestLimit) {
+            activeMutationBatchId = mutationService.requestLimit(
+                activeRequest.pid,
+                activeRequest.capBytes,
+                {
+                    consumer: "process-limits",
+                    serial: Number(activeRequest.serial || 0)
+                }
+            );
+
+            if (activeMutationBatchId > 0)
+                return;
+
+            activeMutationBatchId = 0;
+        }
+
+        // Compatibility fallback for the current live donor lifetime. Once
+        // ProcessLimitMutation is wired, this path becomes cold.
         applyProcess.exec([
             "/usr/bin/python3",
             "-c",
@@ -207,6 +231,40 @@ Scope {
         Qt.callLater(function() {
             processLimits.startQueuedApply();
         });
+    }
+
+    Connections {
+        target: processLimits.mutationService
+        ignoreUnknownSignals: true
+
+        function onBatchFinished(batchId, context, ok, results) {
+            if (Number(batchId || 0)
+                    !== Number(processLimits.activeMutationBatchId || 0))
+                return;
+
+            if (!context
+                    || String(context.consumer || "") !== "process-limits"
+                    || !processLimits.activeRequest
+                    || Number(context.serial || 0)
+                       !== Number(processLimits.activeRequest.serial || 0))
+                return;
+
+            processLimits.activeMutationBatchId = 0;
+
+            const rows = Array.isArray(results) ? results : [];
+            const payload =
+                rows.length > 0
+                ? rows[0]
+                : {
+                    ok: !!ok,
+                    error:
+                        ok
+                        ? ""
+                        : "PROCESS LIMIT MUTATION RETURNED NO RESULT"
+                };
+
+            processLimits.consumeApply(JSON.stringify(payload || {}));
+        }
     }
 
     Process {

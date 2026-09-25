@@ -402,6 +402,29 @@ reconciliation or a release event.
 This seam reduces post-restart reuse risk without coupling instrumentation
 lifetime to provider activity.
 
+## Recovery result semantics
+
+Recovery distinguishes transport/parse success from provider completeness.
+
+A successfully executed probe may return a partial but usable snapshot:
+
+```text
+ok: true
+partial: true
+observations: [...]
+completeKinds: [...]
+errors: [...]
+```
+
+Those observations may be reconciled additively. Missing provider kinds do not
+authorize pruning.
+
+`ok: false` is reserved for cases where the recovery request itself could not
+produce a usable parsed snapshot (for example QML/worker parse failure).
+
+This keeps conservative `/proc` incompleteness from being misreported as total
+recovery failure.
+
 ## Lease bookkeeping
 
 `buildAugmentation(...)` may reserve generated or caller-supplied endpoint

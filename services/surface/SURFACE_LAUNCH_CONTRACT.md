@@ -51,8 +51,13 @@ DEVTOOLS
 
 This is explicit opt-in.
 
-An empty requested-capability list produces no augmentation even when T5 can
-recognize discoverability opportunities from the supplied launch evidence.
+An empty requested-capability list is a true no-op: it produces no launch
+mutation, no correlation id, no logical lease, and no coordinator lifetime
+state even when T5 can recognize discoverability opportunities from the
+supplied launch evidence.
+
+Unknown capability names are preserved long enough to be rejected explicitly;
+they are never silently dropped into a misleading ready no-op.
 
 `suggestedCapabilities(...)` is advisory domain knowledge. It does not mutate or
 launch anything. A launch domain must explicitly pass capabilities to
@@ -234,6 +239,12 @@ coordinates for logical collision avoidance.
 
 `ready` is true only when every explicitly requested capability is supported
 and no endpoint conflict occurred.
+
+Unsupported or unknown requests fail before endpoint allocation. If a conflict
+is discovered after some sibling capability already reserved an endpoint, the
+coordinator releases that transaction's partial reservations before returning
+`ready: false`. A rejected augmentation therefore owns no instrumentation
+lease and creates no application-instance correlation state.
 
 `markLaunchSucceeded(...)` keeps those logical leases.
 

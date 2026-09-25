@@ -164,6 +164,8 @@ for token in (
     '"generated"',
     '"observed"',
     "options.complete === true",
+    "options.completeKinds",
+    "completeKinds.indexOf(lease.kind)",
     "description.requestedCapabilities.length === 0",
     "description.unsupportedCapabilities.length > 0",
     "releaseCorrelation(correlationId)",

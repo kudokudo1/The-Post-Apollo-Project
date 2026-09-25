@@ -6,6 +6,7 @@ QtObject {
     required property var presentationState
     required property var telemetry
     required property var hunterPresentation
+    property var taskRows: []
 
     signal prepareCpuMemAppend()
     signal prepareCombiAppend()
@@ -236,23 +237,95 @@ QtObject {
             Number(data.ageSeconds || 0)
         );
     }
+    function sourceItem(entry) {
+        if (entry && entry._favoriteRecord)
+            return entry._sourceItem;
+        return entry;
+    }
+
+    function identityFromFavoriteKey(key) {
+        const raw = String(key || "");
+        if (raw.indexOf("task|") !== 0)
+            return "";
+        try {
+            return decodeURIComponent(raw.slice(5));
+        } catch (error) {
+            return "";
+        }
+    }
+
     function persistentIdentity(entry) {
-        if (!entry)
+        const source = sourceItem(entry) || entry;
+        if (!source)
             return "";
 
         const comm = String(
-            entry.comm || entry.name || entry.label || ""
+            source.comm || source.name || source.label || ""
         ).trim();
         if (comm)
             return comm.toLowerCase();
 
-        const args = String(entry.args || "").trim();
+        const args = String(source.args || "").trim();
         if (!args)
             return "";
 
         const first = args.split(/\s+/)[0] || "";
         const pieces = first.split("/");
         return String(pieces[pieces.length - 1] || first).toLowerCase();
+    }
+
+    function identityForEntry(entry) {
+        if (!entry)
+            return "";
+
+        if (entry._favoriteRecord
+                && String(entry._favoriteType || "") === "task") {
+            const stored = identityFromFavoriteKey(entry._favoriteKey);
+            if (stored)
+                return String(stored).trim().toLowerCase();
+        }
+
+        return persistentIdentity(entry);
+    }
+
+    function liveTaskForMiniGraph(entry) {
+        const source = sourceItem(entry) || entry;
+        if (!source || !source._taskRecord)
+            return null;
+
+        const sourcePid = Number(source.pid || 0);
+        if (sourcePid > 1) {
+            for (let i = 0; i < taskRows.length; i++) {
+                const exact = taskRows[i];
+                if (Number(exact && exact.pid || 0) === sourcePid)
+                    return exact;
+            }
+
+            if (!entry._favoriteRecord)
+                return source;
+        }
+
+        const identity = identityForEntry(entry);
+        if (identity) {
+            let best = null;
+
+            for (let i = 0; i < taskRows.length; i++) {
+                const candidate = taskRows[i];
+                if (persistentIdentity(candidate) !== identity)
+                    continue;
+                if (Number(candidate.pid || 0) <= 0)
+                    continue;
+                if (!best
+                        || Number(candidate.cpu || 0)
+                           > Number(best.cpu || 0))
+                    best = candidate;
+            }
+
+            if (best)
+                return best;
+        }
+
+        return source;
     }
 
     function updateMiniCpuHistories(rows) {
@@ -434,6 +507,39 @@ QtObject {
                 key + ":pid:" + String(pid)
             ];
         return Array.isArray(values) ? values : [];
+    }
+
+    function miniCpuHistory(entry) {
+        const source =
+            liveTaskForMiniGraph(entry)
+            || sourceItem(entry)
+            || entry;
+        if (!source || !source._taskRecord)
+            return [];
+
+        return miniCpuHistoryByIdentity(
+            identityForEntry(entry),
+            source
+        );
+    }
+
+    function miniHunterHistoryForEntry(entry) {
+        let metric = "combined";
+
+        if (hunterPresentation.metricMode
+                === hunterPresentation.metricCpu)
+            metric = "cpu";
+        else if (hunterPresentation.metricMode
+                 === hunterPresentation.metricMemory)
+            metric = "mem";
+        else if (hunterPresentation.metricMode
+                 === hunterPresentation.metricIo)
+            metric = "io";
+        else if (hunterPresentation.metricMode
+                 === hunterPresentation.metricAge)
+            metric = "age";
+
+        return miniHunterHistoryForMetric(entry, metric);
     }
 
 }

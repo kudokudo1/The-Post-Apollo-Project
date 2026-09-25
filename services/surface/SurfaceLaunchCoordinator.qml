@@ -15,6 +15,9 @@ QtObject {
     id: coordinator
 
     property int _correlationSerial: 0
+    property string _sessionNonce:
+        Math.floor(Math.random() * 0x100000000)
+            .toString(36)
 
     // Mutable authority state stays behind underscore-prefixed implementation
     // properties. Consumers receive defensive snapshots below.
@@ -79,9 +82,11 @@ QtObject {
         return "unix:@appcontrol-kitty-" + token;
     }
 
-    function newCorrelationId(evidence) {
-        _correlationSerial += 1;
-
+    function correlationIdFor(
+            evidence,
+            timestamp,
+            serial,
+            sessionNonce) {
         const hint = safeToken(
             evidence && (
                 evidence.stableHint
@@ -95,10 +100,22 @@ QtObject {
 
         return [
             "surface",
-            String(Date.now()),
-            String(_correlationSerial),
+            safeToken(sessionNonce) || "session",
+            String(timestamp),
+            String(serial),
             hint
         ].join("-");
+    }
+
+    function newCorrelationId(evidence) {
+        _correlationSerial += 1;
+
+        return correlationIdFor(
+            evidence,
+            Date.now(),
+            _correlationSerial,
+            _sessionNonce
+        );
     }
 
     function commandTokens(evidence) {

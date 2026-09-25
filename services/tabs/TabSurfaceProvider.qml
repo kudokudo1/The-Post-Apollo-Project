@@ -176,16 +176,47 @@ function tabLifecycleScript() {
             && String(entry.targetId || "").length > 0;
     }
 
-    function nativeLifecycleKey(entry) {
+    function providerRecordKey(entry) {
         if (!entry)
             return "";
 
-        // Keep the donor's current "tab|<record id>" semantics when id exists.
-        // targetId/path are fallback provider-native keys only.
-        const value = String(
-            entry.id || entry.targetId || entry.path || ""
-        );
+        // This is provider-local identity evidence only. It intentionally
+        // preserves the donor's current record id and does not attempt to
+        // canonicalize DesktopEntry/Application/Sway/PID relationships.
+        return String(entry.id || "");
+    }
 
+    function identityEvidence(entry) {
+        if (!entry)
+            return ({});
+
+        // Raw evidence exported for Team 7 / future identity adapters.
+        // Consumers must not treat this object as canonical application
+        // identity; fields vary by provider and may be absent.
+        return {
+            providerKey: providerRecordKey(entry),
+            provider: String(entry.provider || ""),
+            appName: String(entry.appName || ""),
+            windowName: String(entry.windowName || ""),
+            path: String(entry.path || ""),
+            roleName: String(entry.roleName || ""),
+            processPids: Array.isArray(entry.processPids)
+                         ? entry.processPids.slice()
+                         : [],
+            debugPort: Number(entry.debugPort || 0),
+            targetId: String(entry.targetId || ""),
+            webSocketDebuggerUrl:
+                String(entry.webSocketDebuggerUrl || ""),
+            kittyAddress: String(entry.kittyAddress || ""),
+            kittyTabId:
+                entry.kittyTabId !== undefined
+                ? entry.kittyTabId
+                : null
+        };
+    }
+
+    function nativeLifecycleKey(entry) {
+        const value = providerRecordKey(entry);
         return value.length > 0 ? "tab|" + value : "";
     }
 

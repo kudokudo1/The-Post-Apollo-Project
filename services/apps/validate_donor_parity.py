@@ -398,7 +398,7 @@ require_all(
         'label: "-⋆♱⋆-"',
         'label: "⋆˙⟡ ⌯⛟\\nFLATPACK"',
         'label: "HIDDEN"',
-        '? "|ω･\`ς)"',
+        '? "|ω･`ς)"',
         ': "|ω-ς)"',
         'Colors.cyan',
         'Colors.magenta',
@@ -746,7 +746,7 @@ require_function_anchors(
     texts.get("selector_presentation", ""),
     "hiddenFace",
     (
-        '"|ω･\`ς)"',
+        '"|ω･`ς)"',
         '"|ω-ς)"',
     ),
 )

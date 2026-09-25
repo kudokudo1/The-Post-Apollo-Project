@@ -236,4 +236,204 @@ QtObject {
             Number(data.ageSeconds || 0)
         );
     }
+    function persistentIdentity(entry) {
+        if (!entry)
+            return "";
+
+        const comm = String(
+            entry.comm || entry.name || entry.label || ""
+        ).trim();
+        if (comm)
+            return comm.toLowerCase();
+
+        const args = String(entry.args || "").trim();
+        if (!args)
+            return "";
+
+        const first = args.split(/\s+/)[0] || "";
+        const pieces = first.split("/");
+        return String(pieces[pieces.length - 1] || first).toLowerCase();
+    }
+
+    function updateMiniCpuHistories(rows) {
+        const sourceRows = Array.isArray(rows) ? rows : [];
+        const previous = presentationState.taskMiniCpuHistories;
+        const next = ({});
+        const previousIdentity =
+            presentationState.taskMiniCpuIdentityHistories;
+        const nextIdentity = ({});
+        const identitySamples = ({});
+
+        for (let i = 0; i < sourceRows.length; i++) {
+            const entry = sourceRows[i];
+            const pid = Number(entry && entry.pid || 0);
+            if (pid <= 0)
+                continue;
+
+            const cpu = Math.max(
+                0,
+                Math.min(
+                    100,
+                    Number(
+                        entry.cpuInstant !== undefined
+                        ? entry.cpuInstant
+                        : entry.cpu || 0
+                    )
+                )
+            );
+
+            const key = "pid:" + String(pid);
+            const history = Array.isArray(previous[key])
+                            ? previous[key].slice() : [];
+            history.push(cpu);
+            while (history.length > presentationState.taskMiniHistoryLimit)
+                history.shift();
+            next[key] = history;
+
+            const identity = persistentIdentity(entry);
+            if (identity
+                    && (
+                        identitySamples[identity] === undefined
+                        || cpu > identitySamples[identity]
+                    ))
+                identitySamples[identity] = cpu;
+        }
+
+        for (const identity in identitySamples) {
+            const key = "identity:" + identity;
+            const history =
+                Array.isArray(previousIdentity[key])
+                ? previousIdentity[key].slice() : [];
+            history.push(identitySamples[identity]);
+            while (history.length > presentationState.taskMiniHistoryLimit)
+                history.shift();
+            nextIdentity[key] = history;
+        }
+
+        presentationState.taskMiniCpuHistories = next;
+        presentationState.taskMiniCpuIdentityHistories = nextIdentity;
+    }
+
+    function updateMiniHunterMetricHistories(rows) {
+        const sourceRows = Array.isArray(rows) ? rows : [];
+        const previous = presentationState.taskMiniHunterMetricHistories;
+        const next = Object.assign({}, previous);
+        const livePids = ({});
+
+        function append(metric, pid, value) {
+            const key = metric + ":pid:" + String(pid);
+            const history = Array.isArray(previous[key])
+                            ? previous[key].slice() : [];
+            history.push(Math.max(0, Number(value || 0)));
+            while (history.length > presentationState.taskMiniHistoryLimit)
+                history.shift();
+            next[key] = history;
+        }
+
+        for (let i = 0; i < sourceRows.length; i++) {
+            const entry = sourceRows[i];
+            const pid = Number(entry && entry.pid || 0);
+            if (pid <= 0)
+                continue;
+
+            livePids[String(pid)] = true;
+
+            const cpu = Math.max(
+                0,
+                Number(
+                    entry.cpuInstant !== undefined
+                    ? entry.cpuInstant
+                    : entry.cpu || 0
+                )
+            );
+            const memMiB =
+                Math.max(0, Number(entry.rss || 0)) / 1024.0;
+            const ioMiB =
+                Math.max(0, Number(entry.ioRate || 0))
+                / (1024.0 * 1024.0);
+            const ageMinutes =
+                Math.max(
+                    0,
+                    entry.ageSeconds !== undefined
+                    ? Number(entry.ageSeconds || 0)
+                    : hunterPresentation.elapsedSeconds(entry.elapsed)
+                ) / 60.0;
+            const combined =
+                cpu
+                + Math.max(0, Number(entry.mem || 0)) * 0.35
+                + Math.log(1 + ioMiB) * 3.0;
+
+            append("cpu", pid, cpu);
+            append("mem", pid, memMiB);
+            append("io", pid, ioMiB);
+            append("age", pid, ageMinutes);
+            append("combined", pid, combined);
+        }
+
+        const keys = Object.keys(next);
+        for (let i = 0; i < keys.length; i++) {
+            const key = String(keys[i]);
+            const pieces = key.split(":pid:");
+            if (pieces.length !== 2)
+                continue;
+
+            const pidText = pieces[1];
+            if (!livePids[pidText]
+                    && Number(pidText || 0)
+                       !== presentationState.taskHistoryPid)
+                delete next[key];
+        }
+
+        presentationState.taskMiniHunterMetricHistories = next;
+    }
+
+    function miniCpuHistoryByIdentity(identity, liveEntry) {
+        const normalized = String(identity || "").trim().toLowerCase();
+        const source = liveEntry || null;
+        const pid = Number(source && source.pid || 0);
+
+        if (pid > 0) {
+            const pidHistory =
+                presentationState.taskMiniCpuHistories[
+                    "pid:" + String(pid)
+                ];
+            if (Array.isArray(pidHistory) && pidHistory.length >= 2)
+                return pidHistory;
+            if (Array.isArray(pidHistory) && pidHistory.length === 1)
+                return [pidHistory[0], pidHistory[0]];
+        }
+
+        if (normalized) {
+            const identityHistory =
+                presentationState.taskMiniCpuIdentityHistories[
+                    "identity:" + normalized
+                ];
+            if (Array.isArray(identityHistory)
+                    && identityHistory.length >= 2)
+                return identityHistory;
+            if (Array.isArray(identityHistory)
+                    && identityHistory.length === 1)
+                return [identityHistory[0], identityHistory[0]];
+        }
+
+        const current = Math.max(
+            0,
+            Math.min(100, Number(source && source.cpu || 0))
+        );
+        return [current, current];
+    }
+
+    function miniHunterHistoryForMetric(entry, metric) {
+        const pid = Number(entry && entry.pid || 0);
+        if (pid <= 0)
+            return [];
+
+        const key = String(metric || "combined");
+        const values =
+            presentationState.taskMiniHunterMetricHistories[
+                key + ":pid:" + String(pid)
+            ];
+        return Array.isArray(values) ? values : [];
+    }
+
 }

@@ -8,8 +8,14 @@ import QtQuick
 //
 // Surface-launch ownership is resolved: T5 owns the shared requirements /
 // coordinator domain, while Team 8 owns launch intent and application of a
-// supplied augmentation. This planner therefore treats augmentation as opaque
-// launcher input and does not infer Kitty/AT-SPI/DevTools requirements itself.
+// supplied launcher-neutral augmentation.
+//
+// Team 5's published payload currently exposes:
+//   ready, env, argvAfterExecutable, argvAppend, bootstrap, correlationId,
+//   leases/conflicts and requested/applied capability metadata.
+//
+// Team 8 consumes only that generic shape. It does not infer Kitty/AT-SPI/
+// DevTools requirements or endpoint policy itself.
 // Team 7 identity is not used here.
 QtObject {
     id: planner
@@ -118,7 +124,8 @@ QtObject {
 
         return {
             kind: planDesktopEntry,
-            entry: entry
+            entry: entry,
+            commandTokens: cleanedCommandTokens(entry)
         };
     }
 
@@ -193,21 +200,124 @@ QtObject {
         };
     }
 
+    function copyStringArray(value) {
+        if (!Array.isArray(value))
+            return [];
+
+        return value.map(function(item) {
+            return String(item || "");
+        });
+    }
+
+    function copyStringMap(value) {
+        const result = {};
+
+        if (!value || typeof value !== "object")
+            return result;
+
+        const keys = Object.keys(value);
+
+        for (let i = 0; i < keys.length; i++)
+            result[String(keys[i])] = String(value[keys[i]] || "");
+
+        return result;
+    }
+
+    function normalizedSurfaceAugmentation(value) {
+        if (value === undefined || value === null)
+            return null;
+
+        const ready = value.ready !== false;
+
+        return {
+            ready: ready,
+            correlationId: String(value.correlationId || ""),
+            env: copyStringMap(value.env),
+            argvAfterExecutable:
+                copyStringArray(value.argvAfterExecutable),
+            argvAppend: copyStringArray(value.argvAppend),
+            bootstrap:
+                value.bootstrap && typeof value.bootstrap === "object"
+                ? Object.assign({}, value.bootstrap)
+                : {},
+            requestedCapabilities:
+                copyStringArray(value.requestedCapabilities),
+            appliedCapabilities:
+                copyStringArray(value.appliedCapabilities),
+            unsupportedCapabilities:
+                copyStringArray(value.unsupportedCapabilities),
+            leases:
+                Array.isArray(value.leases)
+                ? value.leases.slice()
+                : [],
+            conflicts:
+                Array.isArray(value.conflicts)
+                ? value.conflicts.slice()
+                : []
+        };
+    }
+
+    function augmentedArgv(argv, augmentation) {
+        const source = Array.isArray(argv)
+            ? argv.slice()
+            : [];
+
+        if (source.length === 0 || !augmentation)
+            return source;
+
+        const afterExecutable =
+            augmentation.argvAfterExecutable || [];
+        const append = augmentation.argvAppend || [];
+
+        return [source[0]]
+            .concat(afterExecutable)
+            .concat(source.slice(1))
+            .concat(append);
+    }
+
     function withSuppliedAugmentation(basePlan, suppliedAugmentation) {
         if (!basePlan || basePlan.kind === planUnavailable)
             return basePlan;
 
-        // The augmentation payload is intentionally opaque here. Its
-        // capability semantics, endpoint allocation, lease/correlation state
-        // and bootstrap construction belong to the T5-domain-owned shared
-        // SurfaceLaunch contract. Team 8 only carries the supplied result with
-        // its mechanism-specific launch plan.
-        const next = Object.assign({}, basePlan);
-        next.surfaceLaunchAugmentation =
-            suppliedAugmentation !== undefined
-            ? suppliedAugmentation
-            : null;
+        const augmentation =
+            normalizedSurfaceAugmentation(suppliedAugmentation);
 
+        if (!augmentation)
+            return basePlan;
+
+        if (!augmentation.ready) {
+            return {
+                kind: planUnavailable,
+                reason: "surface-launch-not-ready",
+                entry: basePlan.entry || null,
+                surfaceLaunchAugmentation: augmentation
+            };
+        }
+
+        const next = Object.assign({}, basePlan);
+        next.surfaceLaunchAugmentation = augmentation;
+        next.launchEnv = Object.assign({}, augmentation.env);
+
+        // Argv-based launch mechanisms can be transformed immediately without
+        // knowing any provider-specific capability semantics.
+        if (Array.isArray(basePlan.commandTokens)) {
+            next.commandTokens = augmentedArgv(
+                basePlan.commandTokens,
+                augmentation
+            );
+        }
+
+        if (Array.isArray(basePlan.argv)) {
+            next.argv = augmentedArgv(
+                basePlan.argv,
+                augmentation
+            );
+        }
+
+        // Shell/Bottles plans retain the normalized augmentation for their
+        // mechanism-specific executor. The SurfaceLaunch domain owns what the
+        // mutation means; Team 8 owns how that mutation is transported through
+        // the selected launch mechanism.
         return next;
     }
 

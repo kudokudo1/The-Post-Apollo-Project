@@ -39,6 +39,41 @@ Team 7
     semantic interpretation / joins
 ```
 
+## One shared lease authority
+
+APPS, RUN, and future launch domains must all consume the same stateful
+`SurfaceLaunchCoordinator` authority.
+
+The implementation is registered as the singleton:
+
+```text
+qs.services.surface.SurfaceLaunchCoordinator
+```
+
+`SurfaceLaunchRequirements` is also a singleton sibling because its policy is
+shared and stateless.
+
+This is forbidden:
+
+```text
+APPS -> SurfaceLaunchCoordinator instance A
+RUN  -> SurfaceLaunchCoordinator instance B
+```
+
+because those independent lease maps could both allocate the same debug port or
+socket coordinate.
+
+The required topology is:
+
+```text
+APPS ─┐
+      ├──> ONE SurfaceLaunchCoordinator singleton
+RUN  ─┘
+```
+
+Launch domains consume the authority; they never instantiate their own
+coordinator or copy its lease state locally.
+
 ## Frozen capability boundary
 
 The capability boundary is:

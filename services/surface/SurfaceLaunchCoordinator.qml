@@ -217,16 +217,17 @@ QtObject {
         if (!id)
             return false;
 
+        const hadState = !!correlationState[id];
         const nextLeases = {};
         const keys = Object.keys(leases);
-        let removed = false;
+        let removedLease = false;
 
         for (let i = 0; i < keys.length; i++) {
             const key = keys[i];
             const lease = leases[key];
 
             if (lease && lease.correlationId === id) {
-                removed = true;
+                removedLease = true;
                 continue;
             }
 
@@ -239,26 +240,27 @@ QtObject {
         delete states[id];
         correlationState = states;
 
-        return removed;
+        return removedLease || hadState;
     }
 
     function markLaunchSucceeded(correlationId) {
         const id = asText(correlationId);
 
-        if (!id)
-            return;
+        if (!id || !correlationState[id])
+            return false;
 
         const states = Object.assign({}, correlationState);
-        const current = states[id] || ({});
+        const current = states[id];
 
         states[id] = Object.assign({}, current, {
             state: "launched"
         });
         correlationState = states;
+        return true;
     }
 
     function markLaunchFailed(correlationId) {
-        releaseCorrelation(correlationId);
+        return releaseCorrelation(correlationId);
     }
 
     function buildAugmentation(evidence, requestedCapabilities) {

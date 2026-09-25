@@ -316,11 +316,19 @@ QtObject {
         // Argv-based launch mechanisms can be transformed immediately without
         // knowing any provider-specific capability semantics.
         if (Array.isArray(basePlan.commandTokens)) {
-            next.commandTokens = augmentedArgv(
-                basePlan.entry,
-                basePlan.commandTokens,
-                augmentation
-            );
+            if (basePlan.commandTokens[0] === "__APPCONTROL_SHELL__") {
+                // Shell text is opaque at this layer. Preserve it verbatim so
+                // the mechanism-specific command builder can either carry
+                // environment-only augmentation or fail closed for argv
+                // mutation rather than corrupting shell syntax.
+                next.commandTokens = basePlan.commandTokens.slice();
+            } else {
+                next.commandTokens = augmentedArgv(
+                    basePlan.entry,
+                    basePlan.commandTokens,
+                    augmentation
+                );
+            }
         }
 
         if (Array.isArray(basePlan.argv)) {

@@ -289,6 +289,61 @@ TestCase {
         compare(observations.length, 2);
     }
 
+    function test_bridgeDiagnosticsScopeLeaseCompleteness() {
+        const kinds = provider.instrumentationObservationCompleteKinds([
+            "KITTY SOCKETS:1",
+            "KITTY TABS:2",
+            "KITTY ERROR:NONE",
+            "DEVTOOLS PORTS:9222",
+            "DEVTOOLS TARGETS:3",
+            "DEVTOOLS ERROR:NONE"
+        ]);
+
+        compare(kinds.length, 2);
+        compare(kinds[0], "devtools-port");
+        compare(kinds[1], "kitty-listen-on");
+    }
+
+    function test_providerFailureWithholdsOnlyFailedCompleteness() {
+        const kinds = provider.instrumentationObservationCompleteKinds([
+            "KITTY SOCKETS:1",
+            "KITTY ERROR:NONE",
+            "DEVTOOLS PORTS:NONE",
+            "DEVTOOLS ERROR:DISCOVERY: permission denied"
+        ]);
+
+        compare(kinds.length, 1);
+        compare(kinds[0], "kitty-listen-on");
+    }
+
+    function test_fallbackCountDiagnosticsDoNotClaimCompleteness() {
+        const kinds = provider.instrumentationObservationCompleteKinds([
+            "KITTY:2",
+            "DEVTOOLS:4"
+        ]);
+
+        compare(kinds.length, 0);
+    }
+
+    function test_instrumentationLeaseSnapshotCombinesEvidenceAndScope() {
+        const snapshot = provider.instrumentationLeaseSnapshot(
+            [{
+                id: "devtools:9444:A",
+                provider: "DEVTOOLS",
+                debugPort: 9444
+            }],
+            [
+                "DEVTOOLS ERROR:NONE",
+                "KITTY ERROR:socket failed"
+            ]
+        );
+
+        compare(snapshot.observations.length, 1);
+        compare(snapshot.observations[0].kind, "devtools-port");
+        compare(snapshot.completeKinds.length, 1);
+        compare(snapshot.completeKinds[0], "devtools-port");
+    }
+
     function test_nativeLifecycleIsProviderSpecific() {
         verify(provider.hasNativeLifecycleControl({
             provider: "DEVTOOLS",

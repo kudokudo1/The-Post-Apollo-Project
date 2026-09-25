@@ -263,6 +263,20 @@ semantic identities still exist.
 Team 6 does not decide provider lifetime. This mechanism only removes audio
 policies after the owner declares an identity gone.
 
+The removal decisions are themselves pure/testable:
+
+```text
+policyKeysOutsideLiveSet(policies, scope, liveKeys)
+mutePolicyKeysWithPid(policies, scope, pid)
+```
+
+`policyKeysOutsideLiveSet` never crosses scopes. A WINDOW lifetime update cannot
+prune APP or TAB policies merely because the semantic-key text is the same.
+
+`mutePolicyKeysWithPid` supports the donor's narrow-WINDOW-unmute/broad-APP
+cleanup rule while keeping that cleanup explicitly scoped. A PID is process
+evidence, not a semantic application key.
+
 ## Host integration boundary
 
 Current status:

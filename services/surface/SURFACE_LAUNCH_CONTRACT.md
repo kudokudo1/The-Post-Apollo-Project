@@ -234,8 +234,15 @@ bookkeeping, not a claim that T5 created or owns the runtime listener.
 Caller-supplied Kitty listen addresses are handled the same way.
 
 If a caller-supplied coordinate conflicts with an existing logical lease, the
-augmentation returns `ready: false` plus a conflict record. A launcher should
-not execute a non-ready augmentation unchanged.
+augmentation returns `ready: false` plus a conflict record.
+
+Rejected augmentations fail closed: executable `env`, `argvAfterExecutable`,
+`argvAppend`, endpoint bootstrap coordinates, and leases are returned empty.
+Diagnostics remain available through `conflicts` /
+`unsupportedCapabilities`.
+
+A launcher must still honor `ready`, but a missed readiness check no longer
+receives a partially executable mutation payload.
 
 The coordinator does not claim that logical lease availability proves the OS
 TCP port is free. The launched application owns the actual listener and runtime

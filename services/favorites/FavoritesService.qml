@@ -48,6 +48,40 @@ QtObject {
         };
     }
 
+    // Pure key migration helper. Provider adapters may propose old/new keys,
+    // but Favorites owns deduplication, ordering preservation and persistence.
+    function replaced(list, oldKey, newKey) {
+        const oldValue = keyString(oldKey);
+        const newValue = keyString(newKey);
+
+        if (!oldValue || !newValue || oldValue === newValue)
+            return {
+                values: list.slice(),
+                changed: false
+            };
+
+        const next = list.slice();
+        const oldIndex = next.indexOf(oldValue);
+
+        if (oldIndex < 0)
+            return {
+                values: next,
+                changed: false
+            };
+
+        const newIndex = next.indexOf(newValue);
+
+        if (newIndex >= 0)
+            next.splice(oldIndex, 1);
+        else
+            next[oldIndex] = newValue;
+
+        return {
+            values: next,
+            changed: true
+        };
+    }
+
     // Generic favorite membership. Key construction remains provider/adapter
     // responsibility; this service intentionally does not invent identity.
     function isFavoriteKey(key) {
@@ -61,6 +95,20 @@ QtObject {
 
         store.favoriteKeys = result.values;
         return result.enabled;
+    }
+
+    function replaceFavoriteKey(oldKey, newKey) {
+        const result = replaced(
+            store.favoriteKeys,
+            oldKey,
+            newKey
+        );
+
+        if (!result.changed)
+            return false;
+
+        store.favoriteKeys = result.values;
+        return true;
     }
 
     // THERMAL/SYSTEM metric-box watches.

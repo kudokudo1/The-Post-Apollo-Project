@@ -67,6 +67,9 @@ required_functions = {
         "plan",
         "withSuppliedAugmentation",
         "normalizedSurfaceAugmentation",
+        "flatpakDesktopAppId",
+        "flatpakOptionConsumesNext",
+        "flatpakApplicationIndex",
         "augmentedArgv",
         "copyStringArray",
         "copyStringMap",
@@ -259,6 +262,25 @@ for key, text in texts.items():
             errors.append(
                 f"{key}: canonical identity token present: {token!r}"
             )
+
+# Flatpak is a launch wrapper. Team 8 must preserve the application
+# boundary:
+#   flatpak run [wrapper opts] APP_ID argvAfterExecutable [existing argv] argvAppend
+# Never regress to generic token-0 insertion or append-after-entire-source.
+launch_text = texts.get("launch", "")
+for required in (
+    "flatpakApplicationIndex",
+    "source.slice(0, appIndex + 1)",
+    ".concat(afterExecutable)",
+    ".concat(source.slice(appIndex + 1))",
+    ".concat(append)",
+    "flatpak-application-boundary-unresolved",
+):
+    if required not in launch_text:
+        errors.append(
+            "launch: missing Flatpak application-boundary invariant: "
+            + repr(required)
+        )
 
 # SurfaceLaunch ownership is resolved, but provider-specific requirement
 # construction remains T5-domain-owned. Team 8 may carry/apply a supplied

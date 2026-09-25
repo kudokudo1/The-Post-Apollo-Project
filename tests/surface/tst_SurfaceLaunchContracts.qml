@@ -464,6 +464,54 @@ TestCase {
         compare(augmentation.argvAppend.length, 0);
     }
 
+    function test_nonLoopbackDebugAddressIsRejected() {
+        const evidence = braveEvidence();
+        evidence.argv = [
+            "brave-browser",
+            "--remote-debugging-address=0.0.0.0",
+            "--remote-debugging-port=9444"
+        ];
+
+        const augmentation = coordinator.buildAugmentation(
+            evidence,
+            [requirements.capabilityDevTools]
+        );
+
+        verify(!augmentation.ready);
+        compare(augmentation.appliedCapabilities.length, 0);
+        compare(augmentation.leases.length, 0);
+        compare(augmentation.conflicts.length, 1);
+        compare(
+            augmentation.conflicts[0].kind,
+            "devtools-debug-address"
+        );
+        compare(
+            augmentation.conflicts[0].reason,
+            "requires-loopback"
+        );
+        compare(Object.keys(coordinator.leases).length, 0);
+    }
+
+    function test_loopbackDebugAddressIsAccepted() {
+        const evidence = braveEvidence();
+        evidence.argv = [
+            "brave-browser",
+            "--remote-debugging-address=127.0.0.1",
+            "--remote-debugging-port=9444"
+        ];
+
+        const augmentation = coordinator.buildAugmentation(
+            evidence,
+            [requirements.capabilityDevTools]
+        );
+
+        verify(augmentation.ready);
+        compare(augmentation.bootstrap.debugAddress, "127.0.0.1");
+        compare(augmentation.bootstrap.debugPort, 9444);
+        compare(augmentation.leases.length, 1);
+        compare(augmentation.conflicts.length, 0);
+    }
+
     function test_existingDebugAddressIsPreserved() {
         const evidence = braveEvidence();
         evidence.argv = [

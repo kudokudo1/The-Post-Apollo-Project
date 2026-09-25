@@ -264,6 +264,46 @@ TestCase {
         compare(observation.applicationEntity, undefined);
     }
 
+    function test_parseSinkInputsAcceptsPactlArray() {
+        const parsed = audio.parseSinkInputs(
+            '[{"index":51,"mute":false,"properties":{"application.id":"demo"}}]'
+        );
+
+        compare(parsed.length, 1);
+        compare(parsed[0].index, 51);
+        compare(parsed[0].properties["application.id"], "demo");
+    }
+
+    function test_parseSinkInputsRejectsInvalidPayloads() {
+        let malformedThrew = false;
+        let objectThrew = false;
+
+        try {
+            audio.parseSinkInputs("{not-json");
+        } catch (error) {
+            malformedThrew = true;
+        }
+
+        try {
+            audio.parseSinkInputs('{"index":51}');
+        } catch (error) {
+            objectThrew = true;
+        }
+
+        compare(malformedThrew, true);
+        compare(objectThrew, true);
+    }
+
+    function test_sinkInputVolumeSupportsRawPulseValue() {
+        const stream = {
+            volume: {
+                mono: { value: 32768 }
+            }
+        };
+
+        compare(audio.sinkInputVolumePercent(stream), 50);
+    }
+
     function test_policyNamespacesNormalizeScopeOnly() {
         compare(audio.policyStorageKey(" APP ", "demo"), "app:demo");
         compare(audio.policyStorageKey("WINDOW", "demo"), "window:demo");

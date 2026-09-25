@@ -36,6 +36,43 @@ TestCase {
         };
     }
 
+    function test_familyRecognitionIgnoresTrailingArgumentText() {
+        const fakeKitty = {
+            displayName: "Shell Wrapper",
+            executable: "bash",
+            argv: ["bash", "-lc", "echo kitty"]
+        };
+
+        const fakeElectron = {
+            displayName: "Script Runner",
+            executable: "python3",
+            argv: ["python3", "tool.py", "--label=electron"]
+        };
+
+        verify(!requirements.looksLikeKitty(fakeKitty));
+        verify(!requirements.looksLikeChromiumElectron(fakeElectron));
+        compare(
+            requirements.suggestedCapabilities(fakeKitty).length,
+            0
+        );
+        compare(
+            requirements.suggestedCapabilities(fakeElectron).length,
+            0
+        );
+    }
+
+    function test_launcherExecutableIdentityStillClassifies() {
+        verify(requirements.looksLikeKitty({
+            executable: "/usr/bin/kitty",
+            argv: ["/usr/bin/kitty", "bash", "-lc", "echo hello"]
+        }));
+
+        verify(requirements.looksLikeChromiumElectron({
+            executable: "/usr/bin/electron",
+            argv: ["/usr/bin/electron", "app.js"]
+        }));
+    }
+
     function test_capabilitiesAreExplicitOptIn() {
         const augmentation = coordinator.buildAugmentation(
             braveEvidence(),

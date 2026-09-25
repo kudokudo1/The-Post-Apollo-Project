@@ -48,6 +48,11 @@ PanelWindow {
         ? appControlWindow.thermalRows
         : []
 
+    readonly property var fanRows:
+        appControlWindow && appControlWindow.fanRows
+        ? appControlWindow.fanRows
+        : []
+
     readonly property var systemRows:
         appControlWindow && appControlWindow.systemRows
         ? appControlWindow.systemRows
@@ -134,7 +139,10 @@ PanelWindow {
 
     function selectedMonitorRows() {
         if (selectedModeIndex === 2) {
-            return thermalRows.filter(function(entry) {
+            const sourceRows =
+                thermalSubMode === 1 ? fanRows : thermalRows;
+
+            return sourceRows.filter(function(entry) {
                 const isFan = entry && entry.sensorKind === "fan";
                 return thermalSubMode === 1 ? isFan : !isFan;
             });
@@ -269,6 +277,66 @@ PanelWindow {
             return appControlWindow.systemIconAccent(entry);
 
         return Colors.cyan;
+    }
+
+    function monitorIdentityMetric(entry) {
+        if (!entry)
+            return "";
+
+        if (entry._thermalRecord) {
+            if (entry.sensorKind === "fan") {
+                const rpm =
+                    entry.rpmAvailable === false
+                    ? "RPM N/A"
+                    : Number(entry.rpm || 0).toFixed(0) + " RPM";
+
+                return rpm + " • " + String(entry.chip || "FAN");
+            }
+
+            const c = Number(entry.tempC || 0);
+            const f = (c * 9 / 5) + 32;
+
+            return f.toFixed(1)
+                   + "°F / "
+                   + c.toFixed(1)
+                   + "°C • "
+                   + String(entry.chip || "SENSOR");
+        }
+
+        if (entry._systemRecord) {
+            return String(entry.category || "SYSTEM")
+                   + " • "
+                   + String(entry.metric || entry.secondary || "");
+        }
+
+        return "";
+    }
+
+    function monitorIdentityRole(entry) {
+        return String(entry && entry.role || "");
+    }
+
+    function monitorIdentityDetail(entry) {
+        if (!entry)
+            return "";
+
+        if (entry._thermalRecord)
+            return "SOURCE • " + String(entry.source || "UNKNOWN");
+
+        if (entry._systemRecord)
+            return String(entry.detail || entry.secondary || "");
+
+        return "";
+    }
+
+    function monitorIdentityPurpose(entry) {
+        if (!entry || !entry._thermalRecord)
+            return "";
+
+        if (appControlWindow && appControlWindow.thermalSimplePurpose)
+            return String(appControlWindow.thermalSimplePurpose(entry) || "");
+
+        return "";
     }
 
     function scheduleFavoritesFaceBlink() {
@@ -1071,11 +1139,256 @@ PanelWindow {
         }
 
         Item {
-            id: sharedStateHeader
+            id: selectedMonitorIdentity
+
+            readonly property var entry:
+                cpuPlusWindow.selectedMonitorEntry()
+
+            readonly property bool showingThermal:
+                !!entry && !!entry._thermalRecord
+
+            readonly property bool showingSystem:
+                !!entry && !!entry._systemRecord
+
+            readonly property bool showingTemperature:
+                showingThermal
+                && entry.sensorKind !== "fan"
+
+            visible:
+                (cpuPlusWindow.selectedModeIndex === 2
+                 || cpuPlusWindow.selectedModeIndex === 3)
+                && entry !== null
+
+            height: visible ? 122 : 0
 
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: sharedHeaderLine.bottom
+
+            anchors.leftMargin: 16
+            anchors.rightMargin: 16
+            anchors.topMargin: 8
+
+            Row {
+                id: selectedMonitorIdentityTop
+
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+
+                height: 54
+                spacing: 12
+
+                Item {
+                    id: selectedMonitorIdentityIconBox
+
+                    width: 54
+                    height: 54
+
+                    Loader {
+                        id: selectedMonitorThermalIcon
+
+                        anchors.centerIn: parent
+
+                        active:
+                            selectedMonitorIdentity.showingTemperature
+
+                        visible: active
+
+                        sourceComponent:
+                            active ? thermalIconComponent : undefined
+
+                        onLoaded: {
+                            item.iconScale = 1.08;
+                            item.iconColor = Qt.binding(function() {
+                                return cpuPlusWindow.monitorEntryAccent(
+                                    selectedMonitorIdentity.entry
+                                );
+                            });
+                            item.glowColor = Qt.binding(function() {
+                                return cpuPlusWindow.monitorEntryAccent(
+                                    selectedMonitorIdentity.entry
+                                );
+                            });
+                            item.glowOpacity = 0.50;
+                        }
+                    }
+
+                    GohuText {
+                        anchors.centerIn: parent
+                        width: parent.width
+
+                        visible:
+                            !selectedMonitorIdentity.showingTemperature
+
+                        horizontalAlignment: Text.AlignHCenter
+
+                        text:
+                            cpuPlusWindow.monitorEntryIcon(
+                                selectedMonitorIdentity.entry
+                            )
+
+                        font.pixelSize:
+                            selectedMonitorIdentity.showingSystem
+                            ? (
+                                  String(
+                                      selectedMonitorIdentity.entry
+                                      && selectedMonitorIdentity.entry.category
+                                      || ""
+                                  ).toUpperCase() === "NETWORK"
+                                  ? 26 : 31
+                              )
+                            : 23
+
+                        fontSizeMode: Text.HorizontalFit
+                        minimumPixelSize: 10
+
+                        color:
+                            cpuPlusWindow.monitorEntryAccent(
+                                selectedMonitorIdentity.entry
+                            )
+
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 8
+                            samples: 7
+                            opacity: 0.58
+                            color:
+                                cpuPlusWindow.monitorEntryAccent(
+                                    selectedMonitorIdentity.entry
+                                )
+                            transparentBorder: true
+                        }
+                    }
+                }
+
+                Column {
+                    width:
+                        Math.max(
+                            0,
+                            parent.width
+                            - selectedMonitorIdentityIconBox.width
+                            - parent.spacing
+                        )
+
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 3
+
+                    GohuText {
+                        width: parent.width
+
+                        text:
+                            cpuPlusWindow.monitorEntryTitle(
+                                selectedMonitorIdentity.entry
+                            )
+
+                        font.pixelSize: 15
+                        color:
+                            cpuPlusWindow.monitorEntryAccent(
+                                selectedMonitorIdentity.entry
+                            )
+
+                        elide: Text.ElideRight
+
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 7
+                            samples: 7
+                            opacity: 0.48
+                            color:
+                                cpuPlusWindow.monitorEntryAccent(
+                                    selectedMonitorIdentity.entry
+                                )
+                            transparentBorder: true
+                        }
+                    }
+
+                    GohuText {
+                        width: parent.width
+
+                        text:
+                            cpuPlusWindow.monitorIdentityMetric(
+                                selectedMonitorIdentity.entry
+                            )
+
+                        font.pixelSize: 10
+                        color: Colors.white
+                        opacity: 0.92
+                        elide: Text.ElideRight
+                    }
+                }
+            }
+
+            GohuText {
+                id: selectedMonitorIdentityRole
+
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: selectedMonitorIdentityTop.bottom
+                anchors.topMargin: 5
+
+                text:
+                    cpuPlusWindow.monitorIdentityRole(
+                        selectedMonitorIdentity.entry
+                    )
+
+                font.pixelSize: 9
+                color: Colors.white
+                opacity: 0.50
+                elide: Text.ElideRight
+            }
+
+            GohuText {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: selectedMonitorIdentityRole.bottom
+                anchors.topMargin: 3
+
+                text:
+                    cpuPlusWindow.monitorIdentityPurpose(
+                        selectedMonitorIdentity.entry
+                    )
+
+                visible: text.length > 0
+
+                wrapMode: Text.Wrap
+                maximumLineCount: 2
+                elide: Text.ElideRight
+
+                font.pixelSize: 9
+                color: Colors.white
+                opacity: 0.42
+                lineHeightMode: Text.ProportionalHeight
+                lineHeight: 1.10
+            }
+
+            GohuText {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+
+                text:
+                    cpuPlusWindow.monitorIdentityDetail(
+                        selectedMonitorIdentity.entry
+                    )
+
+                font.pixelSize: 8
+                color:
+                    selectedMonitorIdentity.showingThermal
+                    ? Colors.orange
+                    : Colors.cyan
+
+                opacity: 0.68
+                elide: Text.ElideMiddle
+            }
+        }
+
+        Item {
+            id: sharedStateHeader
+
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: selectedMonitorIdentity.bottom
 
             anchors.leftMargin: 8
             anchors.rightMargin: 8
@@ -1514,24 +1827,44 @@ PanelWindow {
             anchors.top: targetSubModeStrip.bottom
             anchors.bottom: parent.bottom
 
-            anchors.leftMargin: 8
-            anchors.rightMargin: 18
+            anchors.leftMargin: 6
+            anchors.rightMargin: 19
             anchors.bottomMargin: 8
-            anchors.topMargin: 10
+            anchors.topMargin: 8
 
             visible:
                 cpuPlusWindow.selectedModeIndex === 2
                 || cpuPlusWindow.selectedModeIndex === 3
 
             clip: true
+            boundsBehavior: Flickable.StopAtBounds
             contentWidth: width
             contentHeight: monitorSelectorColumn.implicitHeight
+
+            function clampContentY() {
+                const maxY =
+                    Math.max(0, contentHeight - height);
+
+                contentY =
+                    Math.max(
+                        0,
+                        Math.min(maxY, contentY)
+                    );
+            }
+
+            onContentHeightChanged: {
+                clampContentY();
+            }
+
+            onHeightChanged: {
+                clampContentY();
+            }
 
             Column {
                 id: monitorSelectorColumn
 
                 width: monitorSelectorScroll.width
-                spacing: 7
+                spacing: 1
 
                 Repeater {
                     model: cpuPlusWindow.selectedMonitorRows()
@@ -1563,9 +1896,7 @@ PanelWindow {
                             : Colors.cyan
 
                         width: monitorSelectorColumn.width
-                        height:
-                            modelData && modelData._systemRecord
-                            ? 64 : 56
+                        height: 50
 
                         color:
                             isPressed
@@ -1596,34 +1927,46 @@ PanelWindow {
 
                         Row {
                             anchors.fill: parent
-                            anchors.margins: 6
-                            spacing: 7
+                            anchors.leftMargin: 6
+                            anchors.rightMargin: 6
+                            anchors.topMargin: 3
+                            anchors.bottomMargin: 3
+                            spacing: 6
 
                             Item {
                                 id: monitorRowIconBox
 
+                                readonly property bool showingSystemIcon:
+                                    !!monitorRowButton.modelData
+                                    && !!monitorRowButton.modelData._systemRecord
+
+                                readonly property bool showingTemperatureIcon:
+                                    !showingSystemIcon
+                                    && !!monitorRowButton.modelData
+                                    && !!monitorRowButton.modelData._thermalRecord
+                                    && monitorRowButton.modelData.sensorKind !== "fan"
+
                                 width:
-                                    monitorRowButton.modelData
-                                    && monitorRowButton.modelData._systemRecord
-                                    ? 58
-                                    : monitorRowButton.modelData
-                                      && monitorRowButton.modelData._thermalRecord
-                                      && monitorRowButton.modelData.sensorKind !== "fan"
+                                    showingSystemIcon
+                                    ? 54
+                                    : showingTemperatureIcon
                                     ? 56
                                     : 42
 
                                 height: parent.height
 
                                 Loader {
+                                    id: targetTemperatureIconLoader
+
                                     anchors.centerIn: parent
 
-                                    visible:
-                                        monitorRowButton.modelData
-                                        && monitorRowButton.modelData._thermalRecord
-                                        && monitorRowButton.modelData.sensorKind !== "fan"
+                                    active:
+                                        monitorRowIconBox.showingTemperatureIcon
+
+                                    visible: active
 
                                     sourceComponent:
-                                        visible ? thermalIconComponent : undefined
+                                        active ? thermalIconComponent : undefined
 
                                     onLoaded: {
                                         item.iconScale = 0.86;
@@ -1658,11 +2001,7 @@ PanelWindow {
                                     horizontalAlignment: Text.AlignHCenter
 
                                     visible:
-                                        !(
-                                            monitorRowButton.modelData
-                                            && monitorRowButton.modelData._thermalRecord
-                                            && monitorRowButton.modelData.sensorKind !== "fan"
-                                         )
+                                        !monitorRowIconBox.showingTemperatureIcon
 
                                     text:
                                         cpuPlusWindow.monitorEntryIcon(
@@ -1795,155 +2134,171 @@ PanelWindow {
                 }
             }
         }
-    }
+        // AppControl selector scrollbar geometry.
+        Rectangle {
+            id: targetScrollTrack
 
-    // AppControl selector scrollbar geometry.
-    Rectangle {
-        id: targetScrollTrack
+            width: 10
 
-        parent: targetPane
-        width: 10
+            anchors.top: targetSubModeStrip.bottom
+            anchors.bottom: parent.bottom
+            anchors.right: parent.right
 
-        anchors.top: targetSubModeStrip.bottom
-        anchors.bottom: parent.bottom
-        anchors.right: parent.right
+            anchors.topMargin: 10
+            anchors.bottomMargin: 8
+            anchors.rightMargin: 3
 
-        anchors.topMargin: 10
-        anchors.bottomMargin: 8
-        anchors.rightMargin: 3
+            color:
+                cpuPlusWindow.selectedModeIndex === 2
+                ? Colors.orange
+                : Colors.cyan
 
-        color:
-            cpuPlusWindow.selectedModeIndex === 2
-            ? Colors.orange
-            : Colors.cyan
-
-        opacity:
-            monitorSelectorScroll.contentHeight
-            > monitorSelectorScroll.height
-            ? 0.90 : 0.0
-
-        visible:
-            (cpuPlusWindow.selectedModeIndex === 2
-             || cpuPlusWindow.selectedModeIndex === 3)
-            && opacity > 0.0
-
-        z: 300
-
-        property real maxContentY:
-            Math.max(
-                0,
+            opacity:
                 monitorSelectorScroll.contentHeight
-                - monitorSelectorScroll.height
-            )
+                > monitorSelectorScroll.height
+                ? 0.90 : 0.0
 
-        property real handleTravel:
-            Math.max(
-                0,
-                height - targetScrollHandle.height
-            )
+            visible:
+                (cpuPlusWindow.selectedModeIndex === 2
+                 || cpuPlusWindow.selectedModeIndex === 3)
+                && opacity > 0.0
 
-        function setScrollFromHandleY(handleY) {
-            if (maxContentY <= 0 || handleTravel <= 0)
-                return;
+            z: 300
 
-            const clampedY =
+            property real maxContentY:
                 Math.max(
                     0,
-                    Math.min(handleTravel, handleY)
-                );
-
-            monitorSelectorScroll.contentY =
-                (clampedY / handleTravel) * maxContentY;
-        }
-
-        RectangularShadow {
-            anchors.fill: parent
-            spread: 2
-            z: -1
-            opacity: 0.24
-            color: parent.color
-        }
-
-        Rectangle {
-            id: targetScrollHandle
-
-            width: 6
-            anchors.horizontalCenter: parent.horizontalCenter
-
-            height:
-                Math.max(
-                    30,
-                    parent.height
-                    * Math.min(
-                        1.0,
-                        monitorSelectorScroll.visibleArea.heightRatio
-                    )
+                    monitorSelectorScroll.contentHeight
+                    - monitorSelectorScroll.height
                 )
 
-            y: {
-                if (targetScrollTrack.maxContentY <= 0
-                        || targetScrollTrack.handleTravel <= 0)
-                    return 0;
+            property real handleTravel:
+                Math.max(
+                    0,
+                    height - targetScrollHandle.height
+                )
 
-                const clampedContentY =
+            function setScrollFromHandleY(handleY) {
+                if (maxContentY <= 0 || handleTravel <= 0)
+                    return;
+
+                const clampedY =
                     Math.max(
                         0,
-                        Math.min(
-                            targetScrollTrack.maxContentY,
-                            monitorSelectorScroll.contentY
-                        )
+                        Math.min(handleTravel, handleY)
                     );
 
-                return (
-                    clampedContentY
-                    / targetScrollTrack.maxContentY
-                ) * targetScrollTrack.handleTravel;
+                monitorSelectorScroll.contentY =
+                    (clampedY / handleTravel) * maxContentY;
             }
-
-            color: Colors.magenta
 
             RectangularShadow {
                 anchors.fill: parent
                 spread: 2
                 z: -1
-                opacity: 0.28
+                opacity: 0.24
+                color: parent.color
+            }
+
+            Rectangle {
+                id: targetScrollHandle
+
+                width: 6
+                anchors.horizontalCenter: parent.horizontalCenter
+
+                height:
+                    Math.max(
+                        30,
+                        parent.height
+                        * Math.min(
+                            1.0,
+                            monitorSelectorScroll.visibleArea.heightRatio
+                        )
+                    )
+
+                y: {
+                    const ratio =
+                        Math.max(
+                            0.0,
+                            Math.min(
+                                1.0,
+                                Number(
+                                    monitorSelectorScroll.visibleArea.heightRatio
+                                    || 0
+                                )
+                            )
+                        );
+
+                    const maxPosition =
+                        Math.max(0.0, 1.0 - ratio);
+
+                    const position =
+                        Math.max(
+                            0.0,
+                            Math.min(
+                                maxPosition,
+                                Number(
+                                    monitorSelectorScroll.visibleArea.yPosition
+                                    || 0
+                                )
+                            )
+                        );
+
+                    if (maxPosition <= 0
+                            || targetScrollTrack.handleTravel <= 0)
+                        return 0;
+
+                    return (
+                        position / maxPosition
+                    ) * targetScrollTrack.handleTravel;
+                }
+
                 color: Colors.magenta
-            }
-        }
 
-        MouseArea {
-            id: targetScrollMouse
-
-            anchors.fill: parent
-            hoverEnabled: true
-            acceptedButtons: Qt.LeftButton
-
-            property real dragOffset: 0
-
-            onPressed: function(mouse) {
-                const handleTop = targetScrollHandle.y;
-                const handleBottom =
-                    targetScrollHandle.y
-                    + targetScrollHandle.height;
-
-                dragOffset =
-                    mouse.y >= handleTop
-                    && mouse.y <= handleBottom
-                    ? mouse.y - handleTop
-                    : targetScrollHandle.height / 2;
-
-                targetScrollTrack.setScrollFromHandleY(
-                    mouse.y - dragOffset
-                );
+                RectangularShadow {
+                    anchors.fill: parent
+                    spread: 2
+                    z: -1
+                    opacity: 0.28
+                    color: Colors.magenta
+                }
             }
 
-            onPositionChanged: function(mouse) {
-                if (pressed)
+            MouseArea {
+                id: targetScrollMouse
+
+                anchors.fill: parent
+                hoverEnabled: true
+                acceptedButtons: Qt.LeftButton
+
+                property real dragOffset: 0
+
+                onPressed: function(mouse) {
+                    const handleTop = targetScrollHandle.y;
+                    const handleBottom =
+                        targetScrollHandle.y
+                        + targetScrollHandle.height;
+
+                    dragOffset =
+                        mouse.y >= handleTop
+                        && mouse.y <= handleBottom
+                        ? mouse.y - handleTop
+                        : targetScrollHandle.height / 2;
+
                     targetScrollTrack.setScrollFromHandleY(
                         mouse.y - dragOffset
                     );
+                }
+
+                onPositionChanged: function(mouse) {
+                    if (pressed)
+                        targetScrollTrack.setScrollFromHandleY(
+                            mouse.y - dragOffset
+                        );
+                }
             }
         }
+
     }
 
     // ============================================================

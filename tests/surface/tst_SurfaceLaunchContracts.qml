@@ -790,6 +790,33 @@ TestCase {
         );
     }
 
+    function test_rejectedAugmentationCarriesNoExecutableMutation() {
+        const evidence = braveEvidence();
+        evidence.argv = [
+            "brave-browser",
+            "--remote-debugging-address=0.0.0.0",
+            "--remote-debugging-port=9444"
+        ];
+
+        const augmentation = coordinator.buildAugmentation(
+            evidence,
+            [
+                requirements.capabilityAccessibility,
+                requirements.capabilityDevTools
+            ]
+        );
+
+        verify(!augmentation.ready);
+        compare(Object.keys(augmentation.env).length, 0);
+        compare(augmentation.argvAfterExecutable.length, 0);
+        compare(augmentation.argvAppend.length, 0);
+        compare(augmentation.bootstrap.kittyListenOn, "");
+        compare(augmentation.bootstrap.debugAddress, "");
+        compare(augmentation.bootstrap.debugPort, 0);
+        compare(augmentation.leases.length, 0);
+        verify(augmentation.conflicts.length > 0);
+    }
+
     function test_requirementsDoNotClaimSemanticIdentity() {
         const description = requirements.describe(
             braveEvidence(),

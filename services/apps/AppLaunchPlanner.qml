@@ -6,10 +6,10 @@ import QtQuick
 // AppControl host dependency. It preserves the donor's APPS launch semantics
 // while leaving execution hooks open for sibling providers.
 //
-// Team 5's current published contract owns provider-native discovery and
-// activation, not DesktopEntry-aware launch preparation. The donor's
-// accessibility/debug-port launch instrumentation is therefore an unresolved
-// cross-team seam and is intentionally not implemented here yet.
+// Surface-launch ownership is resolved: T5 owns the shared requirements /
+// coordinator domain, while Team 8 owns launch intent and application of a
+// supplied augmentation. This planner therefore treats augmentation as opaque
+// launcher input and does not infer Kitty/AT-SPI/DevTools requirements itself.
 // Team 7 identity is not used here.
 QtObject {
     id: planner
@@ -260,13 +260,35 @@ QtObject {
         };
     }
 
-    function plan(entry, sourceMode, launchMode, bottleName) {
+    function withSuppliedAugmentation(basePlan, suppliedAugmentation) {
+        if (!basePlan || basePlan.kind === planUnavailable)
+            return basePlan;
+
+        // The augmentation payload is intentionally opaque here. Its
+        // capability semantics, endpoint allocation, lease/correlation state
+        // and bootstrap construction belong to the T5-domain-owned shared
+        // SurfaceLaunch contract. Team 8 only carries the supplied result with
+        // its mechanism-specific launch plan.
+        const next = Object.assign({}, basePlan);
+        next.surfaceLaunchAugmentation =
+            suppliedAugmentation !== undefined
+            ? suppliedAugmentation
+            : null;
+
+        return next;
+    }
+
+    function plan(entry, sourceMode, launchMode, bottleName,
+                  suppliedAugmentation) {
+        let basePlan;
+
         if (launchMode === coreProvider.launchToolbox)
-            return toolboxPlan(entry, sourceMode);
+            basePlan = toolboxPlan(entry, sourceMode);
+        else if (launchMode === coreProvider.launchBottle)
+            basePlan = bottlePlan(entry, sourceMode, bottleName);
+        else
+            basePlan = normalPlan(entry, sourceMode);
 
-        if (launchMode === coreProvider.launchBottle)
-            return bottlePlan(entry, sourceMode, bottleName);
-
-        return normalPlan(entry, sourceMode);
+        return withSuppliedAugmentation(basePlan, suppliedAugmentation);
     }
 }

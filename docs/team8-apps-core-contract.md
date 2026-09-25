@@ -62,6 +62,31 @@ launch mechanisms, and application of a supplied augmentation. AppLaunchPlanner 
 that supplied augmentation opaquely until the shared T5-domain contract freezes its exact
 payload schema.
 
+### AppHiddenAdapter.qml
+
+Pure HIDDEN-to-APPS adapter.
+
+Owns:
+
+- converting externally discovered command names into APPS-shaped records
+- donor-compatible hidden record metadata
+- known CLI icon hints
+- DesktopEntry icon fallback using Team 8 launch-executable parsing
+
+It does **not**:
+
+- discover commands
+- own RUN history
+- execute commands
+- contain an AppControl callback
+- define canonical application identity
+
+Current records intentionally omit the donor's embedded `execute()` closure. HIDDEN
+execution is represented later as `AppLaunchPlanner` HIDDEN intent.
+
+The future RunService remains responsible for supplying the command catalog; Team 8 only
+adapts those externally supplied rows into APPS presentation records.
+
 ### AppCatalogPolicy.qml
 
 Pure APPS catalog/search/ranking policy.

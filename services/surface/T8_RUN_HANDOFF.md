@@ -75,6 +75,10 @@ The consumer must explicitly pass the requested list.
 Calling `suggestedCapabilities(...)` is advisory. It is not a global launch
 hook.
 
+An empty explicit request is a true no-op: no correlation id, coordinator state,
+lease, environment mutation, or argv mutation is created. Unknown capability
+names fail visibly instead of being silently ignored.
+
 ## Augmentation application
 
 Current output separates:
@@ -121,6 +125,10 @@ Do not execute a returned augmentation unchanged when:
 ready == false
 ```
 
+A rejected augmentation retains diagnostic `unsupportedCapabilities` /
+`conflicts` but holds no lease and creates no application-instance correlation
+state.
+
 Reasons include:
 
 - requested capability unsupported for supplied evidence
@@ -139,6 +147,9 @@ success -> markLaunchSucceeded(correlationId)
 failure -> markLaunchFailed(correlationId)
 ```
 
+These hooks return whether they changed a known prepared correlation. A random
+or stale correlation id cannot manufacture launched state.
+
 Success does not release instrumentation leases.
 
 Application/process lifetime bookkeeping later calls:
@@ -148,3 +159,7 @@ releaseCorrelation(correlationId)
 ```
 
 Provider deactivation is never a release trigger.
+
+`releaseCorrelation(...)` succeeds for either endpoint-backed instrumentation
+or correlation-only instrumentation such as ACCESSIBILITY, where no socket/port
+lease exists.

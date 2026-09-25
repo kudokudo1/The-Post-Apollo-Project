@@ -64,6 +64,9 @@ TestCase {
         readonly property string omnitrix: "green"
         readonly property string cyan: "cyan"
         readonly property string magenta: "magenta"
+        readonly property string yellow: "yellow"
+        readonly property string dark: "dark"
+        readonly property string black: "black"
         readonly property string white: "white"
     }
 
@@ -789,7 +792,8 @@ TestCase {
         );
 
         compare(spec.glowColor, "cyan");
-        compare(spec.fillColor, undefined === spec.fillColor ? "" : spec.fillColor);
+        compare(spec.fillColor, "dark");
+        compare(spec.textColor, "cyan");
         compare(spec.glowRadius, 12);
         compare(spec.glowSamples, 11);
         compare(spec.glowOpacity, 0.66);
@@ -803,7 +807,8 @@ TestCase {
         );
 
         compare(spec.glowColor, "magenta");
-        compare(spec.fillColor, undefined === spec.fillColor ? "" : spec.fillColor);
+        compare(spec.fillColor, "yellow");
+        compare(spec.textColor, "magenta");
         compare(spec.glowRadius, 8);
         compare(spec.glowSamples, 7);
         compare(spec.glowOpacity, 0.64);
@@ -817,6 +822,8 @@ TestCase {
         );
 
         compare(spec.glowColor, "orange");
+        compare(spec.fillColor, "yellow");
+        compare(spec.textColor, "orange");
         compare(spec.glowRadius, 8);
         compare(spec.glowSamples, 7);
         compare(spec.glowOpacity, 0.60);

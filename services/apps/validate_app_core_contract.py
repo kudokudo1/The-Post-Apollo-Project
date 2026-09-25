@@ -63,6 +63,10 @@ required_functions = {
         "bottlePlan",
         "plan",
         "withSuppliedAugmentation",
+        "normalizedSurfaceAugmentation",
+        "augmentedArgv",
+        "copyStringArray",
+        "copyStringMap",
     },
     "bottles": {
         "collectNames",
@@ -211,7 +215,8 @@ for key, path in FILES.items():
 print(" host coupling: none")
 print(" Team 1/5/6/7 physiology: none")
 print(" SurfaceLaunch requirement policy: external / T5-domain-owned")
-print(" supplied augmentation carriage: Team 8 launch-plan responsibility")
+print(" supplied SurfaceLaunch payload: structurally consumed by Team 8")
+print(" SurfaceLaunch requirement policy: T5-domain-owned")
 print(" Bottles discovery: isolated Team 8 provider")
 print(" browser/desktop action policy: pure Team 8 planner")
 print(" APPS catalog/search/ranking: pure Team 8 policy")

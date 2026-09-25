@@ -32,7 +32,7 @@ QtObject {
             );
     }
 
-    function desktopActionPlan(action, fallbackIndex) {
+    function desktopActionPlan(action, entry, fallbackIndex) {
         if (!action) {
             return {
                 kind: planUnavailable,
@@ -44,7 +44,7 @@ QtObject {
         if (action._appControlBuiltin) {
             return browserBuiltinPlan(
                 String(action._appControlBuiltin),
-                null,
+                entry,
                 fallbackIndex
             );
         }

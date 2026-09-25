@@ -141,3 +141,26 @@ The provider must not acquire knowledge of:
 Provider/service work exists independently on the Team 5 branch. AppControl still
 uses its donor-local implementation. No donor block has been removed and no
 service lifetime has been integrated yet.
+
+
+## Instrumentation recovery evidence
+
+Team 5 now exposes:
+
+```text
+instrumentationLeaseObservations(rows)
+```
+
+This derives only runtime endpoint occupancy evidence from discovered surfaces:
+
+- DEVTOOLS `debugPort` -> `devtools-port`
+- KITTY `kittyAddress` -> `kitty-listen-on`
+
+It does not allocate, release, or own leases.
+
+The shared `SurfaceLaunchCoordinator` may consume those observations through
+`reconcileObservedInstrumentation(...)` to rebuild collision knowledge after
+a shell/coordinator restart.
+
+Provider inactivity is not a release signal. The provider therefore does not
+automatically clear SurfaceLaunch observations when `active` becomes false.

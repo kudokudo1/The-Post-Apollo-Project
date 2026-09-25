@@ -254,6 +254,29 @@ Expected:
 - matching current stream receives explicit unmute mutation
 - one-shot request is then discarded
 
+## E2. Pure policy planners
+
+Policy decisions must be testable without invoking live mutation APIs.
+
+Expected:
+
+```text
+mutePolicyTargets
+    returns currently-unmuted matching streams that persistent policy would mute
+
+pendingMuteTargets
+    returns only matching streams whose observed mute state differs from the
+    requested one-shot state
+
+volumePolicyTargets
+    resolves overlapping APP/WINDOW/TAB rules by newest serial and clamps to
+    the service volume ceiling
+```
+
+The isolated QtTest suite must exercise these planners directly. It must not call
+`setSinkInputMute()`, `setSinkInputVolumes()`, `setMutePolicy()`, or
+`setVolumePolicy()`.
+
 ## F. Volume behavior
 
 ### F1 — unity cap

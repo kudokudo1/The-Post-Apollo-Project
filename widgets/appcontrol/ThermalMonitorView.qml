@@ -7,6 +7,7 @@ import "../../components"
             id: thermalMonitorBody
 
 required property var controller
+required property var thermalController
 property alias loadSlider: thermalLoadSlider
 
             width: parent.width
@@ -68,7 +69,7 @@ property alias loadSlider: thermalLoadSlider
                                           + " RPM"
                                         : "N/A",
                                     accent:
-                                    controller.thermalColorForCelsius(
+                                    thermalController.thermalColorForCelsius(
                                         Number(sensor.highC || 0)
                                     )
                                 }
@@ -82,7 +83,7 @@ property alias loadSlider: thermalLoadSlider
                                 tempC: Number(sensor.tempC || 0),
                                 value: "",
                                 accent:
-                                    controller.thermalAccent(sensor)
+                                    thermalController.thermalAccent(sensor)
                             },
                             {
                                 id: "high",
@@ -109,7 +110,7 @@ property alias loadSlider: thermalLoadSlider
                                     ? ""
                                     : "N/A",
                                 accent:
-                                    controller.thermalColorForCelsius(
+                                    thermalController.thermalColorForCelsius(
                                         Number(sensor.critC || 0)
                                     )
                             }
@@ -179,7 +180,7 @@ property alias loadSlider: thermalLoadSlider
                                         anchors.bottom: parent.bottom
 
                                         text:
-                                            controller.celsiusToFahrenheit(
+                                            thermalController.celsiusToFahrenheit(
                                                 modelData.tempC
                                             ).toFixed(1)
                                             + "°F"
@@ -308,7 +309,7 @@ property alias loadSlider: thermalLoadSlider
                     && thermalMonitorBody.safeSensor.sensorKind === "fan"
                 readonly property bool canAdjust:
                     fanMode
-                    && controller.fanControlUnlocked(
+                    && thermalController.fanControlUnlocked(
                            thermalMonitorBody.currentSensor
                        )
                     && (thermalMonitorBody.safeSensor.controlWritable
@@ -326,7 +327,7 @@ property alias loadSlider: thermalLoadSlider
                         Math.min(100, activePercent() + Number(deltaPercent || 0))
                     );
                     previewPercent = target;
-                    controller.writeFanPercent(
+                    thermalController.writeFanPercent(
                         thermalMonitorBody.currentSensor,
                         target
                     );
@@ -340,14 +341,14 @@ property alias loadSlider: thermalLoadSlider
                                    ? thermalMonitorBody.safeSensor.tempC : 0)));
 
                     const desired =
-                        controller.desiredFanPercentFor(
+                        thermalController.desiredFanPercentFor(
                             thermalMonitorBody.currentSensor
                         );
                     if (desired >= 0)
                         return desired;
 
                     const pending =
-                        controller.pendingFanPercentFor(
+                        thermalController.pendingFanPercentFor(
                             thermalMonitorBody.currentSensor
                         );
                     if (pending >= 0)
@@ -385,7 +386,7 @@ property alias loadSlider: thermalLoadSlider
                 border.color:
                     keyboardSelected
                     ? Colors.magenta
-                    : controller.thermalAccent(thermalMonitorBody.currentSensor)
+                    : thermalController.thermalAccent(thermalMonitorBody.currentSensor)
 
                 Rectangle {
                     anchors.left: parent.left
@@ -395,14 +396,14 @@ property alias loadSlider: thermalLoadSlider
                     anchors.topMargin: 3
                     anchors.bottomMargin: 3
                     width: Math.max(0, parent.trackSpan * thermalLoadSlider.activePercent() / 100.0)
-                    color: controller.thermalAccent(thermalMonitorBody.currentSensor)
+                    color: thermalController.thermalAccent(thermalMonitorBody.currentSensor)
                     opacity: 0.50
                     layer.enabled: true
                     layer.effect: DropShadow {
                         radius: 6
                         samples: 5
                         opacity: fanSliderMouse.containsMouse || fanSliderMouse.pressed ? 0.68 : 0.40
-                        color: controller.thermalAccent(thermalMonitorBody.currentSensor)
+                        color: thermalController.thermalAccent(thermalMonitorBody.currentSensor)
                         transparentBorder: true
                     }
                 }
@@ -419,7 +420,7 @@ property alias loadSlider: thermalLoadSlider
                          * thermalLoadSlider.activePercent() / 100.0
                     color: Colors.white
                     border.width: 1
-                    border.color: controller.thermalAccent(thermalMonitorBody.currentSensor)
+                    border.color: thermalController.thermalAccent(thermalMonitorBody.currentSensor)
 
                     GohuText {
                         anchors.centerIn: parent
@@ -434,7 +435,7 @@ property alias loadSlider: thermalLoadSlider
                         spread: 3
                         z: -1
                         opacity: 0.40
-                        color: controller.thermalAccent(thermalMonitorBody.currentSensor)
+                        color: thermalController.thermalAccent(thermalMonitorBody.currentSensor)
                     }
                 }
 
@@ -471,7 +472,7 @@ property alias loadSlider: thermalLoadSlider
                         radius: 5
                         samples: 5
                         opacity: 0.34
-                        color: controller.thermalAccent(thermalMonitorBody.currentSensor)
+                        color: thermalController.thermalAccent(thermalMonitorBody.currentSensor)
                         transparentBorder: true
                     }
                 }
@@ -504,7 +505,7 @@ property alias loadSlider: thermalLoadSlider
                     onReleased: function(mouse) {
                         const target = thermalLoadSlider.percentAt(mouse.x);
                         thermalLoadSlider.previewPercent = target;
-                        controller.writeFanPercent(thermalMonitorBody.currentSensor, target);
+                        thermalController.writeFanPercent(thermalMonitorBody.currentSensor, target);
                         fanSliderPreviewReset.restart();
                         mouse.accepted = true;
                     }
@@ -515,7 +516,7 @@ property alias loadSlider: thermalLoadSlider
                         const target = Math.max(0, Math.min(100,
                             thermalLoadSlider.activePercent() + (delta > 0 ? 5 : -5)));
                         thermalLoadSlider.previewPercent = target;
-                        controller.writeFanPercent(thermalMonitorBody.currentSensor, target);
+                        thermalController.writeFanPercent(thermalMonitorBody.currentSensor, target);
                         fanSliderPreviewReset.restart();
                         wheel.accepted = true;
                     }
@@ -533,7 +534,7 @@ property alias loadSlider: thermalLoadSlider
                     spread: fanSliderMouse.containsMouse || fanSliderMouse.pressed ? 4 : 2
                     z: -1
                     opacity: fanSliderMouse.containsMouse || fanSliderMouse.pressed ? 0.60 : 0.26
-                    color: controller.thermalAccent(thermalMonitorBody.currentSensor)
+                    color: thermalController.thermalAccent(thermalMonitorBody.currentSensor)
                 }
             }
 
@@ -576,7 +577,7 @@ property alias loadSlider: thermalLoadSlider
                     text:
                         (thermalMonitorBody.safeSensor.controlWritable
                          || thermalMonitorBody.safeSensor.controlRequiresAuth)
-                        && !controller.fanControlUnlocked(
+                        && !thermalController.fanControlUnlocked(
                                thermalMonitorBody.currentSensor
                            )
                         ? "SAFETY LOCKED • UNLOCK THE GREEN LOCK ABOVE FOR FAN CONTROL"
@@ -602,11 +603,11 @@ property alias loadSlider: thermalLoadSlider
                                ).toFixed(0)
                                + "%"
                              : "N/A")
-                          + (controller.desiredFanPercentFor(
+                          + (thermalController.desiredFanPercentFor(
                                  thermalMonitorBody.currentSensor
                              ) >= 0
                              ? " • TARGET "
-                               + controller.desiredFanPercentFor(
+                               + thermalController.desiredFanPercentFor(
                                      thermalMonitorBody.currentSensor
                                  ).toFixed(0)
                                + "%"
@@ -661,7 +662,7 @@ property alias loadSlider: thermalLoadSlider
 
                             property bool canControl:
                                 !!thermalMonitorBody.currentSensor
-                                && controller.fanControlUnlocked(
+                                && thermalController.fanControlUnlocked(
                                        thermalMonitorBody.currentSensor
                                    )
                                 && !!(thermalMonitorBody.safeSensor.controlWritable
@@ -717,22 +718,22 @@ property alias loadSlider: thermalLoadSlider
 
                                 onClicked: {
                                     if (modelData.action === "auto") {
-                                        controller.clearDesiredFanPercent(
+                                        thermalController.clearDesiredFanPercent(
                                             thermalMonitorBody.currentSensor
                                         );
                                     } else if (modelData.action === "max") {
-                                        controller.setDesiredFanPercent(
+                                        thermalController.setDesiredFanPercent(
                                             thermalMonitorBody.currentSensor,
                                             100
                                         );
                                     } else if (modelData.action === "boost") {
-                                        controller.setDesiredFanPercent(
+                                        thermalController.setDesiredFanPercent(
                                             thermalMonitorBody.currentSensor,
                                             Math.min(100, thermalLoadSlider.activePercent() + 10)
                                         );
                                     }
 
-                                    controller.writeFanControl(
+                                    thermalController.writeFanControl(
                                         thermalMonitorBody.currentSensor,
                                         modelData.action
                                     );

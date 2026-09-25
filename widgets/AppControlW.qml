@@ -6,6 +6,7 @@ import Quickshell.Io
 import "../components"
 import "../services/system"
 import "appcontrol"
+import "thermal"
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 
@@ -69,155 +70,11 @@ PanelWindow {
     readonly property int remoteViewAll: 2
     property int remoteViewMode: remoteViewConfigured
 
-    // One canonical THERMAL glyph composition. The source glyphs stay
-    // fully opaque; glow is drawn as sibling shadows instead of layer effects.
+    // Canonical THERMAL glyph now lives in widgets/thermal so AppControl
+    // and CPU++ can render the exact same composition.
     Component {
         id: thermalIconComponent
-
-        Item {
-            id: thermalIconRoot
-            property color iconColor: Colors.orange
-            property real iconScale: 1.0
-            property real glowOpacity: 0.46
-            property bool pressed: false
-
-            opacity: 1.0
-            implicitWidth: 59 * iconScale
-            implicitHeight: 24 * iconScale
-            width: implicitWidth
-            height: implicitHeight
-
-            Item {
-                id: thermalIconScaledContent
-                width: 59
-                height: 24
-                anchors.centerIn: parent
-                scale: thermalIconRoot.iconScale
-                transformOrigin: Item.Center
-                opacity: 1.0
-
-                // A third small star occupies the open upper-left pocket so
-                // the left/right decoration feels balanced at every scale.
-                GohuText {
-                    id: thermalIconTopLeftStar
-                    x: 15
-                    y: -3
-                    text: "⋆"
-                    font.pixelSize: 7
-                    opacity: 1.0
-                    color: thermalIconRoot.pressed ? Colors.black : thermalIconRoot.iconColor
-                }
-
-                DropShadow {
-                    anchors.fill: thermalIconTopLeftStar
-                    source: thermalIconTopLeftStar
-                    visible: !thermalIconRoot.pressed
-                    horizontalOffset: 0
-                    verticalOffset: 0
-                    radius: 4
-                    samples: 5
-                    opacity: thermalIconRoot.glowOpacity
-                    color: thermalIconRoot.iconColor
-                    transparentBorder: true
-                }
-
-                Row {
-                    id: thermalIconOuterRow
-                    anchors.centerIn: parent
-                    spacing: 1
-
-                    Row {
-                        id: thermalIconLeftCoreRow
-                        anchors.verticalCenter: parent.verticalCenter
-                        spacing: -9
-
-                        Item {
-                            width: thermalIconLeft.implicitWidth
-                            height: 24
-
-                            GohuText {
-                                id: thermalIconLeft
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: "₊˚⊹"
-                                font.pixelSize: 13
-                                font.letterSpacing: -1.6
-                                opacity: 1.0
-                                color: thermalIconRoot.pressed ? Colors.black : thermalIconRoot.iconColor
-                            }
-
-                            DropShadow {
-                                anchors.fill: thermalIconLeft
-                                source: thermalIconLeft
-                                visible: !thermalIconRoot.pressed
-                                horizontalOffset: 0
-                                verticalOffset: 0
-                                radius: 5
-                                samples: 5
-                                opacity: thermalIconRoot.glowOpacity
-                                color: thermalIconRoot.iconColor
-                                transparentBorder: true
-                            }
-                        }
-
-                        Item {
-                            width: thermalIconCore.implicitWidth
-                            height: 24
-
-                            Text {
-                                id: thermalIconCore
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: "🌡"
-                                font.family: "Noto Sans Symbols2"
-                                font.pixelSize: 20
-                                font.weight: Font.Bold
-                                opacity: 1.0
-                                color: thermalIconRoot.pressed ? Colors.black : thermalIconRoot.iconColor
-                            }
-
-                            DropShadow {
-                                anchors.fill: thermalIconCore
-                                source: thermalIconCore
-                                visible: !thermalIconRoot.pressed
-                                horizontalOffset: 0
-                                verticalOffset: 0
-                                radius: 5
-                                samples: 5
-                                opacity: thermalIconRoot.glowOpacity * 0.76
-                                color: thermalIconRoot.iconColor
-                                transparentBorder: true
-                            }
-                        }
-                    }
-
-                    Item {
-                        width: thermalIconRight.implicitWidth
-                        height: 24
-
-                        GohuText {
-                            id: thermalIconRight
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: "๋࣭⭑"
-                            font.pixelSize: 13
-                            opacity: 1.0
-                            color: thermalIconRoot.pressed ? Colors.black : thermalIconRoot.iconColor
-                        }
-
-                        DropShadow {
-                            anchors.fill: thermalIconRight
-                            source: thermalIconRight
-                            visible: !thermalIconRoot.pressed
-                            horizontalOffset: 0
-                            verticalOffset: 0
-                            radius: 5
-                            samples: 5
-                            opacity: thermalIconRoot.glowOpacity
-                            color: thermalIconRoot.iconColor
-                            transparentBorder: true
-                        }
-                    }
-                }
-            }
-        }
+        ThermalIcon { }
     }
 
     // FAVORITES has two scopes:
@@ -589,14 +446,6 @@ PanelWindow {
     // ============================================================
     // KILL MODE / BASIC TASK MANAGER
     // ============================================================
-
-    // ============================================================
-    // THERMAL MODE SUB-VIEWS
-    // ============================================================
-
-    readonly property int thermalViewThermal: 0
-    readonly property int thermalViewFans: 1
-    property int thermalViewMode: thermalViewThermal
 
     // KILL mode now mirrors the other multi-view modes: NORMAL is the full
     // process list, while HUNTER surfaces only recently active processes and
@@ -1036,7 +885,7 @@ PanelWindow {
         id: systemTelemetry
 
         onFanRowsChanged: {
-            fanControl.reconcilePendingPercent(fanRows);
+            thermalController.reconcileFanRows(fanRows);
         }
 
         onRefreshed: {
@@ -1078,48 +927,19 @@ PanelWindow {
         }
     }
 
-    function fanControlUnlocked(entry) {
-        return fanControl.unlocked(entry);
+    ThermalController {
+        id: thermalController
+        telemetry: systemTelemetry
+        fanControl: fanControl
     }
 
-    function toggleFanControlUnlocked(entry) {
-        fanControl.toggleUnlocked(entry);
-    }
-
-    function desiredFanPercentFor(entry) {
-        return fanControl.desiredPercentFor(entry);
-    }
-
-    function setDesiredFanPercent(entry, percent) {
-        fanControl.setDesiredPercent(entry, percent);
-    }
-
-    function clearDesiredFanPercent(entry) {
-        fanControl.clearDesiredPercent(entry);
-    }
-
-    function pendingFanPercentFor(entry) {
-        return fanControl.pendingPercentFor(entry);
-    }
-
-    function writeFanControl(entry, action, percent) {
-        fanControl.writeControl(entry, action, percent);
-    }
-
-    function writeFanPercent(entry, percent) {
-        fanControl.writePercent(entry, percent);
-    }
-
-    function setThermalViewMode(mode) {
-        thermalViewMode =
-            mode === thermalViewFans
-            ? thermalViewFans
-            : thermalViewThermal;
-
+    // Host-only glue: shared thermal state changes in ThermalController;
+    // AppControl only handles its own focus, selection and refresh policy.
+    function activateThermalViewMode(mode) {
+        thermalController.setThermalViewMode(mode);
         keyboardActive = true;
         hoveredResultIndex = -1;
         detailFocused = false;
-
         refreshKillMonitor();
         resetResultSelection();
         resetDetailActionSelection();
@@ -1145,45 +965,6 @@ PanelWindow {
                   === systemModeIndex
                && !!source
                && !!source._systemRecord;
-    }
-
-    function celsiusToFahrenheit(value) {
-        return (Number(value || 0) * 9 / 5) + 32;
-    }
-
-    function formatThermalMenuTemp(value) {
-        const c = Number(value || 0);
-        const f = celsiusToFahrenheit(c);
-
-        return f.toFixed(1) + "°F / " + c.toFixed(1) + "°C";
-    }
-
-    function thermalColorForCelsius(value) {
-        const temp = Number(value || 0);
-
-        if (temp < 30)
-            return Colors.white;
-        if (temp < 40)
-            return Colors.yellow;
-        if (temp < 50)
-            return Colors.omnitrix;
-        if (temp < 60)
-            return Colors.cyan;
-        if (temp < 70)
-            return Colors.orange;
-        if (temp < 80)
-            return Colors.magenta;
-
-        return Colors.red;
-    }
-
-    function thermalAccent(entry) {
-        if (entry && entry.sensorKind === "fan")
-            return Colors.omnitrix;
-
-        return thermalColorForCelsius(
-            Number(entry && entry.tempC || 0)
-        );
     }
 
     function systemAccent(entry) {
@@ -1265,32 +1046,6 @@ PanelWindow {
             return "⇄";
 
         return "🖳";
-    }
-
-    function thermalSimplePurpose(entry) {
-        if (!entry)
-            return "";
-
-        const name = String(entry.name || entry.label || "sensor");
-        const chip = String(entry.chip || "hardware");
-        const lower = (name + " " + chip).toLowerCase();
-
-        if (entry.sensorKind === "fan")
-            return "COOLING FAN • Moves heat away from the hardware. This reading shows how fast it is spinning right now; higher RPM means more cooling effort.";
-        if (lower.indexOf("nvme") !== -1 || lower.indexOf("ssd") !== -1)
-            return "DRIVE TEMPERATURE • Measures how hot this SSD/NVMe device is right now. Use it to see whether storage is heating up under load.";
-        if (lower.indexOf("gpu") !== -1 || lower.indexOf("nvidia") !== -1
-                || lower.indexOf("nouveau") !== -1 || lower.indexOf("amdgpu") !== -1)
-            return "GPU TEMPERATURE • Measures heat from the graphics hardware. It normally rises while rendering, gaming, video work, or other GPU-heavy tasks.";
-        if (lower.indexOf("package") !== -1 || lower.indexOf("core") !== -1
-                || lower.indexOf("cpu") !== -1 || lower.indexOf("k10temp") !== -1
-                || lower.indexOf("coretemp") !== -1)
-            return "CPU TEMPERATURE • Measures heat from the processor or one of its cores. It rises when the CPU is doing more work.";
-        if (lower.indexOf("pch") !== -1 || lower.indexOf("chipset") !== -1)
-            return "CHIPSET TEMPERATURE • Measures heat from the motherboard chipset that helps connect and coordinate system devices.";
-
-        return "TEMPERATURE SENSOR • Measures the heat reported by " + name
-               + " on " + chip + ". Use it to see whether that hardware is warming up or cooling down.";
     }
 
     function taskSimplePurpose(entry) {
@@ -3250,8 +3005,8 @@ PanelWindow {
         }
         if (favoritesFilterMode === thermalModeIndex) {
             return [
-                { group: "thermalView", value: thermalViewThermal, label: "", accent: Colors.orange, size: 12, thermalIcon: true },
-                { group: "thermalView", value: thermalViewFans, label: "", accent: Colors.omnitrix, size: 19, fanIcon: true }
+                { group: "thermalView", value: thermalController.thermalViewThermal, label: "", accent: Colors.orange, size: 12, thermalIcon: true },
+                { group: "thermalView", value: thermalController.thermalViewFans, label: "", accent: Colors.omnitrix, size: 19, fanIcon: true }
             ];
         }
         if (favoritesFilterMode === killModeIndex) {
@@ -3310,7 +3065,7 @@ PanelWindow {
         if (item.group === "runList") return runListMode === item.value;
         if (item.group === "runPrefix") return runPrefixMode === item.value;
         if (item.group === "windowList") return windowListMode === item.value;
-        if (item.group === "thermalView") return thermalViewMode === item.value;
+        if (item.group === "thermalView") return thermalController.thermalViewMode === item.value;
         if (item.group === "killView") return killViewMode === item.value;
         if (item.group === "hunterMetric") return hunterMetricMode === item.value;
         if (item.group === "hunterVisibility") return hunterVisibilityMode === item.value;
@@ -3325,7 +3080,7 @@ PanelWindow {
         else if (item.group === "runList") setRunListMode(item.value);
         else if (item.group === "runPrefix") setRunPrefixMode(item.value);
         else if (item.group === "windowList") setWindowListMode(item.value);
-        else if (item.group === "thermalView") setThermalViewMode(item.value);
+        else if (item.group === "thermalView") activateThermalViewMode(item.value);
         else if (item.group === "killView") setKillViewMode(item.value);
         else if (item.group === "hunterMetric") setHunterMetricMode(item.value);
         else if (item.group === "hunterVisibility") setHunterVisibilityMode(item.value);
@@ -3367,7 +3122,7 @@ PanelWindow {
             return windowListMode === windowListTabs ? !!source._tabRecord : !source._tabRecord;
 
         if (favoritesFilterMode === thermalModeIndex)
-            return thermalViewMode === thermalViewFans
+            return thermalController.thermalViewMode === thermalController.thermalViewFans
                    ? String(source.sensorKind || "") === "fan"
                    : String(source.sensorKind || "") !== "fan";
 
@@ -8475,8 +8230,8 @@ PanelWindow {
             const favoriteKeys = favoriteStore.favoriteKeys;
 
             const sourceRows =
-                appControlWindow.thermalViewMode
-                === appControlWindow.thermalViewFans
+                thermalController.thermalViewMode
+                === thermalController.thermalViewFans
                 ? appControlWindow.fanRows
                 : appControlWindow.thermalRows;
 
@@ -8513,8 +8268,8 @@ PanelWindow {
                 if (aFavorite !== bFavorite)
                     return aFavorite ? -1 : 1;
 
-                if (appControlWindow.thermalViewMode
-                        === appControlWindow.thermalViewFans)
+                if (thermalController.thermalViewMode
+                        === thermalController.thermalViewFans)
                     return Number(b.rpm || 0) - Number(a.rpm || 0);
 
                 return Number(b.tempC || 0) - Number(a.tempC || 0);
@@ -15626,7 +15381,7 @@ PanelWindow {
                                     return resultButton.isPressed ? Colors.black
                                            : resultButton.isHovered || resultButton.isSelected
                                            ? Colors.orange
-                                           : appControlWindow.thermalAccent(selectorAppIconBox.sourceItem);
+                                           : thermalController.thermalAccent(selectorAppIconBox.sourceItem);
                                 });
                                 item.pressed = Qt.binding(function() { return resultButton.isPressed; });
                                 item.glowOpacity = 0.50;
@@ -15642,7 +15397,7 @@ PanelWindow {
                             opacity: resultButton.isHovered || resultButton.isSelected ? 0.58 : 0.38
                             color: resultButton.isHovered || resultButton.isSelected
                                    ? Colors.orange
-                                   : appControlWindow.thermalAccent(selectorAppIconBox.sourceItem)
+                                   : thermalController.thermalAccent(selectorAppIconBox.sourceItem)
                             transparentBorder: true
                         }
 
@@ -15702,7 +15457,7 @@ PanelWindow {
                                 ? Colors.red
                                 : selectorAppIconBox.sourceMode
                                   === appControlWindow.thermalModeIndex
-                                ? appControlWindow.thermalAccent(selectorAppIconBox.sourceItem)
+                                ? thermalController.thermalAccent(selectorAppIconBox.sourceItem)
                                 : appControlWindow.systemIconAccent(selectorAppIconBox.sourceItem)
 
                             layer.enabled: !resultButton.isPressed
@@ -15721,7 +15476,7 @@ PanelWindow {
                                     ? Colors.red
                                     : selectorAppIconBox.sourceMode
                                       === appControlWindow.thermalModeIndex
-                                    ? appControlWindow.thermalAccent(selectorAppIconBox.sourceItem)
+                                    ? thermalController.thermalAccent(selectorAppIconBox.sourceItem)
                                     : appControlWindow.systemIconAccent(selectorAppIconBox.sourceItem)
                                 transparentBorder: true
                             }
@@ -15978,7 +15733,7 @@ PanelWindow {
                             : resultNameGlowBox.showingTask
                             ? Colors.red
                             : resultNameGlowBox.showingThermal
-                            ? appControlWindow.thermalAccent(resultNameGlowBox.sourceItem)
+                            ? thermalController.thermalAccent(resultNameGlowBox.sourceItem)
                             : resultNameGlowBox.showingSystem
                             ? appControlWindow.systemAccent(resultNameGlowBox.sourceItem)
                             : appControlWindow.resultIsApplication(
@@ -16194,7 +15949,7 @@ PanelWindow {
                                        + " RPM")
                                     + " • "
                                     + String(resultNameGlowBox.sourceItem.chip || "FAN")
-                                  : appControlWindow.formatThermalMenuTemp(
+                                  : thermalController.formatThermalMenuTemp(
                                         resultNameGlowBox.sourceItem.tempC
                                     )
                                     + " • "
@@ -16212,7 +15967,7 @@ PanelWindow {
                                 : resultButton.isSelected
                                 ? Colors.orange
                                 : resultNameGlowBox.showingThermal
-                                ? appControlWindow.thermalAccent(resultNameGlowBox.sourceItem)
+                                ? thermalController.thermalAccent(resultNameGlowBox.sourceItem)
                                 : resultNameGlowBox.showingSystem
                                 ? appControlWindow.systemAccent(resultNameGlowBox.sourceItem)
                                 : appControlWindow.selectedModeIndex
@@ -16376,7 +16131,7 @@ PanelWindow {
                            ? Colors.magenta
                            : killMiniGraphBox.accent)
                         : sourceMode === appControlWindow.thermalModeIndex
-                        ? appControlWindow.thermalAccent(sourceItem)
+                        ? thermalController.thermalAccent(sourceItem)
                         : sourceMode === appControlWindow.systemModeIndex
                         ? appControlWindow.systemAccent(sourceItem)
                         : selectorAppIconBox.visible
@@ -17735,290 +17490,20 @@ PanelWindow {
         }
 
         // ========================================================
-        // KILL VIEW SELECTOR — DETAILED / THERMAL / SYSTEM
+        // THERMAL / FAN VIEW SELECTOR
         // ========================================================
-
-                Rectangle {
+        ThermalViewSelector {
             id: thermalViewSelector
-
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: searchHeader.bottom
-
-            height: 42
             visible:
                 appControlWindow.selectedModeIndex
                 === appControlWindow.thermalModeIndex
+            controller: thermalController
 
-            color: Colors.black
-            z: 260
-
-            Row {
-                anchors.fill: parent
-                anchors.leftMargin: 7
-                anchors.rightMargin: 7
-                anchors.topMargin: 5
-                anchors.bottomMargin: 6
-                spacing: 7
-
-                Rectangle {
-                    id: thermalViewThermalButton
-
-                    width: (parent.width - parent.spacing) / 2
-                    height: parent.height
-
-                    opacity: 1.0
-
-                    property bool isSelected:
-                        appControlWindow.thermalViewMode
-                        === appControlWindow.thermalViewThermal
-                    property bool isHovered:
-                        thermalViewThermalMouse.containsMouse
-                    property bool isPressed:
-                        thermalViewThermalMouse.pressed
-
-                    readonly property color subModeGlowColor:
-                        isSelected
-                        ? Colors.magenta
-                        : isHovered
-                        ? Colors.orange
-                        : Colors.orange
-
-                    color:
-                        isPressed
-                        ? Colors.magenta
-                        : isHovered || isSelected
-                        ? Colors.yellow
-                        : Colors.dark
-
-                    border.width: 1
-                    border.color: thermalViewThermalButton.subModeGlowColor
-
-                    Loader {
-                        id: thermalViewThermalContent
-                        opacity: 1.0
-                        anchors.centerIn: parent
-                        anchors.verticalCenterOffset: 3
-                        sourceComponent: thermalIconComponent
-                        onLoaded: {
-                            item.iconScale = 1.0;
-                            item.iconColor = Qt.binding(function() {
-                                return thermalViewThermalButton.isPressed
-                                       ? Colors.black
-                                       : thermalViewThermalButton.subModeGlowColor;
-                            });
-                            item.pressed = Qt.binding(function() {
-                                return thermalViewThermalButton.isPressed;
-                            });
-                            item.glowOpacity = 0.50;
-                        }
-                    }
-
-                    DropShadow {
-                        anchors.fill: thermalViewThermalContent
-                        source: thermalViewThermalContent
-                        horizontalOffset: 0
-                        verticalOffset: 0
-                        radius: 7
-                        samples: 5
-
-                        opacity:
-                            thermalViewThermalButton.isPressed
-                            ? 0.0
-                            : thermalViewThermalButton.isSelected
-                            ? 0.68
-                            : thermalViewThermalButton.isHovered
-                            ? 0.60
-                            : 0.44
-
-                        color: thermalViewThermalButton.subModeGlowColor
-                        transparentBorder: true
-                    }
-
-                    MouseArea {
-                        id: thermalViewThermalMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-
-                        onClicked: {
-                            appControlWindow.setThermalViewMode(
-                                appControlWindow.thermalViewThermal
-                            );
-                        }
-                    }
-
-                    RectangularShadow {
-                        anchors.fill: parent
-                        spread: 5
-                        z: -1
-                        opacity:
-                            thermalViewThermalButton.isHovered
-                            || thermalViewThermalButton.isSelected
-                            ? 0.70
-                            : 0.50
-                        color: thermalViewThermalButton.subModeGlowColor
-                    }
-                }
-
-                Rectangle {
-                    id: thermalViewFansButton
-
-                    width: (parent.width - parent.spacing) / 2
-                    height: parent.height
-
-                    opacity: 1.0
-
-                    property bool isSelected:
-                        appControlWindow.thermalViewMode
-                        === appControlWindow.thermalViewFans
-                    property bool isHovered:
-                        thermalViewFansMouse.containsMouse
-                    property bool isPressed:
-                        thermalViewFansMouse.pressed
-
-                    readonly property color subModeGlowColor:
-                        isSelected
-                        ? Colors.magenta
-                        : isHovered
-                        ? Colors.orange
-                        : Colors.omnitrix
-
-                    color:
-                        isPressed
-                        ? Colors.magenta
-                        : isHovered || isSelected
-                        ? Colors.yellow
-                        : Colors.dark
-
-                    border.width: 1
-                    border.color: thermalViewFansButton.subModeGlowColor
-
-                    Item {
-                        id: thermalViewFansContent
-                        anchors.centerIn: parent
-                        width: thermalViewFansRow.implicitWidth
-                        height: parent.height
-
-                        Row {
-                            id: thermalViewFansRow
-                            anchors.centerIn: parent
-                            spacing: 5
-
-                            Rectangle {
-                                id: thermalViewFanGlyphBox
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: 25
-                                height: 20
-                                color: "transparent"
-                                border.width: 1
-                                border.color: thermalViewFansButton.isPressed
-                                              ? Colors.black
-                                              : thermalViewFansButton.subModeGlowColor
-
-                                GohuText {
-                                    anchors.centerIn: parent
-                                    anchors.verticalCenterOffset: 3
-                                    text: "✇"
-                                    font.pixelSize: 19
-                                    color: thermalViewFansButton.isPressed
-                                           ? Colors.black
-                                           : thermalViewFansButton.subModeGlowColor
-                                }
-
-                                RectangularShadow {
-                                    anchors.fill: parent
-                                    spread: 2
-                                    z: -1
-                                    opacity: thermalViewFansButton.isPressed ? 0.0 : 0.24
-                                    color: thermalViewFansButton.subModeGlowColor
-                                }
-                            }
-
-                            GohuText {
-                                id: thermalViewFanOrnament
-                                anchors.verticalCenter: parent.verticalCenter
-                                anchors.verticalCenterOffset: 2
-                                text: "༄｡°"
-                                font.pixelSize: 15
-                                color: thermalViewFansButton.isPressed
-                                       ? Colors.black
-                                       : thermalViewFansButton.subModeGlowColor
-
-                                layer.enabled: !thermalViewFansButton.isPressed
-                                layer.effect: DropShadow {
-                                    horizontalOffset: 0
-                                    verticalOffset: 0
-                                    radius: 9
-                                    samples: 9
-                                    opacity: 0.76
-                                    color: thermalViewFansButton.subModeGlowColor
-                                    transparentBorder: true
-                                }
-                            }
-                        }
-                    }
-
-                    DropShadow {
-                        anchors.fill: thermalViewFansContent
-                        source: thermalViewFansContent
-                        horizontalOffset: 0
-                        verticalOffset: 0
-                        radius: 9
-                        samples: 9
-
-                        opacity:
-                            thermalViewFansButton.isPressed
-                            ? 0.0
-                            : thermalViewFansButton.isSelected
-                            ? 0.36
-                            : thermalViewFansButton.isHovered
-                            ? 0.30
-                            : 0.20
-
-                        color: thermalViewFansButton.subModeGlowColor
-                        transparentBorder: true
-                    }
-
-                    MouseArea {
-                        id: thermalViewFansMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-
-                        onClicked: {
-                            appControlWindow.setThermalViewMode(
-                                appControlWindow.thermalViewFans
-                            );
-                        }
-                    }
-
-                    RectangularShadow {
-                        anchors.fill: parent
-                        spread: 5
-                        z: -1
-                        opacity:
-                            thermalViewFansButton.isHovered
-                            || thermalViewFansButton.isSelected
-                            ? 0.70
-                            : 0.50
-                        color: thermalViewFansButton.subModeGlowColor
-                    }
-                }
-            }
-
-            Rectangle {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.bottom: parent.bottom
-                height: 1
-                color: Colors.orange
-
-                RectangularShadow {
-                    anchors.fill: parent
-                    spread: 2
-                    z: -1
-                    opacity: 0.26
-                    color: Colors.orange
-                }
+            onViewModeRequested: function(mode) {
+                appControlWindow.activateThermalViewMode(mode);
             }
         }
 
@@ -21153,7 +20638,7 @@ PanelWindow {
                                         onLoaded: {
                                             item.iconScale = 1.08;
                                             item.iconColor = Qt.binding(function() {
-                                                return appControlWindow.thermalAccent(selectedAppIdentity.currentResult);
+                                                return thermalController.thermalAccent(selectedAppIdentity.currentResult);
                                             });
                                             item.glowOpacity = 0.50;
                                         }
@@ -21196,7 +20681,7 @@ PanelWindow {
                                             selectedAppIdentity.showingTask
                                             ? Colors.red
                                             : selectedAppIdentity.showingThermal
-                                            ? appControlWindow.thermalAccent(
+                                            ? thermalController.thermalAccent(
                                                   selectedAppIdentity.currentResult
                                               )
                                             : appControlWindow.systemAccent(
@@ -21214,7 +20699,7 @@ PanelWindow {
                                                 selectedAppIdentity.showingTask
                                                 ? Colors.red
                                                 : selectedAppIdentity.showingThermal
-                                                ? appControlWindow.thermalAccent(
+                                                ? thermalController.thermalAccent(
                                                       selectedAppIdentity.currentResult
                                                   )
                                                 : appControlWindow.systemAccent(
@@ -21492,7 +20977,7 @@ PanelWindow {
                                                         selectedAppIdentity.safeResult.chip
                                                         || "FAN"
                                                     )
-                                                : appControlWindow.formatThermalMenuTemp(
+                                                : thermalController.formatThermalMenuTemp(
                                                       selectedAppIdentity.safeResult.tempC
                                                   )
                                                   + " • "
@@ -21595,7 +21080,7 @@ PanelWindow {
                                     || selectedAppIdentity.showingThermal
                                 text:
                                     selectedAppIdentity.showingThermal
-                                    ? appControlWindow.thermalSimplePurpose(
+                                    ? thermalController.thermalSimplePurpose(
                                           selectedAppIdentity.safeResult
                                       )
                                     : selectedAppIdentity.showingTask
@@ -21832,74 +21317,18 @@ PanelWindow {
                         }
                     }
 
-                    // Fan-control safety lock mirrors the PROCESS STATE lock
-                    // position, but uses the omnitrix/green safety accent.
-                    Item {
+                    // Shared fan safety lock; AppControl supplies only the selected sensor.
+                    FanSafetyLock {
                         id: fanControlSafetyLockBadge
-                        width: 30
-                        height: 26
                         anchors.right: parent.right
                         anchors.rightMargin: -5
                         anchors.verticalCenter: parent.verticalCenter
-                        z: 50
-
-                        readonly property var fanItem:
+                        controller: thermalController
+                        sensor:
                             appControlWindow.selectedResultIsThermal()
                             && thermalMonitorBody.currentSensor
                             && thermalMonitorBody.safeSensor.sensorKind === "fan"
                             ? thermalMonitorBody.currentSensor : null
-                        readonly property bool unlocked:
-                            fanItem && appControlWindow.fanControlUnlocked(fanItem)
-
-                        visible: fanItem !== null
-
-                        Rectangle {
-                            anchors.fill: parent
-                            anchors.margins: 3
-                            color: Colors.black
-                            opacity: 0.96
-                            border.width: 1
-                            border.color: Colors.omnitrix
-
-                            RectangularShadow {
-                                anchors.fill: parent
-                                anchors.margins: -3
-                                spread: 3
-                                z: -1
-                                opacity:
-                                    fanControlSafetyLockMouse.containsMouse
-                                    ? 0.42 : 0.22
-                                color: Colors.omnitrix
-                            }
-
-                            GohuText {
-                                anchors.centerIn: parent
-                                text: fanControlSafetyLockBadge.unlocked ? "☍" : ""
-                                font.pixelSize:
-                                    fanControlSafetyLockBadge.unlocked ? 15 : 12
-                                color: Colors.omnitrix
-                                layer.enabled: true
-                                layer.effect: DropShadow {
-                                    radius: 4
-                                    samples: 5
-                                    opacity: 0.42
-                                    color: Colors.omnitrix
-                                    transparentBorder: true
-                                }
-                            }
-                        }
-
-                        MouseArea {
-                            id: fanControlSafetyLockMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onClicked: {
-                                if (fanControlSafetyLockBadge.fanItem)
-                                    appControlWindow.toggleFanControlUnlocked(
-                                        fanControlSafetyLockBadge.fanItem
-                                    );
-                            }
-                        }
                     }
 
                 }
@@ -22599,6 +22028,7 @@ PanelWindow {
             ThermalMonitorView {
                 id: thermalMonitorBody
                 controller: appControlWindow
+                thermalController: thermalController
             }
 
             SystemMonitorView {
@@ -29235,10 +28665,10 @@ MouseArea {
         }
 
         if (selectedModeIndex === thermalModeIndex) {
-            setThermalViewMode(cycleSelectorValue([
-                thermalViewThermal,
-                thermalViewFans
-            ], thermalViewMode, direction));
+            activateThermalViewMode(cycleSelectorValue([
+                thermalController.thermalViewThermal,
+                thermalController.thermalViewFans
+            ], thermalController.thermalViewMode, direction));
             return true;
         }
 
@@ -29406,10 +28836,10 @@ MouseArea {
                 && !detailFocused
                 && event.key === Qt.Key_Tab
                 && (event.modifiers & Qt.ControlModifier)) {
-            setThermalViewMode(
-                thermalViewMode === thermalViewThermal
-                ? thermalViewFans
-                : thermalViewThermal
+            activateThermalViewMode(
+                thermalController.thermalViewMode === thermalController.thermalViewThermal
+                ? thermalController.thermalViewFans
+                : thermalController.thermalViewThermal
             );
 
             event.accepted = true;
@@ -29601,10 +29031,10 @@ MouseArea {
         if (selectedModeIndex === thermalModeIndex
                 && event.key === Qt.Key_Left
                 && (event.modifiers & Qt.ShiftModifier)) {
-            setThermalViewMode(
-                thermalViewMode === thermalViewThermal
-                ? thermalViewFans
-                : thermalViewThermal
+            activateThermalViewMode(
+                thermalController.thermalViewMode === thermalController.thermalViewThermal
+                ? thermalController.thermalViewFans
+                : thermalController.thermalViewThermal
             );
 
             event.accepted = true;

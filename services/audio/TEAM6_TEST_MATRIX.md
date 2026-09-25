@@ -125,6 +125,29 @@ raw properties
 
 Expected: normalization/matching must not overwrite the raw observation.
 
+
+## B2. Team 7 observation adapter
+
+For each live sink-input, `streamObservation()` must expose:
+
+```text
+provider = PIPEWIRE
+providerKey = sink-input:<stream index>
+lifetimeClass = ephemeral
+generation
+raw observation
+aliases with provenance
+relationships[]
+```
+
+Expected:
+
+- provider key is treated as ephemeral object identity
+- raw PipeWire evidence is not overwritten by normalized aliases
+- aliases keep their source field/kind
+- no canonical application key is manufactured
+- every accepted live snapshot advances the observation generation
+
 ## C. Match evidence vs identity
 
 A resolved stream must expose separate evidence:

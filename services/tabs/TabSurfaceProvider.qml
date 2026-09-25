@@ -37,6 +37,7 @@ Scope {
 
     property bool bridgeReady: false
     property string bridgeError: ""
+    property string activationError: ""
 
     // Native tab lifecycle state is intentionally keyed by provider record
     // identity, not by Team 7's future canonical application identity.
@@ -221,9 +222,40 @@ function tabLifecycleScript() {
         appTabsSecondWarmRefreshTimer.restart();
     }
 
+    function parseActivationResult(rawText) {
+        const raw = String(rawText || "").trim();
+
+        if (!raw)
+            return {
+                ok: false,
+                message: "EMPTY TAB ACTIVATION RESPONSE"
+            };
+
+        try {
+            const payload = JSON.parse(raw);
+            const ok = !!payload.ok;
+            const error = String(payload.error || "");
+
+            return {
+                ok: ok,
+                message:
+                    ok
+                    ? ""
+                    : (error || "TAB ACTIVATION FAILED")
+            };
+        } catch (error) {
+            return {
+                ok: false,
+                message: "TAB ACTIVATION PARSE: " + String(error)
+            };
+        }
+    }
+
     function activate(entry) {
         if (!entry || !entry._tabRecord || entry._tabUnavailable)
             return false;
+
+        activationError = "";
 
         appTabsActivateProcess.exec([
             "/usr/bin/python3",
@@ -239,6 +271,8 @@ function tabLifecycleScript() {
     function activateControl(entry) {
         if (!entry || !entry._tabControlRecord)
             return false;
+
+        activationError = "";
 
         appTabsActivateProcess.exec([
             "/usr/bin/python3",
@@ -556,15 +590,27 @@ function tabLifecycleScript() {
 
         stdout: StdioCollector {
             onStreamFinished: {
-                const message = String(text || "").trim();
+                const result =
+                    tabSurfaceProvider.parseActivationResult(text);
 
-                if (message.length > 0)
+                tabSurfaceProvider.activationError =
+                    result.ok ? "" : result.message;
+
+                if (result.ok) {
                     console.log(
-                        "TabSurfaceProvider activation:",
-                        message
+                        "TabSurfaceProvider activation: OK"
                     );
+                } else {
+                    console.log(
+                        "TabSurfaceProvider activation error:",
+                        result.message
+                    );
+                }
 
-                tabSurfaceProvider.activationFinished(true, message);
+                tabSurfaceProvider.activationFinished(
+                    result.ok,
+                    result.message
+                );
             }
         }
 
@@ -573,11 +619,11 @@ function tabLifecycleScript() {
                 const message = String(text || "").trim();
 
                 if (message.length > 0) {
+                    tabSurfaceProvider.activationError = message;
                     console.log(
                         "TabSurfaceProvider activation error:",
                         message
                     );
-                    tabSurfaceProvider.activationFinished(false, message);
                 }
             }
         }

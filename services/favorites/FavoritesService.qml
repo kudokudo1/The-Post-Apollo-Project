@@ -3,7 +3,7 @@ pragma Singleton
 import QtQuick
 import "." as FavoritesBackend
 
-Singleton {
+QtObject {
     id: root
 
     readonly property var store: FavoritesBackend.FavoritesStore

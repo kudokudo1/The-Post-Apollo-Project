@@ -257,7 +257,7 @@ QtObject {
         };
     }
 
-    function augmentedArgv(argv, augmentation) {
+    function augmentedArgv(entry, argv, augmentation) {
         const source = Array.isArray(argv)
             ? argv.slice()
             : [];
@@ -268,6 +268,21 @@ QtObject {
         const afterExecutable =
             augmentation.argvAfterExecutable || [];
         const append = augmentation.argvAppend || [];
+
+        // For direct/native argv, token 0 is the application executable and
+        // argvAfterExecutable belongs immediately after it.
+        //
+        // Flatpak DesktopEntries are launcher wrappers:
+        //   flatpak run ... APP_ID [application argv...]
+        // Token 0 is therefore NOT the application executable. Team 8 owns
+        // this transport distinction, so application-facing augmentation is
+        // carried after the existing Flatpak command/application coordinates
+        // rather than being injected into flatpak's own option space.
+        if (coreProvider.entryIsFlatpak(entry)) {
+            return source
+                .concat(afterExecutable)
+                .concat(append);
+        }
 
         return [source[0]]
             .concat(afterExecutable)
@@ -302,6 +317,7 @@ QtObject {
         // knowing any provider-specific capability semantics.
         if (Array.isArray(basePlan.commandTokens)) {
             next.commandTokens = augmentedArgv(
+                basePlan.entry,
                 basePlan.commandTokens,
                 augmentation
             );
@@ -309,6 +325,7 @@ QtObject {
 
         if (Array.isArray(basePlan.argv)) {
             next.argv = augmentedArgv(
+                basePlan.entry,
                 basePlan.argv,
                 augmentation
             );

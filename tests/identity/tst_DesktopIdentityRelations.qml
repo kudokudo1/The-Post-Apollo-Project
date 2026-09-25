@@ -143,6 +143,98 @@ TestCase {
         );
     }
 
+    function test_surfaceLaunchDebugPortAttachesToProcess() {
+        const launch = identity.surfaceLaunchObservation({
+            correlationId: "launch-devtools",
+            appliedCapabilities: ["DEVTOOLS"],
+            bootstrap: {
+                correlationId: "launch-devtools",
+                debugAddress: "127.0.0.1",
+                debugPort: 9225
+            }
+        }, 5);
+
+        const process = identity.processObservation({
+            pid: 5520,
+            comm: "code",
+            args: "/usr/bin/code --remote-debugging-port=9225"
+        }, 5);
+
+        const edges = relations.debugPortEdges([
+            launch,
+            process
+        ]);
+
+        compare(edges.length, 1);
+        compare(edges[0].leftProvider, "SURFACE_LAUNCH");
+        compare(edges[0].rightKey, "pid:5520");
+        compare(
+            edges[0].kind,
+            relations.relationDebugPortOwner
+        );
+    }
+
+    function test_surfaceLaunchKittyEndpointAttachesToSurface() {
+        const launch = identity.surfaceLaunchObservation({
+            correlationId: "launch-kitty",
+            appliedCapabilities: ["KITTY_REMOTE"],
+            bootstrap: {
+                correlationId: "launch-kitty",
+                kittyListenOn: "unix:@appcontrol-kitty-77"
+            }
+        }, 6);
+
+        const surface = identity.surfaceObservation({
+            provider: "KITTY",
+            providerKey: "kitty:12",
+            appName: "Kitty",
+            kittyAddress: "unix:@appcontrol-kitty-77",
+            kittyTabId: 12,
+            processPids: []
+        }, 6);
+
+        const edges = relations.kittyEndpointEdges([
+            launch,
+            surface
+        ]);
+
+        compare(edges.length, 1);
+        compare(
+            edges[0].kind,
+            relations.relationKittyEndpoint
+        );
+        compare(
+            edges[0].leftKey,
+            "surface-launch:launch-kitty"
+        );
+        compare(edges[0].rightKey, "kitty:12");
+        compare(edges[0].strength, identity.strengthExact);
+    }
+
+    function test_differentKittyEndpointDoesNotJoin() {
+        const launch = identity.surfaceLaunchObservation({
+            correlationId: "launch-kitty-a",
+            bootstrap: {
+                correlationId: "launch-kitty-a",
+                kittyListenOn: "unix:@kitty-a"
+            }
+        }, 1);
+
+        const surface = identity.surfaceObservation({
+            provider: "KITTY",
+            providerKey: "kitty:44",
+            kittyAddress: "unix:@kitty-b"
+        }, 1);
+
+        compare(
+            relations.kittyEndpointEdges([
+                launch,
+                surface
+            ]).length,
+            0
+        );
+    }
+
     function test_normalizedAliasMatchStaysHeuristic() {
         const desktop = identity.desktopEntryObservation({
             id: "org.mozilla.firefox.desktop",
@@ -268,6 +360,7 @@ TestCase {
         verify(snapshot.explicitEdges !== undefined);
         verify(snapshot.pidGroups !== undefined);
         verify(snapshot.debugPortEdges !== undefined);
+        verify(snapshot.kittyEndpointEdges !== undefined);
         verify(snapshot.aliasEdges !== undefined);
 
         verify(snapshot.status === undefined);

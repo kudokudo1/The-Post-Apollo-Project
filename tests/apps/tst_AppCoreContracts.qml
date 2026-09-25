@@ -27,6 +27,11 @@ TestCase {
         actionCatalog: actionCatalog
     }
 
+    AppCatalogPolicy {
+        id: catalogPolicy
+        coreProvider: core
+    }
+
     function nativeEntry() {
         return {
             id: "org.example.Native.desktop",
@@ -85,6 +90,89 @@ TestCase {
         }
 
         return kinds;
+    }
+
+    function test_catalogPolicyPreservesDonorSourceBehavior() {
+        const native = nativeEntry();
+        const flatpak = flatpakEntry();
+        const rows = catalogPolicy.rows(
+            [flatpak, native],
+            [],
+            "",
+            core.sourceNative,
+            null
+        );
+
+        // Native/Flatpak selection does not hide the other source.
+        compare(rows.length, 2);
+        compare(rows[0].name, "Flatpak App");
+        compare(rows[1].name, "Native App");
+
+        const flatpakSearch = catalogPolicy.rows(
+            [native, flatpak],
+            [],
+            "flatpak",
+            core.sourceNative,
+            null
+        );
+
+        compare(flatpakSearch.length, 1);
+        compare(flatpakSearch[0].name, "Flatpak App");
+    }
+
+    function test_catalogPreferenceIsInjectedNotOwned() {
+        const native = nativeEntry();
+        const flatpak = flatpakEntry();
+
+        const rows = catalogPolicy.rows(
+            [native, flatpak],
+            [],
+            "",
+            core.sourceNative,
+            function(entry) {
+                return entry === native;
+            }
+        );
+
+        compare(rows.length, 2);
+        compare(rows[0], native);
+        compare(rows[1], flatpak);
+    }
+
+    function test_hiddenCatalogUsesExternalRunRows() {
+        const alpha = {
+            _hiddenCommand: true,
+            id: "hidden:alpha",
+            name: "alpha-tool"
+        };
+        const beta = {
+            _hiddenCommand: true,
+            id: "hidden:beta",
+            name: "beta-tool"
+        };
+
+        let rows = catalogPolicy.rows(
+            [],
+            [beta, alpha],
+            "",
+            core.sourceHidden,
+            null
+        );
+
+        compare(rows.length, 2);
+        compare(rows[0].name, "alpha-tool");
+        compare(rows[1].name, "beta-tool");
+
+        rows = catalogPolicy.rows(
+            [],
+            [beta, alpha],
+            "beta",
+            core.sourceHidden,
+            null
+        );
+
+        compare(rows.length, 1);
+        compare(rows[0].name, "beta-tool");
     }
 
     function test_sourceClassification() {

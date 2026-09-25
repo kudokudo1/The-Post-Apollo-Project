@@ -100,6 +100,20 @@ Scope {
         return core.sourceLabel(entry);
     }
 
+    function entryLaunchableForSource(entry, sourceMode) {
+        return core.entryLaunchableForSource(
+            entry,
+            sourceMode
+        );
+    }
+
+    function actionsAvailableForSource(entry, sourceMode) {
+        return core.actionsAvailableForSource(
+            entry,
+            sourceMode
+        );
+    }
+
     function entryKey(entry) {
         return catalogPolicy.entryKey(entry);
     }

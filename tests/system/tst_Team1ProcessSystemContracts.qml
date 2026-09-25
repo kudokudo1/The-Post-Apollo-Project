@@ -304,6 +304,26 @@ TestCase {
         compare(fakeProcessControl.calls.length, 0);
     }
 
+    function test_failedResumePreservesOptimisticFrozenState() {
+        const entry = {
+            pid: 7100,
+            comm: "demo",
+            user: "user",
+            state: "T",
+            args: "/usr/bin/demo"
+        };
+
+        actionController.markFrozen(entry, true);
+        compare(actionController.isFrozen(entry), true);
+
+        fakeProcessControl.succeed = false;
+
+        compare(actionController.requestToggleFreeze(entry), false);
+        compare(actionController.isFrozen(entry), true);
+        compare(fakeProcessControl.calls.length, 1);
+        compare(fakeProcessControl.calls[0].signalName, "-CONT");
+    }
+
     function test_resourceScopeBlocksProtectedProcesses() {
         const rows = [
             {

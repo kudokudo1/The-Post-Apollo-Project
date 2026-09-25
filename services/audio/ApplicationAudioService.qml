@@ -534,52 +534,46 @@ Scope {
         return true;
     }
 
-    // Preserve the donor's WINDOW-unmute rule: a narrow WINDOW action may
-    // clear a broader APP mute policy that contains the same live PID, but it
-    // must not erase unrelated WINDOW/TAB rules.
-    function clearMutePoliciesWithPid(scope, pid) {
+    function mutePolicyKeysWithPid(policies, scope, pid) {
+        const policyMap = policies || ({});
         const scopeText = String(scope || "").trim().toLowerCase();
         const targetPid = Number(pid || 0);
+        const matches = [];
 
-        if (!scopeText || targetPid <= 1)
-            return false;
+        if (!scopeText
+                || isNaN(targetPid)
+                || Math.floor(targetPid) !== targetPid
+                || targetPid <= 1)
+            return matches;
 
-        const keys = Object.keys(mutePolicies);
-        const next = Object.assign({}, mutePolicies);
-        let changed = false;
+        const keys = Object.keys(policyMap);
 
         for (let i = 0; i < keys.length; i++) {
-            const policy = mutePolicies[keys[i]] || {};
+            const policy = policyMap[keys[i]] || {};
             if (String(policy.scope || "") !== scopeText)
                 continue;
 
             const descriptor = policy.descriptor || {};
-            const pids = descriptor.pids || [];
+            const pids = Array.isArray(descriptor.pids)
+                ? descriptor.pids
+                : [];
 
-            if (pids.indexOf(targetPid) !== -1) {
-                delete next[keys[i]];
-                changed = true;
-            }
+            if (pids.indexOf(targetPid) !== -1)
+                matches.push(keys[i]);
         }
 
-        if (changed) {
-            mutePolicies = next;
-            requestPolicyRefresh();
-        }
-
-        return changed;
+        return matches;
     }
 
-    // Provider-owned lifetimes stay outside Team 6. A provider can explicitly
-    // tell the service which semantic keys remain live for one scope; the
-    // service only removes audio policies tied to identities that disappeared.
-    function retainPolicyKeys(scope, liveKeys) {
+    function policyKeysOutsideLiveSet(policies, scope, liveKeys) {
+        const policyMap = policies || ({});
         const scopeText = String(scope || "").trim().toLowerCase();
-        if (!scopeText)
-            return false;
-
         const live = ({});
         const source = Array.isArray(liveKeys) ? liveKeys : [];
+        const stale = [];
+
+        if (!scopeText)
+            return stale;
 
         for (let i = 0; i < source.length; i++) {
             const key = String(source[i] || "");
@@ -587,38 +581,67 @@ Scope {
                 live[key] = true;
         }
 
-        let changed = false;
+        const keys = Object.keys(policyMap);
+        for (let i = 0; i < keys.length; i++) {
+            const policy = policyMap[keys[i]] || {};
+            if (String(policy.scope || "") !== scopeText)
+                continue;
+
+            if (!live[String(policy.semanticKey || "")])
+                stale.push(keys[i]);
+        }
+
+        return stale;
+    }
+
+    // Preserve the donor's WINDOW-unmute rule: a narrow WINDOW action may
+    // clear a broader APP mute policy that contains the same live PID, but it
+    // must not erase unrelated WINDOW/TAB rules.
+    function clearMutePoliciesWithPid(scope, pid) {
+        const removals = mutePolicyKeysWithPid(mutePolicies, scope, pid);
+        if (removals.length === 0)
+            return false;
+
+        const next = Object.assign({}, mutePolicies);
+
+        for (let i = 0; i < removals.length; i++)
+            delete next[removals[i]];
+
+        mutePolicies = next;
+        requestPolicyRefresh();
+        return true;
+    }
+
+    // Provider-owned lifetimes stay outside Team 6. A provider can explicitly
+    // tell the service which semantic keys remain live for one scope; the
+    // service only removes audio policies tied to identities that disappeared.
+    function retainPolicyKeys(scope, liveKeys) {
+        const muteRemovals = policyKeysOutsideLiveSet(
+            mutePolicies,
+            scope,
+            liveKeys
+        );
+        const volumeRemovals = policyKeysOutsideLiveSet(
+            volumePolicies,
+            scope,
+            liveKeys
+        );
+
+        if (muteRemovals.length === 0 && volumeRemovals.length === 0)
+            return false;
 
         const muteNext = Object.assign({}, mutePolicies);
-        const muteKeys = Object.keys(mutePolicies);
-        for (let i = 0; i < muteKeys.length; i++) {
-            const policy = mutePolicies[muteKeys[i]] || {};
-            if (String(policy.scope || "") !== scopeText)
-                continue;
-            if (!live[String(policy.semanticKey || "")]) {
-                delete muteNext[muteKeys[i]];
-                changed = true;
-            }
-        }
-
         const volumeNext = Object.assign({}, volumePolicies);
-        const volumeKeys = Object.keys(volumePolicies);
-        for (let i = 0; i < volumeKeys.length; i++) {
-            const policy = volumePolicies[volumeKeys[i]] || {};
-            if (String(policy.scope || "") !== scopeText)
-                continue;
-            if (!live[String(policy.semanticKey || "")]) {
-                delete volumeNext[volumeKeys[i]];
-                changed = true;
-            }
-        }
 
-        if (changed) {
-            mutePolicies = muteNext;
-            volumePolicies = volumeNext;
-        }
+        for (let i = 0; i < muteRemovals.length; i++)
+            delete muteNext[muteRemovals[i]];
 
-        return changed;
+        for (let i = 0; i < volumeRemovals.length; i++)
+            delete volumeNext[volumeRemovals[i]];
+
+        mutePolicies = muteNext;
+        volumePolicies = volumeNext;
+        return true;
     }
 
     function volumePolicyKey(scope, key) {

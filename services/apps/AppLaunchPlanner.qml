@@ -257,6 +257,117 @@ QtObject {
         };
     }
 
+    function flatpakDesktopAppId(entry) {
+        const id = String(entry && entry.id || "").trim();
+
+        return id.replace(/\\.desktop$/i, "");
+    }
+
+    function flatpakOptionConsumesNext(token) {
+        const value = String(token || "");
+
+        return [
+            "--arch",
+            "--branch",
+            "--command",
+            "--cwd",
+            "--env",
+            "--env-fd",
+            "--unset-env",
+            "--share",
+            "--unshare",
+            "--socket",
+            "--nosocket",
+            "--device",
+            "--nodevice",
+            "--allow",
+            "--disallow",
+            "--filesystem",
+            "--nofilesystem",
+            "--persist",
+            "--talk-name",
+            "--own-name",
+            "--system-talk-name",
+            "--system-own-name",
+            "--add-policy",
+            "--remove-policy",
+            "--parent-expose-pids"
+        ].indexOf(value) !== -1;
+    }
+
+    function flatpakApplicationIndex(entry, argv) {
+        const source = Array.isArray(argv)
+            ? argv
+            : [];
+
+        if (source.length < 3)
+            return -1;
+
+        const first = String(source[0] || "");
+        const firstParts = first.split("/");
+        const executable = String(
+            firstParts[firstParts.length - 1] || ""
+        ).toLowerCase();
+
+        if (executable !== "flatpak")
+            return -1;
+
+        let runIndex = -1;
+
+        for (let i = 1; i < source.length; i++) {
+            if (String(source[i] || "") === "run") {
+                runIndex = i;
+                break;
+            }
+        }
+
+        if (runIndex < 0)
+            return -1;
+
+        // Flatpak-generated DesktopEntries normally expose the application ID
+        // in entry.id. Prefer that exact coordinate because it cleanly
+        // separates wrapper arguments from application arguments.
+        const desktopAppId = flatpakDesktopAppId(entry);
+
+        if (desktopAppId) {
+            for (let i = runIndex + 1; i < source.length; i++) {
+                const token = String(source[i] || "");
+
+                if (token === desktopAppId
+                        || token.indexOf(desktopAppId + "//") === 0) {
+                    return i;
+                }
+            }
+        }
+
+        // Fallback for unusual DesktopEntries whose id differs from the
+        // Flatpak application coordinate. Parse the option region after
+        // "flatpak run" until the first application token.
+        for (let i = runIndex + 1; i < source.length; i++) {
+            const token = String(source[i] || "");
+
+            if (token === "--")
+                return i + 1 < source.length ? i + 1 : -1;
+
+            if (token.indexOf("--") === 0) {
+                if (token.indexOf("=") !== -1)
+                    continue;
+
+                if (flatpakOptionConsumesNext(token))
+                    i += 1;
+
+                continue;
+            }
+
+            if (token.indexOf("-") === 0)
+                continue;
+
+            return i;
+        }
+
+        return -1;
+    }
+
     function augmentedArgv(entry, argv, augmentation) {
         const source = Array.isArray(argv)
             ? argv.slice()
@@ -272,15 +383,24 @@ QtObject {
         // For direct/native argv, token 0 is the application executable and
         // argvAfterExecutable belongs immediately after it.
         //
-        // Flatpak DesktopEntries are launcher wrappers:
-        //   flatpak run ... APP_ID [application argv...]
-        // Token 0 is therefore NOT the application executable. Team 8 owns
-        // this transport distinction, so application-facing augmentation is
-        // carried after the existing Flatpak command/application coordinates
-        // rather than being injected into flatpak's own option space.
+        // Flatpak is a wrapper:
+        //   flatpak run [wrapper opts] APP_ID [existing app argv...]
+        //
+        // SurfaceLaunch argvAfterExecutable belongs after APP_ID but before
+        // the application's existing argv. argvAppend stays at the end.
         if (coreProvider.entryIsFlatpak(entry)) {
-            return source
+            const appIndex =
+                flatpakApplicationIndex(entry, source);
+
+            if (appIndex < 0) {
+                // Fail closed later rather than silently placing application
+                // flags into Flatpak wrapper space or behind existing app argv.
+                return [];
+            }
+
+            return source.slice(0, appIndex + 1)
                 .concat(afterExecutable)
+                .concat(source.slice(appIndex + 1))
                 .concat(append);
         }
 
@@ -328,6 +448,16 @@ QtObject {
                     basePlan.commandTokens,
                     augmentation
                 );
+
+                if (coreProvider.entryIsFlatpak(basePlan.entry)
+                        && next.commandTokens.length === 0) {
+                    return {
+                        kind: planUnavailable,
+                        reason: "flatpak-application-boundary-unresolved",
+                        entry: basePlan.entry || null,
+                        surfaceLaunchAugmentation: augmentation
+                    };
+                }
             }
         }
 
@@ -337,6 +467,16 @@ QtObject {
                 basePlan.argv,
                 augmentation
             );
+
+            if (coreProvider.entryIsFlatpak(basePlan.entry)
+                    && next.argv.length === 0) {
+                return {
+                    kind: planUnavailable,
+                    reason: "flatpak-application-boundary-unresolved",
+                    entry: basePlan.entry || null,
+                    surfaceLaunchAugmentation: augmentation
+                };
+            }
         }
 
         // Shell/Bottles plans retain the normalized augmentation for their

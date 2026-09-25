@@ -302,6 +302,39 @@ TestCase {
         verify(second.bootstrap.debugPort <= 9499);
     }
 
+    function test_appsAndRunShareOneLeaseUniverse() {
+        // Simulate two independent launch domains using the same shared
+        // SurfaceLaunchCoordinator singleton. Both Brave-shaped launches
+        // prefer 9222; the second request must observe the first lease.
+        const appsLaunch = coordinator.buildAugmentation(
+            braveEvidence(),
+            [requirements.capabilityDevTools]
+        );
+
+        const runLaunch = coordinator.buildAugmentation(
+            braveEvidence(),
+            [requirements.capabilityDevTools]
+        );
+
+        verify(appsLaunch.ready);
+        verify(runLaunch.ready);
+        compare(appsLaunch.bootstrap.debugPort, 9222);
+        verify(runLaunch.bootstrap.debugPort !== 9222);
+        verify(runLaunch.bootstrap.debugPort >= 9300);
+        verify(runLaunch.bootstrap.debugPort <= 9499);
+
+        const leaseKeys = Object.keys(coordinator.leases);
+        compare(leaseKeys.length, 2);
+        verify(
+            coordinator.leases["devtools-port:9222"] !== undefined
+        );
+        verify(
+            coordinator.leases[
+                "devtools-port:" + String(runLaunch.bootstrap.debugPort)
+            ] !== undefined
+        );
+    }
+
     function test_releaseAllowsPreferredPortReuse() {
         const first = coordinator.buildAugmentation(
             braveEvidence(),

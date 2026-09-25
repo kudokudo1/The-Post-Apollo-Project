@@ -36,6 +36,7 @@ required_functions = {
     "controlObservationSignature",
     "controlRowsSignature",
     "updateControlsStable",
+    "clearPendingLifecycle",
     "setLifecycleFrozen",
 }
 
@@ -188,6 +189,20 @@ for control_field in (
 
 if "updateControlsStable(" not in text:
     errors.append("persistent bridge does not use stable control reconciliation")
+
+lifecycle_start = text.find("function setLifecycleFrozen")
+lifecycle_end = text.find("onActiveChanged:", lifecycle_start)
+lifecycle_text = (
+    text[lifecycle_start:lifecycle_end]
+    if lifecycle_start >= 0 and lifecycle_end > lifecycle_start
+    else ""
+)
+
+if "tabLifecycleProcess.running" not in lifecycle_text:
+    errors.append("native lifecycle mutations are not serialized")
+
+if "clearPendingLifecycle()" not in text:
+    errors.append("native lifecycle pending state is not cleared")
 
 if "running: tabSurfaceProvider.active" not in text:
     errors.append("persistent discovery bridge is not governed by neutral active input")

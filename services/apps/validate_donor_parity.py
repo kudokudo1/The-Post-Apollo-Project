@@ -34,6 +34,7 @@ EXTRACTED = {
     "command_builder": APP_DIR / "AppLaunchCommandBuilder.qml",
     "actions": APP_DIR / "AppActionCatalog.qml",
     "action_planner": APP_DIR / "AppActionPlanner.qml",
+    "action_command_builder": APP_DIR / "AppActionCommandBuilder.qml",
     "catalog": APP_DIR / "AppCatalogPolicy.qml",
     "hidden": APP_DIR / "AppHiddenAdapter.qml",
     "bottles": APP_DIR / "AppBottleProvider.qml",
@@ -210,6 +211,20 @@ require_function_anchors(
         '"passwords"',
         '"profile-manager"',
         '"firefox-view"',
+    ),
+)
+
+require_function_anchors(
+    "donor browser builtin action routing",
+    donor_text,
+    "runBrowserBuiltinAppAction",
+    (
+        "browserShortcutSequence",
+        "runBrowserShortcutAction",
+        "runBrowserLaunchAction",
+        'action === "downloads"',
+        'action === "bookmarks"',
+        'action === "clear-data"',
     ),
 )
 
@@ -447,6 +462,40 @@ require_function_anchors(
         '"about:logins"',
         '"--ProfileManager"',
         '"about:firefoxview"',
+    ),
+)
+
+require_function_anchors(
+    "extracted browser shortcut descriptor",
+    texts.get("action_command_builder", ""),
+    "buildBrowserShortcut",
+    (
+        "plan.sequence",
+        "browserKind",
+        "entry",
+        "stableId",
+    ),
+)
+
+require_function_anchors(
+    "extracted browser launch descriptor",
+    texts.get("action_command_builder", ""),
+    "buildBrowserLaunch",
+    (
+        "cleanedCommandTokens",
+        '"__APPCONTROL_SHELL__"',
+        "plan.extraArgs",
+    ),
+)
+
+require_function_anchors(
+    "extracted DesktopEntry action descriptor",
+    texts.get("action_command_builder", ""),
+    "buildDesktopAction",
+    (
+        "plan.action",
+        "plan.entry",
+        "plan.stableId",
     ),
 )
 

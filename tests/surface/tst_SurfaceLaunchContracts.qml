@@ -160,6 +160,39 @@ TestCase {
         compare(Object.keys(coordinator.leases).length, 0);
     }
 
+    function test_generatedKittyEndpointIsBoundedAndDistinct() {
+        const first = coordinator.buildAugmentation(
+            {
+                displayName:
+                    "Kitty with an intentionally extremely long human-readable launch hint",
+                executable: "kitty",
+                argv: ["kitty"],
+                stableHint:
+                    "this-is-an-extremely-long-stable-hint-that-should-not-expand-the-socket-name-indefinitely"
+            },
+            [requirements.capabilityKittyRemote]
+        );
+
+        const second = coordinator.buildAugmentation(
+            kittyEvidence(),
+            [requirements.capabilityKittyRemote]
+        );
+
+        verify(first.ready);
+        verify(second.ready);
+        verify(first.bootstrap.kittyListenOn.length <= 83);
+        verify(second.bootstrap.kittyListenOn.length <= 83);
+        verify(
+            first.bootstrap.kittyListenOn
+            !== second.bootstrap.kittyListenOn
+        );
+        verify(
+            first.bootstrap.kittyListenOn.indexOf(
+                "unix:@appcontrol-kitty-"
+            ) === 0
+        );
+    }
+
     function test_kittyRemoteAugmentation() {
         const augmentation = coordinator.buildAugmentation(
             kittyEvidence(),

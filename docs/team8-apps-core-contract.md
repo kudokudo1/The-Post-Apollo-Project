@@ -62,6 +62,43 @@ launch mechanisms, and application of a supplied augmentation. AppLaunchPlanner 
 that supplied augmentation opaquely until the shared T5-domain contract freezes its exact
 payload schema.
 
+### AppLaunchCommandBuilder.qml
+
+Pure mechanism-specific execution descriptor builder.
+
+It converts `AppLaunchPlanner` intent into one of:
+
+```
+desktop-entry-execute
+argv
+run-dispatch
+unavailable
+```
+
+No process is started by this component.
+
+Current transport rules:
+
+- unaugmented normal DesktopEntry launch preserves the `entry.execute()` fast path
+- augmented direct/native argv becomes an explicit env/argv descriptor
+- Toolbox argv carries environment and mutated argv inside `toolbox run`
+- opaque shell commands accept environment-only augmentation and fail closed for argv
+  mutation
+- HIDDEN becomes a RUN-domain dispatch descriptor rather than a Team 8 process launch
+- Bottles preserves the donor `bottles-cli run -b ... -p ...` path
+
+Bottles SurfaceLaunch transport has now been verified against the documented CLI shape:
+
+- Bottles `run` supports child arguments through `--args`
+- Flatpak supports per-run `--env=VAR=VALUE`
+
+Team 8 therefore maps current simple flag-style SurfaceLaunch tokens to Bottles
+`--args` and carries environment through Flatpak `--env=` or native `env`.
+
+Complex whitespace-bearing Bottles child tokens still fail closed with
+`surface-launch-bottle-arg-quoting-unresolved`; Team 8 does not guess Windows/Wine
+quoting semantics.
+
 ### AppCoreFacade.qml
 
 Standalone composition surface for future host integration.
@@ -440,8 +477,9 @@ augmentation after the existing wrapper/application coordinates, while direct/na
 places `argvAfterExecutable` immediately after the executable token.
 
 Shell and Bottles plans retain normalized SurfaceLaunch augmentation for their
-mechanism-specific executors; Team 8 does not invent shell quoting or Bottles argument
-transport before those executors are defined.
+mechanism-specific execution layer. Opaque shell argv mutation still fails closed.
+Bottles now has a documented simple-token transport through `--args` plus per-run
+environment transport; complex quoting remains intentionally unsupported until proven.
 
 Conceptually:
 

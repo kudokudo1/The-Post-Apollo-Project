@@ -3478,6 +3478,12 @@ PanelWindow {
     readonly property string fileScanError: fileService.scanError
     readonly property string fileSearchError: fileService.searchError
 
+    // The old in-host parser reset selector state after publishing new rows.
+    // Keep that navigation behavior in the host rather than giving FileService
+    // a back-reference into AppControl.
+    onFileEntriesChanged: resetResultSelection()
+    onFileSearchEntriesChanged: resetResultSelection()
+
     function fileHumanBytes(value) {
         return fileService.humanBytes(value);
     }

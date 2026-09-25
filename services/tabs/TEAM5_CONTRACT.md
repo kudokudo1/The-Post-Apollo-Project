@@ -32,7 +32,7 @@ Current donor providers expose different evidence:
 - `path`
 - `appName`
 - `windowName`
-- accessibility role / role name
+- accessibility `role` / `roleName`
 - selected state
 
 ### DEVTOOLS
@@ -75,9 +75,28 @@ Team 5 must not fabricate missing DesktopEntry, application, Sway-window, or PID
 relationships. Temporary provider record IDs remain valid until Team 7 supplies
 canonical mappings.
 
-Team 7's semantic entity/observation schema is not frozen yet. This Team 5
-contract therefore freezes only preservation of raw observations and ownership
-boundaries, not the final cross-provider identity schema.
+Team 7 has now frozen the minimal observation/evidence envelope:
+
+```text
+provider
+providerKey
+lifetimeClass
+generation
+raw
+aliases[]
+relationships[]
+```
+
+Team 5 does **not** duplicate that envelope. `identityEvidence(entry)` remains
+the raw surface-provider handoff. Team 7's
+`DesktopIdentityEvidence.surfaceObservation(...)` is the authority that wraps
+Team 5 evidence into the shared envelope, classifies lifetime, derives aliases,
+and creates explicit relationships such as provider-observed PID edges.
+
+This keeps discovery evidence and semantic identity policy physically separate.
+Team 5 must therefore preserve the raw fields Team 7 consumes, while avoiding
+local `lifetimeClass`, resolver scoring, alias vocabulary, relationship kinds,
+or canonical application keys.
 
 ## Team 6 handoff
 

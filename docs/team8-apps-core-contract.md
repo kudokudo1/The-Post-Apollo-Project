@@ -222,6 +222,42 @@ When T3 Overhead eventually releases Team 8 for host integration:
 6. submit a certification request to T0 Manager rather than giving runtime commands
    directly to the operator
 
+## Team 7 evidence contract
+
+Team 7 has frozen the minimal observation/evidence envelope:
+
+```
+provider
+providerKey
+lifetimeClass
+generation
+raw
+aliases[]
+relationships[]
+```
+
+Current Team 7 artifacts consumed as contract references:
+
+- `services/identity/TEAM7_CONTRACT.md`
+  blob `87f87ba0c9484d879aef7da8dfd0be80c945faf8`
+- `services/identity/DesktopIdentityEvidence.qml`
+  blob `ae2d07329b4e4c97a13f79a67131c2363ec99eaf`
+- `services/identity/DesktopIdentityRelations.qml`
+  blob `378327a67a395f67c52b20cb9b829c10d3ce809e`
+
+For Team 8, the important API is `desktopEntryObservation(entry)`.
+
+Team 8 should delegate DesktopEntry evidence wrapping to Team 7 rather than duplicating:
+
+- alias vocabulary
+- normalization semantics
+- lifetime classification
+- relationship vocabulary
+- resolver status/ambiguity semantics
+
+DesktopEntry IDs remain valid Team 8 catalog coordinates but are not promoted by Team 8
+into universal cross-provider application identity.
+
 ## Identity rule
 
 Until Team 7 freezes a shared contract:
@@ -300,9 +336,36 @@ DEVTOOLS
 
 Team 8 must not implement an `augmentEverything`-style global interceptor.
 
-The exact shared API/schema is not frozen yet. Until T5 publishes it, Team 8 carries the
-supplied augmentation opaquely on its launch plans and does not infer provider-specific
-requirements itself.
+T5 has now published the launcher-neutral implementation on
+`feature/team5-tab-surface-provider`.
+
+Consumed contract artifacts at the time of this update:
+
+- `services/surface/SurfaceLaunchRequirements.qml`
+  blob `e23792b67bd2f3d0f5dbfe29d1348aa46f4f0b72`
+- `services/surface/SurfaceLaunchCoordinator.qml`
+  blob `45b10920f5940493815433df1e7cb8fb6b5f6fd1`
+- Team 5 contract blob
+  `e73d1a389fb321972a6c2834cb3d43f8e092e7be`
+
+The launcher-facing augmentation shape currently includes:
+
+```
+ready
+correlationId
+env
+argvAfterExecutable
+argvAppend
+bootstrap
+requestedCapabilities
+appliedCapabilities
+unsupportedCapabilities
+leases
+conflicts
+```
+
+Team 8 consumes this generic structure and applies its argv/env transport semantics
+without interpreting capability-domain policy.
 
 Conceptually:
 

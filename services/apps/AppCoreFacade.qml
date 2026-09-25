@@ -27,8 +27,11 @@ Scope {
     readonly property int launchToolbox: core.launchToolbox
     readonly property int launchBottle: core.launchBottle
 
+    property int sourceMode: sourceNative
+    property int launchMode: launchNormal
+
     readonly property var bottleNames: bottles.names
-    readonly property string selectedBottleName: bottles.selectedName
+    property alias selectedBottleName: bottles.selectedName
     readonly property bool bottlesLoading: bottles.loading
     readonly property string bottlesError: bottles.errorText
 
@@ -79,6 +82,11 @@ Scope {
         catalogPolicy: catalogPolicy
     }
 
+    AppModePolicy {
+        id: modePolicy
+        coreProvider: core
+    }
+
     AppIdentityAdapter {
         id: identityAdapter
         identityEvidence: facade.identityEvidence
@@ -95,14 +103,44 @@ Scope {
         );
     }
 
-    function resultRows(queryText, sourceMode) {
+    function resultRows(queryText, requestedSourceMode) {
+        const mode = requestedSourceMode === undefined
+            ? sourceMode
+            : modePolicy.normalizeSourceMode(requestedSourceMode);
+
         return catalogPolicy.rows(
             core.desktopEntries(),
             hiddenEntries(),
             queryText,
-            sourceMode,
+            mode,
             preferencePredicate
         );
+    }
+
+    function sourceChangePlan(entries, previousName, requestedMode) {
+        return modePolicy.sourceChangePlan(
+            entries,
+            previousName,
+            requestedMode
+        );
+    }
+
+    function setSourceMode(requestedMode) {
+        sourceMode =
+            modePolicy.normalizeSourceMode(requestedMode);
+        return sourceMode;
+    }
+
+    function setLaunchMode(requestedMode) {
+        launchMode =
+            modePolicy.normalizeLaunchMode(requestedMode);
+        return launchMode;
+    }
+
+    function selectBottle(name) {
+        selectedBottleName =
+            String(name || "").trim();
+        return selectedBottleName;
     }
 
     function sourceLabel(entry) {

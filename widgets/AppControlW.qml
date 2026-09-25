@@ -5,6 +5,7 @@ import Quickshell.I3
 import Quickshell.Io
 import "../components"
 import "../services/system"
+import qs.services.favorites
 import "appcontrol"
 import "thermal"
 import QtQuick.Effects
@@ -5127,30 +5128,10 @@ PanelWindow {
     // FAVORITES
     // ============================================================
 
-    FileView {
-        id: favoriteStoreFile
-
-        path: Quickshell.dataDir + "/appcontrol-favorites.json"
-        watchChanges: true
-
-        onFileChanged: reload()
-        onAdapterUpdated: writeAdapter()
-
-        JsonAdapter {
-            id: favoriteStore
-
-            property list<string> favoriteKeys: []
-            // One preferred control-panel action per app/command.
-            property list<string> favoriteDetailActionKeys: []
-            // Persistent watch/favorite state for individual THERMAL/SYSTEM
-            // control-panel metric boxes. Notification thresholds can bind
-            // to these keys later without changing the on-disk format again.
-            property list<string> favoriteMonitorBoxKeys: []
-            // KILL watches use a stable command identity, not PID, so they
-            // survive process termination and PID reuse.
-            property list<string> favoriteTaskMetricKeys: []
-        }
-    }
+    // Persistence now lives in the shared FavoritesStore singleton.
+    // Keep the compatibility object name so existing consumers—including
+    // HunterOperationController—continue to see the exact favoriteKeys shape.
+    readonly property var favoriteStore: FavoritesStore
 
 
 

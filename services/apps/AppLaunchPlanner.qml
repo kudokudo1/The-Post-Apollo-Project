@@ -260,28 +260,37 @@ QtObject {
     function flatpakDesktopAppId(entry) {
         const id = String(entry && entry.id || "").trim();
 
-        return id.replace(/\\.desktop$/i, "");
+        return id.toLowerCase().endsWith(".desktop")
+            ? id.slice(0, -8)
+            : id;
     }
 
     function flatpakOptionConsumesNext(token) {
         const value = String(token || "");
 
         return [
+            "--installation",
             "--arch",
             "--branch",
             "--command",
             "--cwd",
+            "--runtime",
+            "--runtime-version",
             "--env",
             "--env-fd",
             "--unset-env",
             "--share",
             "--unshare",
+            "--share-if",
             "--socket",
             "--nosocket",
+            "--socket-if",
             "--device",
             "--nodevice",
+            "--device-if",
             "--allow",
             "--disallow",
+            "--allow-if",
             "--filesystem",
             "--nofilesystem",
             "--persist",
@@ -289,9 +298,16 @@ QtObject {
             "--own-name",
             "--system-talk-name",
             "--system-own-name",
+            "--a11y-talk-name",
+            "--a11y-own-name",
             "--add-policy",
             "--remove-policy",
-            "--parent-expose-pids"
+            "--usb",
+            "--nousb",
+            "--parent-pid",
+            "--instance-id-fd",
+            "--app-path",
+            "--usr-path"
         ].indexOf(value) !== -1;
     }
 

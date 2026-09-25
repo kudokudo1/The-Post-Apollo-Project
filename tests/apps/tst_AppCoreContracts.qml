@@ -14,6 +14,10 @@ TestCase {
         coreProvider: core
     }
 
+    AppLaunchCommandBuilder {
+        id: launchCommandBuilder
+    }
+
     AppBottleProvider {
         id: bottleProvider
     }
@@ -418,6 +422,21 @@ TestCase {
             "1"
         );
 
+        const launchCommand = facade.buildLaunchCommand(
+            launchPlan,
+            "/bin/zsh"
+        );
+
+        compare(
+            launchCommand.kind,
+            launchCommandBuilder.commandArgv
+        );
+        compare(
+            launchCommand.argv.join(" "),
+            "env ACCESSIBILITY_ENABLED=1 "
+            + "/usr/bin/native-app --surface-ready"
+        );
+
         compare(
             facade.restoreIndex(
                 [native, brave],
@@ -652,6 +671,249 @@ TestCase {
             "/usr/bin/native-app --first --last"
         );
         compare(plan.launchEnv.TEST_SURFACE, "1");
+    }
+
+    function test_launchCommandBuilderPreservesDesktopEntryFastPath() {
+        const plan = launchPlanner.plan(
+            nativeEntry(),
+            core.sourceNative,
+            core.launchNormal,
+            "",
+            null
+        );
+
+        const command = launchCommandBuilder.build(
+            plan,
+            "/bin/zsh"
+        );
+
+        compare(
+            command.kind,
+            launchCommandBuilder.commandDesktopEntry
+        );
+        compare(command.entry.name, "Native App");
+    }
+
+    function test_launchCommandBuilderCarriesEnvAndArgv() {
+        const plan = launchPlanner.plan(
+            nativeEntry(),
+            core.sourceNative,
+            core.launchNormal,
+            "",
+            {
+                ready: true,
+                correlationId: "surface-native",
+                env: {
+                    ZETA: "2",
+                    ALPHA: "1"
+                },
+                argvAfterExecutable: ["--after"],
+                argvAppend: ["--last"]
+            }
+        );
+
+        const command = launchCommandBuilder.build(
+            plan,
+            "/bin/zsh"
+        );
+
+        compare(
+            command.kind,
+            launchCommandBuilder.commandArgv
+        );
+        compare(
+            command.argv.join(" "),
+            "env ALPHA=1 ZETA=2 "
+            + "/usr/bin/native-app --after --last"
+        );
+        compare(command.correlationId, "surface-native");
+    }
+
+    function test_shellSurfaceArgvFailsClosed() {
+        const shellEntry = {
+            id: "org.example.Shell.desktop",
+            name: "Shell App",
+            command: "shell-app --existing %U"
+        };
+
+        const plan = launchPlanner.plan(
+            shellEntry,
+            core.sourceNative,
+            core.launchNormal,
+            "",
+            {
+                ready: true,
+                env: { ACCESSIBILITY_ENABLED: "1" },
+                argvAppend: ["--surface"]
+            }
+        );
+
+        compare(
+            plan.commandTokens[0],
+            "__APPCONTROL_SHELL__"
+        );
+        compare(
+            plan.commandTokens[1],
+            "shell-app --existing"
+        );
+
+        const command = launchCommandBuilder.build(
+            plan,
+            "/bin/zsh"
+        );
+
+        compare(
+            command.kind,
+            launchCommandBuilder.commandUnavailable
+        );
+        compare(
+            command.reason,
+            "surface-launch-shell-argv-transport-unresolved"
+        );
+    }
+
+    function test_shellSurfaceEnvOnlyIsTransportable() {
+        const shellEntry = {
+            id: "org.example.Shell.desktop",
+            name: "Shell App",
+            command: "shell-app --existing %U"
+        };
+
+        const plan = launchPlanner.plan(
+            shellEntry,
+            core.sourceNative,
+            core.launchNormal,
+            "",
+            {
+                ready: true,
+                correlationId: "surface-shell",
+                env: { ACCESSIBILITY_ENABLED: "1" }
+            }
+        );
+
+        const command = launchCommandBuilder.build(
+            plan,
+            "/bin/zsh"
+        );
+
+        compare(
+            command.kind,
+            launchCommandBuilder.commandArgv
+        );
+        compare(
+            command.argv.join(" "),
+            "env ACCESSIBILITY_ENABLED=1 "
+            + "/bin/zsh -lc shell-app --existing"
+        );
+        compare(command.correlationId, "surface-shell");
+    }
+
+    function test_toolboxCommandBuilderCarriesAugmentationInsideToolbox() {
+        const plan = launchPlanner.plan(
+            nativeEntry(),
+            core.sourceNative,
+            core.launchToolbox,
+            "",
+            {
+                ready: true,
+                correlationId: "surface-toolbox",
+                env: { ACCESSIBILITY_ENABLED: "1" },
+                argvAfterExecutable: ["--surface"],
+                argvAppend: []
+            }
+        );
+
+        const command = launchCommandBuilder.build(plan, "");
+
+        compare(
+            command.kind,
+            launchCommandBuilder.commandArgv
+        );
+        compare(
+            command.argv.join(" "),
+            "toolbox run env ACCESSIBILITY_ENABLED=1 "
+            + "/usr/bin/native-app --surface"
+        );
+        compare(command.correlationId, "surface-toolbox");
+    }
+
+    function test_bottleCommandBuilderPreservesDonorAndFailsClosedForMutation() {
+        let plan = launchPlanner.plan(
+            nativeEntry(),
+            core.sourceNative,
+            core.launchBottle,
+            "Gaming",
+            null
+        );
+
+        let command = launchCommandBuilder.build(plan, "");
+
+        compare(
+            command.kind,
+            launchCommandBuilder.commandArgv
+        );
+        compare(command.argv[0], "sh");
+        compare(command.argv[1], "-lc");
+        verify(
+            command.argv[2].indexOf(
+                "flatpak run --command=bottles-cli "
+            ) !== -1
+        );
+        verify(
+            command.argv[2].indexOf(
+                "bottles-cli run -b 'Gaming' -p 'Native App'"
+            ) !== -1
+        );
+
+        plan = launchPlanner.plan(
+            nativeEntry(),
+            core.sourceNative,
+            core.launchBottle,
+            "Gaming",
+            {
+                ready: true,
+                env: { ACCESSIBILITY_ENABLED: "1" }
+            }
+        );
+
+        command = launchCommandBuilder.build(plan, "");
+
+        compare(
+            command.kind,
+            launchCommandBuilder.commandUnavailable
+        );
+        compare(
+            command.reason,
+            "surface-launch-bottle-transport-unresolved"
+        );
+    }
+
+    function test_hiddenCommandBuildsRunDispatchNotProcessCommand() {
+        const plan = launchPlanner.plan(
+            hiddenEntry(),
+            core.sourceHidden,
+            core.launchNormal,
+            "",
+            {
+                ready: true,
+                correlationId: "surface-hidden"
+            }
+        );
+
+        const command = launchCommandBuilder.build(plan, "");
+
+        compare(
+            command.kind,
+            launchCommandBuilder.commandRunDispatch
+        );
+        compare(
+            command.commandText,
+            "secret-command --flag"
+        );
+        compare(
+            command.surfaceLaunchAugmentation.correlationId,
+            "surface-hidden"
+        );
     }
 
     function test_bottlePayloadParsing() {

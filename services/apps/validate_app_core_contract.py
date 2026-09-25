@@ -26,6 +26,7 @@ FILES = {
     "catalog": APP_DIR / "AppCatalogPolicy.qml",
     "hidden": APP_DIR / "AppHiddenAdapter.qml",
     "selection": APP_DIR / "AppSelectionPolicy.qml",
+    "identity": APP_DIR / "AppIdentityAdapter.qml",
 }
 
 errors: list[str] = []
@@ -108,6 +109,12 @@ required_functions = {
         "rememberedKeyFor",
         "restoreIndex",
     },
+    "identity": {
+        "available",
+        "observationForEntry",
+        "providerKeyForEntry",
+        "rawForEntry",
+    },
 }
 
 for key, required in required_functions.items():
@@ -157,7 +164,7 @@ for key, text in texts.items():
 # Planning/catalog files must remain pure. They describe intent; they do not
 # launch processes, create workers/timers, or mutate the desktop. Bottles is a
 # discovery provider and therefore may own its bottles-cli Process.
-for key in ("launch", "actions", "actionPlanner", "catalog", "hidden", "selection"):
+for key in ("launch", "actions", "actionPlanner", "catalog", "hidden", "selection", "identity"):
     text = texts.get(key, "")
     for token in (
         "Quickshell.execDetached",
@@ -170,6 +177,26 @@ for key in ("launch", "actions", "actionPlanner", "catalog", "hidden", "selectio
             errors.append(
                 f"{key}: execution/lifecycle token present: {token!r}"
             )
+
+
+# Team 8's identity adapter must remain delegation-only. Team 7 owns evidence
+# normalization, alias/relationship vocabulary, lifetime classification and
+# resolver semantics.
+identity_text = texts.get("identity", "")
+for token in (
+    "function normalizeToken",
+    "function makeAlias",
+    "function appendAlias",
+    "function makeRelationship",
+    "function resolutionEnvelope",
+    "lifetimePersistent:",
+    "resolutionResolved:",
+):
+    if token in identity_text:
+        errors.append(
+            f"identity: Team 7 semantic implementation leaked into APPS: "
+            f"{token!r}"
+        )
 
 # Team 8 may consume DesktopEntries in its catalog provider, but must not turn
 # its local behavior classification into a canonical identity service.
@@ -222,3 +249,4 @@ print(" browser/desktop action policy: pure Team 8 planner")
 print(" APPS catalog/search/ranking: pure Team 8 policy")
 print(" HIDDEN adaptation: pure Team 8 adapter over external RUN rows")
 print(" APPS selection remembrance: pure Team 8 lookup policy")
+print(" DesktopEntry identity evidence: delegated to Team 7")

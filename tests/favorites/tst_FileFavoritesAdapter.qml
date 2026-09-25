@@ -118,12 +118,14 @@ TestCase {
             FavoritesBackend.FileFavoritesAdapter.canonicalFavoriteKey(fileEntry);
 
         compare(
-            FavoritesBackend.FileFavoritesAdapter.migratedKeysForEntry(
-                fileEntry,
-                2,
-                ["app:keep", legacy, "task|keep"]
+            JSON.stringify(
+                FavoritesBackend.FileFavoritesAdapter.migratedKeysForEntry(
+                    fileEntry,
+                    2,
+                    ["app:keep", legacy, "task|keep"]
+                )
             ),
-            ["app:keep", canonical, "task|keep"]
+            JSON.stringify(["app:keep", canonical, "task|keep"])
         );
     }
 
@@ -134,12 +136,14 @@ TestCase {
             FavoritesBackend.FileFavoritesAdapter.canonicalFavoriteKey(fileEntry);
 
         compare(
-            FavoritesBackend.FileFavoritesAdapter.migratedKeysForEntry(
-                fileEntry,
-                2,
-                [canonical, legacy]
+            JSON.stringify(
+                FavoritesBackend.FileFavoritesAdapter.migratedKeysForEntry(
+                    fileEntry,
+                    2,
+                    [canonical, legacy]
+                )
             ),
-            [canonical]
+            JSON.stringify([canonical])
         );
     }
 

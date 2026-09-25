@@ -385,6 +385,45 @@ function tabLifecycleScript() {
         return result;
     }
 
+    function instrumentationObservationCompleteKinds(
+            diagnosticRows) {
+        const source = Array.isArray(diagnosticRows)
+            ? diagnosticRows
+            : (Array.isArray(diagnostics) ? diagnostics : []);
+        let kittyComplete = false;
+        let devToolsComplete = false;
+
+        for (let i = 0; i < source.length; i++) {
+            const line = String(source[i] || "").trim();
+
+            if (line === "KITTY ERROR:NONE")
+                kittyComplete = true;
+
+            if (line === "DEVTOOLS ERROR:NONE")
+                devToolsComplete = true;
+        }
+
+        const result = [];
+
+        if (devToolsComplete)
+            result.push("devtools-port");
+
+        if (kittyComplete)
+            result.push("kitty-listen-on");
+
+        return result;
+    }
+
+    function instrumentationLeaseSnapshot(rows, diagnosticRows) {
+        return {
+            observations: instrumentationLeaseObservations(rows),
+            completeKinds:
+                instrumentationObservationCompleteKinds(
+                    diagnosticRows
+                )
+        };
+    }
+
     function nativeLifecycleKey(entry) {
         const value = providerRecordKey(entry);
         return value.length > 0 ? "tab|" + value : "";

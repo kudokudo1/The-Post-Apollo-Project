@@ -14,7 +14,7 @@ import "." as SurfaceBackend
 QtObject {
     id: coordinator
 
-    property int correlationSerial: 0
+    property int _correlationSerial: 0
 
     // Mutable authority state stays behind underscore-prefixed implementation
     // properties. Consumers receive defensive snapshots below.
@@ -27,21 +27,33 @@ QtObject {
     readonly property int fallbackPortStart: 9300
     readonly property int fallbackPortEnd: 9499
 
-    function copyMap(source) {
-        const result = {};
-        const keys = Object.keys(source || ({}));
+    function copyValue(value) {
+        if (Array.isArray(value)) {
+            const result = [];
 
-        for (let i = 0; i < keys.length; i++) {
-            const key = keys[i];
-            const value = source[key];
+            for (let i = 0; i < value.length; i++)
+                result.push(copyValue(value[i]));
 
-            result[key] =
-                value && typeof value === "object"
-                ? Object.assign({}, value)
-                : value;
+            return result;
         }
 
-        return result;
+        if (value && typeof value === "object") {
+            const result = {};
+            const keys = Object.keys(value);
+
+            for (let i = 0; i < keys.length; i++) {
+                const key = keys[i];
+                result[key] = copyValue(value[key]);
+            }
+
+            return result;
+        }
+
+        return value;
+    }
+
+    function copyMap(source) {
+        return copyValue(source || ({}));
     }
 
     function asText(value) {
@@ -59,7 +71,7 @@ QtObject {
     }
 
     function newCorrelationId(evidence) {
-        correlationSerial += 1;
+        _correlationSerial += 1;
 
         const hint = safeToken(
             evidence && (
@@ -75,7 +87,7 @@ QtObject {
         return [
             "surface",
             String(Date.now()),
-            String(correlationSerial),
+            String(_correlationSerial),
             hint
         ].join("-");
     }
@@ -271,7 +283,7 @@ QtObject {
             nextLeases[key] = lease;
         }
 
-        leases = nextLeases;
+        _leaseState = nextLeases;
 
         const states = Object.assign({}, _correlationState);
         delete states[id];

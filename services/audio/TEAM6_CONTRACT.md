@@ -96,6 +96,34 @@ stream index
 
 Do not replace those observations with normalized aliases.
 
+## Pure policy planning boundary
+
+Policy matching/arbitration is separated from mutation.
+
+Pure planners:
+
+```text
+mutePolicyTargets(inputs, policies)
+pendingMuteTargets(inputs, policies)
+volumePolicyTargets(inputs, policies)
+```
+
+Side-effect layer:
+
+```text
+applyMutePolicies(inputs)
+applyPendingMuteStates(inputs)
+applyVolumePolicies(inputs)
+```
+
+The planners never call `pactl`. They make future-stream matching, one-shot mute
+synchronization, and overlapping volume arbitration testable without touching
+the operator's live audio session.
+
+The volume planner preserves donor semantics: when multiple APP/WINDOW/TAB
+policies match the same sink-input, the highest/latest policy serial wins and
+the target is clamped to the 0–100% unity range.
+
 ## Stream physiology vs host availability
 
 `resolve(...)` intentionally reports:

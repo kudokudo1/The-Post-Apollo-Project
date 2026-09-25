@@ -42,6 +42,37 @@ TestCase {
         catalogPolicy: catalogPolicy
     }
 
+    QtObject {
+        id: fakeIdentityEvidence
+
+        function desktopEntryObservation(entry) {
+            return {
+                provider: "DESKTOP_ENTRY",
+                providerKey: entry && entry.id
+                    ? "desktop-entry:" + String(entry.id)
+                    : "",
+                lifetimeClass: "persistent",
+                generation: null,
+                raw: {
+                    id: entry ? String(entry.id || "") : "",
+                    name: entry ? String(entry.name || "") : ""
+                },
+                aliases: [{
+                    kind: "desktop-entry.id",
+                    value: entry ? String(entry.id || "") : "",
+                    normalized: "owned-by-team7",
+                    provider: "DESKTOP_ENTRY"
+                }],
+                relationships: []
+            };
+        }
+    }
+
+    AppIdentityAdapter {
+        id: identityAdapter
+        identityEvidence: fakeIdentityEvidence
+    }
+
     function nativeEntry() {
         return {
             id: "org.example.Native.desktop",
@@ -281,6 +312,29 @@ TestCase {
                 "anything"
             ),
             -1
+        );
+    }
+
+    function test_identityAdapterDelegatesToTeam7Contract() {
+        const entry = nativeEntry();
+        const observation = identityAdapter.observationForEntry(entry);
+
+        verify(observation !== null);
+        compare(observation.provider, "DESKTOP_ENTRY");
+        compare(
+            observation.providerKey,
+            "desktop-entry:org.example.Native.desktop"
+        );
+        compare(observation.lifetimeClass, "persistent");
+        compare(observation.aliases[0].normalized, "owned-by-team7");
+
+        compare(
+            identityAdapter.providerKeyForEntry(entry),
+            "desktop-entry:org.example.Native.desktop"
+        );
+        compare(
+            identityAdapter.rawForEntry(entry).name,
+            "Native App"
         );
     }
 

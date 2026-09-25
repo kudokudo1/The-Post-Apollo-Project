@@ -7,6 +7,8 @@ import Qt5Compat.GraphicalEffects
 Rectangle {
     id: cpuDock
 
+    property var cpuPlusWindow
+
     // Session-wide hardware services are injected by shell.qml. CPU++ can
     // build its own view/controller state without duplicating polling or PWM
     // ownership.
@@ -68,7 +70,8 @@ Rectangle {
 
         onClicked: function (mouse) {
             if (mouse.button === Qt.LeftButton) {
-                // Left-click function
+                if (cpuDock.cpuPlusWindow)
+                    cpuDock.cpuPlusWindow.toggle();
             }
 
             if (mouse.button === Qt.RightButton) {

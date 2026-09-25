@@ -204,9 +204,28 @@ PanelWindow {
 
         // CPU
 
-        Cpu {
-            systemTelemetry: sharedSystemTelemetry
-            fanControl: sharedFanControl
+        Item {
+            width: cpuButton.implicitWidth
+            height: cpuButton.implicitHeight
+
+            Cpu {
+                id: cpuButton
+                anchors.fill: parent
+
+                cpuPlusWindow: cpuPlusWindow
+                systemTelemetry: sharedSystemTelemetry
+                fanControl: sharedFanControl
+            }
+
+            CpuPlusW {
+                id: cpuPlusWindow
+
+                screen: Quickshell.screens.find(s => s.name === "DP-5")
+
+                appControlWindow: appControlWindow
+                systemTelemetry: sharedSystemTelemetry
+                fanControl: sharedFanControl
+            }
         }
 
         // Weather

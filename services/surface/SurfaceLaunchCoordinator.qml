@@ -92,6 +92,23 @@ QtObject {
         return 0;
     }
 
+    function existingDebugAddress(evidence) {
+        const tokens = commandTokens(evidence);
+
+        for (let i = 0; i < tokens.length; i++) {
+            const token = asText(tokens[i]);
+
+            if (token.indexOf("--remote-debugging-address=") === 0)
+                return token.split("=", 2)[1] || "";
+
+            if (token === "--remote-debugging-address"
+                    && i + 1 < tokens.length)
+                return asText(tokens[i + 1]);
+        }
+
+        return "";
+    }
+
     function existingKittyListenOn(evidence) {
         const tokens = commandTokens(evidence);
 
@@ -106,6 +123,26 @@ QtObject {
         }
 
         return "";
+    }
+
+    function kittyRemoteControlEnabled(evidence) {
+        const tokens = commandTokens(evidence);
+
+        for (let i = 0; i < tokens.length; i++) {
+            const token = asText(tokens[i]);
+
+            if (token.indexOf("allow_remote_control=") === 0)
+                return true;
+
+            if (token === "-o"
+                    && i + 1 < tokens.length
+                    && asText(tokens[i + 1]).indexOf(
+                        "allow_remote_control="
+                    ) === 0)
+                return true;
+        }
+
+        return false;
     }
 
     function leaseKey(kind, value) {
@@ -220,15 +257,21 @@ QtObject {
                     requirements.capabilityKittyRemote
                 ) !== -1) {
             const existingListenOn = existingKittyListenOn(evidence);
+            const remoteEnabled = kittyRemoteControlEnabled(evidence);
             let listenOn = existingListenOn;
+
+            if (!remoteEnabled) {
+                argvAfterExecutable.push(
+                    "-o",
+                    "allow_remote_control=socket-only"
+                );
+            }
 
             if (!listenOn) {
                 listenOn =
                     "unix:@appcontrol-kitty-" + correlationId;
 
                 argvAfterExecutable.push(
-                    "-o",
-                    "allow_remote_control=socket-only",
                     "--listen-on",
                     listenOn
                 );
@@ -266,7 +309,9 @@ QtObject {
                     requirements.capabilityDevTools
                 ) !== -1) {
             const existingPort = existingDebugPort(evidence);
+            const existingAddress = existingDebugAddress(evidence);
             let port = existingPort;
+            let address = existingAddress;
 
             if (port <= 0) {
                 port = allocateDebugPort(
@@ -275,12 +320,10 @@ QtObject {
                 );
 
                 if (port > 0) {
-                    if (!hasArgPrefix(
-                                evidence,
-                                "--remote-debugging-address"
-                            )) {
+                    if (!address) {
+                        address = "127.0.0.1";
                         argvAppend.push(
-                            "--remote-debugging-address=127.0.0.1"
+                            "--remote-debugging-address=" + address
                         );
                     }
 
@@ -297,9 +340,7 @@ QtObject {
                 }
             }
 
-            metadata.debugAddress = port > 0
-                ? "127.0.0.1"
-                : "";
+            metadata.debugAddress = port > 0 ? address : "";
             metadata.debugPort = port;
         }
 

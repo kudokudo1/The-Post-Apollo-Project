@@ -30,6 +30,7 @@ FILES = {
     "selection": APP_DIR / "AppSelectionPolicy.qml",
     "mode": APP_DIR / "AppModePolicy.qml",
     "iconGlow": APP_DIR / "AppIconGlowPolicy.qml",
+    "selectorPresentation": APP_DIR / "AppSelectorPresentation.qml",
     "identity": APP_DIR / "AppIdentityAdapter.qml",
     "facade": APP_DIR / "AppCoreFacade.qml",
 }
@@ -154,6 +155,15 @@ required_functions = {
         "remember",
         "classify",
     },
+    "selectorPresentation": {
+        "palette",
+        "sourceOptions",
+        "launchOptions",
+        "hiddenFace",
+        "sourceBadge",
+        "sourceGlowSpec",
+        "launchGlowSpec",
+    },
     "identity": {
         "available",
         "observationForEntry",
@@ -185,6 +195,12 @@ required_functions = {
         "cachedIconGlow",
         "rememberIconGlow",
         "classifyIconGlow",
+        "sourceSelectorOptions",
+        "launchSelectorOptions",
+        "hiddenSourceFace",
+        "sourceBadge",
+        "sourceGlowSpec",
+        "launchGlowSpec",
         "identityObservation",
         "refreshBottles",
     },
@@ -237,7 +253,7 @@ for key, text in texts.items():
 # Planning/catalog files must remain pure. They describe intent; they do not
 # launch processes, create workers/timers, or mutate the desktop. Bottles is a
 # discovery provider and therefore may own its bottles-cli Process.
-for key in ("launch", "commandBuilder", "actions", "actionPlanner", "actionCommandBuilder", "catalog", "hidden", "selection", "mode", "iconGlow", "identity", "facade"):
+for key in ("launch", "commandBuilder", "actions", "actionPlanner", "actionCommandBuilder", "catalog", "hidden", "selection", "mode", "iconGlow", "selectorPresentation", "identity", "facade"):
     text = texts.get(key, "")
     for token in (
         "Quickshell.execDetached",
@@ -344,6 +360,7 @@ print(" HIDDEN adaptation: pure Team 8 adapter over external RUN rows")
 print(" APPS selection remembrance: pure Team 8 lookup policy")
 print(" APPS source/launch modes: pure Team 8 policy")
 print(" APPS icon glow classification/cache: palette-injected Team 8 policy")
+print(" APPS selector/result styling: palette-injected Team 8 presentation")
 print(" DesktopEntry identity evidence: delegated to Team 7")
 print(" standalone facade: composition-only Team 8 integration surface")
 print(" launch execution descriptors: pure Team 8 mechanism builder")

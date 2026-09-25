@@ -32,6 +32,11 @@ TestCase {
         coreProvider: core
     }
 
+    AppHiddenAdapter {
+        id: hiddenAdapter
+        launchPlanner: launchPlanner
+    }
+
     function nativeEntry() {
         return {
             id: "org.example.Native.desktop",
@@ -173,6 +178,70 @@ TestCase {
 
         compare(rows.length, 1);
         compare(rows[0].name, "beta-tool");
+    }
+
+    function test_hiddenAdapterProducesPureAppRows() {
+        const desktop = [{
+            id: "kitty.desktop",
+            name: "Kitty",
+            command: ["/usr/bin/kitty"],
+            icon: "kitty-custom"
+        }];
+
+        const nvim = hiddenAdapter.recordForCommand(
+            "nvim",
+            desktop
+        );
+
+        verify(nvim !== null);
+        compare(nvim._hiddenCommand, true);
+        compare(nvim.id, "hidden:nvim");
+        compare(nvim.name, "nvim");
+        compare(nvim.genericName, "HIDDEN COMMAND");
+        compare(nvim.command[0], "nvim");
+        compare(nvim.icon, "nvim");
+        compare(nvim.execute, undefined);
+
+        const kitty = hiddenAdapter.recordForCommand(
+            "kitty",
+            desktop
+        );
+
+        // Donor-known icon mapping wins before DesktopEntry fallback.
+        compare(kitty.icon, "kitty");
+
+        const custom = hiddenAdapter.recordForCommand(
+            "custom-app",
+            [{
+                id: "custom.desktop",
+                name: "Custom",
+                command: ["/usr/bin/custom-app"],
+                icon: "custom-icon"
+            }]
+        );
+
+        compare(custom.icon, "custom-icon");
+    }
+
+    function test_hiddenAdapterFeedsCatalogWithoutOwningDiscovery() {
+        const rows = hiddenAdapter.records(
+            ["beta", "alpha"],
+            []
+        );
+
+        compare(rows.length, 2);
+
+        const filtered = catalogPolicy.rows(
+            [],
+            rows,
+            "",
+            core.sourceHidden,
+            null
+        );
+
+        compare(filtered.length, 2);
+        compare(filtered[0].name, "alpha");
+        compare(filtered[1].name, "beta");
     }
 
     function test_sourceClassification() {

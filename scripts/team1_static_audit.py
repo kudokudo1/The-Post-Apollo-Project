@@ -231,6 +231,16 @@ def audit_architecture() -> None:
         "ProcessResourceState",
     )
     require(
+        resource_state,
+        "property var frozenScopes: ({})",
+        "ProcessResourceState",
+    )
+    require(
+        resource_state,
+        "!!frozenScopes[key]",
+        "ProcessResourceState",
+    )
+    require(
         resource_controller,
         "required property var limitMutation",
         "ProcessResourceController",

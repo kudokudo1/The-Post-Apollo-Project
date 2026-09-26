@@ -11,14 +11,6 @@ TestCase {
 
     AppMetadataPresentation {
         id: metadataPresentation
-        appOverrides: ({
-            "Native App": {
-                name: "Override Name",
-                description: "Override Description",
-                longDescription: "Override Long Description",
-                icon: "file:/tmp/override-icon.svg"
-            }
-        })
     }
 
     AppLaunchPlanner {
@@ -195,6 +187,15 @@ TestCase {
     function test_metadataPresentationOwnsOverridesAndFallbacks() {
         const native = nativeEntry();
 
+        metadataPresentation.appOverrides = ({
+            "Native App": {
+                name: "Override Name",
+                description: "Override Description",
+                longDescription: "Override Long Description",
+                icon: "file:/tmp/override-icon.svg"
+            }
+        });
+
         compare(
             metadataPresentation.displayName(native),
             "Override Name"
@@ -270,6 +271,8 @@ TestCase {
             metadataPresentation.actionIconSource(""),
             ""
         );
+
+        metadataPresentation.appOverrides = ({});
     }
 
     function test_facadeRoutesMetadataThroughPresentationOrgan() {
@@ -1077,6 +1080,28 @@ TestCase {
 
         compare(plan.kind, launchPlanner.planHidden);
         compare(plan.commandText, "secret-command --flag");
+    }
+
+    function test_bottleProgramNamePreservesMetadataOverride() {
+        const native = nativeEntry();
+
+        metadataPresentation.appOverrides = ({
+            "Native App": {
+                name: "Bottle Override"
+            }
+        });
+
+        const plan = launchPlanner.plan(
+            native,
+            core.sourceNative,
+            core.launchBottle,
+            "Gaming"
+        );
+
+        compare(plan.kind, launchPlanner.planBottle);
+        compare(plan.programName, "Bottle Override");
+
+        metadataPresentation.appOverrides = ({});
     }
 
     function test_surfaceLaunchAugmentationUsesPublishedShape() {

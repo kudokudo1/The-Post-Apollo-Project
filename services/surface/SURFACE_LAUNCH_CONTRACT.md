@@ -336,6 +336,29 @@ SurfaceLaunchCoordinator
     reconcileObservedInstrumentation(...)
 ```
 
+Recovery occupancy is conservative and kernel-confirmed.
+
+For Kitty, inherited `KITTY_LISTEN_ON` environment text is not sufficient by
+itself. The recovery probe also requires the corresponding live address to be
+present in `/proc/net/unix`. This prevents a surviving child process from
+keeping a ghost Kitty lease after the actual listener has exited.
+
+For DevTools, a surviving `--remote-debugging-port` command-line argument is
+likewise insufficient by itself. Recovery checks the candidate process network
+namespace's `/proc/<pid>/net/tcp` / `tcp6` tables and requires a live LISTEN
+socket on that port.
+
+Process ownership checks are tri-state:
+
+```text
+same user       -> inspect
+different user  -> ignore
+unknown/error   -> provider scope incomplete
+```
+
+An ownership/read failure therefore cannot masquerade as evidence that an
+endpoint is absent and cannot authorize pruning for that provider scope.
+
 The provider emits only observed coordinates:
 
 ```text

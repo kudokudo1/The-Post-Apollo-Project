@@ -48,6 +48,7 @@ Scope {
     AppLaunchPlanner {
         id: launchPlanner
         coreProvider: core
+        metadataPresentation: metadataPresentation
     }
 
     AppLaunchCommandBuilder {

@@ -139,6 +139,7 @@ else:
         errors.append(f"recovery probe Python syntax invalid: {exc}")
 
 for token in (
+    "Preserve the last trusted snapshot",
     "property Process _probeProcess: Process {",
     "SURFACE RECOVERY SNAPSHOT UNUSABLE",
     "if (snapshot.ok)",
@@ -210,6 +211,20 @@ for token, reason in {
 }.items():
     if token in authority_executable:
         errors.append(f"forbidden token {token!r}: {reason}")
+
+refresh_match = re.search(
+    r"function\s+refresh\s*\(\s*\)\s*\{(.*?)\n\s*\}",
+    recovery,
+    re.S,
+)
+if not refresh_match:
+    errors.append("unable to inspect recovery refresh function")
+else:
+    refresh_text = refresh_match.group(1)
+    if "partial = false" in refresh_text:
+        errors.append("recovery refresh clears partial state before new snapshot")
+    if 'errorText = ""' in refresh_text:
+        errors.append("recovery refresh clears snapshot diagnostics before replacement")
 
 # Recovery may execute its diagnostic probe, but it remains outside host,
 # launcher, semantic-identity, audio, and process-control ownership.

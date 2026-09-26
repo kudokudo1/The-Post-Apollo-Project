@@ -25,6 +25,7 @@ FILES = {
     "bottles": APP_DIR / "AppBottleProvider.qml",
     "actions": APP_DIR / "AppActionCatalog.qml",
     "actionPlanner": APP_DIR / "AppActionPlanner.qml",
+    "detailActions": APP_DIR / "AppDetailActionPolicy.qml",
     "actionCommandBuilder": APP_DIR / "AppActionCommandBuilder.qml",
     "catalog": APP_DIR / "AppCatalogPolicy.qml",
     "hidden": APP_DIR / "AppHiddenAdapter.qml",
@@ -119,6 +120,13 @@ required_functions = {
         "browserBuiltinPlan",
         "plan",
     },
+    "detailActions": {
+        "desktopActions",
+        "actionCount",
+        "stableId",
+        "descriptor",
+        "available",
+    },
     "actionCommandBuilder": {
         "unavailable",
         "buildDesktopAction",
@@ -194,6 +202,10 @@ required_functions = {
         "actionIconSource",
         "actionsFor",
         "planAction",
+        "detailActionCount",
+        "detailActionStableId",
+        "detailActionDescriptor",
+        "detailActionAvailable",
         "planLaunch",
         "buildLaunchCommand",
         "rememberedKeyFor",
@@ -259,7 +271,7 @@ for key, text in texts.items():
 # Planning/catalog files must remain pure. They describe intent; they do not
 # launch processes, create workers/timers, or mutate the desktop. Bottles is a
 # discovery provider and therefore may own its bottles-cli Process.
-for key in ("metadata", "launch", "commandBuilder", "actions", "actionPlanner", "actionCommandBuilder", "catalog", "hidden", "selection", "mode", "iconGlow", "selectorPresentation", "identity", "facade"):
+for key in ("metadata", "launch", "commandBuilder", "actions", "actionPlanner", "detailActions", "actionCommandBuilder", "catalog", "hidden", "selection", "mode", "iconGlow", "selectorPresentation", "identity", "facade"):
     text = texts.get(key, "")
     for token in (
         "Quickshell.execDetached",
@@ -426,6 +438,7 @@ print(" supplied SurfaceLaunch payload: structurally consumed by Team 8")
 print(" SurfaceLaunch requirement policy: T5-domain-owned")
 print(" Bottles discovery: isolated Team 8 provider")
 print(" browser/desktop action policy: pure Team 8 planner")
+print(" APPS detail-action topology: pure Team 8 policy over injected facts")
 print(" browser/desktop action execution: neutral Team 8 descriptors")
 print(" APPS catalog/search/ranking: pure Team 8 policy")
 print(" HIDDEN adaptation: pure Team 8 adapter over external RUN rows")

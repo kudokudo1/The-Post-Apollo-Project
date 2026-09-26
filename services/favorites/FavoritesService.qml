@@ -8,8 +8,6 @@ QtObject {
 
     readonly property var store: FavoritesBackend.FavoritesStore
 
-    // Temporary compatibility surface. Consumers that only need membership
-    // state can move to FavoritesService without learning persistence details.
     readonly property var favoriteKeys: store.favoriteKeys
     readonly property var favoriteDetailActionKeys: store.favoriteDetailActionKeys
     readonly property var favoriteMonitorBoxKeys: store.favoriteMonitorBoxKeys
@@ -42,14 +40,32 @@ QtObject {
         else
             next.push(value);
 
-        return {
-            values: next,
-            enabled: enabled
-        };
+        return { values: next, enabled: enabled };
     }
 
-    // Generic favorite membership. Key construction remains provider/adapter
-    // responsibility; this service intentionally does not invent identity.
+    function replaced(list, oldKey, newKey) {
+        const oldValue = keyString(oldKey);
+        const newValue = keyString(newKey);
+
+        if (!oldValue || !newValue || oldValue === newValue)
+            return { values: list.slice(), changed: false };
+
+        const next = list.slice();
+        const oldIndex = next.indexOf(oldValue);
+
+        if (oldIndex < 0)
+            return { values: next, changed: false };
+
+        const newIndex = next.indexOf(newValue);
+
+        if (newIndex >= 0)
+            next.splice(oldIndex, 1);
+        else
+            next[oldIndex] = newValue;
+
+        return { values: next, changed: true };
+    }
+
     function isFavoriteKey(key) {
         return contains(store.favoriteKeys, key);
     }
@@ -63,7 +79,16 @@ QtObject {
         return result.enabled;
     }
 
-    // THERMAL/SYSTEM metric-box watches.
+    function replaceFavoriteKey(oldKey, newKey) {
+        const result = replaced(store.favoriteKeys, oldKey, newKey);
+
+        if (!result.changed)
+            return false;
+
+        store.favoriteKeys = result.values;
+        return true;
+    }
+
     function isMonitorBoxKey(key) {
         return contains(store.favoriteMonitorBoxKeys, key);
     }
@@ -77,7 +102,6 @@ QtObject {
         return result.enabled;
     }
 
-    // Process metric watches.
     function isTaskMetricKey(key) {
         return contains(store.favoriteTaskMetricKeys, key);
     }
@@ -91,8 +115,6 @@ QtObject {
         return result.enabled;
     }
 
-    // Preferred detail actions preserve the donor's one-action-per-context
-    // behavior. The caller owns construction of both context and action key.
     function isPreferredActionKey(key) {
         return contains(store.favoriteDetailActionKeys, key);
     }
@@ -116,8 +138,6 @@ QtObject {
 
         const wasFavorite = oldKeys.indexOf(actionKey) !== -1;
 
-        // Match the donor exactly: selecting another action replaces the old
-        // preferred action; selecting the same action clears it.
         if (!wasFavorite)
             next.push(actionKey);
 

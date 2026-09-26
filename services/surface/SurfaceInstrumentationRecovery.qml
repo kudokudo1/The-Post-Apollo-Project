@@ -136,7 +136,7 @@ QtObject {
         return true;
     }
 
-    Process {
+    property Process _probeProcess: Process {
         id: probeProcess
 
         stdout: StdioCollector {

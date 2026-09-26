@@ -514,6 +514,27 @@ TestCase {
         );
     }
 
+    function test_recoveryProbeConfirmsDevToolsTcpListener() {
+        const script = recovery.probeScript();
+
+        verify(
+            script.indexOf(
+                "def namespace_has_tcp_listener(pid, port)"
+            ) !== -1
+        );
+        verify(script.indexOf("/net/%s") !== -1);
+        verify(script.indexOf("('tcp', 'tcp6')") !== -1);
+        verify(script.indexOf("state == '0A'") !== -1);
+        verify(
+            script.indexOf(
+                "namespace_has_tcp_listener(pid, port)"
+            ) !== -1
+        );
+        verify(
+            script.indexOf("DEVTOOLS SOCKET") !== -1
+        );
+    }
+
     function test_recoveryProbeTreatsUnknownPidOwnershipAsIncomplete() {
         const script = recovery.probeScript();
 

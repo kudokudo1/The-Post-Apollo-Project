@@ -139,6 +139,11 @@ else:
         errors.append(f"recovery probe Python syntax invalid: {exc}")
 
 for token in (
+    "DEVTOOLS SOCKET",
+    "namespace_has_tcp_listener(pid, port)",
+    "state == '0A'",
+    "('tcp', 'tcp6')",
+    "def namespace_has_tcp_listener(pid, port)",
     "if owned is None:",
     "return (None, exc)",
     "socket_key in kitty_sockets",

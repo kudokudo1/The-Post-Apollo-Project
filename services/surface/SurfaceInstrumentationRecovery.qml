@@ -80,6 +80,7 @@ QtObject {
         }
 
         return {
+            ok: payload.ok !== false,
             observations: rows,
             completeKinds: kinds,
             partial: !!payload.partial,
@@ -92,6 +93,14 @@ QtObject {
 
     function applySnapshot(payload) {
         const snapshot = normalizedSnapshot(payload);
+
+        if (!snapshot.ok) {
+            errorText =
+                snapshot.errorText
+                || "SURFACE RECOVERY SNAPSHOT UNUSABLE";
+            partial = true;
+            return snapshot;
+        }
 
         observations = snapshot.observations;
         completeKinds = snapshot.completeKinds;
@@ -136,12 +145,13 @@ QtObject {
 
                 try {
                     payload = JSON.parse(String(text || "").trim());
-                    recovery.applySnapshot(payload);
-                    recovery.reconcileSharedAuthority();
+                    const snapshot = recovery.applySnapshot(payload);
 
-                    const ok = !!payload.ok;
+                    if (snapshot.ok)
+                        recovery.reconcileSharedAuthority();
+
                     recovery.refreshFinished(
-                        ok,
+                        snapshot.ok,
                         recovery.errorText
                     );
                 } catch (error) {

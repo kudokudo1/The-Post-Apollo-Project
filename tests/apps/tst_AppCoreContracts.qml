@@ -36,6 +36,12 @@ TestCase {
         actionCatalog: actionCatalog
     }
 
+    AppDetailActionPolicy {
+        id: detailActionPolicy
+        actionCatalog: actionCatalog
+        actionPlanner: actionPlanner
+    }
+
     AppActionCommandBuilder {
         id: actionCommandBuilder
         launchPlanner: launchPlanner
@@ -1025,6 +1031,169 @@ TestCase {
         // HIDDEN accepts only hidden-command records.
         compare(core.entryLaunchableForSource(hidden, core.sourceHidden), true);
         compare(core.entryLaunchableForSource(native, core.sourceHidden), false);
+    }
+
+    function test_detailActionPolicyPreservesNormalTopology() {
+        const native = nativeEntry();
+
+        compare(detailActionPolicy.actionCount(native), 6);
+        compare(detailActionPolicy.stableId(native, 0), "launch");
+        compare(detailActionPolicy.stableId(native, 1), "bottles");
+        compare(detailActionPolicy.stableId(native, 2), "toolbox");
+        compare(detailActionPolicy.stableId(native, 3), "mute-app");
+        compare(detailActionPolicy.stableId(native, 4), "freeze-app");
+        compare(detailActionPolicy.stableId(native, 5), "kill");
+
+        compare(
+            detailActionPolicy.available(
+                native,
+                0,
+                { launchable: true }
+            ),
+            true
+        );
+        compare(
+            detailActionPolicy.available(
+                native,
+                1,
+                { bottleReady: false }
+            ),
+            false
+        );
+        compare(
+            detailActionPolicy.available(
+                native,
+                1,
+                { bottleReady: true }
+            ),
+            true
+        );
+        compare(
+            detailActionPolicy.available(
+                native,
+                2,
+                { toolboxLaunchable: true }
+            ),
+            true
+        );
+        compare(
+            detailActionPolicy.available(
+                native,
+                3,
+                { audioAvailable: true }
+            ),
+            true
+        );
+        compare(
+            detailActionPolicy.available(
+                native,
+                4,
+                { resourceFreezeAvailable: true }
+            ),
+            true
+        );
+        compare(
+            detailActionPolicy.available(
+                native,
+                5,
+                { killAvailable: true }
+            ),
+            true
+        );
+    }
+
+    function test_detailActionPolicyPreservesDesktopActionOffsets() {
+        const brave = braveEntry();
+        const actions = actionCatalog.desktopActions(brave);
+
+        compare(actions.length, 12);
+        compare(detailActionPolicy.actionCount(brave), 18);
+
+        compare(
+            detailActionPolicy.stableId(brave, 1),
+            "builtin|new-window"
+        );
+        compare(
+            detailActionPolicy.stableId(brave, 12),
+            "builtin|task-manager"
+        );
+        compare(detailActionPolicy.stableId(brave, 13), "bottles");
+        compare(detailActionPolicy.stableId(brave, 14), "toolbox");
+        compare(detailActionPolicy.stableId(brave, 15), "mute-app");
+        compare(detailActionPolicy.stableId(brave, 16), "freeze-app");
+        compare(detailActionPolicy.stableId(brave, 17), "kill");
+
+        const descriptor = detailActionPolicy.descriptor(brave, 1);
+        compare(descriptor.kind, detailActionPolicy.actionDesktop);
+        compare(descriptor.desktopIndex, 0);
+        compare(descriptor.stableId, "builtin|new-window");
+        compare(descriptor.action._appControlBuiltin, "new-window");
+    }
+
+    function test_detailActionPolicyPreservesHiddenTopology() {
+        const hidden = hiddenEntry();
+
+        compare(detailActionPolicy.actionCount(hidden), 7);
+        compare(detailActionPolicy.stableId(hidden, 0), "launch");
+        compare(detailActionPolicy.stableId(hidden, 1), "hidden-kitty");
+        compare(detailActionPolicy.stableId(hidden, 2), "hidden-float");
+        compare(
+            detailActionPolicy.stableId(hidden, 3),
+            "hidden-fullscreen"
+        );
+        compare(
+            detailActionPolicy.stableId(hidden, 4),
+            "hidden-bottles"
+        );
+        compare(
+            detailActionPolicy.stableId(hidden, 5),
+            "hidden-toolbox"
+        );
+        compare(detailActionPolicy.stableId(hidden, 6), "hidden-kill");
+
+        compare(
+            detailActionPolicy.available(
+                hidden,
+                4,
+                { bottleReady: true }
+            ),
+            true
+        );
+        compare(
+            detailActionPolicy.available(
+                hidden,
+                4,
+                { bottleReady: false }
+            ),
+            false
+        );
+        compare(
+            detailActionPolicy.available(hidden, 5, {}),
+            true
+        );
+        compare(
+            detailActionPolicy.available(hidden, 6, {}),
+            true
+        );
+    }
+
+    function test_facadeExposesDetailActionTopology() {
+        const native = nativeEntry();
+
+        compare(facade.detailActionCount(native), 6);
+        compare(facade.detailActionStableId(native, 3), "mute-app");
+        compare(
+            facade.detailActionDescriptor(native, 5).kind,
+            "kill"
+        );
+        compare(
+            facade.detailActionAvailable(
+                native,
+                4,
+                { resourceFreezeAvailable: true }
+            ),
+            true
+        );
     }
 
     function test_cleanedDesktopEntryTokens() {

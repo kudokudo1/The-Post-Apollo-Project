@@ -39,8 +39,9 @@ Owns APPS catalog/source behavior only.
 
 Important contract points:
 
-- `hiddenEntries` is an input seam; APPS must not build a second RUN catalog.
 - Native/Flatpak classification preserves current donor behavior.
+- HIDDEN command rows do not enter through this provider; the only APPS-side
+  HIDDEN path is `hiddenCommandNames -> AppHiddenAdapter -> AppCatalogPolicy`.
 - display metadata and override presentation do not live in this provider.
 
 ### AppMetadataPresentation.qml

@@ -658,7 +658,7 @@ QtObject {
                         conflictRows.push(reservation.conflict);
                 } else {
                     listenOn =
-                        "unix:@appcontrol-kitty-" + correlationId;
+                        kittyListenAddress(correlationId);
 
                     argvAfterExecutable.push(
                         "--listen-on",

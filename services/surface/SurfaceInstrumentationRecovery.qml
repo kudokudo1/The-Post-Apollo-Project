@@ -125,9 +125,11 @@ QtObject {
             return false;
 
         loading = true;
-        errorText = "";
-        partial = false;
 
+        // Preserve the last trusted snapshot and its partial/completeness
+        // status while a replacement probe is in flight. "loading" is the
+        // freshness signal; clearing snapshot status early would make stale
+        // evidence appear newly complete.
         probeProcess.exec([
             "python3",
             "-c",

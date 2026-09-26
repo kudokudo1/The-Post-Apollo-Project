@@ -205,6 +205,7 @@ required_functions = {
         "detailActionCount",
         "detailActionStableId",
         "detailActionDescriptor",
+        "detailActionFacts",
         "detailActionAvailable",
         "planLaunch",
         "buildLaunchCommand",
@@ -327,6 +328,13 @@ for required in (
     "metadataPresentation.iconSource",
     "metadataPresentation.actionIconSource",
     "metadataPresentation: metadataPresentation",
+    "detailActionPolicy.available",
+    "core.actionsAvailableForSource",
+    "core.entryLaunchableForSource",
+    "launchPlanner.cleanedCommandTokens",
+    "audioAvailable",
+    "resourceFreezeAvailable",
+    "killAvailable",
 ):
     if required not in facade_text:
         errors.append(

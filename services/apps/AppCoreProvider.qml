@@ -16,8 +16,9 @@ import Quickshell
 //   - Favorites persistence/reconstruction (Team 2)
 //   - RUN command discovery/history (future RunService)
 //
-// HIDDEN entries are accepted through hiddenEntries so the future RunService
-// can supply them without APPS rebuilding a second command catalog.
+// HIDDEN rows are adapted separately by AppHiddenAdapter from the future
+// RunService command catalog; this provider does not own a duplicate HIDDEN
+// catalog seam.
 QtObject {
     id: provider
 
@@ -29,10 +30,6 @@ QtObject {
     readonly property int launchToolbox: 1
     readonly property int launchBottle: 2
 
-    // Future RunService adapter input. Records remain provider-owned by RUN;
-    // APPS only consumes application-shaped rows supplied through this seam.
-    property var hiddenEntries: []
-
     function desktopEntries() {
         const values = DesktopEntries.applications.values;
 
@@ -40,18 +37,6 @@ QtObject {
             return [];
 
         return [...values];
-    }
-
-    function sourceEntries(sourceMode) {
-        if (sourceMode === sourceHidden)
-            return Array.isArray(hiddenEntries)
-                   ? hiddenEntries.slice()
-                   : [];
-
-        // Preserve donor behavior: NORMAL and FLATPAK both inspect the same
-        // DesktopEntries catalog. The source selector changes classification /
-        // action availability rather than hiding the other package form.
-        return desktopEntries();
     }
 
     function entryIsFlatpak(entry) {

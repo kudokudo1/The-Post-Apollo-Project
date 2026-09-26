@@ -3,3 +3,4 @@ module qs.services.favorites
 singleton FavoritesStore 1.0 FavoritesStore.qml
 singleton FavoritesService 1.0 FavoritesService.qml
 singleton FileFavoritesAdapter 1.0 FileFavoritesAdapter.qml
+FileFavoriteResolutionClient 1.0 FileFavoriteResolutionClient.qml

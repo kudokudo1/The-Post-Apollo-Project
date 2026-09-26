@@ -73,6 +73,12 @@ Scope {
         launchPlanner: launchPlanner
     }
 
+    AppDetailActionPolicy {
+        id: detailActionPolicy
+        actionCatalog: actionCatalog
+        actionPlanner: actionPlanner
+    }
+
     AppCatalogPolicy {
         id: catalogPolicy
         coreProvider: core
@@ -216,6 +222,32 @@ Scope {
 
     function buildActionCommand(plan) {
         return actionCommandBuilder.build(plan);
+    }
+
+    function detailActionCount(entry) {
+        return detailActionPolicy.actionCount(entry);
+    }
+
+    function detailActionStableId(entry, actionIndex) {
+        return detailActionPolicy.stableId(
+            entry,
+            actionIndex
+        );
+    }
+
+    function detailActionDescriptor(entry, actionIndex) {
+        return detailActionPolicy.descriptor(
+            entry,
+            actionIndex
+        );
+    }
+
+    function detailActionAvailable(entry, actionIndex, facts) {
+        return detailActionPolicy.available(
+            entry,
+            actionIndex,
+            facts
+        );
     }
 
     function planLaunch(entry, sourceMode, launchMode,

@@ -1048,6 +1048,22 @@ TestCase {
             detailActionPolicy.available(
                 native,
                 0,
+                {}
+            ),
+            false
+        );
+        compare(
+            detailActionPolicy.available(
+                native,
+                0,
+                { actionsAvailable: true }
+            ),
+            false
+        );
+        compare(
+            detailActionPolicy.available(
+                native,
+                0,
                 { actionsAvailable: true, launchable: true }
             ),
             true
@@ -1194,11 +1210,48 @@ TestCase {
             facade.detailActionDescriptor(native, 5).kind,
             "kill"
         );
+
+        const facts = facade.detailActionFacts(
+            native,
+            facade.sourceNative,
+            {
+                audioAvailable: true,
+                resourceFreezeAvailable: true,
+                killAvailable: true
+            }
+        );
+
+        compare(facts.actionsAvailable, true);
+        compare(facts.launchable, true);
+        compare(facts.toolboxLaunchable, true);
+        compare(facts.audioAvailable, true);
+        compare(facts.resourceFreezeAvailable, true);
+        compare(facts.killAvailable, true);
+
+        compare(
+            facade.detailActionAvailable(
+                native,
+                3,
+                facade.sourceNative,
+                { audioAvailable: true }
+            ),
+            true
+        );
         compare(
             facade.detailActionAvailable(
                 native,
                 4,
-                { actionsAvailable: true, resourceFreezeAvailable: true }
+                facade.sourceNative,
+                { resourceFreezeAvailable: true }
+            ),
+            true
+        );
+        compare(
+            facade.detailActionAvailable(
+                native,
+                5,
+                facade.sourceNative,
+                { killAvailable: true }
             ),
             true
         );

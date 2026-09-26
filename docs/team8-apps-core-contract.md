@@ -35,13 +35,37 @@ Team 8 does not own:
 
 ### AppCoreProvider.qml
 
-Owns APPS catalog/source/presentation behavior only.
+Owns APPS catalog/source behavior only.
 
 Important contract points:
 
 - `hiddenEntries` is an input seam; APPS must not build a second RUN catalog.
-- `appOverrides` is presentation-only and must not become semantic identity.
 - Native/Flatpak classification preserves current donor behavior.
+- display metadata and override presentation do not live in this provider.
+
+### AppMetadataPresentation.qml
+
+Pure APPS display-metadata / override policy.
+
+Owns:
+
+- APPS-local `appOverrides` lookup by current donor display name
+- display-name fallback
+- short/long description fallback
+- display icon override/fallback
+- Quickshell icon-source resolution for non-path icon names
+
+It does not:
+
+- discover applications
+- classify semantic identity
+- own source or launch policy
+- own global theme colors
+- mutate host selection, focus, navigation, or detail state
+
+`AppCoreFacade` keeps `appOverrides` as the external input and routes its stable
+display API through this organ. This keeps metadata presentation independently
+testable without making the catalog provider a presentation controller.
 
 ### AppLaunchPlanner.qml
 
@@ -110,7 +134,7 @@ host-neutral API:
 - HIDDEN adaptation from externally supplied RUN command names
 - catalog/search/result policy
 - source labels / launchability
-- APPS presentation metadata
+- APPS presentation metadata through `AppMetadataPresentation`
 - action catalog + action planning
 - launch planning + supplied SurfaceLaunch augmentation transport
 - remembered-selection lookup

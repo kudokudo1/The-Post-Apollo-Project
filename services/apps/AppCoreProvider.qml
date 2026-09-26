@@ -5,8 +5,8 @@ import Quickshell
 //
 // Standalone provider seam prepared on certified fused baseline 943d273.
 //
-// This file is intentionally NOT wired into AppControlW yet. It owns only
-// behavior that remains APPS-specific after shared physiology is removed.
+// This file is intentionally NOT wired into AppControlW yet. It owns APPS
+// catalog/source behavior only after shared physiology is removed.
 //
 // It does not own:
 //   - application/window/tab semantic identity (Team 7)
@@ -32,10 +32,6 @@ QtObject {
     // Future RunService adapter input. Records remain provider-owned by RUN;
     // APPS only consumes application-shaped rows supplied through this seam.
     property var hiddenEntries: []
-
-    // APPS-local presentation overrides. These intentionally do not define
-    // semantic identity; Team 7 remains authoritative for identity joins.
-    property var appOverrides: ({})
 
     function desktopEntries() {
         const values = DesktopEntries.applications.values;
@@ -143,68 +139,5 @@ QtObject {
         return !entry._hiddenCommand;
     }
 
-    function appOverride(entry) {
-        if (!entry || !entry.name)
-            return null;
 
-        return appOverrides[entry.name] || null;
-    }
-
-    function displayName(entry) {
-        if (!entry)
-            return "NO SELECTION";
-
-        const override = appOverride(entry);
-
-        return override && override.name
-               ? override.name
-               : (entry.name || "APPLICATION");
-    }
-
-    function displayDescription(entry) {
-        if (!entry)
-            return "";
-
-        const override = appOverride(entry);
-
-        if (override && override.description)
-            return override.description;
-
-        return entry.genericName || entry.comment || "APPLICATION";
-    }
-
-    function longDescription(entry) {
-        if (!entry)
-            return "";
-
-        const override = appOverride(entry);
-
-        if (override && override.longDescription)
-            return override.longDescription;
-
-        return entry.comment || "";
-    }
-
-    function displayIcon(entry) {
-        if (!entry)
-            return "";
-
-        const override = appOverride(entry);
-
-        return override && override.icon
-               ? override.icon
-               : (entry.icon || "");
-    }
-
-    function iconSource(entry) {
-        const icon = displayIcon(entry);
-
-        if (!icon)
-            return "";
-
-        if (icon.indexOf("/") === 0 || icon.indexOf("file:") === 0)
-            return icon;
-
-        return Quickshell.iconPath(icon, true);
-    }
 }

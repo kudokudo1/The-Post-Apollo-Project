@@ -259,6 +259,16 @@ TestCase {
             metadataPresentation.iconSource(null),
             ""
         );
+        compare(
+            metadataPresentation.actionIconSource(
+                "file:/tmp/action-icon.svg"
+            ),
+            "file:/tmp/action-icon.svg"
+        );
+        compare(
+            metadataPresentation.actionIconSource(""),
+            ""
+        );
     }
 
     function test_facadeRoutesMetadataThroughPresentationOrgan() {
@@ -289,6 +299,12 @@ TestCase {
         compare(
             facade.iconSource(native),
             "file:/tmp/facade-icon.svg"
+        );
+        compare(
+            facade.actionIconSource(
+                "file:/tmp/facade-action.svg"
+            ),
+            "file:/tmp/facade-action.svg"
         );
 
         facade.appOverrides = ({});

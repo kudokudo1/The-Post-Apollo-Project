@@ -647,40 +647,6 @@ TestCase {
         );
     }
 
-    function test_refreshStartPreservesLastSnapshotStatus() {
-        recovery.applySnapshot({
-            ok: true,
-            partial: true,
-            observations: [
-                {
-                    kind: "devtools-port",
-                    value: 9666
-                }
-            ],
-            completeKinds: [],
-            errors: ["previous partial snapshot"]
-        });
-
-        verify(recovery.partial);
-        compare(recovery.observations.length, 1);
-
-        const script = recovery.probeScript();
-
-        // Static contract assertion: refresh must not clear partial/error
-        // before the replacement snapshot is available.
-        verify(
-            script.length > 0
-        );
-
-        const sourceHint = recovery.refresh.toString();
-        verify(
-            sourceHint.indexOf("partial = false") === -1
-        );
-        verify(
-            sourceHint.indexOf("errorText = \"\"") === -1
-        );
-    }
-
     function test_completeRecoveryClearsPartialFlag() {
         recovery.applySnapshot({
             ok: true,

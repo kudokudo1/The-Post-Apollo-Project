@@ -4,7 +4,7 @@ Prepared from Team 8 isolated branch:
 
 ```text
 branch: team8/apps-core-prep
-content prepared through: 504beab36655d8e79d8fdfbb41d90371bbaf3233
+packet scope: metadata + action-icon + detail-action topology extraction complete
 certified patient observed: 8f5bb8f0cf67b526ed8cac577980e0416c176ed2
 original branch base / merge-base: 943d27310f68d9941e7b19631fbd56aa9bd633e8
 host file touched on parallel branch: NO
@@ -12,6 +12,9 @@ host file touched on parallel branch: NO
 
 This packet does not authorize host surgery. It exists so Team 8 can re-read and
 reconcile quickly when T3 Overhead assigns an APPS host-integration slot.
+
+Always read the live branch HEAD and the T3-named certified patient at integration
+time; this packet intentionally does not treat an embedded Team 8 SHA as authority.
 
 ## 1. Preferred host-facing seam
 

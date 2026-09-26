@@ -48,7 +48,6 @@ for key, path in FILES.items():
 required_functions = {
     "core": {
         "desktopEntries",
-        "sourceEntries",
         "entryIsFlatpak",
         "sourceLabel",
         "entryHasLaunchCommand",
@@ -273,6 +272,20 @@ for key in ("metadata", "launch", "commandBuilder", "actions", "actionPlanner", 
             errors.append(
                 f"{key}: execution/lifecycle token present: {token!r}"
             )
+
+
+# HIDDEN command discovery/adaptation has exactly one APPS-side path:
+# facade hiddenCommandNames -> AppHiddenAdapter -> AppCatalogPolicy.
+# AppCoreProvider must not grow a second HIDDEN catalog seam.
+core_text = texts.get("core", "")
+for token in (
+    "property var hiddenEntries",
+    "function sourceEntries",
+):
+    if token in core_text:
+        errors.append(
+            f"core: duplicate HIDDEN catalog seam returned: {token!r}"
+        )
 
 
 # Catalog/source ownership and APPS metadata presentation are separate organs.

@@ -1048,7 +1048,7 @@ TestCase {
             detailActionPolicy.available(
                 native,
                 0,
-                { launchable: true }
+                { actionsAvailable: true, launchable: true }
             ),
             true
         );
@@ -1056,7 +1056,7 @@ TestCase {
             detailActionPolicy.available(
                 native,
                 1,
-                { bottleReady: false }
+                { actionsAvailable: true, bottleReady: false }
             ),
             false
         );
@@ -1064,7 +1064,7 @@ TestCase {
             detailActionPolicy.available(
                 native,
                 1,
-                { bottleReady: true }
+                { actionsAvailable: true, bottleReady: true }
             ),
             true
         );
@@ -1072,7 +1072,7 @@ TestCase {
             detailActionPolicy.available(
                 native,
                 2,
-                { toolboxLaunchable: true }
+                { actionsAvailable: true, toolboxLaunchable: true }
             ),
             true
         );
@@ -1080,7 +1080,7 @@ TestCase {
             detailActionPolicy.available(
                 native,
                 3,
-                { audioAvailable: true }
+                { actionsAvailable: true, audioAvailable: true }
             ),
             true
         );
@@ -1088,7 +1088,7 @@ TestCase {
             detailActionPolicy.available(
                 native,
                 4,
-                { resourceFreezeAvailable: true }
+                { actionsAvailable: true, resourceFreezeAvailable: true }
             ),
             true
         );
@@ -1096,7 +1096,7 @@ TestCase {
             detailActionPolicy.available(
                 native,
                 5,
-                { killAvailable: true }
+                { actionsAvailable: true, killAvailable: true }
             ),
             true
         );
@@ -1155,7 +1155,7 @@ TestCase {
             detailActionPolicy.available(
                 hidden,
                 4,
-                { bottleReady: true }
+                { actionsAvailable: true, bottleReady: true }
             ),
             true
         );
@@ -1163,16 +1163,24 @@ TestCase {
             detailActionPolicy.available(
                 hidden,
                 4,
-                { bottleReady: false }
+                { actionsAvailable: true, bottleReady: false }
             ),
             false
         );
         compare(
-            detailActionPolicy.available(hidden, 5, {}),
+            detailActionPolicy.available(
+                hidden,
+                5,
+                { actionsAvailable: true }
+            ),
             true
         );
         compare(
-            detailActionPolicy.available(hidden, 6, {}),
+            detailActionPolicy.available(
+                hidden,
+                6,
+                { actionsAvailable: true }
+            ),
             true
         );
     }
@@ -1190,7 +1198,7 @@ TestCase {
             facade.detailActionAvailable(
                 native,
                 4,
-                { resourceFreezeAvailable: true }
+                { actionsAvailable: true, resourceFreezeAvailable: true }
             ),
             true
         );

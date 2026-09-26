@@ -62,7 +62,9 @@ required_functions = {
         "displayDescription",
         "longDescription",
         "displayIcon",
+        "iconSourceForValue",
         "iconSource",
+        "actionIconSource",
     },
     "launch": {
         "cleanedCommandTokens",
@@ -190,6 +192,7 @@ required_functions = {
         "displayDescription",
         "longDescription",
         "iconSource",
+        "actionIconSource",
         "actionsFor",
         "planAction",
         "planLaunch",
@@ -297,6 +300,7 @@ for required in (
     "metadataPresentation.displayDescription",
     "metadataPresentation.longDescription",
     "metadataPresentation.iconSource",
+    "metadataPresentation.actionIconSource",
 ):
     if required not in facade_text:
         errors.append(

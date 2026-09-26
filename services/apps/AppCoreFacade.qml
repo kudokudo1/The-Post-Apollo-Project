@@ -242,11 +242,46 @@ Scope {
         );
     }
 
-    function detailActionAvailable(entry, actionIndex, facts) {
+    function detailActionFacts(entry, requestedSourceMode,
+                               siblingFacts) {
+        const mode = requestedSourceMode === undefined
+            ? sourceMode
+            : modePolicy.normalizeSourceMode(requestedSourceMode);
+
+        const external =
+            siblingFacts && typeof siblingFacts === "object"
+            ? siblingFacts
+            : {};
+
+        return {
+            actionsAvailable:
+                core.actionsAvailableForSource(entry, mode),
+            launchable:
+                core.entryLaunchableForSource(entry, mode),
+            bottleReady:
+                selectedBottleName.length > 0
+                && !bottlesLoading,
+            toolboxLaunchable:
+                launchPlanner.cleanedCommandTokens(entry).length > 0,
+            audioAvailable:
+                !!external.audioAvailable,
+            resourceFreezeAvailable:
+                !!external.resourceFreezeAvailable,
+            killAvailable:
+                !!external.killAvailable
+        };
+    }
+
+    function detailActionAvailable(entry, actionIndex,
+                                   requestedSourceMode, siblingFacts) {
         return detailActionPolicy.available(
             entry,
             actionIndex,
-            facts
+            detailActionFacts(
+                entry,
+                requestedSourceMode,
+                siblingFacts
+            )
         );
     }
 

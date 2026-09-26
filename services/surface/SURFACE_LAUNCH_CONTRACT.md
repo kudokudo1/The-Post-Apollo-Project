@@ -420,7 +420,20 @@ Those observations may be reconciled additively. Missing provider kinds do not
 authorize pruning.
 
 `ok: false` is reserved for cases where the recovery request itself could not
-produce a usable parsed snapshot (for example QML/worker parse failure).
+produce a usable parsed snapshot.
+
+An unusable snapshot is non-mutating:
+
+```text
+previous observations       preserved
+previous completeKinds      preserved
+generation                  unchanged
+shared coordinator          not reconciled
+error/partial state         updated for diagnostics
+```
+
+This prevents a broken worker/result from erasing trusted occupancy knowledge
+or authorizing stale-lease pruning.
 
 This keeps conservative `/proc` incompleteness from being misreported as total
 recovery failure.

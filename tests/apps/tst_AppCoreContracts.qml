@@ -9,6 +9,18 @@ TestCase {
         id: core
     }
 
+    AppMetadataPresentation {
+        id: metadataPresentation
+        appOverrides: ({
+            "Native App": {
+                name: "Override Name",
+                description: "Override Description",
+                longDescription: "Override Long Description",
+                icon: "file:/tmp/override-icon.svg"
+            }
+        })
+    }
+
     AppLaunchPlanner {
         id: launchPlanner
         coreProvider: core
@@ -177,6 +189,109 @@ TestCase {
         }
 
         return kinds;
+    }
+
+    function test_metadataPresentationOwnsOverridesAndFallbacks() {
+        const native = nativeEntry();
+
+        compare(
+            metadataPresentation.displayName(native),
+            "Override Name"
+        );
+        compare(
+            metadataPresentation.displayDescription(native),
+            "Override Description"
+        );
+        compare(
+            metadataPresentation.longDescription(native),
+            "Override Long Description"
+        );
+        compare(
+            metadataPresentation.displayIcon(native),
+            "file:/tmp/override-icon.svg"
+        );
+        compare(
+            metadataPresentation.iconSource(native),
+            "file:/tmp/override-icon.svg"
+        );
+
+        const plain = {
+            name: "Plain App",
+            genericName: "Plain Generic",
+            comment: "Plain Comment",
+            icon: "file:/tmp/plain-icon.svg"
+        };
+
+        compare(
+            metadataPresentation.displayName(plain),
+            "Plain App"
+        );
+        compare(
+            metadataPresentation.displayDescription(plain),
+            "Plain Generic"
+        );
+        compare(
+            metadataPresentation.longDescription(plain),
+            "Plain Comment"
+        );
+        compare(
+            metadataPresentation.iconSource(plain),
+            "file:/tmp/plain-icon.svg"
+        );
+
+        compare(
+            metadataPresentation.displayName(null),
+            "NO SELECTION"
+        );
+        compare(
+            metadataPresentation.displayDescription(null),
+            ""
+        );
+        compare(
+            metadataPresentation.longDescription(null),
+            ""
+        );
+        compare(
+            metadataPresentation.displayIcon(null),
+            ""
+        );
+        compare(
+            metadataPresentation.iconSource(null),
+            ""
+        );
+    }
+
+    function test_facadeRoutesMetadataThroughPresentationOrgan() {
+        const native = nativeEntry();
+
+        compare(facade.displayName(native), "Native App");
+        compare(facade.displayDescription(native), "Native");
+        compare(
+            facade.longDescription(native),
+            "Native application"
+        );
+
+        facade.appOverrides = ({
+            "Native App": {
+                name: "Facade Override",
+                description: "Facade Description",
+                longDescription: "Facade Long",
+                icon: "file:/tmp/facade-icon.svg"
+            }
+        });
+
+        compare(facade.displayName(native), "Facade Override");
+        compare(
+            facade.displayDescription(native),
+            "Facade Description"
+        );
+        compare(facade.longDescription(native), "Facade Long");
+        compare(
+            facade.iconSource(native),
+            "file:/tmp/facade-icon.svg"
+        );
+
+        facade.appOverrides = ({});
     }
 
     function test_catalogPolicyPreservesDonorSourceBehavior() {

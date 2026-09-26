@@ -19,6 +19,7 @@ APP_DIR = ROOT / "services" / "apps"
 
 FILES = {
     "core": APP_DIR / "AppCoreProvider.qml",
+    "metadata": APP_DIR / "AppMetadataPresentation.qml",
     "launch": APP_DIR / "AppLaunchPlanner.qml",
     "commandBuilder": APP_DIR / "AppLaunchCommandBuilder.qml",
     "bottles": APP_DIR / "AppBottleProvider.qml",
@@ -54,6 +55,9 @@ required_functions = {
         "entryMatchesSource",
         "entryLaunchableForSource",
         "actionsAvailableForSource",
+    },
+    "metadata": {
+        "overrideFor",
         "displayName",
         "displayDescription",
         "longDescription",
@@ -253,7 +257,7 @@ for key, text in texts.items():
 # Planning/catalog files must remain pure. They describe intent; they do not
 # launch processes, create workers/timers, or mutate the desktop. Bottles is a
 # discovery provider and therefore may own its bottles-cli Process.
-for key in ("launch", "commandBuilder", "actions", "actionPlanner", "actionCommandBuilder", "catalog", "hidden", "selection", "mode", "iconGlow", "selectorPresentation", "identity", "facade"):
+for key in ("metadata", "launch", "commandBuilder", "actions", "actionPlanner", "actionCommandBuilder", "catalog", "hidden", "selection", "mode", "iconGlow", "selectorPresentation", "identity", "facade"):
     text = texts.get(key, "")
     for token in (
         "Quickshell.execDetached",
@@ -359,6 +363,7 @@ print(" APPS catalog/search/ranking: pure Team 8 policy")
 print(" HIDDEN adaptation: pure Team 8 adapter over external RUN rows")
 print(" APPS selection remembrance: pure Team 8 lookup policy")
 print(" APPS source/launch modes: pure Team 8 policy")
+print(" APPS metadata/override presentation: isolated Team 8 policy")
 print(" APPS icon glow classification/cache: palette-injected Team 8 policy")
 print(" APPS selector/result styling: palette-injected Team 8 presentation")
 print(" DesktopEntry identity evidence: delegated to Team 7")

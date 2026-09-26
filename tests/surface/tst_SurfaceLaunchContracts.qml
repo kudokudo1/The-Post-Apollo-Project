@@ -585,6 +585,40 @@ TestCase {
         );
     }
 
+    function test_unusableRecoverySnapshotDoesNotMutateTrustedState() {
+        recovery.applySnapshot({
+            ok: true,
+            partial: false,
+            observations: [
+                {
+                    kind: "devtools-port",
+                    value: 9444
+                }
+            ],
+            completeKinds: ["devtools-port"],
+            errors: []
+        });
+
+        const generation = recovery.generation;
+
+        const rejected = recovery.applySnapshot({
+            ok: false,
+            partial: true,
+            observations: [],
+            completeKinds: ["devtools-port"],
+            errors: ["probe transport failed"]
+        });
+
+        verify(!rejected.ok);
+        compare(recovery.generation, generation);
+        compare(recovery.observations.length, 1);
+        compare(recovery.observations[0].value, 9444);
+        compare(recovery.completeKinds.length, 1);
+        compare(recovery.completeKinds[0], "devtools-port");
+        verify(recovery.partial);
+        verify(recovery.errorText.length > 0);
+    }
+
     function test_partialRecoveryIsUsableWithoutClaimingCompleteness() {
         const snapshot = recovery.applySnapshot({
             ok: true,

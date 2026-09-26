@@ -314,12 +314,30 @@ for required in (
     "metadataPresentation.longDescription",
     "metadataPresentation.iconSource",
     "metadataPresentation.actionIconSource",
+    "metadataPresentation: metadataPresentation",
 ):
     if required not in facade_text:
         errors.append(
             "facade: metadata presentation seam missing: "
             + repr(required)
         )
+
+
+launch_text = texts.get("launch", "")
+for required in (
+    "required property var metadataPresentation",
+    "metadataPresentation.displayName(entry)",
+):
+    if required not in launch_text:
+        errors.append(
+            "launch: explicit metadata dependency missing: "
+            + repr(required)
+        )
+
+if "coreProvider.displayName(entry)" in launch_text:
+    errors.append(
+        "launch: presentation dependency leaked back through AppCoreProvider"
+    )
 
 
 # Team 8's identity adapter must remain delegation-only. Team 7 owns evidence

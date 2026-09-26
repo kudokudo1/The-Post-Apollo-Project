@@ -35,6 +35,7 @@ EXTRACTED = {
     "command_builder": APP_DIR / "AppLaunchCommandBuilder.qml",
     "actions": APP_DIR / "AppActionCatalog.qml",
     "action_planner": APP_DIR / "AppActionPlanner.qml",
+    "detail_actions": APP_DIR / "AppDetailActionPolicy.qml",
     "action_command_builder": APP_DIR / "AppActionCommandBuilder.qml",
     "catalog": APP_DIR / "AppCatalogPolicy.qml",
     "hidden": APP_DIR / "AppHiddenAdapter.qml",
@@ -350,6 +351,52 @@ require_function_anchors(
         'icon.indexOf("/") === 0',
         'icon.indexOf("file:") === 0',
         "Quickshell.iconPath(icon, true)",
+    ),
+)
+
+require_function_anchors(
+    "donor APPS detail-action stable IDs",
+    donor_text,
+    "detailActionStableId",
+    (
+        '"launch"',
+        '"hidden-kitty"',
+        '"hidden-float"',
+        '"hidden-fullscreen"',
+        '"hidden-bottles"',
+        '"hidden-toolbox"',
+        '"hidden-kill"',
+        '"bottles"',
+        '"toolbox"',
+        '"mute-app"',
+        '"freeze-app"',
+        '"kill"',
+        "appDesktopActions(appEntry)",
+    ),
+)
+
+require_function_anchors(
+    "donor APPS detail-action count",
+    donor_text,
+    "detailActionCount",
+    (
+        "if (appEntry._hiddenCommand)",
+        "return 7",
+        "return 6 + appDesktopActions(appEntry).length",
+    ),
+)
+
+require_function_anchors(
+    "donor APPS detail-action availability dependencies",
+    donor_text,
+    "detailActionAvailable",
+    (
+        "selectedBottleName.length > 0",
+        "!bottlesLoading",
+        "appToolboxCommandTokens(appEntry).length > 0",
+        "appAudioAvailable",
+        "selectedResourceScopeRows().length > 0",
+        "selectedApplicationKillPids().length > 0",
     ),
 )
 
@@ -816,6 +863,50 @@ require_function_anchors(
     "actionIconSource",
     (
         "iconSourceForValue(icon)",
+    ),
+)
+
+require_function_anchors(
+    "extracted APPS detail-action stable IDs",
+    texts.get("detail_actions", ""),
+    "stableId",
+    (
+        "actionHiddenKitty",
+        "actionHiddenFloat",
+        "actionHiddenFullscreen",
+        "actionHiddenBottles",
+        "actionHiddenToolbox",
+        "actionHiddenKill",
+        "actionBottles",
+        "actionToolbox",
+        "actionMute",
+        "actionFreeze",
+        "actionKill",
+        "actionPlanner.stableActionId",
+    ),
+)
+
+require_function_anchors(
+    "extracted APPS detail-action count",
+    texts.get("detail_actions", ""),
+    "actionCount",
+    (
+        "entry._hiddenCommand",
+        "return 7",
+        "return 6 + desktopActions(entry).length",
+    ),
+)
+
+require_function_anchors(
+    "extracted APPS detail-action availability facts",
+    texts.get("detail_actions", ""),
+    "available",
+    (
+        "state.bottleReady",
+        "state.toolboxLaunchable",
+        "state.audioAvailable",
+        "state.resourceFreezeAvailable",
+        "state.killAvailable",
     ),
 )
 

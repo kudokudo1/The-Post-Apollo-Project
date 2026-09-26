@@ -64,15 +64,23 @@ QtObject {
                : (entry.icon || "");
     }
 
-    function iconSource(entry) {
-        const icon = displayIcon(entry);
+    function iconSourceForValue(icon) {
+        const value = icon ? String(icon) : "";
 
-        if (!icon)
+        if (!value)
             return "";
 
-        if (icon.indexOf("/") === 0 || icon.indexOf("file:") === 0)
-            return icon;
+        if (value.indexOf("/") === 0 || value.indexOf("file:") === 0)
+            return value;
 
-        return Quickshell.iconPath(icon, true);
+        return Quickshell.iconPath(value, true);
+    }
+
+    function iconSource(entry) {
+        return iconSourceForValue(displayIcon(entry));
+    }
+
+    function actionIconSource(icon) {
+        return iconSourceForValue(icon);
     }
 }

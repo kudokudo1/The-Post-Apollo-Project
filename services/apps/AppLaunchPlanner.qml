@@ -21,6 +21,7 @@ QtObject {
     id: planner
 
     required property var coreProvider
+    required property var metadataPresentation
 
     readonly property string planDesktopEntry: "desktop-entry"
     readonly property string planToolboxArgv: "toolbox-argv"
@@ -99,7 +100,7 @@ QtObject {
             return "";
 
         return String(
-            coreProvider.displayName(entry)
+            metadataPresentation.displayName(entry)
             || entry.name
             || ""
         ).trim();

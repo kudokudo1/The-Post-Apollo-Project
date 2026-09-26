@@ -502,6 +502,27 @@ TestCase {
         );
     }
 
+    function test_recoveryProbeConfirmsKittySocketKernelOccupancy() {
+        const script = recovery.probeScript();
+
+        verify(script.indexOf("/proc/net/unix") !== -1);
+        verify(script.indexOf("def unix_socket_addresses()") !== -1);
+        verify(script.indexOf("def kitty_socket_key(address)") !== -1);
+        verify(script.indexOf("socket_key in kitty_sockets") !== -1);
+        verify(
+            script.indexOf("KITTY SOCKET TABLE:") !== -1
+        );
+    }
+
+    function test_recoveryProbeTreatsUnknownPidOwnershipAsIncomplete() {
+        const script = recovery.probeScript();
+
+        verify(script.indexOf("return (None, exc)") !== -1);
+        verify(script.indexOf("if owned is None:") !== -1);
+        verify(script.indexOf("kitty_complete = False") !== -1);
+        verify(script.indexOf("devtools_complete = False") !== -1);
+    }
+
     function test_recoverySnapshotRehydratesSharedAuthorityWithoutTabs() {
         const snapshot = recovery.applySnapshot({
             observations: [

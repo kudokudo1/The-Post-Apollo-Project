@@ -197,6 +197,10 @@ Scope {
         return metadataPresentation.iconSource(entry);
     }
 
+    function actionIconSource(icon) {
+        return metadataPresentation.actionIconSource(icon);
+    }
+
     function actionsFor(entry) {
         return actionCatalog.desktopActions(entry);
     }

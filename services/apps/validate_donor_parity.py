@@ -177,6 +177,17 @@ require_function_anchors(
 )
 
 require_function_anchors(
+    "donor Bottles program naming",
+    donor_text,
+    "bottleProgramName",
+    (
+        "appDisplayName(entry)",
+        "entry.name",
+        ".trim()",
+    ),
+)
+
+require_function_anchors(
     "donor Bottles launch mechanism",
     donor_text,
     "launchAppInBottle",
@@ -566,6 +577,17 @@ require_function_anchors(
         r"/^%[fFuUdDnNickvm]$/",
         '"__APPCONTROL_SHELL__"',
         r"/\s+%[fFuUdDnNickvm]\b/g",
+    ),
+)
+
+require_function_anchors(
+    "extracted Bottles program naming",
+    texts.get("launch", ""),
+    "bottleProgramName",
+    (
+        "metadataPresentation.displayName(entry)",
+        "entry.name",
+        ".trim()",
     ),
 )
 

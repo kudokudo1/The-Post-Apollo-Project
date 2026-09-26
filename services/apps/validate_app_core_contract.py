@@ -272,6 +272,39 @@ for key in ("metadata", "launch", "commandBuilder", "actions", "actionPlanner", 
             )
 
 
+# Catalog/source ownership and APPS metadata presentation are separate organs.
+# AppCoreProvider must not reacquire display overrides merely because both are
+# consumed through AppCoreFacade.
+core_text = texts.get("core", "")
+for token in (
+    "appOverrides",
+    "function appOverride",
+    "function displayName",
+    "function displayDescription",
+    "function longDescription",
+    "function displayIcon",
+    "function iconSource",
+):
+    if token in core_text:
+        errors.append(
+            f"core: metadata presentation leaked back into provider: {token!r}"
+        )
+
+facade_text = texts.get("facade", "")
+for required in (
+    "AppMetadataPresentation {",
+    "metadataPresentation.displayName",
+    "metadataPresentation.displayDescription",
+    "metadataPresentation.longDescription",
+    "metadataPresentation.iconSource",
+):
+    if required not in facade_text:
+        errors.append(
+            "facade: metadata presentation seam missing: "
+            + repr(required)
+        )
+
+
 # Team 8's identity adapter must remain delegation-only. Team 7 owns evidence
 # normalization, alias/relationship vocabulary, lifetime classification and
 # resolver semantics.

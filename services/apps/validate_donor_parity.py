@@ -902,6 +902,8 @@ require_function_anchors(
     texts.get("detail_actions", ""),
     "available",
     (
+        "state.actionsAvailable !== true",
+        "state.launchable === true",
         "state.bottleReady",
         "state.toolboxLaunchable",
         "state.audioAvailable",

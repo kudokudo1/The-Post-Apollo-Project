@@ -257,6 +257,7 @@ if "knownCapabilities.indexOf(value) === -1" in requirements:
     )
 
 for token in (
+    "kittyListenAddress(correlationId)",
     "existingDebugPort",
     "existingDebugAddress",
     "existingKittyListenOn",

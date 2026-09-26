@@ -54,6 +54,7 @@ Owns:
 - short/long description fallback
 - display icon override/fallback
 - Quickshell icon-source resolution for non-path icon names
+- DesktopEntry action-icon source resolution with the same path/theme rules
 
 It does not:
 
@@ -64,8 +65,9 @@ It does not:
 - mutate host selection, focus, navigation, or detail state
 
 `AppCoreFacade` keeps `appOverrides` as the external input and routes its stable
-display API through this organ. This keeps metadata presentation independently
-testable without making the catalog provider a presentation controller.
+display API through this organ, including `actionIconSource(icon)`. This keeps
+metadata presentation independently testable without making the catalog provider
+a presentation controller.
 
 ### AppLaunchPlanner.qml
 

@@ -4,7 +4,7 @@ Prepared from Team 8 isolated branch:
 
 ```text
 branch: team8/apps-core-prep
-head at preparation: ba0aab98527cb66e1a97512098612a4ebae8ccb2
+content prepared through: 504beab36655d8e79d8fdfbb41d90371bbaf3233
 certified patient observed: 8f5bb8f0cf67b526ed8cac577980e0416c176ed2
 original branch base / merge-base: 943d27310f68d9941e7b19631fbd56aa9bd633e8
 host file touched on parallel branch: NO
@@ -31,6 +31,7 @@ AppCoreFacade
 ├── AppBottleProvider
 ├── AppActionCatalog
 ├── AppActionPlanner
+├── AppDetailActionPolicy
 ├── AppActionCommandBuilder
 ├── AppIconGlowPolicy
 └── AppSelectorPresentation
@@ -183,6 +184,52 @@ flatpak run [wrapper options] APP_ID
 ```
 
 Unresolved boundaries fail closed.
+
+### APPS detail-action topology
+
+The donor currently mixes APPS-specific action ordering/stable IDs into generic
+detail navigation:
+
+```text
+detailActionStableId
+detailActionCount
+APPS branch of detailActionAvailable
+```
+
+Replacement:
+
+```text
+AppDetailActionPolicy
+AppCoreFacade.detailActionCount(...)
+AppCoreFacade.detailActionStableId(...)
+AppCoreFacade.detailActionDescriptor(...)
+AppCoreFacade.detailActionFacts(...)
+AppCoreFacade.detailActionAvailable(...)
+```
+
+Team 8 owns the APPS provider topology and provider-owned stable IDs.
+
+The facade composes Team 8 facts:
+
+```text
+actionsAvailable
+launchable
+bottleReady
+toolboxLaunchable
+```
+
+Sibling facts remain injected only as booleans:
+
+```text
+audioAvailable             Team 6
+resourceFreezeAvailable    Team 1
+killAvailable              Team 1
+```
+
+The policy fails closed when required facts are absent. It does not import audio or
+process/resource services, and it does not own Favorites persistence.
+
+Generic detail index state, focus, scrolling, widgets and activation dispatch remain host-owned.
 
 ### APPS actions
 

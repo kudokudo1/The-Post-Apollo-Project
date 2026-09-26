@@ -135,11 +135,11 @@ QtObject {
             ? facts
             : {};
 
-        if (state.actionsAvailable === false)
+        if (state.actionsAvailable !== true)
             return false;
 
         if (actionIndex === 0)
-            return state.launchable !== false;
+            return state.launchable === true;
 
         if (entry._hiddenCommand) {
             if (actionIndex >= 1 && actionIndex <= 3)

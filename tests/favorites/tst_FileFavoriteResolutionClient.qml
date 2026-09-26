@@ -149,6 +149,37 @@ TestCase {
         );
     }
 
+    function test_relays_unavailable_without_reconstruction_guess() {
+        const identity = "file:/root/not-readable";
+        const resolution = {
+            status: "unavailable",
+            identity: identity,
+            path: "/root/not-readable",
+            reason: "filesystem-record-unavailable",
+            row: null
+        };
+
+        verify(client.resolveFavoriteKey(identity));
+        fakeFileService.favoriteResolutionFinished(
+            identity,
+            resolution
+        );
+
+        compare(completionSpy.count, 1);
+        compare(
+            completionSpy.signalArguments[0][1].status,
+            "unavailable"
+        );
+        compare(
+            completionSpy.signalArguments[0][1].reason,
+            "filesystem-record-unavailable"
+        );
+        compare(
+            completionSpy.signalArguments[0][1].row,
+            null
+        );
+    }
+
     function test_unrequested_provider_signal_is_ignored() {
         fakeFileService.favoriteResolutionFinished(
             "file:/tmp/other",

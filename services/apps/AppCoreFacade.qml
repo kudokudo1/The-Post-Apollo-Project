@@ -38,6 +38,10 @@ Scope {
 
     AppCoreProvider {
         id: core
+    }
+
+    AppMetadataPresentation {
+        id: metadataPresentation
         appOverrides: facade.appOverrides
     }
 
@@ -178,19 +182,19 @@ Scope {
     }
 
     function displayName(entry) {
-        return core.displayName(entry);
+        return metadataPresentation.displayName(entry);
     }
 
     function displayDescription(entry) {
-        return core.displayDescription(entry);
+        return metadataPresentation.displayDescription(entry);
     }
 
     function longDescription(entry) {
-        return core.longDescription(entry);
+        return metadataPresentation.longDescription(entry);
     }
 
     function iconSource(entry) {
-        return core.iconSource(entry);
+        return metadataPresentation.iconSource(entry);
     }
 
     function actionsFor(entry) {

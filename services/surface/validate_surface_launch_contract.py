@@ -139,6 +139,12 @@ else:
         errors.append(f"recovery probe Python syntax invalid: {exc}")
 
 for token in (
+    "if owned is None:",
+    "return (None, exc)",
+    "socket_key in kitty_sockets",
+    "def kitty_socket_key(address)",
+    "def unix_socket_addresses()",
+    "/proc/net/unix",
     "'partial': bool(errors)",
     "os.getuid()",
     "os.stat('/proc/%s' % pid).st_uid == uid",

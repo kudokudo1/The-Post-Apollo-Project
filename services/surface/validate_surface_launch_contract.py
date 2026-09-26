@@ -139,6 +139,7 @@ else:
         errors.append(f"recovery probe Python syntax invalid: {exc}")
 
 for token in (
+    "property Process _probeProcess: Process {",
     "SURFACE RECOVERY SNAPSHOT UNUSABLE",
     "if (snapshot.ok)",
     "if (!snapshot.ok)",

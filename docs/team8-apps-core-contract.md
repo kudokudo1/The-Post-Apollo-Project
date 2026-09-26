@@ -74,6 +74,12 @@ a presentation controller.
 
 Pure planning layer. It does not execute processes.
 
+The planner receives both `AppCoreProvider` and `AppMetadataPresentation`.
+That split is intentional: source/launchability policy remains in the core provider,
+while donor-compatible Bottles program naming uses the current APPS display-name
+policy. A presentation override may therefore affect the Bottles program label, but
+it does not become semantic identity.
+
 Produces intent for:
 
 - normal DesktopEntry launch
@@ -139,6 +145,7 @@ host-neutral API:
 - source labels / launchability
 - APPS presentation metadata through `AppMetadataPresentation`
 - action catalog + action planning
+- APPS detail-action topology / stable IDs / availability fact composition
 - launch planning + supplied SurfaceLaunch augmentation transport
 - remembered-selection lookup
 - Team 7 DesktopEntry evidence delegation
@@ -373,6 +380,70 @@ Important donor behavior preserved:
 
 This keeps APPS result behavior reusable without creating an APPS -> Favorites or
 APPS -> RUN implementation dependency.
+
+### AppDetailActionPolicy.qml
+
+Pure APPS detail-action topology.
+
+Owns:
+
+- APPS detail action count
+- APPS provider-owned stable action IDs
+- DesktopEntry/browser action offsets inside the APPS detail list
+- HIDDEN APPS action ordering
+- mapping an APPS detail index to a provider action descriptor
+- availability evaluation over explicit input facts
+
+The normal APPS order remains:
+
+```text
+LAUNCH
+desktop/browser actions...
+BOTTLES
+TOOLBOX
+MUTE APP
+FREEZE/RESUME APP
+KILL
+```
+
+The HIDDEN APPS order remains:
+
+```text
+LAUNCH
+KITTY
+FLOAT
+FULLSCREEN
+BOTTLES
+TOOLBOX
+KILL
+```
+
+Availability is deliberately fail-closed. The policy requires explicit
+`actionsAvailable:true`, and LAUNCH additionally requires `launchable:true`.
+
+`AppCoreFacade.detailActionFacts(...)` composes Team 8-owned facts:
+
+```text
+actionsAvailable
+launchable
+bottleReady
+toolboxLaunchable
+```
+
+and accepts only sibling-owned booleans:
+
+```text
+audioAvailable             Team 6
+resourceFreezeAvailable    Team 1
+killAvailable              Team 1
+```
+
+The policy does not import Team 1 or Team 6 implementations. It also does not own
+Favorites persistence: stable IDs are provider coordinates that Team 2/host may
+persist or reference.
+
+Generic detail focus, `selectedDetailActionIndex`, scrolling, button widgets and
+activation dispatch remain host-owned.
 
 ### AppActionPlanner.qml
 

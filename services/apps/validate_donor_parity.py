@@ -30,6 +30,7 @@ APP_DIR = ROOT / "services" / "apps"
 
 EXTRACTED = {
     "core": APP_DIR / "AppCoreProvider.qml",
+    "metadata": APP_DIR / "AppMetadataPresentation.qml",
     "launch": APP_DIR / "AppLaunchPlanner.qml",
     "command_builder": APP_DIR / "AppLaunchCommandBuilder.qml",
     "actions": APP_DIR / "AppActionCatalog.qml",
@@ -264,6 +265,80 @@ require_function_anchors(
         '"about:logins"',
         '"--ProfileManager"',
         '"about:firefoxview"',
+    ),
+)
+
+require_function_anchors(
+    "donor APPS metadata override lookup",
+    donor_text,
+    "appOverride",
+    (
+        "appOverrides[entry.name]",
+        "return null",
+    ),
+)
+
+require_function_anchors(
+    "donor APPS display name",
+    donor_text,
+    "appDisplayName",
+    (
+        '"NO SELECTION"',
+        "override.name",
+        'entry.name || "APPLICATION"',
+    ),
+)
+
+require_function_anchors(
+    "donor APPS display description",
+    donor_text,
+    "appDisplayDescription",
+    (
+        "override.description",
+        'entry.genericName || entry.comment || "APPLICATION"',
+    ),
+)
+
+require_function_anchors(
+    "donor APPS long description",
+    donor_text,
+    "appLongDescription",
+    (
+        "override.longDescription",
+        'entry.comment || ""',
+    ),
+)
+
+require_function_anchors(
+    "donor APPS display icon",
+    donor_text,
+    "appDisplayIcon",
+    (
+        "override.icon",
+        'entry.icon || ""',
+    ),
+)
+
+require_function_anchors(
+    "donor APPS icon source",
+    donor_text,
+    "appIconSource",
+    (
+        "appDisplayIcon(entry)",
+        'icon.indexOf("/") === 0',
+        'icon.indexOf("file:") === 0',
+        "Quickshell.iconPath(icon, true)",
+    ),
+)
+
+require_function_anchors(
+    "donor APPS action icon source",
+    donor_text,
+    "safeActionIconSource",
+    (
+        'icon.indexOf("/") === 0',
+        'icon.indexOf("file:") === 0',
+        "Quickshell.iconPath(icon, true)",
     ),
 )
 
@@ -639,6 +714,86 @@ require_function_anchors(
         'id === "downloads"',
         '"about:downloads"',
         "launchArguments",
+    ),
+)
+
+require_function_anchors(
+    "extracted APPS metadata override lookup",
+    texts.get("metadata", ""),
+    "overrideFor",
+    (
+        "appOverrides[entry.name]",
+        "return null",
+    ),
+)
+
+require_function_anchors(
+    "extracted APPS display name",
+    texts.get("metadata", ""),
+    "displayName",
+    (
+        '"NO SELECTION"',
+        "override.name",
+        'entry.name || "APPLICATION"',
+    ),
+)
+
+require_function_anchors(
+    "extracted APPS display description",
+    texts.get("metadata", ""),
+    "displayDescription",
+    (
+        "override.description",
+        'entry.genericName || entry.comment || "APPLICATION"',
+    ),
+)
+
+require_function_anchors(
+    "extracted APPS long description",
+    texts.get("metadata", ""),
+    "longDescription",
+    (
+        "override.longDescription",
+        'entry.comment || ""',
+    ),
+)
+
+require_function_anchors(
+    "extracted APPS display icon",
+    texts.get("metadata", ""),
+    "displayIcon",
+    (
+        "override.icon",
+        'entry.icon || ""',
+    ),
+)
+
+require_function_anchors(
+    "extracted APPS icon value resolver",
+    texts.get("metadata", ""),
+    "iconSourceForValue",
+    (
+        'value.indexOf("/") === 0',
+        'value.indexOf("file:") === 0',
+        "Quickshell.iconPath(value, true)",
+    ),
+)
+
+require_function_anchors(
+    "extracted APPS icon source",
+    texts.get("metadata", ""),
+    "iconSource",
+    (
+        "iconSourceForValue(displayIcon(entry))",
+    ),
+)
+
+require_function_anchors(
+    "extracted APPS action icon source",
+    texts.get("metadata", ""),
+    "actionIconSource",
+    (
+        "iconSourceForValue(icon)",
     ),
 )
 

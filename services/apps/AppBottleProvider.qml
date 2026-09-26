@@ -146,10 +146,6 @@ Scope {
                     discovered.length > 0 ? discovered[0] : "";
                 bottleProvider.loading = false;
 
-                console.log(
-                    "AppBottleProvider discovered:",
-                    discovered.join(", ")
-                );
             }
         }
 
@@ -159,10 +155,6 @@ Scope {
 
                 if (message) {
                     bottleProvider.errorText = message;
-                    console.log(
-                        "AppBottleProvider list:",
-                        message
-                    );
                 }
 
                 bottleProvider.loading = false;

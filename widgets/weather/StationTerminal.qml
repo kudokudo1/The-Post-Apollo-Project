@@ -1,7 +1,6 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import Quickshell.I3
 import "../../components"
 import "../../services/windowassembly"
 
@@ -27,10 +26,6 @@ Rectangle {
     readonly property int bayY: terminalBay.y
     readonly property int bayWidth: terminalBay.width
     readonly property int bayHeight: terminalBay.height
-
-    // Use Sway's monitor coordinates as the global coordinate authority.
-    // This avoids relying on mapToGlobal() for a layer-shell surface.
-    readonly property var swayMonitor: targetScreen ? I3.monitorFor(targetScreen) : null
 
     property string terminalState: "IDLE"
     property string terminalAppId: "weather-screen"
@@ -127,31 +122,38 @@ Rectangle {
     }
 
     function currentBayRect() {
-        if (!swayMonitor) {
-            console.log("StationTerminal assembly: no Sway monitor for target screen");
+        const shellWindow = terminalView.QSWindow.window;
+        const screen = shellWindow ? shellWindow.screen : targetScreen;
+
+        if (!shellWindow || !screen) {
+            console.log("StationTerminal assembly: shell window/screen not ready");
             return null;
         }
 
-        // WeatherStationW is anchored bottom/right on targetScreen.
-        // Reconstruct its compositor-global origin from the Sway monitor,
-        // then add the known internal layout offsets:
-        //
-        // station -> mode rail -> StationTerminal -> terminalBay.
-        const stationX = Number(swayMonitor.x)
-            + Number(swayMonitor.width)
-            - stationRightMargin
-            - stationWidth;
+        // Ask Quickshell for the bay's position inside the *actual* panel
+        // window. This preserves the real runtime layout instead of rebuilding
+        // header/rail offsets from constants.
+        const localBay = shellWindow.itemRect(terminalBay);
 
-        const stationY = Number(swayMonitor.y)
-            + Number(swayMonitor.height)
+        // A PanelWindow does not expose a compositor-global x/y on Wayland.
+        // WeatherStationW is explicitly anchored bottom+right, so reconstruct
+        // the panel origin from the actual runtime window size and ShellScreen
+        // geometry. ShellScreen x/y are already compositor layout coordinates.
+        const windowX = Number(screen.x)
+            + Number(screen.width)
+            - stationRightMargin
+            - Number(shellWindow.width);
+
+        const windowY = Number(screen.y)
+            + Number(screen.height)
             - stationBottomMargin
-            - stationHeight;
+            - Number(shellWindow.height);
 
         return assemblyTracker.rect(
-            stationX + stationRailWidth + bayX,
-            stationY + stationHeaderHeight + bayY,
-            bayWidth,
-            bayHeight
+            windowX + Number(localBay.x),
+            windowY + Number(localBay.y),
+            Number(localBay.width),
+            Number(localBay.height)
         );
     }
 
@@ -213,10 +215,8 @@ Rectangle {
 
         const bay = currentBayRect();
 
-        if (!bay) {
-            terminalState = "SYNC ERROR";
+        if (!bay)
             return;
-        }
 
         if (!force
                 && bay.x === lastX

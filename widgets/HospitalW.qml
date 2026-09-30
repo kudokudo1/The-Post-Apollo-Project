@@ -326,6 +326,15 @@ PanelWindow {
                     text: "CONTROL SURFACE // LOCAL PATIENT"
                     font.pixelSize: 10
                     color: Colors.cyan
+
+                    layer.enabled: true
+                    layer.effect: DropShadow {
+                        radius: 6
+                        samples: 7
+                        opacity: 0.40
+                        color: Colors.cyan
+                        transparentBorder: true
+                    }
                 }
 
                 Rectangle {
@@ -539,7 +548,7 @@ PanelWindow {
                                     const name = refs[i];
                                     const color = name.indexOf("origin/") === 0
                                         ? String(Colors.white)
-                                        : String(Colors.cyan);
+                                        : String(Colors.blue);
 
                                     pieces.push(
                                         "<font color=\"" + color + "\">"
@@ -799,6 +808,14 @@ PanelWindow {
                         MetaValue {
                             width: 500
                             text: patientService.branch
+
+                            layer.effect: DropShadow {
+                                radius: 7
+                                samples: 9
+                                opacity: 0.34
+                                color: Colors.white
+                                transparentBorder: true
+                            }
                         }
                     }
 
@@ -813,6 +830,14 @@ PanelWindow {
                         MetaValue {
                             width: 500
                             text: patientService.head + " // " + patientService.worktree
+
+                            layer.effect: DropShadow {
+                                radius: 7
+                                samples: 9
+                                opacity: 0.34
+                                color: Colors.white
+                                transparentBorder: true
+                            }
                         }
                     }
                 }

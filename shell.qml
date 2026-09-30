@@ -10,7 +10,6 @@ import "widgets"
 import "widgets/messanger"
 import "widgets/weather"
 import "widgets/notifications"
-import "widgets/hospital"
 
 import "services/weather"
 import "services/system"

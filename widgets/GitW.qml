@@ -196,7 +196,7 @@ PanelWindow {
             ? Colors.magenta
             : Colors.blue
 
-        opacity: 1.0
+        opacity: enabledAction ? 1.0 : 0.35
 
         Behavior on scale {
             NumberAnimation {
@@ -308,7 +308,7 @@ PanelWindow {
         anchors.fill: chassisGeometry
         spread: 6
         z: -20
-        opacity: root.menuOpen ? 0.26 : 0.0
+        opacity: root.menuOpen ? 0.18 : 0.0
         color: Colors.orange
     }
 
@@ -316,59 +316,7 @@ PanelWindow {
         anchors.fill: chassisGeometry
         spread: 12
         z: -21
-        opacity: root.menuOpen ? 0.07 : 0.0
-        color: Colors.orange
-    }
-
-    Rectangle {
-        id: frameGlowSource
-
-        width: root.panelWidth
-        height: root.panelHeight
-        anchors.top: parent.top
-        anchors.topMargin: root.topGlowGutter
-        anchors.horizontalCenter: parent.horizontalCenter
-
-        color: "transparent"
-        border.width: 1
-        border.color: Colors.orange
-
-        opacity: root.menuOpen ? 1.0 : 0.0
-
-        z: 2
-    }
-
-    DropShadow {
-        anchors.fill: frameGlowSource
-        source: frameGlowSource
-
-        horizontalOffset: 0
-        verticalOffset: 0
-
-        radius: 14
-        samples: 17
-
-        color: Colors.orange
-        opacity: root.menuOpen ? 0.96 : 0.0
-
-        z: 3
-
-        transparentBorder: true
-    }
-
-    RectangularShadow {
-        anchors.fill: frameGlowSource
-        spread: 8
-        z: -2
-        opacity: root.menuOpen ? 0.62 : 0.0
-        color: Colors.orange
-    }
-
-    RectangularShadow {
-        anchors.fill: frameGlowSource
-        spread: 18
-        z: -3
-        opacity: root.menuOpen ? 0.22 : 0.0
+        opacity: root.menuOpen ? 0.04 : 0.0
         color: Colors.orange
     }
 
@@ -383,7 +331,7 @@ PanelWindow {
         color: Colors.black
         opacity: root.menuOpen ? 0.97 : 0.0
 
-        border.width: 2
+        border.width: 1
         border.color: Colors.orange
 
         Rectangle {

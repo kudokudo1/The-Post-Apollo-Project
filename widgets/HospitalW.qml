@@ -548,7 +548,7 @@ PanelWindow {
                                     const name = refs[i];
                                     const color = name.indexOf("origin/") === 0
                                         ? String(Colors.white)
-                                        : String(Colors.blue);
+                                        : String(Colors.cyan);
 
                                     pieces.push(
                                         "<font color=\"" + color + "\">"
@@ -570,7 +570,13 @@ PanelWindow {
                                         result += "<font color=\"" + String(Colors.white) + "\">//  </font>";
 
                                     result += "<font color=\""
-                                        + String(headRow ? Colors.yellow : Colors.white)
+                                        + String(
+                                            headRow
+                                            ? Colors.yellow
+                                            : refs.length > 0
+                                            ? Colors.cyan
+                                            : Colors.blue
+                                        )
                                         + "\">"
                                         + escapeStyled(subject)
                                         + "</font>";
@@ -813,7 +819,7 @@ PanelWindow {
                                 radius: 7
                                 samples: 9
                                 opacity: 0.34
-                                color: Colors.white
+                                color: Colors.cyan
                                 transparentBorder: true
                             }
                         }

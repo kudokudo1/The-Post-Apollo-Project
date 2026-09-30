@@ -10,6 +10,7 @@ import "widgets"
 import "widgets/messanger"
 import "widgets/weather"
 import "widgets/notifications"
+import "widgets/hospital"
 
 import "services/weather"
 import "services/system"
@@ -167,7 +168,28 @@ PanelWindow {
 
         // Hospital
 
-        Hospital {}
+        Item {
+            width: hospitalButton.implicitWidth
+            height: hospitalButton.implicitHeight
+
+            Hospital {
+                id: hospitalButton
+
+                anchors.fill: parent
+
+                menuOpen: hospitalWindow.menuOpen
+
+                onToggleRequested: {
+                    hospitalWindow.toggle();
+                }
+            }
+
+            HospitalW {
+                id: hospitalWindow
+
+                screen: Quickshell.screens.find(s => s.name === "DP-5")
+            }
+        }
     }
 
     // ===== CENTER MODULE ========================================

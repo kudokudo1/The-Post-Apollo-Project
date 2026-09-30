@@ -136,8 +136,8 @@ PanelWindow {
         layer.enabled: true
         layer.effect: DropShadow {
             radius: 5
-            samples: 5
-            opacity: 0.38
+            samples: 7
+            opacity: 0.10
             color: Colors.cyan
             transparentBorder: true
         }
@@ -215,17 +215,14 @@ PanelWindow {
 
             layer.enabled: !actionButton.pressed
             layer.effect: DropShadow {
-                radius:
-                    actionButton.hovered
-                    ? 8
-                    : actionButton.selectedAction
-                    ? 7
-                    : 5
-                samples: 7
+                radius: 14
+                samples: 15
                 opacity:
-                    actionButton.hovered || actionButton.selectedAction
-                    ? 0.82
-                    : 0.52
+                    actionButton.hovered
+                    ? 0.80
+                    : actionButton.selectedAction
+                    ? 0.80
+                    : 0.60
                 color:
                     actionButton.selectedAction
                     ? Colors.magenta
@@ -245,27 +242,19 @@ PanelWindow {
             onClicked: actionButton.triggered()
         }
 
-        // CPU++ grammar: structural orange glow stays invariant,
-        // only reach/intensity changes with state.
+        // Bar-module glow recipe: crisp 3px body halo + faint 10px halo.
         RectangularShadow {
             anchors.fill: parent
-            spread:
-                actionButton.hovered
-                ? 6
-                : actionButton.selectedAction
-                ? 4
-                : 2
+            spread: 3
             z: -1
             opacity:
                 actionButton.pressed
-                ? 0.78
+                ? 0.60
                 : actionButton.hovered
-                ? 0.70
+                ? 0.50
                 : actionButton.selectedAction
-                ? 0.62
-                : actionButton.enabledAction
-                ? 0.46
-                : 0.34
+                ? 0.50
+                : 0.40
             color:
                 actionButton.pressed
                 ? Colors.magenta
@@ -278,23 +267,16 @@ PanelWindow {
 
         RectangularShadow {
             anchors.fill: parent
-            spread:
-                actionButton.hovered
-                ? 16
-                : actionButton.selectedAction
-                ? 11
-                : 7
+            spread: 10
             z: -2
             opacity:
                 actionButton.pressed
-                ? 0.26
+                ? 0.12
                 : actionButton.hovered
-                ? 0.22
+                ? 0.09
                 : actionButton.selectedAction
-                ? 0.20
-                : actionButton.enabledAction
-                ? 0.16
-                : 0.12
+                ? 0.09
+                : 0.07
             color:
                 actionButton.pressed
                 ? Colors.magenta
@@ -306,42 +288,36 @@ PanelWindow {
         }
     }
 
-    // Background halo. Inset slightly so the drop shadow has room to
-    // render inside the always-mapped PanelWindow surface.
+    // Main chassis glow: exact AppControl / CPU++ structural recipe.
+    // The surface has a transparent gutter so the outer glow is not clipped.
     Rectangle {
-        id: backgroundGlowSource
+        id: chassisGeometry
 
         width: root.panelWidth
         height: root.panelHeight
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
 
-        color: Colors.black
-        opacity: root.menuOpen ? 0.92 : 0.0
-
-        z: -4
+        color: "transparent"
+        opacity: root.menuOpen ? 1.0 : 0.0
     }
 
-    DropShadow {
-        anchors.fill: backgroundGlowSource
-        source: backgroundGlowSource
-
-        horizontalOffset: 0
-        verticalOffset: 3
-
-        radius: 30
-        samples: 31
-
+    RectangularShadow {
+        anchors.fill: chassisGeometry
+        spread: 6
+        z: -20
+        opacity: root.menuOpen ? 0.38 : 0.0
         color: Colors.orange
-        opacity: root.menuOpen ? 0.42 : 0.0
-
-        z: -5
-
-        transparentBorder: true
     }
 
-    // Active outer frame glow. Kept inside the surface bounds so the
-    // menu can remain flush with the top edge.
+    RectangularShadow {
+        anchors.fill: chassisGeometry
+        spread: 12
+        z: -21
+        opacity: root.menuOpen ? 0.12 : 0.0
+        color: Colors.orange
+    }
+
     Rectangle {
         id: frameGlowSource
 
@@ -351,7 +327,7 @@ PanelWindow {
         anchors.horizontalCenter: parent.horizontalCenter
 
         color: "transparent"
-        border.width: 2
+        border.width: 1
         border.color: Colors.orange
 
         opacity: root.menuOpen ? 1.0 : 0.0
@@ -476,7 +452,7 @@ PanelWindow {
                         anchors.fill: parent
                         spread: 3
                         z: -1
-                        opacity: gitService.available ? 0.66 : 0.38
+                        opacity: gitService.available ? 0.50 : 0.30
                         color: gitService.available ? Colors.orange : Colors.red
                     }
 
@@ -513,9 +489,9 @@ PanelWindow {
 
                 RectangularShadow {
                     anchors.fill: parent
-                    spread: 5
+                    spread: 4
                     z: -1
-                    opacity: 0.44
+                    opacity: 0.22
                     color: Colors.orange
                 }
 
@@ -635,9 +611,9 @@ PanelWindow {
 
                 RectangularShadow {
                     anchors.fill: parent
-                    spread: 5
+                    spread: 4
                     z: -1
-                    opacity: 0.40
+                    opacity: 0.18
                     color: Colors.orange
                 }
 
@@ -687,9 +663,9 @@ PanelWindow {
 
                         layer.enabled: true
                         layer.effect: DropShadow {
-                            radius: 4
-                            samples: 5
-                            opacity: 0.34
+                            radius: 5
+                            samples: 7
+                            opacity: 0.10
                             color: Colors.cyan
                             transparentBorder: true
                         }
@@ -709,9 +685,9 @@ PanelWindow {
 
                 RectangularShadow {
                     anchors.fill: parent
-                    spread: 5
+                    spread: 3
                     z: -1
-                    opacity: 0.42
+                    opacity: 0.28
                     color: Colors.cyan
                 }
 
@@ -826,9 +802,9 @@ PanelWindow {
 
                 layer.enabled: true
                 layer.effect: DropShadow {
-                    radius: 6
+                    radius: 8
                     samples: 7
-                    opacity: 0.62
+                    opacity: 0.56
                     color: Colors.orange
                     transparentBorder: true
                 }

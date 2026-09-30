@@ -668,22 +668,19 @@ PanelWindow {
                                     readonly property bool selected:
                                         root.selectedCommitSha === String(sha || "")
 
-                                    Rectangle {
-                                        width: 18
-                                        height: 18
-                                        radius: 9
+                                    Item {
+                                        width: 22
+                                        height: 22
                                         x: topologyBody.nodeX(lane) - width / 2
                                         anchors.verticalCenter: parent.verticalCenter
-                                        color: "transparent"
-                                        border.width: topologyRow.selected ? 1 : 0
-                                        border.color: Colors.magenta
+                                        visible: topologyRow.selected
                                         z: 1
 
                                         RectangularShadow {
                                             anchors.fill: parent
-                                            spread: 2
+                                            spread: 4
                                             z: -1
-                                            opacity: topologyRow.selected ? 0.42 : 0.0
+                                            opacity: 0.52
                                             color: Colors.magenta
                                         }
                                     }

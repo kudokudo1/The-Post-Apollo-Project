@@ -304,6 +304,26 @@ TestCase {
         compare(fakeProcessControl.calls.length, 0);
     }
 
+    function test_protectedFrozenProcessCanAlwaysResume() {
+        const entry = {
+            pid: 7050,
+            comm: "sway",
+            user: "user",
+            state: "T",
+            args: "/usr/bin/sway"
+        };
+
+        compare(
+            processSafety.dangerActionUnlocked(entry, "freeze"),
+            false
+        );
+        compare(actionController.isFrozen(entry), true);
+        compare(actionController.requestToggleFreeze(entry), true);
+        compare(actionController.isFrozen(entry), false);
+        compare(fakeProcessControl.calls.length, 1);
+        compare(fakeProcessControl.calls[0].signalName, "-CONT");
+    }
+
     function test_failedResumePreservesOptimisticFrozenState() {
         const entry = {
             pid: 7100,

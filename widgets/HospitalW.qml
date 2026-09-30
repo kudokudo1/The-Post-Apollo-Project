@@ -177,7 +177,16 @@ PanelWindow {
 
             text: roomRow.team
             font.pixelSize: 12
-            color: Colors.magenta
+            color: Colors.orange
+
+            layer.enabled: true
+            layer.effect: DropShadow {
+                radius: 5
+                samples: 7
+                opacity: 0.34
+                color: Colors.orange
+                transparentBorder: true
+            }
         }
 
         GohuText {
@@ -190,7 +199,7 @@ PanelWindow {
             width: 440
             text: roomRow.responsibility
             font.pixelSize: 11
-            color: Colors.white
+            color: Colors.cyan
             elide: Text.ElideRight
 
             layer.enabled: true
@@ -513,6 +522,54 @@ PanelWindow {
                                 return 14 + Number(laneNumber || 0) * laneWidth;
                             }
 
+                            function escapeStyled(value) {
+                                return String(value || "")
+                                    .replace(/&/g, "&amp;")
+                                    .replace(/</g, "&lt;")
+                                    .replace(/>/g, "&gt;");
+                            }
+
+                            function graphMetadataMarkup(refValue, subjectValue, headRow) {
+                                const refs = String(refValue || "")
+                                    .split(" • ")
+                                    .filter(function(name) { return name.length > 0; });
+                                const pieces = [];
+
+                                for (let i = 0; i < refs.length; ++i) {
+                                    const name = refs[i];
+                                    const color = name.indexOf("origin/") === 0
+                                        ? String(Colors.white)
+                                        : String(Colors.cyan);
+
+                                    pieces.push(
+                                        "<font color=\"" + color + "\">"
+                                        + escapeStyled(name)
+                                        + "</font>"
+                                    );
+                                }
+
+                                let result = pieces.join(
+                                    "<font color=\"" + String(Colors.white) + "\"> • </font>"
+                                );
+
+                                const subject = String(subjectValue || "");
+
+                                if (subject) {
+                                    if (result)
+                                        result += "<font color=\"" + String(Colors.white) + "\">  //  </font>";
+                                    else
+                                        result += "<font color=\"" + String(Colors.white) + "\">//  </font>";
+
+                                    result += "<font color=\""
+                                        + String(headRow ? Colors.yellow : Colors.white)
+                                        + "\">"
+                                        + escapeStyled(subject)
+                                        + "</font>";
+                                }
+
+                                return result;
+                            }
+
                             Canvas {
                                 id: graphCanvas
 
@@ -647,10 +704,10 @@ PanelWindow {
 
                                         GohuText {
                                             width: parent.width - implicitWidth - 4
-                                            text: (refsText ? refsText : "")
-                                                  + (subject ? (refsText ? "  //  " : "//  ") + subject : "")
+                                            text: topologyBody.graphMetadataMarkup(refsText, subject, isHead)
+                                            textFormat: Text.StyledText
                                             font.pixelSize: 9
-                                            color: isHead ? Colors.yellow : Colors.white
+                                            color: Colors.white
                                             elide: Text.ElideRight
 
                                             layer.enabled: true

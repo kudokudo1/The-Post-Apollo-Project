@@ -21,6 +21,11 @@ Rectangle {
     property int stationHeaderHeight: 62
     property int stationRailWidth: 160
 
+    // Global panel origin is owned by WeatherStationW, the actual PanelWindow.
+    property int stationGlobalX: 0
+    property int stationGlobalY: 0
+    property bool stationGeometryReady: false
+
     // Public bay geometry expected by WeatherStationW's input mask.
     readonly property int bayX: terminalBay.x
     readonly property int bayY: terminalBay.y
@@ -122,41 +127,22 @@ Rectangle {
     }
 
     function currentBayRect() {
-        const shellWindow = terminalView.QSWindow.window;
-        const screen = shellWindow ? shellWindow.screen : targetScreen;
-
-        if (!shellWindow || !screen) {
-            console.log("StationTerminal assembly: shell window/screen not ready");
+        if (!stationGeometryReady)
             return null;
-        }
 
-        // Ask Quickshell for the bay's position inside the *actual* panel
-        // window. This preserves the real runtime layout instead of rebuilding
-        // header/rail offsets from constants.
-        const localBay = shellWindow.itemRect(terminalBay);
-
-        // A PanelWindow does not expose a compositor-global x/y on Wayland.
-        // WeatherStationW is explicitly anchored bottom+right, so reconstruct
-        // the panel origin from the actual runtime window size and ShellScreen
-        // geometry. ShellScreen x/y are already compositor layout coordinates.
-        const windowX = Number(screen.x)
-            + Number(screen.width)
-            - stationRightMargin
-            - Number(shellWindow.width);
-
-        const windowY = Number(screen.y)
-            + Number(screen.height)
-            - stationBottomMargin
-            - Number(shellWindow.height);
-
+        // terminalView fills mainView. Its origin inside the station is:
+        //   X = mode rail width
+        //   Y = header height
+        //
+        // terminalBay then contributes bayX/bayY inside terminalView.
+        // No mapToGlobal(), QsWindow lookup, or guessed window size is needed.
         return assemblyTracker.rect(
-            windowX + Number(localBay.x),
-            windowY + Number(localBay.y),
-            Number(localBay.width),
-            Number(localBay.height)
+            stationGlobalX + stationRailWidth + bayX,
+            stationGlobalY + stationHeaderHeight + bayY,
+            bayWidth,
+            bayHeight
         );
     }
-
     function rectMatchesBay(rect) {
         if (!rect)
             return false;

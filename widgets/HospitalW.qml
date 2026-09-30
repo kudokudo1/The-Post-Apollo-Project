@@ -416,15 +416,57 @@ PanelWindow {
                             text: "PATIENT TOPOLOGY"
                         }
 
-                        MetaLabel {
+                        Row {
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
-                            text: patientService.refreshing
-                                  ? "READING GIT GRAPH"
-                                  : String(patientService.commitCount)
-                                    + " COMMITS // "
-                                    + String(patientService.branchCount)
-                                    + " REFS"
+                            spacing: 3
+
+                            MetaLabel {
+                                visible: patientService.refreshing
+                                text: "READING GIT GRAPH"
+                            }
+
+                            GohuText {
+                                visible: !patientService.refreshing
+                                text: String(patientService.commitCount)
+                                font.pixelSize: 10
+                                color: Colors.orange
+
+                                layer.enabled: true
+                                layer.effect: DropShadow {
+                                    radius: 5
+                                    samples: 7
+                                    opacity: 0.42
+                                    color: Colors.orange
+                                    transparentBorder: true
+                                }
+                            }
+
+                            MetaLabel {
+                                visible: !patientService.refreshing
+                                text: "COMMITS //"
+                            }
+
+                            GohuText {
+                                visible: !patientService.refreshing
+                                text: String(patientService.branchCount)
+                                font.pixelSize: 10
+                                color: Colors.orange
+
+                                layer.enabled: true
+                                layer.effect: DropShadow {
+                                    radius: 5
+                                    samples: 7
+                                    opacity: 0.42
+                                    color: Colors.orange
+                                    transparentBorder: true
+                                }
+                            }
+
+                            MetaLabel {
+                                visible: !patientService.refreshing
+                                text: "REFS"
+                            }
                         }
                     }
 
@@ -454,9 +496,9 @@ PanelWindow {
                                 const lane = Number(laneNumber || 0) % 6;
 
                                 if (lane === 0)
-                                    return Colors.cyan;
-                                if (lane === 1)
                                     return Colors.orange;
+                                if (lane === 1)
+                                    return Colors.cyan;
                                 if (lane === 2)
                                     return Colors.magenta;
                                 if (lane === 3)
@@ -659,6 +701,7 @@ PanelWindow {
                         MetaValue {
                             width: 500
                             text: patientService.repository
+                            color: Colors.orange
                         }
                     }
 

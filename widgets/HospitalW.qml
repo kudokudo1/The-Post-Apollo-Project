@@ -100,8 +100,8 @@ PanelWindow {
         layer.enabled: true
         layer.effect: DropShadow {
             radius: 5
-            samples: 5
-            opacity: 0.38
+            samples: 7
+            opacity: 0.10
             color: Colors.cyan
             transparentBorder: true
         }
@@ -123,9 +123,9 @@ PanelWindow {
 
         RectangularShadow {
             anchors.fill: parent
-            spread: 4
+            spread: 3
             z: -1
-            opacity: 0.38
+            opacity: 0.28
             color: Colors.magenta
         }
 
@@ -157,8 +157,8 @@ PanelWindow {
             layer.enabled: true
             layer.effect: DropShadow {
                 radius: 5
-                samples: 5
-                opacity: 0.38
+                samples: 7
+                opacity: 0.10
                 color: Colors.cyan
                 transparentBorder: true
             }
@@ -177,42 +177,36 @@ PanelWindow {
         }
     }
 
-    // Background halo. Inset slightly so the drop shadow has room to
-    // render inside the always-mapped PanelWindow surface.
+    // Main chassis glow: exact AppControl / CPU++ structural recipe.
+    // The surface has a transparent gutter so the outer glow is not clipped.
     Rectangle {
-        id: backgroundGlowSource
+        id: chassisGeometry
 
         width: root.panelWidth
         height: root.panelHeight
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
 
-        color: Colors.black
-        opacity: root.menuOpen ? 0.92 : 0.0
-
-        z: -4
+        color: "transparent"
+        opacity: root.menuOpen ? 1.0 : 0.0
     }
 
-    DropShadow {
-        anchors.fill: backgroundGlowSource
-        source: backgroundGlowSource
-
-        horizontalOffset: 0
-        verticalOffset: 3
-
-        radius: 30
-        samples: 31
-
+    RectangularShadow {
+        anchors.fill: chassisGeometry
+        spread: 6
+        z: -20
+        opacity: root.menuOpen ? 0.38 : 0.0
         color: Colors.magenta
-        opacity: root.menuOpen ? 0.42 : 0.0
-
-        z: -5
-
-        transparentBorder: true
     }
 
-    // Active outer frame glow. Kept inside the surface bounds so the
-    // menu can remain flush with the top edge.
+    RectangularShadow {
+        anchors.fill: chassisGeometry
+        spread: 12
+        z: -21
+        opacity: root.menuOpen ? 0.12 : 0.0
+        color: Colors.magenta
+    }
+
     Rectangle {
         id: frameGlowSource
 
@@ -222,7 +216,7 @@ PanelWindow {
         anchors.horizontalCenter: parent.horizontalCenter
 
         color: "transparent"
-        border.width: 2
+        border.width: 1
         border.color: Colors.magenta
 
         opacity: root.menuOpen ? 1.0 : 0.0
@@ -352,7 +346,7 @@ PanelWindow {
                         anchors.fill: parent
                         spread: 3
                         z: -1
-                        opacity: 0.58
+                        opacity: 0.38
                         color: Colors.magenta
                     }
 
@@ -391,9 +385,9 @@ PanelWindow {
 
                 RectangularShadow {
                     anchors.fill: parent
-                    spread: 5
+                    spread: 4
                     z: -1
-                    opacity: 0.44
+                    opacity: 0.22
                     color: Colors.magenta
                 }
 
@@ -488,9 +482,9 @@ PanelWindow {
 
                 RectangularShadow {
                     anchors.fill: parent
-                    spread: 5
+                    spread: 3
                     z: -1
-                    opacity: 0.42
+                    opacity: 0.28
                     color: Colors.cyan
                 }
 
@@ -534,9 +528,9 @@ PanelWindow {
 
                     layer.enabled: true
                     layer.effect: DropShadow {
-                        radius: 6
+                        radius: 8
                         samples: 7
-                        opacity: 0.62
+                        opacity: 0.56
                         color: Colors.magenta
                         transparentBorder: true
                     }

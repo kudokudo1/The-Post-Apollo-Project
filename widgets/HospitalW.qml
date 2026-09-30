@@ -11,6 +11,12 @@ PanelWindow {
     id: root
 
     property bool menuOpen: false
+    property string selectedCommitSha: ""
+
+    function toggleCommitSelection(sha) {
+        const candidate = String(sha || "");
+        selectedCommitSha = selectedCommitSha === candidate ? "" : candidate;
+    }
 
     property int panelWidth: 700
     property int panelHeight: 875
@@ -431,7 +437,10 @@ PanelWindow {
                         SectionLabel {
                             anchors.left: parent.left
                             anchors.verticalCenter: parent.verticalCenter
-                            text: "PATIENT TOPOLOGY"
+                            text: root.selectedCommitSha
+                                  ? "PATIENT TOPOLOGY // SELECTED "
+                                    + root.selectedCommitSha.slice(0, 8)
+                                  : "PATIENT TOPOLOGY"
                         }
 
                         Row {
@@ -650,9 +659,34 @@ PanelWindow {
                                 model: patientService.topologyModel
 
                                 delegate: Item {
+                                    id: topologyRow
+
                                     width: topologyBody.width
                                     height: topologyBody.rowHeight
                                     y: index * topologyBody.rowHeight
+
+                                    readonly property bool selected:
+                                        root.selectedCommitSha === String(sha || "")
+
+                                    Rectangle {
+                                        width: 18
+                                        height: 18
+                                        radius: 9
+                                        x: topologyBody.nodeX(lane) - width / 2
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        color: "transparent"
+                                        border.width: topologyRow.selected ? 1 : 0
+                                        border.color: Colors.magenta
+                                        z: 1
+
+                                        RectangularShadow {
+                                            anchors.fill: parent
+                                            spread: 2
+                                            z: -1
+                                            opacity: topologyRow.selected ? 0.42 : 0.0
+                                            color: Colors.magenta
+                                        }
+                                    }
 
                                     Rectangle {
                                         width: isHead || String(refsText || "").length > 0 ? 10 : 8
@@ -735,6 +769,19 @@ PanelWindow {
                                             }
                                         }
                                     }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        z: 20
+                                        acceptedButtons: Qt.LeftButton
+                                        hoverEnabled: true
+                                        preventStealing: false
+                                        cursorShape: Qt.PointingHandCursor
+
+                                        onClicked: {
+                                            root.toggleCommitSelection(sha);
+                                        }
+                                    }
                                 }
                             }
 
@@ -743,6 +790,10 @@ PanelWindow {
 
                                 function onTopologyRevisionChanged() {
                                     graphCanvas.requestPaint();
+
+                                    if (root.selectedCommitSha
+                                            && patientService.indexOfSha(root.selectedCommitSha) < 0)
+                                        root.selectedCommitSha = "";
                                 }
                             }
                         }
@@ -937,7 +988,7 @@ PanelWindow {
                                 radius: 7
                                 samples: 9
                                 opacity: 0.34
-                                color: Colors.white
+                                color: Colors.cyan
                                 transparentBorder: true
                             }
                         }
@@ -991,10 +1042,35 @@ PanelWindow {
                     spacing: 22
 
                     GohuText {
-                        text: "REFRESH"
+                        id: refreshAction
+
+                        text: patientService.refreshing ? "READING" : "REFRESH"
                         font.pixelSize: 10
-                        color: Colors.cyan
-                        opacity: 0.45
+                        color: refreshMouse.containsMouse ? Colors.orange : Colors.cyan
+                        opacity: patientService.refreshing ? 0.55 : 1.0
+
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 7
+                            opacity: refreshMouse.containsMouse ? 0.52 : 0.28
+                            color: refreshAction.color
+                            transparentBorder: true
+                        }
+
+                        MouseArea {
+                            id: refreshMouse
+                            anchors.fill: parent
+                            anchors.margins: -8
+                            hoverEnabled: true
+                            enabled: !patientService.refreshing
+                            cursorShape: Qt.PointingHandCursor
+
+                            onClicked: {
+                                hospitalGitService.refresh();
+                                patientService.refresh();
+                            }
+                        }
                     }
 
                     GohuText {

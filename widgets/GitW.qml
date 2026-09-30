@@ -99,12 +99,30 @@ PanelWindow {
 
     component SectionLabel: GohuText {
         font.pixelSize: 12
-        color: Colors.orange
+        color: Colors.magenta
+
+        layer.enabled: true
+        layer.effect: DropShadow {
+            radius: 6
+            samples: 7
+            opacity: 0.46
+            color: Colors.magenta
+            transparentBorder: true
+        }
     }
 
     component MetaLabel: GohuText {
         font.pixelSize: 10
         color: Colors.cyan
+
+        layer.enabled: true
+        layer.effect: DropShadow {
+            radius: 4
+            samples: 5
+            opacity: 0.28
+            color: Colors.cyan
+            transparentBorder: true
+        }
     }
 
     component MetaValue: GohuText {
@@ -118,27 +136,92 @@ PanelWindow {
 
         property string label: ""
         property bool enabledAction: false
+        property bool selectedAction: false
 
         signal triggered()
 
-        readonly property bool hovered: actionMouse.containsMouse
-        readonly property bool pressed: actionMouse.pressed
+        readonly property bool hovered:
+            enabledAction && actionMouse.containsMouse
+        readonly property bool pressed:
+            enabledAction && actionMouse.pressed
+
+        readonly property color contentColor:
+            !enabledAction
+            ? Colors.cyan
+            : pressed
+            ? Colors.black
+            : selectedAction
+            ? Colors.magenta
+            : hovered
+            ? Colors.orange
+            : Colors.cyan
 
         width: 112
         height: 36
 
-        color: pressed ? Colors.magenta : hovered && enabledAction ? Colors.yellow : Colors.dark
+        scale:
+            pressed
+            ? 0.99
+            : hovered
+            ? 1.025
+            : selectedAction
+            ? 1.01
+            : 1.0
+
+        color:
+            pressed
+            ? Colors.magenta
+            : hovered || selectedAction
+            ? Colors.yellow
+            : Colors.black
+
         border.width: 1
-        border.color: enabledAction ? (pressed ? Colors.magenta : hovered ? Colors.yellow : Colors.orange) : Colors.cyan
-        opacity: enabledAction ? 1.0 : 0.35
+        border.color:
+            !enabledAction
+            ? Colors.cyan
+            : hovered || pressed || selectedAction
+            ? Colors.orange
+            : Colors.cyan
+
+        opacity: enabledAction ? 1.0 : 0.32
+
+        Behavior on scale {
+            NumberAnimation {
+                duration: 90
+                easing.type: Easing.OutQuad
+            }
+        }
 
         GohuText {
+            id: actionText
+
             anchors.centerIn: parent
+
             text: actionButton.label
             font.pixelSize: 10
-            color: actionButton.enabledAction
-                   ? (actionButton.pressed ? Colors.black : Colors.orange)
-                   : Colors.cyan
+            color: actionButton.contentColor
+
+            layer.enabled: actionButton.enabledAction && !actionButton.pressed
+            layer.effect: DropShadow {
+                radius:
+                    actionButton.hovered
+                    ? 8
+                    : actionButton.selectedAction
+                    ? 7
+                    : 5
+                samples: 7
+                opacity:
+                    actionButton.hovered || actionButton.selectedAction
+                    ? 0.72
+                    : 0.34
+                color:
+                    actionButton.selectedAction
+                    ? Colors.magenta
+                    : actionButton.hovered
+                    ? Colors.orange
+                    : Colors.cyan
+                transparentBorder: true
+            }
         }
 
         MouseArea {
@@ -148,6 +231,52 @@ PanelWindow {
             enabled: actionButton.enabledAction
 
             onClicked: actionButton.triggered()
+        }
+
+        // CPU++ grammar: structural orange glow stays invariant,
+        // only reach/intensity changes with state.
+        RectangularShadow {
+            anchors.fill: parent
+            spread:
+                actionButton.hovered
+                ? 6
+                : actionButton.selectedAction
+                ? 4
+                : 2
+            z: -1
+            opacity:
+                !actionButton.enabledAction
+                ? 0.0
+                : actionButton.pressed
+                ? 0.62
+                : actionButton.hovered
+                ? 0.56
+                : actionButton.selectedAction
+                ? 0.46
+                : 0.10
+            color: Colors.orange
+        }
+
+        RectangularShadow {
+            anchors.fill: parent
+            spread:
+                actionButton.hovered
+                ? 16
+                : actionButton.selectedAction
+                ? 11
+                : 7
+            z: -2
+            opacity:
+                !actionButton.enabledAction
+                ? 0.0
+                : actionButton.pressed
+                ? 0.16
+                : actionButton.hovered
+                ? 0.14
+                : actionButton.selectedAction
+                ? 0.11
+                : 0.035
+            color: Colors.orange
         }
     }
 
@@ -217,6 +346,22 @@ PanelWindow {
         transparentBorder: true
     }
 
+    RectangularShadow {
+        anchors.fill: frameGlowSource
+        spread: 6
+        z: -2
+        opacity: root.menuOpen ? 0.38 : 0.0
+        color: Colors.orange
+    }
+
+    RectangularShadow {
+        anchors.fill: frameGlowSource
+        spread: 12
+        z: -3
+        opacity: root.menuOpen ? 0.12 : 0.0
+        color: Colors.orange
+    }
+
     Rectangle {
         id: frame
         anchors.fill: parent
@@ -257,7 +402,16 @@ PanelWindow {
 
                     text: "GIT // LOCAL REPOSITORY"
                     font.pixelSize: 20
-                    color: Colors.orange
+                    color: Colors.magenta
+
+                    layer.enabled: true
+                    layer.effect: DropShadow {
+                        radius: 8
+                        samples: 9
+                        opacity: 0.52
+                        color: Colors.magenta
+                        transparentBorder: true
+                    }
                 }
 
                 GohuText {
@@ -284,6 +438,14 @@ PanelWindow {
                     border.width: 1
                     border.color: Colors.orange
 
+                    RectangularShadow {
+                        anchors.fill: parent
+                        spread: 3
+                        z: -1
+                        opacity: gitService.available ? 0.42 : 0.18
+                        color: gitService.available ? Colors.orange : Colors.red
+                    }
+
                     GohuText {
                         anchors.centerIn: parent
                         text: gitService.refreshing ? "READING" : gitService.available ? "LOCAL LIVE" : "OFFLINE"
@@ -296,7 +458,15 @@ PanelWindow {
             Rectangle {
                 width: parent.width
                 height: 2
-                color: Colors.orange
+                color: Colors.cyan
+
+                RectangularShadow {
+                    anchors.fill: parent
+                    spread: 3
+                    z: -1
+                    opacity: 0.34
+                    color: Colors.cyan
+                }
             }
 
             Rectangle {
@@ -306,6 +476,14 @@ PanelWindow {
                 color: Colors.dark
                 border.width: 1
                 border.color: Colors.orange
+
+                RectangularShadow {
+                    anchors.fill: parent
+                    spread: 4
+                    z: -1
+                    opacity: 0.22
+                    color: Colors.orange
+                }
 
                 Column {
                     anchors {
@@ -388,18 +566,21 @@ PanelWindow {
                 ActionButton {
                     label: "STATUS"
                     enabledAction: !gitService.actionBusy
+                    selectedAction: gitService.actionTitle === "STATUS"
                     onTriggered: gitService.runReadAction("status")
                 }
 
                 ActionButton {
                     label: "DIFF"
                     enabledAction: !gitService.actionBusy
+                    selectedAction: gitService.actionTitle === "DIFF"
                     onTriggered: gitService.runReadAction("diff")
                 }
 
                 ActionButton {
                     label: "LOG"
                     enabledAction: !gitService.actionBusy
+                    selectedAction: gitService.actionTitle === "LOG"
                     onTriggered: gitService.runReadAction("log")
                 }
 
@@ -417,6 +598,14 @@ PanelWindow {
                 color: Colors.dark
                 border.width: 1
                 border.color: Colors.orange
+
+                RectangularShadow {
+                    anchors.fill: parent
+                    spread: 4
+                    z: -1
+                    opacity: 0.18
+                    color: Colors.orange
+                }
 
                 GohuText {
                     anchors {
@@ -474,6 +663,14 @@ PanelWindow {
                 color: Colors.dark
                 border.width: 1
                 border.color: Colors.cyan
+
+                RectangularShadow {
+                    anchors.fill: parent
+                    spread: 3
+                    z: -1
+                    opacity: 0.22
+                    color: Colors.cyan
+                }
 
                 Column {
                     anchors {
@@ -568,6 +765,7 @@ PanelWindow {
                 ActionButton {
                     label: "GH REFRESH"
                     enabledAction: !githubService.refreshing
+                    selectedAction: githubService.refreshing
                     onTriggered: githubService.refresh()
                 }
             }

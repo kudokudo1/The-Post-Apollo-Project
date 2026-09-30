@@ -15,9 +15,12 @@ PanelWindow {
     property int panelTopMargin: 0
     property int panelLeftMargin: 50
     property int frameInset: 8
+    property int glowGutter: 14
 
-    implicitWidth: panelWidth
-    implicitHeight: panelHeight
+    // The visible menu keeps its original size/position. The transparent
+    // surface is larger only so the chassis shadow has pixels to render into.
+    implicitWidth: panelWidth + glowGutter * 2
+    implicitHeight: panelHeight + glowGutter
 
     anchors {
         top: true
@@ -28,7 +31,7 @@ PanelWindow {
 
     margins {
         top: panelTopMargin
-        left: panelLeftMargin
+        left: panelLeftMargin - glowGutter
         right: 0
         bottom: 0
     }
@@ -93,6 +96,15 @@ PanelWindow {
         font.pixelSize: 11
         color: Colors.white
         elide: Text.ElideRight
+
+        layer.enabled: true
+        layer.effect: DropShadow {
+            radius: 5
+            samples: 5
+            opacity: 0.38
+            color: Colors.cyan
+            transparentBorder: true
+        }
     }
 
     component RoomRow: Rectangle {
@@ -111,9 +123,9 @@ PanelWindow {
 
         RectangularShadow {
             anchors.fill: parent
-            spread: 3
+            spread: 4
             z: -1
-            opacity: 0.18
+            opacity: 0.38
             color: Colors.magenta
         }
 
@@ -141,6 +153,15 @@ PanelWindow {
             font.pixelSize: 11
             color: Colors.white
             elide: Text.ElideRight
+
+            layer.enabled: true
+            layer.effect: DropShadow {
+                radius: 5
+                samples: 5
+                opacity: 0.38
+                color: Colors.cyan
+                transparentBorder: true
+            }
         }
 
         GohuText {
@@ -161,8 +182,10 @@ PanelWindow {
     Rectangle {
         id: backgroundGlowSource
 
-        anchors.fill: parent
-        anchors.margins: 8
+        width: root.panelWidth
+        height: root.panelHeight
+        anchors.top: parent.top
+        anchors.horizontalCenter: parent.horizontalCenter
 
         color: Colors.black
         opacity: root.menuOpen ? 0.92 : 0.0
@@ -193,7 +216,10 @@ PanelWindow {
     Rectangle {
         id: frameGlowSource
 
-        anchors.fill: parent
+        width: root.panelWidth
+        height: root.panelHeight
+        anchors.top: parent.top
+        anchors.horizontalCenter: parent.horizontalCenter
 
         color: "transparent"
         border.width: 2
@@ -211,11 +237,11 @@ PanelWindow {
         horizontalOffset: 0
         verticalOffset: 0
 
-        radius: 18
-        samples: 23
+        radius: 14
+        samples: 17
 
         color: Colors.magenta
-        opacity: root.menuOpen ? 0.76 : 0.0
+        opacity: root.menuOpen ? 0.96 : 0.0
 
         z: 3
 
@@ -224,24 +250,27 @@ PanelWindow {
 
     RectangularShadow {
         anchors.fill: frameGlowSource
-        spread: 6
+        spread: 8
         z: -2
-        opacity: root.menuOpen ? 0.38 : 0.0
+        opacity: root.menuOpen ? 0.62 : 0.0
         color: Colors.magenta
     }
 
     RectangularShadow {
         anchors.fill: frameGlowSource
-        spread: 12
+        spread: 18
         z: -3
-        opacity: root.menuOpen ? 0.12 : 0.0
+        opacity: root.menuOpen ? 0.22 : 0.0
         color: Colors.magenta
     }
 
     Rectangle {
         id: frame
 
-        anchors.fill: parent
+        width: root.panelWidth
+        height: root.panelHeight
+        anchors.top: parent.top
+        anchors.horizontalCenter: parent.horizontalCenter
 
         color: Colors.black
         opacity: root.menuOpen ? 0.97 : 0.0
@@ -323,7 +352,7 @@ PanelWindow {
                         anchors.fill: parent
                         spread: 3
                         z: -1
-                        opacity: 0.34
+                        opacity: 0.58
                         color: Colors.magenta
                     }
 
@@ -362,9 +391,9 @@ PanelWindow {
 
                 RectangularShadow {
                     anchors.fill: parent
-                    spread: 4
+                    spread: 5
                     z: -1
-                    opacity: 0.22
+                    opacity: 0.44
                     color: Colors.magenta
                 }
 
@@ -459,9 +488,9 @@ PanelWindow {
 
                 RectangularShadow {
                     anchors.fill: parent
-                    spread: 3
+                    spread: 5
                     z: -1
-                    opacity: 0.22
+                    opacity: 0.42
                     color: Colors.cyan
                 }
 
@@ -502,6 +531,15 @@ PanelWindow {
                     text: "ACTUATORS OFFLINE"
                     font.pixelSize: 8
                     color: Colors.magenta
+
+                    layer.enabled: true
+                    layer.effect: DropShadow {
+                        radius: 6
+                        samples: 7
+                        opacity: 0.62
+                        color: Colors.magenta
+                        transparentBorder: true
+                    }
                 }
             }
         }

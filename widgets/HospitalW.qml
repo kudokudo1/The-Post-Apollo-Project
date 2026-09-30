@@ -703,24 +703,24 @@ PanelWindow {
                                         layer.enabled: true
                                         layer.effect: DropShadow {
                                             radius: topologyRow.selected
-                                                    ? 10
+                                                    ? 12
                                                     : isHead
                                                     ? 7
                                                     : 5
                                             samples: topologyRow.selected
-                                                     ? 17
+                                                     ? 21
                                                      : isHead
                                                      ? 9
                                                      : 7
                                             opacity: topologyRow.selected
-                                                     ? 0.78
+                                                     ? 0.92
                                                      : isHead
                                                      ? 0.78
                                                      : topologyStar.refLandmark
                                                      ? 0.48
                                                      : 0.38
                                             color: topologyRow.selected
-                                                   ? Colors.yellow
+                                                   ? Colors.orange
                                                    : topologyStar.starColor
                                             transparentBorder: true
                                         }

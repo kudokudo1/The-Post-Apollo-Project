@@ -7,7 +7,7 @@ import Qt5Compat.GraphicalEffects
 Rectangle {
     id: dock
 
-    implicitWidth: Math.max(92, gitMark.implicitWidth + 18)
+    implicitWidth: Math.max(108, gitMark.implicitWidth + 18)
     implicitHeight: 50
 
     color: dock.menuOpen ? Colors.yellow : Colors.black
@@ -21,21 +21,39 @@ Rectangle {
         id: markContainer
         anchors.fill: parent
 
-        Text {
+        Row {
             id: gitMark
 
             anchors.centerIn: parent
+            spacing: 5
 
-            text: "≽(•⩊•マ≼"
-            font.pixelSize: 16
+            GohuText {
+                text: ""
+                font.pixelSize: 20
+                anchors.verticalCenter: parent.verticalCenter
 
-            color: dock.menuOpen
-                   ? Colors.orange
-                   : mouse.pressed
-                   ? Colors.magenta
-                   : mouse.containsMouse
-                   ? Colors.orange
-                   : Colors.white
+                color: dock.menuOpen
+                       ? Colors.orange
+                       : mouse.pressed
+                       ? Colors.magenta
+                       : mouse.containsMouse
+                       ? Colors.orange
+                       : Colors.white
+            }
+
+            GohuText {
+                text: "≽(•⩊•マ≼"
+                font.pixelSize: 16
+                anchors.verticalCenter: parent.verticalCenter
+
+                color: dock.menuOpen
+                       ? Colors.orange
+                       : mouse.pressed
+                       ? Colors.magenta
+                       : mouse.containsMouse
+                       ? Colors.orange
+                       : Colors.white
+            }
         }
 
         DropShadow {

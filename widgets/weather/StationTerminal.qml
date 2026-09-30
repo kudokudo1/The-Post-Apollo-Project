@@ -139,7 +139,7 @@ Rectangle {
     }
 
     function defineAssembly(sceneRect) {
-        assemblyTracker.defineScene(
+        assemblyDefined = assemblyTracker.defineScene(
             assemblySceneId,
             sceneRect,
             [
@@ -169,7 +169,10 @@ Rectangle {
             }
         );
 
-        assemblyDefined = true;
+        if (!assemblyDefined) {
+            terminalState = "SYNC ERROR";
+            console.log("StationTerminal assembly: bridge is not running");
+        }
     }
 
     function syncGeometry(force) {

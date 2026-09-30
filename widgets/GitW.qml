@@ -17,9 +17,12 @@ PanelWindow {
     property int panelTopMargin: 0
     property int panelLeftMargin: 600
     property int frameInset: 8
+    property int glowGutter: 14
 
-    implicitWidth: panelWidth
-    implicitHeight: panelHeight
+    // The visible menu keeps its original size/position. The transparent
+    // surface is larger only so the chassis shadow has pixels to render into.
+    implicitWidth: panelWidth + glowGutter * 2
+    implicitHeight: panelHeight + glowGutter
 
     anchors {
         top: true
@@ -30,7 +33,7 @@ PanelWindow {
 
     margins {
         top: panelTopMargin
-        left: panelLeftMargin
+        left: panelLeftMargin - glowGutter
         right: 0
         bottom: 0
     }
@@ -129,6 +132,15 @@ PanelWindow {
         font.pixelSize: 11
         color: Colors.white
         elide: Text.ElideRight
+
+        layer.enabled: true
+        layer.effect: DropShadow {
+            radius: 5
+            samples: 5
+            opacity: 0.38
+            color: Colors.cyan
+            transparentBorder: true
+        }
     }
 
     component ActionButton: Rectangle {
@@ -146,15 +158,13 @@ PanelWindow {
             enabledAction && actionMouse.pressed
 
         readonly property color contentColor:
-            !enabledAction
-            ? Colors.cyan
-            : pressed
+            pressed
             ? Colors.black
             : selectedAction
             ? Colors.magenta
             : hovered
             ? Colors.orange
-            : Colors.cyan
+            : Colors.white
 
         width: 112
         height: 36
@@ -177,13 +187,15 @@ PanelWindow {
 
         border.width: 1
         border.color:
-            !enabledAction
-            ? Colors.cyan
-            : hovered || pressed || selectedAction
+            pressed
+            ? Colors.magenta
+            : hovered
             ? Colors.orange
-            : Colors.cyan
+            : selectedAction
+            ? Colors.magenta
+            : Colors.blue
 
-        opacity: enabledAction ? 1.0 : 0.32
+        opacity: 1.0
 
         Behavior on scale {
             NumberAnimation {
@@ -201,7 +213,7 @@ PanelWindow {
             font.pixelSize: 10
             color: actionButton.contentColor
 
-            layer.enabled: actionButton.enabledAction && !actionButton.pressed
+            layer.enabled: !actionButton.pressed
             layer.effect: DropShadow {
                 radius:
                     actionButton.hovered
@@ -212,8 +224,8 @@ PanelWindow {
                 samples: 7
                 opacity:
                     actionButton.hovered || actionButton.selectedAction
-                    ? 0.72
-                    : 0.34
+                    ? 0.82
+                    : 0.52
                 color:
                     actionButton.selectedAction
                     ? Colors.magenta
@@ -245,16 +257,23 @@ PanelWindow {
                 : 2
             z: -1
             opacity:
-                !actionButton.enabledAction
-                ? 0.0
-                : actionButton.pressed
-                ? 0.62
+                actionButton.pressed
+                ? 0.78
                 : actionButton.hovered
-                ? 0.56
+                ? 0.70
                 : actionButton.selectedAction
+                ? 0.62
+                : actionButton.enabledAction
                 ? 0.46
-                : 0.10
-            color: Colors.orange
+                : 0.34
+            color:
+                actionButton.pressed
+                ? Colors.magenta
+                : actionButton.hovered
+                ? Colors.orange
+                : actionButton.selectedAction
+                ? Colors.magenta
+                : Colors.blue
         }
 
         RectangularShadow {
@@ -267,16 +286,23 @@ PanelWindow {
                 : 7
             z: -2
             opacity:
-                !actionButton.enabledAction
-                ? 0.0
-                : actionButton.pressed
-                ? 0.16
+                actionButton.pressed
+                ? 0.26
                 : actionButton.hovered
-                ? 0.14
+                ? 0.22
                 : actionButton.selectedAction
-                ? 0.11
-                : 0.035
-            color: Colors.orange
+                ? 0.20
+                : actionButton.enabledAction
+                ? 0.16
+                : 0.12
+            color:
+                actionButton.pressed
+                ? Colors.magenta
+                : actionButton.hovered
+                ? Colors.orange
+                : actionButton.selectedAction
+                ? Colors.magenta
+                : Colors.blue
         }
     }
 
@@ -285,8 +311,10 @@ PanelWindow {
     Rectangle {
         id: backgroundGlowSource
 
-        anchors.fill: parent
-        anchors.margins: 8
+        width: root.panelWidth
+        height: root.panelHeight
+        anchors.top: parent.top
+        anchors.horizontalCenter: parent.horizontalCenter
 
         color: Colors.black
         opacity: root.menuOpen ? 0.92 : 0.0
@@ -317,7 +345,10 @@ PanelWindow {
     Rectangle {
         id: frameGlowSource
 
-        anchors.fill: parent
+        width: root.panelWidth
+        height: root.panelHeight
+        anchors.top: parent.top
+        anchors.horizontalCenter: parent.horizontalCenter
 
         color: "transparent"
         border.width: 2
@@ -335,11 +366,11 @@ PanelWindow {
         horizontalOffset: 0
         verticalOffset: 0
 
-        radius: 18
-        samples: 23
+        radius: 14
+        samples: 17
 
         color: Colors.orange
-        opacity: root.menuOpen ? 0.76 : 0.0
+        opacity: root.menuOpen ? 0.96 : 0.0
 
         z: 3
 
@@ -348,23 +379,26 @@ PanelWindow {
 
     RectangularShadow {
         anchors.fill: frameGlowSource
-        spread: 6
+        spread: 8
         z: -2
-        opacity: root.menuOpen ? 0.38 : 0.0
+        opacity: root.menuOpen ? 0.62 : 0.0
         color: Colors.orange
     }
 
     RectangularShadow {
         anchors.fill: frameGlowSource
-        spread: 12
+        spread: 18
         z: -3
-        opacity: root.menuOpen ? 0.12 : 0.0
+        opacity: root.menuOpen ? 0.22 : 0.0
         color: Colors.orange
     }
 
     Rectangle {
         id: frame
-        anchors.fill: parent
+        width: root.panelWidth
+        height: root.panelHeight
+        anchors.top: parent.top
+        anchors.horizontalCenter: parent.horizontalCenter
 
         color: Colors.black
         opacity: root.menuOpen ? 0.97 : 0.0
@@ -442,7 +476,7 @@ PanelWindow {
                         anchors.fill: parent
                         spread: 3
                         z: -1
-                        opacity: gitService.available ? 0.42 : 0.18
+                        opacity: gitService.available ? 0.66 : 0.38
                         color: gitService.available ? Colors.orange : Colors.red
                     }
 
@@ -479,9 +513,9 @@ PanelWindow {
 
                 RectangularShadow {
                     anchors.fill: parent
-                    spread: 4
+                    spread: 5
                     z: -1
-                    opacity: 0.22
+                    opacity: 0.44
                     color: Colors.orange
                 }
 
@@ -601,9 +635,9 @@ PanelWindow {
 
                 RectangularShadow {
                     anchors.fill: parent
-                    spread: 4
+                    spread: 5
                     z: -1
-                    opacity: 0.18
+                    opacity: 0.40
                     color: Colors.orange
                 }
 
@@ -651,6 +685,15 @@ PanelWindow {
                         font.pixelSize: 9
                         color: Colors.white
 
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 4
+                            samples: 5
+                            opacity: 0.34
+                            color: Colors.cyan
+                            transparentBorder: true
+                        }
+
                         wrapMode: Text.WrapAnywhere
                     }
                 }
@@ -666,9 +709,9 @@ PanelWindow {
 
                 RectangularShadow {
                     anchors.fill: parent
-                    spread: 3
+                    spread: 5
                     z: -1
-                    opacity: 0.22
+                    opacity: 0.42
                     color: Colors.cyan
                 }
 
@@ -780,6 +823,15 @@ PanelWindow {
                 horizontalAlignment: Text.AlignRight
                 font.pixelSize: 8
                 color: Colors.orange
+
+                layer.enabled: true
+                layer.effect: DropShadow {
+                    radius: 6
+                    samples: 7
+                    opacity: 0.62
+                    color: Colors.orange
+                    transparentBorder: true
+                }
             }
         }
 

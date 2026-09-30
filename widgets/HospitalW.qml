@@ -482,7 +482,8 @@ PanelWindow {
                                 onPaint: {
                                     const ctx = getContext("2d");
 
-                                    ctx.reset();
+                                    ctx.globalAlpha = 1.0;
+                                    ctx.clearRect(0, 0, width, height);
                                     ctx.lineWidth = 1.35;
 
                                     for (let i = 0; i < patientService.commitCount; ++i) {

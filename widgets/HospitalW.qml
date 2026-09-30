@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import qs.components
+import "../services/git"
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 
@@ -63,6 +64,25 @@ PanelWindow {
 
     function toggle() {
         root.menuOpen = !root.menuOpen;
+    }
+
+    onMenuOpenChanged: {
+        if (root.menuOpen)
+            hospitalGitService.refresh();
+    }
+
+    Component.onCompleted: hospitalGitService.refresh()
+
+    GitService {
+        id: hospitalGitService
+    }
+
+    Timer {
+        interval: 3000
+        repeat: true
+        running: root.menuOpen
+
+        onTriggered: hospitalGitService.refresh()
     }
 
     component SectionLabel: GohuText {
@@ -197,7 +217,7 @@ PanelWindow {
         anchors.fill: chassisGeometry
         spread: 6
         z: -20
-        opacity: root.menuOpen ? 0.26 : 0.0
+        opacity: root.menuOpen ? 0.18 : 0.0
         color: Colors.magenta
     }
 
@@ -205,59 +225,7 @@ PanelWindow {
         anchors.fill: chassisGeometry
         spread: 12
         z: -21
-        opacity: root.menuOpen ? 0.07 : 0.0
-        color: Colors.magenta
-    }
-
-    Rectangle {
-        id: frameGlowSource
-
-        width: root.panelWidth
-        height: root.panelHeight
-        anchors.top: parent.top
-        anchors.topMargin: root.topGlowGutter
-        anchors.horizontalCenter: parent.horizontalCenter
-
-        color: "transparent"
-        border.width: 1
-        border.color: Colors.magenta
-
-        opacity: root.menuOpen ? 1.0 : 0.0
-
-        z: 2
-    }
-
-    DropShadow {
-        anchors.fill: frameGlowSource
-        source: frameGlowSource
-
-        horizontalOffset: 0
-        verticalOffset: 0
-
-        radius: 14
-        samples: 17
-
-        color: Colors.magenta
-        opacity: root.menuOpen ? 0.96 : 0.0
-
-        z: 3
-
-        transparentBorder: true
-    }
-
-    RectangularShadow {
-        anchors.fill: frameGlowSource
-        spread: 8
-        z: -2
-        opacity: root.menuOpen ? 0.62 : 0.0
-        color: Colors.magenta
-    }
-
-    RectangularShadow {
-        anchors.fill: frameGlowSource
-        spread: 18
-        z: -3
-        opacity: root.menuOpen ? 0.22 : 0.0
+        opacity: root.menuOpen ? 0.04 : 0.0
         color: Colors.magenta
     }
 
@@ -273,7 +241,7 @@ PanelWindow {
         color: Colors.black
         opacity: root.menuOpen ? 0.97 : 0.0
 
-        border.width: 2
+        border.width: 1
         border.color: Colors.magenta
 
         Rectangle {
@@ -328,7 +296,7 @@ PanelWindow {
                         bottom: parent.bottom
                     }
 
-                    text: "CONTROL SURFACE // STATIC SHELL"
+                    text: "CONTROL SURFACE // LOCAL PATIENT"
                     font.pixelSize: 10
                     color: Colors.cyan
                 }
@@ -356,9 +324,13 @@ PanelWindow {
 
                     GohuText {
                         anchors.centerIn: parent
-                        text: "UNVERIFIED"
+                        text: hospitalGitService.refreshing
+                              ? "READING"
+                              : hospitalGitService.available
+                              ? "LOCAL LIVE"
+                              : "OFFLINE"
                         font.pixelSize: 9
-                        color: Colors.magenta
+                        color: hospitalGitService.available ? Colors.magenta : Colors.red
                     }
                 }
             }
@@ -417,7 +389,7 @@ PanelWindow {
 
                         MetaValue {
                             width: 330
-                            text: "taskbars-post-apollo"
+                            text: hospitalGitService.repository
                         }
                     }
 
@@ -426,12 +398,12 @@ PanelWindow {
 
                         MetaLabel {
                             width: 110
-                            text: "CERTIFIED HEAD"
+                            text: "BRANCH"
                         }
 
                         MetaValue {
                             width: 330
-                            text: "NOT CONNECTED"
+                            text: hospitalGitService.branch
                         }
                     }
 
@@ -440,12 +412,12 @@ PanelWindow {
 
                         MetaLabel {
                             width: 110
-                            text: "HOST SLOT"
+                            text: "LIVE HEAD"
                         }
 
                         MetaValue {
                             width: 330
-                            text: "NOT CONNECTED"
+                            text: hospitalGitService.head + " // " + hospitalGitService.worktree
                         }
                     }
                 }
@@ -526,7 +498,9 @@ PanelWindow {
                         bottomMargin: 5
                     }
 
-                    text: "ACTUATORS OFFLINE"
+                    text: hospitalGitService.available
+                          ? "LOCAL PATIENT LIVE // ACTUATORS OFFLINE"
+                          : "LOCAL PATIENT OFFLINE"
                     font.pixelSize: 8
                     color: Colors.magenta
 

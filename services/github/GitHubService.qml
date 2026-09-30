@@ -137,8 +137,11 @@ Scope {
     function parseWorkflows(payload) {
         const raw = String(payload || "").trim();
 
-        if (!raw)
-            throw new Error("EMPTY WORKFLOW RESPONSE");
+        if (!raw) {
+            workflowCount = 0;
+            latestWorkflow = "NO WORKFLOWS";
+            return;
+        }
 
         const rows = JSON.parse(raw);
 
@@ -154,8 +157,12 @@ Scope {
     function parseRuns(payload) {
         const raw = String(payload || "").trim();
 
-        if (!raw)
-            throw new Error("EMPTY RUN RESPONSE");
+        if (!raw) {
+            latestRunStatus = "NO RUNS";
+            latestRunConclusion = "";
+            latestRunBranch = "";
+            return;
+        }
 
         const rows = JSON.parse(raw);
 

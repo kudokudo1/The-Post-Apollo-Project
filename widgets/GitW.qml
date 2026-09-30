@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import qs.components
+import "../services/git"
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 
@@ -11,7 +12,7 @@ PanelWindow {
     property bool menuOpen: false
 
     property int panelWidth: 540
-    property int panelHeight: 470
+    property int panelHeight: 650
     property int panelTopMargin: 0
     property int panelLeftMargin: 600
     property int frameInset: 8
@@ -59,6 +60,25 @@ PanelWindow {
         root.menuOpen = !root.menuOpen;
     }
 
+    onMenuOpenChanged: {
+        if (root.menuOpen)
+            gitService.refresh();
+    }
+
+    Component.onCompleted: gitService.refresh()
+
+    GitService {
+        id: gitService
+    }
+
+    Timer {
+        interval: 3000
+        repeat: true
+        running: root.menuOpen
+
+        onTriggered: gitService.refresh()
+    }
+
     component SectionLabel: GohuText {
         font.pixelSize: 12
         color: Colors.orange
@@ -81,19 +101,35 @@ PanelWindow {
         property string label: ""
         property bool enabledAction: false
 
+        signal triggered()
+
+        readonly property bool hovered: actionMouse.containsMouse
+        readonly property bool pressed: actionMouse.pressed
+
         width: 112
         height: 36
 
-        color: Colors.dark
+        color: pressed ? Colors.magenta : hovered && enabledAction ? Colors.yellow : Colors.dark
         border.width: 1
-        border.color: enabledAction ? Colors.orange : Colors.cyan
-        opacity: enabledAction ? 1.0 : 0.45
+        border.color: enabledAction ? (pressed ? Colors.magenta : hovered ? Colors.yellow : Colors.orange) : Colors.cyan
+        opacity: enabledAction ? 1.0 : 0.35
 
         GohuText {
             anchors.centerIn: parent
             text: actionButton.label
             font.pixelSize: 10
-            color: actionButton.enabledAction ? Colors.orange : Colors.cyan
+            color: actionButton.enabledAction
+                   ? (actionButton.pressed ? Colors.black : Colors.orange)
+                   : Colors.cyan
+        }
+
+        MouseArea {
+            id: actionMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            enabled: actionButton.enabledAction
+
+            onClicked: actionButton.triggered()
         }
     }
 
@@ -180,7 +216,7 @@ PanelWindow {
                         bottom: parent.bottom
                     }
 
-                    text: "CONTROL SURFACE // STATIC SHELL"
+                    text: "CONTROL SURFACE // LOCAL GIT"
                     font.pixelSize: 10
                     color: Colors.cyan
                 }
@@ -200,9 +236,9 @@ PanelWindow {
 
                     GohuText {
                         anchors.centerIn: parent
-                        text: "NOT CONNECTED"
+                        text: gitService.refreshing ? "READING" : gitService.available ? "LOCAL LIVE" : "OFFLINE"
                         font.pixelSize: 8
-                        color: Colors.orange
+                        color: gitService.available ? Colors.orange : Colors.red
                     }
                 }
             }
@@ -243,7 +279,7 @@ PanelWindow {
 
                         MetaValue {
                             width: 365
-                            text: "NOT CONNECTED"
+                            text: gitService.repository
                         }
                     }
 
@@ -257,7 +293,7 @@ PanelWindow {
 
                         MetaValue {
                             width: 365
-                            text: "NOT CONNECTED"
+                            text: gitService.branch
                         }
                     }
 
@@ -271,7 +307,7 @@ PanelWindow {
 
                         MetaValue {
                             width: 365
-                            text: "NOT CONNECTED"
+                            text: gitService.head
                         }
                     }
 
@@ -285,7 +321,7 @@ PanelWindow {
 
                         MetaValue {
                             width: 365
-                            text: "NOT CONNECTED"
+                            text: gitService.worktree
                         }
                     }
                 }
@@ -299,10 +335,86 @@ PanelWindow {
                 width: parent.width
                 spacing: 10
 
-                ActionButton { label: "STATUS" }
-                ActionButton { label: "DIFF" }
-                ActionButton { label: "LOG" }
-                ActionButton { label: "LAZYGIT" }
+                ActionButton {
+                    label: "STATUS"
+                    enabledAction: !gitService.actionBusy
+                    onTriggered: gitService.runReadAction("status")
+                }
+
+                ActionButton {
+                    label: "DIFF"
+                    enabledAction: !gitService.actionBusy
+                    onTriggered: gitService.runReadAction("diff")
+                }
+
+                ActionButton {
+                    label: "LOG"
+                    enabledAction: !gitService.actionBusy
+                    onTriggered: gitService.runReadAction("log")
+                }
+
+                ActionButton {
+                    label: "LAZYGIT"
+                    enabledAction: true
+                    onTriggered: gitService.launchLazygit()
+                }
+            }
+
+            Rectangle {
+                width: parent.width
+                height: 112
+
+                color: Colors.dark
+                border.width: 1
+                border.color: Colors.orange
+
+                GohuText {
+                    anchors {
+                        top: parent.top
+                        left: parent.left
+                        right: parent.right
+                    }
+
+                    anchors.topMargin: 8
+                    anchors.leftMargin: 10
+                    anchors.rightMargin: 10
+
+                    text: gitService.actionBusy ? gitService.actionTitle + " // RUNNING" : gitService.actionTitle
+                    font.pixelSize: 10
+                    color: Colors.orange
+                }
+
+                Flickable {
+                    anchors {
+                        top: parent.top
+                        bottom: parent.bottom
+                        left: parent.left
+                        right: parent.right
+                    }
+
+                    anchors.topMargin: 27
+                    anchors.bottomMargin: 8
+                    anchors.leftMargin: 10
+                    anchors.rightMargin: 10
+
+                    clip: true
+                    contentWidth: width
+                    contentHeight: Math.max(height, outputText.implicitHeight)
+
+                    boundsBehavior: Flickable.StopAtBounds
+
+                    GohuText {
+                        id: outputText
+
+                        width: parent.width
+
+                        text: gitService.actionOutput
+                        font.pixelSize: 9
+                        color: Colors.white
+
+                        wrapMode: Text.WrapAnywhere
+                    }
+                }
             }
 
             Rectangle {
@@ -335,7 +447,7 @@ PanelWindow {
 
                         MetaValue {
                             width: 365
-                            text: "NOT CONNECTED"
+                            text: gitService.origin
                         }
                     }
 
@@ -366,7 +478,7 @@ PanelWindow {
 
             GohuText {
                 width: parent.width
-                text: "READERS OFFLINE // NO GIT COMMANDS EXECUTED"
+                text: gitService.lastError ? "LOCAL ERROR // " + gitService.lastError : "LOCAL READER ACTIVE // REMOTE WRITES LOCKED"
                 horizontalAlignment: Text.AlignRight
                 font.pixelSize: 8
                 color: Colors.orange

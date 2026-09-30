@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Quickshell.I3
 import "../../components"
 import "../../services/windowassembly"
 
@@ -20,6 +21,16 @@ Rectangle {
     property int stationBottomMargin: 90
     property int stationHeaderHeight: 62
     property int stationRailWidth: 160
+
+    // Public bay geometry expected by WeatherStationW's input mask.
+    readonly property int bayX: terminalBay.x
+    readonly property int bayY: terminalBay.y
+    readonly property int bayWidth: terminalBay.width
+    readonly property int bayHeight: terminalBay.height
+
+    // Use Sway's monitor coordinates as the global coordinate authority.
+    // This avoids relying on mapToGlobal() for a layer-shell surface.
+    readonly property var swayMonitor: targetScreen ? I3.monitorFor(targetScreen) : null
 
     property string terminalState: "IDLE"
     property string terminalAppId: "weather-screen"
@@ -116,13 +127,31 @@ Rectangle {
     }
 
     function currentBayRect() {
-        const point = terminalBay.mapToGlobal(0, 0);
+        if (!swayMonitor) {
+            console.log("StationTerminal assembly: no Sway monitor for target screen");
+            return null;
+        }
+
+        // WeatherStationW is anchored bottom/right on targetScreen.
+        // Reconstruct its compositor-global origin from the Sway monitor,
+        // then add the known internal layout offsets:
+        //
+        // station -> mode rail -> StationTerminal -> terminalBay.
+        const stationX = Number(swayMonitor.x)
+            + Number(swayMonitor.width)
+            - stationRightMargin
+            - stationWidth;
+
+        const stationY = Number(swayMonitor.y)
+            + Number(swayMonitor.height)
+            - stationBottomMargin
+            - stationHeight;
 
         return assemblyTracker.rect(
-            point.x,
-            point.y,
-            terminalBay.width,
-            terminalBay.height
+            stationX + stationRailWidth + bayX,
+            stationY + stationHeaderHeight + bayY,
+            bayWidth,
+            bayHeight
         );
     }
 
@@ -131,6 +160,9 @@ Rectangle {
             return false;
 
         const bay = currentBayRect();
+
+        if (!bay)
+            return false;
 
         return Math.round(Number(rect.x)) === bay.x
             && Math.round(Number(rect.y)) === bay.y
@@ -180,6 +212,11 @@ Rectangle {
             return;
 
         const bay = currentBayRect();
+
+        if (!bay) {
+            terminalState = "SYNC ERROR";
+            return;
+        }
 
         if (!force
                 && bay.x === lastX

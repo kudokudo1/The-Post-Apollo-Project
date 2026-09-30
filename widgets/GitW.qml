@@ -255,7 +255,7 @@ PanelWindow {
                 ? 0.50
                 : actionButton.selectedAction
                 ? 0.50
-                : 0.32
+                : 0.28
             color:
                 actionButton.pressed
                 ? Colors.magenta
@@ -277,7 +277,7 @@ PanelWindow {
                 ? 0.09
                 : actionButton.selectedAction
                 ? 0.09
-                : 0.05
+                : 0.04
             color:
                 actionButton.pressed
                 ? Colors.magenta
@@ -308,7 +308,7 @@ PanelWindow {
         anchors.fill: chassisGeometry
         spread: 6
         z: -20
-        opacity: root.menuOpen ? 0.18 : 0.0
+        opacity: root.menuOpen ? 0.21 : 0.0
         color: Colors.orange
     }
 
@@ -316,7 +316,7 @@ PanelWindow {
         anchors.fill: chassisGeometry
         spread: 12
         z: -21
-        opacity: root.menuOpen ? 0.04 : 0.0
+        opacity: root.menuOpen ? 0.05 : 0.0
         color: Colors.orange
     }
 
@@ -409,10 +409,21 @@ PanelWindow {
                     }
 
                     GohuText {
+                        id: gitLocalStatusText
+
                         anchors.centerIn: parent
                         text: gitService.refreshing ? "READING" : gitService.available ? "LOCAL LIVE" : "OFFLINE"
                         font.pixelSize: 8
                         color: gitService.available ? Colors.orange : Colors.red
+
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 10
+                            samples: 11
+                            opacity: gitService.available ? 0.82 : 0.44
+                            color: gitLocalStatusText.color
+                            transparentBorder: true
+                        }
                     }
                 }
             }
@@ -736,7 +747,6 @@ PanelWindow {
                 ActionButton {
                     label: "GH REFRESH"
                     enabledAction: !githubService.refreshing
-                    selectedAction: githubService.refreshing
                     onTriggered: githubService.refresh()
                 }
             }

@@ -217,7 +217,7 @@ PanelWindow {
         anchors.fill: chassisGeometry
         spread: 6
         z: -20
-        opacity: root.menuOpen ? 0.18 : 0.0
+        opacity: root.menuOpen ? 0.21 : 0.0
         color: Colors.magenta
     }
 
@@ -225,7 +225,7 @@ PanelWindow {
         anchors.fill: chassisGeometry
         spread: 12
         z: -21
-        opacity: root.menuOpen ? 0.04 : 0.0
+        opacity: root.menuOpen ? 0.05 : 0.0
         color: Colors.magenta
     }
 
@@ -323,6 +323,8 @@ PanelWindow {
                     }
 
                     GohuText {
+                        id: hospitalLocalStatusText
+
                         anchors.centerIn: parent
                         text: hospitalGitService.refreshing
                               ? "READING"
@@ -331,6 +333,15 @@ PanelWindow {
                               : "OFFLINE"
                         font.pixelSize: 9
                         color: hospitalGitService.available ? Colors.magenta : Colors.red
+
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 10
+                            samples: 11
+                            opacity: hospitalGitService.available ? 0.82 : 0.44
+                            color: hospitalLocalStatusText.color
+                            transparentBorder: true
+                        }
                     }
                 }
             }

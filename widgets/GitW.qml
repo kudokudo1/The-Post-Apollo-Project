@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Wayland
 import qs.components
 import "../services/git"
+import "../services/github"
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 
@@ -61,14 +62,23 @@ PanelWindow {
     }
 
     onMenuOpenChanged: {
-        if (root.menuOpen)
+        if (root.menuOpen) {
             gitService.refresh();
+            githubService.refresh();
+        }
     }
 
-    Component.onCompleted: gitService.refresh()
+    Component.onCompleted: {
+        gitService.refresh();
+    }
 
     GitService {
         id: gitService
+    }
+
+    GitHubService {
+        id: githubService
+        originUrl: gitService.origin
     }
 
     Timer {
@@ -77,6 +87,14 @@ PanelWindow {
         running: root.menuOpen
 
         onTriggered: gitService.refresh()
+    }
+
+    Timer {
+        interval: 15000
+        repeat: true
+        running: root.menuOpen
+
+        onTriggered: githubService.refresh()
     }
 
     component SectionLabel: GohuText {
@@ -131,6 +149,38 @@ PanelWindow {
 
             onClicked: actionButton.triggered()
         }
+    }
+
+    // Background halo. Inset slightly so the drop shadow has room to
+    // render inside the always-mapped PanelWindow surface.
+    Rectangle {
+        id: backgroundGlowSource
+
+        anchors.fill: parent
+        anchors.margins: 8
+
+        color: Colors.black
+        opacity: root.menuOpen ? 0.92 : 0.0
+
+        z: -4
+    }
+
+    DropShadow {
+        anchors.fill: backgroundGlowSource
+        source: backgroundGlowSource
+
+        horizontalOffset: 0
+        verticalOffset: 3
+
+        radius: 30
+        samples: 31
+
+        color: Colors.orange
+        opacity: root.menuOpen ? 0.42 : 0.0
+
+        z: -5
+
+        transparentBorder: true
     }
 
     // Active outer frame glow. Kept inside the surface bounds so the
@@ -251,7 +301,7 @@ PanelWindow {
 
             Rectangle {
                 width: parent.width
-                height: 154
+                height: 140
 
                 color: Colors.dark
                 border.width: 1
@@ -362,7 +412,7 @@ PanelWindow {
 
             Rectangle {
                 width: parent.width
-                height: 112
+                height: 90
 
                 color: Colors.dark
                 border.width: 1
@@ -419,7 +469,7 @@ PanelWindow {
 
             Rectangle {
                 width: parent.width
-                height: 88
+                height: 118
 
                 color: Colors.dark
                 border.width: 1
@@ -431,10 +481,10 @@ PanelWindow {
                         margins: 12
                     }
 
-                    spacing: 8
+                    spacing: 7
 
                     SectionLabel {
-                        text: "REMOTE"
+                        text: "REMOTE // GITHUB"
                     }
 
                     Row {
@@ -456,12 +506,52 @@ PanelWindow {
 
                         MetaLabel {
                             width: 100
-                            text: "NETWORK"
+                            text: "GITHUB"
                         }
 
                         MetaValue {
                             width: 365
-                            text: "NOT REQUESTED"
+                            text: githubService.refreshing
+                                  ? "READING"
+                                  : githubService.available
+                                  ? "LIVE // " + githubService.repoSlug
+                                  : githubService.lastError
+                                  ? githubService.lastError
+                                  : "NOT REQUESTED"
+                        }
+                    }
+
+                    Row {
+                        spacing: 10
+
+                        MetaLabel {
+                            width: 100
+                            text: "WORKFLOWS"
+                        }
+
+                        MetaValue {
+                            width: 365
+                            text: githubService.available
+                                  ? String(githubService.workflowCount) + " // " + githubService.latestWorkflow
+                                  : "NOT CONNECTED"
+                        }
+                    }
+
+                    Row {
+                        spacing: 10
+
+                        MetaLabel {
+                            width: 100
+                            text: "LATEST RUN"
+                        }
+
+                        MetaValue {
+                            width: 365
+                            text: githubService.available
+                                  ? githubService.latestRunStatus
+                                    + (githubService.latestRunConclusion ? " // " + githubService.latestRunConclusion : "")
+                                    + (githubService.latestRunBranch ? " // " + githubService.latestRunBranch : "")
+                                  : "NOT CONNECTED"
                         }
                     }
                 }
@@ -474,11 +564,21 @@ PanelWindow {
                 ActionButton { label: "FETCH" }
                 ActionButton { label: "PULL" }
                 ActionButton { label: "PUSH" }
+
+                ActionButton {
+                    label: "GH REFRESH"
+                    enabledAction: !githubService.refreshing
+                    onTriggered: githubService.refresh()
+                }
             }
 
             GohuText {
                 width: parent.width
-                text: gitService.lastError ? "LOCAL ERROR // " + gitService.lastError : "LOCAL READER ACTIVE // REMOTE WRITES LOCKED"
+                text: gitService.lastError
+                      ? "LOCAL ERROR // " + gitService.lastError
+                      : githubService.lastError
+                      ? "GITHUB // " + githubService.lastError
+                      : "LOCAL + GITHUB READERS ACTIVE // REMOTE WRITES LOCKED"
                 horizontalAlignment: Text.AlignRight
                 font.pixelSize: 8
                 color: Colors.orange

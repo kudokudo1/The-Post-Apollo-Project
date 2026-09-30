@@ -540,6 +540,16 @@ PanelWindow {
                                     height: topologyBody.rowHeight
                                     y: index * topologyBody.rowHeight
 
+                                    Rectangle {
+                                        width: isHead || String(refsText || "").length > 0 ? 9 : 7
+                                        height: width
+                                        radius: width / 2
+                                        x: topologyBody.nodeX(lane) - width / 2
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        color: Colors.dark
+                                        z: 1
+                                    }
+
                                     NotoText {
                                         id: topologyStar
 
@@ -547,6 +557,7 @@ PanelWindow {
                                         height: parent.height
                                         x: topologyBody.nodeX(lane) - width / 2
                                         anchors.verticalCenter: parent.verticalCenter
+                                        z: 2
 
                                         readonly property bool refLandmark:
                                             String(refsText || "").length > 0

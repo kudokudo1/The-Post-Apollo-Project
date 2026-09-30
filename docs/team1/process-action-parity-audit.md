@@ -29,8 +29,9 @@ confirmed freeze
   -> refresh request
 
 resume
+  -> remains available even when the protected-process one-shot unlock was consumed
   -> SIGCONT
-  -> optimistic thaw state
+  -> optimistic thaw state only after SIGCONT dispatch succeeds
   -> relock freeze action
   -> refresh request
 

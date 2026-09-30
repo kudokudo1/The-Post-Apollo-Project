@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Wayland
 import qs.components
 import "../services/git"
+import "../services/hospital"
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 
@@ -11,8 +12,8 @@ PanelWindow {
 
     property bool menuOpen: false
 
-    property int panelWidth: 520
-    property int panelHeight: 650
+    property int panelWidth: 700
+    property int panelHeight: 875
     property int panelTopMargin: 0
     property int panelLeftMargin: 50
     property int frameInset: 8
@@ -67,14 +68,23 @@ PanelWindow {
     }
 
     onMenuOpenChanged: {
-        if (root.menuOpen)
+        if (root.menuOpen) {
             hospitalGitService.refresh();
+            patientService.refresh();
+        }
     }
 
-    Component.onCompleted: hospitalGitService.refresh()
+    Component.onCompleted: {
+        hospitalGitService.refresh();
+        patientService.refresh();
+    }
 
     GitService {
         id: hospitalGitService
+    }
+
+    HospitalService {
+        id: patientService
     }
 
     Timer {
@@ -83,6 +93,14 @@ PanelWindow {
         running: root.menuOpen
 
         onTriggered: hospitalGitService.refresh()
+    }
+
+    Timer {
+        interval: 5000
+        repeat: true
+        running: root.menuOpen
+
+        onTriggered: patientService.refresh()
     }
 
     component SectionLabel: GohuText {
@@ -136,7 +154,7 @@ PanelWindow {
         property string stateText: "UNVERIFIED"
 
         width: roomsColumn.width
-        height: 42
+        height: 30
 
         color: Colors.dark
         border.width: 1
@@ -169,7 +187,7 @@ PanelWindow {
                 leftMargin: 62
             }
 
-            width: 285
+            width: 440
             text: roomRow.responsibility
             font.pixelSize: 11
             color: Colors.white
@@ -360,6 +378,224 @@ PanelWindow {
                 }
             }
 
+            // ===== PATIENT TOPOLOGY =============================
+
+            Rectangle {
+                id: topologyFrame
+
+                width: parent.width
+                height: 190
+
+                color: Colors.dark
+                border.width: 1
+                border.color: Colors.cyan
+
+                RectangularShadow {
+                    anchors.fill: parent
+                    spread: 3
+                    z: -1
+                    opacity: 0.20
+                    color: Colors.cyan
+                }
+
+                Column {
+                    anchors {
+                        fill: parent
+                        margins: 10
+                    }
+
+                    spacing: 6
+
+                    Item {
+                        width: parent.width
+                        height: 18
+
+                        SectionLabel {
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "PATIENT TOPOLOGY"
+                        }
+
+                        MetaLabel {
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: patientService.refreshing
+                                  ? "READING GIT GRAPH"
+                                  : String(patientService.commitCount)
+                                    + " COMMITS // "
+                                    + String(patientService.branchCount)
+                                    + " REFS"
+                        }
+                    }
+
+                    Flickable {
+                        id: topologyFlick
+
+                        width: parent.width
+                        height: 146
+
+                        clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+                        contentWidth: width
+                        contentHeight: Math.max(height, patientService.commitCount * topologyBody.rowHeight)
+
+                        Item {
+                            id: topologyBody
+
+                            width: topologyFlick.width
+                            height: topologyFlick.contentHeight
+
+                            property real rowHeight: 24
+                            property real laneWidth: 22
+                            property real laneAreaWidth:
+                                Math.min(190, 44 + (patientService.maxLane + 1) * laneWidth)
+
+                            function laneColor(laneNumber) {
+                                const lane = Number(laneNumber || 0) % 6;
+
+                                if (lane === 0)
+                                    return Colors.cyan;
+                                if (lane === 1)
+                                    return Colors.orange;
+                                if (lane === 2)
+                                    return Colors.magenta;
+                                if (lane === 3)
+                                    return Colors.blue;
+                                if (lane === 4)
+                                    return Colors.green;
+
+                                return Colors.red;
+                            }
+
+                            function nodeX(laneNumber) {
+                                return 14 + Number(laneNumber || 0) * laneWidth;
+                            }
+
+                            Canvas {
+                                id: graphCanvas
+
+                                anchors.fill: parent
+
+                                onWidthChanged: requestPaint()
+                                onHeightChanged: requestPaint()
+
+                                onPaint: {
+                                    const ctx = getContext("2d");
+
+                                    ctx.reset();
+                                    ctx.lineWidth = 1.35;
+
+                                    for (let i = 0; i < patientService.commitCount; ++i) {
+                                        const row = patientService.commitAt(i);
+
+                                        if (!row)
+                                            continue;
+
+                                        const parents = String(row.parents || "").trim();
+
+                                        if (!parents)
+                                            continue;
+
+                                        const parentList = parents.split(/\s+/);
+                                        const x1 = topologyBody.nodeX(row.lane);
+                                        const y1 = i * topologyBody.rowHeight + topologyBody.rowHeight / 2;
+
+                                        for (let p = 0; p < parentList.length; ++p) {
+                                            const parentIndex = patientService.indexOfSha(parentList[p]);
+
+                                            if (parentIndex < 0)
+                                                continue;
+
+                                            const parentRow = patientService.commitAt(parentIndex);
+
+                                            if (!parentRow)
+                                                continue;
+
+                                            const x2 = topologyBody.nodeX(parentRow.lane);
+                                            const y2 = parentIndex * topologyBody.rowHeight
+                                                     + topologyBody.rowHeight / 2;
+                                            const middleY = y1 + (y2 - y1) * 0.52;
+
+                                            ctx.beginPath();
+                                            ctx.strokeStyle = String(topologyBody.laneColor(row.lane));
+                                            ctx.globalAlpha = 0.72;
+                                            ctx.moveTo(x1, y1);
+                                            ctx.lineTo(x1, middleY);
+                                            ctx.lineTo(x2, middleY);
+                                            ctx.lineTo(x2, y2);
+                                            ctx.stroke();
+                                        }
+                                    }
+
+                                    ctx.globalAlpha = 1.0;
+                                }
+                            }
+
+                            Repeater {
+                                model: patientService.topologyModel
+
+                                delegate: Item {
+                                    width: topologyBody.width
+                                    height: topologyBody.rowHeight
+                                    y: index * topologyBody.rowHeight
+
+                                    Rectangle {
+                                        width: isHead ? 11 : 8
+                                        height: width
+                                        radius: width / 2
+
+                                        x: topologyBody.nodeX(lane) - width / 2
+                                        anchors.verticalCenter: parent.verticalCenter
+
+                                        color: topologyBody.laneColor(lane)
+                                        border.width: isHead ? 2 : 1
+                                        border.color: isHead ? Colors.yellow : Colors.black
+
+                                        RectangularShadow {
+                                            anchors.fill: parent
+                                            spread: isHead ? 4 : 2
+                                            z: -1
+                                            opacity: isHead ? 0.55 : 0.28
+                                            color: parent.color
+                                        }
+                                    }
+
+                                    GohuText {
+                                        x: topologyBody.laneAreaWidth
+                                        width: parent.width - x - 6
+                                        anchors.verticalCenter: parent.verticalCenter
+
+                                        text: shortSha
+                                              + (refsText ? "  " + refsText : "")
+                                              + (subject ? "  //  " + subject : "")
+                                        font.pixelSize: 9
+                                        color: isHead ? Colors.yellow : Colors.white
+                                        elide: Text.ElideRight
+
+                                        layer.enabled: isHead
+                                        layer.effect: DropShadow {
+                                            radius: 6
+                                            samples: 7
+                                            opacity: 0.46
+                                            color: Colors.yellow
+                                            transparentBorder: true
+                                        }
+                                    }
+                                }
+                            }
+
+                            Connections {
+                                target: patientService
+
+                                function onTopologyRevisionChanged() {
+                                    graphCanvas.requestPaint();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // ===== PATIENT ======================================
 
             Rectangle {
@@ -399,8 +635,8 @@ PanelWindow {
                         }
 
                         MetaValue {
-                            width: 330
-                            text: hospitalGitService.repository
+                            width: 500
+                            text: patientService.repository
                         }
                     }
 
@@ -413,8 +649,8 @@ PanelWindow {
                         }
 
                         MetaValue {
-                            width: 330
-                            text: hospitalGitService.branch
+                            width: 500
+                            text: patientService.branch
                         }
                     }
 
@@ -423,12 +659,12 @@ PanelWindow {
 
                         MetaLabel {
                             width: 110
-                            text: "LIVE HEAD"
+                            text: "PATIENT HEAD"
                         }
 
                         MetaValue {
-                            width: 330
-                            text: hospitalGitService.head + " // " + hospitalGitService.worktree
+                            width: 500
+                            text: patientService.head + " // " + patientService.worktree
                         }
                     }
                 }
@@ -444,7 +680,7 @@ PanelWindow {
                 id: roomsColumn
 
                 width: parent.width
-                spacing: 5
+                spacing: 4
 
                 RoomRow { team: "T1"; responsibility: "SYSTEM / HUNTER" }
                 RoomRow { team: "T2"; responsibility: "FAVORITES" }

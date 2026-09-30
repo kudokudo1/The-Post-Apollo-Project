@@ -177,7 +177,16 @@ PanelWindow {
 
             text: roomRow.team
             font.pixelSize: 12
-            color: Colors.magenta
+            color: Colors.orange
+
+            layer.enabled: true
+            layer.effect: DropShadow {
+                radius: 5
+                samples: 7
+                opacity: 0.34
+                color: Colors.orange
+                transparentBorder: true
+            }
         }
 
         GohuText {
@@ -190,7 +199,7 @@ PanelWindow {
             width: 440
             text: roomRow.responsibility
             font.pixelSize: 11
-            color: Colors.white
+            color: Colors.cyan
             elide: Text.ElideRight
 
             layer.enabled: true
@@ -481,6 +490,88 @@ PanelWindow {
                         contentWidth: width
                         contentHeight: Math.max(height, patientService.commitCount * topologyBody.rowHeight)
 
+                        // Topology scroll rail: cyan track, orange handle.
+                        Rectangle {
+                            id: topologyScrollTrack
+
+                            anchors {
+                                top: parent.top
+                                bottom: parent.bottom
+                                right: parent.right
+                                topMargin: 2
+                                bottomMargin: 2
+                            }
+
+                            width: 4
+                            radius: 2
+                            color: Colors.cyan
+                            opacity: topologyFlick.contentHeight > topologyFlick.height ? 0.46 : 0.0
+                            z: 20
+
+                            Rectangle {
+                                id: topologyScrollHandle
+
+                                width: 8
+                                radius: 3
+                                anchors.horizontalCenter: parent.horizontalCenter
+
+                                readonly property real minHandleHeight: 22
+                                readonly property real ratio:
+                                    topologyFlick.contentHeight > 0
+                                    ? topologyFlick.height / topologyFlick.contentHeight
+                                    : 1.0
+                                readonly property real travel:
+                                    Math.max(0, topologyScrollTrack.height - height)
+
+                                height: Math.max(
+                                    minHandleHeight,
+                                    topologyScrollTrack.height * Math.min(1.0, ratio)
+                                )
+
+                                y: topologyFlick.contentHeight > topologyFlick.height
+                                   ? topologyFlick.visibleArea.yPosition * topologyScrollTrack.height
+                                   : 0
+
+                                color: Colors.orange
+                                opacity: topologyScrollTrack.opacity > 0 ? 1.0 : 0.0
+
+                                RectangularShadow {
+                                    anchors.fill: parent
+                                    spread: 2
+                                    z: -1
+                                    opacity: 0.38
+                                    color: Colors.orange
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+
+                                    property real grabOffset: 0
+
+                                    onPressed: function(mouse) {
+                                        grabOffset = mouse.y;
+                                    }
+
+                                    onPositionChanged: function(mouse) {
+                                        if (!pressed || topologyScrollHandle.travel <= 0)
+                                            return;
+
+                                        const localY = topologyScrollHandle.y + mouse.y - grabOffset;
+                                        const clamped = Math.max(
+                                            0,
+                                            Math.min(topologyScrollHandle.travel, localY)
+                                        );
+                                        const fraction = clamped / topologyScrollHandle.travel;
+
+                                        topologyFlick.contentY = fraction
+                                            * Math.max(0, topologyFlick.contentHeight - topologyFlick.height);
+                                    }
+                                }
+                            }
+                        }
+
                         Item {
                             id: topologyBody
 
@@ -511,6 +602,38 @@ PanelWindow {
 
                             function nodeX(laneNumber) {
                                 return 14 + Number(laneNumber || 0) * laneWidth;
+                            }
+
+                            function escapeMarkup(value) {
+                                return String(value || "")
+                                    .replace(/&/g, "&amp;")
+                                    .replace(/</g, "&lt;")
+                                    .replace(/>/g, "&gt;");
+                            }
+
+                            function refMarkup(value) {
+                                const refs = String(value || "")
+                                    .split(" • ")
+                                    .filter(function(refName) { return refName.length > 0; });
+
+                                const rendered = [];
+
+                                for (let i = 0; i < refs.length; ++i) {
+                                    const refName = refs[i];
+                                    const refColor = refName.indexOf("origin/") === 0
+                                        ? String(Colors.white)
+                                        : String(Colors.cyan);
+
+                                    rendered.push(
+                                        "<font color=\"" + refColor + "\">"
+                                        + escapeMarkup(refName)
+                                        + "</font>"
+                                    );
+                                }
+
+                                return rendered.join(
+                                    "<font color=\"" + String(Colors.white) + "\"> • </font>"
+                                );
                             }
 
                             Canvas {
@@ -645,21 +768,42 @@ PanelWindow {
                                             }
                                         }
 
-                                        GohuText {
+                                        Row {
                                             width: parent.width - implicitWidth - 4
-                                            text: (refsText ? refsText : "")
-                                                  + (subject ? (refsText ? "  //  " : "//  ") + subject : "")
-                                            font.pixelSize: 9
-                                            color: isHead ? Colors.yellow : Colors.white
-                                            elide: Text.ElideRight
+                                            spacing: 4
 
-                                            layer.enabled: true
-                                            layer.effect: DropShadow {
-                                                radius: isHead ? 6 : 5
-                                                samples: 7
-                                                opacity: isHead ? 0.46 : 0.20
-                                                color: isHead ? Colors.yellow : Colors.cyan
-                                                transparentBorder: true
+                                            GohuText {
+                                                visible: String(refsText || "").length > 0
+                                                text: topologyBody.refMarkup(refsText)
+                                                textFormat: Text.RichText
+                                                font.pixelSize: 9
+
+                                                layer.enabled: true
+                                                layer.effect: DropShadow {
+                                                    radius: 5
+                                                    samples: 7
+                                                    opacity: 0.22
+                                                    color: Colors.cyan
+                                                    transparentBorder: true
+                                                }
+                                            }
+
+                                            GohuText {
+                                                visible: String(subject || "").length > 0
+                                                width: parent.width - x
+                                                text: "//  " + subject
+                                                font.pixelSize: 9
+                                                color: isHead ? Colors.yellow : Colors.white
+                                                elide: Text.ElideRight
+
+                                                layer.enabled: true
+                                                layer.effect: DropShadow {
+                                                    radius: isHead ? 6 : 5
+                                                    samples: 7
+                                                    opacity: isHead ? 0.46 : 0.20
+                                                    color: isHead ? Colors.yellow : Colors.cyan
+                                                    transparentBorder: true
+                                                }
                                             }
                                         }
                                     }

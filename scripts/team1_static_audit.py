@@ -345,6 +345,7 @@ def audit_architecture() -> None:
         "test_processIdentityRejectsPidReuseMismatch",
         "test_protectedActionUnlockRelocksAfterCancel",
         "test_confirmedActionRevalidatesCapturedTarget",
+        "test_protectedFrozenProcessCanAlwaysResume",
         "test_failedResumePreservesOptimisticFrozenState",
         "test_resourceScopeBlocksProtectedProcesses",
         "test_verifiedKernelResultsRemainPerPidAndMixed",
@@ -369,6 +370,18 @@ def audit_architecture() -> None:
         "ProcessLimitMutation {",
         "Team1ProcessSystemContracts",
     )
+
+    require(
+        action,
+        "if (!validEntry(entry))",
+        "ProcessActionController",
+    )
+    require(
+        action,
+        'if (!actionAllowed(entry, "freeze"))',
+        "ProcessActionController",
+    )
+
 
     # Prepared shared organs must not treat AppControl itself as a backend.
     for label, text in (

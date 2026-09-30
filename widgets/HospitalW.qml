@@ -540,24 +540,34 @@ PanelWindow {
                                     height: topologyBody.rowHeight
                                     y: index * topologyBody.rowHeight
 
-                                    Rectangle {
-                                        width: isHead ? 11 : 8
-                                        height: width
-                                        radius: width / 2
+                                    NotoText {
+                                        id: topologyStar
 
+                                        width: 20
+                                        height: parent.height
                                         x: topologyBody.nodeX(lane) - width / 2
                                         anchors.verticalCenter: parent.verticalCenter
 
-                                        color: topologyBody.laneColor(lane)
-                                        border.width: isHead ? 2 : 1
-                                        border.color: isHead ? Colors.yellow : Colors.black
+                                        readonly property bool refLandmark:
+                                            String(refsText || "").length > 0
+                                        readonly property color starColor:
+                                            isHead
+                                            ? Colors.yellow
+                                            : topologyBody.laneColor(lane)
 
-                                        RectangularShadow {
-                                            anchors.fill: parent
-                                            spread: isHead ? 4 : 2
-                                            z: -1
-                                            opacity: isHead ? 0.55 : 0.28
-                                            color: parent.color
+                                        text: isHead || refLandmark ? "★" : "✦"
+                                        font.pixelSize: isHead ? 15 : refLandmark ? 13 : 12
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
+                                        color: starColor
+
+                                        layer.enabled: true
+                                        layer.effect: DropShadow {
+                                            radius: isHead ? 7 : topologyStar.refLandmark ? 5 : 4
+                                            samples: isHead ? 9 : 7
+                                            opacity: isHead ? 0.78 : topologyStar.refLandmark ? 0.48 : 0.30
+                                            color: topologyStar.starColor
+                                            transparentBorder: true
                                         }
                                     }
 

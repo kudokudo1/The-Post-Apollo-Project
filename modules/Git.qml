@@ -64,7 +64,9 @@ Rectangle {
             radius: 14
             samples: 15
             color: Colors.orange
-            opacity: mouse.pressed
+            opacity: dock.menuOpen
+                     ? 1.0
+                     : mouse.pressed
                      ? 1.0
                      : mouse.containsMouse
                      ? 0.82
@@ -93,7 +95,9 @@ Rectangle {
         spread: 3
         z: -1
         color: Colors.orange
-        opacity: mouse.pressed
+        opacity: dock.menuOpen
+                 ? 0.75
+                 : mouse.pressed
                  ? 0.60
                  : mouse.containsMouse
                  ? 0.48
@@ -105,7 +109,9 @@ Rectangle {
         spread: 10
         z: 1
         color: Colors.orange
-        opacity: mouse.pressed
+        opacity: dock.menuOpen
+                 ? 0.16
+                 : mouse.pressed
                  ? 0.12
                  : mouse.containsMouse
                  ? 0.09

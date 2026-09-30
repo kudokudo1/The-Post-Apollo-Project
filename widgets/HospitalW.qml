@@ -748,6 +748,102 @@ PanelWindow {
                         }
                     }
                 }
+
+                // Read-only scroll indicator. This is deliberately outside the
+                // Flickable/content hierarchy so it cannot affect graph geometry.
+                Item {
+                    id: topologyScrollIndicator
+
+                    anchors {
+                        top: parent.top
+                        bottom: parent.bottom
+                        right: parent.right
+                        topMargin: 36
+                        bottomMargin: 10
+                        rightMargin: 5
+                    }
+
+                    width: 14
+                    z: 50
+
+                    readonly property bool canScroll:
+                        topologyFlick.contentHeight > topologyFlick.height + 1
+                    readonly property bool active:
+                        canScroll
+                        && (topologyFlick.moving
+                            || topologyFlick.dragging
+                            || topologyFlick.flicking)
+
+                    opacity: active ? 1.0 : 0.0
+
+                    Behavior on opacity {
+                        NumberAnimation {
+                            duration: 120
+                        }
+                    }
+
+                    Rectangle {
+                        id: topologyScrollRail
+
+                        width: 1
+                        anchors {
+                            top: parent.top
+                            bottom: parent.bottom
+                            horizontalCenter: parent.horizontalCenter
+                        }
+
+                        color: Colors.cyan
+                        opacity: 0.62
+
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 4
+                            samples: 5
+                            opacity: 0.32
+                            color: Colors.cyan
+                            transparentBorder: true
+                        }
+                    }
+
+                    NotoText {
+                        id: topologyScrollStar
+
+                        width: parent.width
+                        height: 16
+                        x: 0
+
+                        readonly property real scrollRange:
+                            Math.max(
+                                0.0001,
+                                1.0 - topologyFlick.visibleArea.heightRatio
+                            )
+                        readonly property real scrollFraction:
+                            Math.max(
+                                0.0,
+                                Math.min(
+                                    1.0,
+                                    topologyFlick.visibleArea.yPosition / scrollRange
+                                )
+                            )
+
+                        y: scrollFraction * Math.max(0, parent.height - height)
+
+                        text: "★"
+                        font.pixelSize: 12
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        color: Colors.orange
+
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 6
+                            samples: 7
+                            opacity: 0.68
+                            color: Colors.orange
+                            transparentBorder: true
+                        }
+                    }
+                }
             }
 
             // ===== PATIENT ======================================

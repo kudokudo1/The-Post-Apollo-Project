@@ -8,14 +8,14 @@ Rectangle {
     id: dock
 
     implicitHeight: 50
-    implicitWidth: 130
+    implicitWidth: Math.max(72, hospitalMark.implicitWidth + 18)
 
     color: Colors.black
 
     // Keep these exposed so the mark can be tuned without rebuilding the button.
-    property int beatPixelSize: 13
-    property int centerPixelSize: 11
-    property int markSpacing: 1
+    property int beatPixelSize: 11
+    property int centerPixelSize: 28
+    property int markSpacing: 0
 
     signal leftClicked()
     signal rightClicked()
@@ -38,13 +38,13 @@ Rectangle {
                 font.pixelSize: dock.beatPixelSize
 
                 color: mouse.pressed
-                       ? Colors.cyan
+                       ? Colors.orange
                        : mouse.containsMouse
-                       ? Colors.cyan
+                       ? Colors.orange
                        : Colors.white
             }
 
-            Text {
+            NotoText {
                 id: hospitalCenter
 
                 text: "⚚"
@@ -53,9 +53,9 @@ Rectangle {
                 anchors.verticalCenter: leftBeat.verticalCenter
 
                 color: mouse.pressed
-                       ? Colors.cyan
+                       ? Colors.orange
                        : mouse.containsMouse
-                       ? Colors.cyan
+                       ? Colors.orange
                        : Colors.white
             }
 
@@ -68,9 +68,9 @@ Rectangle {
                 anchors.verticalCenter: leftBeat.verticalCenter
 
                 color: mouse.pressed
-                       ? Colors.cyan
+                       ? Colors.orange
                        : mouse.containsMouse
-                       ? Colors.cyan
+                       ? Colors.orange
                        : Colors.white
             }
         }
@@ -95,7 +95,7 @@ Rectangle {
                      ? 0.8
                      : 0.6
 
-            color: Colors.cyan
+            color: Colors.orange
 
             transparentBorder: true
         }
@@ -135,7 +135,7 @@ Rectangle {
                  ? 0.5
                  : 0.4
 
-        color: Colors.cyan
+        color: Colors.orange
     }
 
     RectangularShadow {
@@ -152,6 +152,6 @@ Rectangle {
                  ? 0.09
                  : 0.07
 
-        color: Colors.cyan
+        color: Colors.orange
     }
 }

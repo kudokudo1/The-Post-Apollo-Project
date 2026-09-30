@@ -555,17 +555,17 @@ PanelWindow {
                                             ? Colors.yellow
                                             : topologyBody.laneColor(lane)
 
-                                        text: isHead || refLandmark ? "★" : "✦"
-                                        font.pixelSize: isHead ? 15 : refLandmark ? 13 : 12
+                                        text: isHead || refLandmark ? "★" : "✧"
+                                        font.pixelSize: isHead ? 15 : refLandmark ? 13 : 13
                                         horizontalAlignment: Text.AlignHCenter
                                         verticalAlignment: Text.AlignVCenter
                                         color: starColor
 
                                         layer.enabled: true
                                         layer.effect: DropShadow {
-                                            radius: isHead ? 7 : topologyStar.refLandmark ? 5 : 4
+                                            radius: isHead ? 7 : topologyStar.refLandmark ? 5 : 5
                                             samples: isHead ? 9 : 7
-                                            opacity: isHead ? 0.78 : topologyStar.refLandmark ? 0.48 : 0.30
+                                            opacity: isHead ? 0.78 : topologyStar.refLandmark ? 0.48 : 0.38
                                             color: topologyStar.starColor
                                             transparentBorder: true
                                         }

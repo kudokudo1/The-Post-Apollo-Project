@@ -37,6 +37,20 @@ Scope {
     property bool workflowDone: false
     property bool runsDone: false
 
+    property bool workflowExitSeen: false
+    property bool workflowStdoutSeen: false
+    property bool workflowStderrSeen: false
+    property int workflowExitCode: -1
+    property string workflowStdoutText: ""
+    property string workflowStderrText: ""
+
+    property bool runsExitSeen: false
+    property bool runsStdoutSeen: false
+    property bool runsStderrSeen: false
+    property int runsExitCode: -1
+    property string runsStdoutText: ""
+    property string runsStderrText: ""
+
     property int workflowCount: 0
     property string latestWorkflow: "NOT REQUESTED"
     property string latestRunStatus: "NOT REQUESTED"
@@ -60,6 +74,20 @@ Scope {
         workflowDone = false;
         runsDone = false;
         lastError = "";
+
+        workflowExitSeen = false;
+        workflowStdoutSeen = false;
+        workflowStderrSeen = false;
+        workflowExitCode = -1;
+        workflowStdoutText = "";
+        workflowStderrText = "";
+
+        runsExitSeen = false;
+        runsStdoutSeen = false;
+        runsStderrSeen = false;
+        runsExitCode = -1;
+        runsStdoutText = "";
+        runsStderrText = "";
 
         workflowsProcess.exec([
             "/usr/bin/toolbox",
@@ -148,15 +176,21 @@ Scope {
         }
     }
 
-    function finishWorkflow(exitCode, stdoutText, stderrText) {
+    function maybeFinishWorkflow() {
         if (!refreshing || workflowDone)
             return;
 
-        if (Number(exitCode) !== 0) {
-            recordError("WORKFLOWS EXIT " + String(exitCode) + " // ", stderrText || "NO STDERR");
+        if (!workflowExitSeen || !workflowStdoutSeen || !workflowStderrSeen)
+            return;
+
+        if (workflowExitCode !== 0) {
+            recordError(
+                "WORKFLOWS EXIT " + String(workflowExitCode) + " // ",
+                workflowStderrText || "NO STDERR"
+            );
         } else {
             try {
-                parseWorkflows(stdoutText);
+                parseWorkflows(workflowStdoutText);
             } catch (error) {
                 recordError("WORKFLOW PARSE // ", String(error));
             }
@@ -166,15 +200,21 @@ Scope {
         finishIfComplete();
     }
 
-    function finishRuns(exitCode, stdoutText, stderrText) {
+    function maybeFinishRuns() {
         if (!refreshing || runsDone)
             return;
 
-        if (Number(exitCode) !== 0) {
-            recordError("RUNS EXIT " + String(exitCode) + " // ", stderrText || "NO STDERR");
+        if (!runsExitSeen || !runsStdoutSeen || !runsStderrSeen)
+            return;
+
+        if (runsExitCode !== 0) {
+            recordError(
+                "RUNS EXIT " + String(runsExitCode) + " // ",
+                runsStderrText || "NO STDERR"
+            );
         } else {
             try {
-                parseRuns(stdoutText);
+                parseRuns(runsStdoutText);
             } catch (error) {
                 recordError("RUN PARSE // ", String(error));
             }
@@ -197,19 +237,25 @@ Scope {
         id: workflowsProcess
 
         stdout: StdioCollector {
-            id: workflowsStdout
+            onStreamFinished: {
+                githubService.workflowStdoutText = this.text;
+                githubService.workflowStdoutSeen = true;
+                githubService.maybeFinishWorkflow();
+            }
         }
 
         stderr: StdioCollector {
-            id: workflowsStderr
+            onStreamFinished: {
+                githubService.workflowStderrText = this.text;
+                githubService.workflowStderrSeen = true;
+                githubService.maybeFinishWorkflow();
+            }
         }
 
         onExited: function(exitCode, exitStatus) {
-            githubService.finishWorkflow(
-                exitCode,
-                workflowsStdout.text,
-                workflowsStderr.text
-            );
+            githubService.workflowExitCode = Number(exitCode);
+            githubService.workflowExitSeen = true;
+            githubService.maybeFinishWorkflow();
         }
     }
 
@@ -217,19 +263,25 @@ Scope {
         id: runsProcess
 
         stdout: StdioCollector {
-            id: runsStdout
+            onStreamFinished: {
+                githubService.runsStdoutText = this.text;
+                githubService.runsStdoutSeen = true;
+                githubService.maybeFinishRuns();
+            }
         }
 
         stderr: StdioCollector {
-            id: runsStderr
+            onStreamFinished: {
+                githubService.runsStderrText = this.text;
+                githubService.runsStderrSeen = true;
+                githubService.maybeFinishRuns();
+            }
         }
 
         onExited: function(exitCode, exitStatus) {
-            githubService.finishRuns(
-                exitCode,
-                runsStdout.text,
-                runsStderr.text
-            );
+            githubService.runsExitCode = Number(exitCode);
+            githubService.runsExitSeen = true;
+            githubService.maybeFinishRuns();
         }
     }
 

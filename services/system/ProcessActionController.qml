@@ -269,9 +269,12 @@ Scope {
     }
 
     function requestToggleFreeze(entry) {
-        if (!actionAllowed(entry, "freeze"))
+        if (!validEntry(entry))
             return false;
 
+        // Recovery must remain available even after a one-shot danger unlock
+        // was consumed by the original freeze. Gating THAW behind a fresh
+        // protected-process unlock can strand a stopped critical process.
         if (isFrozen(entry)) {
             if (!controlService.sendSignal(entryPid(entry), "-CONT"))
                 return false;
@@ -281,6 +284,9 @@ Scope {
             refreshRequested();
             return true;
         }
+
+        if (!actionAllowed(entry, "freeze"))
+            return false;
 
         const request = confirmationFor(entry, "freeze");
 

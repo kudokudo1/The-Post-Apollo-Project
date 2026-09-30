@@ -7,7 +7,7 @@ import Qt5Compat.GraphicalEffects
 Rectangle {
     id: dock
 
-    implicitWidth: Math.max(108, gitMark.implicitWidth + 18)
+    implicitWidth: Math.max(118, gitMark.implicitWidth + 18)
     implicitHeight: 50
 
     color: dock.menuOpen ? Colors.yellow : Colors.black
@@ -29,7 +29,7 @@ Rectangle {
 
             GohuText {
                 text: ""
-                font.pixelSize: 20
+                font.pixelSize: 30
                 anchors.verticalCenter: parent.verticalCenter
 
                 color: dock.menuOpen

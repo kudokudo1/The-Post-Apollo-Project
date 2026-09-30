@@ -1,7 +1,6 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
-import Quickshell.I3
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 import "../../components"
@@ -15,19 +14,16 @@ PanelWindow {
     property bool menuOpen: false
 
     // Compositor-global origin of the Weather Station panel.
-    // Keep this at the owning PanelWindow where both the target screen and
-    // layer-shell anchoring are known.
-    readonly property var swayMonitor: weatherStation.screen
-        ? I3.monitorFor(weatherStation.screen)
-        : null
-
-    readonly property int stationGlobalX: swayMonitor
-        ? Number(swayMonitor.x) + Number(swayMonitor.width)
+    // ShellScreen already exposes the monitor-layout x/y/width/height, so use
+    // the exact screen object the PanelWindow is attached to. This avoids an
+    // asynchronous I3 monitor lookup during startup.
+    readonly property int stationGlobalX: weatherStation.screen
+        ? Number(weatherStation.screen.x) + Number(weatherStation.screen.width)
             - margins.right - stationBackground.width
         : 0
 
-    readonly property int stationGlobalY: swayMonitor
-        ? Number(swayMonitor.y) + Number(swayMonitor.height)
+    readonly property int stationGlobalY: weatherStation.screen
+        ? Number(weatherStation.screen.y) + Number(weatherStation.screen.height)
             - margins.bottom - stationBackground.height
         : 0
 
@@ -563,7 +559,7 @@ PanelWindow {
 
                 stationGlobalX: weatherStation.stationGlobalX
                 stationGlobalY: weatherStation.stationGlobalY
-                stationGeometryReady: weatherStation.swayMonitor !== null
+                stationGeometryReady: weatherStation.screen !== null
             }
         }
 

@@ -10,37 +10,7 @@ Rectangle {
     implicitHeight: 50
     implicitWidth: Math.max(72, hospitalMark.implicitWidth + 18)
 
-    readonly property bool hovered: mouse.containsMouse
-    readonly property bool pressed: mouse.pressed
-
-    scale:
-        pressed
-        ? 0.99
-        : hovered
-        ? 1.025
-        : menuOpen
-        ? 1.01
-        : 1.0
-
-    color:
-        pressed
-        ? Colors.magenta
-        : hovered || menuOpen
-        ? Colors.yellow
-        : Colors.black
-
-    border.width: 1
-    border.color:
-        hovered || pressed || menuOpen
-        ? Colors.magenta
-        : Colors.cyan
-
-    Behavior on scale {
-        NumberAnimation {
-            duration: 90
-            easing.type: Easing.OutQuad
-        }
-    }
+    color: dock.menuOpen ? Colors.yellow : Colors.black
 
     // Keep these exposed so the mark can be tuned without rebuilding the button.
     property int beatPixelSize: 11
@@ -63,8 +33,7 @@ Rectangle {
             anchors.centerIn: parent
             spacing: dock.markSpacing
 
-            // Give every glyph the same vertical box. This centers the
-            // visible mark instead of centering three different font metrics.
+            // Shared vertical box keeps the visible mark centered.
             height: 34
 
             Text {
@@ -76,13 +45,13 @@ Rectangle {
                 font.pixelSize: dock.beatPixelSize
                 verticalAlignment: Text.AlignVCenter
 
-                color: dock.pressed
-                       ? Colors.black
-                       : dock.menuOpen
+                color: dock.menuOpen
                        ? Colors.magenta
-                       : dock.hovered
-                       ? Colors.orange
-                       : Colors.cyan
+                       : mouse.pressed
+                       ? Colors.magenta
+                       : mouse.containsMouse
+                       ? Colors.magenta
+                       : Colors.white
             }
 
             NotoText {
@@ -94,13 +63,13 @@ Rectangle {
                 font.pixelSize: dock.centerPixelSize
                 verticalAlignment: Text.AlignVCenter
 
-                color: dock.pressed
-                       ? Colors.black
-                       : dock.menuOpen
+                color: dock.menuOpen
                        ? Colors.magenta
-                       : dock.hovered
-                       ? Colors.orange
-                       : Colors.cyan
+                       : mouse.pressed
+                       ? Colors.magenta
+                       : mouse.containsMouse
+                       ? Colors.magenta
+                       : Colors.white
             }
 
             Text {
@@ -112,13 +81,13 @@ Rectangle {
                 font.pixelSize: dock.beatPixelSize
                 verticalAlignment: Text.AlignVCenter
 
-                color: dock.pressed
-                       ? Colors.black
-                       : dock.menuOpen
+                color: dock.menuOpen
                        ? Colors.magenta
-                       : dock.hovered
-                       ? Colors.orange
-                       : Colors.cyan
+                       : mouse.pressed
+                       ? Colors.magenta
+                       : mouse.containsMouse
+                       ? Colors.magenta
+                       : Colors.white
             }
         }
 
@@ -136,21 +105,13 @@ Rectangle {
 
             z: 2
 
-            opacity:
-                dock.pressed
-                ? 0.0
-                : dock.hovered
-                ? 0.82
-                : dock.menuOpen
-                ? 0.72
-                : 0.58
+            opacity: mouse.pressed
+                     ? 1.0
+                     : mouse.containsMouse
+                     ? 0.8
+                     : 0.6
 
-            color:
-                dock.menuOpen
-                ? Colors.magenta
-                : dock.hovered
-                ? Colors.orange
-                : Colors.cyan
+            color: Colors.magenta
 
             transparentBorder: true
         }
@@ -181,22 +142,14 @@ Rectangle {
 
         anchors.fill: parent
 
-        spread:
-            dock.hovered
-            ? 6
-            : dock.menuOpen
-            ? 4
-            : 2
+        spread: 3
         z: -1
 
-        opacity:
-            dock.pressed
-            ? 0.62
-            : dock.hovered
-            ? 0.56
-            : dock.menuOpen
-            ? 0.46
-            : 0.10
+        opacity: mouse.pressed
+                 ? 0.6
+                 : mouse.containsMouse
+                 ? 0.5
+                 : 0.4
 
         color: Colors.magenta
     }
@@ -206,22 +159,14 @@ Rectangle {
 
         anchors.fill: parent
 
-        spread:
-            dock.hovered
-            ? 16
-            : dock.menuOpen
-            ? 11
-            : 7
-        z: -2
+        spread: 10
+        z: 1
 
-        opacity:
-            dock.pressed
-            ? 0.16
-            : dock.hovered
-            ? 0.14
-            : dock.menuOpen
-            ? 0.11
-            : 0.035
+        opacity: mouse.pressed
+                 ? 0.12
+                 : mouse.containsMouse
+                 ? 0.09
+                 : 0.07
 
         color: Colors.magenta
     }

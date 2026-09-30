@@ -16,11 +16,12 @@ PanelWindow {
     property int panelLeftMargin: 50
     property int frameInset: 8
     property int glowGutter: 14
+    property int topGlowGutter: 12
 
-    // The visible menu keeps its original size/position. The transparent
-    // surface is larger only so the chassis shadow has pixels to render into.
+    // Reserve transparent pixels above the visible chassis so its top glow
+    // renders inside the PanelWindow instead of being clipped by the top bar.
     implicitWidth: panelWidth + glowGutter * 2
-    implicitHeight: panelHeight + glowGutter
+    implicitHeight: panelHeight + topGlowGutter + glowGutter
 
     anchors {
         top: true
@@ -185,6 +186,7 @@ PanelWindow {
         width: root.panelWidth
         height: root.panelHeight
         anchors.top: parent.top
+        anchors.topMargin: root.topGlowGutter
         anchors.horizontalCenter: parent.horizontalCenter
 
         color: "transparent"
@@ -195,7 +197,7 @@ PanelWindow {
         anchors.fill: chassisGeometry
         spread: 6
         z: -20
-        opacity: root.menuOpen ? 0.38 : 0.0
+        opacity: root.menuOpen ? 0.26 : 0.0
         color: Colors.magenta
     }
 
@@ -203,7 +205,7 @@ PanelWindow {
         anchors.fill: chassisGeometry
         spread: 12
         z: -21
-        opacity: root.menuOpen ? 0.12 : 0.0
+        opacity: root.menuOpen ? 0.07 : 0.0
         color: Colors.magenta
     }
 
@@ -213,6 +215,7 @@ PanelWindow {
         width: root.panelWidth
         height: root.panelHeight
         anchors.top: parent.top
+        anchors.topMargin: root.topGlowGutter
         anchors.horizontalCenter: parent.horizontalCenter
 
         color: "transparent"
@@ -264,6 +267,7 @@ PanelWindow {
         width: root.panelWidth
         height: root.panelHeight
         anchors.top: parent.top
+        anchors.topMargin: root.topGlowGutter
         anchors.horizontalCenter: parent.horizontalCenter
 
         color: Colors.black

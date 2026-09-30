@@ -12,7 +12,7 @@ PanelWindow {
 
     property int panelWidth: 520
     property int panelHeight: 650
-    property int panelTopMargin: 72
+    property int panelTopMargin: 0
     property int panelLeftMargin: 50
     property int frameInset: 8
 
@@ -128,6 +128,40 @@ PanelWindow {
             font.pixelSize: 9
             color: Colors.cyan
         }
+    }
+
+    // Active outer frame glow. Kept inside the surface bounds so the
+    // menu can remain flush with the top edge.
+    Rectangle {
+        id: frameGlowSource
+
+        anchors.fill: parent
+
+        color: "transparent"
+        border.width: 2
+        border.color: Colors.magenta
+
+        opacity: root.menuOpen ? 1.0 : 0.0
+
+        z: 2
+    }
+
+    DropShadow {
+        anchors.fill: frameGlowSource
+        source: frameGlowSource
+
+        horizontalOffset: 0
+        verticalOffset: 0
+
+        radius: 18
+        samples: 23
+
+        color: Colors.magenta
+        opacity: root.menuOpen ? 0.76 : 0.0
+
+        z: 3
+
+        transparentBorder: true
     }
 
     Rectangle {
@@ -357,21 +391,5 @@ PanelWindow {
             }
         }
 
-        DropShadow {
-            anchors.fill: frame
-            source: frame
-
-            horizontalOffset: 0
-            verticalOffset: 0
-
-            radius: 20
-            samples: 25
-
-            color: Colors.magenta
-            opacity: root.menuOpen ? 0.45 : 0.0
-
-            z: -1
-            transparentBorder: true
-        }
     }
 }

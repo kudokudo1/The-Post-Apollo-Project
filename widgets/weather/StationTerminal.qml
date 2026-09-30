@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "../../components"
+import "../../services/windowassembly"
 
 Rectangle {
     id: terminalView
@@ -30,6 +31,12 @@ Rectangle {
     property int lastHeight: -1
 
     property bool revealAfterSync: false
+
+    // The Weather Station is the first live consumer of the reusable
+    // window-assembly tracker. The QML instrument bay owns the canonical
+    // scene rectangle; Kitty is a follower.
+    property string assemblySceneId: "weather-station-terminal"
+    property bool assemblyDefined: false
 
     // ─────────────────────────────────────────────
     // LAUNCH
@@ -70,79 +77,156 @@ Rectangle {
     // ─────────────────────────────────────────────
     // GEOMETRY SYNC
     //
-    // Kitty follows the ACTUAL QML bay position.
+    // The QML bay remains the structural truth, but movement is now delegated
+    // to the persistent WindowAssemblyBridge instead of spawning swaymsg for
+    // every geometry change.
     // ─────────────────────────────────────────────
 
+    WindowAssemblyTracker {
+        id: assemblyTracker
+
+        intervalMs: 8
+
+        onSnapshot: function (payload) {
+            terminalView.handleAssemblySnapshot(payload);
+        }
+
+        onBridgeError: function (message) {
+            console.log("StationTerminal assembly:", message);
+
+            if (terminalView.terminalState === "STARTING")
+                terminalView.terminalState = "SYNC ERROR";
+        }
+    }
+
     Process {
-        id: geometryProcess
+        id: revealProcess
 
-        property int targetX: 0
-        property int targetY: 0
-        property int targetWidth: 0
-        property int targetHeight: 0
-
-        command: ["swaymsg", "[app_id=\"^weather-screen$\"] " + "floating enable, " + "border none, " + "resize set " + targetWidth + " " + targetHeight + ", " + "move absolute position " + targetX + " " + targetY + (terminalView.revealAfterSync ? ", scratchpad show" : "")]
+        command: ["swaymsg", "[app_id=\"^weather-screen$\"] scratchpad show"]
 
         onExited: function (exitCode, exitStatus) {
             if (exitCode === 0) {
-                terminalView.lastX = geometryProcess.targetX;
-
-                terminalView.lastY = geometryProcess.targetY;
-
-                terminalView.lastWidth = geometryProcess.targetWidth;
-
-                terminalView.lastHeight = geometryProcess.targetHeight;
-
-                if (terminalView.revealAfterSync) {
-                    terminalView.revealAfterSync = false;
-                    terminalView.terminalState = "VISIBLE";
-                }
+                terminalView.revealAfterSync = false;
+                terminalView.terminalState = "VISIBLE";
+                terminalView.syncGeometry(true);
             } else {
                 terminalView.terminalState = "SYNC ERROR";
             }
         }
     }
 
-    function syncGeometry(force) {
-        if (terminalState !== "VISIBLE" && !revealAfterSync) {
-            return;
-        }
-
-        // THIS is the important part:
-        // ask Qt where the bay actually is globally.
+    function currentBayRect() {
         const point = terminalBay.mapToGlobal(0, 0);
 
-        const gx = Math.round(point.x);
+        return assemblyTracker.rect(
+            point.x,
+            point.y,
+            terminalBay.width,
+            terminalBay.height
+        );
+    }
 
-        const gy = Math.round(point.y);
+    function rectMatchesBay(rect) {
+        if (!rect)
+            return false;
 
-        const gw = Math.round(terminalBay.width);
+        const bay = currentBayRect();
 
-        const gh = Math.round(terminalBay.height);
+        return Math.round(Number(rect.x)) === bay.x
+            && Math.round(Number(rect.y)) === bay.y
+            && Math.round(Number(rect.width)) === bay.width
+            && Math.round(Number(rect.height)) === bay.height;
+    }
 
-        if (!force && gx === lastX && gy === lastY && gw === lastWidth && gh === lastHeight) {
+    function defineAssembly(sceneRect) {
+        assemblyTracker.defineScene(
+            assemblySceneId,
+            sceneRect,
+            [
+                assemblyTracker.member(
+                    "screen",
+                    { appId: terminalAppId },
+                    assemblyTracker.transform(
+                        0, 0,
+                        0, 0,
+                        1, 0,
+                        1, 0
+                    ),
+                    {
+                        // Weather Station is a layer-shell instrument, so its
+                        // QML bay is authoritative for this first test.
+                        canLead: false,
+                        setup: true,
+                        tolerance: 0
+                    }
+                )
+            ],
+            {
+                minimumWidth: 1,
+                minimumHeight: 1,
+                watch: true,
+                sync: true
+            }
+        );
+
+        assemblyDefined = true;
+    }
+
+    function syncGeometry(force) {
+        if (terminalState !== "VISIBLE" && !revealAfterSync)
+            return;
+
+        const bay = currentBayRect();
+
+        if (!force
+                && bay.x === lastX
+                && bay.y === lastY
+                && bay.width === lastWidth
+                && bay.height === lastHeight) {
             return;
         }
 
-        if (geometryProcess.running)
-            return;
-        geometryProcess.targetX = gx;
-        geometryProcess.targetY = gy;
-        geometryProcess.targetWidth = gw;
-        geometryProcess.targetHeight = gh;
+        lastX = bay.x;
+        lastY = bay.y;
+        lastWidth = bay.width;
+        lastHeight = bay.height;
 
-        geometryProcess.running = true;
+        if (!assemblyDefined) {
+            defineAssembly(bay);
+            return;
+        }
+
+        assemblyTracker.setSceneRect(
+            assemblySceneId,
+            bay,
+            true
+        );
     }
 
-    // Check geometry while the instrument is open.
-    // It only sends swaymsg when something actually
-    // changed.
+    function handleAssemblySnapshot(payload) {
+        if (!payload || payload.scene !== assemblySceneId)
+            return;
+
+        if (!revealAfterSync || revealProcess.running)
+            return;
+
+        const members = payload.members || {};
+        const screen = members.screen;
+
+        // Reveal only after the hidden Kitty surface has actually reached the
+        // QML bay. This preserves the old "place first, show second" behavior.
+        if (screen && rectMatchesBay(screen.rect))
+            revealProcess.running = true;
+    }
+
+    // mapToGlobal() has no change signal. Sample the source bay cheaply while
+    // the terminal is alive; actual Sway mutations stay on the persistent
+    // bridge and are only sent when the geometry changed.
     Timer {
-        interval: 75
-
+        interval: 16
         repeat: true
-
         running: terminalView.terminalState === "VISIBLE"
+            || terminalView.revealAfterSync
 
         onTriggered: {
             terminalView.syncGeometry(false);
@@ -160,6 +244,12 @@ Rectangle {
 
         onExited: function (exitCode, exitStatus) {
             terminalView.terminalState = "IDLE";
+            terminalView.revealAfterSync = false;
+
+            if (terminalView.assemblyDefined) {
+                assemblyTracker.removeScene(terminalView.assemblySceneId);
+                terminalView.assemblyDefined = false;
+            }
 
             terminalView.lastX = -99999;
             terminalView.lastY = -99999;

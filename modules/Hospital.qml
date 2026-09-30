@@ -29,6 +29,7 @@ Rectangle {
             id: hospitalMark
 
             anchors.centerIn: parent
+            anchors.verticalCenterOffset: 2
             spacing: dock.markSpacing
 
             Text {
@@ -36,11 +37,12 @@ Rectangle {
 
                 text: "ﮩ٨ـﮩﮩ"
                 font.pixelSize: dock.beatPixelSize
+                anchors.verticalCenter: parent.verticalCenter
 
                 color: mouse.pressed
-                       ? Colors.orange
+                       ? Colors.magenta
                        : mouse.containsMouse
-                       ? Colors.orange
+                       ? Colors.magenta
                        : Colors.white
             }
 
@@ -50,12 +52,12 @@ Rectangle {
                 text: "⚚"
                 font.pixelSize: dock.centerPixelSize
 
-                anchors.verticalCenter: leftBeat.verticalCenter
+                anchors.verticalCenter: parent.verticalCenter
 
                 color: mouse.pressed
-                       ? Colors.orange
+                       ? Colors.magenta
                        : mouse.containsMouse
-                       ? Colors.orange
+                       ? Colors.magenta
                        : Colors.white
             }
 
@@ -65,12 +67,12 @@ Rectangle {
                 text: "ﮩ٨ـﮩ"
                 font.pixelSize: dock.beatPixelSize
 
-                anchors.verticalCenter: leftBeat.verticalCenter
+                anchors.verticalCenter: parent.verticalCenter
 
                 color: mouse.pressed
-                       ? Colors.orange
+                       ? Colors.magenta
                        : mouse.containsMouse
-                       ? Colors.orange
+                       ? Colors.magenta
                        : Colors.white
             }
         }
@@ -95,7 +97,7 @@ Rectangle {
                      ? 0.8
                      : 0.6
 
-            color: Colors.orange
+            color: Colors.magenta
 
             transparentBorder: true
         }
@@ -135,7 +137,7 @@ Rectangle {
                  ? 0.5
                  : 0.4
 
-        color: Colors.orange
+        color: Colors.magenta
     }
 
     RectangularShadow {
@@ -152,6 +154,6 @@ Rectangle {
                  ? 0.09
                  : 0.07
 
-        color: Colors.orange
+        color: Colors.magenta
     }
 }

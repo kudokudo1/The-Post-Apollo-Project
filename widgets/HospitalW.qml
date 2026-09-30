@@ -727,9 +727,9 @@ PanelWindow {
 
                                             layer.enabled: true
                                             layer.effect: DropShadow {
-                                                radius: isHead ? 6 : 5
-                                                samples: 7
-                                                opacity: isHead ? 0.46 : 0.20
+                                                radius: isHead ? 6 : 6
+                                                samples: isHead ? 7 : 9
+                                                opacity: isHead ? 0.46 : 0.38
                                                 color: isHead ? Colors.yellow : Colors.cyan
                                                 transparentBorder: true
                                             }

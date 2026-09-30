@@ -64,11 +64,29 @@ PanelWindow {
     component SectionLabel: GohuText {
         font.pixelSize: 12
         color: Colors.magenta
+
+        layer.enabled: true
+        layer.effect: DropShadow {
+            radius: 6
+            samples: 7
+            opacity: 0.46
+            color: Colors.magenta
+            transparentBorder: true
+        }
     }
 
     component MetaLabel: GohuText {
         font.pixelSize: 10
         color: Colors.cyan
+
+        layer.enabled: true
+        layer.effect: DropShadow {
+            radius: 4
+            samples: 5
+            opacity: 0.28
+            color: Colors.cyan
+            transparentBorder: true
+        }
     }
 
     component MetaValue: GohuText {
@@ -90,6 +108,14 @@ PanelWindow {
         color: Colors.dark
         border.width: 1
         border.color: Colors.magenta
+
+        RectangularShadow {
+            anchors.fill: parent
+            spread: 3
+            z: -1
+            opacity: 0.18
+            color: Colors.magenta
+        }
 
         GohuText {
             anchors {
@@ -196,6 +222,22 @@ PanelWindow {
         transparentBorder: true
     }
 
+    RectangularShadow {
+        anchors.fill: frameGlowSource
+        spread: 6
+        z: -2
+        opacity: root.menuOpen ? 0.38 : 0.0
+        color: Colors.magenta
+    }
+
+    RectangularShadow {
+        anchors.fill: frameGlowSource
+        spread: 12
+        z: -3
+        opacity: root.menuOpen ? 0.12 : 0.0
+        color: Colors.magenta
+    }
+
     Rectangle {
         id: frame
 
@@ -242,6 +284,15 @@ PanelWindow {
                     text: "HOSPITAL // SURGERY ROOM"
                     font.pixelSize: 20
                     color: Colors.magenta
+
+                    layer.enabled: true
+                    layer.effect: DropShadow {
+                        radius: 8
+                        samples: 9
+                        opacity: 0.52
+                        color: Colors.magenta
+                        transparentBorder: true
+                    }
                 }
 
                 GohuText {
@@ -268,6 +319,14 @@ PanelWindow {
                     border.width: 1
                     border.color: Colors.magenta
 
+                    RectangularShadow {
+                        anchors.fill: parent
+                        spread: 3
+                        z: -1
+                        opacity: 0.34
+                        color: Colors.magenta
+                    }
+
                     GohuText {
                         anchors.centerIn: parent
                         text: "UNVERIFIED"
@@ -280,7 +339,15 @@ PanelWindow {
             Rectangle {
                 width: parent.width
                 height: 2
-                color: Colors.magenta
+                color: Colors.cyan
+
+                RectangularShadow {
+                    anchors.fill: parent
+                    spread: 3
+                    z: -1
+                    opacity: 0.34
+                    color: Colors.cyan
+                }
             }
 
             // ===== PATIENT ======================================
@@ -292,6 +359,14 @@ PanelWindow {
                 color: Colors.dark
                 border.width: 1
                 border.color: Colors.magenta
+
+                RectangularShadow {
+                    anchors.fill: parent
+                    spread: 4
+                    z: -1
+                    opacity: 0.22
+                    color: Colors.magenta
+                }
 
                 Column {
                     anchors {
@@ -381,6 +456,14 @@ PanelWindow {
                 color: Colors.dark
                 border.width: 1
                 border.color: Colors.cyan
+
+                RectangularShadow {
+                    anchors.fill: parent
+                    spread: 3
+                    z: -1
+                    opacity: 0.22
+                    color: Colors.cyan
+                }
 
                 Row {
                     anchors.centerIn: parent

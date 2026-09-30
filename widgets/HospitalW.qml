@@ -583,7 +583,7 @@ PanelWindow {
                                     y: index * topologyBody.rowHeight
 
                                     Rectangle {
-                                        width: isHead || String(refsText || "").length > 0 ? 9 : 7
+                                        width: isHead || String(refsText || "").length > 0 ? 10 : 8
                                         height: width
                                         radius: width / 2
                                         x: topologyBody.nodeX(lane) - width / 2
@@ -624,25 +624,43 @@ PanelWindow {
                                         }
                                     }
 
-                                    GohuText {
+                                    Row {
                                         x: topologyBody.laneAreaWidth
                                         width: parent.width - x - 6
                                         anchors.verticalCenter: parent.verticalCenter
+                                        spacing: 4
 
-                                        text: shortSha
-                                              + (refsText ? "  " + refsText : "")
-                                              + (subject ? "  //  " + subject : "")
-                                        font.pixelSize: 9
-                                        color: isHead ? Colors.yellow : Colors.white
-                                        elide: Text.ElideRight
+                                        GohuText {
+                                            text: shortSha
+                                            font.pixelSize: 9
+                                            color: Colors.orange
 
-                                        layer.enabled: isHead
-                                        layer.effect: DropShadow {
-                                            radius: 6
-                                            samples: 7
-                                            opacity: 0.46
-                                            color: Colors.yellow
-                                            transparentBorder: true
+                                            layer.enabled: true
+                                            layer.effect: DropShadow {
+                                                radius: 5
+                                                samples: 7
+                                                opacity: 0.40
+                                                color: Colors.orange
+                                                transparentBorder: true
+                                            }
+                                        }
+
+                                        GohuText {
+                                            width: parent.width - implicitWidth - 4
+                                            text: (refsText ? refsText : "")
+                                                  + (subject ? (refsText ? "  //  " : "//  ") + subject : "")
+                                            font.pixelSize: 9
+                                            color: isHead ? Colors.yellow : Colors.white
+                                            elide: Text.ElideRight
+
+                                            layer.enabled: true
+                                            layer.effect: DropShadow {
+                                                radius: isHead ? 6 : 5
+                                                samples: 7
+                                                opacity: isHead ? 0.46 : 0.20
+                                                color: isHead ? Colors.yellow : Colors.cyan
+                                                transparentBorder: true
+                                            }
                                         }
                                     }
                                 }
@@ -702,6 +720,14 @@ PanelWindow {
                             width: 500
                             text: patientService.repository
                             color: Colors.orange
+
+                            layer.effect: DropShadow {
+                                radius: 5
+                                samples: 7
+                                opacity: 0.28
+                                color: Colors.orange
+                                transparentBorder: true
+                            }
                         }
                     }
 

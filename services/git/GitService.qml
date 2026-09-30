@@ -59,7 +59,7 @@ Scope {
                 'printf "WORKTREE\\t%s\\n" "$worktree"',
                 'printf "ORIGIN\\t%s\\n" "$origin"',
                 'printf "DONE\\t\\n"'
-            ].join("; ")
+            ].join("\n")
         ]);
     }
 
@@ -133,7 +133,7 @@ Scope {
                 '    ;;',
                 'esac',
                 'printf "__PA_DONE__\\n"'
-            ].join("; "),
+            ].join("\n"),
             "_",
             action
         ]);
@@ -159,7 +159,7 @@ Scope {
         Quickshell.execDetached([
             "bash",
             "-lc",
-            'cd "$HOME/.config/quickshell" && exec kitty --directory "$PWD" lazygit'
+            'cd "$HOME/.config/quickshell" && exec kitty --directory "$PWD" toolbox run -c fedora-toolbox-44 lazygit'
         ]);
     }
 

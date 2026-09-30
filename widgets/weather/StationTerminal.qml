@@ -56,13 +56,40 @@ Rectangle {
     Process {
         id: launchProcess
 
-        command: ["bash", "-lc", "kitty " + "--config /var/home/mapple/.config/kitty/weatherstation.conf " + "--override confirm_os_window_close=0 " + "--app-id weather-screen " + "--title 'STAR MAP' " + "/var/home/mapple/.local/bin/weatherstation-starmap " + ">/dev/null 2>&1 &"]
+        // Keep Kitty as the actual managed child. The previous bash "... &"
+        // wrapper made startup depend on the wrapper exiting before we even
+        // began looking for the Sway surface.
+        command: [
+            "kitty",
+            "--config", "/var/home/mapple/.config/kitty/weatherstation.conf",
+            "--override", "confirm_os_window_close=0",
+            "--app-id", "weather-screen",
+            "--title", "STAR MAP",
+            "/var/home/mapple/.local/bin/weatherstation-starmap"
+        ]
+
+        stderr: SplitParser {
+            onRead: function (data) {
+                const message = String(data || "").trim();
+
+                if (message.length > 0)
+                    console.log("StationTerminal kitty:", message);
+            }
+        }
+
+        onStarted: {
+            console.log("StationTerminal launch: kitty process started");
+
+            if (!waitForKitty.running)
+                waitForKitty.running = true;
+        }
 
         onExited: function (exitCode, exitStatus) {
-            if (exitCode === 0)
-                waitForKitty.running = true;
-            else
-                terminalView.terminalState = "LAUNCH ERROR";
+            console.log(
+                "StationTerminal launch: kitty exited",
+                exitCode,
+                exitStatus
+            );
         }
     }
 
@@ -76,6 +103,12 @@ Rectangle {
         command: ["bash", "-lc", "for i in $(seq 1 100); do " + "if swaymsg -t get_tree | " + "grep -Fq '\"app_id\": \"weather-screen\"'; then " + "exit 0; " + "fi; " + "sleep 0.05; " + "done; " + "exit 1"]
 
         onExited: function (exitCode, exitStatus) {
+            console.log(
+                "StationTerminal wait: weather-screen lookup exited",
+                exitCode,
+                exitStatus
+            );
+
             if (exitCode === 0) {
                 terminalView.revealAfterSync = true;
                 terminalView.syncGeometry(true);
@@ -306,6 +339,8 @@ Rectangle {
         }
 
         terminalState = "STARTING";
+
+        console.log("StationTerminal open: starting Star Map");
 
         if (!launchProcess.running)
             launchProcess.running = true;

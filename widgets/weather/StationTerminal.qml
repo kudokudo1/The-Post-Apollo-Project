@@ -159,6 +159,12 @@ Rectangle {
     }
 
     function defineAssembly(sceneRect) {
+        console.log(
+            "StationTerminal assembly target:",
+            sceneRect.x, sceneRect.y,
+            sceneRect.width, sceneRect.height
+        );
+
         assemblyDefined = assemblyTracker.defineScene(
             assemblySceneId,
             sceneRect,
@@ -241,8 +247,14 @@ Rectangle {
 
         // Reveal only after the hidden Kitty surface has actually reached the
         // QML bay. This preserves the old "place first, show second" behavior.
-        if (screen && rectMatchesBay(screen.rect))
+        if (screen && rectMatchesBay(screen.rect)) {
+            console.log(
+                "StationTerminal assembly placed:",
+                screen.rect.x, screen.rect.y,
+                screen.rect.width, screen.rect.height
+            );
             revealProcess.running = true;
+        }
     }
 
     // mapToGlobal() has no change signal. Sample the source bay cheaply while

@@ -189,6 +189,31 @@ PanelWindow {
                 screen: Quickshell.screens.find(s => s.name === "DP-5")
             }
         }
+
+        // Git
+
+        Item {
+            width: gitButton.implicitWidth
+            height: gitButton.implicitHeight
+
+            Git {
+                id: gitButton
+
+                anchors.fill: parent
+
+                menuOpen: gitWindow.menuOpen
+
+                onToggleRequested: {
+                    gitWindow.toggle();
+                }
+            }
+
+            GitW {
+                id: gitWindow
+
+                screen: Quickshell.screens.find(s => s.name === "DP-5")
+            }
+        }
     }
 
     // ===== CENTER MODULE ========================================

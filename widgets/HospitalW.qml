@@ -130,6 +130,38 @@ PanelWindow {
         }
     }
 
+    // Background halo. Inset slightly so the drop shadow has room to
+    // render inside the always-mapped PanelWindow surface.
+    Rectangle {
+        id: backgroundGlowSource
+
+        anchors.fill: parent
+        anchors.margins: 8
+
+        color: Colors.black
+        opacity: root.menuOpen ? 0.92 : 0.0
+
+        z: -4
+    }
+
+    DropShadow {
+        anchors.fill: backgroundGlowSource
+        source: backgroundGlowSource
+
+        horizontalOffset: 0
+        verticalOffset: 3
+
+        radius: 30
+        samples: 31
+
+        color: Colors.magenta
+        opacity: root.menuOpen ? 0.42 : 0.0
+
+        z: -5
+
+        transparentBorder: true
+    }
+
     // Active outer frame glow. Kept inside the surface bounds so the
     // menu can remain flush with the top edge.
     Rectangle {

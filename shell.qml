@@ -164,6 +164,10 @@ PanelWindow {
         // Tray
 
         Tray {}
+
+        // Hospital
+
+        Hospital {}
     }
 
     // ===== CENTER MODULE ========================================

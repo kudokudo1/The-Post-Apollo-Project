@@ -105,7 +105,9 @@ Rectangle {
 
             z: 2
 
-            opacity: mouse.pressed
+            opacity: dock.menuOpen
+                     ? 1.0
+                     : mouse.pressed
                      ? 1.0
                      : mouse.containsMouse
                      ? 0.8
@@ -145,7 +147,9 @@ Rectangle {
         spread: 3
         z: -1
 
-        opacity: mouse.pressed
+        opacity: dock.menuOpen
+                 ? 0.75
+                 : mouse.pressed
                  ? 0.6
                  : mouse.containsMouse
                  ? 0.5
@@ -162,7 +166,9 @@ Rectangle {
         spread: 10
         z: 1
 
-        opacity: mouse.pressed
+        opacity: dock.menuOpen
+                 ? 0.16
+                 : mouse.pressed
                  ? 0.12
                  : mouse.containsMouse
                  ? 0.09

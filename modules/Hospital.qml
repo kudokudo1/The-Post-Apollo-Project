@@ -31,15 +31,20 @@ Rectangle {
             id: hospitalMark
 
             anchors.centerIn: parent
-            anchors.verticalCenterOffset: 2
             spacing: dock.markSpacing
+
+            // Give every glyph the same vertical box. This centers the
+            // visible mark instead of centering three different font metrics.
+            height: 34
 
             Text {
                 id: leftBeat
 
+                height: hospitalMark.height
+
                 text: "ﮩ٨ـﮩﮩ"
                 font.pixelSize: dock.beatPixelSize
-                anchors.verticalCenter: parent.verticalCenter
+                verticalAlignment: Text.AlignVCenter
 
                 color: dock.menuOpen
                        ? Colors.magenta
@@ -53,10 +58,11 @@ Rectangle {
             NotoText {
                 id: hospitalCenter
 
+                height: hospitalMark.height
+
                 text: "⚚"
                 font.pixelSize: dock.centerPixelSize
-
-                anchors.verticalCenter: parent.verticalCenter
+                verticalAlignment: Text.AlignVCenter
 
                 color: dock.menuOpen
                        ? Colors.magenta
@@ -70,10 +76,11 @@ Rectangle {
             Text {
                 id: rightBeat
 
+                height: hospitalMark.height
+
                 text: "ﮩ٨ـﮩ"
                 font.pixelSize: dock.beatPixelSize
-
-                anchors.verticalCenter: parent.verticalCenter
+                verticalAlignment: Text.AlignVCenter
 
                 color: dock.menuOpen
                        ? Colors.magenta

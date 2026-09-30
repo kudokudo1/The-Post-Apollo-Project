@@ -324,6 +324,8 @@ favorite-wrapper process identity normalization
 PID reuse / captured-target revalidation
 descendant process-scope expansion
 protected-process unlock + cancel/relock behavior
+protected frozen-process THAW recovery without a second unlock
+failed THAW preserves frozen state
 protected process-resource blocking
 verified per-PID RLIMIT state
 partial RLIMIT result accounting

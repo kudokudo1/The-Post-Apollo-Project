@@ -34,7 +34,8 @@ Scope {
 
     property bool available: false
     property bool refreshing: false
-    property int pendingReads: 0
+    property bool workflowDone: false
+    property bool runsDone: false
 
     property int workflowCount: 0
     property string latestWorkflow: "NOT REQUESTED"
@@ -54,16 +55,18 @@ Scope {
             return;
         }
 
+        available = false;
         refreshing = true;
-        pendingReads = 2;
+        workflowDone = false;
+        runsDone = false;
         lastError = "";
 
         workflowsProcess.exec([
-            "toolbox",
+            "/usr/bin/toolbox",
             "run",
             "-c",
             "fedora-toolbox-44",
-            "gh",
+            "/usr/bin/gh",
             "workflow",
             "list",
             "-R",
@@ -75,11 +78,11 @@ Scope {
         ]);
 
         runsProcess.exec([
-            "toolbox",
+            "/usr/bin/toolbox",
             "run",
             "-c",
             "fedora-toolbox-44",
-            "gh",
+            "/usr/bin/gh",
             "run",
             "list",
             "-R",
@@ -93,121 +96,161 @@ Scope {
         watchdog.restart();
     }
 
-    function finishRead() {
-        pendingReads = Math.max(0, pendingReads - 1);
+    function recordError(prefix, message) {
+        const clean = String(message || "").trim();
 
-        if (pendingReads === 0) {
-            refreshing = false;
-            watchdog.stop();
+        if (!clean)
+            return;
 
-            if (!lastError)
-                available = true;
+        if (!lastError)
+            lastError = prefix + clean;
+    }
+
+    function parseWorkflows(payload) {
+        const raw = String(payload || "").trim();
+
+        if (!raw)
+            throw new Error("EMPTY WORKFLOW RESPONSE");
+
+        const rows = JSON.parse(raw);
+
+        if (!Array.isArray(rows))
+            throw new Error("WORKFLOW RESPONSE IS NOT AN ARRAY");
+
+        workflowCount = rows.length;
+        latestWorkflow = rows.length > 0
+            ? String(rows[0].name || rows[0].path || "UNKNOWN")
+            : "NO WORKFLOWS";
+    }
+
+    function parseRuns(payload) {
+        const raw = String(payload || "").trim();
+
+        if (!raw)
+            throw new Error("EMPTY RUN RESPONSE");
+
+        const rows = JSON.parse(raw);
+
+        if (!Array.isArray(rows))
+            throw new Error("RUN RESPONSE IS NOT AN ARRAY");
+
+        if (rows.length > 0) {
+            const run = rows[0];
+
+            latestWorkflow = String(run.workflowName || latestWorkflow || "UNKNOWN");
+            latestRunStatus = String(run.status || "UNKNOWN").toUpperCase();
+            latestRunConclusion = String(run.conclusion || "").toUpperCase();
+            latestRunBranch = String(run.headBranch || "");
+        } else {
+            latestRunStatus = "NO RUNS";
+            latestRunConclusion = "";
+            latestRunBranch = "";
         }
     }
 
-    function consumeWorkflows(line) {
-        const raw = String(line || "").trim();
-
-        if (!raw)
+    function finishWorkflow(exitCode, stdoutText, stderrText) {
+        if (!refreshing || workflowDone)
             return;
 
-        try {
-            const rows = JSON.parse(raw);
-
-            if (Array.isArray(rows)) {
-                workflowCount = rows.length;
-                latestWorkflow = rows.length > 0
-                    ? String(rows[0].name || rows[0].path || "UNKNOWN")
-                    : "NO WORKFLOWS";
-                finishRead();
+        if (Number(exitCode) !== 0) {
+            recordError("WORKFLOWS EXIT " + String(exitCode) + " // ", stderrText || "NO STDERR");
+        } else {
+            try {
+                parseWorkflows(stdoutText);
+            } catch (error) {
+                recordError("WORKFLOW PARSE // ", String(error));
             }
-        } catch (error) {
-            lastError = "WORKFLOW PARSE: " + String(error);
-            finishRead();
         }
+
+        workflowDone = true;
+        finishIfComplete();
     }
 
-    function consumeRuns(line) {
-        const raw = String(line || "").trim();
-
-        if (!raw)
+    function finishRuns(exitCode, stdoutText, stderrText) {
+        if (!refreshing || runsDone)
             return;
 
-        try {
-            const rows = JSON.parse(raw);
-
-            if (Array.isArray(rows)) {
-                if (rows.length > 0) {
-                    const run = rows[0];
-
-                    latestWorkflow = String(run.workflowName || latestWorkflow || "UNKNOWN");
-                    latestRunStatus = String(run.status || "UNKNOWN").toUpperCase();
-                    latestRunConclusion = String(run.conclusion || "").toUpperCase();
-                    latestRunBranch = String(run.headBranch || "");
-                } else {
-                    latestRunStatus = "NO RUNS";
-                    latestRunConclusion = "";
-                    latestRunBranch = "";
-                }
-
-                finishRead();
+        if (Number(exitCode) !== 0) {
+            recordError("RUNS EXIT " + String(exitCode) + " // ", stderrText || "NO STDERR");
+        } else {
+            try {
+                parseRuns(stdoutText);
+            } catch (error) {
+                recordError("RUN PARSE // ", String(error));
             }
-        } catch (error) {
-            lastError = "RUN PARSE: " + String(error);
-            finishRead();
         }
+
+        runsDone = true;
+        finishIfComplete();
+    }
+
+    function finishIfComplete() {
+        if (!workflowDone || !runsDone)
+            return;
+
+        refreshing = false;
+        watchdog.stop();
+        available = !lastError;
     }
 
     Process {
         id: workflowsProcess
 
-        stdout: SplitParser {
-            onRead: function(line) {
-                githubService.consumeWorkflows(line);
-            }
+        stdout: StdioCollector {
+            id: workflowsStdout
         }
 
-        stderr: SplitParser {
-            onRead: function(line) {
-                const message = String(line || "").trim();
+        stderr: StdioCollector {
+            id: workflowsStderr
+        }
 
-                if (message.length > 0)
-                    githubService.lastError = message;
-            }
+        onExited: function(exitCode, exitStatus) {
+            githubService.finishWorkflow(
+                exitCode,
+                workflowsStdout.text,
+                workflowsStderr.text
+            );
         }
     }
 
     Process {
         id: runsProcess
 
-        stdout: SplitParser {
-            onRead: function(line) {
-                githubService.consumeRuns(line);
-            }
+        stdout: StdioCollector {
+            id: runsStdout
         }
 
-        stderr: SplitParser {
-            onRead: function(line) {
-                const message = String(line || "").trim();
+        stderr: StdioCollector {
+            id: runsStderr
+        }
 
-                if (message.length > 0)
-                    githubService.lastError = message;
-            }
+        onExited: function(exitCode, exitStatus) {
+            githubService.finishRuns(
+                exitCode,
+                runsStdout.text,
+                runsStderr.text
+            );
         }
     }
 
     Timer {
         id: watchdog
-        interval: 10000
+        interval: 12000
         repeat: false
 
         onTriggered: {
-            githubService.refreshing = false;
-            githubService.pendingReads = 0;
-            githubService.available = false;
+            if (!githubService.refreshing)
+                return;
 
-            if (!githubService.lastError)
-                githubService.lastError = "GITHUB READ TIMEOUT";
+            githubService.refreshing = false;
+            githubService.available = false;
+            githubService.lastError = "GITHUB PROCESS TIMEOUT";
+
+            if (workflowsProcess.running)
+                workflowsProcess.running = false;
+
+            if (runsProcess.running)
+                runsProcess.running = false;
         }
     }
 }

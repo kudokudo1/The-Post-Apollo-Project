@@ -668,23 +668,6 @@ PanelWindow {
                                     readonly property bool selected:
                                         root.selectedCommitSha === String(sha || "")
 
-                                    Item {
-                                        width: 22
-                                        height: 22
-                                        x: topologyBody.nodeX(lane) - width / 2
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        visible: topologyRow.selected
-                                        z: 1
-
-                                        RectangularShadow {
-                                            anchors.fill: parent
-                                            spread: 4
-                                            z: -1
-                                            opacity: 0.52
-                                            color: Colors.magenta
-                                        }
-                                    }
-
                                     Rectangle {
                                         width: isHead || String(refsText || "").length > 0 ? 10 : 8
                                         height: width
@@ -719,10 +702,26 @@ PanelWindow {
 
                                         layer.enabled: true
                                         layer.effect: DropShadow {
-                                            radius: isHead ? 7 : topologyStar.refLandmark ? 5 : 5
-                                            samples: isHead ? 9 : 7
-                                            opacity: isHead ? 0.78 : topologyStar.refLandmark ? 0.48 : 0.38
-                                            color: topologyStar.starColor
+                                            radius: topologyRow.selected
+                                                    ? 10
+                                                    : isHead
+                                                    ? 7
+                                                    : 5
+                                            samples: topologyRow.selected
+                                                     ? 17
+                                                     : isHead
+                                                     ? 9
+                                                     : 7
+                                            opacity: topologyRow.selected
+                                                     ? 0.78
+                                                     : isHead
+                                                     ? 0.78
+                                                     : topologyStar.refLandmark
+                                                     ? 0.48
+                                                     : 0.38
+                                            color: topologyRow.selected
+                                                   ? Colors.yellow
+                                                   : topologyStar.starColor
                                             transparentBorder: true
                                         }
                                     }

@@ -10,14 +10,16 @@ Rectangle {
     implicitHeight: 50
     implicitWidth: Math.max(72, hospitalMark.implicitWidth + 18)
 
-    color: Colors.black
+    color: dock.menuOpen ? Colors.yellow : Colors.black
 
     // Keep these exposed so the mark can be tuned without rebuilding the button.
     property int beatPixelSize: 11
     property int centerPixelSize: 28
     property int markSpacing: 0
 
-    signal leftClicked()
+    property bool menuOpen: false
+
+    signal toggleRequested()
     signal rightClicked()
 
     Item {
@@ -39,7 +41,9 @@ Rectangle {
                 font.pixelSize: dock.beatPixelSize
                 anchors.verticalCenter: parent.verticalCenter
 
-                color: mouse.pressed
+                color: dock.menuOpen
+                       ? Colors.magenta
+                       : mouse.pressed
                        ? Colors.magenta
                        : mouse.containsMouse
                        ? Colors.magenta
@@ -54,7 +58,9 @@ Rectangle {
 
                 anchors.verticalCenter: parent.verticalCenter
 
-                color: mouse.pressed
+                color: dock.menuOpen
+                       ? Colors.magenta
+                       : mouse.pressed
                        ? Colors.magenta
                        : mouse.containsMouse
                        ? Colors.magenta
@@ -69,7 +75,9 @@ Rectangle {
 
                 anchors.verticalCenter: parent.verticalCenter
 
-                color: mouse.pressed
+                color: dock.menuOpen
+                       ? Colors.magenta
+                       : mouse.pressed
                        ? Colors.magenta
                        : mouse.containsMouse
                        ? Colors.magenta
@@ -114,7 +122,7 @@ Rectangle {
 
         onClicked: function(mouse) {
             if (mouse.button === Qt.LeftButton) {
-                dock.leftClicked();
+                dock.toggleRequested();
             }
 
             if (mouse.button === Qt.RightButton) {

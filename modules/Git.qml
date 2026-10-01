@@ -61,8 +61,8 @@ Rectangle {
             source: gitMark
             horizontalOffset: 0
             verticalOffset: 0
-            radius: 14
-            samples: 15
+            radius: dock.menuOpen ? 18 : 14
+            samples: dock.menuOpen ? 21 : 15
             color: Colors.orange
             opacity: dock.menuOpen
                      ? 1.0
@@ -96,7 +96,7 @@ Rectangle {
         z: -1
         color: Colors.orange
         opacity: dock.menuOpen
-                 ? 0.75
+                 ? 0.86
                  : mouse.pressed
                  ? 0.60
                  : mouse.containsMouse
@@ -110,7 +110,7 @@ Rectangle {
         z: 1
         color: Colors.orange
         opacity: dock.menuOpen
-                 ? 0.16
+                 ? 0.22
                  : mouse.pressed
                  ? 0.12
                  : mouse.containsMouse

@@ -166,10 +166,10 @@ PanelWindow {
 
         layer.enabled: true
         layer.effect: DropShadow {
-            radius: 6
+            radius: 7
             samples: 9
-            opacity: 0.46
-            color: Colors.blue
+            opacity: 0.48
+            color: Colors.cyan
             transparentBorder: true
         }
     }
@@ -177,9 +177,46 @@ PanelWindow {
     component DimValue: GohuText {
         font.pixelSize: 11
         color: Colors.white
-        opacity: 0.30
+        opacity: 0.34
         elide: Text.ElideRight
-        layer.enabled: false
+
+        layer.enabled: true
+        layer.effect: DropShadow {
+            radius: 3
+            samples: 5
+            opacity: 0.16
+            color: Colors.white
+            transparentBorder: true
+        }
+    }
+
+    component OrangeLabel: GohuText {
+        font.pixelSize: 10
+        color: Colors.orange
+
+        layer.enabled: true
+        layer.effect: DropShadow {
+            radius: 5
+            samples: 7
+            opacity: 0.38
+            color: Colors.orange
+            transparentBorder: true
+        }
+    }
+
+    component CyanValue: GohuText {
+        font.pixelSize: 11
+        color: Colors.cyan
+        elide: Text.ElideRight
+
+        layer.enabled: true
+        layer.effect: DropShadow {
+            radius: 5
+            samples: 7
+            opacity: 0.30
+            color: Colors.cyan
+            transparentBorder: true
+        }
     }
 
     component ActionButton: Rectangle {
@@ -730,12 +767,12 @@ PanelWindow {
                     Row {
                         spacing: 10
 
-                        MetaLabel {
+                        OrangeLabel {
                             width: 100
                             text: "ORIGIN"
                         }
 
-                        MetaValue {
+                        CyanValue {
                             width: 365
                             text: gitService.origin
                         }
@@ -744,7 +781,7 @@ PanelWindow {
                     Row {
                         spacing: 10
 
-                        MetaLabel {
+                        OrangeLabel {
                             width: 100
                             text: "GITHUB"
                         }
@@ -758,9 +795,14 @@ PanelWindow {
                                 text: "LIVE"
                             }
 
-                            MetaValue {
+                            OrangeValue {
                                 visible: githubService.available && !githubService.refreshing
-                                text: " // " + githubService.repoSlug
+                                text: " // "
+                            }
+
+                            CyanValue {
+                                visible: githubService.available && !githubService.refreshing
+                                text: githubService.repoSlug
                             }
 
                             MetaValue {

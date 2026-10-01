@@ -12,6 +12,8 @@ PanelWindow {
 
     property bool menuOpen: false
     property string activePage: "git"
+    property string factoryTemplate: "smoke"
+    property string factoryTrigger: "manual"
 
     property int panelWidth: 540
     property int panelHeight: 650
@@ -73,6 +75,24 @@ PanelWindow {
         root.activePage = "github";
         gitService.refresh();
         githubService.refresh();
+    }
+
+    function cycleFactoryTemplate() {
+        root.factoryTemplate = root.factoryTemplate === "smoke"
+                               ? "shell-check"
+                               : "smoke";
+        githubService.clearFactoryResult();
+    }
+
+    function cycleFactoryTrigger() {
+        if (root.factoryTrigger === "manual")
+            root.factoryTrigger = "push";
+        else if (root.factoryTrigger === "push")
+            root.factoryTrigger = "manual+push";
+        else
+            root.factoryTrigger = "manual";
+
+        githubService.clearFactoryResult();
     }
 
     onMenuOpenChanged: {
@@ -1083,78 +1103,189 @@ PanelWindow {
                                 anchors.fill: parent
                                 spread: 4
                                 z: -1
-                                opacity: 0.18
+                                opacity: 0.22
                                 color: Colors.orange
                             }
 
                             Column {
                                 anchors {
                                     fill: parent
-                                    margins: 12
+                                    margins: 10
                                 }
 
-                                spacing: 10
+                                spacing: 4
 
                                 SectionLabel {
                                     text: "WORKFLOW FACTORY"
                                 }
 
                                 Row {
-                                    spacing: 10
+                                    width: parent.width
+                                    height: 30
+                                    spacing: 8
 
-                                    MetaLabel {
-                                        width: 100
-                                        text: "BACKEND"
+                                    ActionButton {
+                                        width: (parent.width - 8) / 2
+                                        height: 30
+                                        label: "TEMPLATE // " + root.factoryTemplate.toUpperCase()
+                                        enabledAction: !githubService.factoryBusy
+                                        onTriggered: root.cycleFactoryTemplate()
                                     }
 
-                                    OrangeValue {
-                                        width: 365
-                                        text: githubService.available ? "PX ONLINE" : "WAITING FOR PX"
+                                    ActionButton {
+                                        width: (parent.width - 8) / 2
+                                        height: 30
+                                        label: "TRIGGER // " + root.factoryTrigger.toUpperCase()
+                                        enabledAction: !githubService.factoryBusy
+                                        onTriggered: root.cycleFactoryTrigger()
                                     }
                                 }
 
                                 Row {
-                                    spacing: 10
+                                    width: parent.width
+                                    height: 27
+                                    spacing: 8
 
-                                    MetaLabel {
-                                        width: 100
-                                        text: "CREATE"
+                                    BlueLabel {
+                                        width: 68
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: "NAME"
                                     }
 
-                                    MetaValue {
-                                        width: 365
-                                        text: "TEMPLATE → TRIGGER → NAME → PREVIEW → INSTALL"
+                                    Rectangle {
+                                        width: parent.width - 76
+                                        height: 26
+                                        color: Colors.black
+                                        border.width: 1
+                                        border.color: factoryNameInput.activeFocus ? Colors.orange : Colors.cyan
+
+                                        RectangularShadow {
+                                            anchors.fill: parent
+                                            spread: 2
+                                            z: -1
+                                            opacity: factoryNameInput.activeFocus ? 0.34 : 0.16
+                                            color: factoryNameInput.activeFocus ? Colors.orange : Colors.cyan
+                                        }
+
+                                        GohuText {
+                                            anchors {
+                                                left: parent.left
+                                                verticalCenter: parent.verticalCenter
+                                                leftMargin: 7
+                                            }
+
+                                            visible: factoryNameInput.text.length === 0 && !factoryNameInput.activeFocus
+                                            text: "workflow-name"
+                                            font.pixelSize: 10
+                                            color: Colors.white
+                                            opacity: 0.38
+                                        }
+
+                                        TextInput {
+                                            id: factoryNameInput
+
+                                            anchors {
+                                                fill: parent
+                                                margins: 5
+                                            }
+
+                                            verticalAlignment: TextInput.AlignVCenter
+                                            clip: true
+                                            font.family: "GohuFont 11 Nerd Font Mono"
+                                            font.pixelSize: 10
+                                            color: Colors.white
+                                            selectionColor: Colors.magenta
+                                            selectedTextColor: Colors.black
+
+                                            onTextChanged: githubService.clearFactoryResult()
+                                        }
                                     }
                                 }
 
                                 Row {
-                                    spacing: 10
+                                    width: parent.width
+                                    height: 30
+                                    spacing: 8
 
-                                    MetaLabel {
-                                        width: 100
-                                        text: "VALIDATION"
+                                    ActionButton {
+                                        width: (parent.width - 8) / 2
+                                        height: 30
+                                        label: githubService.factoryBusy && githubService.factoryMode === "preview"
+                                               ? "PREVIEWING"
+                                               : "PREVIEW"
+                                        enabledAction: githubService.available
+                                                       && !githubService.factoryBusy
+                                                       && factoryNameInput.text.trim().length > 0
+                                        onTriggered: githubService.previewWorkflow(
+                                            root.factoryTemplate,
+                                            factoryNameInput.text.trim(),
+                                            root.factoryTrigger
+                                        )
                                     }
 
-                                    CyanValue {
-                                        width: 365
-                                        text: "ACTIONLINT CONTRACT READY"
+                                    ActionButton {
+                                        width: (parent.width - 8) / 2
+                                        height: 30
+                                        label: githubService.factoryBusy && githubService.factoryMode === "install"
+                                               ? "INSTALLING"
+                                               : "INSTALL"
+                                        enabledAction: githubService.available
+                                                       && !githubService.factoryBusy
+                                                       && githubService.factoryMode === "preview"
+                                                       && githubService.factoryValidationStatus === "PASS"
+                                                       && githubService.factoryLastTemplate === root.factoryTemplate
+                                                       && githubService.factoryLastTrigger === root.factoryTrigger
+                                                       && githubService.factoryLastSlug === factoryNameInput.text.trim()
+                                        onTriggered: githubService.installWorkflow(
+                                            root.factoryTemplate,
+                                            factoryNameInput.text.trim(),
+                                            root.factoryTrigger
+                                        )
                                     }
                                 }
 
-                                Rectangle {
+                                Row {
                                     width: parent.width
-                                    height: 1
-                                    color: Colors.blue
-                                    opacity: 0.65
-                                }
+                                    height: 18
+                                    spacing: 8
 
-                                GohuText {
-                                    width: parent.width
-                                    text: "PAGE SPLIT COMPLETE // CREATOR + RUN SELECTORS NEXT"
-                                    font.pixelSize: 9
-                                    color: Colors.white
-                                    opacity: 0.72
-                                    wrapMode: Text.Wrap
+                                    BlueLabel {
+                                        width: 68
+                                        text: "PX"
+                                    }
+
+                                    GohuText {
+                                        width: parent.width - 76
+                                        text: {
+                                            if (githubService.factoryBusy)
+                                                return githubService.factoryMode === "install"
+                                                       ? "INSTALLING // VALIDATING + OPENING PR"
+                                                       : "PREVIEWING // VALIDATING";
+
+                                            if (githubService.factoryPullRequest)
+                                                return "PR READY // " + githubService.factoryPullRequest;
+
+                                            if (githubService.factoryValidationStatus === "PASS")
+                                                return "PASS // " + githubService.factoryPath;
+
+                                            if (githubService.factoryValidationStatus === "FAIL"
+                                                    || githubService.factoryValidationStatus === "ERROR")
+                                                return githubService.factoryValidationStatus
+                                                       + " // "
+                                                       + (githubService.factoryValidationMessage || "PX FACTORY ERROR");
+
+                                            return "PREVIEW REQUIRED BEFORE INSTALL";
+                                        }
+
+                                        font.pixelSize: 9
+                                        color: githubService.factoryValidationStatus === "FAIL"
+                                               || githubService.factoryValidationStatus === "ERROR"
+                                               ? Colors.red
+                                               : githubService.factoryValidationStatus === "PASS"
+                                               ? Colors.orange
+                                               : Colors.white
+                                        elide: Text.ElideRight
+                                    }
                                 }
                             }
                         }

@@ -144,6 +144,21 @@ PanelWindow {
         }
     }
 
+    component OrangeValue: GohuText {
+        font.pixelSize: 11
+        color: Colors.orange
+        elide: Text.ElideRight
+
+        layer.enabled: true
+        layer.effect: DropShadow {
+            radius: 6
+            samples: 9
+            opacity: 0.46
+            color: Colors.orange
+            transparentBorder: true
+        }
+    }
+
     component ActionButton: Rectangle {
         id: actionButton
 
@@ -478,7 +493,7 @@ PanelWindow {
                             text: "REPOSITORY"
                         }
 
-                        MetaValue {
+                        OrangeValue {
                             width: 365
                             text: gitService.repository
                         }
@@ -506,7 +521,7 @@ PanelWindow {
                             text: "HEAD"
                         }
 
-                        MetaValue {
+                        OrangeValue {
                             width: 365
                             text: gitService.head
                         }
@@ -520,9 +535,32 @@ PanelWindow {
                             text: "WORKTREE"
                         }
 
-                        MetaValue {
+                        Row {
                             width: 365
-                            text: gitService.worktree
+                            spacing: 0
+
+                            MetaValue {
+                                visible: String(gitService.worktree).indexOf("DIRTY") !== 0
+                                text: gitService.worktree
+                            }
+
+                            MetaValue {
+                                visible: String(gitService.worktree).indexOf("DIRTY") === 0
+                                text: "DIRTY • "
+                            }
+
+                            OrangeValue {
+                                visible: String(gitService.worktree).indexOf("DIRTY") === 0
+                                text: {
+                                    const match = String(gitService.worktree).match(/(\d+)\s+CHANGES/);
+                                    return match ? match[1] : "";
+                                }
+                            }
+
+                            MetaValue {
+                                visible: String(gitService.worktree).indexOf("DIRTY") === 0
+                                text: " CHANGES"
+                            }
                         }
                     }
                 }
@@ -688,15 +726,28 @@ PanelWindow {
                             text: "GITHUB"
                         }
 
-                        MetaValue {
+                        Row {
                             width: 365
-                            text: githubService.refreshing
-                                  ? "READING"
-                                  : githubService.available
-                                  ? "LIVE // " + githubService.repoSlug
-                                  : githubService.lastError
-                                  ? githubService.lastError
-                                  : "NOT REQUESTED"
+                            spacing: 0
+
+                            OrangeValue {
+                                visible: githubService.available && !githubService.refreshing
+                                text: "LIVE"
+                            }
+
+                            MetaValue {
+                                visible: githubService.available && !githubService.refreshing
+                                text: " // " + githubService.repoSlug
+                            }
+
+                            MetaValue {
+                                visible: !githubService.available || githubService.refreshing
+                                text: githubService.refreshing
+                                      ? "READING"
+                                      : githubService.lastError
+                                      ? githubService.lastError
+                                      : "NOT REQUESTED"
+                            }
                         }
                     }
 
@@ -708,11 +759,29 @@ PanelWindow {
                             text: "WORKFLOWS"
                         }
 
-                        MetaValue {
+                        Row {
                             width: 365
-                            text: githubService.available
-                                  ? String(githubService.workflowCount) + " // " + githubService.latestWorkflow
-                                  : "NOT CONNECTED"
+                            spacing: 0
+
+                            OrangeValue {
+                                visible: githubService.available && githubService.workflowCount > 0
+                                text: String(githubService.workflowCount)
+                            }
+
+                            MetaValue {
+                                visible: githubService.available && githubService.workflowCount === 0
+                                text: "0"
+                            }
+
+                            MetaValue {
+                                visible: githubService.available
+                                text: " // " + githubService.latestWorkflow
+                            }
+
+                            MetaValue {
+                                visible: !githubService.available
+                                text: "NOT CONNECTED"
+                            }
                         }
                     }
 
@@ -724,13 +793,31 @@ PanelWindow {
                             text: "LATEST RUN"
                         }
 
-                        MetaValue {
+                        Row {
                             width: 365
-                            text: githubService.available
-                                  ? githubService.latestRunStatus
-                                    + (githubService.latestRunConclusion ? " // " + githubService.latestRunConclusion : "")
-                                    + (githubService.latestRunBranch ? " // " + githubService.latestRunBranch : "")
-                                  : "NOT CONNECTED"
+                            spacing: 0
+
+                            OrangeValue {
+                                visible: githubService.available && githubService.runCount > 0
+                                text: String(githubService.runCount)
+                            }
+
+                            MetaValue {
+                                visible: githubService.available && githubService.runCount === 0
+                                text: "0"
+                            }
+
+                            MetaValue {
+                                visible: githubService.available
+                                text: " // " + githubService.latestRunStatus
+                                      + (githubService.latestRunConclusion ? " // " + githubService.latestRunConclusion : "")
+                                      + (githubService.latestRunBranch ? " // " + githubService.latestRunBranch : "")
+                            }
+
+                            MetaValue {
+                                visible: !githubService.available
+                                text: "NOT CONNECTED"
+                            }
                         }
                     }
                 }

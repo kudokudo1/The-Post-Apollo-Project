@@ -340,7 +340,7 @@ PanelWindow {
             ? Colors.magenta
             : hovered
             ? Colors.orange
-            : Colors.cyan
+            : Colors.white
 
         width: 112
         height: 36
@@ -386,6 +386,7 @@ PanelWindow {
             text: actionButton.label
             font.pixelSize: 11
             color: actionButton.contentColor
+            opacity: 1.0
 
             layer.enabled: !actionButton.pressed
             layer.effect: DropShadow {
@@ -393,11 +394,11 @@ PanelWindow {
                 samples: 11
                 opacity:
                     actionButton.hovered
-                    ? 0.62
+                    ? 0.72
                     : actionButton.selectedAction
-                    ? 0.58
+                    ? 0.68
                     : actionButton.enabledAction
-                    ? 0.46
+                    ? 0.62
                     : 0.12
                 color:
                     actionButton.hovered || actionButton.selectedAction
@@ -518,7 +519,8 @@ PanelWindow {
                 ? Colors.magenta
                 : pageTab.hovered
                 ? Colors.orange
-                : Colors.cyan
+                : Colors.white
+            opacity: 1.0
 
             layer.enabled: !pageTab.pressed
             layer.effect: DropShadow {
@@ -526,10 +528,10 @@ PanelWindow {
                 samples: 11
                 opacity:
                     pageTab.hovered
-                    ? 0.62
+                    ? 0.72
                     : pageTab.selected
-                    ? 0.58
-                    : 0.46
+                    ? 0.68
+                    : 0.62
                 color:
                     pageTab.hovered || pageTab.selected
                     ? Colors.orange

@@ -34,6 +34,7 @@ Rectangle {
                 font.pixelSize: 38
                 anchors.verticalCenter: parent.verticalCenter
                 color: Colors.white
+                opacity: 1.0
 
                 transform: Scale {
                     origin.x: gitDataMark.width / 2
@@ -64,8 +65,8 @@ Rectangle {
                      : mouse.pressed
                      ? 1.0
                      : mouse.containsMouse
-                     ? 0.90
-                     : 0.58
+                     ? 0.96
+                     : 0.76
             transparentBorder: true
         }
     }

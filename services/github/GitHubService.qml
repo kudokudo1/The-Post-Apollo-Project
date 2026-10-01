@@ -52,6 +52,7 @@ Scope {
     property string runsStderrText: ""
 
     property int workflowCount: 0
+    property int runCount: 0
     property string latestWorkflow: "NOT REQUESTED"
     property string latestRunStatus: "NOT REQUESTED"
     property string latestRunConclusion: ""
@@ -74,6 +75,7 @@ Scope {
         workflowDone = false;
         runsDone = false;
         lastError = "";
+        runCount = 0;
 
         workflowExitSeen = false;
         workflowStdoutSeen = false;
@@ -158,6 +160,7 @@ Scope {
         const raw = String(payload || "").trim();
 
         if (!raw) {
+            runCount = 0;
             latestRunStatus = "NO RUNS";
             latestRunConclusion = "";
             latestRunBranch = "";
@@ -168,6 +171,8 @@ Scope {
 
         if (!Array.isArray(rows))
             throw new Error("RUN RESPONSE IS NOT AN ARRAY");
+
+        runCount = rows.length;
 
         if (rows.length > 0) {
             const run = rows[0];

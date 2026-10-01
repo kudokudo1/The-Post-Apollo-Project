@@ -215,6 +215,20 @@ PanelWindow {
         }
     }
 
+    component BlueLabel: GohuText {
+        font.pixelSize: 10
+        color: Colors.blue
+
+        layer.enabled: true
+        layer.effect: DropShadow {
+            radius: 6
+            samples: 7
+            opacity: 0.48
+            color: Colors.cyan
+            transparentBorder: true
+        }
+    }
+
     component CyanValue: GohuText {
         font.pixelSize: 11
         color: Colors.cyan
@@ -245,13 +259,9 @@ PanelWindow {
             enabledAction && actionMouse.pressed
 
         readonly property color contentColor:
-            pressed
+            pressed || selectedAction || hovered
             ? Colors.black
-            : selectedAction
-            ? Colors.magenta
-            : hovered
-            ? Colors.orange
-            : Colors.white
+            : Colors.cyan
 
         width: 112
         height: 36
@@ -279,10 +289,10 @@ PanelWindow {
             : hovered
             ? Colors.orange
             : selectedAction
-            ? Colors.magenta
-            : Colors.blue
+            ? Colors.orange
+            : Colors.cyan
 
-        opacity: enabledAction ? 1.0 : 0.35
+        opacity: enabledAction ? 1.0 : 0.22
 
         Behavior on scale {
             NumberAnimation {
@@ -295,23 +305,23 @@ PanelWindow {
             id: actionText
             anchors.centerIn: parent
             text: actionButton.label
-            font.pixelSize: 10
+            font.pixelSize: 11
             color: actionButton.contentColor
 
             layer.enabled: !actionButton.pressed
             layer.effect: DropShadow {
-                radius: 14
-                samples: 15
+                radius: 15
+                samples: 17
                 opacity:
                     actionButton.hovered
-                    ? 0.80
+                    ? 0.96
                     : actionButton.selectedAction
-                    ? 0.80
-                    : 0.60
+                    ? 0.92
+                    : actionButton.enabledAction
+                    ? 0.82
+                    : 0.18
                 color:
-                    actionButton.selectedAction
-                    ? Colors.magenta
-                    : actionButton.hovered
+                    actionButton.hovered || actionButton.selectedAction
                     ? Colors.orange
                     : Colors.cyan
                 transparentBorder: true
@@ -333,20 +343,20 @@ PanelWindow {
             z: -1
             opacity:
                 actionButton.pressed
-                ? 0.60
+                ? 0.68
                 : actionButton.hovered
-                ? 0.50
+                ? 0.62
                 : actionButton.selectedAction
-                ? 0.50
-                : 0.28
+                ? 0.58
+                : actionButton.enabledAction
+                ? 0.42
+                : 0.10
             color:
                 actionButton.pressed
                 ? Colors.magenta
-                : actionButton.hovered
+                : actionButton.hovered || actionButton.selectedAction
                 ? Colors.orange
-                : actionButton.selectedAction
-                ? Colors.magenta
-                : Colors.blue
+                : Colors.cyan
         }
 
         RectangularShadow {
@@ -355,20 +365,20 @@ PanelWindow {
             z: -2
             opacity:
                 actionButton.pressed
-                ? 0.12
+                ? 0.16
                 : actionButton.hovered
-                ? 0.09
+                ? 0.14
                 : actionButton.selectedAction
-                ? 0.09
-                : 0.04
+                ? 0.12
+                : actionButton.enabledAction
+                ? 0.08
+                : 0.02
             color:
                 actionButton.pressed
                 ? Colors.magenta
-                : actionButton.hovered
+                : actionButton.hovered || actionButton.selectedAction
                 ? Colors.orange
-                : actionButton.selectedAction
-                ? Colors.magenta
-                : Colors.blue
+                : Colors.cyan
         }
     }
 
@@ -389,27 +399,27 @@ PanelWindow {
 
         border.width: 1
         border.color: selected
-                      ? Colors.magenta
+                      ? Colors.orange
                       : tabMouse.containsMouse
                       ? Colors.orange
-                      : Colors.blue
+                      : Colors.cyan
 
         GohuText {
             anchors.centerIn: parent
             text: pageTab.label
-            font.pixelSize: 10
+            font.pixelSize: 11
             color: pageTab.selected
-                   ? Colors.magenta
+                   ? Colors.black
                    : tabMouse.containsMouse
                    ? Colors.orange
-                   : Colors.white
+                   : Colors.cyan
 
             layer.enabled: true
             layer.effect: DropShadow {
-                radius: pageTab.selected ? 12 : 7
-                samples: 13
-                opacity: pageTab.selected ? 0.74 : 0.38
-                color: pageTab.selected ? Colors.magenta : Colors.cyan
+                radius: pageTab.selected ? 14 : tabMouse.containsMouse ? 12 : 10
+                samples: 15
+                opacity: pageTab.selected ? 0.88 : tabMouse.containsMouse ? 0.80 : 0.64
+                color: pageTab.selected || tabMouse.containsMouse ? Colors.orange : Colors.cyan
                 transparentBorder: true
             }
         }
@@ -425,8 +435,8 @@ PanelWindow {
             anchors.fill: parent
             spread: selected ? 5 : 3
             z: -1
-            opacity: selected ? 0.42 : tabMouse.containsMouse ? 0.28 : 0.12
-            color: selected ? Colors.magenta : tabMouse.containsMouse ? Colors.orange : Colors.blue
+            opacity: selected ? 0.55 : tabMouse.containsMouse ? 0.42 : 0.24
+            color: selected || tabMouse.containsMouse ? Colors.orange : Colors.cyan
         }
     }
 
@@ -876,12 +886,12 @@ PanelWindow {
                                 Row {
                                     spacing: 10
 
-                                    OrangeLabel {
+                                    BlueLabel {
                                         width: 100
                                         text: "ORIGIN"
                                     }
 
-                                    CyanValue {
+                                    OrangeValue {
                                         width: 365
                                         text: gitService.origin
                                     }
@@ -1180,7 +1190,7 @@ PanelWindow {
                                 Row {
                                     spacing: 10
 
-                                    MetaLabel {
+                                    BlueLabel {
                                         width: 100
                                         text: "BRIDGE"
                                     }

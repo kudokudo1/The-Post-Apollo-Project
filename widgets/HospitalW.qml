@@ -144,6 +144,50 @@ PanelWindow {
         }
     }
 
+    component OrangeLabel: GohuText {
+        font.pixelSize: 10
+        color: Colors.orange
+
+        layer.enabled: true
+        layer.effect: DropShadow {
+            radius: 5
+            samples: 7
+            opacity: 0.38
+            color: Colors.orange
+            transparentBorder: true
+        }
+    }
+
+    component CyanValue: GohuText {
+        font.pixelSize: 11
+        color: Colors.cyan
+        elide: Text.ElideRight
+
+        layer.enabled: true
+        layer.effect: DropShadow {
+            radius: 5
+            samples: 7
+            opacity: 0.30
+            color: Colors.cyan
+            transparentBorder: true
+        }
+    }
+
+    component BlueValue: GohuText {
+        font.pixelSize: 11
+        color: Colors.blue
+        elide: Text.ElideRight
+
+        layer.enabled: true
+        layer.effect: DropShadow {
+            radius: 7
+            samples: 9
+            opacity: 0.48
+            color: Colors.cyan
+            transparentBorder: true
+        }
+    }
+
     component RoomRow: Rectangle {
         id: roomRow
 
@@ -958,22 +1002,14 @@ PanelWindow {
                     Row {
                         spacing: 10
 
-                        MetaLabel {
+                        OrangeLabel {
                             width: 110
                             text: "BRANCH"
                         }
 
-                        MetaValue {
+                        CyanValue {
                             width: 500
                             text: patientService.branch
-
-                            layer.effect: DropShadow {
-                                radius: 7
-                                samples: 9
-                                opacity: 0.34
-                                color: Colors.cyan
-                                transparentBorder: true
-                            }
                         }
                     }
 
@@ -989,15 +1025,8 @@ PanelWindow {
                             width: 500
                             spacing: 0
 
-                            MetaValue {
+                            BlueValue {
                                 text: patientService.head + " // "
-                                layer.effect: DropShadow {
-                                    radius: 7
-                                    samples: 9
-                                    opacity: 0.34
-                                    color: Colors.cyan
-                                    transparentBorder: true
-                                }
                             }
 
                             GohuText {

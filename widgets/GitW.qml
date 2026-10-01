@@ -1225,68 +1225,31 @@ PanelWindow {
                                         border.width: 1
                                         border.color: Colors.cyan
 
-                                        Column {
+                                        SelectorDial {
                                             anchors {
                                                 fill: parent
-                                                margins: 8
+                                                margins: 3
                                             }
 
-                                            spacing: 5
+                                            labelText: "IGNITION"
+                                            options: ["manual", "push", "manual+push"]
+                                            displayOptions: ["MAN", "PUSH", "M+P"]
+                                            currentIndex: root.factoryTrigger === "push"
+                                                          ? 1
+                                                          : root.factoryTrigger === "manual+push"
+                                                          ? 2
+                                                          : 0
+                                            readoutText: root.factoryTrigger.toUpperCase()
 
-                                            GohuText {
-                                                width: parent.width
-                                                text: "IGNITION"
-                                                horizontalAlignment: Text.AlignHCenter
-                                                font.pixelSize: 10
-                                                color: Colors.magenta
+                                            onSelectionRequested: function(index, value) {
+                                                const next = String(value);
+
+                                                if (root.factoryTrigger === next)
+                                                    return;
+
+                                                root.factoryTrigger = next;
+                                                githubService.clearFactoryResult();
                                             }
-
-                                            Item {
-                                                width: parent.width
-                                                height: 94
-
-                                                Rectangle {
-                                                    anchors.centerIn: parent
-                                                    width: 88
-                                                    height: 88
-                                                    radius: 44
-                                                    color: Colors.dark
-                                                    border.width: 2
-                                                    border.color: Colors.cyan
-
-                                                    Rectangle {
-                                                        anchors.centerIn: parent
-                                                        width: 62
-                                                        height: 62
-                                                        radius: 31
-                                                        color: Colors.black
-                                                        border.width: 1
-                                                        border.color: Colors.orange
-                                                    }
-
-                                                    GohuText {
-                                                        anchors.centerIn: parent
-                                                        text: root.factoryTrigger.toUpperCase()
-                                                        font.pixelSize: 9
-                                                        color: Colors.orange
-                                                    }
-                                                }
-                                            }
-
-                                            GohuText {
-                                                width: parent.width
-                                                text: "DIAL BAY // TEMP CLICK"
-                                                horizontalAlignment: Text.AlignHCenter
-                                                font.pixelSize: 7
-                                                color: Colors.white
-                                                opacity: 0.65
-                                            }
-                                        }
-
-                                        MouseArea {
-                                            anchors.fill: parent
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: root.cycleFactoryTrigger()
                                         }
                                     }
 
@@ -1298,71 +1261,27 @@ PanelWindow {
                                         border.width: 1
                                         border.color: Colors.cyan
 
-                                        Column {
+                                        SelectorDial {
                                             anchors {
                                                 fill: parent
-                                                margins: 8
+                                                margins: 3
                                             }
 
-                                            spacing: 5
+                                            labelText: "OPERATION"
+                                            options: ["smoke", "shell-check"]
+                                            displayOptions: ["SMOKE", "SHELL"]
+                                            currentIndex: root.factoryTemplate === "shell-check" ? 1 : 0
+                                            readoutText: root.factoryTemplate.toUpperCase()
 
-                                            GohuText {
-                                                width: parent.width
-                                                text: "OPERATION"
-                                                horizontalAlignment: Text.AlignHCenter
-                                                font.pixelSize: 10
-                                                color: Colors.magenta
+                                            onSelectionRequested: function(index, value) {
+                                                const next = String(value);
+
+                                                if (root.factoryTemplate === next)
+                                                    return;
+
+                                                root.factoryTemplate = next;
+                                                githubService.clearFactoryResult();
                                             }
-
-                                            Item {
-                                                width: parent.width
-                                                height: 94
-
-                                                Rectangle {
-                                                    anchors.centerIn: parent
-                                                    width: 88
-                                                    height: 88
-                                                    radius: 44
-                                                    color: Colors.dark
-                                                    border.width: 2
-                                                    border.color: Colors.cyan
-
-                                                    Rectangle {
-                                                        anchors.centerIn: parent
-                                                        width: 62
-                                                        height: 62
-                                                        radius: 31
-                                                        color: Colors.black
-                                                        border.width: 1
-                                                        border.color: Colors.orange
-                                                    }
-
-                                                    GohuText {
-                                                        anchors.centerIn: parent
-                                                        width: 56
-                                                        text: root.factoryTemplate.toUpperCase()
-                                                        horizontalAlignment: Text.AlignHCenter
-                                                        wrapMode: Text.Wrap
-                                                        font.pixelSize: 8
-                                                        color: Colors.orange
-                                                    }
-                                                }
-                                            }
-
-                                            GohuText {
-                                                width: parent.width
-                                                text: "DIAL BAY // TEMP CLICK"
-                                                horizontalAlignment: Text.AlignHCenter
-                                                font.pixelSize: 7
-                                                color: Colors.white
-                                                opacity: 0.65
-                                            }
-                                        }
-
-                                        MouseArea {
-                                            anchors.fill: parent
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: root.cycleFactoryTemplate()
                                         }
                                     }
 
@@ -1374,64 +1293,18 @@ PanelWindow {
                                         border.width: 1
                                         border.color: Colors.cyan
 
-                                        Column {
+                                        SelectorDial {
                                             anchors {
                                                 fill: parent
-                                                margins: 8
+                                                margins: 3
                                             }
 
-                                            spacing: 5
-
-                                            GohuText {
-                                                width: parent.width
-                                                text: "TARGET"
-                                                horizontalAlignment: Text.AlignHCenter
-                                                font.pixelSize: 10
-                                                color: Colors.magenta
-                                            }
-
-                                            Item {
-                                                width: parent.width
-                                                height: 94
-
-                                                Rectangle {
-                                                    anchors.centerIn: parent
-                                                    width: 88
-                                                    height: 88
-                                                    radius: 44
-                                                    color: Colors.dark
-                                                    border.width: 2
-                                                    border.color: Colors.cyan
-
-                                                    Rectangle {
-                                                        anchors.centerIn: parent
-                                                        width: 62
-                                                        height: 62
-                                                        radius: 31
-                                                        color: Colors.black
-                                                        border.width: 1
-                                                        border.color: Colors.orange
-                                                    }
-
-                                                    GohuText {
-                                                        anchors.centerIn: parent
-                                                        width: 56
-                                                        text: "CURRENT\nREPO"
-                                                        horizontalAlignment: Text.AlignHCenter
-                                                        font.pixelSize: 8
-                                                        color: Colors.orange
-                                                    }
-                                                }
-                                            }
-
-                                            GohuText {
-                                                width: parent.width
-                                                text: "DIAL BAY // RESERVED"
-                                                horizontalAlignment: Text.AlignHCenter
-                                                font.pixelSize: 7
-                                                color: Colors.white
-                                                opacity: 0.65
-                                            }
+                                            labelText: "TARGET"
+                                            options: ["current-repo"]
+                                            displayOptions: ["REPO"]
+                                            currentIndex: 0
+                                            interactive: false
+                                            readoutText: "CURRENT REPO"
                                         }
                                     }
                                 }

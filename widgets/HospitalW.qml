@@ -1001,20 +1001,22 @@ PanelWindow {
                             }
 
                             GohuText {
+                                readonly property bool cleanState:
+                                    String(patientService.worktree || "")
+                                        .trim()
+                                        .toUpperCase() === "CLEAN"
+
                                 text: patientService.worktree
                                 font.pixelSize: 11
-                                color: patientService.worktree === "CLEAN"
-                                       ? Colors.orange
-                                       : Colors.white
+                                opacity: 1.0
+                                color: cleanState ? Colors.orange : Colors.white
 
                                 layer.enabled: true
                                 layer.effect: DropShadow {
-                                    radius: patientService.worktree === "CLEAN" ? 6 : 7
+                                    radius: cleanState ? 7 : 7
                                     samples: 9
-                                    opacity: patientService.worktree === "CLEAN" ? 0.46 : 0.34
-                                    color: patientService.worktree === "CLEAN"
-                                           ? Colors.orange
-                                           : Colors.cyan
+                                    opacity: cleanState ? 0.58 : 0.34
+                                    color: cleanState ? Colors.orange : Colors.cyan
                                     transparentBorder: true
                                 }
                             }

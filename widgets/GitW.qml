@@ -62,6 +62,10 @@ PanelWindow {
     surfaceFormat.opaque: false
     visible: true
 
+    // PanelWindow defaults to non-focusable. The GitHub factory contains a
+    // TextInput, so let Wayland grant keyboard focus while that page is open.
+    focusable: root.menuOpen && root.activePage === "github"
+
     mask: Region {
         x: 0
         y: 0
@@ -1264,6 +1268,8 @@ PanelWindow {
                                                 margins: 5
                                             }
 
+                                            activeFocusOnPress: true
+                                            selectByMouse: true
                                             verticalAlignment: TextInput.AlignVCenter
                                             clip: true
                                             font.family: "GohuFont 11 Nerd Font Mono"

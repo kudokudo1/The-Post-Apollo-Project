@@ -437,6 +437,8 @@ Item {
             model: dialRoot.optionCount()
 
             delegate: Item {
+                id: optionMark
+
                 required property int index
 
                 readonly property real labelAngle: dialRoot.angleForIndex(index)
@@ -464,10 +466,10 @@ Item {
                     layer.enabled: true
                     layer.effect: MultiEffect {
                         shadowEnabled: true
-                        shadowColor: parent.index === dialRoot.currentIndex
+                        shadowColor: optionMark.index === dialRoot.currentIndex
                                      ? dialRoot.markerColor
                                      : dialRoot.labelColor
-                        shadowOpacity: parent.index === dialRoot.currentIndex ? 0.58 : 0.26
+                        shadowOpacity: optionMark.index === dialRoot.currentIndex ? 0.58 : 0.26
                         shadowBlur: 0.35
                     }
                 }
@@ -481,7 +483,7 @@ Item {
 
                     onClicked: {
                         dialRoot.forceActiveFocus();
-                        dialRoot.requestIndex(parent.index);
+                        dialRoot.requestIndex(optionMark.index);
                     }
                 }
             }

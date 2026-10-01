@@ -64,9 +64,9 @@ PanelWindow {
     surfaceFormat.opaque: false
     visible: true
 
-    // PanelWindow defaults to non-focusable. The GitHub factory contains a
-    // TextInput, so let Wayland grant keyboard focus while that page is open.
-    focusable: root.menuOpen && root.activePage === "github"
+    // Both cameras contain typeable controls, so let Wayland grant focus
+    // while the Git machine is open.
+    focusable: root.menuOpen
 
     mask: Region {
         x: 0
@@ -317,6 +317,101 @@ PanelWindow {
             samples: 7
             opacity: 0.30
             color: Colors.cyan
+            transparentBorder: true
+        }
+    }
+
+    component SelectorInput: Rectangle {
+        id: selectorInput
+
+        property string valueText: ""
+        property string draftText: valueText
+        property string placeholderText: ""
+        property color accentColor: Colors.cyan
+        property bool editable: true
+
+        signal submitted(string value)
+
+        height: 28
+        color: Colors.black
+        border.width: 1
+        border.color: input.activeFocus ? Colors.yellow : selectorInput.accentColor
+
+        onValueTextChanged: {
+            if (!input.activeFocus)
+                draftText = valueText;
+        }
+
+        TextInput {
+            id: input
+
+            anchors {
+                fill: parent
+                leftMargin: 7
+                rightMargin: 7
+            }
+
+            text: selectorInput.draftText
+            readOnly: !selectorInput.editable
+            selectByMouse: true
+            clip: true
+
+            font.family: GohuFont.family
+            font.pixelSize: 10
+            color: selectorInput.accentColor
+            selectionColor: Colors.orange
+            selectedTextColor: Colors.black
+            verticalAlignment: TextInput.AlignVCenter
+
+            onTextEdited: selectorInput.draftText = text
+
+            onAccepted: {
+                const candidate = String(text || "").trim();
+
+                if (candidate)
+                    selectorInput.submitted(candidate);
+
+                focus = false;
+            }
+
+            Keys.onEscapePressed: function(event) {
+                selectorInput.draftText = selectorInput.valueText;
+                focus = false;
+                event.accepted = true;
+            }
+
+            onActiveFocusChanged: {
+                if (activeFocus) {
+                    selectorInput.draftText = selectorInput.valueText;
+                    text = selectorInput.valueText;
+                    selectAll();
+                } else {
+                    selectorInput.draftText = selectorInput.valueText;
+                    text = selectorInput.valueText;
+                }
+            }
+        }
+
+        GohuText {
+            anchors {
+                left: parent.left
+                leftMargin: 7
+                verticalCenter: parent.verticalCenter
+            }
+
+            visible: !input.activeFocus && !selectorInput.valueText
+            text: selectorInput.placeholderText
+            font.pixelSize: 9
+            color: Colors.white
+            opacity: 0.48
+        }
+
+        layer.enabled: input.activeFocus
+        layer.effect: DropShadow {
+            radius: 7
+            samples: 9
+            opacity: input.activeFocus ? 0.62 : 0.0
+            color: Colors.yellow
             transparentBorder: true
         }
     }
@@ -644,6 +739,54 @@ PanelWindow {
             opacity: 0.70
         }
 
+        IndexRail {
+            id: repoRail
+
+            visible: root.activePage === "git"
+            z: 100
+            anchors {
+                left: parent.left
+                leftMargin: 2
+                top: parent.top
+                topMargin: 138
+                bottom: parent.bottom
+                bottomMargin: 18
+            }
+
+            count: gitService.repoCount
+            currentIndex: gitService.repoIndexOfPath(gitService.repoPath)
+            accentColor: Colors.orange
+            sideLabel: "REPO"
+
+            onIndexRequested: function(index) {
+                gitService.selectRepo(index);
+            }
+        }
+
+        IndexRail {
+            id: remoteRail
+
+            visible: root.activePage === "git"
+            z: 100
+            anchors {
+                right: parent.right
+                rightMargin: 2
+                top: parent.top
+                topMargin: 138
+                bottom: parent.bottom
+                bottomMargin: 18
+            }
+
+            count: gitService.remoteBranchCount
+            currentIndex: gitService.remoteIndexOf(gitService.selectedRemoteBranch)
+            accentColor: Colors.cyan
+            sideLabel: "REMOTE"
+
+            onIndexRequested: function(index) {
+                gitService.selectRemote(index);
+            }
+        }
+
         Column {
             anchors {
                 fill: parent
@@ -836,28 +979,14 @@ PanelWindow {
                                             onTriggered: gitService.cycleRepo(-1)
                                         }
 
-                                        Rectangle {
+                                        SelectorInput {
                                             width: parent.width - 64
-                                            height: 28
-                                            color: Colors.black
-                                            border.width: 1
-                                            border.color: Colors.orange
+                                            valueText: gitService.repoLabel
+                                            placeholderText: "TYPE REPO NAME"
+                                            accentColor: Colors.orange
 
-                                            OrangeValue {
-                                                anchors {
-                                                    fill: parent
-                                                    leftMargin: 7
-                                                    rightMargin: 7
-                                                }
-                                                verticalAlignment: Text.AlignVCenter
-                                                text: gitService.repoLabel
-                                            }
-
-                                            MouseArea {
-                                                anchors.fill: parent
-                                                enabled: gitService.repoCount > 1
-                                                cursorShape: Qt.PointingHandCursor
-                                                onClicked: gitService.cycleRepo(1)
+                                            onSubmitted: function(value) {
+                                                gitService.selectRepoText(value);
                                             }
                                         }
 
@@ -959,30 +1088,17 @@ PanelWindow {
                                             onTriggered: gitService.cycleRemote(-1)
                                         }
 
-                                        Rectangle {
+                                        SelectorInput {
                                             width: parent.width - 64
-                                            height: 28
-                                            color: Colors.black
-                                            border.width: 1
-                                            border.color:
+                                            valueText: gitService.selectedRemoteBranch
+                                            placeholderText: "TYPE REMOTE BRANCH"
+                                            accentColor:
                                                 gitService.selectedRemoteExists
                                                 ? Colors.cyan
                                                 : Colors.magenta
 
-                                            CyanValue {
-                                                anchors {
-                                                    fill: parent
-                                                    leftMargin: 7
-                                                    rightMargin: 7
-                                                }
-                                                verticalAlignment: Text.AlignVCenter
-                                                text: gitService.selectedRemoteBranch
-                                                      ? gitService.selectedRemoteBranch
-                                                      : "NO REMOTE TARGET"
-                                                color:
-                                                    gitService.selectedRemoteExists
-                                                    ? Colors.cyan
-                                                    : Colors.magenta
+                                            onSubmitted: function(value) {
+                                                gitService.selectRemoteText(value);
                                             }
                                         }
 

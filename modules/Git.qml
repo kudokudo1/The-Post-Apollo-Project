@@ -31,15 +31,15 @@ Rectangle {
                 id: gitDataMark
 
                 text: ""
-                font.pixelSize: 34
+                font.pixelSize: 38
                 anchors.verticalCenter: parent.verticalCenter
                 color: Colors.white
 
                 transform: Scale {
                     origin.x: gitDataMark.width / 2
                     origin.y: gitDataMark.height / 2
-                    xScale: 0.72
-                    yScale: 1.14
+                    xScale: 0.54
+                    yScale: 1.26
                 }
             }
 
@@ -89,7 +89,7 @@ Rectangle {
         anchors.fill: parent
         spread: 3
         z: -1
-        color: Colors.orange
+        color: Colors.yellow
         opacity: dock.menuOpen
                  ? 0.86
                  : mouse.pressed
@@ -103,7 +103,7 @@ Rectangle {
         anchors.fill: parent
         spread: 10
         z: 1
-        color: Colors.orange
+        color: Colors.yellow
         opacity: dock.menuOpen
                  ? 0.22
                  : mouse.pressed

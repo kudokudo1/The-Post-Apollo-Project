@@ -644,14 +644,14 @@ PanelWindow {
 
                             color: Colors.dark
                             border.width: 1
-                            border.color: Colors.orange
+                            border.color: Colors.cyan
 
                             RectangularShadow {
                                 anchors.fill: parent
                                 spread: 4
                                 z: -1
-                                opacity: 0.22
-                                color: Colors.orange
+                                opacity: 0.25
+                                color: Colors.cyan
                             }
 
                             Column {
@@ -901,7 +901,7 @@ PanelWindow {
 
                         Rectangle {
                             width: parent.width
-                            height: 154
+                            height: 140
 
                             color: Colors.dark
                             border.width: 1
@@ -1063,7 +1063,7 @@ PanelWindow {
 
                         Rectangle {
                             width: parent.width
-                            height: 206
+                            height: 166
 
                             color: Colors.dark
                             border.width: 1
@@ -1149,24 +1149,51 @@ PanelWindow {
                             }
                         }
 
-                        GohuText {
+                        Rectangle {
                             width: parent.width
-                            text: githubService.lastError
-                                  ? "PX / GITHUB // " + githubService.lastError
-                                  : githubService.available
-                                  ? "PX BRIDGE ACTIVE // REMOTE WRITES STILL LOCKED"
-                                  : "PX BRIDGE WAITING"
-                            horizontalAlignment: Text.AlignRight
-                            font.pixelSize: 8
-                            color: Colors.orange
+                            height: 70
 
-                            layer.enabled: true
-                            layer.effect: DropShadow {
-                                radius: 8
-                                samples: 7
-                                opacity: 0.56
-                                color: Colors.orange
-                                transparentBorder: true
+                            color: Colors.dark
+                            border.width: 1
+                            border.color: Colors.cyan
+
+                            RectangularShadow {
+                                anchors.fill: parent
+                                spread: 3
+                                z: -1
+                                opacity: 0.22
+                                color: Colors.cyan
+                            }
+
+                            Column {
+                                anchors {
+                                    fill: parent
+                                    margins: 10
+                                }
+
+                                spacing: 7
+
+                                SectionLabel {
+                                    text: "PX STATUS"
+                                }
+
+                                Row {
+                                    spacing: 10
+
+                                    MetaLabel {
+                                        width: 100
+                                        text: "BRIDGE"
+                                    }
+
+                                    OrangeValue {
+                                        width: 365
+                                        text: githubService.lastError
+                                              ? "ERROR // " + githubService.lastError
+                                              : githubService.available
+                                              ? "ACTIVE // REMOTE WRITES LOCKED"
+                                              : "WAITING"
+                                    }
+                                }
                             }
                         }
                     }

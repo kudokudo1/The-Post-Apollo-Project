@@ -11,6 +11,7 @@ PanelWindow {
     id: root
 
     property bool menuOpen: false
+    property string activePage: "git"
 
     property int panelWidth: 540
     property int panelHeight: 650
@@ -20,8 +21,6 @@ PanelWindow {
     property int glowGutter: 14
     property int topGlowGutter: 12
 
-    // Reserve transparent pixels above the visible chassis so its top glow
-    // renders inside the PanelWindow instead of being clipped by the top bar.
     implicitWidth: panelWidth + glowGutter * 2
     implicitHeight: panelHeight + topGlowGutter + glowGutter
 
@@ -65,16 +64,28 @@ PanelWindow {
         root.menuOpen = !root.menuOpen;
     }
 
-    onMenuOpenChanged: {
-        if (root.menuOpen) {
-            gitService.refresh();
-            githubService.refresh();
-        }
-    }
-
-    Component.onCompleted: {
+    function showGitPage() {
+        root.activePage = "git";
         gitService.refresh();
     }
+
+    function showGithubPage() {
+        root.activePage = "github";
+        gitService.refresh();
+        githubService.refresh();
+    }
+
+    onMenuOpenChanged: {
+        if (!root.menuOpen)
+            return;
+
+        gitService.refresh();
+
+        if (root.activePage === "github")
+            githubService.refresh();
+    }
+
+    Component.onCompleted: gitService.refresh()
 
     GitService {
         id: gitService
@@ -88,7 +99,7 @@ PanelWindow {
     Timer {
         interval: 3000
         repeat: true
-        running: root.menuOpen
+        running: root.menuOpen && root.activePage === "git"
 
         onTriggered: gitService.refresh()
     }
@@ -96,7 +107,7 @@ PanelWindow {
     Timer {
         interval: 15000
         repeat: true
-        running: root.menuOpen
+        running: root.menuOpen && root.activePage === "github"
 
         onTriggered: githubService.refresh()
     }
@@ -282,9 +293,7 @@ PanelWindow {
 
         GohuText {
             id: actionText
-
             anchors.centerIn: parent
-
             text: actionButton.label
             font.pixelSize: 10
             color: actionButton.contentColor
@@ -318,7 +327,6 @@ PanelWindow {
             onClicked: actionButton.triggered()
         }
 
-        // Bar-module glow recipe: crisp 3px body halo + faint 10px halo.
         RectangularShadow {
             anchors.fill: parent
             spread: 3
@@ -364,8 +372,64 @@ PanelWindow {
         }
     }
 
-    // Main chassis glow: exact AppControl / CPU++ structural recipe.
-    // The surface has a transparent gutter so the outer glow is not clipped.
+    component PageTab: Rectangle {
+        id: pageTab
+
+        property string label: ""
+        property bool selected: false
+
+        signal triggered()
+
+        height: 36
+        color: selected
+               ? Colors.yellow
+               : tabMouse.containsMouse
+               ? Colors.dark
+               : Colors.black
+
+        border.width: 1
+        border.color: selected
+                      ? Colors.magenta
+                      : tabMouse.containsMouse
+                      ? Colors.orange
+                      : Colors.blue
+
+        GohuText {
+            anchors.centerIn: parent
+            text: pageTab.label
+            font.pixelSize: 10
+            color: pageTab.selected
+                   ? Colors.magenta
+                   : tabMouse.containsMouse
+                   ? Colors.orange
+                   : Colors.white
+
+            layer.enabled: true
+            layer.effect: DropShadow {
+                radius: pageTab.selected ? 12 : 7
+                samples: 13
+                opacity: pageTab.selected ? 0.74 : 0.38
+                color: pageTab.selected ? Colors.magenta : Colors.cyan
+                transparentBorder: true
+            }
+        }
+
+        MouseArea {
+            id: tabMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            onClicked: pageTab.triggered()
+        }
+
+        RectangularShadow {
+            anchors.fill: parent
+            spread: selected ? 5 : 3
+            z: -1
+            opacity: selected ? 0.42 : tabMouse.containsMouse ? 0.28 : 0.12
+            color: selected ? Colors.magenta : tabMouse.containsMouse ? Colors.orange : Colors.blue
+        }
+    }
+
     Rectangle {
         id: chassisGeometry
 
@@ -397,6 +461,7 @@ PanelWindow {
 
     Rectangle {
         id: frame
+
         width: root.panelWidth
         height: root.panelHeight
         anchors.top: parent.top
@@ -437,7 +502,9 @@ PanelWindow {
                         top: parent.top
                     }
 
-                    text: "GIT // LOCAL REPOSITORY"
+                    text: root.activePage === "git"
+                          ? "GIT // LOCAL REPOSITORY"
+                          : "GITHUB // REMOTE AUTOMATION"
                     font.pixelSize: 20
                     color: Colors.magenta
 
@@ -457,7 +524,9 @@ PanelWindow {
                         bottom: parent.bottom
                     }
 
-                    text: "CONTROL SURFACE // LOCAL GIT"
+                    text: root.activePage === "git"
+                          ? "CONTROL SURFACE // LOCAL GIT"
+                          : "PX CONTROL SURFACE // GITHUB ACTIONS"
                     font.pixelSize: 10
                     color: Colors.cyan
                 }
@@ -479,24 +548,45 @@ PanelWindow {
                         anchors.fill: parent
                         spread: 3
                         z: -1
-                        opacity: gitService.available ? 0.50 : 0.30
-                        color: gitService.available ? Colors.orange : Colors.red
+                        opacity: {
+                            if (root.activePage === "git")
+                                return gitService.available ? 0.50 : 0.30;
+
+                            return githubService.available ? 0.50 : 0.30;
+                        }
+                        color: {
+                            if (root.activePage === "git")
+                                return gitService.available ? Colors.orange : Colors.red;
+
+                            return githubService.available ? Colors.orange : Colors.red;
+                        }
                     }
 
                     GohuText {
-                        id: gitLocalStatusText
-
+                        id: pageStatusText
                         anchors.centerIn: parent
-                        text: gitService.refreshing ? "READING" : gitService.available ? "LOCAL LIVE" : "OFFLINE"
+
+                        text: {
+                            if (root.activePage === "git")
+                                return gitService.refreshing ? "READING" : gitService.available ? "LOCAL LIVE" : "OFFLINE";
+
+                            return githubService.refreshing ? "READING" : githubService.available ? "PX LIVE" : "OFFLINE";
+                        }
+
                         font.pixelSize: 8
-                        color: gitService.available ? Colors.orange : Colors.red
+                        color: {
+                            if (root.activePage === "git")
+                                return gitService.available ? Colors.orange : Colors.red;
+
+                            return githubService.available ? Colors.orange : Colors.red;
+                        }
 
                         layer.enabled: true
                         layer.effect: DropShadow {
                             radius: 10
                             samples: 11
-                            opacity: gitService.available ? 0.82 : 0.44
-                            color: gitLocalStatusText.color
+                            opacity: 0.82
+                            color: pageStatusText.color
                             transparentBorder: true
                         }
                     }
@@ -517,403 +607,571 @@ PanelWindow {
                 }
             }
 
-            Rectangle {
+            Row {
                 width: parent.width
-                height: 140
+                spacing: 10
 
-                color: Colors.dark
-                border.width: 1
-                border.color: Colors.orange
-
-                RectangularShadow {
-                    anchors.fill: parent
-                    spread: 4
-                    z: -1
-                    opacity: 0.22
-                    color: Colors.orange
+                PageTab {
+                    width: (parent.width - 10) / 2
+                    label: "GIT // LOCAL"
+                    selected: root.activePage === "git"
+                    onTriggered: root.showGitPage()
                 }
 
-                Column {
-                    anchors {
-                        fill: parent
-                        margins: 12
-                    }
+                PageTab {
+                    width: (parent.width - 10) / 2
+                    label: "GITHUB // REMOTE"
+                    selected: root.activePage === "github"
+                    onTriggered: root.showGithubPage()
+                }
+            }
 
-                    spacing: 8
+            Item {
+                width: parent.width
+                height: parent.height - 130
 
-                    SectionLabel {
-                        text: "LOCAL TRUTH"
-                    }
+                Item {
+                    anchors.fill: parent
+                    visible: root.activePage === "git"
 
-                    Row {
-                        spacing: 10
+                    Column {
+                        anchors.fill: parent
+                        spacing: 12
 
-                        MetaLabel {
-                            width: 100
-                            text: "REPOSITORY"
-                        }
+                        Rectangle {
+                            width: parent.width
+                            height: 140
 
-                        OrangeValue {
-                            width: 365
-                            text: gitService.repository
-                        }
-                    }
+                            color: Colors.dark
+                            border.width: 1
+                            border.color: Colors.orange
 
-                    Row {
-                        spacing: 10
-
-                        OrangeLabel {
-                            width: 100
-                            text: "BRANCH"
-                        }
-
-                        CyanValue {
-                            width: 365
-                            text: gitService.branch
-                        }
-                    }
-
-                    Row {
-                        spacing: 10
-
-                        MetaLabel {
-                            width: 100
-                            text: "HEAD"
-                        }
-
-                        BlueValue {
-                            width: 365
-                            text: gitService.head
-                        }
-                    }
-
-                    Row {
-                        spacing: 10
-
-                        MetaLabel {
-                            width: 100
-                            text: "WORKTREE"
-                        }
-
-                        Row {
-                            width: 365
-                            spacing: 0
-
-                            MetaValue {
-                                visible: String(gitService.worktree).indexOf("DIRTY") !== 0
-                                text: gitService.worktree
+                            RectangularShadow {
+                                anchors.fill: parent
+                                spread: 4
+                                z: -1
+                                opacity: 0.22
+                                color: Colors.orange
                             }
 
-                            MetaValue {
-                                visible: String(gitService.worktree).indexOf("DIRTY") === 0
-                                text: "DIRTY • "
-                            }
+                            Column {
+                                anchors {
+                                    fill: parent
+                                    margins: 12
+                                }
 
-                            OrangeValue {
-                                visible: String(gitService.worktree).indexOf("DIRTY") === 0
-                                text: {
-                                    const match = String(gitService.worktree).match(/(\d+)\s+CHANGES/);
-                                    return match ? match[1] : "";
+                                spacing: 8
+
+                                SectionLabel {
+                                    text: "LOCAL TRUTH"
+                                }
+
+                                Row {
+                                    spacing: 10
+
+                                    MetaLabel {
+                                        width: 100
+                                        text: "REPOSITORY"
+                                    }
+
+                                    OrangeValue {
+                                        width: 365
+                                        text: gitService.repository
+                                    }
+                                }
+
+                                Row {
+                                    spacing: 10
+
+                                    OrangeLabel {
+                                        width: 100
+                                        text: "BRANCH"
+                                    }
+
+                                    CyanValue {
+                                        width: 365
+                                        text: gitService.branch
+                                    }
+                                }
+
+                                Row {
+                                    spacing: 10
+
+                                    MetaLabel {
+                                        width: 100
+                                        text: "HEAD"
+                                    }
+
+                                    BlueValue {
+                                        width: 365
+                                        text: gitService.head
+                                    }
+                                }
+
+                                Row {
+                                    spacing: 10
+
+                                    MetaLabel {
+                                        width: 100
+                                        text: "WORKTREE"
+                                    }
+
+                                    Row {
+                                        width: 365
+                                        spacing: 0
+
+                                        MetaValue {
+                                            visible: String(gitService.worktree).indexOf("DIRTY") !== 0
+                                            text: gitService.worktree
+                                        }
+
+                                        MetaValue {
+                                            visible: String(gitService.worktree).indexOf("DIRTY") === 0
+                                            text: "DIRTY • "
+                                        }
+
+                                        OrangeValue {
+                                            visible: String(gitService.worktree).indexOf("DIRTY") === 0
+                                            text: {
+                                                const match = String(gitService.worktree).match(/(\d+)\s+CHANGES/);
+                                                return match ? match[1] : "";
+                                            }
+                                        }
+
+                                        MetaValue {
+                                            visible: String(gitService.worktree).indexOf("DIRTY") === 0
+                                            text: " CHANGES"
+                                        }
+                                    }
                                 }
                             }
+                        }
 
-                            MetaValue {
-                                visible: String(gitService.worktree).indexOf("DIRTY") === 0
-                                text: " CHANGES"
+                        SectionLabel {
+                            text: "LOCAL ACTIONS"
+                        }
+
+                        Row {
+                            width: parent.width
+                            spacing: 10
+
+                            ActionButton {
+                                label: "STATUS"
+                                enabledAction: !gitService.actionBusy
+                                selectedAction: gitService.actionTitle === "STATUS"
+                                onTriggered: gitService.runReadAction("status")
+                            }
+
+                            ActionButton {
+                                label: "DIFF"
+                                enabledAction: !gitService.actionBusy
+                                selectedAction: gitService.actionTitle === "DIFF"
+                                onTriggered: gitService.runReadAction("diff")
+                            }
+
+                            ActionButton {
+                                label: "LOG"
+                                enabledAction: !gitService.actionBusy
+                                selectedAction: gitService.actionTitle === "LOG"
+                                onTriggered: gitService.runReadAction("log")
+                            }
+
+                            ActionButton {
+                                label: "LAZYGIT"
+                                enabledAction: true
+                                onTriggered: gitService.launchLazygit()
+                            }
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 166
+
+                            color: Colors.dark
+                            border.width: 1
+                            border.color: Colors.orange
+
+                            RectangularShadow {
+                                anchors.fill: parent
+                                spread: 4
+                                z: -1
+                                opacity: 0.18
+                                color: Colors.orange
+                            }
+
+                            GohuText {
+                                anchors {
+                                    top: parent.top
+                                    left: parent.left
+                                    right: parent.right
+                                }
+
+                                anchors.topMargin: 8
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 10
+
+                                text: gitService.actionBusy ? gitService.actionTitle + " // RUNNING" : gitService.actionTitle
+                                font.pixelSize: 10
+                                color: Colors.orange
+                            }
+
+                            Flickable {
+                                anchors {
+                                    top: parent.top
+                                    bottom: parent.bottom
+                                    left: parent.left
+                                    right: parent.right
+                                }
+
+                                anchors.topMargin: 27
+                                anchors.bottomMargin: 8
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 10
+
+                                clip: true
+                                contentWidth: width
+                                contentHeight: Math.max(height, outputText.implicitHeight)
+                                boundsBehavior: Flickable.StopAtBounds
+
+                                GohuText {
+                                    id: outputText
+                                    width: parent.width
+                                    text: gitService.actionOutput
+                                    font.pixelSize: 9
+                                    color: Colors.white
+                                    wrapMode: Text.WrapAnywhere
+
+                                    layer.enabled: true
+                                    layer.effect: DropShadow {
+                                        radius: 5
+                                        samples: 7
+                                        opacity: 0.10
+                                        color: Colors.cyan
+                                        transparentBorder: true
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 70
+
+                            color: Colors.dark
+                            border.width: 1
+                            border.color: Colors.cyan
+
+                            Column {
+                                anchors {
+                                    fill: parent
+                                    margins: 10
+                                }
+
+                                spacing: 7
+
+                                SectionLabel {
+                                    text: "REMOTE ENDPOINT"
+                                }
+
+                                Row {
+                                    spacing: 10
+
+                                    OrangeLabel {
+                                        width: 100
+                                        text: "ORIGIN"
+                                    }
+
+                                    CyanValue {
+                                        width: 365
+                                        text: gitService.origin
+                                    }
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            SectionLabel {
-                text: "LOCAL ACTIONS"
-            }
-
-            Row {
-                width: parent.width
-                spacing: 10
-
-                ActionButton {
-                    label: "STATUS"
-                    enabledAction: !gitService.actionBusy
-                    selectedAction: gitService.actionTitle === "STATUS"
-                    onTriggered: gitService.runReadAction("status")
-                }
-
-                ActionButton {
-                    label: "DIFF"
-                    enabledAction: !gitService.actionBusy
-                    selectedAction: gitService.actionTitle === "DIFF"
-                    onTriggered: gitService.runReadAction("diff")
-                }
-
-                ActionButton {
-                    label: "LOG"
-                    enabledAction: !gitService.actionBusy
-                    selectedAction: gitService.actionTitle === "LOG"
-                    onTriggered: gitService.runReadAction("log")
-                }
-
-                ActionButton {
-                    label: "LAZYGIT"
-                    enabledAction: true
-                    onTriggered: gitService.launchLazygit()
-                }
-            }
-
-            Rectangle {
-                width: parent.width
-                height: 90
-
-                color: Colors.dark
-                border.width: 1
-                border.color: Colors.orange
-
-                RectangularShadow {
+                Item {
                     anchors.fill: parent
-                    spread: 4
-                    z: -1
-                    opacity: 0.18
-                    color: Colors.orange
-                }
+                    visible: root.activePage === "github"
 
-                GohuText {
-                    anchors {
-                        top: parent.top
-                        left: parent.left
-                        right: parent.right
-                    }
+                    Column {
+                        anchors.fill: parent
+                        spacing: 12
 
-                    anchors.topMargin: 8
-                    anchors.leftMargin: 10
-                    anchors.rightMargin: 10
+                        Rectangle {
+                            width: parent.width
+                            height: 154
 
-                    text: gitService.actionBusy ? gitService.actionTitle + " // RUNNING" : gitService.actionTitle
-                    font.pixelSize: 10
-                    color: Colors.orange
-                }
+                            color: Colors.dark
+                            border.width: 1
+                            border.color: Colors.cyan
 
-                Flickable {
-                    anchors {
-                        top: parent.top
-                        bottom: parent.bottom
-                        left: parent.left
-                        right: parent.right
-                    }
-
-                    anchors.topMargin: 27
-                    anchors.bottomMargin: 8
-                    anchors.leftMargin: 10
-                    anchors.rightMargin: 10
-
-                    clip: true
-                    contentWidth: width
-                    contentHeight: Math.max(height, outputText.implicitHeight)
-
-                    boundsBehavior: Flickable.StopAtBounds
-
-                    GohuText {
-                        id: outputText
-
-                        width: parent.width
-
-                        text: gitService.actionOutput
-                        font.pixelSize: 9
-                        color: Colors.white
-
-                        layer.enabled: true
-                        layer.effect: DropShadow {
-                            radius: 5
-                            samples: 7
-                            opacity: 0.10
-                            color: Colors.cyan
-                            transparentBorder: true
-                        }
-
-                        wrapMode: Text.WrapAnywhere
-                    }
-                }
-            }
-
-            Rectangle {
-                width: parent.width
-                height: 118
-
-                color: Colors.dark
-                border.width: 1
-                border.color: Colors.cyan
-
-                RectangularShadow {
-                    anchors.fill: parent
-                    spread: 3
-                    z: -1
-                    opacity: 0.28
-                    color: Colors.cyan
-                }
-
-                Column {
-                    anchors {
-                        fill: parent
-                        margins: 12
-                    }
-
-                    spacing: 7
-
-                    SectionLabel {
-                        text: "REMOTE // GITHUB"
-                    }
-
-                    Row {
-                        spacing: 10
-
-                        OrangeLabel {
-                            width: 100
-                            text: "ORIGIN"
-                        }
-
-                        CyanValue {
-                            width: 365
-                            text: gitService.origin
-                        }
-                    }
-
-                    Row {
-                        spacing: 10
-
-                        MetaLabel {
-                            width: 100
-                            text: "GITHUB"
-                        }
-
-                        Row {
-                            width: 365
-                            spacing: 0
-
-                            OrangeValue {
-                                visible: githubService.available && !githubService.refreshing
-                                text: "LIVE // " + githubService.repoSlug
+                            RectangularShadow {
+                                anchors.fill: parent
+                                spread: 4
+                                z: -1
+                                opacity: 0.25
+                                color: Colors.cyan
                             }
 
-                            MetaValue {
-                                visible: !githubService.available || githubService.refreshing
-                                text: githubService.refreshing
-                                      ? "READING"
-                                      : githubService.lastError
-                                      ? githubService.lastError
-                                      : "NOT REQUESTED"
+                            Column {
+                                anchors {
+                                    fill: parent
+                                    margins: 12
+                                }
+
+                                spacing: 8
+
+                                SectionLabel {
+                                    text: "REMOTE // GITHUB"
+                                }
+
+                                Row {
+                                    spacing: 10
+
+                                    OrangeLabel {
+                                        width: 100
+                                        text: "REPOSITORY"
+                                    }
+
+                                    CyanValue {
+                                        width: 365
+                                        text: githubService.repoSlug || "NOT CONNECTED"
+                                    }
+                                }
+
+                                Row {
+                                    spacing: 10
+
+                                    MetaLabel {
+                                        width: 100
+                                        text: "CONNECTION"
+                                    }
+
+                                    OrangeValue {
+                                        width: 365
+                                        text: githubService.refreshing
+                                              ? "READING"
+                                              : githubService.available
+                                              ? "LIVE // PX"
+                                              : githubService.lastError || "NOT REQUESTED"
+                                    }
+                                }
+
+                                Row {
+                                    spacing: 10
+
+                                    MetaLabel {
+                                        width: 100
+                                        text: "WORKFLOWS"
+                                    }
+
+                                    Row {
+                                        width: 365
+                                        spacing: 0
+
+                                        OrangeValue {
+                                            visible: githubService.available && githubService.workflowCount > 0
+                                            text: String(githubService.workflowCount)
+                                        }
+
+                                        DimValue {
+                                            visible: githubService.available && githubService.workflowCount === 0
+                                            text: "0"
+                                        }
+
+                                        MetaValue {
+                                            visible: githubService.available
+                                            text: " // " + githubService.latestWorkflow
+                                        }
+
+                                        MetaValue {
+                                            visible: !githubService.available
+                                            text: "NOT CONNECTED"
+                                        }
+                                    }
+                                }
+
+                                Row {
+                                    spacing: 10
+
+                                    MetaLabel {
+                                        width: 100
+                                        text: "LATEST RUN"
+                                    }
+
+                                    Row {
+                                        width: 365
+                                        spacing: 0
+
+                                        OrangeValue {
+                                            visible: githubService.available && githubService.runCount > 0
+                                            text: String(githubService.runCount)
+                                        }
+
+                                        DimValue {
+                                            visible: githubService.available && githubService.runCount === 0
+                                            text: "0"
+                                        }
+
+                                        MetaValue {
+                                            visible: githubService.available
+                                            text: " // " + githubService.latestRunStatus
+                                                  + (githubService.latestRunConclusion ? " // " + githubService.latestRunConclusion : "")
+                                                  + (githubService.latestRunBranch ? " // " + githubService.latestRunBranch : "")
+                                        }
+
+                                        MetaValue {
+                                            visible: !githubService.available
+                                            text: "NOT CONNECTED"
+                                        }
+                                    }
+                                }
                             }
                         }
-                    }
 
-                    Row {
-                        spacing: 10
-
-                        MetaLabel {
-                            width: 100
-                            text: "WORKFLOWS"
-                        }
-
-                        Row {
-                            width: 365
-                            spacing: 0
-
-                            OrangeValue {
-                                visible: githubService.available && githubService.workflowCount > 0
-                                text: String(githubService.workflowCount)
-                            }
-
-                            DimValue {
-                                visible: githubService.available && githubService.workflowCount === 0
-                                text: "0"
-                            }
-
-                            MetaValue {
-                                visible: githubService.available
-                                text: " // " + githubService.latestWorkflow
-                            }
-
-                            MetaValue {
-                                visible: !githubService.available
-                                text: "NOT CONNECTED"
-                            }
-                        }
-                    }
-
-                    Row {
-                        spacing: 10
-
-                        MetaLabel {
-                            width: 100
-                            text: "LATEST RUN"
+                        SectionLabel {
+                            text: "PX CONTROL"
                         }
 
                         Row {
-                            width: 365
-                            spacing: 0
+                            width: parent.width
+                            spacing: 10
 
-                            OrangeValue {
-                                visible: githubService.available && githubService.runCount > 0
-                                text: String(githubService.runCount)
+                            ActionButton {
+                                label: "REFRESH"
+                                enabledAction: !githubService.refreshing
+                                onTriggered: githubService.refresh()
                             }
 
-                            DimValue {
-                                visible: githubService.available && githubService.runCount === 0
-                                text: "0"
+                            ActionButton {
+                                label: "RUN"
+                                enabledAction: false
                             }
 
-                            MetaValue {
-                                visible: githubService.available
-                                text: " // " + githubService.latestRunStatus
-                                      + (githubService.latestRunConclusion ? " // " + githubService.latestRunConclusion : "")
-                                      + (githubService.latestRunBranch ? " // " + githubService.latestRunBranch : "")
+                            ActionButton {
+                                label: "RERUN"
+                                enabledAction: false
                             }
 
-                            MetaValue {
-                                visible: !githubService.available
-                                text: "NOT CONNECTED"
+                            ActionButton {
+                                label: "CANCEL"
+                                enabledAction: false
+                            }
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 206
+
+                            color: Colors.dark
+                            border.width: 1
+                            border.color: Colors.orange
+
+                            RectangularShadow {
+                                anchors.fill: parent
+                                spread: 4
+                                z: -1
+                                opacity: 0.18
+                                color: Colors.orange
+                            }
+
+                            Column {
+                                anchors {
+                                    fill: parent
+                                    margins: 12
+                                }
+
+                                spacing: 10
+
+                                SectionLabel {
+                                    text: "WORKFLOW FACTORY"
+                                }
+
+                                Row {
+                                    spacing: 10
+
+                                    MetaLabel {
+                                        width: 100
+                                        text: "BACKEND"
+                                    }
+
+                                    OrangeValue {
+                                        width: 365
+                                        text: githubService.available ? "PX ONLINE" : "WAITING FOR PX"
+                                    }
+                                }
+
+                                Row {
+                                    spacing: 10
+
+                                    MetaLabel {
+                                        width: 100
+                                        text: "CREATE"
+                                    }
+
+                                    MetaValue {
+                                        width: 365
+                                        text: "TEMPLATE → TRIGGER → NAME → PREVIEW → INSTALL"
+                                    }
+                                }
+
+                                Row {
+                                    spacing: 10
+
+                                    MetaLabel {
+                                        width: 100
+                                        text: "VALIDATION"
+                                    }
+
+                                    CyanValue {
+                                        width: 365
+                                        text: "ACTIONLINT CONTRACT READY"
+                                    }
+                                }
+
+                                Rectangle {
+                                    width: parent.width
+                                    height: 1
+                                    color: Colors.blue
+                                    opacity: 0.65
+                                }
+
+                                GohuText {
+                                    width: parent.width
+                                    text: "PAGE SPLIT COMPLETE // CREATOR + RUN SELECTORS NEXT"
+                                    font.pixelSize: 9
+                                    color: Colors.white
+                                    opacity: 0.72
+                                    wrapMode: Text.Wrap
+                                }
+                            }
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text: githubService.lastError
+                                  ? "PX / GITHUB // " + githubService.lastError
+                                  : githubService.available
+                                  ? "PX BRIDGE ACTIVE // REMOTE WRITES STILL LOCKED"
+                                  : "PX BRIDGE WAITING"
+                            horizontalAlignment: Text.AlignRight
+                            font.pixelSize: 8
+                            color: Colors.orange
+
+                            layer.enabled: true
+                            layer.effect: DropShadow {
+                                radius: 8
+                                samples: 7
+                                opacity: 0.56
+                                color: Colors.orange
+                                transparentBorder: true
                             }
                         }
                     }
-                }
-            }
-
-            Row {
-                width: parent.width
-                spacing: 10
-
-                ActionButton { label: "FETCH" }
-                ActionButton { label: "PULL" }
-                ActionButton { label: "PUSH" }
-
-                ActionButton {
-                    label: "GH REFRESH"
-                    enabledAction: !githubService.refreshing
-                    onTriggered: githubService.refresh()
-                }
-            }
-
-            GohuText {
-                width: parent.width
-                text: gitService.lastError
-                      ? "LOCAL ERROR // " + gitService.lastError
-                      : githubService.lastError
-                      ? "GITHUB // " + githubService.lastError
-                      : "LOCAL + GITHUB READERS ACTIVE // REMOTE WRITES LOCKED"
-                horizontalAlignment: Text.AlignRight
-                font.pixelSize: 8
-                color: Colors.orange
-
-                layer.enabled: true
-                layer.effect: DropShadow {
-                    radius: 8
-                    samples: 7
-                    opacity: 0.56
-                    color: Colors.orange
-                    transparentBorder: true
                 }
             }
         }
-
     }
 }

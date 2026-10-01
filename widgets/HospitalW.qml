@@ -671,13 +671,42 @@ PanelWindow {
                                     }
 
                                     NotoText {
-                                        id: topologyStar
+                                        id: topologySelectionGlow
 
                                         width: 20
                                         height: parent.height
                                         x: topologyBody.nodeX(lane) - width / 2
                                         anchors.verticalCenter: parent.verticalCenter
                                         z: 2
+                                        visible: topologyRow.selected
+
+                                        readonly property bool refLandmark:
+                                            String(refsText || "").length > 0
+
+                                        text: isHead || refLandmark ? "★" : "✧"
+                                        font.pixelSize: isHead ? 15 : refLandmark ? 13 : 13
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
+                                        color: Colors.orange
+
+                                        layer.enabled: true
+                                        layer.effect: DropShadow {
+                                            radius: 12
+                                            samples: 21
+                                            opacity: 0.92
+                                            color: Colors.orange
+                                            transparentBorder: true
+                                        }
+                                    }
+
+                                    NotoText {
+                                        id: topologyStar
+
+                                        width: 20
+                                        height: parent.height
+                                        x: topologyBody.nodeX(lane) - width / 2
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        z: 3
 
                                         readonly property bool refLandmark:
                                             String(refsText || "").length > 0
@@ -694,26 +723,14 @@ PanelWindow {
 
                                         layer.enabled: true
                                         layer.effect: DropShadow {
-                                            radius: topologyRow.selected
-                                                    ? 12
-                                                    : isHead
-                                                    ? 7
-                                                    : 5
-                                            samples: topologyRow.selected
-                                                     ? 21
-                                                     : isHead
-                                                     ? 9
-                                                     : 7
-                                            opacity: topologyRow.selected
-                                                     ? 0.92
-                                                     : isHead
+                                            radius: isHead ? 7 : 5
+                                            samples: isHead ? 9 : 7
+                                            opacity: isHead
                                                      ? 0.78
                                                      : topologyStar.refLandmark
                                                      ? 0.48
                                                      : 0.38
-                                            color: topologyRow.selected
-                                                   ? Colors.orange
-                                                   : topologyStar.starColor
+                                            color: topologyStar.starColor
                                             transparentBorder: true
                                         }
                                     }

@@ -177,14 +177,14 @@ PanelWindow {
     component DimValue: GohuText {
         font.pixelSize: 11
         color: Colors.white
-        opacity: 0.34
+        opacity: 0.68
         elide: Text.ElideRight
 
         layer.enabled: true
         layer.effect: DropShadow {
             radius: 3
             samples: 5
-            opacity: 0.16
+            opacity: 0.12
             color: Colors.white
             transparentBorder: true
         }
@@ -562,12 +562,12 @@ PanelWindow {
                     Row {
                         spacing: 10
 
-                        MetaLabel {
+                        OrangeLabel {
                             width: 100
                             text: "BRANCH"
                         }
 
-                        MetaValue {
+                        CyanValue {
                             width: 365
                             text: gitService.branch
                         }
@@ -781,7 +781,7 @@ PanelWindow {
                     Row {
                         spacing: 10
 
-                        OrangeLabel {
+                        MetaLabel {
                             width: 100
                             text: "GITHUB"
                         }
@@ -792,17 +792,7 @@ PanelWindow {
 
                             OrangeValue {
                                 visible: githubService.available && !githubService.refreshing
-                                text: "LIVE"
-                            }
-
-                            OrangeValue {
-                                visible: githubService.available && !githubService.refreshing
-                                text: " // "
-                            }
-
-                            CyanValue {
-                                visible: githubService.available && !githubService.refreshing
-                                text: githubService.repoSlug
+                                text: "LIVE // " + githubService.repoSlug
                             }
 
                             MetaValue {

@@ -279,8 +279,12 @@ PanelWindow {
             enabledAction && actionMouse.pressed
 
         readonly property color contentColor:
-            pressed || selectedAction || hovered
+            pressed
             ? Colors.black
+            : selectedAction
+            ? Colors.magenta
+            : hovered
+            ? Colors.orange
             : Colors.cyan
 
         width: 112
@@ -330,16 +334,16 @@ PanelWindow {
 
             layer.enabled: !actionButton.pressed
             layer.effect: DropShadow {
-                radius: 15
-                samples: 17
+                radius: 10
+                samples: 11
                 opacity:
                     actionButton.hovered
-                    ? 0.96
+                    ? 0.62
                     : actionButton.selectedAction
-                    ? 0.92
+                    ? 0.58
                     : actionButton.enabledAction
-                    ? 0.82
-                    : 0.18
+                    ? 0.46
+                    : 0.12
                 color:
                     actionButton.hovered || actionButton.selectedAction
                     ? Colors.orange
@@ -363,14 +367,14 @@ PanelWindow {
             z: -1
             opacity:
                 actionButton.pressed
-                ? 0.68
+                ? 0.48
                 : actionButton.hovered
-                ? 0.62
+                ? 0.40
                 : actionButton.selectedAction
-                ? 0.58
+                ? 0.36
                 : actionButton.enabledAction
-                ? 0.42
-                : 0.10
+                ? 0.26
+                : 0.07
             color:
                 actionButton.pressed
                 ? Colors.magenta
@@ -385,14 +389,14 @@ PanelWindow {
             z: -2
             opacity:
                 actionButton.pressed
-                ? 0.16
+                ? 0.10
                 : actionButton.hovered
-                ? 0.14
-                : actionButton.selectedAction
-                ? 0.12
-                : actionButton.enabledAction
                 ? 0.08
-                : 0.02
+                : actionButton.selectedAction
+                ? 0.07
+                : actionButton.enabledAction
+                ? 0.045
+                : 0.015
             color:
                 actionButton.pressed
                 ? Colors.magenta
@@ -429,16 +433,16 @@ PanelWindow {
             text: pageTab.label
             font.pixelSize: 11
             color: pageTab.selected
-                   ? Colors.black
+                   ? Colors.magenta
                    : tabMouse.containsMouse
                    ? Colors.orange
                    : Colors.cyan
 
             layer.enabled: true
             layer.effect: DropShadow {
-                radius: pageTab.selected ? 14 : tabMouse.containsMouse ? 12 : 10
-                samples: 15
-                opacity: pageTab.selected ? 0.88 : tabMouse.containsMouse ? 0.80 : 0.64
+                radius: pageTab.selected ? 10 : tabMouse.containsMouse ? 9 : 7
+                samples: 11
+                opacity: pageTab.selected ? 0.56 : tabMouse.containsMouse ? 0.50 : 0.38
                 color: pageTab.selected || tabMouse.containsMouse ? Colors.orange : Colors.cyan
                 transparentBorder: true
             }
@@ -455,7 +459,7 @@ PanelWindow {
             anchors.fill: parent
             spread: selected ? 5 : 3
             z: -1
-            opacity: selected ? 0.55 : tabMouse.containsMouse ? 0.42 : 0.24
+            opacity: selected ? 0.34 : tabMouse.containsMouse ? 0.28 : 0.16
             color: selected || tabMouse.containsMouse ? Colors.orange : Colors.cyan
         }
     }
@@ -739,28 +743,35 @@ PanelWindow {
                                 }
 
                                 Row {
+                                    width: parent.width
+                                    height: 16
                                     spacing: 10
 
                                     MetaLabel {
                                         width: 100
+                                        anchors.verticalCenter: parent.verticalCenter
                                         text: "WORKTREE"
                                     }
 
                                     Row {
                                         width: 365
+                                        height: parent.height
                                         spacing: 0
 
                                         MetaValue {
+                                            anchors.verticalCenter: parent.verticalCenter
                                             visible: String(gitService.worktree).indexOf("DIRTY") !== 0
                                             text: gitService.worktree
                                         }
 
                                         MetaValue {
+                                            anchors.verticalCenter: parent.verticalCenter
                                             visible: String(gitService.worktree).indexOf("DIRTY") === 0
                                             text: "DIRTY • "
                                         }
 
                                         OrangeValue {
+                                            anchors.verticalCenter: parent.verticalCenter
                                             visible: String(gitService.worktree).indexOf("DIRTY") === 0
                                             text: {
                                                 const match = String(gitService.worktree).match(/(\d+)\s+CHANGES/);
@@ -769,6 +780,7 @@ PanelWindow {
                                         }
 
                                         MetaValue {
+                                            anchors.verticalCenter: parent.verticalCenter
                                             visible: String(gitService.worktree).indexOf("DIRTY") === 0
                                             text: " CHANGES"
                                         }
@@ -1147,13 +1159,13 @@ PanelWindow {
                                     spacing: 8
 
                                     BlueLabel {
-                                        width: 68
+                                        width: 44
                                         anchors.verticalCenter: parent.verticalCenter
                                         text: "NAME"
                                     }
 
                                     Rectangle {
-                                        width: parent.width - 76
+                                        width: parent.width - 52
                                         height: 26
                                         color: Colors.black
                                         border.width: 1
@@ -1321,7 +1333,7 @@ PanelWindow {
                                 Row {
                                     spacing: 10
 
-                                    BlueLabel {
+                                    MetaLabel {
                                         width: 100
                                         text: "BRIDGE"
                                     }

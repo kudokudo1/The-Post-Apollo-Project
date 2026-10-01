@@ -16,6 +16,7 @@ PanelWindow {
     property string factoryTrigger: "manual"
     property int selectedWorkflowIndex: 0
     property int selectedRunIndex: 0
+    property string selectedGitCommitSha: ""
 
     readonly property var selectedWorkflow:
         githubService.workflows.length > 0
@@ -30,10 +31,9 @@ PanelWindow {
     readonly property string selectedRunStatus:
         selectedRun ? String(selectedRun.status || "").toLowerCase() : ""
 
-    // Local Git stays compact. The automation mixer gets enough chassis
-    // space for three physical selector bays, generated code, library, and runs.
-    property int panelWidth: root.activePage === "github" ? 860 : 540
-    property int panelHeight: root.activePage === "github" ? 790 : 650
+    // One physical machine, two cameras. Page changes never resize the chassis.
+    property int panelWidth: 860
+    property int panelHeight: 790
     property int panelTopMargin: 0
     property int panelLeftMargin: 600
     property int frameInset: 8
@@ -796,134 +796,353 @@ PanelWindow {
 
                     Column {
                         anchors.fill: parent
-                        spacing: 12
+                        spacing: 10
 
-                        Rectangle {
-                            width: parent.width
-                            height: 140
-
-                            color: Colors.dark
-                            border.width: 1
-                            border.color: Colors.cyan
-
-                            RectangularShadow {
-                                anchors.fill: parent
-                                spread: 4
-                                z: -1
-                                opacity: 0.25
-                                color: Colors.cyan
-                            }
-
-                            Column {
-                                anchors {
-                                    fill: parent
-                                    margins: 12
-                                }
-
-                                spacing: 8
-
-                                SectionLabel {
-                                    text: "LOCAL TRUTH"
-                                }
-
-                                Row {
-                                    spacing: 10
-
-                                    MetaLabel {
-                                        width: 100
-                                        text: "REPOSITORY"
-                                    }
-
-                                    OrangeValue {
-                                        width: 365
-                                        text: gitService.repository
-                                    }
-                                }
-
-                                Row {
-                                    spacing: 10
-
-                                    OrangeLabel {
-                                        width: 100
-                                        text: "BRANCH"
-                                    }
-
-                                    CyanValue {
-                                        width: 365
-                                        text: gitService.branch
-                                    }
-                                }
-
-                                Row {
-                                    spacing: 10
-
-                                    MetaLabel {
-                                        width: 100
-                                        text: "HEAD"
-                                    }
-
-                                    BlueValue {
-                                        width: 365
-                                        text: gitService.head
-                                    }
-                                }
-
-                                Row {
-                                    width: parent.width
-                                    height: 16
-                                    spacing: 10
-
-                                    MetaLabel {
-                                        width: 100
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: "WORKTREE"
-                                    }
-
-                                    Row {
-                                        width: 365
-                                        height: parent.height
-                                        spacing: 0
-
-                                        MetaValue {
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            visible: String(gitService.worktree).indexOf("DIRTY") !== 0
-                                            text: gitService.worktree
-                                        }
-
-                                        MetaValue {
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            visible: String(gitService.worktree).indexOf("DIRTY") === 0
-                                            text: "DIRTY • "
-                                        }
-
-                                        OrangeValue {
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            visible: String(gitService.worktree).indexOf("DIRTY") === 0
-                                            text: {
-                                                const match = String(gitService.worktree).match(/(\d+)\s+CHANGES/);
-                                                return match ? match[1] : "";
-                                            }
-                                        }
-
-                                        MetaValue {
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            visible: String(gitService.worktree).indexOf("DIRTY") === 0
-                                            text: " CHANGES"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        SectionLabel {
-                            text: "LOCAL ACTIONS"
-                        }
+                        // ===== REPOSITORY / BRANCH CONTROL STRIP =====
 
                         Row {
                             width: parent.width
+                            height: 82
+                            spacing: 10
+
+                            Rectangle {
+                                width: (parent.width - 20) / 3
+                                height: parent.height
+                                color: Colors.dark
+                                border.width: 1
+                                border.color: Colors.cyan
+
+                                Column {
+                                    anchors {
+                                        fill: parent
+                                        margins: 8
+                                    }
+                                    spacing: 5
+
+                                    MetaLabel {
+                                        text: "REPOSITORY"
+                                    }
+
+                                    Row {
+                                        width: parent.width
+                                        height: 28
+                                        spacing: 4
+
+                                        ActionButton {
+                                            width: 28
+                                            height: 28
+                                            label: "‹"
+                                            enabledAction: gitService.repoCount > 1
+                                            onTriggered: gitService.cycleRepo(-1)
+                                        }
+
+                                        Rectangle {
+                                            width: parent.width - 64
+                                            height: 28
+                                            color: Colors.black
+                                            border.width: 1
+                                            border.color: Colors.orange
+
+                                            OrangeValue {
+                                                anchors {
+                                                    fill: parent
+                                                    leftMargin: 7
+                                                    rightMargin: 7
+                                                }
+                                                verticalAlignment: Text.AlignVCenter
+                                                text: gitService.repoLabel
+                                            }
+
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                enabled: gitService.repoCount > 1
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: gitService.cycleRepo(1)
+                                            }
+                                        }
+
+                                        ActionButton {
+                                            width: 28
+                                            height: 28
+                                            label: "›"
+                                            enabledAction: gitService.repoCount > 1
+                                            onTriggered: gitService.cycleRepo(1)
+                                        }
+                                    }
+
+                                    DimValue {
+                                        width: parent.width
+                                        text: gitService.repository + "  //  " + gitService.repoRoot
+                                        font.pixelSize: 8
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                width: (parent.width - 20) / 3
+                                height: parent.height
+                                color: Colors.dark
+                                border.width: 1
+                                border.color: Colors.orange
+
+                                Column {
+                                    anchors {
+                                        fill: parent
+                                        margins: 8
+                                    }
+                                    spacing: 6
+
+                                    OrangeLabel {
+                                        text: "CURRENT LOCAL"
+                                    }
+
+                                    CyanValue {
+                                        width: parent.width
+                                        text: gitService.branch
+                                        font.pixelSize: 12
+                                    }
+
+                                    Row {
+                                        spacing: 8
+
+                                        MetaLabel {
+                                            text: "HEAD"
+                                        }
+
+                                        BlueValue {
+                                            width: 82
+                                            text: gitService.head
+                                            font.pixelSize: 9
+                                        }
+
+                                        MetaValue {
+                                            width: parent.width - 120
+                                            text: gitService.worktree
+                                            font.pixelSize: 9
+                                        }
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                width: (parent.width - 20) / 3
+                                height: parent.height
+                                color: Colors.dark
+                                border.width: 1
+                                border.color:
+                                    gitService.selectedRemoteExists
+                                    ? Colors.cyan
+                                    : Colors.magenta
+
+                                Column {
+                                    anchors {
+                                        fill: parent
+                                        margins: 8
+                                    }
+                                    spacing: 5
+
+                                    MetaLabel {
+                                        text: "REMOTE TARGET"
+                                    }
+
+                                    Row {
+                                        width: parent.width
+                                        height: 28
+                                        spacing: 4
+
+                                        ActionButton {
+                                            width: 28
+                                            height: 28
+                                            label: "‹"
+                                            enabledAction: gitService.remoteBranchCount > 0
+                                            onTriggered: gitService.cycleRemote(-1)
+                                        }
+
+                                        Rectangle {
+                                            width: parent.width - 64
+                                            height: 28
+                                            color: Colors.black
+                                            border.width: 1
+                                            border.color:
+                                                gitService.selectedRemoteExists
+                                                ? Colors.cyan
+                                                : Colors.magenta
+
+                                            CyanValue {
+                                                anchors {
+                                                    fill: parent
+                                                    leftMargin: 7
+                                                    rightMargin: 7
+                                                }
+                                                verticalAlignment: Text.AlignVCenter
+                                                text: gitService.selectedRemoteBranch
+                                                      ? gitService.selectedRemoteBranch
+                                                      : "NO REMOTE TARGET"
+                                                color:
+                                                    gitService.selectedRemoteExists
+                                                    ? Colors.cyan
+                                                    : Colors.magenta
+                                            }
+                                        }
+
+                                        ActionButton {
+                                            width: 28
+                                            height: 28
+                                            label: "›"
+                                            enabledAction: gitService.remoteBranchCount > 0
+                                            onTriggered: gitService.cycleRemote(1)
+                                        }
+                                    }
+
+                                    GohuText {
+                                        width: parent.width
+                                        text:
+                                            gitService.selectedRemoteExists
+                                            ? "EXISTING REMOTE BRANCH"
+                                            : gitService.selectedRemoteBranch
+                                              ? "WILL CREATE THIS REMOTE BRANCH"
+                                              : "NO REMOTE BRANCH AVAILABLE"
+                                        font.pixelSize: 8
+                                        color:
+                                            gitService.selectedRemoteExists
+                                            ? Colors.white
+                                            : Colors.magenta
+                                        elide: Text.ElideRight
+                                    }
+                                }
+                            }
+                        }
+
+                        // ===== BRANCH MAP ==============================
+
+                        BranchMap {
+                            width: parent.width
+                            height: 250
+
+                            topologyService: gitService
+                            titleText: "REPOSITORY BRANCH MAP"
+                            selectedSha: root.selectedGitCommitSha
+
+                            onCommitSelected: function(sha) {
+                                const candidate = String(sha || "");
+                                root.selectedGitCommitSha =
+                                    root.selectedGitCommitSha === candidate
+                                    ? ""
+                                    : candidate;
+                            }
+                        }
+
+                        // ===== SYNC CONTROLS ===========================
+
+                        Rectangle {
+                            width: parent.width
+                            height: 58
+                            color: Colors.dark
+                            border.width: 1
+                            border.color: Colors.orange
+
+                            Row {
+                                anchors {
+                                    fill: parent
+                                    margins: 8
+                                }
+                                spacing: 8
+
+                                Column {
+                                    width: parent.width - 390
+                                    height: parent.height
+                                    spacing: 3
+
+                                    SectionLabel {
+                                        text: "SYNC // EXPLICIT DIRECTION"
+                                    }
+
+                                    GohuText {
+                                        width: parent.width
+                                        text:
+                                            "PULL  "
+                                            + (
+                                                gitService.selectedRemoteBranch
+                                                ? gitService.selectedRemoteBranch
+                                                : "REMOTE"
+                                            )
+                                            + "  →  "
+                                            + gitService.branch
+                                            + "     //     PUSH  "
+                                            + gitService.branch
+                                            + "  →  "
+                                            + (
+                                                gitService.selectedRemoteBranch
+                                                ? gitService.selectedRemoteBranch
+                                                : "REMOTE"
+                                            )
+                                        font.pixelSize: 8
+                                        color: Colors.white
+                                        elide: Text.ElideRight
+                                    }
+
+                                    GohuText {
+                                        width: parent.width
+                                        text:
+                                            gitService.upstream
+                                            ? "TRACKING "
+                                              + gitService.upstream
+                                              + "  //  LOCAL +"
+                                              + gitService.ahead
+                                              + "  //  REMOTE +"
+                                              + gitService.behind
+                                            : "NO TRACKING BRANCH // PICK A REMOTE TARGET ABOVE"
+                                        font.pixelSize: 8
+                                        color:
+                                            gitService.upstream
+                                            ? Colors.cyan
+                                            : Colors.magenta
+                                        elide: Text.ElideRight
+                                    }
+                                }
+
+                                ActionButton {
+                                    width: 116
+                                    label: "FETCH"
+                                    enabledAction: !gitService.actionBusy
+                                    selectedAction: gitService.actionTitle === "FETCH"
+                                    onTriggered: gitService.runSyncAction("fetch")
+                                }
+
+                                ActionButton {
+                                    width: 116
+                                    label: "← PULL"
+                                    enabledAction:
+                                        !gitService.actionBusy
+                                        && gitService.selectedRemoteExists
+                                    selectedAction: gitService.actionTitle === "PULL"
+                                    onTriggered: gitService.runSyncAction("pull")
+                                }
+
+                                ActionButton {
+                                    width: 132
+                                    label:
+                                        gitService.selectedRemoteExists
+                                        ? "PUSH →"
+                                        : "CREATE REMOTE"
+                                    enabledAction:
+                                        !gitService.actionBusy
+                                        && !!gitService.selectedRemoteBranch
+                                    selectedAction: gitService.actionTitle === "PUSH"
+                                    onTriggered: gitService.runSyncAction("push")
+                                }
+                            }
+                        }
+
+                        // ===== LOCAL TOOLS =============================
+
+                        Row {
+                            width: parent.width
+                            height: 36
                             spacing: 10
 
                             ActionButton {
+                                width: 124
                                 label: "STATUS"
                                 enabledAction: !gitService.actionBusy
                                 selectedAction: gitService.actionTitle === "STATUS"
@@ -931,6 +1150,7 @@ PanelWindow {
                             }
 
                             ActionButton {
+                                width: 124
                                 label: "DIFF"
                                 enabledAction: !gitService.actionBusy
                                 selectedAction: gitService.actionTitle === "DIFF"
@@ -938,6 +1158,7 @@ PanelWindow {
                             }
 
                             ActionButton {
+                                width: 124
                                 label: "LOG"
                                 enabledAction: !gitService.actionBusy
                                 selectedAction: gitService.actionTitle === "LOG"
@@ -945,27 +1166,46 @@ PanelWindow {
                             }
 
                             ActionButton {
+                                width: 124
                                 label: "LAZYGIT"
                                 enabledAction: true
                                 onTriggered: gitService.launchLazygit()
+                            }
+
+                            Rectangle {
+                                width: parent.width - 536
+                                height: parent.height
+                                color: Colors.dark
+                                border.width: 1
+                                border.color:
+                                    gitService.actionExitCode === 0
+                                    ? Colors.cyan
+                                    : Colors.red
+
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    text:
+                                        gitService.actionBusy
+                                        ? gitService.actionTitle + " // RUNNING"
+                                        : gitService.worktree
+                                    font.pixelSize: 9
+                                    color:
+                                        gitService.actionExitCode === 0
+                                        ? Colors.white
+                                        : Colors.red
+                                }
                             }
                         }
 
                         Rectangle {
                             width: parent.width
-                            height: 166
-
+                            height: 112
                             color: Colors.dark
                             border.width: 1
-                            border.color: Colors.orange
-
-                            RectangularShadow {
-                                anchors.fill: parent
-                                spread: 4
-                                z: -1
-                                opacity: 0.18
-                                color: Colors.orange
-                            }
+                            border.color:
+                                gitService.actionExitCode === 0
+                                ? Colors.cyan
+                                : Colors.red
 
                             GohuText {
                                 anchors {
@@ -973,14 +1213,18 @@ PanelWindow {
                                     left: parent.left
                                     right: parent.right
                                 }
-
-                                anchors.topMargin: 8
-                                anchors.leftMargin: 10
-                                anchors.rightMargin: 10
-
-                                text: gitService.actionBusy ? gitService.actionTitle + " // RUNNING" : gitService.actionTitle
-                                font.pixelSize: 10
-                                color: Colors.orange
+                                anchors.topMargin: 7
+                                anchors.leftMargin: 9
+                                anchors.rightMargin: 9
+                                text:
+                                    gitService.actionBusy
+                                    ? gitService.actionTitle + " // RUNNING"
+                                    : gitService.actionTitle + " // OUTPUT"
+                                font.pixelSize: 9
+                                color:
+                                    gitService.actionExitCode === 0
+                                    ? Colors.orange
+                                    : Colors.red
                             }
 
                             Flickable {
@@ -990,69 +1234,23 @@ PanelWindow {
                                     left: parent.left
                                     right: parent.right
                                 }
-
-                                anchors.topMargin: 27
-                                anchors.bottomMargin: 8
-                                anchors.leftMargin: 10
-                                anchors.rightMargin: 10
+                                anchors.topMargin: 24
+                                anchors.bottomMargin: 7
+                                anchors.leftMargin: 9
+                                anchors.rightMargin: 9
 
                                 clip: true
                                 contentWidth: width
-                                contentHeight: Math.max(height, outputText.implicitHeight)
+                                contentHeight: Math.max(height, localOutputText.implicitHeight)
                                 boundsBehavior: Flickable.StopAtBounds
 
                                 GohuText {
-                                    id: outputText
+                                    id: localOutputText
                                     width: parent.width
                                     text: gitService.actionOutput
                                     font.pixelSize: 9
                                     color: Colors.white
                                     wrapMode: Text.WrapAnywhere
-
-                                    layer.enabled: true
-                                    layer.effect: DropShadow {
-                                        radius: 5
-                                        samples: 7
-                                        opacity: 0.10
-                                        color: Colors.cyan
-                                        transparentBorder: true
-                                    }
-                                }
-                            }
-                        }
-
-                        Rectangle {
-                            width: parent.width
-                            height: 70
-
-                            color: Colors.dark
-                            border.width: 1
-                            border.color: Colors.cyan
-
-                            Column {
-                                anchors {
-                                    fill: parent
-                                    margins: 10
-                                }
-
-                                spacing: 7
-
-                                SectionLabel {
-                                    text: "REMOTE ENDPOINT"
-                                }
-
-                                Row {
-                                    spacing: 10
-
-                                    BlueLabel {
-                                        width: 100
-                                        text: "ORIGIN"
-                                    }
-
-                                    OrangeValue {
-                                        width: 365
-                                        text: gitService.origin
-                                    }
                                 }
                             }
                         }

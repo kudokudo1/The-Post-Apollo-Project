@@ -67,8 +67,6 @@ Item {
         model: Math.min(rail.count, 11)
 
         Rectangle {
-            required property int index
-
             width: index % 5 === 0 ? 8 : 5
             height: 1
             x: (rail.width - width) / 2

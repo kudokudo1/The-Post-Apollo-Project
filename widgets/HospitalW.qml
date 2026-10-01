@@ -101,14 +101,6 @@ PanelWindow {
         onTriggered: hospitalGitService.refresh()
     }
 
-    Timer {
-        interval: 5000
-        repeat: true
-        running: root.menuOpen
-
-        onTriggered: patientService.refresh()
-    }
-
     component SectionLabel: GohuText {
         font.pixelSize: 12
         color: Colors.magenta

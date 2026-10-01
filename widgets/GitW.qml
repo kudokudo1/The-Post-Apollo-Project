@@ -1236,14 +1236,14 @@ PanelWindow {
                                         height: 26
                                         color: Colors.black
                                         border.width: 1
-                                        border.color: factoryNameInput.activeFocus ? Colors.orange : Colors.cyan
+                                        border.color: factoryNameInput.activeFocus ? Colors.magenta : Colors.orange
 
                                         RectangularShadow {
                                             anchors.fill: parent
                                             spread: 2
                                             z: -1
                                             opacity: factoryNameInput.activeFocus ? 0.34 : 0.16
-                                            color: factoryNameInput.activeFocus ? Colors.orange : Colors.cyan
+                                            color: factoryNameInput.activeFocus ? Colors.magenta : Colors.orange
                                         }
 
                                         GohuText {

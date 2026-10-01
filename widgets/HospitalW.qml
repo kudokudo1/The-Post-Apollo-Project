@@ -985,16 +985,38 @@ PanelWindow {
                             text: "PATIENT HEAD"
                         }
 
-                        MetaValue {
+                        Row {
                             width: 500
-                            text: patientService.head + " // " + patientService.worktree
+                            spacing: 0
 
-                            layer.effect: DropShadow {
-                                radius: 7
-                                samples: 9
-                                opacity: 0.34
-                                color: Colors.cyan
-                                transparentBorder: true
+                            MetaValue {
+                                text: patientService.head + " // "
+                                layer.effect: DropShadow {
+                                    radius: 7
+                                    samples: 9
+                                    opacity: 0.34
+                                    color: Colors.cyan
+                                    transparentBorder: true
+                                }
+                            }
+
+                            GohuText {
+                                text: patientService.worktree
+                                font.pixelSize: 11
+                                color: patientService.worktree === "CLEAN"
+                                       ? Colors.orange
+                                       : Colors.white
+
+                                layer.enabled: true
+                                layer.effect: DropShadow {
+                                    radius: patientService.worktree === "CLEAN" ? 6 : 7
+                                    samples: 9
+                                    opacity: patientService.worktree === "CLEAN" ? 0.46 : 0.34
+                                    color: patientService.worktree === "CLEAN"
+                                           ? Colors.orange
+                                           : Colors.cyan
+                                    transparentBorder: true
+                                }
                             }
                         }
                     }

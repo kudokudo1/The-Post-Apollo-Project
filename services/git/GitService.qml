@@ -184,6 +184,48 @@ Scope {
         selectRepo(index);
     }
 
+    function selectRepoText(query) {
+        const needle = String(query || "").trim().toLowerCase();
+
+        if (!needle)
+            return false;
+
+        let partialIndex = -1;
+
+        for (let i = 0; i < repoRows.count; ++i) {
+            const row = repoRows.get(i);
+            const label = String(row.label || "");
+            const pathValue = String(row.path || "");
+            const lowerLabel = label.toLowerCase();
+            const lowerPath = pathValue.toLowerCase();
+
+            if (lowerLabel === needle || lowerPath === needle) {
+                selectRepo(i);
+                return true;
+            }
+
+            if (
+                partialIndex < 0
+                && (
+                    lowerLabel.indexOf(needle) >= 0
+                    || lowerPath.indexOf(needle) >= 0
+                )
+            )
+                partialIndex = i;
+        }
+
+        if (partialIndex >= 0) {
+            selectRepo(partialIndex);
+            return true;
+        }
+
+        actionTitle = "REPOSITORY";
+        actionExitCode = 1;
+        actionOutput = "NO MATCH // " + String(query || "")
+                     + "\nType part of a repo name already registered on this machine.";
+        return false;
+    }
+
     function selectRemote(index) {
         const row = remoteBranchAt(index);
         if (!row)
@@ -205,6 +247,29 @@ Scope {
                     % remoteBranchRows.count;
 
         selectRemote(index);
+    }
+
+    function selectRemoteText(query) {
+        let value = String(query || "").trim();
+
+        if (!value)
+            return false;
+
+        value = value.replace(/^refs\/remotes\//, "");
+
+        if (value.indexOf("/") < 0)
+            value = "origin/" + value;
+
+        selectedRemoteBranch = value;
+        selectedRemoteExists = remoteIndexOf(value) >= 0;
+        actionTitle = "REMOTE TARGET";
+        actionExitCode = 0;
+        actionOutput = selectedRemoteExists
+            ? "SELECTED EXISTING REMOTE // " + value
+            : "REMOTE DOES NOT EXIST YET // " + value
+              + "\nPUSH will create it. Nothing has been changed yet.";
+
+        return true;
     }
 
     function resetTopology() {

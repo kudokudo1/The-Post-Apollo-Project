@@ -325,7 +325,6 @@ PanelWindow {
         id: selectorInput
 
         property string valueText: ""
-        property string draftText: valueText
         property string placeholderText: ""
         property color accentColor: Colors.cyan
         property bool editable: true
@@ -339,7 +338,7 @@ PanelWindow {
 
         onValueTextChanged: {
             if (!input.activeFocus)
-                draftText = valueText;
+                input.text = valueText;
         }
 
         TextInput {
@@ -351,7 +350,6 @@ PanelWindow {
                 rightMargin: 7
             }
 
-            text: selectorInput.draftText
             readOnly: !selectorInput.editable
             selectByMouse: true
             clip: true
@@ -363,7 +361,7 @@ PanelWindow {
             selectedTextColor: Colors.black
             verticalAlignment: TextInput.AlignVCenter
 
-            onTextEdited: selectorInput.draftText = text
+            Component.onCompleted: text = selectorInput.valueText
 
             onAccepted: {
                 const candidate = String(text || "").trim();
@@ -375,18 +373,16 @@ PanelWindow {
             }
 
             Keys.onEscapePressed: function(event) {
-                selectorInput.draftText = selectorInput.valueText;
+                text = selectorInput.valueText;
                 focus = false;
                 event.accepted = true;
             }
 
             onActiveFocusChanged: {
                 if (activeFocus) {
-                    selectorInput.draftText = selectorInput.valueText;
                     text = selectorInput.valueText;
                     selectAll();
                 } else {
-                    selectorInput.draftText = selectorInput.valueText;
                     text = selectorInput.valueText;
                 }
             }

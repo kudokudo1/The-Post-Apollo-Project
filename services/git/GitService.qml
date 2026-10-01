@@ -7,6 +7,7 @@ Scope {
 
     property bool available: false
     property bool refreshing: false
+    property bool refreshPending: false
     property bool discoveringRepos: false
     property bool actionBusy: false
 
@@ -169,6 +170,12 @@ Scope {
         repoLabel = String(row.label || "REPOSITORY");
         selectedRemoteBranch = "";
         selectedRemoteExists = false;
+
+        if (refreshing) {
+            refreshPending = true;
+            return;
+        }
+
         refresh();
     }
 
@@ -499,6 +506,13 @@ Scope {
             if (!lastError) {
                 available = true;
                 refreshed();
+            }
+
+            if (refreshPending) {
+                refreshPending = false;
+                Qt.callLater(function() {
+                    refresh();
+                });
             }
         }
     }

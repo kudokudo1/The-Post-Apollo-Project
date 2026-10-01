@@ -159,6 +159,29 @@ PanelWindow {
         }
     }
 
+    component BlueValue: GohuText {
+        font.pixelSize: 11
+        color: Colors.blue
+        elide: Text.ElideRight
+
+        layer.enabled: true
+        layer.effect: DropShadow {
+            radius: 6
+            samples: 9
+            opacity: 0.46
+            color: Colors.blue
+            transparentBorder: true
+        }
+    }
+
+    component DimValue: GohuText {
+        font.pixelSize: 11
+        color: Colors.white
+        opacity: 0.30
+        elide: Text.ElideRight
+        layer.enabled: false
+    }
+
     component ActionButton: Rectangle {
         id: actionButton
 
@@ -521,7 +544,7 @@ PanelWindow {
                             text: "HEAD"
                         }
 
-                        OrangeValue {
+                        BlueValue {
                             width: 365
                             text: gitService.head
                         }
@@ -768,7 +791,7 @@ PanelWindow {
                                 text: String(githubService.workflowCount)
                             }
 
-                            MetaValue {
+                            DimValue {
                                 visible: githubService.available && githubService.workflowCount === 0
                                 text: "0"
                             }
@@ -802,7 +825,7 @@ PanelWindow {
                                 text: String(githubService.runCount)
                             }
 
-                            MetaValue {
+                            DimValue {
                                 visible: githubService.available && githubService.runCount === 0
                                 text: "0"
                             }

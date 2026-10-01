@@ -91,36 +91,22 @@ Scope {
         runsStdoutText = "";
         runsStderrText = "";
 
+        // GitHub semantics belong to PX. This surface only supplies the
+        // repository identity and consumes PX's stable JSON contract.
         workflowsProcess.exec([
-            "/usr/bin/toolbox",
-            "run",
-            "-c",
-            "fedora-toolbox-44",
-            "/usr/bin/gh",
-            "workflow",
-            "list",
-            "-R",
-            repoSlug,
-            "--limit",
-            "100",
-            "--json",
-            "name,state,path"
+            "bash",
+            "-lc",
+            'exec "$HOME/.local/bin/px" workflows "$1"',
+            "px-workflows",
+            repoSlug
         ]);
 
         runsProcess.exec([
-            "/usr/bin/toolbox",
-            "run",
-            "-c",
-            "fedora-toolbox-44",
-            "/usr/bin/gh",
-            "run",
-            "list",
-            "-R",
-            repoSlug,
-            "--limit",
-            "8",
-            "--json",
-            "databaseId,workflowName,status,conclusion,headBranch,createdAt"
+            "bash",
+            "-lc",
+            'exec "$HOME/.local/bin/px" runs "$1" 8',
+            "px-runs",
+            repoSlug
         ]);
 
         watchdog.restart();
@@ -308,7 +294,7 @@ Scope {
 
             githubService.refreshing = false;
             githubService.available = false;
-            githubService.lastError = "GITHUB PROCESS TIMEOUT";
+            githubService.lastError = "PX GITHUB BRIDGE TIMEOUT";
 
             if (workflowsProcess.running)
                 workflowsProcess.running = false;

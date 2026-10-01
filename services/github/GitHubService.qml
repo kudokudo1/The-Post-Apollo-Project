@@ -79,6 +79,16 @@ Scope {
     property string factoryLastTrigger: ""
     property string factoryLastSlug: ""
 
+    property bool actionBusy: false
+    property string actionKind: ""
+    property string actionResult: "READY"
+    property bool actionExitSeen: false
+    property bool actionStdoutSeen: false
+    property bool actionStderrSeen: false
+    property int actionExitCode: -1
+    property string actionStdoutText: ""
+    property string actionStderrText: ""
+
     property string lastError: ""
 
     function refresh() {
@@ -197,6 +207,82 @@ Scope {
             latestRunConclusion = "";
             latestRunBranch = "";
         }
+    }
+
+    function runWorkflow(workflowPath) {
+        runRemoteAction("run", workflowPath);
+    }
+
+    function rerunRun(runId) {
+        runRemoteAction("rerun", String(runId || ""));
+    }
+
+    function cancelRun(runId) {
+        runRemoteAction("cancel", String(runId || ""));
+    }
+
+    function runRemoteAction(kind, target) {
+        if (actionBusy || refreshing)
+            return;
+
+        if (!repoSlug) {
+            actionResult = "ERROR // NO GITHUB REPOSITORY";
+            return;
+        }
+
+        const cleanTarget = String(target || "").trim();
+
+        if (!cleanTarget) {
+            actionResult = "ERROR // TARGET REQUIRED";
+            return;
+        }
+
+        if (kind !== "run" && kind !== "rerun" && kind !== "cancel") {
+            actionResult = "ERROR // UNKNOWN ACTION";
+            return;
+        }
+
+        actionBusy = true;
+        actionKind = kind;
+        actionResult = kind.toUpperCase() + " // RUNNING";
+        actionExitSeen = false;
+        actionStdoutSeen = false;
+        actionStderrSeen = false;
+        actionExitCode = -1;
+        actionStdoutText = "";
+        actionStderrText = "";
+
+        remoteActionProcess.exec([
+            "bash",
+            "-lc",
+            'exec "$HOME/.local/bin/px" "$1" "$2" "$3"',
+            "px-action",
+            kind,
+            repoSlug,
+            cleanTarget
+        ]);
+
+        actionWatchdog.restart();
+    }
+
+    function maybeFinishRemoteAction() {
+        if (!actionBusy)
+            return;
+
+        if (!actionExitSeen || !actionStdoutSeen || !actionStderrSeen)
+            return;
+
+        actionBusy = false;
+        actionWatchdog.stop();
+
+        if (actionExitCode === 0) {
+            actionResult = actionKind.toUpperCase() + " // OK";
+            refresh();
+            return;
+        }
+
+        const error = String(actionStderrText || actionStdoutText || "PX ACTION FAILED").trim();
+        actionResult = "ERROR // " + error;
     }
 
     function clearFactoryResult() {
@@ -388,6 +474,32 @@ Scope {
     }
 
     Process {
+        id: remoteActionProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                githubService.actionStdoutText = this.text;
+                githubService.actionStdoutSeen = true;
+                githubService.maybeFinishRemoteAction();
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                githubService.actionStderrText = this.text;
+                githubService.actionStderrSeen = true;
+                githubService.maybeFinishRemoteAction();
+            }
+        }
+
+        onExited: function(exitCode, exitStatus) {
+            githubService.actionExitCode = Number(exitCode);
+            githubService.actionExitSeen = true;
+            githubService.maybeFinishRemoteAction();
+        }
+    }
+
+    Process {
         id: factoryProcess
 
         stdout: StdioCollector {
@@ -462,6 +574,23 @@ Scope {
             githubService.runsExitCode = Number(exitCode);
             githubService.runsExitSeen = true;
             githubService.maybeFinishRuns();
+        }
+    }
+
+    Timer {
+        id: actionWatchdog
+        interval: 15000
+        repeat: false
+
+        onTriggered: {
+            if (!githubService.actionBusy)
+                return;
+
+            githubService.actionBusy = false;
+            githubService.actionResult = "ERROR // PX ACTION TIMEOUT";
+
+            if (remoteActionProcess.running)
+                remoteActionProcess.running = false;
         }
     }
 

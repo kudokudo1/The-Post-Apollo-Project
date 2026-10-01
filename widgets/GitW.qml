@@ -469,36 +469,71 @@ PanelWindow {
 
         signal triggered()
 
+        readonly property bool hovered: tabMouse.containsMouse
+        readonly property bool pressed: tabMouse.pressed
+
         height: 36
-        color: selected
-               ? Colors.yellow
-               : tabMouse.containsMouse
-               ? Colors.dark
-               : Colors.black
+
+        scale:
+            pressed
+            ? 0.99
+            : hovered
+            ? 1.025
+            : selected
+            ? 1.01
+            : 1.0
+
+        color:
+            pressed
+            ? Colors.magenta
+            : hovered || selected
+            ? Colors.yellow
+            : Colors.black
 
         border.width: 1
-        border.color: selected
-                      ? Colors.orange
-                      : tabMouse.containsMouse
-                      ? Colors.orange
-                      : Colors.cyan
+        border.color:
+            pressed
+            ? Colors.magenta
+            : hovered
+            ? Colors.orange
+            : selected
+            ? Colors.orange
+            : Colors.cyan
+
+        Behavior on scale {
+            NumberAnimation {
+                duration: 90
+                easing.type: Easing.OutQuad
+            }
+        }
 
         GohuText {
             anchors.centerIn: parent
             text: pageTab.label
             font.pixelSize: 11
-            color: pageTab.selected
-                   ? Colors.magenta
-                   : tabMouse.containsMouse
-                   ? Colors.orange
-                   : Colors.cyan
+            color:
+                pageTab.pressed
+                ? Colors.black
+                : pageTab.selected
+                ? Colors.magenta
+                : pageTab.hovered
+                ? Colors.orange
+                : Colors.cyan
 
-            layer.enabled: true
+            layer.enabled: !pageTab.pressed
             layer.effect: DropShadow {
-                radius: pageTab.selected ? 10 : tabMouse.containsMouse ? 9 : 7
+                radius: 10
                 samples: 11
-                opacity: pageTab.selected ? 0.56 : tabMouse.containsMouse ? 0.50 : 0.38
-                color: pageTab.selected || tabMouse.containsMouse ? Colors.orange : Colors.cyan
+                opacity:
+                    pageTab.hovered
+                    ? 0.62
+                    : pageTab.selected
+                    ? 0.58
+                    : 0.46
+                color:
+                    pageTab.hovered || pageTab.selected
+                    ? Colors.orange
+                    : Colors.cyan
                 transparentBorder: true
             }
         }
@@ -512,10 +547,42 @@ PanelWindow {
 
         RectangularShadow {
             anchors.fill: parent
-            spread: selected ? 5 : 3
+            spread: 3
             z: -1
-            opacity: selected ? 0.34 : tabMouse.containsMouse ? 0.28 : 0.16
-            color: selected || tabMouse.containsMouse ? Colors.orange : Colors.cyan
+            opacity:
+                pageTab.pressed
+                ? 0.48
+                : pageTab.hovered
+                ? 0.40
+                : pageTab.selected
+                ? 0.36
+                : 0.26
+            color:
+                pageTab.pressed
+                ? Colors.magenta
+                : pageTab.hovered || pageTab.selected
+                ? Colors.orange
+                : Colors.cyan
+        }
+
+        RectangularShadow {
+            anchors.fill: parent
+            spread: 10
+            z: -2
+            opacity:
+                pageTab.pressed
+                ? 0.10
+                : pageTab.hovered
+                ? 0.08
+                : pageTab.selected
+                ? 0.07
+                : 0.045
+            color:
+                pageTab.pressed
+                ? Colors.magenta
+                : pageTab.hovered || pageTab.selected
+                ? Colors.orange
+                : Colors.cyan
         }
     }
 

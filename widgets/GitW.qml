@@ -14,6 +14,21 @@ PanelWindow {
     property string activePage: "git"
     property string factoryTemplate: "smoke"
     property string factoryTrigger: "manual"
+    property int selectedWorkflowIndex: 0
+    property int selectedRunIndex: 0
+
+    readonly property var selectedWorkflow:
+        githubService.workflows.length > 0
+        ? githubService.workflows[Math.min(selectedWorkflowIndex, githubService.workflows.length - 1)]
+        : null
+
+    readonly property var selectedRun:
+        githubService.runs.length > 0
+        ? githubService.runs[Math.min(selectedRunIndex, githubService.runs.length - 1)]
+        : null
+
+    readonly property string selectedRunStatus:
+        selectedRun ? String(selectedRun.status || "").toLowerCase() : ""
 
     property int panelWidth: 540
     property int panelHeight: 650
@@ -95,6 +110,24 @@ PanelWindow {
         githubService.clearFactoryResult();
     }
 
+    function cycleWorkflow() {
+        const count = githubService.workflows.length;
+
+        if (count <= 0)
+            return;
+
+        root.selectedWorkflowIndex = (root.selectedWorkflowIndex + 1) % count;
+    }
+
+    function cycleRun() {
+        const count = githubService.runs.length;
+
+        if (count <= 0)
+            return;
+
+        root.selectedRunIndex = (root.selectedRunIndex + 1) % count;
+    }
+
     onMenuOpenChanged: {
         if (!root.menuOpen)
             return;
@@ -114,6 +147,24 @@ PanelWindow {
     GitHubService {
         id: githubService
         originUrl: gitService.origin
+    }
+
+    Connections {
+        target: githubService
+
+        function onWorkflowsChanged() {
+            if (githubService.workflows.length === 0)
+                root.selectedWorkflowIndex = 0;
+            else if (root.selectedWorkflowIndex >= githubService.workflows.length)
+                root.selectedWorkflowIndex = 0;
+        }
+
+        function onRunsChanged() {
+            if (githubService.runs.length === 0)
+                root.selectedRunIndex = 0;
+            else if (root.selectedRunIndex >= githubService.runs.length)
+                root.selectedRunIndex = 0;
+        }
     }
 
     Timer {
@@ -963,7 +1014,7 @@ PanelWindow {
                                     margins: 12
                                 }
 
-                                spacing: 8
+                                spacing: 5
 
                                 SectionLabel {
                                     text: "REMOTE // GITHUB"
@@ -1002,72 +1053,60 @@ PanelWindow {
                                 }
 
                                 Row {
+                                    width: parent.width
+                                    height: 24
                                     spacing: 10
 
                                     MetaLabel {
                                         width: 100
-                                        text: "WORKFLOWS"
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: "WORKFLOW"
                                     }
 
-                                    Row {
+                                    ActionButton {
                                         width: 365
-                                        spacing: 0
-
-                                        OrangeValue {
-                                            visible: githubService.available && githubService.workflowCount > 0
-                                            text: String(githubService.workflowCount)
-                                        }
-
-                                        DimValue {
-                                            visible: githubService.available && githubService.workflowCount === 0
-                                            text: "0"
-                                        }
-
-                                        MetaValue {
-                                            visible: githubService.available
-                                            text: " // " + githubService.latestWorkflow
-                                        }
-
-                                        MetaValue {
-                                            visible: !githubService.available
-                                            text: "NOT CONNECTED"
-                                        }
+                                        height: 24
+                                        enabledAction: githubService.available
+                                                       && githubService.workflowCount > 0
+                                                       && !githubService.refreshing
+                                                       && !githubService.actionBusy
+                                        label: root.selectedWorkflow
+                                               ? String(root.selectedWorkflowIndex + 1)
+                                                 + "/" + String(githubService.workflowCount)
+                                                 + " // "
+                                                 + String(root.selectedWorkflow.name || root.selectedWorkflow.path || "UNKNOWN")
+                                               : "0 // NO WORKFLOWS"
+                                        onTriggered: root.cycleWorkflow()
                                     }
                                 }
 
                                 Row {
+                                    width: parent.width
+                                    height: 24
                                     spacing: 10
 
                                     MetaLabel {
                                         width: 100
-                                        text: "LATEST RUN"
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: "RUN"
                                     }
 
-                                    Row {
+                                    ActionButton {
                                         width: 365
-                                        spacing: 0
-
-                                        OrangeValue {
-                                            visible: githubService.available && githubService.runCount > 0
-                                            text: String(githubService.runCount)
-                                        }
-
-                                        DimValue {
-                                            visible: githubService.available && githubService.runCount === 0
-                                            text: "0"
-                                        }
-
-                                        MetaValue {
-                                            visible: githubService.available
-                                            text: " // " + githubService.latestRunStatus
-                                                  + (githubService.latestRunConclusion ? " // " + githubService.latestRunConclusion : "")
-                                                  + (githubService.latestRunBranch ? " // " + githubService.latestRunBranch : "")
-                                        }
-
-                                        MetaValue {
-                                            visible: !githubService.available
-                                            text: "NOT CONNECTED"
-                                        }
+                                        height: 24
+                                        enabledAction: githubService.available
+                                                       && githubService.runCount > 0
+                                                       && !githubService.refreshing
+                                                       && !githubService.actionBusy
+                                        label: root.selectedRun
+                                               ? String(root.selectedRunIndex + 1)
+                                                 + "/" + String(githubService.runCount)
+                                                 + " // #"
+                                                 + String(root.selectedRun.databaseId || "?")
+                                                 + " // "
+                                                 + String(root.selectedRun.status || "UNKNOWN").toUpperCase()
+                                               : "0 // NO RUNS"
+                                        onTriggered: root.cycleRun()
                                     }
                                 }
                             }
@@ -1084,22 +1123,46 @@ PanelWindow {
                             ActionButton {
                                 label: "REFRESH"
                                 enabledAction: !githubService.refreshing
+                                               && !githubService.actionBusy
+                                               && !githubService.factoryBusy
                                 onTriggered: githubService.refresh()
                             }
 
                             ActionButton {
-                                label: "RUN"
-                                enabledAction: false
+                                label: githubService.actionBusy && githubService.actionKind === "run"
+                                       ? "RUNNING"
+                                       : "RUN"
+                                enabledAction: root.selectedWorkflow
+                                               && !githubService.refreshing
+                                               && !githubService.actionBusy
+                                               && !githubService.factoryBusy
+                                onTriggered: githubService.runWorkflow(
+                                    String(root.selectedWorkflow.path || root.selectedWorkflow.name || "")
+                                )
                             }
 
                             ActionButton {
-                                label: "RERUN"
-                                enabledAction: false
+                                label: githubService.actionBusy && githubService.actionKind === "rerun"
+                                       ? "RERUNNING"
+                                       : "RERUN"
+                                enabledAction: root.selectedRun
+                                               && root.selectedRunStatus === "completed"
+                                               && !githubService.refreshing
+                                               && !githubService.actionBusy
+                                               && !githubService.factoryBusy
+                                onTriggered: githubService.rerunRun(root.selectedRun.databaseId)
                             }
 
                             ActionButton {
-                                label: "CANCEL"
-                                enabledAction: false
+                                label: githubService.actionBusy && githubService.actionKind === "cancel"
+                                       ? "CANCELLING"
+                                       : "CANCEL"
+                                enabledAction: root.selectedRun
+                                               && root.selectedRunStatus !== "completed"
+                                               && !githubService.refreshing
+                                               && !githubService.actionBusy
+                                               && !githubService.factoryBusy
+                                onTriggered: githubService.cancelRun(root.selectedRun.databaseId)
                             }
                         }
 
@@ -1342,8 +1405,12 @@ PanelWindow {
                                         width: 365
                                         text: githubService.lastError
                                               ? "ERROR // " + githubService.lastError
+                                              : githubService.actionBusy
+                                              ? githubService.actionResult
+                                              : githubService.actionResult !== "READY"
+                                              ? githubService.actionResult
                                               : githubService.available
-                                              ? "ACTIVE // REMOTE WRITES LOCKED"
+                                              ? "ACTIVE // PX CONTROL READY"
                                               : "WAITING"
                                     }
                                 }

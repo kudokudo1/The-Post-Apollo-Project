@@ -174,7 +174,7 @@ PanelWindow {
     }
 
     Timer {
-        interval: 3000
+        interval: 10000
         repeat: true
         running: root.menuOpen && root.activePage === "git"
 
@@ -373,7 +373,7 @@ PanelWindow {
             ? Colors.orange
             : Colors.cyan
 
-        opacity: enabledAction ? 1.0 : 0.22
+        opacity: 1.0
 
         Behavior on scale {
             NumberAnimation {
@@ -903,6 +903,7 @@ PanelWindow {
                                     }
 
                                     Row {
+                                        width: parent.width
                                         spacing: 8
 
                                         MetaLabel {

@@ -302,6 +302,31 @@ Scope {
         factoryLastSlug = "";
     }
 
+    function friendlyFactoryMessage(message) {
+        const raw = String(message || "").trim();
+        const lower = raw.toLowerCase();
+
+        if (!raw)
+            return "PX COULD NOT BUILD THE WORKFLOW.";
+
+        if (lower.indexOf("workflow slug must match") >= 0)
+            return "WORKFLOW NAME // use lowercase letters, numbers, and hyphens only. Example: t6-audit";
+
+        if (lower.indexOf("workflow slug required") >= 0)
+            return "WORKFLOW NAME // type a name first. Example: t6-audit";
+
+        if (lower.indexOf("template and name required") >= 0)
+            return "WORKFLOW FACTORY // choose an operation and give the workflow a name.";
+
+        if (lower.indexOf("no github repository") >= 0)
+            return "GITHUB CONNECTION // this repo is not connected to a GitHub repository.";
+
+        if (lower.indexOf("factory timeout") >= 0)
+            return "PX FACTORY // GitHub took too long to answer. Try PREVIEW again.";
+
+        return raw;
+    }
+
     function previewWorkflow(templateId, slug, triggerId) {
         runFactory("preview", templateId, slug, triggerId);
     }
@@ -326,7 +351,13 @@ Scope {
 
         if (!cleanTemplate || !cleanSlug) {
             factoryValidationStatus = "ERROR";
-            factoryValidationMessage = "TEMPLATE AND NAME REQUIRED";
+            factoryValidationMessage = "WORKFLOW FACTORY // choose an operation and give the workflow a name.";
+            return;
+        }
+
+        if (!/^[a-z0-9][a-z0-9-]*$/.test(cleanSlug)) {
+            factoryValidationStatus = "ERROR";
+            factoryValidationMessage = "WORKFLOW NAME // use lowercase letters, numbers, and hyphens only. Example: t6-audit";
             return;
         }
 
@@ -404,9 +435,13 @@ Scope {
 
         if (factoryExitCode !== 0 && !parsed) {
             factoryValidationStatus = "ERROR";
-            factoryValidationMessage = String(factoryStderrText || "PX FACTORY FAILED").trim();
+            factoryValidationMessage = friendlyFactoryMessage(
+                String(factoryStderrText || "PX FACTORY FAILED").trim()
+            );
         } else if (factoryExitCode !== 0 && !factoryValidationMessage) {
-            factoryValidationMessage = String(factoryStderrText || "").trim();
+            factoryValidationMessage = friendlyFactoryMessage(
+                String(factoryStderrText || "").trim()
+            );
         }
 
         factoryBusy = false;

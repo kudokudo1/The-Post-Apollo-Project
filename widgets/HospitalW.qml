@@ -548,85 +548,103 @@ PanelWindow {
 
             // ===== PATIENT ======================================
 
-            Rectangle {
+            Row {
+                id: patientRoomRow
+
                 width: parent.width
-                height: 118
+                height: 148
+                spacing: 10
 
-                color: Colors.dark
-                border.width: 1
-                border.color: Colors.magenta
+                Rectangle {
+                    id: patientPane
 
-                RectangularShadow {
-                    anchors.fill: parent
-                    spread: 4
-                    z: -1
-                    opacity: 0.22
-                    color: Colors.magenta
-                }
+                    width: (parent.width - parent.spacing) / 2
+                    height: parent.height
 
-                Column {
-                    anchors {
-                        fill: parent
-                        margins: 12
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: Colors.magenta
+
+                    RectangularShadow {
+                        anchors.fill: parent
+                        spread: 4
+                        z: -1
+                        opacity: 0.22
+                        color: Colors.magenta
                     }
 
-                    spacing: 7
-
-                    SectionLabel {
-                        text: "PATIENT"
-                    }
-
-                    Row {
-                        spacing: 10
-
-                        MetaLabel {
-                            width: 110
-                            text: "REPOSITORY"
+                    Column {
+                        anchors {
+                            fill: parent
+                            margins: 12
                         }
 
-                        MetaValue {
-                            width: 500
-                            text: patientService.repository
-                            color: Colors.orange
+                        spacing: 8
 
-                            layer.effect: DropShadow {
-                                radius: 5
-                                samples: 7
-                                opacity: 0.28
-                                color: Colors.orange
-                                transparentBorder: true
-                            }
-                        }
-                    }
-
-                    Row {
-                        spacing: 10
-
-                        OrangeLabel {
-                            width: 110
-                            text: "BRANCH"
-                        }
-
-                        CyanValue {
-                            width: 500
-                            text: patientService.branch
-                        }
-                    }
-
-                    Row {
-                        spacing: 10
-
-                        MetaLabel {
-                            width: 110
-                            text: "PATIENT HEAD"
+                        SectionLabel {
+                            text: "PATIENT"
                         }
 
                         Row {
-                            width: 500
-                            spacing: 0
+                            spacing: 8
+
+                            MetaLabel {
+                                width: 76
+                                text: "REPOSITORY"
+                            }
+
+                            MetaValue {
+                                width: patientPane.width - 108
+                                text: patientService.repository
+                                color: Colors.orange
+                                elide: Text.ElideRight
+
+                                layer.effect: DropShadow {
+                                    radius: 5
+                                    samples: 7
+                                    opacity: 0.28
+                                    color: Colors.orange
+                                    transparentBorder: true
+                                }
+                            }
+                        }
+
+                        Row {
+                            spacing: 8
+
+                            OrangeLabel {
+                                width: 76
+                                text: "BRANCH"
+                            }
+
+                            CyanValue {
+                                width: patientPane.width - 108
+                                text: patientService.branch
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        Row {
+                            spacing: 8
+
+                            MetaLabel {
+                                width: 76
+                                text: "HEAD"
+                            }
 
                             BlueValue {
-                                text: patientService.head + " // "
+                                width: patientPane.width - 108
+                                text: patientService.head
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        Row {
+                            spacing: 8
+
+                            MetaLabel {
+                                width: 76
+                                text: "WORKTREE"
                             }
 
                             GohuText {
@@ -635,9 +653,10 @@ PanelWindow {
                                         .trim()
                                         .toUpperCase() === "CLEAN"
 
+                                width: patientPane.width - 108
                                 text: patientService.worktree
-                                font.pixelSize: 11
-                                opacity: 1.0
+                                font.pixelSize: 10
+                                elide: Text.ElideRight
                                 color: cleanState ? Colors.orange : Colors.white
 
                                 layer.enabled: true
@@ -648,6 +667,153 @@ PanelWindow {
                                     color: cleanState ? Colors.orange : Colors.cyan
                                     transparentBorder: true
                                 }
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    id: roomPane
+
+                    width: (parent.width - parent.spacing) / 2
+                    height: parent.height
+
+                    color: Colors.dark
+                    border.width: 1
+                    border.color:
+                        root.selectedRoomTeam.length > 0
+                        ? Colors.orange
+                        : Colors.magenta
+
+                    RectangularShadow {
+                        anchors.fill: parent
+                        spread: 4
+                        z: -1
+                        opacity:
+                            root.selectedRoomTeam.length > 0
+                            ? 0.30
+                            : 0.18
+                        color:
+                            root.selectedRoomTeam.length > 0
+                            ? Colors.orange
+                            : Colors.magenta
+                    }
+
+                    Column {
+                        anchors {
+                            fill: parent
+                            margins: 12
+                        }
+
+                        spacing: 8
+
+                        SectionLabel {
+                            text:
+                                root.selectedRoomTeam.length > 0
+                                ? "ROOM // " + root.selectedRoomTeam
+                                : "ROOM // NONE SELECTED"
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text: {
+                                const room = root.selectedRoomData || {};
+                                return String(
+                                    room.responsibility
+                                    || "SELECT AN OPERATING ROOM"
+                                );
+                            }
+                            font.pixelSize: 10
+                            color: Colors.orange
+                            elide: Text.ElideRight
+                        }
+
+                        Row {
+                            spacing: 8
+
+                            MetaLabel {
+                                width: 66
+                                text: "BRANCH"
+                            }
+
+                            CyanValue {
+                                width: roomPane.width - 98
+                                text: {
+                                    const room = root.selectedRoomData || {};
+                                    return String(room.branch || "NO DATA");
+                                }
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        Row {
+                            spacing: 8
+
+                            MetaLabel {
+                                width: 66
+                                text: "HEAD"
+                            }
+
+                            BlueValue {
+                                width: roomPane.width - 98
+                                text: {
+                                    const room = root.selectedRoomData || {};
+                                    const head = String(room.head || "");
+                                    return head ? head.slice(0, 12) : "NO DATA";
+                                }
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        Row {
+                            spacing: 8
+
+                            MetaLabel {
+                                width: 66
+                                text: "RELATION"
+                            }
+
+                            GohuText {
+                                width: roomPane.width - 98
+                                text: {
+                                    const room = root.selectedRoomData || {};
+
+                                    if (!root.selectedRoomTeam.length)
+                                        return "WAITING";
+
+                                    const state =
+                                        String(room.state || "WAITING");
+                                    const ahead = Number(room.ahead || 0);
+                                    const behind = Number(room.behind || 0);
+
+                                    return state
+                                           + " // +" + ahead
+                                           + " / -" + behind;
+                                }
+                                font.pixelSize: 10
+                                color: Colors.magenta
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        Row {
+                            spacing: 8
+
+                            MetaLabel {
+                                width: 66
+                                text: "TOUCHED"
+                            }
+
+                            MetaValue {
+                                width: roomPane.width - 98
+                                text: {
+                                    const room = root.selectedRoomData || {};
+                                    return String(
+                                        room.updated_at
+                                        || "NO DATA"
+                                    );
+                                }
+                                elide: Text.ElideRight
                             }
                         }
                     }
@@ -707,130 +873,7 @@ PanelWindow {
                 RoomRow { team: "T8"; responsibility: "APPS" }
             }
 
-            Rectangle {
-                id: roomDetail
 
-                width: parent.width
-                height: visible ? 170 : 0
-                visible: root.selectedRoomTeam.length > 0
-
-                color: Colors.dark
-                border.width: 1
-                border.color: Colors.orange
-
-                RectangularShadow {
-                    anchors.fill: parent
-                    spread: 4
-                    z: -1
-                    opacity: 0.30
-                    color: Colors.orange
-                }
-
-                Column {
-                    anchors {
-                        fill: parent
-                        margins: 12
-                    }
-
-                    spacing: 7
-
-                    GohuText {
-                        text: {
-                            const room = root.selectedRoomData || {};
-                            const responsibility =
-                                String(room.responsibility || "");
-                            return "ROOM // " + root.selectedRoomTeam
-                                   + (responsibility
-                                      ? " // " + responsibility
-                                      : "");
-                        }
-                        font.pixelSize: 13
-                        color: Colors.orange
-                    }
-
-                    Row {
-                        spacing: 10
-
-                        MetaLabel {
-                            width: 92
-                            text: "BRANCH"
-                        }
-
-                        CyanValue {
-                            width: roomDetail.width - 130
-                            text: {
-                                const room = root.selectedRoomData || {};
-                                return String(room.branch || "NO DATA");
-                            }
-                        }
-                    }
-
-                    Row {
-                        spacing: 10
-
-                        MetaLabel {
-                            width: 92
-                            text: "HEAD"
-                        }
-
-                        BlueValue {
-                            width: roomDetail.width - 130
-                            text: {
-                                const room = root.selectedRoomData || {};
-                                const head = String(room.head || "");
-                                return head ? head.slice(0, 12) : "NO DATA";
-                            }
-                        }
-                    }
-
-                    Row {
-                        spacing: 10
-
-                        MetaLabel {
-                            width: 92
-                            text: "RELATION"
-                        }
-
-                        GohuText {
-                            text: {
-                                const room = root.selectedRoomData || {};
-                                const state =
-                                    String(room.state || "WAITING");
-                                const ahead = Number(room.ahead || 0);
-                                const behind = Number(room.behind || 0);
-                                return state + " // +" + ahead
-                                       + " / -" + behind;
-                            }
-                            font.pixelSize: 11
-                            color: Colors.magenta
-                        }
-                    }
-
-                    Row {
-                        spacing: 10
-
-                        MetaLabel {
-                            width: 92
-                            text: "LAST TOUCH"
-                        }
-
-                        MetaValue {
-                            width: roomDetail.width - 130
-                            text: {
-                                const room = root.selectedRoomData || {};
-                                return String(room.updated_at || "NO DATA");
-                            }
-                        }
-                    }
-
-                    GohuText {
-                        text: "CLICK SELECTED ROOM AGAIN TO CLOSE"
-                        font.pixelSize: 9
-                        color: Colors.cyan
-                        opacity: 0.64
-                    }
-                }
-            }
             }
         }
 

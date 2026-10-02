@@ -421,7 +421,7 @@ PanelWindow {
         property string leftIcon: ""
         property string rightIcon: ""
         property int iconPixelSize: 24
-        property int iconVerticalOffset: 1
+        property int iconVerticalOffset: 0
 
         signal triggered()
 
@@ -805,7 +805,7 @@ PanelWindow {
             z: 100
             anchors {
                 left: parent.left
-                leftMargin: 16
+                leftMargin: 18
                 top: parent.top
                 topMargin: 148
                 bottom: parent.bottom
@@ -829,7 +829,7 @@ PanelWindow {
             z: 100
             anchors {
                 right: parent.right
-                rightMargin: 16
+                rightMargin: 18
                 top: parent.top
                 topMargin: 148
                 bottom: parent.bottom
@@ -851,8 +851,8 @@ PanelWindow {
                 fill: parent
                 topMargin: 18
                 bottomMargin: 18
-                leftMargin: root.activePage === "git" ? 64 : 18
-                rightMargin: root.activePage === "git" ? 64 : 18
+                leftMargin: 18
+                rightMargin: 18
             }
 
             spacing: 12
@@ -996,7 +996,11 @@ PanelWindow {
                 height: parent.height - 130
 
                 Item {
-                    anchors.fill: parent
+                    anchors {
+                        fill: parent
+                        leftMargin: 46
+                        rightMargin: 46
+                    }
                     visible: root.activePage === "git"
 
                     Column {
@@ -1215,7 +1219,7 @@ PanelWindow {
 
                         Rectangle {
                             width: parent.width
-                            height: 62
+                            height: 58
                             color: Colors.dark
                             border.width: 1
                             border.color: Colors.orange
@@ -1282,7 +1286,8 @@ PanelWindow {
 
                                 ActionButton {
                                     width: 94
-                                    height: 40
+                                    height: 36
+                                    anchors.verticalCenter: parent.verticalCenter
                                     label: "FETCH"
                                     enabledAction: !gitService.actionBusy
                                     selectedAction: gitService.actionTitle === "FETCH"
@@ -1291,10 +1296,11 @@ PanelWindow {
 
                                 ActionButton {
                                     width: 104
-                                    height: 40
+                                    height: 36
+                                    anchors.verticalCenter: parent.verticalCenter
                                     label: "PULL"
                                     leftIcon: "◂"
-                                    iconPixelSize: 31
+                                    iconPixelSize: 29
                                     enabledAction:
                                         !gitService.actionBusy
                                         && gitService.selectedRemoteExists
@@ -1318,7 +1324,8 @@ PanelWindow {
 
                                 ActionButton {
                                     width: 124
-                                    height: 40
+                                    height: 36
+                                    anchors.verticalCenter: parent.verticalCenter
                                     label:
                                         gitService.selectedRemoteExists
                                         ? "PUSH"
@@ -1327,7 +1334,7 @@ PanelWindow {
                                         gitService.selectedRemoteExists
                                         ? "▸"
                                         : ""
-                                    iconPixelSize: 31
+                                    iconPixelSize: 29
                                     enabledAction:
                                         !gitService.actionBusy
                                         && !!gitService.selectedRemoteBranch
@@ -1341,12 +1348,12 @@ PanelWindow {
 
                         Row {
                             width: parent.width
-                            height: 40
+                            height: 36
                             spacing: 10
 
                             ActionButton {
                                 width: 124
-                                height: 40
+                                height: 36
                                 label: "STATUS"
                                 enabledAction: !gitService.actionBusy
                                 selectedAction: gitService.actionTitle === "STATUS"
@@ -1355,7 +1362,7 @@ PanelWindow {
 
                             ActionButton {
                                 width: 124
-                                height: 40
+                                height: 36
                                 label: "DIFF"
                                 enabledAction: !gitService.actionBusy
                                 selectedAction: gitService.actionTitle === "DIFF"
@@ -1364,7 +1371,7 @@ PanelWindow {
 
                             ActionButton {
                                 width: 124
-                                height: 40
+                                height: 36
                                 label: "LOG"
                                 enabledAction: !gitService.actionBusy
                                 selectedAction: gitService.actionTitle === "LOG"
@@ -1373,7 +1380,7 @@ PanelWindow {
 
                             ActionButton {
                                 width: 124
-                                height: 40
+                                height: 36
                                 label: "LAZYGIT"
                                 enabledAction: true
                                 onTriggered: gitService.launchLazygit()
@@ -1400,7 +1407,7 @@ PanelWindow {
                                         gitService.actionBusy
                                         ? gitService.actionTitle + " // RUNNING"
                                         : gitService.worktree
-                                    font.pixelSize: 10
+                                    font.pixelSize: 11
                                     color:
                                         gitService.actionExitCode === 0
                                         ? Colors.cyan

@@ -7,8 +7,8 @@ Rectangle {
     property string icon: "⏭"
     property string tag: "FF"
     property bool enabledAction: true
-    property bool discovered: false
-    property color accentColor: Colors.magenta
+    property bool active: true
+    property color modeColor: Colors.magenta
 
     signal triggered()
 
@@ -22,40 +22,43 @@ Rectangle {
     readonly property bool pressed:
         enabledAction && mouse.pressed
 
-    property int pulsePhase: 0
-
-    readonly property color pulseColor:
-        discovered
-        ? accentColor
-        : pulsePhase === 0
-        ? Colors.magenta
-        : pulsePhase === 1
-        ? Colors.orange
-        : Colors.cyan
-
     color:
         pressed
+        ? Colors.magenta
+        : active
         ? Colors.yellow
         : hovered
-        ? Colors.dark
+        ? Colors.yellow
         : Colors.black
 
     border.width: 1
-    border.color: pulseColor
+    border.color:
+        pressed
+        ? Colors.magenta
+        : active
+        ? Colors.orange
+        : hovered
+        ? Colors.orange
+        : Colors.cyan
 
     RectangularShadow {
         anchors.fill: parent
-        spread: actuator.pressed ? 2 : 5
+        spread: actuator.pressed ? 2 : 4
         z: -1
         opacity:
             actuator.pressed
-            ? 0.30
+            ? 0.48
+            : actuator.active
+            ? 0.40
             : actuator.hovered
-            ? 0.58
-            : actuator.discovered
-            ? 0.34
-            : 0.48
-        color: actuator.pulseColor
+            ? 0.40
+            : 0.20
+        color:
+            actuator.pressed
+            ? Colors.magenta
+            : actuator.active || actuator.hovered
+            ? Colors.orange
+            : Colors.cyan
     }
 
     Column {
@@ -65,15 +68,25 @@ Rectangle {
         NotoText {
             anchors.horizontalCenter: parent.horizontalCenter
             text: actuator.icon
-            font.pixelSize: 15
-            color: actuator.pressed ? Colors.black : Colors.white
+            font.pixelSize: 17
+            color:
+                actuator.pressed
+                ? Colors.black
+                : actuator.active
+                ? actuator.modeColor
+                : Colors.white
         }
 
         GohuText {
             anchors.horizontalCenter: parent.horizontalCenter
             text: actuator.tag
             font.pixelSize: 7
-            color: actuator.pressed ? Colors.black : actuator.pulseColor
+            color:
+                actuator.pressed
+                ? Colors.black
+                : actuator.active
+                ? actuator.modeColor
+                : Colors.white
         }
     }
 
@@ -84,18 +97,6 @@ Rectangle {
         hoverEnabled: true
         cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
 
-        onClicked: {
-            actuator.discovered = true;
-            actuator.triggered();
-        }
-    }
-
-    Timer {
-        interval: 520
-        repeat: true
-        running: actuator.visible && !actuator.discovered
-
-        onTriggered:
-            actuator.pulsePhase = (actuator.pulsePhase + 1) % 3
+        onClicked: actuator.triggered()
     }
 }

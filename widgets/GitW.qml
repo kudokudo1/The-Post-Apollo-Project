@@ -814,7 +814,7 @@ PanelWindow {
 
             count: gitService.repoCount
             currentIndex: gitService.repoIndexOfPath(gitService.repoPath)
-            accentColor: Colors.orange
+            accentColor: Colors.magenta
             sideLabel: "REPO"
 
             onIndexRequested: function(index) {
@@ -838,7 +838,7 @@ PanelWindow {
 
             count: gitService.remoteBranchCount
             currentIndex: gitService.selectedRemoteIndex
-            accentColor: Colors.cyan
+            accentColor: Colors.orange
             sideLabel: "REMOTE"
 
             onIndexRequested: function(index) {
@@ -1243,17 +1243,17 @@ PanelWindow {
                                     GohuText {
                                         width: parent.width
                                         text:
-                                            "PULL  "
+                                            "PULL "
                                             + (
                                                 gitService.selectedRemoteBranch
                                                 ? gitService.selectedRemoteBranch
                                                 : "REMOTE"
                                             )
-                                            + "  →  "
+                                            + " → "
                                             + gitService.branch
-                                            + "     //     PUSH  "
+                                            + " // PUSH "
                                             + gitService.branch
-                                            + "  →  "
+                                            + " → "
                                             + (
                                                 gitService.selectedRemoteBranch
                                                 ? gitService.selectedRemoteBranch

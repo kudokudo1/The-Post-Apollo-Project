@@ -355,7 +355,7 @@ PanelWindow {
             layer.effect: DropShadow {
                 radius: 7
                 samples: 9
-                opacity: input.activeFocus ? 0.72 : 0.52
+                opacity: input.activeFocus ? 0.64 : 0.52
                 color: selectorInput.accentColor
                 transparentBorder: true
             }
@@ -421,6 +421,7 @@ PanelWindow {
         property string leftIcon: ""
         property string rightIcon: ""
         property int iconPixelSize: 24
+        property int iconVerticalOffset: 1
 
         signal triggered()
 
@@ -504,11 +505,11 @@ PanelWindow {
                 samples: 11
                 opacity:
                     actionButton.hovered
-                    ? 0.72
+                    ? 0.64
                     : actionButton.selectedAction
-                    ? 0.68
+                    ? 0.60
                     : actionButton.enabledAction
-                    ? 0.78
+                    ? 0.68
                     : 0.10
                 color:
                     actionButton.hovered || actionButton.selectedAction
@@ -531,11 +532,11 @@ PanelWindow {
                 samples: 11
                 opacity:
                     actionButton.hovered
-                    ? 0.72
+                    ? 0.64
                     : actionButton.selectedAction
-                    ? 0.68
+                    ? 0.60
                     : actionButton.enabledAction
-                    ? 0.78
+                    ? 0.68
                     : 0.10
                 color:
                     actionButton.hovered || actionButton.selectedAction
@@ -547,6 +548,7 @@ PanelWindow {
             NotoText {
                 visible: actionButton.leftIcon.length > 0
                 anchors.verticalCenter: parent.verticalCenter
+                anchors.verticalCenterOffset: actionButton.iconVerticalOffset
                 text: actionButton.leftIcon
                 font.pixelSize: actionButton.iconPixelSize
                 color: actionButton.contentColor
@@ -564,6 +566,7 @@ PanelWindow {
             NotoText {
                 visible: actionButton.rightIcon.length > 0
                 anchors.verticalCenter: parent.verticalCenter
+                anchors.verticalCenterOffset: actionButton.iconVerticalOffset
                 text: actionButton.rightIcon
                 font.pixelSize: actionButton.iconPixelSize
                 color: actionButton.contentColor
@@ -586,13 +589,13 @@ PanelWindow {
             z: -1
             opacity:
                 actionButton.pressed
-                ? 0.48
+                ? 0.42
                 : actionButton.hovered
-                ? 0.40
+                ? 0.34
                 : actionButton.selectedAction
-                ? 0.36
+                ? 0.30
                 : actionButton.enabledAction
-                ? 0.36
+                ? 0.30
                 : 0.06
             color:
                 actionButton.pressed
@@ -681,9 +684,9 @@ PanelWindow {
                 samples: 11
                 opacity:
                     pageTab.hovered
-                    ? 0.72
+                    ? 0.64
                     : pageTab.selected
-                    ? 0.68
+                    ? 0.60
                     : 0.62
                 color:
                     pageTab.hovered || pageTab.selected
@@ -706,11 +709,11 @@ PanelWindow {
             z: -1
             opacity:
                 pageTab.pressed
-                ? 0.48
+                ? 0.42
                 : pageTab.hovered
-                ? 0.40
+                ? 0.34
                 : pageTab.selected
-                ? 0.36
+                ? 0.30
                 : 0.26
             color:
                 pageTab.pressed
@@ -1225,7 +1228,7 @@ PanelWindow {
                                 spacing: 8
 
                                 Column {
-                                    width: parent.width - 410
+                                    width: parent.width - 422
                                     height: parent.height
                                     spacing: 3
 
@@ -1298,7 +1301,7 @@ PanelWindow {
                                 }
 
                                 ModeActuator {
-                                    width: 44
+                                    width: 52
                                     height: 36
                                     icon: gitService.pullModeIcon
                                     tag: gitService.pullModeLabel
@@ -1306,7 +1309,7 @@ PanelWindow {
                                     modeColor:
                                         gitService.pullMode === "ff-only"
                                         ? Colors.magenta
-                                        : Colors.cyan
+                                        : Colors.orange
                                     enabledAction: !gitService.actionBusy
                                     onTriggered: gitService.cyclePullMode()
                                 }
@@ -1372,10 +1375,20 @@ PanelWindow {
                             Rectangle {
                                 width: parent.width - 536
                                 height: parent.height
-                                color: Colors.dark
+
+                                readonly property bool cleanIdle:
+                                    !gitService.actionBusy
+                                    && gitService.worktree === "CLEAN"
+
+                                color:
+                                    cleanIdle
+                                    ? Qt.rgba(0.08, 0.08, 0.10, 0.82)
+                                    : Colors.dark
                                 border.width: 1
                                 border.color:
-                                    gitService.actionExitCode === 0
+                                    cleanIdle
+                                    ? Qt.rgba(0.58, 0.58, 0.62, 0.42)
+                                    : gitService.actionExitCode === 0
                                     ? Colors.cyan
                                     : Colors.red
 
@@ -1387,9 +1400,15 @@ PanelWindow {
                                         : gitService.worktree
                                     font.pixelSize: 9
                                     color:
-                                        gitService.actionExitCode === 0
+                                        parent.cleanIdle
                                         ? Colors.white
+                                        : gitService.actionExitCode === 0
+                                        ? Colors.cyan
                                         : Colors.red
+                                    opacity:
+                                        parent.cleanIdle
+                                        ? 0.38
+                                        : 1.0
                                 }
                             }
                         }

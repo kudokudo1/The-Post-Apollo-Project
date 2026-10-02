@@ -125,6 +125,13 @@ Scope {
         return -1;
     }
 
+    function isRemoteBranchTarget(value) {
+        const target = String(value || "").trim();
+        const slash = target.indexOf("/");
+
+        return slash > 0 && slash < target.length - 1;
+    }
+
     function discoverRepos() {
         if (discoveringRepos)
             return;
@@ -283,7 +290,9 @@ Scope {
 
         value = value.replace(/^refs\/remotes\//, "");
 
-        if (value.indexOf("/") < 0)
+        if (value === "origin" && branch && branch !== "DETACHED")
+            value = "origin/" + branch;
+        else if (value.indexOf("/") < 0)
             value = "origin/" + value;
 
         selectedRemoteBranch = value;
@@ -325,8 +334,14 @@ Scope {
         for (let i = 0; i < pendingLocalBranches.length; ++i)
             localBranchRows.append({ name: pendingLocalBranches[i] });
 
-        for (let i = 0; i < pendingRemoteBranches.length; ++i)
-            remoteBranchRows.append({ name: pendingRemoteBranches[i] });
+        for (let i = 0; i < pendingRemoteBranches.length; ++i) {
+            const remoteName = String(pendingRemoteBranches[i] || "");
+
+            if (!isRemoteBranchTarget(remoteName))
+                continue;
+
+            remoteBranchRows.append({ name: remoteName });
+        }
 
         for (let i = 0; i < pendingTopology.length; ++i)
             topologyRows.append(pendingTopology[i]);
@@ -411,12 +426,22 @@ Scope {
     }
 
     function ensureRemoteSelection() {
-        if (selectedRemoteBranch) {
+        if (selectedRemoteBranch && isRemoteBranchTarget(selectedRemoteBranch)) {
             selectedRemoteExists = remoteIndexOf(selectedRemoteBranch) >= 0;
-            return;
+
+            if (selectedRemoteExists) {
+                selectedRemoteIndex = remoteIndexOf(selectedRemoteBranch);
+                return;
+            }
+        } else {
+            selectedRemoteBranch = "";
+            selectedRemoteExists = false;
+            selectedRemoteIndex = -1;
         }
 
-        if (upstream && remoteIndexOf(upstream) >= 0) {
+        if (upstream
+                && isRemoteBranchTarget(upstream)
+                && remoteIndexOf(upstream) >= 0) {
             selectedRemoteBranch = upstream;
             selectedRemoteExists = true;
             selectedRemoteIndex = remoteIndexOf(upstream);
@@ -427,13 +452,23 @@ Scope {
             ? "origin/" + branch
             : "";
 
+        if (matching && remoteIndexOf(matching) >= 0) {
+            selectedRemoteBranch = matching;
+            selectedRemoteExists = true;
+            selectedRemoteIndex = remoteIndexOf(matching);
+            return;
+        }
+
+        if (remoteBranchRows.count > 0) {
+            selectedRemoteIndex = 0;
+            selectedRemoteBranch = String(remoteBranchRows.get(0).name || "");
+            selectedRemoteExists = isRemoteBranchTarget(selectedRemoteBranch);
+            return;
+        }
+
         selectedRemoteBranch = matching;
-        selectedRemoteExists = matching
-            ? remoteIndexOf(matching) >= 0
-            : false;
-        selectedRemoteIndex = selectedRemoteExists
-            ? remoteIndexOf(matching)
-            : -1;
+        selectedRemoteExists = false;
+        selectedRemoteIndex = -1;
     }
 
     function refresh() {
@@ -499,7 +534,9 @@ Scope {
                 'done < <(git -C "$root" for-each-ref --format="%(refname:short)" refs/heads 2>/dev/null)',
                 'while IFS= read -r ref; do',
                 '  [ -z "$ref" ] && continue',
+                '  [ "$ref" = "origin" ] && continue',
                 '  [ "$ref" = "origin/HEAD" ] && continue',
+                '  case "$ref" in */*) ;; *) continue ;; esac',
                 '  printf "REMOTEBRANCH\\t%s\\n" "$ref"',
                 'done < <(git -C "$root" for-each-ref --format="%(refname:short)" refs/remotes/origin 2>/dev/null)',
                 'git -C "$root" log --all --topo-order --date-order -n 48 --pretty=format:"COMMIT%x09%H%x09%P%x09%D%x09%s"',
@@ -617,9 +654,13 @@ Scope {
         if (allowed.indexOf(action) < 0)
             return;
 
-        if ((action === "pull" || action === "push") && !selectedRemoteBranch) {
+        if ((action === "pull" || action === "push")
+                && !isRemoteBranchTarget(selectedRemoteBranch)) {
             actionTitle = action.toUpperCase();
-            actionOutput = "Choose a remote branch first.";
+            actionOutput =
+                "Choose a remote branch target first."
+                + "\nExample // origin/" + String(branch || "main")
+                + "\nA remote name by itself is not a branch.";
             actionExitCode = 1;
             return;
         }

@@ -132,16 +132,24 @@ Scope {
 
     function acquireSlot(team, branch, head, reason) {
         const requester = String(team || "").trim();
+        const requestedBranch = String(branch || "").trim();
+        const requestedHead = String(head || "").trim();
 
         if (!requester) {
             lastError = "AUTHORITY REFUSED // TEAM MISSING";
             return false;
         }
 
+        if (!requestedBranch || !requestedHead) {
+            lastError =
+                "AUTHORITY REFUSED // EXACT BRANCH AND HEAD REQUIRED";
+            return false;
+        }
+
         if (available) {
             ownerTeam = requester;
-            ownerBranch = String(branch || "");
-            ownerHead = String(head || "");
+            ownerBranch = requestedBranch;
+            ownerHead = requestedHead;
             ownerLeaseId = nowIso() + "::" + requester;
             acquiredAt = nowIso();
             lastError = "";
@@ -161,9 +169,6 @@ Scope {
         }
 
         if (ownerTeam === requester) {
-            const requestedBranch = String(branch || "");
-            const requestedHead = String(head || "");
-
             const snapshotIncomplete =
                 !ownerLeaseId
                 || !ownerBranch
@@ -208,8 +213,8 @@ Scope {
             const nextQueue = queue.slice();
             nextQueue.push({
                 team: requester,
-                branch: String(branch || ""),
-                head: String(head || ""),
+                branch: requestedBranch,
+                head: requestedHead,
                 requestedAt: nowIso(),
                 reason: String(reason || "")
             });

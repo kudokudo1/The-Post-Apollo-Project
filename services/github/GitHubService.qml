@@ -60,6 +60,27 @@ Scope {
     property string latestRunConclusion: ""
     property string latestRunBranch: ""
 
+    property bool inspectorBusy: false
+    property string inspectorRunId: ""
+    property var inspectedRun: ({})
+    property var inspectorJobs: []
+    property string inspectorLogText: ""
+    property string inspectorError: ""
+
+    property bool inspectorMetaExitSeen: false
+    property bool inspectorMetaStdoutSeen: false
+    property bool inspectorMetaStderrSeen: false
+    property int inspectorMetaExitCode: -1
+    property string inspectorMetaStdoutText: ""
+    property string inspectorMetaStderrText: ""
+
+    property bool inspectorLogsExitSeen: false
+    property bool inspectorLogsStdoutSeen: false
+    property bool inspectorLogsStderrSeen: false
+    property int inspectorLogsExitCode: -1
+    property string inspectorLogsStdoutText: ""
+    property string inspectorLogsStderrText: ""
+
     property bool factoryBusy: false
     property string factoryMode: ""
     property bool factoryExitSeen: false
@@ -208,6 +229,120 @@ Scope {
             latestRunConclusion = "";
             latestRunBranch = "";
         }
+    }
+
+    function inspectRun(runId) {
+        const cleanRunId = String(runId || "").trim();
+
+        if (!repoSlug || !cleanRunId)
+            return;
+
+        inspectorBusy = true;
+        inspectorRunId = cleanRunId;
+        inspectedRun = ({});
+        inspectorJobs = [];
+        inspectorLogText = "";
+        inspectorError = "";
+
+        inspectorMetaExitSeen = false;
+        inspectorMetaStdoutSeen = false;
+        inspectorMetaStderrSeen = false;
+        inspectorMetaExitCode = -1;
+        inspectorMetaStdoutText = "";
+        inspectorMetaStderrText = "";
+
+        inspectorLogsExitSeen = false;
+        inspectorLogsStdoutSeen = false;
+        inspectorLogsStderrSeen = false;
+        inspectorLogsExitCode = -1;
+        inspectorLogsStdoutText = "";
+        inspectorLogsStderrText = "";
+
+        inspectorProcess.exec([
+            "bash",
+            "-lc",
+            'exec "$HOME/.local/bin/px" inspect "$1" "$2"',
+            "px-inspect",
+            repoSlug,
+            cleanRunId
+        ]);
+
+        inspectorLogsProcess.exec([
+            "bash",
+            "-lc",
+            'exec "$HOME/.local/bin/px" logs "$1" "$2"',
+            "px-logs",
+            repoSlug,
+            cleanRunId
+        ]);
+
+        inspectorWatchdog.restart();
+    }
+
+    function parseInspectorMetadata(payload) {
+        const raw = String(payload || "").trim();
+
+        if (!raw)
+            throw new Error("PX INSPECT RETURNED NO JSON");
+
+        const data = JSON.parse(raw);
+
+        inspectedRun = data || ({});
+        inspectorJobs =
+            data && Array.isArray(data.jobs)
+            ? data.jobs
+            : [];
+    }
+
+    function maybeFinishInspector() {
+        if (!inspectorBusy)
+            return;
+
+        const metaDone =
+            inspectorMetaExitSeen
+            && inspectorMetaStdoutSeen
+            && inspectorMetaStderrSeen;
+
+        const logsDone =
+            inspectorLogsExitSeen
+            && inspectorLogsStdoutSeen
+            && inspectorLogsStderrSeen;
+
+        if (!metaDone || !logsDone)
+            return;
+
+        if (inspectorMetaExitCode === 0) {
+            try {
+                parseInspectorMetadata(inspectorMetaStdoutText);
+            } catch (error) {
+                inspectorError = "INSPECT PARSE // " + String(error);
+            }
+        } else {
+            inspectorError =
+                String(
+                    inspectorMetaStderrText
+                    || inspectorMetaStdoutText
+                    || "PX INSPECT FAILED"
+                ).trim();
+        }
+
+        if (inspectorLogsExitCode === 0) {
+            inspectorLogText = String(inspectorLogsStdoutText || "");
+        } else {
+            const logError =
+                String(
+                    inspectorLogsStderrText
+                    || inspectorLogsStdoutText
+                    || "RUN LOGS UNAVAILABLE"
+                ).trim();
+
+            inspectorLogText =
+                "LOGS UNAVAILABLE // "
+                + logError;
+        }
+
+        inspectorBusy = false;
+        inspectorWatchdog.stop();
     }
 
     function runWorkflow(workflowPath) {
@@ -563,6 +698,58 @@ Scope {
     }
 
     Process {
+        id: inspectorProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                githubService.inspectorMetaStdoutText = this.text;
+                githubService.inspectorMetaStdoutSeen = true;
+                githubService.maybeFinishInspector();
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                githubService.inspectorMetaStderrText = this.text;
+                githubService.inspectorMetaStderrSeen = true;
+                githubService.maybeFinishInspector();
+            }
+        }
+
+        onExited: function(exitCode, exitStatus) {
+            githubService.inspectorMetaExitCode = Number(exitCode);
+            githubService.inspectorMetaExitSeen = true;
+            githubService.maybeFinishInspector();
+        }
+    }
+
+    Process {
+        id: inspectorLogsProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                githubService.inspectorLogsStdoutText = this.text;
+                githubService.inspectorLogsStdoutSeen = true;
+                githubService.maybeFinishInspector();
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                githubService.inspectorLogsStderrText = this.text;
+                githubService.inspectorLogsStderrSeen = true;
+                githubService.maybeFinishInspector();
+            }
+        }
+
+        onExited: function(exitCode, exitStatus) {
+            githubService.inspectorLogsExitCode = Number(exitCode);
+            githubService.inspectorLogsExitSeen = true;
+            githubService.maybeFinishInspector();
+        }
+    }
+
+    Process {
         id: remoteActionProcess
 
         stdout: StdioCollector {
@@ -663,6 +850,26 @@ Scope {
             githubService.runsExitCode = Number(exitCode);
             githubService.runsExitSeen = true;
             githubService.maybeFinishRuns();
+        }
+    }
+
+    Timer {
+        id: inspectorWatchdog
+        interval: 25000
+        repeat: false
+
+        onTriggered: {
+            if (!githubService.inspectorBusy)
+                return;
+
+            githubService.inspectorBusy = false;
+            githubService.inspectorError = "PX RUN INSPECTOR TIMEOUT";
+
+            if (inspectorProcess.running)
+                inspectorProcess.running = false;
+
+            if (inspectorLogsProcess.running)
+                inspectorLogsProcess.running = false;
         }
     }
 

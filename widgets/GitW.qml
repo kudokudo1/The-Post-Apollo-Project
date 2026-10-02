@@ -429,7 +429,12 @@ PanelWindow {
             ? Colors.magenta
             : hovered
             ? Colors.orange
-            : Colors.white
+            : Colors.cyan
+
+        readonly property real contentOpacity:
+            pressed || hovered || selectedAction || enabledAction
+            ? 1.0
+            : 0.34
 
         width: 112
         height: 36
@@ -482,7 +487,7 @@ PanelWindow {
             text: actionButton.label
             font.pixelSize: 11
             color: actionButton.contentColor
-            opacity: 1.0
+            opacity: actionButton.contentOpacity
 
             layer.enabled: !actionButton.pressed
             layer.effect: DropShadow {
@@ -494,8 +499,8 @@ PanelWindow {
                     : actionButton.selectedAction
                     ? 0.68
                     : actionButton.enabledAction
-                    ? 0.62
-                    : 0.12
+                    ? 0.78
+                    : 0.10
                 color:
                     actionButton.hovered || actionButton.selectedAction
                     ? Colors.orange
@@ -536,6 +541,7 @@ PanelWindow {
                 text: actionButton.leftIcon
                 font.pixelSize: actionButton.iconPixelSize
                 color: actionButton.contentColor
+                opacity: actionButton.contentOpacity
             }
 
             GohuText {
@@ -543,6 +549,7 @@ PanelWindow {
                 text: actionButton.label
                 font.pixelSize: 11
                 color: actionButton.contentColor
+                opacity: actionButton.contentOpacity
             }
 
             NotoText {
@@ -551,6 +558,7 @@ PanelWindow {
                 text: actionButton.rightIcon
                 font.pixelSize: actionButton.iconPixelSize
                 color: actionButton.contentColor
+                opacity: actionButton.contentOpacity
             }
         }
 
@@ -575,8 +583,8 @@ PanelWindow {
                 : actionButton.selectedAction
                 ? 0.36
                 : actionButton.enabledAction
-                ? 0.26
-                : 0.07
+                ? 0.36
+                : 0.06
             color:
                 actionButton.pressed
                 ? Colors.magenta
@@ -1208,7 +1216,7 @@ PanelWindow {
                                 spacing: 8
 
                                 Column {
-                                    width: parent.width - 390
+                                    width: parent.width - 410
                                     height: parent.height
                                     spacing: 3
 
@@ -1272,7 +1280,7 @@ PanelWindow {
                                     width: 104
                                     label: "PULL"
                                     leftIcon: "◂"
-                                    iconPixelSize: 25
+                                    iconPixelSize: 31
                                     enabledAction:
                                         !gitService.actionBusy
                                         && gitService.selectedRemoteExists
@@ -1304,7 +1312,7 @@ PanelWindow {
                                         gitService.selectedRemoteExists
                                         ? "▸"
                                         : ""
-                                    iconPixelSize: 25
+                                    iconPixelSize: 31
                                     enabledAction:
                                         !gitService.actionBusy
                                         && !!gitService.selectedRemoteBranch

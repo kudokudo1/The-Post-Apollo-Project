@@ -7,6 +7,9 @@ Scope {
 
     property string repository: ""
     property string team: ""
+    property string localRepoPath: ""
+
+    property string integrationMode: ""
 
     property bool running: false
     property bool available: false
@@ -45,6 +48,7 @@ Scope {
         ahead = 0;
         behind = 0;
         head = "";
+        integrationMode = "";
         diffFileCount = 0;
         additions = 0;
         deletions = 0;
@@ -71,7 +75,8 @@ Scope {
 
         if (targetMode !== "status"
                 && targetMode !== "diff"
-                && targetMode !== "log") {
+                && targetMode !== "log"
+                && targetMode !== "prepare") {
             lastError = "UNKNOWN ROOM ACTION";
             summary = lastError;
             return;
@@ -161,7 +166,54 @@ Scope {
             return;
         }
 
+        if (mode === "PREPARE") {
+            integrationMode =
+                String(data.mode || "REVIEW_REQUIRED").toUpperCase();
+            relation =
+                String(data.relation || "UNKNOWN").toUpperCase();
+            ahead = Number(data.ahead || 0);
+            behind = Number(data.behind || 0);
+
+            const totals = data.totals || {};
+            diffFileCount = Number(totals.files || 0);
+            additions = Number(totals.additions || 0);
+            deletions = Number(totals.deletions || 0);
+
+            summary = "PREPARE // " + integrationMode
+                      + " // " + diffFileCount + " FILES"
+                      + " // +" + ahead
+                      + " / -" + behind;
+            return;
+        }
+
         summary = "ROOM // UNKNOWN RESPONSE";
+    }
+
+    function launchLazygit() {
+        const repo = String(localRepoPath || "").trim();
+
+        if (!repo) {
+            lastError = "LOCAL REPOSITORY NOT READY";
+            summary = lastError;
+            return;
+        }
+
+        Quickshell.execDetached([
+            "bash",
+            "-lc",
+            [
+                'repo="$1"',
+                'cd "$repo" || exit 1',
+                'exec kitty --directory "$PWD" toolbox run -c fedora-toolbox-44 lazygit'
+            ].join("\n"),
+            "hospital-room-lazygit",
+            repo
+        ]);
+
+        lastError = "";
+        summary = team
+                  ? "LAZYGIT // " + team
+                  : "LAZYGIT // OPEN";
     }
 
     function maybeFinish() {

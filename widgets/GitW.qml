@@ -1187,17 +1187,14 @@ PanelWindow {
                                     GohuText {
                                         width: parent.width
                                         text:
-                                            (
-                                                gitService.upstream
-                                                ? "TRACKING "
-                                                  + gitService.upstream
-                                                  + "  //  LOCAL +"
-                                                  + gitService.ahead
-                                                  + "  //  REMOTE +"
-                                                  + gitService.behind
-                                                : "NO TRACKING BRANCH // PICK A REMOTE TARGET ABOVE"
-                                            )
-                                            + "  //  SAFE PULL = FAST-FORWARD ONLY"
+                                            gitService.upstream
+                                            ? "TRACKING "
+                                              + gitService.upstream
+                                              + "  //  LOCAL +"
+                                              + gitService.ahead
+                                              + "  //  REMOTE +"
+                                              + gitService.behind
+                                            : "NO TRACKING BRANCH // PICK A REMOTE TARGET ABOVE"
                                         font.pixelSize: 8
                                         color:
                                             gitService.upstream
@@ -1208,7 +1205,7 @@ PanelWindow {
                                 }
 
                                 ActionButton {
-                                    width: 116
+                                    width: 94
                                     label: "FETCH"
                                     enabledAction: !gitService.actionBusy
                                     selectedAction: gitService.actionTitle === "FETCH"
@@ -1216,8 +1213,8 @@ PanelWindow {
                                 }
 
                                 ActionButton {
-                                    width: 116
-                                    label: "← SAFE PULL"
+                                    width: 94
+                                    label: "← PULL"
                                     enabledAction:
                                         !gitService.actionBusy
                                         && gitService.selectedRemoteExists
@@ -1225,8 +1222,18 @@ PanelWindow {
                                     onTriggered: gitService.runSyncAction("pull")
                                 }
 
+                                ModeActuator {
+                                    width: 44
+                                    height: 36
+                                    icon: gitService.pullModeIcon
+                                    tag: gitService.pullModeLabel
+                                    accentColor: Colors.magenta
+                                    enabledAction: !gitService.actionBusy
+                                    onTriggered: gitService.cyclePullMode()
+                                }
+
                                 ActionButton {
-                                    width: 132
+                                    width: 124
                                     label:
                                         gitService.selectedRemoteExists
                                         ? "PUSH →"

@@ -2202,8 +2202,12 @@ PanelWindow {
                                     text: {
                                         if (githubService.factoryBusy)
                                             return githubService.factoryMode === "install"
-                                                   ? "SAVING // VALIDATING + OPENING PR"
+                                                   ? "SAVING // VALIDATING + INSTALLING"
                                                    : "PREVIEWING // VALIDATING";
+
+                                        if (githubService.factoryInstallCommit)
+                                            return "WORKFLOW INSTALLED // "
+                                                   + githubService.factoryInstallCommit.slice(0, 10);
 
                                         if (githubService.factoryPullRequest)
                                             return "WORKFLOW PR READY // " + githubService.factoryPullRequest;

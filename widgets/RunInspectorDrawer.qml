@@ -142,7 +142,7 @@ Item {
         GohuText {
             anchors.centerIn: parent
             text: button.label
-            font.pixelSize: 8
+            font.pixelSize: 9
             color:
                 !button.enabledAction
                 ? Colors.cyan
@@ -204,7 +204,7 @@ Item {
                         + " // "
                         + root.field("workflowName", "UNKNOWN WORKFLOW")
 
-                    font.pixelSize: 11
+                    font.pixelSize: 13
                     color: Colors.magenta
                     elide: Text.ElideRight
                 }
@@ -219,7 +219,7 @@ Item {
                         : root.field("conclusion", root.field("status", "READY")).toUpperCase()
 
                     horizontalAlignment: Text.AlignRight
-                    font.pixelSize: 8
+                    font.pixelSize: 9
 
                     color:
                         root.githubService.inspectorBusy
@@ -267,7 +267,7 @@ Item {
 
                 // LEFT = identity + steps.
                 Rectangle {
-                    width: 302
+                    width: 336
                     height: parent.height
 
                     color: Colors.dark
@@ -284,7 +284,7 @@ Item {
 
                         GohuText {
                             text: "RUN IDENTITY"
-                            font.pixelSize: 10
+                            font.pixelSize: 12
                             color: Colors.magenta
                         }
 
@@ -295,80 +295,80 @@ Item {
                             rowSpacing: 3
 
                             GohuText {
-                                width: 66
+                                width: 72
                                 text: "BRANCH"
-                                font.pixelSize: 7
+                                font.pixelSize: 8
                                 color: Colors.orange
                             }
 
                             GohuText {
-                                width: 208
+                                width: 238
                                 text: root.field("headBranch", "—")
-                                font.pixelSize: 8
+                                font.pixelSize: 9
                                 color: Colors.white
                                 elide: Text.ElideRight
                             }
 
                             GohuText {
-                                width: 66
+                                width: 72
                                 text: "COMMIT"
-                                font.pixelSize: 7
+                                font.pixelSize: 8
                                 color: Colors.orange
                             }
 
                             GohuText {
-                                width: 208
+                                width: 238
                                 text: root.compactSha(root.field("headSha", "—"))
-                                font.pixelSize: 8
+                                font.pixelSize: 9
                                 color: Colors.cyan
                                 elide: Text.ElideRight
                             }
 
                             GohuText {
-                                width: 66
+                                width: 72
                                 text: "EVENT"
-                                font.pixelSize: 7
+                                font.pixelSize: 8
                                 color: Colors.orange
                             }
 
                             GohuText {
-                                width: 208
+                                width: 238
                                 text: root.field("event", "—").toUpperCase()
-                                font.pixelSize: 8
+                                font.pixelSize: 9
                                 color: Colors.white
                                 elide: Text.ElideRight
                             }
 
                             GohuText {
-                                width: 66
+                                width: 72
                                 text: "DURATION"
-                                font.pixelSize: 7
+                                font.pixelSize: 8
                                 color: Colors.orange
                             }
 
                             GohuText {
-                                width: 208
+                                width: 238
                                 text: root.durationText()
-                                font.pixelSize: 8
+                                font.pixelSize: 9
                                 color: Colors.white
                             }
 
                             GohuText {
-                                width: 66
+                                width: 72
                                 text: "STARTED"
-                                font.pixelSize: 7
+                                font.pixelSize: 8
                                 color: Colors.orange
                             }
 
                             GohuText {
-                                width: 208
+                                width: 238
                                 text: root.readableTime(
                                     root.field(
                                         "startedAt",
                                         root.field("createdAt", "")
                                     )
                                 )
-                                font.pixelSize: 7
+                                font.pixelSize: 8
                                 color: Colors.white
                                 elide: Text.ElideRight
                             }
@@ -388,7 +388,7 @@ Item {
                             GohuText {
                                 width: parent.width - 66
                                 text: "JOBS / STEPS"
-                                font.pixelSize: 9
+                                font.pixelSize: 10
                                 color: Colors.magenta
                             }
 
@@ -396,7 +396,7 @@ Item {
                                 width: 66
                                 text: String(root.stepRows.length)
                                 horizontalAlignment: Text.AlignRight
-                                font.pixelSize: 8
+                                font.pixelSize: 9
                                 color: Colors.orange
                             }
                         }
@@ -446,7 +446,7 @@ Item {
                                                 width: 22
                                                 anchors.verticalCenter: parent.verticalCenter
                                                 text: String(index + 1)
-                                                font.pixelSize: 7
+                                                font.pixelSize: 8
                                                 color: Colors.orange
                                             }
 
@@ -454,7 +454,7 @@ Item {
                                                 width: parent.width - 96
                                                 anchors.verticalCenter: parent.verticalCenter
                                                 text: String(modelData.name || "STEP")
-                                                font.pixelSize: 7
+                                                font.pixelSize: 8
                                                 color: Colors.white
                                                 elide: Text.ElideRight
                                             }
@@ -469,7 +469,7 @@ Item {
                                                         || "UNKNOWN"
                                                     ).toUpperCase()
                                                 horizontalAlignment: Text.AlignRight
-                                                font.pixelSize: 6
+                                                font.pixelSize: 7
                                                 color:
                                                     root.resultColor(
                                                         modelData.status,
@@ -492,7 +492,7 @@ Item {
                                         : "NO STEP DATA"
 
                                     horizontalAlignment: Text.AlignHCenter
-                                    font.pixelSize: 8
+                                    font.pixelSize: 9
                                     color:
                                         root.githubService.inspectorError
                                         ? Colors.red
@@ -506,7 +506,7 @@ Item {
 
                 // RIGHT = raw run log stream.
                 Rectangle {
-                    width: parent.width - 310
+                    width: parent.width - 344
                     height: parent.height
 
                     color: Colors.dark
@@ -531,7 +531,7 @@ Item {
                             GohuText {
                                 width: parent.width - 118
                                 text: "OUTPUT // LOG STREAM"
-                                font.pixelSize: 10
+                                font.pixelSize: 12
                                 color: Colors.magenta
                             }
 
@@ -544,7 +544,7 @@ Item {
                                     ? "ERROR"
                                     : "RUN LOG"
                                 horizontalAlignment: Text.AlignRight
-                                font.pixelSize: 7
+                                font.pixelSize: 8
                                 color:
                                     root.githubService.inspectorError
                                     ? Colors.red
@@ -589,7 +589,7 @@ Item {
 
                                 textFormat: Text.PlainText
                                 wrapMode: Text.WrapAnywhere
-                                font.pixelSize: 8
+                                font.pixelSize: 10
                                 color:
                                     root.githubService.inspectorError
                                     ? Colors.red

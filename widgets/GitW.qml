@@ -1310,7 +1310,8 @@ PanelWindow {
 
                                 ModeActuator {
                                     width: 52
-                                    height: 40
+                                    height: 36
+                                    anchors.verticalCenter: parent.verticalCenter
                                     icon: gitService.pullModeIcon
                                     tag: gitService.pullModeLabel
                                     active: true

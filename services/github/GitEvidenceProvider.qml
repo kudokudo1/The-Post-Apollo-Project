@@ -23,7 +23,20 @@ Scope {
     readonly property string currentBranch:
         gitService ? String(gitService.branch || "") : ""
 
+    property bool requestBusy: false
+    property string requestSha: ""
+    property string requestRunId: ""
+    property string requestError: ""
+    property string requestStartedAt: ""
+    property bool requestGitReady: false
+    property bool requestGithubReady: false
+    property bool requestRunsReady: false
+    property bool requestInspectorReady: true
+    property var lastPacket: ({})
+
     signal evidenceCaptured(var packet)
+    signal requestStarted(string sha, string runId)
+    signal requestFinished(var packet)
 
     function nowIso() {
         return new Date().toISOString();
@@ -162,8 +175,16 @@ Scope {
 
     function runsForSha(sha) {
         const target = textValue(sha, "");
+        const exactSource =
+            githubService
+            && textValue(githubService.evidenceRunsSha, "") === target
+            && Array.isArray(githubService.evidenceRuns)
+            ? githubService.evidenceRuns
+            : null;
         const source =
-            githubService && Array.isArray(githubService.runs)
+            exactSource !== null
+            ? exactSource
+            : githubService && Array.isArray(githubService.runs)
             ? githubService.runs
             : [];
         const rows = [];
@@ -307,6 +328,10 @@ Scope {
                 targetShaKnown: Boolean(targetSha),
                 localHeadKnown: Boolean(currentHead),
                 githubAvailable: githubAvailable,
+                exactRunQuery:
+                    githubService
+                    && textValue(githubService.evidenceRunsSha, "") === targetSha
+                    && !Boolean(githubService.evidenceRunsBusy),
                 matchingRunCount: matchingRuns.length,
                 inspectedRunIncluded: Boolean(inspected),
                 inspectorBusy:
@@ -314,14 +339,212 @@ Scope {
                 inspectorError:
                     githubService
                     ? textValue(githubService.inspectorError, "")
-                    : ""
+                    : "",
+                requestError: requestError
             }
         };
+    }
+
+    function findRequestedRun(runIdValue, sha) {
+        const needle = textValue(runIdValue, "");
+        const rows = runsForSha(sha);
+
+        if (!needle)
+            return null;
+
+        for (let i = 0; i < rows.length; ++i) {
+            if (rows[i].id === needle)
+                return rows[i];
+        }
+
+        return null;
+    }
+
+    function requestEvidence(sha, runIdValue) {
+        if (requestBusy)
+            return false;
+
+        const targetSha = textValue(sha, currentHead);
+        const targetRunId = textValue(runIdValue, "");
+
+        if (!targetSha)
+            return false;
+
+        requestBusy = true;
+        requestSha = targetSha;
+        requestRunId = targetRunId;
+        requestError = "";
+        requestStartedAt = nowIso();
+        requestGitReady = !gitService;
+        requestGithubReady = !githubService;
+        requestRunsReady = !githubService;
+        requestInspectorReady = !targetRunId;
+        lastPacket = ({});
+
+        requestStarted(targetSha, targetRunId);
+
+        if (gitService) {
+            if (gitService.refreshing) {
+                requestGitReady = false;
+            } else {
+                gitService.refresh();
+                requestGitReady = !gitService.refreshing;
+            }
+        }
+
+        if (githubService) {
+            if (githubService.refreshing) {
+                requestGithubReady = false;
+            } else {
+                githubService.refresh();
+                requestGithubReady = !githubService.refreshing;
+            }
+
+            const queryStarted =
+                githubService.requestEvidenceRuns(targetSha);
+
+            if (!queryStarted) {
+                requestRunsReady = true;
+                requestError =
+                    textValue(
+                        githubService.evidenceRunsError,
+                        "EXACT-SHA EVIDENCE QUERY BUSY"
+                    );
+            }
+        }
+
+        maybeFinishRequest();
+        return true;
+    }
+
+    function maybeStartRequestedInspector() {
+        if (!requestBusy
+                || !requestRunsReady
+                || requestInspectorReady
+                || !requestRunId) {
+            return;
+        }
+
+        if (!githubService) {
+            requestError = "RUN INSPECTOR UNAVAILABLE";
+            requestInspectorReady = true;
+            return;
+        }
+
+        const requested = findRequestedRun(requestRunId, requestSha);
+
+        if (!requested) {
+            requestError =
+                "REQUESTED RUN NOT FOUND FOR TARGET SHA // "
+                + requestRunId;
+            requestInspectorReady = true;
+            return;
+        }
+
+        if (githubService.inspectorBusy)
+            return;
+
+        requestInspectorReady = false;
+        githubService.inspectRun(requestRunId);
+    }
+
+    function maybeFinishRequest() {
+        if (!requestBusy)
+            return;
+
+        maybeStartRequestedInspector();
+
+        if (!requestGitReady
+                || !requestGithubReady
+                || !requestRunsReady
+                || !requestInspectorReady) {
+            return;
+        }
+
+        const packet = buildEvidencePacket(requestSha);
+
+        packet.request = {
+            startedAt: requestStartedAt,
+            finishedAt: nowIso(),
+            sha: requestSha,
+            runId: requestRunId,
+            error: requestError
+        };
+
+        lastPacket = packet;
+        requestBusy = false;
+        evidenceCaptured(packet);
+        requestFinished(packet);
     }
 
     function capture(sha) {
         const packet = buildEvidencePacket(sha);
         evidenceCaptured(packet);
         return packet;
+    }
+
+    Connections {
+        target: evidenceProvider.gitService
+
+        function onRefreshed() {
+            if (!evidenceProvider.requestBusy)
+                return;
+
+            evidenceProvider.requestGitReady = true;
+            evidenceProvider.maybeFinishRequest();
+        }
+
+        function onRefreshingChanged() {
+            if (!evidenceProvider.requestBusy || target.refreshing)
+                return;
+
+            evidenceProvider.requestGitReady = true;
+            evidenceProvider.maybeFinishRequest();
+        }
+    }
+
+    Connections {
+        target: evidenceProvider.githubService
+
+        function onRefreshingChanged() {
+            if (!evidenceProvider.requestBusy || target.refreshing)
+                return;
+
+            evidenceProvider.requestGithubReady = true;
+            evidenceProvider.maybeFinishRequest();
+        }
+
+        function onEvidenceRunsReady(sha, runs, error) {
+            if (!evidenceProvider.requestBusy
+                    || String(sha || "") !== evidenceProvider.requestSha) {
+                return;
+            }
+
+            evidenceProvider.requestRunsReady = true;
+
+            if (String(error || ""))
+                evidenceProvider.requestError = String(error);
+
+            evidenceProvider.maybeFinishRequest();
+        }
+
+        function onInspectorBusyChanged() {
+            if (!evidenceProvider.requestBusy
+                    || !evidenceProvider.requestRunId
+                    || target.inspectorBusy) {
+                return;
+            }
+
+            if (String(target.inspectorRunId || "")
+                    === evidenceProvider.requestRunId) {
+                evidenceProvider.requestInspectorReady = true;
+
+                if (String(target.inspectorError || ""))
+                    evidenceProvider.requestError =
+                        String(target.inspectorError);
+            }
+
+            evidenceProvider.maybeFinishRequest();
+        }
     }
 }

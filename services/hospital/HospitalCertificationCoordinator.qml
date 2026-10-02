@@ -24,6 +24,15 @@ Scope {
 
     property string hostLeaseId: ""
 
+    Connections {
+        target: authority
+
+        function onHydratedChanged() {
+            if (authority.hydrated)
+                coordinator.recoverHostLease();
+        }
+    }
+
     readonly property bool hostSlotOwned:
         roomService
         && hostLeaseId.length > 0
@@ -286,6 +295,34 @@ Scope {
         return true;
     }
 
+    function recoverHostLease() {
+        if (!roomService || !authority.hydrated) {
+            hostLeaseId = "";
+            return false;
+        }
+
+        const recovered = authority.recoverLease(
+            roomService.team,
+            roomService.branch,
+            roomService.head
+        );
+
+        hostLeaseId = String(recovered || "");
+
+        if (!hostLeaseId
+                && authority.ownerTeam === String(roomService.team || "")) {
+            bridgeError =
+                "HOST SLOT RECOVERY BLOCKED // SNAPSHOT MISMATCH";
+            return false;
+        }
+
+        if (hostLeaseId
+                && bridgeError.indexOf("HOST SLOT RECOVERY") === 0)
+            bridgeError = "";
+
+        return hostLeaseId.length > 0;
+    }
+
     function bindRoom(service) {
         roomService = service;
         verificationPending = false;
@@ -305,6 +342,7 @@ Scope {
             roomService.team
         );
 
+        recoverHostLease();
         return true;
     }
 

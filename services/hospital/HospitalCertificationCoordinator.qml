@@ -95,6 +95,31 @@ Scope {
             );
         }
 
+        function onIntegrationFailed(reason, uncertain) {
+            if (!coordinator.roomService)
+                return;
+
+            if (certification.state !== "INTEGRATING")
+                return;
+
+            certification.block(
+                (uncertain
+                 ? "INTEGRATION UNCERTAIN // "
+                 : "INTEGRATION REFUSED // ")
+                + String(reason || "UNKNOWN FAILURE"),
+                coordinator.roomSnapshot(),
+                {
+                    source: "ROOM_SERVICE",
+                    uncertain: Boolean(uncertain),
+                    hostSlotRetained:
+                        coordinator.hostSlotOwned
+                }
+            );
+
+            coordinator.bridgeError =
+                certification.lastError;
+        }
+
         function onPostOpStarted() {
             if (!coordinator.roomService)
                 return;

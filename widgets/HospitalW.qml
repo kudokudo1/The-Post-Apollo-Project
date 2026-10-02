@@ -28,7 +28,7 @@ PanelWindow {
     }
 
     property int panelWidth: 700
-    property int panelHeight: 1370
+    property int panelHeight: 1320
     property int panelTopMargin: 0
     property int panelLeftMargin: 50
     property int frameInset: 8
@@ -373,6 +373,8 @@ PanelWindow {
         border.color: Colors.magenta
 
         Rectangle {
+            id: innerFrame
+
             anchors.fill: parent
             anchors.margins: root.frameInset
 
@@ -382,15 +384,43 @@ PanelWindow {
             opacity: 0.70
         }
 
+        Rectangle {
+            id: bottomStop
+
+            height: 2
+            anchors {
+                left: parent.left
+                right: parent.right
+                bottom: parent.bottom
+                leftMargin: root.frameInset
+                rightMargin: root.frameInset
+                bottomMargin: root.frameInset
+            }
+
+            color: Colors.cyan
+            opacity: 1.0
+
+            RectangularShadow {
+                anchors.fill: parent
+                spread: 3
+                z: -1
+                opacity: 0.34
+                color: Colors.cyan
+            }
+        }
+
         Flickable {
             id: hospitalScroll
 
             anchors {
-                fill: parent
+                left: parent.left
+                right: parent.right
+                top: parent.top
+                bottom: bottomStop.top
                 leftMargin: 18
                 topMargin: 18
                 rightMargin: 18
-                bottomMargin: 18
+                bottomMargin: 10
             }
 
             clip: true
@@ -974,9 +1004,9 @@ PanelWindow {
 
             anchors {
                 top: parent.top
-                bottom: parent.bottom
+                bottom: bottomStop.top
                 right: parent.right
-                topMargin: 8
+                topMargin: 88
                 bottomMargin: 0
                 rightMargin: 3
             }

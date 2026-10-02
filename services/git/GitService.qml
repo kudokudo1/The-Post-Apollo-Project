@@ -30,6 +30,9 @@ Scope {
     property int maxLane: 0
     property int topologyRevision: 0
     property var activeLanes: []
+    property var pendingLocalBranches: []
+    property var pendingRemoteBranches: []
+    property var pendingTopology: []
 
     property string lastError: ""
     property string actionTitle: "READY"
@@ -282,10 +285,25 @@ Scope {
         return true;
     }
 
-    function resetTopology() {
-        topologyRows.clear();
+    function resetTopologyBuild() {
         activeLanes = [];
         maxLane = 0;
+        pendingTopology = [];
+    }
+
+    function publishPendingModels() {
+        localBranchRows.clear();
+        remoteBranchRows.clear();
+        topologyRows.clear();
+
+        for (let i = 0; i < pendingLocalBranches.length; ++i)
+            localBranchRows.append({ name: pendingLocalBranches[i] });
+
+        for (let i = 0; i < pendingRemoteBranches.length; ++i)
+            remoteBranchRows.append({ name: pendingRemoteBranches[i] });
+
+        for (let i = 0; i < pendingTopology.length; ++i)
+            topologyRows.append(pendingTopology[i]);
     }
 
     function allocateLane(sha, parents) {
@@ -355,7 +373,7 @@ Scope {
         const lane = allocateLane(sha, parents);
         const decorated = String(refs || "");
 
-        topologyRows.append({
+        pendingTopology.push({
             sha: sha,
             shortSha: String(sha).slice(0, 8),
             parents: parents.join(" "),
@@ -398,9 +416,9 @@ Scope {
 
         refreshing = true;
         lastError = "";
-        localBranchRows.clear();
-        remoteBranchRows.clear();
-        resetTopology();
+        pendingLocalBranches = [];
+        pendingRemoteBranches = [];
+        resetTopologyBuild();
         refreshWatchdog.restart();
 
         refreshProcess.exec([
@@ -494,15 +512,16 @@ Scope {
         else if (key === "BEHIND")
             behind = Number(value || 0);
         else if (key === "LOCALBRANCH")
-            localBranchRows.append({ name: value });
+            pendingLocalBranches.push(value);
         else if (key === "REMOTEBRANCH")
-            remoteBranchRows.append({ name: value });
+            pendingRemoteBranches.push(value);
         else if (key === "ERROR") {
             available = false;
             lastError = value;
         } else if (key === "DONE") {
             refreshing = false;
             refreshWatchdog.stop();
+            publishPendingModels();
             ensureRemoteSelection();
             topologyRevision += 1;
 

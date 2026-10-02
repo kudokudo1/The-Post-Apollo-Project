@@ -34,6 +34,9 @@ Scope {
     property bool selectedRemoteExists: false
     property int selectedRemoteIndex: -1
 
+    readonly property bool selectedRemoteTargetValid:
+        isRemoteBranchTarget(selectedRemoteBranch)
+
     property int maxLane: 0
     property int topologyRevision: 0
     property var activeLanes: []

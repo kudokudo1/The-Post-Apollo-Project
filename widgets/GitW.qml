@@ -15,6 +15,7 @@ PanelWindow {
     property string factoryTemplate: "smoke"
     property string factoryTrigger: "manual"
     property int selectedWorkflowIndex: 0
+    property bool workflowMenuOpen: false
     property int selectedRunIndex: 0
     property string selectedGitCommitSha: ""
     property var activeTextEditor: null
@@ -109,6 +110,7 @@ PanelWindow {
     }
 
     function showGitPage() {
+        root.workflowMenuOpen = false;
         root.activePage = "git";
         gitService.refresh();
     }
@@ -144,6 +146,16 @@ PanelWindow {
             return;
 
         root.selectedWorkflowIndex = (root.selectedWorkflowIndex + 1) % count;
+    }
+
+    function selectWorkflow(index) {
+        const count = githubService.workflows.length;
+
+        if (count <= 0)
+            return;
+
+        root.selectedWorkflowIndex = Math.max(0, Math.min(count - 1, index));
+        root.workflowMenuOpen = false;
     }
 
     function cycleRun() {
@@ -1969,8 +1981,11 @@ PanelWindow {
                         // ===== SAVED MACHINES ==========================
 
                         Rectangle {
+                            id: workflowLibrary
+
                             width: parent.width
                             height: 92
+                            z: root.workflowMenuOpen ? 300 : 0
 
                             color: Colors.dark
                             border.width: 1
@@ -2015,7 +2030,7 @@ PanelWindow {
                                     spacing: 8
 
                                     ActionButton {
-                                        width: parent.width - 328
+                                        width: parent.width - 370
                                         height: 30
                                         enabledAction: githubService.available
                                                        && githubService.workflowCount > 0
@@ -2028,6 +2043,18 @@ PanelWindow {
                                                  + String(root.selectedWorkflow.name || root.selectedWorkflow.path || "UNKNOWN")
                                                : "0 // NO WORKFLOWS"
                                         onTriggered: root.cycleWorkflow()
+                                    }
+
+                                    ActionButton {
+                                        width: 34
+                                        height: 30
+                                        label: root.workflowMenuOpen ? "▴" : "▾"
+                                        enabledAction: githubService.available
+                                                       && githubService.workflowCount > 0
+                                                       && !githubService.refreshing
+                                                       && !githubService.actionBusy
+                                        selectedAction: root.workflowMenuOpen
+                                        onTriggered: root.workflowMenuOpen = !root.workflowMenuOpen
                                     }
 
                                     ActionButton {
@@ -2067,6 +2094,125 @@ PanelWindow {
                                             text: "ASSIGN // NEXT"
                                             font.pixelSize: 8
                                             color: Colors.white
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            id: workflowDropdown
+
+                            visible: root.workflowMenuOpen
+                                     && githubService.workflowCount > 0
+                            z: 500
+
+                            anchors {
+                                left: workflowLibrary.left
+                                right: workflowLibrary.right
+                                top: workflowLibrary.bottom
+                                leftMargin: 9
+                                rightMargin: 9
+                                topMargin: 4
+                            }
+
+                            height: Math.min(githubService.workflowCount, 6) * 30 + 8
+                            color: Colors.black
+                            border.width: 1
+                            border.color: Colors.orange
+                            clip: true
+
+                            RectangularShadow {
+                                anchors.fill: parent
+                                spread: 4
+                                z: -1
+                                opacity: 0.28
+                                color: Colors.orange
+                            }
+
+                            Flickable {
+                                anchors {
+                                    fill: parent
+                                    margins: 4
+                                }
+
+                                clip: true
+                                contentWidth: width
+                                contentHeight: workflowMenuColumn.height
+                                boundsBehavior: Flickable.StopAtBounds
+
+                                Column {
+                                    id: workflowMenuColumn
+                                    width: parent.width
+                                    spacing: 0
+
+                                    Repeater {
+                                        model: githubService.workflows
+
+                                        Rectangle {
+                                            required property int index
+                                            required property var modelData
+
+                                            width: workflowMenuColumn.width
+                                            height: 30
+
+                                            readonly property bool selected:
+                                                index === root.selectedWorkflowIndex
+
+                                            color:
+                                                selected
+                                                ? Colors.yellow
+                                                : workflowChoiceMouse.containsMouse
+                                                ? Colors.dark
+                                                : Colors.black
+
+                                            border.width: 0
+
+                                            GohuText {
+                                                anchors {
+                                                    left: parent.left
+                                                    right: parent.right
+                                                    verticalCenter: parent.verticalCenter
+                                                    leftMargin: 8
+                                                    rightMargin: 8
+                                                }
+
+                                                text:
+                                                    String(index + 1)
+                                                    + " // "
+                                                    + String(
+                                                        modelData.name
+                                                        || modelData.path
+                                                        || "UNKNOWN"
+                                                    )
+                                                font.pixelSize: 9
+                                                color:
+                                                    parent.selected
+                                                    ? Colors.magenta
+                                                    : workflowChoiceMouse.containsMouse
+                                                    ? Colors.orange
+                                                    : Colors.cyan
+                                                elide: Text.ElideRight
+                                            }
+
+                                            Rectangle {
+                                                anchors {
+                                                    left: parent.left
+                                                    right: parent.right
+                                                    bottom: parent.bottom
+                                                }
+                                                height: 1
+                                                color: Colors.cyan
+                                                opacity: 0.18
+                                            }
+
+                                            MouseArea {
+                                                id: workflowChoiceMouse
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: root.selectWorkflow(index)
+                                            }
                                         }
                                     }
                                 }

@@ -25,6 +25,7 @@ Scope {
 
     property string selectedRemoteBranch: ""
     property bool selectedRemoteExists: false
+    property int selectedRemoteIndex: -1
 
     property int maxLane: 0
     property int topologyRevision: 0
@@ -168,8 +169,6 @@ Scope {
 
         repoPath = String(row.path || "");
         repoLabel = String(row.label || "REPOSITORY");
-        selectedRemoteBranch = "";
-        selectedRemoteExists = false;
 
         if (refreshing) {
             refreshPending = true;
@@ -240,13 +239,14 @@ Scope {
 
         selectedRemoteBranch = String(row.name || "");
         selectedRemoteExists = true;
+        selectedRemoteIndex = index;
     }
 
     function cycleRemote(delta) {
         if (remoteBranchRows.count <= 0)
             return;
 
-        let index = remoteIndexOf(selectedRemoteBranch);
+        let index = selectedRemoteIndex;
         if (index < 0)
             index = 0;
         else
@@ -269,6 +269,9 @@ Scope {
 
         selectedRemoteBranch = value;
         selectedRemoteExists = remoteIndexOf(value) >= 0;
+        selectedRemoteIndex = selectedRemoteExists
+            ? remoteIndexOf(value)
+            : selectedRemoteIndex;
         actionTitle = "REMOTE TARGET";
         actionExitCode = 0;
         actionOutput = selectedRemoteExists
@@ -364,14 +367,15 @@ Scope {
     }
 
     function ensureRemoteSelection() {
-        if (selectedRemoteBranch && remoteIndexOf(selectedRemoteBranch) >= 0) {
-            selectedRemoteExists = true;
+        if (selectedRemoteBranch) {
+            selectedRemoteExists = remoteIndexOf(selectedRemoteBranch) >= 0;
             return;
         }
 
         if (upstream && remoteIndexOf(upstream) >= 0) {
             selectedRemoteBranch = upstream;
             selectedRemoteExists = true;
+            selectedRemoteIndex = remoteIndexOf(upstream);
             return;
         }
 
@@ -379,14 +383,13 @@ Scope {
             ? "origin/" + branch
             : "";
 
-        if (matching && remoteIndexOf(matching) >= 0) {
-            selectedRemoteBranch = matching;
-            selectedRemoteExists = true;
-            return;
-        }
-
         selectedRemoteBranch = matching;
-        selectedRemoteExists = false;
+        selectedRemoteExists = matching
+            ? remoteIndexOf(matching) >= 0
+            : false;
+        selectedRemoteIndex = selectedRemoteExists
+            ? remoteIndexOf(matching)
+            : -1;
     }
 
     function refresh() {

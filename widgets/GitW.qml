@@ -351,6 +351,15 @@ PanelWindow {
             selectedTextColor: Colors.black
             verticalAlignment: TextInput.AlignVCenter
 
+            layer.enabled: true
+            layer.effect: DropShadow {
+                radius: 7
+                samples: 9
+                opacity: input.activeFocus ? 0.72 : 0.52
+                color: selectorInput.accentColor
+                transparentBorder: true
+            }
+
             Component.onCompleted: text = selectorInput.valueText
 
             onAccepted: {
@@ -663,7 +672,7 @@ PanelWindow {
                 ? Colors.magenta
                 : pageTab.hovered
                 ? Colors.orange
-                : Colors.white
+                : Colors.cyan
             opacity: 1.0
 
             layer.enabled: !pageTab.pressed
@@ -1293,7 +1302,7 @@ PanelWindow {
                                     height: 36
                                     icon: gitService.pullModeIcon
                                     tag: gitService.pullModeLabel
-                                    active: gitService.pullMode === "ff-only"
+                                    active: true
                                     modeColor:
                                         gitService.pullMode === "ff-only"
                                         ? Colors.magenta
@@ -1413,6 +1422,18 @@ PanelWindow {
                                     gitService.actionExitCode === 0
                                     ? Colors.orange
                                     : Colors.red
+
+                                layer.enabled: true
+                                layer.effect: DropShadow {
+                                    radius: 8
+                                    samples: 9
+                                    opacity: 0.62
+                                    color:
+                                        gitService.actionExitCode === 0
+                                        ? Colors.orange
+                                        : Colors.red
+                                    transparentBorder: true
+                                }
                             }
 
                             Flickable {
@@ -1439,6 +1460,21 @@ PanelWindow {
                                     font.pixelSize: 9
                                     color: Colors.white
                                     wrapMode: Text.WrapAnywhere
+
+                                    layer.enabled: true
+                                    layer.effect: DropShadow {
+                                        radius: 5
+                                        samples: 7
+                                        opacity:
+                                            gitService.actionExitCode === 0
+                                            ? 0.24
+                                            : 0.40
+                                        color:
+                                            gitService.actionExitCode === 0
+                                            ? Colors.cyan
+                                            : Colors.red
+                                        transparentBorder: true
+                                    }
                                 }
                             }
                         }

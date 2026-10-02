@@ -9,12 +9,17 @@ Scope {
 
     property bool verificationPending: false
     property string verificationRunId: ""
+    property string pendingDriftGate: ""
     property string bridgeError: ""
     property var lastGitEvidence: ({})
     property var lastVerificationChecks: ({})
 
     HospitalOperatingAuthorityService {
         id: authority
+    }
+
+    HospitalCertificationDriftService {
+        id: driftProbe
     }
 
     property string hostLeaseId: ""
@@ -55,8 +60,13 @@ Scope {
         certification.canVerify
         && evidenceProvider
         && !verificationPending
-    readonly property bool canCertify: certification.canCertify
-    readonly property bool canArm: certification.canArm
+        && !driftProbe.busy
+    readonly property bool canCertify:
+        certification.canCertify
+        && !driftProbe.busy
+    readonly property bool canArm:
+        certification.canArm
+        && !driftProbe.busy
     readonly property bool canIntegrate: certification.canIntegrate
 
     readonly property var evidencePacket:
@@ -127,10 +137,135 @@ Scope {
         }
     }
 
+    Connections {
+        target: driftProbe
+
+        function onChecked(result) {
+            const gate = coordinator.pendingDriftGate;
+            coordinator.pendingDriftGate = "";
+
+            const outcome =
+                String((result || {}).status || "").toUpperCase();
+
+            if (outcome === "ERROR") {
+                coordinator.bridgeError =
+                    String((result || {}).error || "")
+                    || "REMOTE DRIFT CHECK FAILED";
+                return;
+            }
+
+            if (outcome === "DRIFT") {
+                const differences =
+                    Array.isArray((result || {}).differences)
+                    ? result.differences
+                    : [];
+
+                certification.block(
+                    "REMOTE DRIFT // "
+                    + (
+                        differences.length > 0
+                        ? differences.join(" + ")
+                        : "SNAPSHOT CHANGED"
+                    ),
+                    coordinator.roomSnapshot(),
+                    {
+                        source: "REMOTE_DRIFT_PROBE",
+                        drift: result || {}
+                    }
+                );
+
+                coordinator.bridgeError =
+                    certification.lastError;
+                return;
+            }
+
+            if (outcome !== "MATCH") {
+                coordinator.bridgeError =
+                    "REMOTE DRIFT CHECK // UNKNOWN RESULT";
+                return;
+            }
+
+            coordinator.bridgeError = "";
+
+            if (gate === "VERIFY")
+                coordinator.startEvidenceRequest();
+            else if (gate === "CERTIFY")
+                coordinator.certifyAfterDrift();
+            else if (gate === "ARM")
+                coordinator.armAfterDrift();
+        }
+    }
+
+    function roomSnapshot() {
+        if (!roomService
+                || typeof roomService.certificationSnapshot
+                    !== "function")
+            return ({});
+
+        return roomService.certificationSnapshot();
+    }
+
+    function expectedSnapshotForGate(gate) {
+        const current = roomSnapshot();
+        let expectedHead = "";
+
+        if (gate === "VERIFY")
+            expectedHead = String(certification.candidateHead || "");
+        else if (gate === "CERTIFY")
+            expectedHead = String(certification.verifiedHead || "");
+        else if (gate === "ARM")
+            expectedHead = String(certification.certifiedHead || "");
+
+        return {
+            repository: String(current.repository || ""),
+            team: String(current.team || ""),
+            branch: String(current.branch || ""),
+            head: expectedHead,
+            base: String(current.base || ""),
+            baseHead: String(certification.candidateBaseHead || "")
+        };
+    }
+
+    function beginRemoteDriftGate(gate) {
+        if (!roomService) {
+            bridgeError = String(gate || "")
+                          + " // ROOM SERVICE MISSING";
+            return false;
+        }
+
+        if (driftProbe.busy) {
+            bridgeError = "REMOTE DRIFT CHECK // BUSY";
+            return false;
+        }
+
+        const expected =
+            expectedSnapshotForGate(String(gate || ""));
+
+        pendingDriftGate = String(gate || "");
+        bridgeError = "";
+
+        const started = driftProbe.check(
+            expected.repository,
+            expected.team,
+            expected
+        );
+
+        if (!started) {
+            pendingDriftGate = "";
+            bridgeError =
+                driftProbe.lastError
+                || "REMOTE DRIFT CHECK REFUSED";
+            return false;
+        }
+
+        return true;
+    }
+
     function bindRoom(service) {
         roomService = service;
         verificationPending = false;
         verificationRunId = "";
+        pendingDriftGate = "";
         bridgeError = "";
         lastGitEvidence = ({});
         lastVerificationChecks = ({});
@@ -317,8 +452,19 @@ Scope {
             return false;
         }
 
-        verificationPending = true;
         verificationRunId = String(runId || "");
+        return beginRemoteDriftGate("VERIFY");
+    }
+
+    function startEvidenceRequest() {
+        if (!evidenceProvider
+                || typeof evidenceProvider.requestEvidence
+                    !== "function") {
+            bridgeError = "VERIFY // GIT EVIDENCE PROVIDER MISSING";
+            return false;
+        }
+
+        verificationPending = true;
         bridgeError = "";
 
         const started = evidenceProvider.requestEvidence(
@@ -378,12 +524,42 @@ Scope {
         if (!roomService)
             return false;
 
-        return certification.certifyVerified(
-            roomService.certificationSnapshot()
+        if (!certification.canCertify) {
+            bridgeError =
+                certification.lastError
+                || "CERTIFY // VERIFIED STATE REQUIRED";
+            return false;
+        }
+
+        return beginRemoteDriftGate("CERTIFY");
+    }
+
+    function certifyAfterDrift() {
+        const accepted = certification.certifyVerified(
+            roomSnapshot()
         );
+
+        bridgeError = accepted
+                      ? ""
+                      : certification.lastError;
+        return accepted;
     }
 
     function arm() {
+        if (!roomService)
+            return false;
+
+        if (!certification.canArm) {
+            bridgeError =
+                certification.lastError
+                || "ARM // CERTIFICATION REQUIRED";
+            return false;
+        }
+
+        return beginRemoteDriftGate("ARM");
+    }
+
+    function armAfterDrift() {
         if (!roomService)
             return false;
 

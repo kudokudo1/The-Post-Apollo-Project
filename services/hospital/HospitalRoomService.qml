@@ -70,6 +70,26 @@ Scope {
 
     property bool integrating: false
 
+    property bool postOpRunning: false
+    property string postOpStatus: ""
+    property string postOpOperation: ""
+    property string postOpExpectedBaseHead: ""
+    property string postOpExpectedRoomHead: ""
+    property string postOpCurrentBaseHead: ""
+    property string postOpCurrentRoomHead: ""
+    property string postOpCurrentRelation: ""
+    property bool postOpRoomUnchanged: false
+    readonly property string postOpDetail:
+        postOpStatus === "POST_OP_CLEAN"
+        ? "MAIN " + postOpCurrentBaseHead.slice(0, 8)
+          + " // ROOM CONTAINED"
+          + (
+              postOpRoomUnchanged
+              ? " // ROOM HEAD UNCHANGED"
+              : " // ROOM ADVANCED AFTER OP"
+            )
+        : ""
+
     property bool running: false
     property bool available: false
     property string action: ""
@@ -104,6 +124,13 @@ Scope {
     property string rehearseStdoutText: ""
     property string rehearseStderrText: ""
 
+    property bool postOpExitSeen: false
+    property bool postOpStdoutSeen: false
+    property bool postOpStderrSeen: false
+    property int postOpExitCode: -1
+    property string postOpStdoutText: ""
+    property string postOpStderrText: ""
+
     property bool integrateExitSeen: false
     property bool integrateStdoutSeen: false
     property bool integrateStderrSeen: false
@@ -113,6 +140,7 @@ Scope {
 
     signal inspected()
     signal integrated()
+    signal postOpFinished()
 
     function disarm() {
         armed = false;
@@ -138,6 +166,14 @@ Scope {
         baseHead = "";
         integrationMode = "";
         disarm();
+        postOpStatus = "";
+        postOpOperation = "";
+        postOpExpectedBaseHead = "";
+        postOpExpectedRoomHead = "";
+        postOpCurrentBaseHead = "";
+        postOpCurrentRoomHead = "";
+        postOpCurrentRelation = "";
+        postOpRoomUnchanged = false;
         rehearsalStatus = "";
         rehearsalConflicts = [];
         rehearsalChangedFiles = [];
@@ -157,7 +193,7 @@ Scope {
     }
 
     function runInspection(mode) {
-        if (running || rehearsing || integrating)
+        if (running || rehearsing || integrating || postOpRunning)
             return;
 
         const targetRepo = String(repository || "").trim();
@@ -302,7 +338,7 @@ Scope {
     }
 
     function rehearsePrepared() {
-        if (running || rehearsing || integrating)
+        if (running || rehearsing || integrating || postOpRunning)
             return;
 
         if (!canRehearse) {
@@ -477,7 +513,7 @@ Scope {
     }
 
     function integrateArmed() {
-        if (integrating || running || rehearsing)
+        if (integrating || running || rehearsing || postOpRunning)
             return;
 
         if (!armed) {
@@ -548,6 +584,120 @@ Scope {
         }
 
         integrateWatchdog.restart();
+    }
+
+    function startPostOpVerification(
+            operation,
+            verifyRepository,
+            verifyTeam,
+            verifyBase,
+            expectedBaseHead,
+            expectedRoomHead) {
+        postOpRunning = true;
+        postOpStatus = "VERIFYING";
+        postOpOperation = String(operation || "");
+        postOpExpectedBaseHead = String(expectedBaseHead || "");
+        postOpExpectedRoomHead = String(expectedRoomHead || "");
+        postOpCurrentBaseHead = "";
+        postOpCurrentRoomHead = "";
+        postOpCurrentRelation = "";
+        postOpRoomUnchanged = false;
+        available = false;
+        action = "POST_OP";
+        lastError = "";
+        summary = "POST-OP // VERIFYING "
+                  + postOpOperation
+                  + " RESULT";
+
+        postOpExitSeen = false;
+        postOpStdoutSeen = false;
+        postOpStderrSeen = false;
+        postOpExitCode = -1;
+        postOpStdoutText = "";
+        postOpStderrText = "";
+
+        postOpProcess.exec([
+            "bash",
+            "-lc",
+            'exec "$HOME/.local/bin/px" verify "$1" "$2" "$3" "$4" "$5"',
+            "px-post-op",
+            String(verifyRepository || ""),
+            String(verifyTeam || ""),
+            String(verifyBase || ""),
+            postOpExpectedBaseHead,
+            postOpExpectedRoomHead
+        ]);
+
+        postOpWatchdog.restart();
+    }
+
+    function maybeFinishPostOp() {
+        if (!postOpRunning
+                || !postOpExitSeen
+                || !postOpStdoutSeen
+                || !postOpStderrSeen)
+            return;
+
+        postOpRunning = false;
+        postOpWatchdog.stop();
+
+        if (postOpExitCode !== 0) {
+            available = false;
+            postOpStatus = "VERIFY_FAILED";
+            lastError = String(
+                postOpStderrText
+                || postOpStdoutText
+                || ("PX POST-OP EXIT " + postOpExitCode)
+            ).trim();
+            summary = "POST-OP WARNING // " + lastError;
+            postOpFinished();
+            return;
+        }
+
+        try {
+            const data = JSON.parse(
+                String(postOpStdoutText || "").trim()
+            );
+            const status =
+                String(data.status || "UNKNOWN").toUpperCase();
+            const relation = data.current_room_relation || {};
+
+            postOpStatus = status;
+            postOpCurrentBaseHead =
+                String(data.current_base_head || "");
+            postOpCurrentRoomHead =
+                String(data.current_room_head || "");
+            postOpCurrentRelation =
+                String(relation.status || "UNKNOWN").toUpperCase();
+            postOpRoomUnchanged =
+                Boolean(data.room_branch_unchanged);
+
+            if (status !== "POST_OP_CLEAN")
+                throw new Error(
+                    "UNEXPECTED POST-OP STATUS // " + status
+                );
+
+            available = true;
+            lastError = "";
+            action = "POST_OP";
+            summary = "POST-OP CLEAN // "
+                      + postOpOperation
+                      + " // "
+                      + String(data.base || "")
+                      + "@"
+                      + postOpCurrentBaseHead.slice(0, 8)
+                      + " // ROOM "
+                      + postOpCurrentRelation;
+
+            integrated();
+            postOpFinished();
+        } catch (error) {
+            available = false;
+            postOpStatus = "VERIFY_FAILED";
+            lastError = "POST-OP PARSE // " + String(error);
+            summary = lastError;
+            postOpFinished();
+        }
     }
 
     function launchLazygit() {
@@ -647,20 +797,38 @@ Scope {
                     "UNEXPECTED " + operationLabel + " RESPONSE"
                 );
 
-            action = mergeMode ? "MERGE" : "INTEGRATE";
-            available = true;
-            lastError = "";
-            summary = expectedStatus + " // "
-                      + String(data.base || armedBase)
-                      + " // "
-                      + String(data.old_base_head || "")
-                            .slice(0, 8)
-                      + " → "
-                      + String(data.new_base_head || "")
-                            .slice(0, 8);
+            const verifyRepository =
+                String(data.repository || armedRepository);
+            const verifyTeam =
+                String(data.team || armedTeam);
+            const verifyBase =
+                String(data.base || armedBase);
+            const verifyBaseHead =
+                String(data.new_base_head || "");
+            const verifyRoomHead =
+                String(data.room_head || armedHead);
+
+            if (!verifyRepository
+                    || !verifyTeam
+                    || !verifyBase
+                    || !verifyBaseHead
+                    || !verifyRoomHead)
+                throw new Error(
+                    "MISSING POST-OP VERIFICATION SNAPSHOT"
+                );
+
+            const operation = expectedStatus;
 
             disarm();
-            integrated();
+
+            startPostOpVerification(
+                operation,
+                verifyRepository,
+                verifyTeam,
+                verifyBase,
+                verifyBaseHead,
+                verifyRoomHead
+            );
         } catch (error) {
             available = false;
             lastError = operationLabel
@@ -694,6 +862,32 @@ Scope {
             roomService.rehearseExitCode = Number(code);
             roomService.rehearseExitSeen = true;
             roomService.maybeFinishRehearse();
+        }
+    }
+
+    Process {
+        id: postOpProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                roomService.postOpStdoutText = this.text;
+                roomService.postOpStdoutSeen = true;
+                roomService.maybeFinishPostOp();
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                roomService.postOpStderrText = this.text;
+                roomService.postOpStderrSeen = true;
+                roomService.maybeFinishPostOp();
+            }
+        }
+
+        onExited: function(code, exitStatus) {
+            roomService.postOpExitCode = Number(code);
+            roomService.postOpExitSeen = true;
+            roomService.maybeFinishPostOp();
         }
     }
 
@@ -784,6 +978,28 @@ Scope {
 
             if (rehearseProcess.running)
                 rehearseProcess.running = false;
+        }
+    }
+
+    Timer {
+        id: postOpWatchdog
+        interval: 20000
+        repeat: false
+
+        onTriggered: {
+            if (!roomService.postOpRunning)
+                return;
+
+            roomService.postOpRunning = false;
+            roomService.available = false;
+            roomService.postOpStatus = "VERIFY_TIMEOUT";
+            roomService.lastError = "PX POST-OP VERIFY TIMEOUT";
+            roomService.summary = "POST-OP WARNING // "
+                                  + roomService.lastError;
+            roomService.postOpFinished();
+
+            if (postOpProcess.running)
+                postOpProcess.running = false;
         }
     }
 

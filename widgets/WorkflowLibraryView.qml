@@ -102,7 +102,7 @@ Item {
                     spacing: 6
 
                     Row {
-                        width: parent.width - 3
+                        width: parent.width - 2
                         height: 26
                         spacing: 6
 

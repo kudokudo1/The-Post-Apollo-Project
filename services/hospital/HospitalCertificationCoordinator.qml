@@ -13,6 +13,7 @@ Scope {
     property string bridgeError: ""
     property var lastGitEvidence: ({})
     property var lastVerificationChecks: ({})
+    property var pendingVerificationRuns: ({})
 
     HospitalOperatingAuthorityService {
         id: authority
@@ -233,6 +234,8 @@ Scope {
 
             if (gate === "VERIFY")
                 coordinator.startEvidenceRequest();
+            else if (gate === "VERIFY_FINAL")
+                coordinator.completeEvidenceVerification();
             else if (gate === "CERTIFY")
                 coordinator.certifyAfterDrift();
             else if (gate === "ARM")
@@ -253,7 +256,8 @@ Scope {
         const current = roomSnapshot();
         let expectedHead = "";
 
-        if (gate === "VERIFY")
+        if (gate === "VERIFY"
+                || gate === "VERIFY_FINAL")
             expectedHead = String(certification.candidateHead || "");
         else if (gate === "CERTIFY")
             expectedHead = String(certification.verifiedHead || "");
@@ -350,6 +354,7 @@ Scope {
         bridgeError = "";
         lastGitEvidence = ({});
         lastVerificationChecks = ({});
+        pendingVerificationRuns = ({});
 
         if (!roomService) {
             certification.bindRoom("", "");
@@ -404,16 +409,9 @@ Scope {
     }
 
     function verify(checks, runs) {
-        if (!roomService)
-            return false;
-
-        bridgeError = "";
-
-        return certification.verifyCandidate(
-            roomService.certificationSnapshot(),
-            checks || {},
-            runs || {}
-        );
+        bridgeError =
+            "VERIFY // DIRECT CHECK INJECTION DISABLED";
+        return false;
     }
 
     function checksFromEvidence(packet) {
@@ -596,6 +594,8 @@ Scope {
             JSON.parse(JSON.stringify(packet || {}));
         lastVerificationChecks =
             JSON.parse(JSON.stringify(checks));
+        pendingVerificationRuns =
+            JSON.parse(JSON.stringify(runs));
 
         verificationEvidenceReady(
             lastVerificationChecks,
@@ -607,10 +607,39 @@ Scope {
             return false;
         }
 
+        if (checks.status !== "PASS") {
+            const rejected = certification.verifyCandidate(
+                roomService.certificationSnapshot(),
+                checks,
+                runs
+            );
+
+            bridgeError = rejected
+                          ? ""
+                          : certification.lastError;
+            return rejected;
+        }
+
+        return beginRemoteDriftGate("VERIFY_FINAL");
+    }
+
+    function completeEvidenceVerification() {
+        if (!roomService || !certification.canVerify) {
+            bridgeError = "VERIFY // CANDIDATE NOT READY";
+            return false;
+        }
+
+        if (String(lastVerificationChecks.status || "")
+                !== "PASS") {
+            bridgeError =
+                "VERIFY // PASSING EVIDENCE REQUIRED";
+            return false;
+        }
+
         const accepted = certification.verifyCandidate(
-            roomService.certificationSnapshot(),
-            checks,
-            runs
+            roomSnapshot(),
+            lastVerificationChecks,
+            pendingVerificationRuns
         );
 
         bridgeError = accepted

@@ -8,6 +8,7 @@ Scope {
     property bool available: false
     property bool refreshing: false
     property bool refreshPending: false
+    property string refreshRepoPath: ""
     property bool discoveringRepos: false
     property bool actionBusy: false
 
@@ -33,6 +34,15 @@ Scope {
     property var pendingLocalBranches: []
     property var pendingRemoteBranches: []
     property var pendingTopology: []
+    property string pendingRepoRoot: ""
+    property string pendingRepository: ""
+    property string pendingBranch: ""
+    property string pendingHead: ""
+    property string pendingWorktree: ""
+    property string pendingOrigin: ""
+    property string pendingUpstream: ""
+    property int pendingAhead: 0
+    property int pendingBehind: 0
 
     property string lastError: ""
     property string actionTitle: "READY"
@@ -292,6 +302,16 @@ Scope {
     }
 
     function publishPendingModels() {
+        repoRoot = pendingRepoRoot;
+        repository = pendingRepository;
+        branch = pendingBranch;
+        head = pendingHead;
+        worktree = pendingWorktree;
+        origin = pendingOrigin;
+        upstream = pendingUpstream;
+        ahead = pendingAhead;
+        behind = pendingBehind;
+
         localBranchRows.clear();
         remoteBranchRows.clear();
         topologyRows.clear();
@@ -415,9 +435,19 @@ Scope {
             return;
 
         refreshing = true;
+        refreshRepoPath = repoPath;
         lastError = "";
         pendingLocalBranches = [];
         pendingRemoteBranches = [];
+        pendingRepoRoot = "";
+        pendingRepository = "";
+        pendingBranch = "";
+        pendingHead = "";
+        pendingWorktree = "";
+        pendingOrigin = "";
+        pendingUpstream = "";
+        pendingAhead = 0;
+        pendingBehind = 0;
         resetTopologyBuild();
         refreshWatchdog.restart();
 
@@ -470,7 +500,7 @@ Scope {
                 'printf "\\nDONE\\t\\n"'
             ].join("\n"),
             "pa-git-refresh",
-            repoPath
+            refreshRepoPath
         ]);
     }
 
@@ -491,26 +521,24 @@ Scope {
 
         const value = parts.length > 1 ? parts.slice(1).join("\t") : "";
 
-        if (key === "ROOT") {
-            repoRoot = value;
-            if (!repoPath)
-                repoPath = value;
-        } else if (key === "REPO")
-            repository = value;
+        if (key === "ROOT")
+            pendingRepoRoot = value;
+        else if (key === "REPO")
+            pendingRepository = value;
         else if (key === "BRANCH")
-            branch = value;
+            pendingBranch = value;
         else if (key === "HEAD")
-            head = value;
+            pendingHead = value;
         else if (key === "WORKTREE")
-            worktree = value;
+            pendingWorktree = value;
         else if (key === "ORIGIN")
-            origin = value;
+            pendingOrigin = value;
         else if (key === "UPSTREAM")
-            upstream = value;
+            pendingUpstream = value;
         else if (key === "AHEAD")
-            ahead = Number(value || 0);
+            pendingAhead = Number(value || 0);
         else if (key === "BEHIND")
-            behind = Number(value || 0);
+            pendingBehind = Number(value || 0);
         else if (key === "LOCALBRANCH")
             pendingLocalBranches.push(value);
         else if (key === "REMOTEBRANCH")
@@ -519,18 +547,23 @@ Scope {
             available = false;
             lastError = value;
         } else if (key === "DONE") {
+            const staleRead = refreshRepoPath !== repoPath;
+
             refreshing = false;
             refreshWatchdog.stop();
-            publishPendingModels();
-            ensureRemoteSelection();
-            topologyRevision += 1;
 
-            if (!lastError) {
-                available = true;
-                refreshed();
+            if (!staleRead) {
+                publishPendingModels();
+                ensureRemoteSelection();
+                topologyRevision += 1;
+
+                if (!lastError) {
+                    available = true;
+                    refreshed();
+                }
             }
 
-            if (refreshPending) {
+            if (refreshPending || staleRead) {
                 refreshPending = false;
                 Qt.callLater(function() {
                     refresh();

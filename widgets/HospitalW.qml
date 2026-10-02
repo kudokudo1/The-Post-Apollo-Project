@@ -4,6 +4,7 @@ import Quickshell.Wayland
 import qs.components
 import "../services/git"
 import "../services/hospital"
+import "../services/github"
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 
@@ -91,6 +92,24 @@ PanelWindow {
 
     HospitalService {
         id: patientService
+    }
+
+    GitHubService {
+        id: githubService
+        originUrl: patientService.origin
+    }
+
+    HospitalAuditService {
+        id: auditService
+        repository: githubService.repoSlug
+    }
+
+    Connections {
+        target: patientService
+
+        function onRefreshed() {
+            githubService.refresh();
+        }
     }
 
     Timer {
@@ -641,17 +660,89 @@ PanelWindow {
                     }
 
                     GohuText {
-                        text: "AUDIT"
+                        id: auditAction
+
+                        text: auditService.running
+                              ? "AUDIT // RUNNING"
+                              : auditService.available
+                              ? "AUDIT // " + auditService.status
+                              : "AUDIT"
                         font.pixelSize: 10
-                        color: Colors.cyan
-                        opacity: 0.45
+                        color: auditMouse.containsMouse
+                               ? Colors.orange
+                               : auditService.available
+                               ? Colors.magenta
+                               : auditService.lastError
+                               ? Colors.red
+                               : Colors.cyan
+                        opacity: auditService.running ? 0.60 : 1.0
+
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 7
+                            opacity: auditMouse.containsMouse
+                                     ? 0.52
+                                     : auditService.available
+                                     ? 0.42
+                                     : auditService.lastError
+                                     ? 0.44
+                                     : 0.28
+                            color: auditAction.color
+                            transparentBorder: true
+                        }
+
+                        MouseArea {
+                            id: auditMouse
+                            anchors.fill: parent
+                            anchors.margins: -8
+                            hoverEnabled: true
+                            enabled: !auditService.running && auditService.repository.length > 0
+                            cursorShape: Qt.PointingHandCursor
+
+                            onClicked: auditService.runAudit()
+                        }
                     }
 
                     GohuText {
-                        text: "GITHUB"
+                        id: githubAction
+
+                        text: githubService.refreshing
+                              ? "GITHUB // READING"
+                              : githubService.available
+                              ? "GITHUB // LIVE"
+                              : "GITHUB"
                         font.pixelSize: 10
-                        color: Colors.cyan
-                        opacity: 0.45
+                        color: githubMouse.containsMouse
+                               ? Colors.orange
+                               : githubService.available
+                               ? Colors.magenta
+                               : Colors.cyan
+                        opacity: githubService.refreshing ? 0.60 : 1.0
+
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 7
+                            opacity: githubMouse.containsMouse
+                                     ? 0.52
+                                     : githubService.available
+                                     ? 0.42
+                                     : 0.28
+                            color: githubAction.color
+                            transparentBorder: true
+                        }
+
+                        MouseArea {
+                            id: githubMouse
+                            anchors.fill: parent
+                            anchors.margins: -8
+                            hoverEnabled: true
+                            enabled: !githubService.refreshing && githubService.repoSlug.length > 0
+                            cursorShape: Qt.PointingHandCursor
+
+                            onClicked: githubService.refresh()
+                        }
                     }
                 }
 
@@ -663,9 +754,23 @@ PanelWindow {
                         bottomMargin: 5
                     }
 
-                    text: hospitalGitService.available
-                          ? "LOCAL PATIENT LIVE // ACTUATORS OFFLINE"
-                          : "LOCAL PATIENT OFFLINE"
+                    text: auditService.running
+                          ? "PX AUDIT RUNNING // " + auditService.repository
+                          : auditService.available
+                          ? "AUDIT " + auditService.status
+                            + " // " + String(auditService.workflowCount) + " WORKFLOWS"
+                            + " // " + String(auditService.runCount) + " RECENT RUNS"
+                          : auditService.lastError
+                          ? "AUDIT ERROR // " + auditService.lastError
+                          : !hospitalGitService.available
+                          ? "LOCAL PATIENT OFFLINE"
+                          : githubService.refreshing
+                          ? "LOCAL LIVE // PX → GITHUB READING"
+                          : githubService.available
+                          ? "LOCAL + PX/GITHUB LIVE // WRITE ACTUATORS OFFLINE"
+                          : githubService.lastError
+                          ? "LOCAL LIVE // PX/GITHUB OFFLINE"
+                          : "LOCAL LIVE // PX/GITHUB NOT REQUESTED"
                     font.pixelSize: 8
                     color: Colors.magenta
 

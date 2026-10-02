@@ -482,6 +482,20 @@ Scope {
             return false;
         }
 
+        if (normalized.mode === "DIVERGED") {
+            if (normalized.rehearsal.status !== "CLEAN_MERGE"
+                    || !normalized.rehearsal.resultTree) {
+                block(
+                    "VERIFY BLOCKED // MERGE REHEARSAL NOT CLEAN",
+                    normalized,
+                    {
+                        rehearsal: normalized.rehearsal
+                    }
+                );
+                return false;
+            }
+        }
+
         if (!checksPassed(checks)) {
             block(
                 "VERIFY BLOCKED // CHECKS NOT CLEAN",

@@ -2463,13 +2463,7 @@ PanelWindow {
 
                                 onHeightRequested: function(nextHeight) {
                                     root.runInspectorHeight = Math.round(
-                                        Math.max(
-                                            300,
-                                            Math.min(
-                                                githubCameraBody.height - 20,
-                                                nextHeight
-                                            )
-                                        )
+                                        Math.max(300, nextHeight)
                                     );
                                 }
 

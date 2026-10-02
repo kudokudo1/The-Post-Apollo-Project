@@ -306,7 +306,7 @@ Item {
 
             Row {
                 width: parent.width
-                height: parent.height - 38
+                height: parent.height - 45
                 spacing: 8
 
                 // LEFT = identity + steps.

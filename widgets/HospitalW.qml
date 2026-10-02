@@ -983,12 +983,12 @@ PanelWindow {
 
             color: Colors.cyan
 
-            opacity:
+            readonly property bool scrollable:
                 hospitalScroll.contentHeight
                 > hospitalScroll.height
-                ? 0.90 : 0.0
 
-            visible: opacity > 0.0
+            opacity: scrollable ? 0.90 : 0.38
+            visible: true
             z: 300
 
             property real maxContentY:
@@ -1033,7 +1033,8 @@ PanelWindow {
                 anchors.horizontalCenter: parent.horizontalCenter
 
                 height:
-                    Math.max(
+                    scrollRail.scrollable
+                    ? Math.max(
                         30,
                         parent.height
                         * Math.min(
@@ -1041,8 +1042,12 @@ PanelWindow {
                             hospitalScroll.visibleArea.heightRatio
                         )
                     )
+                    : 42
 
                 y: {
+                    if (!scrollRail.scrollable)
+                        return 0;
+
                     const ratio =
                         Math.max(
                             0.0,
@@ -1080,6 +1085,7 @@ PanelWindow {
                 }
 
                 color: Colors.magenta
+                opacity: scrollRail.scrollable ? 1.0 : 0.72
 
                 RectangularShadow {
                     anchors.fill: parent
@@ -1096,7 +1102,10 @@ PanelWindow {
                 anchors.fill: parent
                 hoverEnabled: true
                 acceptedButtons: Qt.LeftButton
-                cursorShape: Qt.SizeVerCursor
+                enabled: scrollRail.scrollable
+                cursorShape: scrollRail.scrollable
+                             ? Qt.SizeVerCursor
+                             : Qt.ArrowCursor
 
                 property real dragOffset: 0
 

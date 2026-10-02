@@ -129,3 +129,15 @@ services/hospital/HospitalHistoryService.qml provides the persistent Hospital-wi
 services/hospital/HospitalOperatingAuthorityService.qml provides the serialized host-slot owner/queue contract.
 
 The UI integration is intentionally separate so the service contract can stabilize before another lane edits HospitalW.qml.
+## Restart and authority recovery
+
+The operating slot is persistent. A coordinator may recover an existing lease only when the persisted owner team, branch, and HEAD match the selected room snapshot. Team identity alone is not sufficient.
+
+A same-team request that attempts to change the branch or HEAD of an already-held slot is treated as an ownership collision and is refused rather than silently rewriting the authority snapshot.
+
+## Evidence contract identity
+
+Certification accepts the Git/GitHub verification packet only when it identifies itself as schema version 1 from provider `post-apollo.git-evidence`.
+
+Hospital also rejects evidence when the provider reports that the exact-SHA query or inspected run targeted a different SHA than the candidate.
+

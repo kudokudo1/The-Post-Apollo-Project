@@ -24,6 +24,15 @@ Scope {
 
     property string hostLeaseId: ""
 
+    Connections {
+        target: authority
+
+        function onHydratedChanged() {
+            if (authority.hydrated)
+                coordinator.recoverHostLease();
+        }
+    }
+
     readonly property bool hostSlotOwned:
         roomService
         && hostLeaseId.length > 0
@@ -82,9 +91,19 @@ Scope {
     Connections {
         target: coordinator.roomService
 
+        function onBranchChanged() {
+            coordinator.recoverHostLease();
+        }
+
+        function onHeadChanged() {
+            coordinator.recoverHostLease();
+        }
+
         function onInspected() {
             if (!coordinator.roomService)
                 return;
+
+            coordinator.recoverHostLease();
 
             if (String(coordinator.roomService.action || "") !== "PREPARE")
                 return;
@@ -286,6 +305,43 @@ Scope {
         return true;
     }
 
+    function recoverHostLease() {
+        if (!roomService || !authority.hydrated) {
+            hostLeaseId = "";
+            return false;
+        }
+
+        const roomBranch = String(roomService.branch || "");
+        const roomHead = String(roomService.head || "");
+
+        if ((authority.ownerBranch && !roomBranch)
+                || (authority.ownerHead && !roomHead)) {
+            hostLeaseId = "";
+            return false;
+        }
+
+        const recovered = authority.recoverLease(
+            roomService.team,
+            roomBranch,
+            roomHead
+        );
+
+        hostLeaseId = String(recovered || "");
+
+        if (!hostLeaseId
+                && authority.ownerTeam === String(roomService.team || "")) {
+            bridgeError =
+                "HOST SLOT RECOVERY BLOCKED // SNAPSHOT MISMATCH";
+            return false;
+        }
+
+        if (hostLeaseId
+                && bridgeError.indexOf("HOST SLOT RECOVERY") === 0)
+            bridgeError = "";
+
+        return hostLeaseId.length > 0;
+    }
+
     function bindRoom(service) {
         roomService = service;
         verificationPending = false;
@@ -305,6 +361,7 @@ Scope {
             roomService.team
         );
 
+        recoverHostLease();
         return true;
     }
 
@@ -366,9 +423,16 @@ Scope {
         const facts = data.facts || {};
         const completeness = data.completeness || {};
         const summary = facts.runSummary || {};
+        const staleness = facts.staleness || {};
         const snapshot = roomService
                          ? roomService.certificationSnapshot()
                          : {};
+
+        const schemaMatches =
+            Number(data.schemaVersion || 0) === 1;
+        const providerMatches =
+            String(data.provider || "")
+            === "post-apollo.git-evidence";
 
         const repositoryMatches =
             String(target.repository || "")
@@ -391,9 +455,18 @@ Scope {
         let status = "PASS";
         let reason = "EXACT-SHA RUNS CLEAN";
 
-        if (!repositoryMatches || !shaMatches) {
+        if (!schemaMatches || !providerMatches) {
+            status = "ERROR";
+            reason = "UNSUPPORTED GIT EVIDENCE CONTRACT";
+        } else if (!repositoryMatches || !shaMatches) {
             status = "FAIL";
             reason = "EVIDENCE TARGET DOES NOT MATCH CANDIDATE";
+        } else if (staleness.exactQueryTargetsRequestedSha === false) {
+            status = "FAIL";
+            reason = "EXACT-SHA QUERY TARGET DRIFT";
+        } else if (staleness.inspectedRunTargetsRequestedSha === false) {
+            status = "FAIL";
+            reason = "INSPECTED RUN SHA DOES NOT MATCH CANDIDATE";
         } else if (String(completeness.requestError || "")) {
             status = "ERROR";
             reason = String(completeness.requestError);
@@ -434,6 +507,8 @@ Scope {
             successfulRuns: success,
             activeRuns: active,
             failedRuns: failed,
+            schemaMatches: schemaMatches,
+            providerMatches: providerMatches,
             provider: String(data.provider || ""),
             capturedAt: String(data.capturedAt || "")
         };

@@ -12,7 +12,7 @@ Rectangle {
 
     signal triggered()
 
-    width: 44
+    width: 52
     height: 36
     radius: 2
 
@@ -47,12 +47,12 @@ Rectangle {
         z: -1
         opacity:
             actuator.pressed
-            ? 0.48
+            ? 0.42
             : actuator.active
-            ? 0.40
+            ? 0.32
             : actuator.hovered
-            ? 0.40
-            : 0.20
+            ? 0.34
+            : 0.16
         color:
             actuator.pressed
             ? Colors.magenta
@@ -68,7 +68,7 @@ Rectangle {
         NotoText {
             anchors.horizontalCenter: parent.horizontalCenter
             text: actuator.icon
-            font.pixelSize: 17
+            font.pixelSize: 22
             color:
                 actuator.pressed
                 ? Colors.black
@@ -80,7 +80,7 @@ Rectangle {
         GohuText {
             anchors.horizontalCenter: parent.horizontalCenter
             text: actuator.tag
-            font.pixelSize: 7
+            font.pixelSize: 9
             color:
                 actuator.pressed
                 ? Colors.black

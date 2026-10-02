@@ -40,6 +40,28 @@ Scope {
         string eventType)
     signal certificationBlocked(string reason)
 
+    Connections {
+        target: coordinator.roomService
+
+        function onPostOpStarted() {
+            if (!coordinator.roomService)
+                return;
+
+            certification.beginPostOp(
+                coordinator.roomService.postOpSnapshot()
+            );
+        }
+
+        function onPostOpFinished() {
+            if (!coordinator.roomService)
+                return;
+
+            certification.completePostOp(
+                coordinator.roomService.postOpSnapshot()
+            );
+        }
+    }
+
     function bindRoom(service) {
         roomService = service;
 
@@ -65,6 +87,22 @@ Scope {
             roomService.team
         );
 
+        return true;
+    }
+
+    function prepare() {
+        if (!roomService)
+            return false;
+
+        roomService.runInspection("prepare");
+        return true;
+    }
+
+    function rehearse() {
+        if (!roomService)
+            return false;
+
+        roomService.rehearsePrepared();
         return true;
     }
 
@@ -102,18 +140,25 @@ Scope {
         if (!roomService)
             return false;
 
-        return certification.armCertified(
-            roomService.certificationSnapshot()
-        );
+        if (!certification.armCertified(
+                roomService.certificationSnapshot()
+            ))
+            return false;
+
+        return roomService.armPrepared();
     }
 
     function integrate() {
         if (!roomService)
             return false;
 
-        return certification.beginIntegration(
-            roomService.certificationSnapshot()
-        );
+        if (!certification.beginIntegration(
+                roomService.certificationSnapshot()
+            ))
+            return false;
+
+        roomService.integrateArmed();
+        return true;
     }
 
     function beginPostOp() {

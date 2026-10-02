@@ -75,6 +75,26 @@ PanelWindow {
         height: root.menuOpen ? root.height : 0
     }
 
+    function releaseTextFocusAt(item, x, y) {
+        const focused = root.activeFocusItem;
+
+        if (!focused || focused === item)
+            return;
+
+        if (typeof focused.mapFromItem !== "function")
+            return;
+
+        const local = focused.mapFromItem(item, x, y);
+        const inside =
+            local.x >= 0
+            && local.y >= 0
+            && local.x <= focused.width
+            && local.y <= focused.height;
+
+        if (!inside)
+            frame.forceActiveFocus(Qt.MouseFocusReason);
+    }
+
     function open() {
         root.menuOpen = true;
     }
@@ -787,6 +807,18 @@ PanelWindow {
 
         border.width: 1
         border.color: Colors.orange
+
+        TapHandler {
+            acceptedButtons: Qt.LeftButton
+
+            onTapped: function(eventPoint, button) {
+                root.releaseTextFocusAt(
+                    frame,
+                    eventPoint.position.x,
+                    eventPoint.position.y
+                );
+            }
+        }
 
         Rectangle {
             anchors.fill: parent

@@ -1,0 +1,325 @@
+import QtQuick
+import Quickshell
+
+Scope {
+    id: evidenceProvider
+
+    // Doc 3 boundary:
+    // Git/GitHub report facts. Hospital decides what those facts mean.
+    property var gitService: null
+    property var githubService: null
+
+    readonly property int schemaVersion: 1
+    readonly property string providerId: "post-apollo.git-evidence"
+
+    readonly property string repository:
+        githubService ? String(githubService.repoSlug || "") : ""
+
+    readonly property string currentHead:
+        gitService ? String(gitService.head || "") : ""
+
+    readonly property string currentBranch:
+        gitService ? String(gitService.branch || "") : ""
+
+    signal evidenceCaptured(var packet)
+
+    function nowIso() {
+        return new Date().toISOString();
+    }
+
+    function textValue(value, fallback) {
+        if (value === undefined || value === null)
+            return fallback || "";
+
+        const text = String(value);
+        return text.length > 0 ? text : (fallback || "");
+    }
+
+    function firstField(object, names, fallback) {
+        if (!object || !Array.isArray(names))
+            return fallback;
+
+        for (let i = 0; i < names.length; ++i) {
+            const key = names[i];
+
+            if (object[key] !== undefined
+                    && object[key] !== null
+                    && String(object[key]) !== "") {
+                return object[key];
+            }
+        }
+
+        return fallback;
+    }
+
+    function runId(run) {
+        return textValue(
+            firstField(
+                run,
+                ["databaseId", "id", "runId", "number"],
+                ""
+            ),
+            ""
+        );
+    }
+
+    function runSha(run) {
+        return textValue(
+            firstField(
+                run,
+                ["headSha", "head_sha", "sha", "commitSha"],
+                ""
+            ),
+            ""
+        );
+    }
+
+    function normalizeWorkflow(workflow) {
+        const row = workflow || ({});
+
+        return {
+            id: textValue(firstField(row, ["id", "databaseId"], ""), ""),
+            name: textValue(firstField(row, ["name", "workflowName"], ""), ""),
+            path: textValue(firstField(row, ["path", "workflowPath"], ""), ""),
+            state: textValue(firstField(row, ["state", "status"], ""), "")
+        };
+    }
+
+    function normalizeStep(step, index) {
+        const row = step || ({});
+
+        return {
+            number: Number(firstField(row, ["number"], index + 1) || (index + 1)),
+            name: textValue(firstField(row, ["name"], "STEP " + String(index + 1)), ""),
+            status: textValue(firstField(row, ["status"], ""), ""),
+            conclusion: textValue(firstField(row, ["conclusion"], ""), ""),
+            startedAt: textValue(firstField(row, ["startedAt", "started_at"], ""), ""),
+            completedAt: textValue(firstField(row, ["completedAt", "completed_at"], ""), "")
+        };
+    }
+
+    function normalizeJob(job, index) {
+        const row = job || ({});
+        const rawSteps = Array.isArray(row.steps) ? row.steps : [];
+        const steps = [];
+
+        for (let i = 0; i < rawSteps.length; ++i)
+            steps.push(normalizeStep(rawSteps[i], i));
+
+        return {
+            id: textValue(firstField(row, ["databaseId", "id"], ""), ""),
+            name: textValue(firstField(row, ["name"], "JOB " + String(index + 1)), ""),
+            status: textValue(firstField(row, ["status"], ""), ""),
+            conclusion: textValue(firstField(row, ["conclusion"], ""), ""),
+            startedAt: textValue(firstField(row, ["startedAt", "started_at"], ""), ""),
+            completedAt: textValue(firstField(row, ["completedAt", "completed_at"], ""), ""),
+            steps: steps
+        };
+    }
+
+    function normalizeRun(run) {
+        const row = run || ({});
+
+        return {
+            id: runId(row),
+            workflowName: textValue(
+                firstField(row, ["workflowName", "workflow_name", "name"], ""),
+                ""
+            ),
+            workflowPath: textValue(
+                firstField(row, ["workflowPath", "workflow_path", "path"], ""),
+                ""
+            ),
+            event: textValue(firstField(row, ["event"], ""), ""),
+            status: textValue(firstField(row, ["status"], ""), ""),
+            conclusion: textValue(firstField(row, ["conclusion"], ""), ""),
+            headBranch: textValue(
+                firstField(row, ["headBranch", "head_branch", "branch"], ""),
+                ""
+            ),
+            headSha: runSha(row),
+            createdAt: textValue(firstField(row, ["createdAt", "created_at"], ""), ""),
+            startedAt: textValue(firstField(row, ["startedAt", "started_at"], ""), ""),
+            updatedAt: textValue(firstField(row, ["updatedAt", "updated_at"], ""), ""),
+            url: textValue(firstField(row, ["url", "htmlUrl", "html_url"], ""), "")
+        };
+    }
+
+    function normalizedWorkflows() {
+        const source =
+            githubService && Array.isArray(githubService.workflows)
+            ? githubService.workflows
+            : [];
+        const rows = [];
+
+        for (let i = 0; i < source.length; ++i)
+            rows.push(normalizeWorkflow(source[i]));
+
+        return rows;
+    }
+
+    function runsForSha(sha) {
+        const target = textValue(sha, "");
+        const source =
+            githubService && Array.isArray(githubService.runs)
+            ? githubService.runs
+            : [];
+        const rows = [];
+
+        if (!target)
+            return rows;
+
+        for (let i = 0; i < source.length; ++i) {
+            const normalized = normalizeRun(source[i]);
+
+            if (normalized.headSha === target)
+                rows.push(normalized);
+        }
+
+        return rows;
+    }
+
+    function matchingSummaryForInspector(targetSha) {
+        const id =
+            githubService
+            ? textValue(githubService.inspectorRunId, "")
+            : "";
+
+        if (!id)
+            return null;
+
+        const matching = runsForSha(targetSha);
+
+        for (let i = 0; i < matching.length; ++i) {
+            if (matching[i].id === id)
+                return matching[i];
+        }
+
+        return null;
+    }
+
+    function inspectorEvidence(targetSha) {
+        if (!githubService)
+            return null;
+
+        const summary = matchingSummaryForInspector(targetSha);
+
+        if (!summary)
+            return null;
+
+        const detail =
+            githubService.inspectedRun
+            ? normalizeRun(githubService.inspectedRun)
+            : ({});
+        const sourceJobs =
+            Array.isArray(githubService.inspectorJobs)
+            ? githubService.inspectorJobs
+            : [];
+        const jobs = [];
+
+        for (let i = 0; i < sourceJobs.length; ++i)
+            jobs.push(normalizeJob(sourceJobs[i], i));
+
+        return {
+            run: {
+                id: summary.id,
+                workflowName: detail.workflowName || summary.workflowName,
+                workflowPath: detail.workflowPath || summary.workflowPath,
+                event: detail.event || summary.event,
+                status: detail.status || summary.status,
+                conclusion: detail.conclusion || summary.conclusion,
+                headBranch: detail.headBranch || summary.headBranch,
+                headSha: detail.headSha || summary.headSha,
+                createdAt: detail.createdAt || summary.createdAt,
+                startedAt: detail.startedAt || summary.startedAt,
+                updatedAt: detail.updatedAt || summary.updatedAt,
+                url: detail.url || summary.url
+            },
+            jobs: jobs,
+            logs: textValue(githubService.inspectorLogText, ""),
+            busy: Boolean(githubService.inspectorBusy),
+            error: textValue(githubService.inspectorError, "")
+        };
+    }
+
+    function buildEvidencePacket(sha) {
+        const targetSha = textValue(sha, currentHead);
+        const matchingRuns = runsForSha(targetSha);
+        const inspected = inspectorEvidence(targetSha);
+        const gitAvailable =
+            gitService ? Boolean(gitService.available) : false;
+        const githubAvailable =
+            githubService ? Boolean(githubService.available) : false;
+
+        return {
+            schemaVersion: schemaVersion,
+            provider: providerId,
+            capturedAt: nowIso(),
+
+            target: {
+                repository: repository,
+                repoRoot:
+                    gitService ? textValue(gitService.repoRoot, "") : "",
+                origin:
+                    gitService ? textValue(gitService.origin, "") : "",
+                branch:
+                    gitService ? textValue(gitService.branch, "") : "",
+                sha: targetSha
+            },
+
+            localGit: {
+                available: gitAvailable,
+                refreshing:
+                    gitService ? Boolean(gitService.refreshing) : false,
+                headAtCapture: currentHead,
+                headMatchesTarget:
+                    Boolean(targetSha) && currentHead === targetSha,
+                worktree:
+                    gitService ? textValue(gitService.worktree, "") : "",
+                upstream:
+                    gitService ? textValue(gitService.upstream, "") : "",
+                ahead:
+                    gitService ? Number(gitService.ahead || 0) : 0,
+                behind:
+                    gitService ? Number(gitService.behind || 0) : 0,
+                lastError:
+                    gitService ? textValue(gitService.lastError, "") : ""
+            },
+
+            github: {
+                available: githubAvailable,
+                refreshing:
+                    githubService ? Boolean(githubService.refreshing) : false,
+                workflowCount:
+                    githubService ? Number(githubService.workflowCount || 0) : 0,
+                workflows: normalizedWorkflows(),
+                matchingRunCount: matchingRuns.length,
+                matchingRuns: matchingRuns,
+                inspectedRun: inspected,
+                lastError:
+                    githubService ? textValue(githubService.lastError, "") : ""
+            },
+
+            completeness: {
+                repositoryKnown: Boolean(repository),
+                targetShaKnown: Boolean(targetSha),
+                localHeadKnown: Boolean(currentHead),
+                githubAvailable: githubAvailable,
+                matchingRunCount: matchingRuns.length,
+                inspectedRunIncluded: Boolean(inspected),
+                inspectorBusy:
+                    githubService ? Boolean(githubService.inspectorBusy) : false,
+                inspectorError:
+                    githubService
+                    ? textValue(githubService.inspectorError, "")
+                    : ""
+            }
+        };
+    }
+
+    function capture(sha) {
+        const packet = buildEvidencePacket(sha);
+        evidenceCaptured(packet);
+        return packet;
+    }
+}

@@ -12,6 +12,10 @@ Scope {
     property bool discoveringRepos: false
     property bool actionBusy: false
 
+    property string pullMode: "ff-only"
+    readonly property string pullModeLabel: "FF"
+    readonly property string pullModeIcon: "⏭"
+
     property string repoPath: ""
     property string repoLabel: "LIVE QUICKSHELL"
     property string repoRoot: ""
@@ -569,6 +573,23 @@ Scope {
         }
     }
 
+    function describePullMode() {
+        actionTitle = "PULL MODE";
+        actionExitCode = 0;
+        actionOutput =
+            "PULL MODE // FF ONLY"
+            + "\nFast-forward the current local branch when history is clean."
+            + "\nIf Git would need a merge, Pull stops instead."
+            + "\nNothing was changed.";
+    }
+
+    function cyclePullMode() {
+        // Only one real pull policy exists today. This actuator is already
+        // wired as the future mode selector, but it never advertises a fake
+        // second mode.
+        describePullMode();
+    }
+
     function runReadAction(kind) {
         runAction(String(kind || "").toLowerCase());
     }
@@ -607,6 +628,7 @@ Scope {
                 'repo="$1"',
                 'kind="$2"',
                 'target="$3"',
+                'pull_mode="$4"',
                 'if [ -z "$repo" ]; then repo="$HOME/.config/quickshell"; fi',
                 'if ! git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1; then',
                 '  printf "NOT A GIT REPOSITORY\\n"',
@@ -656,7 +678,8 @@ Scope {
             "pa-git-action",
             repoPath,
             action,
-            selectedRemoteBranch
+            selectedRemoteBranch,
+            pullMode
         ]);
     }
 

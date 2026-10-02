@@ -1487,7 +1487,7 @@ PanelWindow {
                                 spacing: 8
 
                                 Column {
-                                    width: parent.width - 422
+                                    width: parent.width - 488
                                     height: parent.height
                                     spacing: 3
 
@@ -1500,9 +1500,14 @@ PanelWindow {
                                         text:
                                             "PULL "
                                             + (
-                                                gitService.selectedRemoteBranch
-                                                ? gitService.selectedRemoteBranch
-                                                : "REMOTE"
+                                                gitService.pullSourceMode === "upstream"
+                                                ? "UPSTREAM "
+                                                : "TARGET "
+                                            )
+                                            + (
+                                                gitService.pullSourceTarget
+                                                ? gitService.pullSourceTarget
+                                                : "NONE"
                                             )
                                             + " → "
                                             + gitService.branch
@@ -1558,9 +1563,22 @@ PanelWindow {
                                     iconPixelSize: 29
                                     enabledAction:
                                         !gitService.actionBusy
-                                        && gitService.selectedRemoteTargetValid
+                                        && gitService.pullSourceTargetValid
                                     selectedAction: gitService.actionTitle === "PULL"
                                     onTriggered: gitService.runSyncAction("pull")
+                                }
+
+                                ActionButton {
+                                    width: 58
+                                    height: 36
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    label: gitService.pullSourceLabel
+                                    orangeAccent:
+                                        gitService.pullSourceMode === "target"
+                                    enabledAction: !gitService.actionBusy
+                                    selectedAction:
+                                        gitService.pullSourceMode === "upstream"
+                                    onTriggered: gitService.cyclePullSource()
                                 }
 
                                 ModeActuator {

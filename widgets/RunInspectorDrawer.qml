@@ -403,7 +403,7 @@ Item {
 
                         Flickable {
                             width: parent.width
-                            height: parent.height - 151
+                            height: parent.height - 157
 
                             clip: true
                             contentWidth: width
@@ -424,7 +424,7 @@ Item {
                                         required property var modelData
 
                                         width: stepColumn.width
-                                        height: 25
+                                        height: 29
 
                                         color: Colors.black
                                         border.width: 1

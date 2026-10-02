@@ -15,9 +15,9 @@ Scope {
     //   - result/detail routing
     //   - Favorites integration
     //
-    // Favorite identity/reconstruction is intentionally NOT defined here yet.
-    // Team 2 + Team 3-F will establish that contract in the coordinated
-    // Favorites/FILES reconstruction wave.
+    // FILES also owns reconstruction of persisted canonical FILE identities.
+    // Favorites may persist / migrate provider keys, but it must hand canonical
+    // identities back here for current filesystem truth.
 
     readonly property string homeDir:
         String(Quickshell.env("HOME") || "/")
@@ -42,6 +42,26 @@ Scope {
     // AppControl currently serializes scans; keeping the context here makes
     // the provider self-contained without reaching back into host state.
     property string scanActiveDir: currentDir
+
+    // Favorite reconstruction is asynchronous because filesystem truth comes
+    // from the same external provider machinery as normal FILES scans. Requests
+    // are serialized so one resolver Process never aliases two identities.
+    property var favoriteResolutionQueue: []
+    property bool favoriteResolutionBusy: false
+    property string favoriteResolutionActiveIdentity: ""
+    property string favoriteResolutionActivePath: ""
+
+    signal favoriteResolutionFinished(string identity, var resolution)
+
+    Process {
+        id: favoriteResolutionProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                fileService.consumeFavoriteResolution(text);
+            }
+        }
+    }
 
     Process {
         id: scanProcess
@@ -168,6 +188,252 @@ Scope {
         return slash <= 0 ? "/" : current.slice(0, slash);
     }
 
+    function favoritePathFromIdentity(identity) {
+        const value =
+            identity === undefined || identity === null
+            ? ""
+            : String(identity);
+
+        if (value.indexOf("file:parent:") === 0)
+            return "";
+
+        if (value.indexOf("file:") !== 0)
+            return "";
+
+        const path = value.slice(5);
+
+        // FileService emits canonical identities from absolute provider paths.
+        // Do not normalize, expand, decode, or guess malformed identities.
+        if (!path || path[0] !== "/" || path.indexOf("\u0000") !== -1)
+            return "";
+
+        return path;
+    }
+
+    function invalidFavoriteResolution(identity, reason) {
+        return {
+            status: "invalid",
+            identity:
+                identity === undefined || identity === null
+                ? ""
+                : String(identity),
+            path: "",
+            reason: String(reason || "invalid-identity"),
+            row: null
+        };
+    }
+
+    function resolveFavoriteIdentity(identity) {
+        const value =
+            identity === undefined || identity === null
+            ? ""
+            : String(identity);
+        const path = favoritePathFromIdentity(value);
+
+        if (!path) {
+            favoriteResolutionFinished(
+                value,
+                invalidFavoriteResolution(
+                    value,
+                    value.indexOf("file:parent:") === 0
+                    ? "parent-navigation-record"
+                    : "invalid-canonical-file-identity"
+                )
+            );
+            return false;
+        }
+
+        const next = favoriteResolutionQueue.slice();
+        next.push({
+            identity: value,
+            path: path
+        });
+        favoriteResolutionQueue = next;
+
+        pumpFavoriteResolutionQueue();
+        return true;
+    }
+
+    function pumpFavoriteResolutionQueue() {
+        if (favoriteResolutionBusy
+                || favoriteResolutionQueue.length === 0)
+            return;
+
+        const next = favoriteResolutionQueue.slice();
+        const request = next.shift();
+        favoriteResolutionQueue = next;
+
+        favoriteResolutionBusy = true;
+        favoriteResolutionActiveIdentity =
+            String(request.identity || "");
+        favoriteResolutionActivePath =
+            String(request.path || "");
+
+        favoriteResolutionProcess.exec([
+            "/bin/sh",
+            "-lc",
+            "p=$1; "
+            + "if [ ! -e \"$p\" ] && [ ! -L \"$p\" ]; then "
+            + "printf 'M\\n'; exit 0; fi; "
+            + "record=$(find \"$p\" -maxdepth 0 "
+            + "-printf 'R\\t%y\\t%f\\t%p\\t%s\\t%M\\t%T@\\n' "
+            + "2>/dev/null); rc=$?; "
+            + "if [ \"$rc\" -ne 0 ] || [ -z \"$record\" ]; then "
+            + "printf 'U\\n'; exit 0; fi; "
+            + "printf '%s\\n' \"$record\"",
+            "appcontrol-file-favorite-resolve",
+            favoriteResolutionActivePath
+        ]);
+    }
+
+    function finishFavoriteResolution(resolution) {
+        const identity = favoriteResolutionActiveIdentity;
+
+        favoriteResolutionBusy = false;
+        favoriteResolutionActiveIdentity = "";
+        favoriteResolutionActivePath = "";
+
+        favoriteResolutionFinished(identity, resolution);
+
+        Qt.callLater(function() {
+            fileService.pumpFavoriteResolutionQueue();
+        });
+    }
+
+    function consumeFavoriteResolution(text) {
+        const identity = favoriteResolutionActiveIdentity;
+        const path = favoriteResolutionActivePath;
+        const lines = String(text || "").split("\n");
+        const first = lines.length > 0 ? lines[0] : "";
+
+        if (first === "M") {
+            finishFavoriteResolution({
+                status: "missing",
+                identity: identity,
+                path: path,
+                reason: "target-does-not-exist",
+                row: null
+            });
+            return;
+        }
+
+        if (first === "U" || first.indexOf("R\t") !== 0) {
+            finishFavoriteResolution({
+                status: "unavailable",
+                identity: identity,
+                path: path,
+                reason: "filesystem-record-unavailable",
+                row: null
+            });
+            return;
+        }
+
+        const fields = first.split("\t");
+
+        if (fields.length < 7 || fields[3] !== path) {
+            finishFavoriteResolution({
+                status: "unavailable",
+                identity: identity,
+                path: path,
+                reason: "filesystem-record-mismatch",
+                row: null
+            });
+            return;
+        }
+
+        const row = recordFromFields(
+            fields[1],
+            fields[2],
+            fields[3],
+            Number(fields[4] || 0),
+            String(fields[5] || ""),
+            Number(fields[6] || 0)
+        );
+
+        if (!row || row.isParent || row.id !== identity) {
+            finishFavoriteResolution({
+                status: "unavailable",
+                identity: identity,
+                path: path,
+                reason: "provider-record-invalid",
+                row: null
+            });
+            return;
+        }
+
+        finishFavoriteResolution({
+            status: "resolved",
+            identity: identity,
+            path: path,
+            reason: "",
+            row: row
+        });
+    }
+
+    function recordFromFields(
+        kind,
+        name,
+        path,
+        sizeBytes,
+        permissions,
+        modifiedEpoch
+    ) {
+        const safeKind = String(kind || "");
+        const safeName = String(name || "");
+        const safePath = String(path || "");
+        const isDir = safeKind === "d";
+        const suffix =
+            safeName.indexOf(".") >= 0
+            ? safeName.slice(safeName.lastIndexOf(".") + 1).toLowerCase()
+            : "";
+
+        let mime = isDir ? "inode/directory" : "file";
+
+        if (!isDir
+                && ["png", "jpg", "jpeg", "gif", "webp", "svg"]
+                    .indexOf(suffix) >= 0) {
+            mime = "image/" + (suffix === "jpg" ? "jpeg" : suffix);
+        } else if (!isDir
+                   && ["mp4", "mkv", "webm", "mov", "avi"]
+                       .indexOf(suffix) >= 0) {
+            mime = "video/" + suffix;
+        } else if (!isDir
+                   && ["mp3", "flac", "wav", "ogg", "m4a"]
+                       .indexOf(suffix) >= 0) {
+            mime = "audio/" + suffix;
+        } else if (!isDir
+                   && [
+                       "txt", "md", "qml", "js", "ts", "py",
+                       "lua", "sh", "json", "yaml", "yml",
+                       "toml", "conf", "ini"
+                   ].indexOf(suffix) >= 0) {
+            mime = "text/" + (suffix || "plain");
+        }
+
+        return {
+            _fileRecord: true,
+            id: "file:" + safePath,
+            name: safeName,
+            label:
+                (isDir
+                 ? "⌯🗁๋࣭⭑  "
+                 : safeKind === "l"
+                 ? "↗  "
+                 : "◇  ")
+                + safeName
+                + (isDir ? "/" : ""),
+            path: safePath,
+            isDir: isDir,
+            isParent: false,
+            kind: safeKind,
+            sizeBytes: Number(sizeBytes || 0),
+            permissions: String(permissions || ""),
+            modifiedEpoch: Number(modifiedEpoch || 0),
+            mime: mime,
+            detail: safePath
+        };
+    }
+
     function refreshBrowse() {
         if (scanLoading)
             return false;
@@ -274,64 +540,16 @@ Scope {
             if (fields.length < 3)
                 continue;
 
-            const kind = fields[0];
-            const name = fields[1];
-            const path = fields[2];
-            const isDir = kind === "d";
-            const sizeBytes = Number(fields[3] || 0);
-            const permissions = String(fields[4] || "");
-            const modifiedEpoch = Number(fields[5] || 0);
-
-            const suffix =
-                name.indexOf(".") >= 0
-                ? name.slice(name.lastIndexOf(".") + 1).toLowerCase()
-                : "";
-
-            let mime = isDir ? "inode/directory" : "file";
-
-            if (!isDir
-                    && ["png", "jpg", "jpeg", "gif", "webp", "svg"]
-                        .indexOf(suffix) >= 0) {
-                mime = "image/" + (suffix === "jpg" ? "jpeg" : suffix);
-            } else if (!isDir
-                       && ["mp4", "mkv", "webm", "mov", "avi"]
-                           .indexOf(suffix) >= 0) {
-                mime = "video/" + suffix;
-            } else if (!isDir
-                       && ["mp3", "flac", "wav", "ogg", "m4a"]
-                           .indexOf(suffix) >= 0) {
-                mime = "audio/" + suffix;
-            } else if (!isDir
-                       && [
-                           "txt", "md", "qml", "js", "ts", "py",
-                           "lua", "sh", "json", "yaml", "yml",
-                           "toml", "conf", "ini"
-                       ].indexOf(suffix) >= 0) {
-                mime = "text/" + (suffix || "plain");
-            }
-
-            rows.push({
-                _fileRecord: true,
-                id: "file:" + path,
-                name: name,
-                label:
-                    (isDir
-                     ? "⌯🗁๋࣭⭑  "
-                     : kind === "l"
-                     ? "↗  "
-                     : "◇  ")
-                    + name
-                    + (isDir ? "/" : ""),
-                path: path,
-                isDir: isDir,
-                isParent: false,
-                kind: kind,
-                sizeBytes: sizeBytes,
-                permissions: permissions,
-                modifiedEpoch: modifiedEpoch,
-                mime: mime,
-                detail: path
-            });
+            rows.push(
+                recordFromFields(
+                    fields[0],
+                    fields[1],
+                    fields[2],
+                    Number(fields[3] || 0),
+                    String(fields[4] || ""),
+                    Number(fields[5] || 0)
+                )
+            );
         }
 
         rows.sort(function(a, b) {

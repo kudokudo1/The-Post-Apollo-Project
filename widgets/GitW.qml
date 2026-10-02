@@ -2298,14 +2298,9 @@ PanelWindow {
                                                                      && githubService.workflowCount > 0
                                                             z: 500
                                 
-                                                            anchors {
-                                                                left: workflowLibrary.left
-                                                                right: workflowLibrary.right
-                                                                top: workflowLibrary.bottom
-                                                                leftMargin: 9
-                                                                rightMargin: 9
-                                                                topMargin: 4
-                                                            }
+                                                            x: 9
+                                                            y: 348
+                                                            width: parent.width - 18
                                 
                                                             height: Math.min(githubService.workflowCount, 5) * 30 + 8
                                                             color: Colors.black

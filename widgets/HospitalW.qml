@@ -27,6 +27,8 @@ PanelWindow {
         selectedRoomTeam = selectedRoomTeam === candidate ? "" : candidate;
     }
 
+    onSelectedRoomTeamChanged: roomService.clearResult()
+
     property int panelWidth: 700
     property int panelHeight: 1320
     property int panelTopMargin: 0
@@ -110,6 +112,12 @@ PanelWindow {
     HospitalAuditService {
         id: auditService
         repository: githubService.repoSlug
+    }
+
+    HospitalRoomService {
+        id: roomService
+        repository: githubService.repoSlug
+        team: root.selectedRoomTeam
     }
 
     Connections {
@@ -552,7 +560,7 @@ PanelWindow {
                 id: patientRoomRow
 
                 width: parent.width
-                height: 148
+                height: 190
                 spacing: 10
 
                 Rectangle {
@@ -815,6 +823,98 @@ PanelWindow {
                                 }
                                 elide: Text.ElideRight
                             }
+                        }
+
+
+                        Row {
+                            id: roomInspectActions
+
+                            width: parent.width
+                            height: 24
+                            spacing: 6
+
+                            Repeater {
+                                model: ["STATUS", "DIFF", "LOG"]
+
+                                Rectangle {
+                                    id: roomInspectButton
+
+                                    required property string modelData
+                                    readonly property bool selectedAction:
+                                        roomService.action === modelData
+                                    readonly property bool enabledAction:
+                                        root.selectedRoomTeam.length > 0
+                                        && !roomService.running
+
+                                    width:
+                                        (
+                                            roomInspectActions.width
+                                            - roomInspectActions.spacing * 2
+                                        ) / 3
+                                    height: parent.height
+
+                                    color:
+                                        roomInspectMouse.pressed
+                                        ? Colors.orange
+                                        : selectedAction
+                                        ? Colors.magenta
+                                        : Colors.black
+                                    border.width: 1
+                                    border.color:
+                                        roomInspectMouse.containsMouse
+                                        ? Colors.orange
+                                        : selectedAction
+                                        ? Colors.magenta
+                                        : Colors.cyan
+                                    opacity: enabledAction ? 1.0 : 0.48
+
+                                    GohuText {
+                                        anchors.centerIn: parent
+                                        text:
+                                            roomService.running
+                                            && roomService.action
+                                               === roomInspectButton.modelData
+                                            ? "READING"
+                                            : roomInspectButton.modelData
+                                        font.pixelSize: 9
+                                        color:
+                                            roomInspectMouse.pressed
+                                            ? Colors.black
+                                            : Colors.cyan
+                                    }
+
+                                    MouseArea {
+                                        id: roomInspectMouse
+
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        enabled: roomInspectButton.enabledAction
+                                        cursorShape:
+                                            enabled
+                                            ? Qt.PointingHandCursor
+                                            : Qt.ArrowCursor
+
+                                        onClicked:
+                                            roomService.runInspection(
+                                                roomInspectButton.modelData
+                                                    .toLowerCase()
+                                            )
+                                    }
+                                }
+                            }
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text: roomService.summary
+                            font.pixelSize: 9
+                            color:
+                                roomService.lastError
+                                ? Colors.red
+                                : roomService.available
+                                ? Colors.cyan
+                                : Colors.magenta
+                            elide: Text.ElideRight
                         }
                     }
                 }

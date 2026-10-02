@@ -169,6 +169,21 @@ Rectangle {
                 opacity: slider.count > 0 ? 0.48 : 0.14
             }
 
+            RectangularShadow {
+                id: thumbGlow
+
+                x: thumb.x
+                y: thumb.y
+                width: thumb.width
+                height: thumb.height
+                z: 2
+                spread: dragArea.pressed ? 3 : 5
+                opacity: dragArea.pressed ? 0.42 : 0.62
+                color: dragArea.pressed
+                       ? Colors.orange
+                       : slider.handleGlowColor
+            }
+
             Rectangle {
                 id: thumb
 
@@ -176,6 +191,7 @@ Rectangle {
                 height: 52
                 radius: 3
                 anchors.horizontalCenter: parent.horizontalCenter
+                z: 3
 
                 y: slider.handleYForIndex()
 
@@ -185,16 +201,6 @@ Rectangle {
                 border.color: dragArea.pressed
                               ? Colors.orange
                               : Colors.white
-
-                RectangularShadow {
-                    anchors.fill: parent
-                    spread: dragArea.pressed ? 3 : 5
-                    z: -2
-                    opacity: dragArea.pressed ? 0.42 : 0.62
-                    color: dragArea.pressed
-                           ? Colors.orange
-                           : slider.handleGlowColor
-                }
 
                 Rectangle {
                     anchors {

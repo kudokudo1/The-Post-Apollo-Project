@@ -192,7 +192,7 @@ Rectangle {
                     opacity: dragArea.pressed ? 0.42 : 0.62
                     color: dragArea.pressed
                            ? Colors.orange
-                           : slider.handleColor
+                           : Colors.magenta
                 }
 
                 Rectangle {

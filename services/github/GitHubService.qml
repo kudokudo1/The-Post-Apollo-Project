@@ -378,6 +378,7 @@ Scope {
         factoryValidationMessage = "";
         factoryInstallBranch = "";
         factoryPullRequest = "";
+        factoryInstallCommit = "";
         factoryLastTemplate = cleanTemplate;
         factoryLastTrigger = cleanTrigger;
         factoryLastSlug = cleanSlug;

@@ -9,6 +9,8 @@ Item {
     required property var githubService
     required property var runSummary
 
+    property int selectedStepIndex: -1
+
     signal closeRequested()
     signal heightRequested(real height)
 
@@ -120,6 +122,69 @@ Item {
             return Colors.orange;
 
         return Colors.cyan;
+    }
+
+    function selectedStepRow() {
+        if (selectedStepIndex < 0 || selectedStepIndex >= stepRows.length)
+            return null;
+
+        return stepRows[selectedStepIndex];
+    }
+
+    function focusedLogText() {
+        const full = String(
+            githubService && githubService.inspectorLogText
+            ? githubService.inspectorLogText
+            : ""
+        );
+
+        const row = selectedStepRow();
+
+        if (!row || !full)
+            return full;
+
+        const jobNeedle = String(row.job || "").trim().toLowerCase();
+        const stepNeedle = String(row.name || "").trim().toLowerCase();
+        const lines = full.split("\n");
+        const matches = [];
+
+        for (let i = 0; i < lines.length; ++i) {
+            const line = String(lines[i] || "");
+            const lower = line.toLowerCase();
+            const fields = line.split("\t");
+
+            if (fields.length >= 2) {
+                const jobField = String(fields[0] || "").trim().toLowerCase();
+                const stepField = String(fields[1] || "").trim().toLowerCase();
+
+                if (
+                    (!jobNeedle || jobField === jobNeedle)
+                    && (!stepNeedle || stepField === stepNeedle)
+                ) {
+                    matches.push(line);
+                    continue;
+                }
+            }
+
+            if (
+                (!jobNeedle || lower.indexOf(jobNeedle) >= 0)
+                && (!stepNeedle || lower.indexOf(stepNeedle) >= 0)
+            )
+                matches.push(line);
+        }
+
+        if (matches.length > 0)
+            return matches.join("\n");
+
+        return "NO MATCHING LOG LINES // "
+             + String(row.name || "STEP")
+             + "\n\n"
+             + full;
+    }
+
+    onStepRowsChanged: {
+        if (selectedStepIndex >= stepRows.length)
+            selectedStepIndex = -1;
     }
 
     component DrawerButton: Rectangle {
@@ -436,19 +501,52 @@ Item {
                                     model: root.stepRows
 
                                     Rectangle {
+                                        id: stepRow
+
                                         required property int index
                                         required property var modelData
+
+                                        readonly property bool selected:
+                                            root.selectedStepIndex === index
+                                        readonly property bool hovered:
+                                            stepMouse.containsMouse
 
                                         width: stepColumn.width
                                         height: 29
 
-                                        color: Colors.black
-                                        border.width: 1
+                                        color:
+                                            selected
+                                            ? Colors.dark
+                                            : hovered
+                                            ? "#17121D"
+                                            : Colors.black
+
+                                        border.width: selected ? 2 : 1
                                         border.color:
-                                            root.resultColor(
-                                                modelData.status,
-                                                modelData.conclusion
-                                            )
+                                            selected
+                                            ? Colors.magenta
+                                            : hovered
+                                            ? Colors.orange
+                                            : root.resultColor(
+                                                  modelData.status,
+                                                  modelData.conclusion
+                                              )
+
+                                        RectangularShadow {
+                                            anchors.fill: parent
+                                            spread: 3
+                                            z: -1
+                                            opacity:
+                                                stepRow.selected
+                                                ? 0.42
+                                                : stepRow.hovered
+                                                ? 0.22
+                                                : 0.0
+                                            color:
+                                                stepRow.selected
+                                                ? Colors.magenta
+                                                : Colors.orange
+                                        }
 
                                         Row {
                                             anchors {
@@ -463,7 +561,10 @@ Item {
                                                 anchors.verticalCenter: parent.verticalCenter
                                                 text: String(index + 1)
                                                 font.pixelSize: 9
-                                                color: Colors.orange
+                                                color:
+                                                    stepRow.selected
+                                                    ? Colors.magenta
+                                                    : Colors.orange
                                             }
 
                                             GohuText {
@@ -471,7 +572,12 @@ Item {
                                                 anchors.verticalCenter: parent.verticalCenter
                                                 text: String(modelData.name || "STEP")
                                                 font.pixelSize: 9
-                                                color: Colors.white
+                                                color:
+                                                    stepRow.selected
+                                                    ? Colors.magenta
+                                                    : stepRow.hovered
+                                                    ? Colors.orange
+                                                    : Colors.white
                                                 elide: Text.ElideRight
                                             }
 
@@ -491,6 +597,21 @@ Item {
                                                         modelData.status,
                                                         modelData.conclusion
                                                     )
+                                            }
+                                        }
+
+                                        MouseArea {
+                                            id: stepMouse
+
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+
+                                            onClicked: {
+                                                root.selectedStepIndex =
+                                                    stepRow.selected
+                                                    ? -1
+                                                    : stepRow.index;
                                             }
                                         }
                                     }
@@ -542,22 +663,34 @@ Item {
 
                         Row {
                             width: parent.width
-                            height: 18
+                            height: 24
+                            spacing: 6
 
                             GohuText {
-                                width: parent.width - 118
-                                text: "OUTPUT // LOG STREAM"
+                                width: parent.width - 188
+                                anchors.verticalCenter: parent.verticalCenter
+                                text:
+                                    root.selectedStepIndex >= 0
+                                    ? "OUTPUT // STEP FOCUS"
+                                    : "OUTPUT // LOG STREAM"
                                 font.pixelSize: 13
                                 color: Colors.magenta
+                                elide: Text.ElideRight
                             }
 
                             GohuText {
-                                width: 118
+                                width: 112
+                                anchors.verticalCenter: parent.verticalCenter
                                 text:
                                     root.githubService.inspectorBusy
                                     ? "READING"
                                     : root.githubService.inspectorError
                                     ? "ERROR"
+                                    : root.selectedStepIndex >= 0
+                                    ? (
+                                          "STEP "
+                                          + String(root.selectedStepIndex + 1)
+                                      )
                                     : "RUN LOG"
                                 horizontalAlignment: Text.AlignRight
                                 font.pixelSize: 9
@@ -565,6 +698,16 @@ Item {
                                     root.githubService.inspectorError
                                     ? Colors.red
                                     : Colors.orange
+                            }
+
+                            DrawerButton {
+                                width: 58
+                                height: 22
+                                label: "ALL"
+                                enabledAction: root.selectedStepIndex >= 0
+
+                                onTriggered:
+                                    root.selectedStepIndex = -1
                             }
                         }
 
@@ -577,7 +720,7 @@ Item {
 
                         Flickable {
                             width: parent.width
-                            height: parent.height - 24
+                            height: parent.height - 30
 
                             clip: true
                             contentWidth: width
@@ -599,8 +742,8 @@ Item {
                                           + "\n\n"
                                           + root.githubService.inspectorLogText
                                       )
-                                    : root.githubService.inspectorLogText
-                                      ? root.githubService.inspectorLogText
+                                    : root.focusedLogText()
+                                      ? root.focusedLogText()
                                       : "NO LOG OUTPUT"
 
                                 textFormat: Text.PlainText

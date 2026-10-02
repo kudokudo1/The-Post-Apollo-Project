@@ -688,6 +688,8 @@ PanelWindow {
                             }
 
                             GohuText {
+                                id: worktreeValue
+
                                 readonly property bool cleanState:
                                     String(patientService.worktree || "")
                                         .trim()
@@ -701,10 +703,10 @@ PanelWindow {
 
                                 layer.enabled: true
                                 layer.effect: DropShadow {
-                                    radius: cleanState ? 9 : 7
-                                    samples: cleanState ? 13 : 9
-                                    opacity: cleanState ? 0.76 : 0.34
-                                    color: cleanState ? Colors.orange : Colors.cyan
+                                    radius: worktreeValue.cleanState ? 9 : 7
+                                    samples: worktreeValue.cleanState ? 13 : 9
+                                    opacity: worktreeValue.cleanState ? 0.76 : 0.34
+                                    color: worktreeValue.cleanState ? Colors.orange : Colors.cyan
                                     transparentBorder: true
                                 }
                             }
@@ -1202,20 +1204,20 @@ PanelWindow {
                                     anchors.fill: parent
                                     spread:
                                         roomService.armed
-                                        || gateState === "VERIFIED"
-                                        || gateState === "CERTIFIED"
+                                        || armButton.gateState === "VERIFIED"
+                                        || armButton.gateState === "CERTIFIED"
                                         ? 4 : 2
                                     z: -1
                                     opacity:
                                         roomService.armed
-                                        || gateState === "VERIFIED"
-                                        || gateState === "CERTIFIED"
+                                        || armButton.gateState === "VERIFIED"
+                                        || armButton.gateState === "CERTIFIED"
                                         ? 0.38 : 0.14
                                     color:
                                         roomService.armed
                                         ? Colors.orange
-                                        : gateState === "VERIFIED"
-                                          || gateState === "CERTIFIED"
+                                        : armButton.gateState === "VERIFIED"
+                                          || armButton.gateState === "CERTIFIED"
                                         ? Colors.magenta
                                         : Colors.cyan
                                 }
@@ -1229,15 +1231,15 @@ PanelWindow {
                                             ? "MERGE ARMED"
                                             : "ARMED"
                                           )
-                                        : gateState === "CANDIDATE"
+                                        : armButton.gateState === "CANDIDATE"
                                         ? (
                                             gitEvidenceProvider.requestBusy
                                             ? "VERIFYING"
                                             : "VERIFY"
                                           )
-                                        : gateState === "VERIFIED"
+                                        : armButton.gateState === "VERIFIED"
                                         ? "CERTIFY"
-                                        : gateState === "CERTIFIED"
+                                        : armButton.gateState === "CERTIFIED"
                                         ? (
                                             roomService.canArmMerge
                                             ? "ARM MERGE"
@@ -1248,8 +1250,8 @@ PanelWindow {
                                     color:
                                         roomService.armed
                                         ? Colors.black
-                                        : gateState === "VERIFIED"
-                                          || gateState === "CERTIFIED"
+                                        : armButton.gateState === "VERIFIED"
+                                          || armButton.gateState === "CERTIFIED"
                                         ? Colors.magenta
                                         : Colors.cyan
                                 }

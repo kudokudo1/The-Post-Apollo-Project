@@ -13,7 +13,7 @@ Rectangle {
     signal triggered()
 
     width: 52
-    height: 40
+    height: 36
     radius: 2
 
     readonly property bool hovered:
@@ -36,7 +36,7 @@ Rectangle {
         pressed
         ? Colors.magenta
         : active
-        ? Colors.orange
+        ? actuator.modeColor
         : hovered
         ? Colors.orange
         : Colors.cyan
@@ -56,20 +56,22 @@ Rectangle {
         color:
             actuator.pressed
             ? Colors.magenta
-            : actuator.active || actuator.hovered
+            : actuator.active
+            ? actuator.modeColor
+            : actuator.hovered
             ? Colors.orange
             : Colors.cyan
     }
 
     Column {
         anchors.centerIn: parent
-        anchors.verticalCenterOffset: 2
+        anchors.verticalCenterOffset: -2
         spacing: -2
 
         NotoText {
             anchors.horizontalCenter: parent.horizontalCenter
             text: actuator.icon
-            font.pixelSize: 21
+            font.pixelSize: 20
             color:
                 actuator.pressed
                 ? Colors.black
@@ -81,7 +83,7 @@ Rectangle {
         GohuText {
             anchors.horizontalCenter: parent.horizontalCenter
             text: actuator.tag
-            font.pixelSize: 10
+            font.pixelSize: 9
             color:
                 actuator.pressed
                 ? Colors.black

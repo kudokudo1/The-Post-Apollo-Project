@@ -265,10 +265,83 @@ Scope {
         };
     }
 
+    function summarizeRuns(rows) {
+        const source = Array.isArray(rows) ? rows : [];
+        const summary = {
+            total: source.length,
+            queued: 0,
+            inProgress: 0,
+            completed: 0,
+            success: 0,
+            failure: 0,
+            cancelled: 0,
+            timedOut: 0,
+            neutral: 0,
+            otherConclusion: 0,
+            missingSha: 0
+        };
+
+        for (let i = 0; i < source.length; ++i) {
+            const run = source[i] || {};
+            const status = textValue(run.status, "").toLowerCase();
+            const conclusion = textValue(run.conclusion, "").toLowerCase();
+
+            if (!textValue(run.headSha, ""))
+                summary.missingSha += 1;
+
+            if (status === "queued")
+                summary.queued += 1;
+            else if (status === "in_progress")
+                summary.inProgress += 1;
+            else if (status === "completed")
+                summary.completed += 1;
+
+            if (conclusion === "success")
+                summary.success += 1;
+            else if (conclusion === "failure")
+                summary.failure += 1;
+            else if (conclusion === "cancelled")
+                summary.cancelled += 1;
+            else if (conclusion === "timed_out")
+                summary.timedOut += 1;
+            else if (conclusion === "neutral")
+                summary.neutral += 1;
+            else if (conclusion)
+                summary.otherConclusion += 1;
+        }
+
+        return summary;
+    }
+
+    function stalenessFacts(targetSha, inspected) {
+        const exactQuerySha =
+            githubService ? textValue(githubService.evidenceRunsSha, "") : "";
+        const inspectedSha =
+            inspected && inspected.run
+            ? textValue(inspected.run.headSha, "")
+            : "";
+
+        return {
+            localHeadMovedFromTarget:
+                Boolean(targetSha)
+                && Boolean(currentHead)
+                && currentHead !== targetSha,
+            exactQueryTargetsRequestedSha:
+                Boolean(targetSha)
+                && exactQuerySha === targetSha,
+            exactQuerySha: exactQuerySha,
+            inspectedRunTargetsRequestedSha:
+                !inspectedSha || inspectedSha === targetSha,
+            inspectedRunSha: inspectedSha
+        };
+    }
+
     function buildEvidencePacket(sha) {
         const targetSha = textValue(sha, currentHead);
         const matchingRuns = runsForSha(targetSha);
         const inspected = inspectorEvidence(targetSha);
+        const runSummary = summarizeRuns(matchingRuns);
+        const staleness = stalenessFacts(targetSha, inspected);
         const gitAvailable =
             gitService ? Boolean(gitService.available) : false;
         const githubAvailable =
@@ -307,6 +380,19 @@ Scope {
                     gitService ? Number(gitService.behind || 0) : 0,
                 lastError:
                     gitService ? textValue(gitService.lastError, "") : ""
+            },
+
+            facts: {
+                targetIsCurrentLocalHead:
+                    Boolean(targetSha)
+                    && Boolean(currentHead)
+                    && targetSha === currentHead,
+                worktreeDirty:
+                    gitService
+                    ? textValue(gitService.worktree, "").indexOf("DIRTY") === 0
+                    : false,
+                runSummary: runSummary,
+                staleness: staleness
             },
 
             github: {

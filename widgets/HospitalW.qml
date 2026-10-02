@@ -409,31 +409,20 @@ PanelWindow {
             }
         }
 
-        Flickable {
-            id: hospitalScroll
+        // Fixed diagnostic/header zone. Nothing above OPERATING ROOMS scrolls.
+        Column {
+            id: fixedTop
 
             anchors {
+                top: parent.top
                 left: parent.left
                 right: parent.right
-                top: parent.top
-                bottom: bottomStop.top
-                leftMargin: 18
                 topMargin: 18
+                leftMargin: 18
                 rightMargin: 18
-                bottomMargin: 10
             }
 
-            clip: true
-            contentWidth: width
-            contentHeight: content.height
-            boundsBehavior: Flickable.StopAtBounds
-            flickDeceleration: 1800
-
-            Column {
-                id: content
-
-                width: hospitalScroll.width
-                spacing: 12
+            spacing: 12
 
             // ===== HEADER =======================================
 
@@ -671,6 +660,36 @@ PanelWindow {
                 text: "OPERATING ROOMS"
             }
 
+
+        }
+
+        // Only the operating-room selector/detail surface scrolls.
+        Flickable {
+            id: hospitalScroll
+
+            anchors {
+                top: fixedTop.bottom
+                bottom: actionBay.top
+                left: parent.left
+                right: parent.right
+                topMargin: 8
+                bottomMargin: 10
+                leftMargin: 18
+                rightMargin: 18
+            }
+
+            clip: true
+            contentWidth: width
+            contentHeight: scrollContent.height
+            boundsBehavior: Flickable.StopAtBounds
+            flickDeceleration: 1800
+
+            Column {
+                id: scrollContent
+
+                width: hospitalScroll.width
+                spacing: 12
+
             Column {
                 id: roomsColumn
 
@@ -812,12 +831,21 @@ PanelWindow {
                     }
                 }
             }
+            }
+        }
 
-            // ===== ACTION BAY ===================================
+        Rectangle {
+            id: actionBay
 
-            Rectangle {
-                width: parent.width
-                height: 54
+            height: 54
+            anchors {
+                left: parent.left
+                right: parent.right
+                bottom: bottomStop.top
+                leftMargin: 18
+                rightMargin: 18
+                bottomMargin: 8
+            }
 
                 color: Colors.dark
                 border.width: 1
@@ -993,8 +1021,6 @@ PanelWindow {
                     }
                 }
             }
-        }
-        }
 
         // AppControl / CPU++ selector scrollbar geometry.
         Rectangle {
@@ -1003,10 +1029,10 @@ PanelWindow {
             width: 10
 
             anchors {
-                top: parent.top
-                bottom: bottomStop.top
+                top: hospitalScroll.top
+                bottom: hospitalScroll.bottom
                 right: parent.right
-                topMargin: 88
+                topMargin: 0
                 bottomMargin: 0
                 rightMargin: 3
             }

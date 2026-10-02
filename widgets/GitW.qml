@@ -541,6 +541,8 @@ PanelWindow {
         property bool selectedAction: false
         property bool primaryBlue: false
         property bool orangeAccent: false
+        property bool orangeTextOnly: false
+        property bool redAccent: false
         property bool loading: false
         property bool loadingSucceeded: true
         property bool loadingComplete: false
@@ -563,7 +565,9 @@ PanelWindow {
             ? Colors.black
             : primaryBlue
             ? Colors.white
-            : orangeAccent
+            : redAccent
+            ? Colors.red
+            : orangeAccent || orangeTextOnly
             ? Colors.orange
             : selectedAction
             ? Colors.magenta
@@ -595,9 +599,11 @@ PanelWindow {
 
         color:
             pressed
-            ? Colors.magenta
+            ? (redAccent ? Colors.red : Colors.magenta)
             : primaryBlue
             ? (loading ? Colors.dark : enabledAction ? Colors.blue : Colors.dark)
+            : redAccent && hovered
+            ? Colors.red
             : orangeAccent && hovered
             ? Colors.yellow
             : hovered || selectedAction
@@ -607,11 +613,15 @@ PanelWindow {
         border.width: 1
         border.color:
             pressed
-            ? Colors.magenta
+            ? (redAccent ? Colors.red : Colors.magenta)
             : primaryBlue
             ? (hovered ? Colors.cyan : Colors.blue)
+            : redAccent
+            ? Colors.red
             : orangeAccent
             ? Colors.orange
+            : orangeTextOnly
+            ? Colors.cyan
             : hovered
             ? Colors.orange
             : selectedAction
@@ -744,8 +754,12 @@ PanelWindow {
                     ? 0.68
                     : 0.10
                 color:
-                    actionButton.orangeAccent
+                    actionButton.redAccent
+                    ? Colors.red
+                    : actionButton.orangeAccent
                     ? Colors.orange
+                    : actionButton.orangeTextOnly
+                    ? Colors.cyan
                     : actionButton.hovered || actionButton.selectedAction
                     ? Colors.orange
                     : Colors.cyan
@@ -774,8 +788,12 @@ PanelWindow {
                     ? 0.68
                     : 0.10
                 color:
-                    actionButton.orangeAccent
+                    actionButton.redAccent
+                    ? Colors.red
+                    : actionButton.orangeAccent
                     ? Colors.orange
+                    : actionButton.orangeTextOnly
+                    ? Colors.cyan
                     : actionButton.hovered || actionButton.selectedAction
                     ? Colors.orange
                     : Colors.cyan
@@ -836,11 +854,15 @@ PanelWindow {
                 : 0.06
             color:
                 actionButton.pressed
-                ? Colors.magenta
+                ? (actionButton.redAccent ? Colors.red : Colors.magenta)
                 : actionButton.primaryBlue
                 ? Colors.blue
+                : actionButton.redAccent
+                ? Colors.red
                 : actionButton.orangeAccent
                 ? Colors.orange
+                : actionButton.orangeTextOnly
+                ? Colors.cyan
                 : actionButton.hovered || actionButton.selectedAction
                 ? Colors.orange
                 : Colors.cyan
@@ -862,11 +884,15 @@ PanelWindow {
                 : 0.015
             color:
                 actionButton.pressed
-                ? Colors.magenta
+                ? (actionButton.redAccent ? Colors.red : Colors.magenta)
                 : actionButton.primaryBlue
                 ? Colors.blue
+                : actionButton.redAccent
+                ? Colors.red
                 : actionButton.orangeAccent
                 ? Colors.orange
+                : actionButton.orangeTextOnly
+                ? Colors.cyan
                 : actionButton.hovered || actionButton.selectedAction
                 ? Colors.orange
                 : Colors.cyan
@@ -1487,7 +1513,7 @@ PanelWindow {
                                 spacing: 8
 
                                 Column {
-                                    width: parent.width - 488
+                                    width: parent.width - 476
                                     height: parent.height
                                     spacing: 3
 
@@ -1548,6 +1574,7 @@ PanelWindow {
                                     width: 94
                                     height: 36
                                     anchors.verticalCenter: parent.verticalCenter
+                                    anchors.verticalCenterOffset: 2
                                     label: "FETCH"
                                     enabledAction: !gitService.actionBusy
                                     selectedAction: gitService.actionTitle === "FETCH"
@@ -1558,6 +1585,7 @@ PanelWindow {
                                     width: 104
                                     height: 36
                                     anchors.verticalCenter: parent.verticalCenter
+                                    anchors.verticalCenterOffset: 2
                                     label: "PULL"
                                     leftIcon: "◂"
                                     iconPixelSize: 29
@@ -1572,6 +1600,7 @@ PanelWindow {
                                     width: 58
                                     height: 36
                                     anchors.verticalCenter: parent.verticalCenter
+                                    anchors.verticalCenterOffset: 2
                                     label: gitService.pullSourceLabel
                                     orangeAccent:
                                         gitService.pullSourceMode === "target"
@@ -1585,6 +1614,7 @@ PanelWindow {
                                     width: 52
                                     height: 36
                                     anchors.verticalCenter: parent.verticalCenter
+                                    anchors.verticalCenterOffset: 2
                                     icon: gitService.pullModeIcon
                                     tag: gitService.pullModeLabel
                                     active: true
@@ -1600,6 +1630,7 @@ PanelWindow {
                                     width: 124
                                     height: 36
                                     anchors.verticalCenter: parent.verticalCenter
+                                    anchors.verticalCenterOffset: 2
                                     label:
                                         gitService.selectedRemoteExists
                                         ? "PUSH"
@@ -2314,7 +2345,7 @@ PanelWindow {
                                                                         ActionButton {
                                                                             width: parent.width - 258
                                                                             height: 30
-                                                                            orangeAccent: true
+                                                                            orangeTextOnly: true
                                                                             enabledAction: githubService.available
                                                                                            && githubService.workflowCount > 0
                                                                                            && !githubService.refreshing
@@ -2418,6 +2449,7 @@ PanelWindow {
                                                                         ActionButton {
                                                                             width: parent.width - 304
                                                                             height: 30
+                                                                            orangeTextOnly: true
                                                                             enabledAction: githubService.available
                                                                                            && githubService.runCount > 0
                                                                                            && !githubService.refreshing
@@ -2463,6 +2495,7 @@ PanelWindow {
                                                                         ActionButton {
                                                                             width: 102
                                                                             height: 30
+                                                                            redAccent: true
                                                                             label: githubService.actionBusy && githubService.actionKind === "cancel"
                                                                                    ? "CANCELLING"
                                                                                    : "CANCEL"

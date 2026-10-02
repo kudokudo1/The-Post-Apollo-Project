@@ -408,6 +408,7 @@ PanelWindow {
         property string label: ""
         property bool enabledAction: false
         property bool selectedAction: false
+        property bool primaryBlue: false
 
         signal triggered()
 
@@ -419,6 +420,8 @@ PanelWindow {
         readonly property color contentColor:
             pressed
             ? Colors.black
+            : primaryBlue
+            ? Colors.white
             : selectedAction
             ? Colors.magenta
             : hovered
@@ -440,6 +443,8 @@ PanelWindow {
         color:
             pressed
             ? Colors.magenta
+            : primaryBlue
+            ? (enabledAction ? Colors.blue : Colors.dark)
             : hovered || selectedAction
             ? Colors.yellow
             : Colors.black
@@ -448,6 +453,8 @@ PanelWindow {
         border.color:
             pressed
             ? Colors.magenta
+            : primaryBlue
+            ? (hovered ? Colors.cyan : Colors.blue)
             : hovered
             ? Colors.orange
             : selectedAction
@@ -517,6 +524,8 @@ PanelWindow {
             color:
                 actionButton.pressed
                 ? Colors.magenta
+                : actionButton.primaryBlue
+                ? Colors.blue
                 : actionButton.hovered || actionButton.selectedAction
                 ? Colors.orange
                 : Colors.cyan
@@ -539,6 +548,8 @@ PanelWindow {
             color:
                 actionButton.pressed
                 ? Colors.magenta
+                : actionButton.primaryBlue
+                ? Colors.blue
                 : actionButton.hovered || actionButton.selectedAction
                 ? Colors.orange
                 : Colors.cyan
@@ -558,14 +569,7 @@ PanelWindow {
 
         height: 36
 
-        scale:
-            pressed
-            ? 0.99
-            : hovered
-            ? 1.025
-            : selected
-            ? 1.01
-            : 1.0
+        scale: 1.0
 
         color:
             pressed
@@ -583,13 +587,6 @@ PanelWindow {
             : selected
             ? Colors.orange
             : Colors.cyan
-
-        Behavior on scale {
-            NumberAnimation {
-                duration: 90
-                easing.type: Easing.OutQuad
-            }
-        }
 
         GohuText {
             anchors.centerIn: parent
@@ -1690,12 +1687,12 @@ PanelWindow {
                                     bottomMargin: 9
                                 }
 
-                                height: 32
+                                height: 38
                                 spacing: 8
 
                                 Rectangle {
-                                    width: parent.width - 312
-                                    height: 30
+                                    width: parent.width - 348
+                                    height: 34
                                     color: Colors.black
                                     border.width: 1
                                     border.color: factoryNameInput.activeFocus ? Colors.magenta : Colors.orange
@@ -1738,7 +1735,7 @@ PanelWindow {
 
                                 ActionButton {
                                     width: 148
-                                    height: 30
+                                    height: 34
                                     label: githubService.factoryBusy && githubService.factoryMode === "preview"
                                            ? "PREVIEWING"
                                            : "PREVIEW CODE"
@@ -1753,8 +1750,9 @@ PanelWindow {
                                 }
 
                                 ActionButton {
-                                    width: 148
-                                    height: 30
+                                    width: 184
+                                    height: 38
+                                    primaryBlue: true
                                     label: githubService.factoryBusy && githubService.factoryMode === "install"
                                            ? "SAVING"
                                            : "SAVE WORKFLOW"

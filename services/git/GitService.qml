@@ -18,6 +18,14 @@ Scope {
     readonly property string pullModeIcon:
         pullMode === "ff-only" ? "⏭" : "⇄"
 
+    property string pullSourceMode: "upstream"
+    readonly property string pullSourceLabel:
+        pullSourceMode === "upstream" ? "UP" : "TGT"
+    readonly property string pullSourceTarget:
+        pullSourceMode === "upstream" ? upstream : selectedRemoteBranch
+    readonly property bool pullSourceTargetValid:
+        isRemoteBranchTarget(pullSourceTarget)
+
     property string repoPath: ""
     property string repoLabel: "LIVE QUICKSHELL"
     property string repoRoot: ""
@@ -639,6 +647,28 @@ Scope {
         describePullMode();
     }
 
+    function cyclePullSource() {
+        pullSourceMode =
+            pullSourceMode === "upstream"
+            ? "target"
+            : "upstream";
+
+        actionTitle = "PULL SOURCE";
+        actionExitCode = 0;
+
+        if (pullSourceMode === "upstream") {
+            actionOutput =
+                pullSourceTargetValid
+                ? "PULL SOURCE // UPSTREAM\n" + pullSourceTarget
+                : "PULL SOURCE // UPSTREAM\nNO TRACKING BRANCH AVAILABLE";
+        } else {
+            actionOutput =
+                pullSourceTargetValid
+                ? "PULL SOURCE // TARGET\n" + pullSourceTarget
+                : "PULL SOURCE // TARGET\nCHOOSE A REMOTE TARGET ABOVE";
+        }
+    }
+
     function runReadAction(kind) {
         runAction(String(kind || "").toLowerCase());
     }
@@ -653,13 +683,26 @@ Scope {
 
         const action = String(kind || "").toLowerCase();
         const allowed = ["status", "diff", "log", "fetch", "pull", "push"];
+        const syncTarget =
+            action === "pull"
+            ? pullSourceTarget
+            : selectedRemoteBranch;
 
         if (allowed.indexOf(action) < 0)
             return;
 
-        if ((action === "pull" || action === "push")
-                && !isRemoteBranchTarget(selectedRemoteBranch)) {
-            actionTitle = action.toUpperCase();
+        if (action === "pull" && !isRemoteBranchTarget(syncTarget)) {
+            actionTitle = "PULL";
+            actionOutput =
+                pullSourceMode === "upstream"
+                ? "PULL SOURCE // UPSTREAM\nNo tracking branch is configured for this local branch."
+                : "PULL SOURCE // TARGET\nChoose a remote branch target first.";
+            actionExitCode = 1;
+            return;
+        }
+
+        if (action === "push" && !isRemoteBranchTarget(selectedRemoteBranch)) {
+            actionTitle = "PUSH";
             actionOutput =
                 "Choose a remote branch target first."
                 + "\nExample // origin/" + String(branch || "main")
@@ -746,7 +789,7 @@ Scope {
             "pa-git-action",
             repoPath,
             action,
-            selectedRemoteBranch,
+            syncTarget,
             pullMode
         ]);
     }

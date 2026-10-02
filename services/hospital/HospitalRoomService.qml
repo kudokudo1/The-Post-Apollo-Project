@@ -10,6 +10,28 @@ Scope {
     property string localRepoPath: ""
 
     property string integrationMode: ""
+    property string base: ""
+    property string baseHead: ""
+
+    property bool armed: false
+    property string armedRepository: ""
+    property string armedTeam: ""
+    property string armedBranch: ""
+    property string armedHead: ""
+    property string armedBase: ""
+    property string armedBaseHead: ""
+    property string armedMode: ""
+
+    readonly property bool canArm:
+        available
+        && action === "PREPARE"
+        && integrationMode === "FAST_FORWARD"
+        && head.length > 0
+        && base.length > 0
+        && baseHead.length > 0
+        && team.length > 0
+
+    property bool integrating: false
 
     property bool running: false
     property bool available: false
@@ -38,7 +60,26 @@ Scope {
     property string stdoutText: ""
     property string stderrText: ""
 
+    property bool integrateExitSeen: false
+    property bool integrateStdoutSeen: false
+    property bool integrateStderrSeen: false
+    property int integrateExitCode: -1
+    property string integrateStdoutText: ""
+    property string integrateStderrText: ""
+
     signal inspected()
+    signal integrated()
+
+    function disarm() {
+        armed = false;
+        armedRepository = "";
+        armedTeam = "";
+        armedBranch = "";
+        armedHead = "";
+        armedBase = "";
+        armedBaseHead = "";
+        armedMode = "";
+    }
 
     function clearResult() {
         available = false;
@@ -48,7 +89,10 @@ Scope {
         ahead = 0;
         behind = 0;
         head = "";
+        base = "";
+        baseHead = "";
         integrationMode = "";
+        disarm();
         diffFileCount = 0;
         additions = 0;
         deletions = 0;
@@ -81,6 +125,9 @@ Scope {
             summary = lastError;
             return;
         }
+
+        if (targetMode === "prepare")
+            disarm();
 
         running = true;
         available = false;
@@ -119,6 +166,7 @@ Scope {
 
         action = mode;
         branch = String(data.branch || "");
+        base = String(data.base || "");
 
         if (mode === "STATUS") {
             relation = String(data.relation || "UNKNOWN").toUpperCase();
@@ -169,6 +217,8 @@ Scope {
         if (mode === "PREPARE") {
             integrationMode =
                 String(data.mode || "REVIEW_REQUIRED").toUpperCase();
+            head = String(data.head || "");
+            baseHead = String(data.base_head || "");
             relation =
                 String(data.relation || "UNKNOWN").toUpperCase();
             ahead = Number(data.ahead || 0);
@@ -187,6 +237,84 @@ Scope {
         }
 
         summary = "ROOM // UNKNOWN RESPONSE";
+    }
+
+    function armPrepared() {
+        if (!canArm) {
+            if (integrationMode && integrationMode !== "FAST_FORWARD")
+                summary = "ARM REFUSED // " + integrationMode;
+            else
+                summary = "ARM REFUSED // PREPARE FAST_FORWARD FIRST";
+            return false;
+        }
+
+        armedRepository = String(repository || "");
+        armedTeam = String(team || "");
+        armedBranch = String(branch || "");
+        armedHead = String(head || "");
+        armedBase = String(base || "");
+        armedBaseHead = String(baseHead || "");
+        armedMode = String(integrationMode || "");
+        armed = true;
+        lastError = "";
+
+        summary = "ARMED // "
+                  + armedTeam
+                  + " // "
+                  + armedHead.slice(0, 8)
+                  + " → "
+                  + armedBase
+                  + "@"
+                  + armedBaseHead.slice(0, 8);
+
+        return true;
+    }
+
+    function integrateArmed() {
+        if (integrating || running)
+            return;
+
+        if (!armed) {
+            lastError = "INTEGRATE REFUSED // NOT ARMED";
+            summary = lastError;
+            return;
+        }
+
+        const localPath = String(localRepoPath || "").trim();
+
+        if (!localPath) {
+            lastError = "INTEGRATE REFUSED // LOCAL PATIENT NOT READY";
+            summary = lastError;
+            disarm();
+            return;
+        }
+
+        integrating = true;
+        lastError = "";
+        summary = "INTEGRATE // VERIFYING ARMED SNAPSHOT";
+
+        integrateExitSeen = false;
+        integrateStdoutSeen = false;
+        integrateStderrSeen = false;
+        integrateExitCode = -1;
+        integrateStdoutText = "";
+        integrateStderrText = "";
+
+        integrateProcess.exec([
+            "bash",
+            "-lc",
+            'exec "$HOME/.local/bin/px" integrate "$1" "$2" "$3" "$4" "$5" "$6" "$7"',
+            "px-integrate",
+            armedRepository,
+            armedTeam,
+            armedBranch,
+            armedHead,
+            armedBase,
+            armedBaseHead,
+            localPath
+        ]);
+
+        integrateWatchdog.restart();
     }
 
     function launchLazygit() {
@@ -246,6 +374,85 @@ Scope {
         }
     }
 
+    function maybeFinishIntegrate() {
+        if (!integrating
+                || !integrateExitSeen
+                || !integrateStdoutSeen
+                || !integrateStderrSeen)
+            return;
+
+        integrating = false;
+        integrateWatchdog.stop();
+
+        if (integrateExitCode !== 0) {
+            available = false;
+            lastError = String(
+                integrateStderrText
+                || integrateStdoutText
+                || ("PX INTEGRATE EXIT " + integrateExitCode)
+            ).trim();
+            summary = "INTEGRATE REFUSED // " + lastError;
+            disarm();
+            return;
+        }
+
+        try {
+            const data = JSON.parse(
+                String(integrateStdoutText || "").trim()
+            );
+
+            if (String(data.status || "").toUpperCase()
+                    !== "INTEGRATED")
+                throw new Error("UNEXPECTED INTEGRATE RESPONSE");
+
+            action = "INTEGRATE";
+            available = true;
+            lastError = "";
+            summary = "INTEGRATED // "
+                      + String(data.base || armedBase)
+                      + " // "
+                      + String(data.old_base_head || "")
+                            .slice(0, 8)
+                      + " → "
+                      + String(data.new_base_head || "")
+                            .slice(0, 8);
+
+            disarm();
+            integrated();
+        } catch (error) {
+            available = false;
+            lastError = "INTEGRATE PARSE // " + String(error);
+            summary = lastError;
+            disarm();
+        }
+    }
+
+    Process {
+        id: integrateProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                roomService.integrateStdoutText = this.text;
+                roomService.integrateStdoutSeen = true;
+                roomService.maybeFinishIntegrate();
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                roomService.integrateStderrText = this.text;
+                roomService.integrateStderrSeen = true;
+                roomService.maybeFinishIntegrate();
+            }
+        }
+
+        onExited: function(code, exitStatus) {
+            roomService.integrateExitCode = Number(code);
+            roomService.integrateExitSeen = true;
+            roomService.maybeFinishIntegrate();
+        }
+    }
+
     Process {
         id: inspectProcess
 
@@ -288,6 +495,26 @@ Scope {
 
             if (inspectProcess.running)
                 inspectProcess.running = false;
+        }
+    }
+
+    Timer {
+        id: integrateWatchdog
+        interval: 20000
+        repeat: false
+
+        onTriggered: {
+            if (!roomService.integrating)
+                return;
+
+            roomService.integrating = false;
+            roomService.available = false;
+            roomService.lastError = "PX INTEGRATE TIMEOUT";
+            roomService.summary = roomService.lastError;
+            roomService.disarm();
+
+            if (integrateProcess.running)
+                integrateProcess.running = false;
         }
     }
 }

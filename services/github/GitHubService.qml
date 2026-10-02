@@ -60,6 +60,21 @@ Scope {
     property string latestRunConclusion: ""
     property string latestRunBranch: ""
 
+    // Exact-SHA evidence query state. This is separate from the normal
+    // recent-runs surface so evidence collection never changes GitW's view.
+    property bool evidenceRunsBusy: false
+    property string evidenceRunsSha: ""
+    property var evidenceRuns: []
+    property string evidenceRunsError: ""
+    property bool evidenceRunsExitSeen: false
+    property bool evidenceRunsStdoutSeen: false
+    property bool evidenceRunsStderrSeen: false
+    property int evidenceRunsExitCode: -1
+    property string evidenceRunsStdoutText: ""
+    property string evidenceRunsStderrText: ""
+
+    signal evidenceRunsReady(string sha, var runs, string error)
+
     property bool inspectorBusy: false
     property string inspectorRunId: ""
     property var inspectedRun: ({})
@@ -229,6 +244,88 @@ Scope {
             latestRunConclusion = "";
             latestRunBranch = "";
         }
+    }
+
+    function requestEvidenceRuns(sha) {
+        const cleanSha = String(sha || "").trim();
+
+        if (!repoSlug) {
+            evidenceRunsError = "ORIGIN IS NOT A GITHUB REPOSITORY";
+            evidenceRunsReady(cleanSha, [], evidenceRunsError);
+            return false;
+        }
+
+        if (!cleanSha) {
+            evidenceRunsError = "COMMIT SHA REQUIRED";
+            evidenceRunsReady("", [], evidenceRunsError);
+            return false;
+        }
+
+        if (evidenceRunsBusy)
+            return false;
+
+        evidenceRunsBusy = true;
+        evidenceRunsSha = cleanSha;
+        evidenceRuns = [];
+        evidenceRunsError = "";
+        evidenceRunsExitSeen = false;
+        evidenceRunsStdoutSeen = false;
+        evidenceRunsStderrSeen = false;
+        evidenceRunsExitCode = -1;
+        evidenceRunsStdoutText = "";
+        evidenceRunsStderrText = "";
+
+        evidenceRunsProcess.exec([
+            "bash",
+            "-lc",
+            'exec "$HOME/.local/bin/px" runs "$1" 100 "$2"',
+            "px-evidence-runs",
+            repoSlug,
+            cleanSha
+        ]);
+
+        evidenceRunsWatchdog.restart();
+        return true;
+    }
+
+    function maybeFinishEvidenceRuns() {
+        if (!evidenceRunsBusy)
+            return;
+
+        if (!evidenceRunsExitSeen
+                || !evidenceRunsStdoutSeen
+                || !evidenceRunsStderrSeen) {
+            return;
+        }
+
+        const requestSha = evidenceRunsSha;
+        let rows = [];
+        let error = "";
+
+        if (evidenceRunsExitCode === 0) {
+            try {
+                const raw = String(evidenceRunsStdoutText || "").trim();
+                rows = raw ? JSON.parse(raw) : [];
+
+                if (!Array.isArray(rows))
+                    throw new Error("EVIDENCE RUN RESPONSE IS NOT AN ARRAY");
+            } catch (parseError) {
+                error = "EVIDENCE RUN PARSE // " + String(parseError);
+                rows = [];
+            }
+        } else {
+            error = String(
+                evidenceRunsStderrText
+                || evidenceRunsStdoutText
+                || "PX EVIDENCE RUN QUERY FAILED"
+            ).trim();
+        }
+
+        evidenceRuns = rows;
+        evidenceRunsError = error;
+        evidenceRunsBusy = false;
+        evidenceRunsWatchdog.stop();
+        evidenceRunsReady(requestSha, rows, error);
     }
 
     function inspectRun(runId) {
@@ -698,6 +795,32 @@ Scope {
     }
 
     Process {
+        id: evidenceRunsProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                githubService.evidenceRunsStdoutText = this.text;
+                githubService.evidenceRunsStdoutSeen = true;
+                githubService.maybeFinishEvidenceRuns();
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                githubService.evidenceRunsStderrText = this.text;
+                githubService.evidenceRunsStderrSeen = true;
+                githubService.maybeFinishEvidenceRuns();
+            }
+        }
+
+        onExited: function(exitCode, exitStatus) {
+            githubService.evidenceRunsExitCode = Number(exitCode);
+            githubService.evidenceRunsExitSeen = true;
+            githubService.maybeFinishEvidenceRuns();
+        }
+    }
+
+    Process {
         id: inspectorProcess
 
         stdout: StdioCollector {
@@ -850,6 +973,31 @@ Scope {
             githubService.runsExitCode = Number(exitCode);
             githubService.runsExitSeen = true;
             githubService.maybeFinishRuns();
+        }
+    }
+
+    Timer {
+        id: evidenceRunsWatchdog
+        interval: 15000
+        repeat: false
+
+        onTriggered: {
+            if (!githubService.evidenceRunsBusy)
+                return;
+
+            const requestSha = githubService.evidenceRunsSha;
+            githubService.evidenceRunsBusy = false;
+            githubService.evidenceRuns = [];
+            githubService.evidenceRunsError = "PX EVIDENCE RUN QUERY TIMEOUT";
+
+            if (evidenceRunsProcess.running)
+                evidenceRunsProcess.running = false;
+
+            githubService.evidenceRunsReady(
+                requestSha,
+                [],
+                githubService.evidenceRunsError
+            );
         }
     }
 

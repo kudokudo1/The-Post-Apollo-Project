@@ -10,6 +10,8 @@ Scope {
     property var queue: []
     property var savedSets: []
 
+    signal procedureDispatched(string name, var procedure)
+
     readonly property string repoSlug:
         githubService ? String(githubService.repoSlug || "") : ""
 
@@ -165,6 +167,78 @@ Scope {
         return setRecord.items.filter(function(item) {
             return !workflowAvailable(item.path);
         }).length;
+    }
+
+    function normalizedProcedure(setRecord) {
+        if (!setRecord || !Array.isArray(setRecord.items))
+            return null;
+
+        const items = setRecord.items.map(function(item) {
+            const path = String(item.path || "");
+            return {
+                path: path,
+                name: String(item.name || path),
+                available: root.workflowAvailable(path)
+            };
+        });
+
+        const missing = items.filter(function(item) {
+            return !item.available;
+        }).length;
+
+        return {
+            schemaVersion: 1,
+            repository: String(setRecord.repository || ""),
+            name: String(setRecord.name || ""),
+            workflowCount: items.length,
+            missingCount: missing,
+            runnable: items.length > 0 && missing === 0,
+            workflows: items
+        };
+    }
+
+    function procedureByName(name) {
+        const clean = String(name || "").trim();
+
+        if (!clean || !repoSlug)
+            return null;
+
+        const index = globalSetIndex(repoSlug, clean);
+
+        if (index < 0)
+            return null;
+
+        return normalizedProcedure(savedSets[index]);
+    }
+
+    function procedures() {
+        return repoSets.map(function(setRecord) {
+            return root.normalizedProcedure(setRecord);
+        }).filter(function(record) {
+            return record !== null;
+        });
+    }
+
+    function runProcedure(name) {
+        const clean = String(name || "").trim();
+
+        if (!clean || !repoSlug)
+            return false;
+
+        const index = globalSetIndex(repoSlug, clean);
+
+        if (index < 0)
+            return false;
+
+        const setRecord = savedSets[index];
+        const procedure = normalizedProcedure(setRecord);
+
+        if (!procedure || !procedure.runnable)
+            return false;
+
+        runSet(setRecord);
+        procedureDispatched(clean, procedure);
+        return true;
     }
 
     function runSet(setRecord) {

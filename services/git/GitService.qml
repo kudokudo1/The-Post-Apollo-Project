@@ -32,6 +32,7 @@ Scope {
     property string repository: "NOT CONNECTED"
     property string branch: "NOT CONNECTED"
     property string head: "NOT CONNECTED"
+    property string headFull: "NOT CONNECTED"
     property string worktree: "NOT CONNECTED"
     property string origin: "NOT CONNECTED"
     property string upstream: ""
@@ -55,6 +56,7 @@ Scope {
     property string pendingRepository: ""
     property string pendingBranch: ""
     property string pendingHead: ""
+    property string pendingHeadFull: ""
     property string pendingWorktree: ""
     property string pendingOrigin: ""
     property string pendingUpstream: ""
@@ -332,6 +334,7 @@ Scope {
         repository = pendingRepository;
         branch = pendingBranch;
         head = pendingHead;
+        headFull = pendingHeadFull;
         worktree = pendingWorktree;
         origin = pendingOrigin;
         upstream = pendingUpstream;
@@ -495,6 +498,7 @@ Scope {
         pendingRepository = "";
         pendingBranch = "";
         pendingHead = "";
+        pendingHeadFull = "";
         pendingWorktree = "";
         pendingOrigin = "";
         pendingUpstream = "";
@@ -519,6 +523,7 @@ Scope {
                 'branch="$(git -C "$root" branch --show-current)"',
                 'if [ -z "$branch" ]; then branch="DETACHED"; fi',
                 'head="$(git -C "$root" rev-parse --short=10 HEAD)"',
+                'head_full="$(git -C "$root" rev-parse HEAD)"',
                 'count="$(git -C "$root" status --porcelain=v1 | wc -l | tr -d " ")"',
                 'if [ "$count" -eq 0 ]; then worktree="CLEAN"; else worktree="DIRTY • $count CHANGES"; fi',
                 'origin="$(git -C "$root" remote get-url origin 2>/dev/null || true)"',
@@ -535,6 +540,7 @@ Scope {
                 'printf "REPO\\t%s\\n" "$name"',
                 'printf "BRANCH\\t%s\\n" "$branch"',
                 'printf "HEAD\\t%s\\n" "$head"',
+                'printf "HEADFULL\\t%s\\n" "$head_full"',
                 'printf "WORKTREE\\t%s\\n" "$worktree"',
                 'printf "ORIGIN\\t%s\\n" "$origin"',
                 'printf "UPSTREAM\\t%s\\n" "$upstream"',
@@ -583,6 +589,8 @@ Scope {
             pendingBranch = value;
         else if (key === "HEAD")
             pendingHead = value;
+        else if (key === "HEADFULL")
+            pendingHeadFull = value;
         else if (key === "WORKTREE")
             pendingWorktree = value;
         else if (key === "ORIGIN")

@@ -409,6 +409,9 @@ PanelWindow {
         property bool enabledAction: false
         property bool selectedAction: false
         property bool primaryBlue: false
+        property string leftIcon: ""
+        property string rightIcon: ""
+        property int iconPixelSize: 24
 
         signal triggered()
 
@@ -473,6 +476,9 @@ PanelWindow {
         GohuText {
             id: actionText
             anchors.centerIn: parent
+            visible:
+                actionButton.leftIcon.length === 0
+                && actionButton.rightIcon.length === 0
             text: actionButton.label
             font.pixelSize: 11
             color: actionButton.contentColor
@@ -495,6 +501,56 @@ PanelWindow {
                     ? Colors.orange
                     : Colors.cyan
                 transparentBorder: true
+            }
+        }
+
+        Row {
+            anchors.centerIn: parent
+            spacing: 6
+            visible:
+                actionButton.leftIcon.length > 0
+                || actionButton.rightIcon.length > 0
+
+            layer.enabled: !actionButton.pressed
+            layer.effect: DropShadow {
+                radius: 10
+                samples: 11
+                opacity:
+                    actionButton.hovered
+                    ? 0.72
+                    : actionButton.selectedAction
+                    ? 0.68
+                    : actionButton.enabledAction
+                    ? 0.62
+                    : 0.12
+                color:
+                    actionButton.hovered || actionButton.selectedAction
+                    ? Colors.orange
+                    : Colors.cyan
+                transparentBorder: true
+            }
+
+            NotoText {
+                visible: actionButton.leftIcon.length > 0
+                anchors.verticalCenter: parent.verticalCenter
+                text: actionButton.leftIcon
+                font.pixelSize: actionButton.iconPixelSize
+                color: actionButton.contentColor
+            }
+
+            GohuText {
+                anchors.verticalCenter: parent.verticalCenter
+                text: actionButton.label
+                font.pixelSize: 11
+                color: actionButton.contentColor
+            }
+
+            NotoText {
+                visible: actionButton.rightIcon.length > 0
+                anchors.verticalCenter: parent.verticalCenter
+                text: actionButton.rightIcon
+                font.pixelSize: actionButton.iconPixelSize
+                color: actionButton.contentColor
             }
         }
 
@@ -1213,8 +1269,10 @@ PanelWindow {
                                 }
 
                                 ActionButton {
-                                    width: 94
-                                    label: "◂ PULL"
+                                    width: 104
+                                    label: "PULL"
+                                    leftIcon: "◂"
+                                    iconPixelSize: 25
                                     enabledAction:
                                         !gitService.actionBusy
                                         && gitService.selectedRemoteExists
@@ -1227,7 +1285,11 @@ PanelWindow {
                                     height: 36
                                     icon: gitService.pullModeIcon
                                     tag: gitService.pullModeLabel
-                                    accentColor: Colors.magenta
+                                    active: gitService.pullMode === "ff-only"
+                                    modeColor:
+                                        gitService.pullMode === "ff-only"
+                                        ? Colors.magenta
+                                        : Colors.cyan
                                     enabledAction: !gitService.actionBusy
                                     onTriggered: gitService.cyclePullMode()
                                 }
@@ -1236,8 +1298,13 @@ PanelWindow {
                                     width: 124
                                     label:
                                         gitService.selectedRemoteExists
-                                        ? "PUSH ▸"
+                                        ? "PUSH"
                                         : "CREATE REMOTE"
+                                    rightIcon:
+                                        gitService.selectedRemoteExists
+                                        ? "▸"
+                                        : ""
+                                    iconPixelSize: 25
                                     enabledAction:
                                         !gitService.actionBusy
                                         && !!gitService.selectedRemoteBranch

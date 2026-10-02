@@ -702,22 +702,39 @@ Scope {
             return false;
         }
 
-        const roomHead =
+        const operatedRoomHead =
+            String(
+                postOp.expectedRoomHead
+                || postOp.expected_room_head
+                || normalized.head
+            );
+        const currentRoomHead =
             String(
                 postOp.currentRoomHead
                 || postOp.current_room_head
-                || normalized.head
+                || operatedRoomHead
             );
+        const roomHeadUnchanged =
+            postOp.roomBranchUnchanged !== undefined
+            ? Boolean(postOp.roomBranchUnchanged)
+            : postOp.room_branch_unchanged !== undefined
+            ? Boolean(postOp.room_branch_unchanged)
+            : currentRoomHead === operatedRoomHead;
 
-        if (armedHead && roomHead !== armedHead) {
+        if (armedHead && operatedRoomHead !== armedHead) {
             block(
-                "POST-OP DRIFT // ROOM HEAD CHANGED",
-                normalized
+                "POST-OP DRIFT // OPERATED ROOM HEAD DOES NOT MATCH ARMED",
+                normalized,
+                {
+                    armedHead: armedHead,
+                    operatedRoomHead: operatedRoomHead,
+                    currentRoomHead: currentRoomHead
+                }
             );
             return false;
         }
 
-        postOpHead = roomHead;
+        postOpHead = operatedRoomHead;
         lastReason = "POST-OP CLEAN";
         lastError = "";
 
@@ -727,7 +744,9 @@ Scope {
             normalized,
             {
                 source: "POST_OP",
-                roomHeadUnchanged: true
+                operatedRoomHead: operatedRoomHead,
+                currentRoomHead: currentRoomHead,
+                roomHeadUnchanged: roomHeadUnchanged
             }
         );
 

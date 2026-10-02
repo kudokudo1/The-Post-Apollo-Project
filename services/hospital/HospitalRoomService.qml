@@ -31,6 +31,31 @@ Scope {
         && baseHead.length > 0
         && team.length > 0
 
+    readonly property bool canRehearse:
+        available
+        && action === "PREPARE"
+        && integrationMode === "DIVERGED"
+        && head.length > 0
+        && base.length > 0
+        && baseHead.length > 0
+        && team.length > 0
+
+    property bool rehearsing: false
+    property string rehearsalStatus: ""
+    property var rehearsalConflicts: []
+    property var rehearsalChangedFiles: []
+    property int rehearsalFileCount: 0
+    property int rehearsalAdditions: 0
+    property int rehearsalDeletions: 0
+    property string rehearsalMergeBase: ""
+    property string rehearsalResultTree: ""
+    readonly property string rehearsalDetail:
+        rehearsalConflicts.length > 0
+        ? rehearsalConflicts.slice(0, 3).join(" • ")
+        : rehearsalStatus === "CLEAN_MERGE"
+        ? "TEMP MERGE CLEAN // PATIENT UNTOUCHED"
+        : ""
+
     property bool integrating: false
 
     property bool running: false
@@ -59,6 +84,13 @@ Scope {
     property int exitCode: -1
     property string stdoutText: ""
     property string stderrText: ""
+
+    property bool rehearseExitSeen: false
+    property bool rehearseStdoutSeen: false
+    property bool rehearseStderrSeen: false
+    property int rehearseExitCode: -1
+    property string rehearseStdoutText: ""
+    property string rehearseStderrText: ""
 
     property bool integrateExitSeen: false
     property bool integrateStdoutSeen: false
@@ -93,6 +125,14 @@ Scope {
         baseHead = "";
         integrationMode = "";
         disarm();
+        rehearsalStatus = "";
+        rehearsalConflicts = [];
+        rehearsalChangedFiles = [];
+        rehearsalFileCount = 0;
+        rehearsalAdditions = 0;
+        rehearsalDeletions = 0;
+        rehearsalMergeBase = "";
+        rehearsalResultTree = "";
         diffFileCount = 0;
         additions = 0;
         deletions = 0;
@@ -104,7 +144,7 @@ Scope {
     }
 
     function runInspection(mode) {
-        if (running)
+        if (running || rehearsing || integrating)
             return;
 
         const targetRepo = String(repository || "").trim();
@@ -126,8 +166,17 @@ Scope {
             return;
         }
 
-        if (targetMode === "prepare")
+        if (targetMode === "prepare") {
             disarm();
+            rehearsalStatus = "";
+            rehearsalConflicts = [];
+            rehearsalChangedFiles = [];
+            rehearsalFileCount = 0;
+            rehearsalAdditions = 0;
+            rehearsalDeletions = 0;
+            rehearsalMergeBase = "";
+            rehearsalResultTree = "";
+        }
 
         running = true;
         available = false;
@@ -239,6 +288,131 @@ Scope {
         summary = "ROOM // UNKNOWN RESPONSE";
     }
 
+    function rehearsePrepared() {
+        if (running || rehearsing || integrating)
+            return;
+
+        if (!canRehearse) {
+            if (integrationMode && integrationMode !== "DIVERGED")
+                summary = "REHEARSE REFUSED // " + integrationMode;
+            else
+                summary = "REHEARSE REFUSED // PREPARE DIVERGED FIRST";
+            return;
+        }
+
+        const localPath = String(localRepoPath || "").trim();
+
+        if (!localPath) {
+            lastError = "REHEARSE REFUSED // LOCAL PATIENT NOT READY";
+            summary = lastError;
+            return;
+        }
+
+        rehearsing = true;
+        lastError = "";
+        rehearsalStatus = "";
+        rehearsalConflicts = [];
+        rehearsalChangedFiles = [];
+        rehearsalFileCount = 0;
+        rehearsalAdditions = 0;
+        rehearsalDeletions = 0;
+        rehearsalMergeBase = "";
+        rehearsalResultTree = "";
+        summary = "REHEARSE // ISOLATED TEMP PATIENT";
+
+        rehearseExitSeen = false;
+        rehearseStdoutSeen = false;
+        rehearseStderrSeen = false;
+        rehearseExitCode = -1;
+        rehearseStdoutText = "";
+        rehearseStderrText = "";
+
+        rehearseProcess.exec([
+            "bash",
+            "-lc",
+            'exec "$HOME/.local/bin/px" rehearse "$1" "$2" "$3" "$4" "$5" "$6" "$7"',
+            "px-rehearse",
+            repository,
+            team,
+            branch,
+            head,
+            base,
+            baseHead,
+            localPath
+        ]);
+
+        rehearseWatchdog.restart();
+    }
+
+    function maybeFinishRehearse() {
+        if (!rehearsing
+                || !rehearseExitSeen
+                || !rehearseStdoutSeen
+                || !rehearseStderrSeen)
+            return;
+
+        rehearsing = false;
+        rehearseWatchdog.stop();
+
+        if (rehearseExitCode !== 0) {
+            available = false;
+            lastError = String(
+                rehearseStderrText
+                || rehearseStdoutText
+                || ("PX REHEARSE EXIT " + rehearseExitCode)
+            ).trim();
+            summary = "REHEARSE REFUSED // " + lastError;
+            return;
+        }
+
+        try {
+            const data = JSON.parse(
+                String(rehearseStdoutText || "").trim()
+            );
+
+            const status =
+                String(data.status || "UNKNOWN").toUpperCase();
+            const totals = data.totals || {};
+
+            rehearsalStatus = status;
+            rehearsalConflicts =
+                Array.isArray(data.conflicts)
+                ? data.conflicts
+                : [];
+            rehearsalChangedFiles =
+                Array.isArray(data.changed_files)
+                ? data.changed_files
+                : [];
+            rehearsalFileCount = Number(totals.files || 0);
+            rehearsalAdditions = Number(totals.additions || 0);
+            rehearsalDeletions = Number(totals.deletions || 0);
+            rehearsalMergeBase = String(data.merge_base || "");
+            rehearsalResultTree = String(data.result_tree || "");
+
+            available = true;
+            lastError = "";
+
+            if (status === "CLEAN_MERGE") {
+                summary = "REHEARSE // CLEAN MERGE // "
+                          + rehearsalFileCount
+                          + " FILES // +"
+                          + rehearsalAdditions
+                          + " / -"
+                          + rehearsalDeletions;
+            } else if (status === "CONFLICTS") {
+                summary = "REHEARSE // CONFLICTS // "
+                          + rehearsalConflicts.length
+                          + " FILES";
+            } else {
+                summary = "REHEARSE // " + status;
+            }
+        } catch (error) {
+            available = false;
+            lastError = "REHEARSE PARSE // " + String(error);
+            summary = lastError;
+        }
+    }
+
     function armPrepared() {
         if (!canArm) {
             if (integrationMode && integrationMode !== "FAST_FORWARD")
@@ -271,7 +445,7 @@ Scope {
     }
 
     function integrateArmed() {
-        if (integrating || running)
+        if (integrating || running || rehearsing)
             return;
 
         if (!armed) {
@@ -428,6 +602,32 @@ Scope {
     }
 
     Process {
+        id: rehearseProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                roomService.rehearseStdoutText = this.text;
+                roomService.rehearseStdoutSeen = true;
+                roomService.maybeFinishRehearse();
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                roomService.rehearseStderrText = this.text;
+                roomService.rehearseStderrSeen = true;
+                roomService.maybeFinishRehearse();
+            }
+        }
+
+        onExited: function(code, exitStatus) {
+            roomService.rehearseExitCode = Number(code);
+            roomService.rehearseExitSeen = true;
+            roomService.maybeFinishRehearse();
+        }
+    }
+
+    Process {
         id: integrateProcess
 
         stdout: StdioCollector {
@@ -495,6 +695,25 @@ Scope {
 
             if (inspectProcess.running)
                 inspectProcess.running = false;
+        }
+    }
+
+    Timer {
+        id: rehearseWatchdog
+        interval: 30000
+        repeat: false
+
+        onTriggered: {
+            if (!roomService.rehearsing)
+                return;
+
+            roomService.rehearsing = false;
+            roomService.available = false;
+            roomService.lastError = "PX REHEARSE TIMEOUT";
+            roomService.summary = roomService.lastError;
+
+            if (rehearseProcess.running)
+                rehearseProcess.running = false;
         }
     }
 

@@ -203,34 +203,6 @@ Item {
 
             // ===== DRAWER HEADER ==================================
 
-            MouseArea {
-                id: resizeHandle
-
-                width: parent.width - 276
-                height: 30
-
-                hoverEnabled: true
-                cursorShape: Qt.SizeVerCursor
-
-                property real startHeight: 0
-                property real startSceneY: 0
-
-                onPressed: function(mouse) {
-                    startHeight = root.height;
-                    startSceneY = mapToItem(null, mouse.x, mouse.y).y;
-                }
-
-                onPositionChanged: function(mouse) {
-                    if (!pressed)
-                        return;
-
-                    const sceneY = mapToItem(null, mouse.x, mouse.y).y;
-                    root.heightRequested(
-                        startHeight + (startSceneY - sceneY)
-                    );
-                }
-            }
-
             Row {
                 width: parent.width
                 height: 30
@@ -642,6 +614,44 @@ Item {
                         }
                     }
                 }
+            }
+        }
+
+        // Overlay the title area without consuming Column height.
+        MouseArea {
+            id: resizeHandle
+
+            anchors {
+                left: parent.left
+                top: parent.top
+                leftMargin: 9
+                topMargin: 9
+            }
+
+            width: parent.width - 294
+            height: 30
+            z: 20
+
+            hoverEnabled: true
+            cursorShape: Qt.SizeVerCursor
+
+            property real startHeight: 0
+            property real startSceneY: 0
+
+            onPressed: function(mouse) {
+                startHeight = root.height;
+                startSceneY = mapToItem(null, mouse.x, mouse.y).y;
+            }
+
+            onPositionChanged: function(mouse) {
+                if (!pressed)
+                    return;
+
+                const sceneY = mapToItem(null, mouse.x, mouse.y).y;
+
+                root.heightRequested(
+                    startHeight + (startSceneY - sceneY)
+                );
             }
         }
     }

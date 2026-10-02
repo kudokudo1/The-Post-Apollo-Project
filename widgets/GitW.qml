@@ -805,11 +805,11 @@ PanelWindow {
             z: 100
             anchors {
                 left: parent.left
-                leftMargin: 10
+                leftMargin: 16
                 top: parent.top
-                topMargin: 138
+                topMargin: 148
                 bottom: parent.bottom
-                bottomMargin: 18
+                bottomMargin: 26
             }
 
             count: gitService.repoCount
@@ -829,11 +829,11 @@ PanelWindow {
             z: 100
             anchors {
                 right: parent.right
-                rightMargin: 10
+                rightMargin: 16
                 top: parent.top
-                topMargin: 138
+                topMargin: 148
                 bottom: parent.bottom
-                bottomMargin: 18
+                bottomMargin: 26
             }
 
             count: gitService.remoteBranchCount
@@ -1215,7 +1215,7 @@ PanelWindow {
 
                         Rectangle {
                             width: parent.width
-                            height: 58
+                            height: 62
                             color: Colors.dark
                             border.width: 1
                             border.color: Colors.orange
@@ -1282,6 +1282,7 @@ PanelWindow {
 
                                 ActionButton {
                                     width: 94
+                                    height: 40
                                     label: "FETCH"
                                     enabledAction: !gitService.actionBusy
                                     selectedAction: gitService.actionTitle === "FETCH"
@@ -1290,6 +1291,7 @@ PanelWindow {
 
                                 ActionButton {
                                     width: 104
+                                    height: 40
                                     label: "PULL"
                                     leftIcon: "◂"
                                     iconPixelSize: 31
@@ -1302,7 +1304,7 @@ PanelWindow {
 
                                 ModeActuator {
                                     width: 52
-                                    height: 36
+                                    height: 40
                                     icon: gitService.pullModeIcon
                                     tag: gitService.pullModeLabel
                                     active: true
@@ -1316,6 +1318,7 @@ PanelWindow {
 
                                 ActionButton {
                                     width: 124
+                                    height: 40
                                     label:
                                         gitService.selectedRemoteExists
                                         ? "PUSH"
@@ -1338,11 +1341,12 @@ PanelWindow {
 
                         Row {
                             width: parent.width
-                            height: 36
+                            height: 40
                             spacing: 10
 
                             ActionButton {
                                 width: 124
+                                height: 40
                                 label: "STATUS"
                                 enabledAction: !gitService.actionBusy
                                 selectedAction: gitService.actionTitle === "STATUS"
@@ -1351,6 +1355,7 @@ PanelWindow {
 
                             ActionButton {
                                 width: 124
+                                height: 40
                                 label: "DIFF"
                                 enabledAction: !gitService.actionBusy
                                 selectedAction: gitService.actionTitle === "DIFF"
@@ -1359,6 +1364,7 @@ PanelWindow {
 
                             ActionButton {
                                 width: 124
+                                height: 40
                                 label: "LOG"
                                 enabledAction: !gitService.actionBusy
                                 selectedAction: gitService.actionTitle === "LOG"
@@ -1367,6 +1373,7 @@ PanelWindow {
 
                             ActionButton {
                                 width: 124
+                                height: 40
                                 label: "LAZYGIT"
                                 enabledAction: true
                                 onTriggered: gitService.launchLazygit()
@@ -1380,15 +1387,10 @@ PanelWindow {
                                     !gitService.actionBusy
                                     && gitService.worktree === "CLEAN"
 
-                                color:
-                                    cleanIdle
-                                    ? Qt.rgba(0.08, 0.08, 0.10, 0.82)
-                                    : Colors.dark
+                                color: Colors.dark
                                 border.width: 1
                                 border.color:
-                                    cleanIdle
-                                    ? Qt.rgba(0.58, 0.58, 0.62, 0.42)
-                                    : gitService.actionExitCode === 0
+                                    gitService.actionExitCode === 0
                                     ? Colors.cyan
                                     : Colors.red
 
@@ -1398,16 +1400,14 @@ PanelWindow {
                                         gitService.actionBusy
                                         ? gitService.actionTitle + " // RUNNING"
                                         : gitService.worktree
-                                    font.pixelSize: 9
+                                    font.pixelSize: 10
                                     color:
-                                        parent.cleanIdle
-                                        ? Colors.white
-                                        : gitService.actionExitCode === 0
+                                        gitService.actionExitCode === 0
                                         ? Colors.cyan
                                         : Colors.red
                                     opacity:
                                         parent.cleanIdle
-                                        ? 0.38
+                                        ? 0.34
                                         : 1.0
                                 }
                             }

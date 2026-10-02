@@ -19,6 +19,7 @@ Scope {
     property string latestRunStatus: ""
     property string latestRunConclusion: ""
     property string latestRunBranch: ""
+    property var rooms: []
 
     property string lastError: ""
 
@@ -42,6 +43,7 @@ Scope {
         latestRunStatus = "";
         latestRunConclusion = "";
         latestRunBranch = "";
+        rooms = [];
         lastError = "";
     }
 
@@ -95,6 +97,9 @@ Scope {
         const runs = data.runs || {};
         runCount = Number(runs.count || 0);
 
+        const roomBlock = data.rooms || {};
+        rooms = Array.isArray(roomBlock.items) ? roomBlock.items : [];
+
         const latest = runs.latest || null;
 
         if (latest) {
@@ -103,6 +108,61 @@ Scope {
             latestRunConclusion = String(latest.conclusion || "").toUpperCase();
             latestRunBranch = String(latest.branch || "");
         }
+    }
+
+    function roomFor(team) {
+        const wanted = String(team || "");
+
+        for (let i = 0; i < rooms.length; ++i) {
+            const room = rooms[i] || {};
+
+            if (String(room.team || "") === wanted)
+                return room;
+        }
+
+        return null;
+    }
+
+    function roomState(team) {
+        const room = roomFor(team);
+        return room ? String(room.state || "UNKNOWN").toUpperCase() : "WAITING";
+    }
+
+    function roomLabel(team) {
+        if (running)
+            return "READING";
+
+        const room = roomFor(team);
+
+        if (!room)
+            return available ? "NO DATA" : "WAITING AUDIT";
+
+        const state = String(room.state || "UNKNOWN").toUpperCase();
+        const ahead = Number(room.ahead || 0);
+        const behind = Number(room.behind || 0);
+        const head = String(room.head || "").slice(0, 8);
+
+        if (state === "IN_MAIN")
+            return head ? "IN MAIN • " + head : "IN MAIN";
+
+        if (state === "AT_MAIN")
+            return "AT MAIN";
+
+        if (state === "AHEAD")
+            return "AHEAD +" + ahead;
+
+        if (state === "DIVERGED")
+            return "DIVERGED +" + ahead + "/-" + behind;
+
+        if (state === "MISSING")
+            return "MISSING";
+
+        return state;
+    }
+
+    function roomBranch(team) {
+        const room = roomFor(team);
+        return room ? String(room.branch || "") : "";
     }
 
     function maybeFinish() {
@@ -157,7 +217,7 @@ Scope {
 
     Timer {
         id: watchdog
-        interval: 10000
+        interval: 20000
         repeat: false
 
         onTriggered: {

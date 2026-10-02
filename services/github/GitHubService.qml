@@ -75,6 +75,7 @@ Scope {
     property string factoryValidationMessage: ""
     property string factoryInstallBranch: ""
     property string factoryPullRequest: ""
+    property string factoryInstallCommit: ""
     property string factoryLastTemplate: ""
     property string factoryLastTrigger: ""
     property string factoryLastSlug: ""
@@ -297,6 +298,7 @@ Scope {
         factoryValidationMessage = "";
         factoryInstallBranch = "";
         factoryPullRequest = "";
+        factoryInstallCommit = "";
         factoryLastTemplate = "";
         factoryLastTrigger = "";
         factoryLastSlug = "";
@@ -412,6 +414,7 @@ Scope {
         factoryValidationMessage = String(validation.message || "");
         factoryInstallBranch = String(install.branch || "");
         factoryPullRequest = String(install.pull_request || "");
+        factoryInstallCommit = String(install.commit || "");
     }
 
     function maybeFinishFactory() {
@@ -447,7 +450,9 @@ Scope {
         factoryBusy = false;
         factoryWatchdog.stop();
 
-        if (factoryMode === "install" && factoryExitCode === 0 && factoryPullRequest)
+        if (factoryMode === "install"
+                && factoryExitCode === 0
+                && (factoryInstallCommit || factoryPullRequest))
             refresh();
     }
 

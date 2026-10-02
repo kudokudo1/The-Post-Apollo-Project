@@ -1187,14 +1187,17 @@ PanelWindow {
                                     GohuText {
                                         width: parent.width
                                         text:
-                                            gitService.upstream
-                                            ? "TRACKING "
-                                              + gitService.upstream
-                                              + "  //  LOCAL +"
-                                              + gitService.ahead
-                                              + "  //  REMOTE +"
-                                              + gitService.behind
-                                            : "NO TRACKING BRANCH // PICK A REMOTE TARGET ABOVE"
+                                            (
+                                                gitService.upstream
+                                                ? "TRACKING "
+                                                  + gitService.upstream
+                                                  + "  //  LOCAL +"
+                                                  + gitService.ahead
+                                                  + "  //  REMOTE +"
+                                                  + gitService.behind
+                                                : "NO TRACKING BRANCH // PICK A REMOTE TARGET ABOVE"
+                                            )
+                                            + "  //  SAFE PULL = FAST-FORWARD ONLY"
                                         font.pixelSize: 8
                                         color:
                                             gitService.upstream
@@ -1214,7 +1217,7 @@ PanelWindow {
 
                                 ActionButton {
                                     width: 116
-                                    label: "← PULL"
+                                    label: "← SAFE PULL"
                                     enabledAction:
                                         !gitService.actionBusy
                                         && gitService.selectedRemoteExists

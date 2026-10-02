@@ -27,7 +27,10 @@ PanelWindow {
         selectedRoomTeam = selectedRoomTeam === candidate ? "" : candidate;
     }
 
-    onSelectedRoomTeamChanged: roomService.clearResult()
+    onSelectedRoomTeamChanged: {
+        roomService.clearResult();
+        certificationCoordinator.bindRoom(roomService);
+    }
 
     property int panelWidth: 700
     property int panelHeight: 1320
@@ -92,12 +95,19 @@ PanelWindow {
     }
 
     Component.onCompleted: {
+        certificationCoordinator.bindRoom(roomService);
         hospitalGitService.refresh();
         patientService.refresh();
     }
 
     GitService {
         id: hospitalGitService
+    }
+
+    GitService {
+        id: hospitalEvidenceGitService
+        repoPath: patientService.repoRoot
+        repoLabel: "HOSPITAL PATIENT"
     }
 
     HospitalService {
@@ -119,6 +129,17 @@ PanelWindow {
         repository: githubService.repoSlug
         team: root.selectedRoomTeam
         localRepoPath: patientService.repoRoot
+    }
+
+    GitEvidenceProvider {
+        id: gitEvidenceProvider
+        gitService: hospitalEvidenceGitService
+        githubService: githubService
+    }
+
+    HospitalCertificationCoordinator {
+        id: certificationCoordinator
+        evidenceProvider: gitEvidenceProvider
     }
 
     Connections {
@@ -1007,9 +1028,7 @@ PanelWindow {
                                                 return;
                                             }
 
-                                            roomService.runInspection(
-                                                "prepare"
-                                            );
+                                            certificationCoordinator.prepare();
                                         }
                                     }
                                 }
@@ -1102,7 +1121,7 @@ PanelWindow {
                                     ? Qt.PointingHandCursor
                                     : Qt.ArrowCursor
 
-                                onClicked: roomService.rehearsePrepared()
+                                onClicked: certificationCoordinator.rehearse()
                             }
                         }
 
@@ -1116,15 +1135,31 @@ PanelWindow {
                             Rectangle {
                                 id: armButton
 
+                                readonly property string gateState:
+                                    certificationCoordinator.state
+                                readonly property bool rehearsalReady:
+                                    roomService.integrationMode !== "DIVERGED"
+                                    || roomService.rehearsalStatus === "CLEAN_MERGE"
                                 readonly property bool enabledAction:
-                                    (
-                                        roomService.canArm
-                                        || roomService.canArmMerge
-                                    )
-                                    && !roomService.running
+                                    !roomService.running
                                     && !roomService.rehearsing
                                     && !roomService.integrating
                                     && !roomService.postOpRunning
+                                    && (
+                                        (
+                                            gateState === "CANDIDATE"
+                                            && rehearsalReady
+                                            && certificationCoordinator.canRequestVerification
+                                        )
+                                        || (
+                                            gateState === "VERIFIED"
+                                            && certificationCoordinator.canCertify
+                                        )
+                                        || (
+                                            gateState === "CERTIFIED"
+                                            && certificationCoordinator.canArm
+                                        )
+                                    )
 
                                 width:
                                     (
@@ -1138,25 +1173,50 @@ PanelWindow {
                                     ? Colors.orange
                                     : roomService.armed
                                     ? Colors.orange
+                                    : gateState === "VERIFIED"
+                                      || gateState === "CERTIFIED"
+                                    ? Colors.magenta
                                     : Colors.black
-                                border.width: roomService.armed ? 2 : 1
+                                border.width:
+                                    roomService.armed
+                                    || gateState === "VERIFIED"
+                                    || gateState === "CERTIFIED"
+                                    ? 2 : 1
                                 border.color:
                                     roomService.armed
                                     ? Colors.orange
+                                    : gateState === "VERIFIED"
+                                      || gateState === "CERTIFIED"
+                                    ? Colors.magenta
                                     : armMouse.containsMouse
                                     ? Colors.orange
                                     : Colors.cyan
-                                opacity: enabledAction || roomService.armed
-                                         ? 1.0 : 0.42
+                                opacity:
+                                    enabledAction
+                                    || roomService.armed
+                                    || gateState === "VERIFIED"
+                                    || gateState === "CERTIFIED"
+                                    ? 1.0 : 0.42
 
                                 RectangularShadow {
                                     anchors.fill: parent
-                                    spread: roomService.armed ? 4 : 2
+                                    spread:
+                                        roomService.armed
+                                        || gateState === "VERIFIED"
+                                        || gateState === "CERTIFIED"
+                                        ? 4 : 2
                                     z: -1
-                                    opacity: roomService.armed ? 0.38 : 0.14
+                                    opacity:
+                                        roomService.armed
+                                        || gateState === "VERIFIED"
+                                        || gateState === "CERTIFIED"
+                                        ? 0.38 : 0.14
                                     color:
                                         roomService.armed
                                         ? Colors.orange
+                                        : gateState === "VERIFIED"
+                                          || gateState === "CERTIFIED"
+                                        ? Colors.magenta
                                         : Colors.cyan
                                 }
 
@@ -1169,13 +1229,28 @@ PanelWindow {
                                             ? "MERGE ARMED"
                                             : "ARMED"
                                           )
-                                        : roomService.canArmMerge
-                                        ? "ARM MERGE"
+                                        : gateState === "CANDIDATE"
+                                        ? (
+                                            gitEvidenceProvider.requestBusy
+                                            ? "VERIFYING"
+                                            : "VERIFY"
+                                          )
+                                        : gateState === "VERIFIED"
+                                        ? "CERTIFY"
+                                        : gateState === "CERTIFIED"
+                                        ? (
+                                            roomService.canArmMerge
+                                            ? "ARM MERGE"
+                                            : "ARM"
+                                          )
                                         : "ARM"
                                     font.pixelSize: 9
                                     color:
                                         roomService.armed
                                         ? Colors.black
+                                        : gateState === "VERIFIED"
+                                          || gateState === "CERTIFIED"
+                                        ? Colors.magenta
                                         : Colors.cyan
                                 }
 
@@ -1192,7 +1267,20 @@ PanelWindow {
                                         ? Qt.PointingHandCursor
                                         : Qt.ArrowCursor
 
-                                    onClicked: roomService.armPrepared()
+                                    onClicked: {
+                                        if (armButton.gateState === "CANDIDATE") {
+                                            certificationCoordinator.requestVerification("");
+                                            return;
+                                        }
+
+                                        if (armButton.gateState === "VERIFIED") {
+                                            certificationCoordinator.certify();
+                                            return;
+                                        }
+
+                                        if (armButton.gateState === "CERTIFIED")
+                                            certificationCoordinator.arm();
+                                    }
                                 }
                             }
 
@@ -1201,6 +1289,7 @@ PanelWindow {
 
                                 readonly property bool enabledAction:
                                     roomService.armed
+                                    && certificationCoordinator.canIntegrate
                                     && !roomService.running
                                     && !roomService.rehearsing
                                     && !roomService.integrating
@@ -1269,17 +1358,24 @@ PanelWindow {
                                         ? Qt.PointingHandCursor
                                         : Qt.ArrowCursor
 
-                                    onClicked: roomService.integrateArmed()
+                                    onClicked: certificationCoordinator.integrate()
                                 }
                             }
                         }
 
                         GohuText {
                             width: parent.width
-                            text: roomService.summary
+                            text:
+                                certificationCoordinator.state !== "IDLE"
+                                ? "CERT // "
+                                  + certificationCoordinator.state
+                                  + " // "
+                                  + roomService.summary
+                                : roomService.summary
                             font.pixelSize: 9
                             color:
-                                roomService.lastError
+                                certificationCoordinator.lastError
+                                || roomService.lastError
                                 ? Colors.red
                                 : roomService.postOpStatus === "POST_OP_CLEAN"
                                 ? Colors.cyan

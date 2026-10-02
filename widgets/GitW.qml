@@ -526,8 +526,8 @@ PanelWindow {
                     : actionButton.selectedAction
                     ? 0.68
                     : actionButton.enabledAction
-                    ? 0.62
-                    : 0.12
+                    ? 0.78
+                    : 0.10
                 color:
                     actionButton.hovered || actionButton.selectedAction
                     ? Colors.orange

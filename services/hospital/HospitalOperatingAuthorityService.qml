@@ -19,6 +19,7 @@ Scope {
 
     property string lastError: ""
     property string lastEvent: ""
+    property bool hydrated: false
 
     readonly property bool available:
         ownerTeam.length === 0
@@ -87,6 +88,7 @@ Scope {
 
         lastError = "";
         lastEvent = "";
+        hydrated = true;
     }
 
     function persist() {
@@ -159,10 +161,40 @@ Scope {
         }
 
         if (ownerTeam === requester) {
-            ownerBranch = String(branch || ownerBranch);
-            ownerHead = String(head || ownerHead);
+            const requestedBranch = String(branch || "");
+            const requestedHead = String(head || "");
+
+            const branchMismatch =
+                requestedBranch.length > 0
+                && ownerBranch.length > 0
+                && requestedBranch !== ownerBranch;
+            const headMismatch =
+                requestedHead.length > 0
+                && ownerHead.length > 0
+                && requestedHead !== ownerHead;
+
+            if (branchMismatch || headMismatch) {
+                lastError =
+                    "AUTHORITY COLLISION // "
+                    + requester
+                    + " ALREADY OWNS DIFFERENT SNAPSHOT";
+
+                appendEvent(
+                    "OWNERSHIP_CHANGE_REFUSED",
+                    requester,
+                    {
+                        currentBranch: ownerBranch,
+                        currentHead: ownerHead,
+                        requestedBranch: requestedBranch,
+                        requestedHead: requestedHead
+                    }
+                );
+
+                collisionDetected(ownerTeam, requester);
+                return false;
+            }
+
             lastError = "";
-            persist();
             return true;
         }
 
@@ -204,6 +236,27 @@ Scope {
             && ownerLeaseId === String(leaseId || "");
     }
 
+    function recoverLease(team, branch, head) {
+        const requester = String(team || "");
+        const requestedBranch = String(branch || "");
+        const requestedHead = String(head || "");
+
+        if (!hydrated || ownerTeam !== requester)
+            return "";
+
+        if (requestedBranch.length > 0
+                && ownerBranch.length > 0
+                && requestedBranch !== ownerBranch)
+            return "";
+
+        if (requestedHead.length > 0
+                && ownerHead.length > 0
+                && requestedHead !== ownerHead)
+            return "";
+
+        return ownerLeaseId;
+    }
+
     function releaseSlot(team, leaseId, reason) {
         const requester = String(team || "");
 
@@ -214,23 +267,32 @@ Scope {
         }
 
         const releasedTeam = ownerTeam;
+        const releasedBranch = ownerBranch;
+        const releasedHead = ownerHead;
+        const releasedLeaseId = ownerLeaseId;
+        const releasedAcquiredAt = acquiredAt;
+
+        appendEvent(
+            "RELEASED",
+            releasedTeam,
+            {
+                reason: String(reason || ""),
+                branch: releasedBranch,
+                head: releasedHead,
+                leaseId: releasedLeaseId,
+                acquiredAt: releasedAcquiredAt
+            }
+        );
 
         ownerTeam = "";
         ownerBranch = "";
         ownerHead = "";
         ownerLeaseId = "";
         acquiredAt = "";
-
-        appendEvent(
-            "RELEASED",
-            releasedTeam,
-            {
-                reason: String(reason || "")
-            }
-        );
+        lastError = "";
+        persist();
 
         slotReleased(releasedTeam);
-        lastError = "";
 
         promoteNext();
         return true;

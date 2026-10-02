@@ -552,15 +552,12 @@ Scope {
             refreshing = false;
             refreshWatchdog.stop();
 
-            if (!staleRead) {
+            if (!staleRead && !lastError) {
                 publishPendingModels();
                 ensureRemoteSelection();
                 topologyRevision += 1;
-
-                if (!lastError) {
-                    available = true;
-                    refreshed();
-                }
+                available = true;
+                refreshed();
             }
 
             if (refreshPending || staleRead) {

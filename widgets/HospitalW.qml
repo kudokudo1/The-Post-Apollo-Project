@@ -28,7 +28,7 @@ PanelWindow {
     }
 
     property int panelWidth: 700
-    property int panelHeight: 1040
+    property int panelHeight: 1370
     property int panelTopMargin: 0
     property int panelLeftMargin: 50
     property int frameInset: 8
@@ -389,7 +389,7 @@ PanelWindow {
                 fill: parent
                 leftMargin: 18
                 topMargin: 18
-                rightMargin: 58
+                rightMargin: 18
                 bottomMargin: 18
             }
 
@@ -976,9 +976,9 @@ PanelWindow {
                 top: parent.top
                 bottom: parent.bottom
                 right: parent.right
-                topMargin: 20
-                bottomMargin: 20
-                rightMargin: 10
+                topMargin: 8
+                bottomMargin: 0
+                rightMargin: 3
             }
 
             color: Colors.cyan
@@ -987,7 +987,7 @@ PanelWindow {
                 hospitalScroll.contentHeight
                 > hospitalScroll.height
 
-            opacity: scrollable ? 0.90 : 0.38
+            opacity: 1.0
             visible: true
             z: 300
 
@@ -1085,7 +1085,7 @@ PanelWindow {
                 }
 
                 color: Colors.magenta
-                opacity: scrollRail.scrollable ? 1.0 : 0.72
+                opacity: 1.0
 
                 RectangularShadow {
                     anchors.fill: parent

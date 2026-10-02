@@ -187,6 +187,21 @@ Item {
             selectedStepIndex = -1;
     }
 
+    onSelectedStepIndexChanged: {
+        Qt.callLater(function() {
+            if (logFlickable)
+                logFlickable.contentY = 0;
+        });
+    }
+
+    Connections {
+        target: root.githubService
+
+        function onInspectorRunIdChanged() {
+            root.selectedStepIndex = -1;
+        }
+    }
+
     component DrawerButton: Rectangle {
         id: button
 
@@ -719,6 +734,8 @@ Item {
                         }
 
                         Flickable {
+                            id: logFlickable
+
                             width: parent.width
                             height: parent.height - 30
 

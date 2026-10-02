@@ -2462,8 +2462,23 @@ PanelWindow {
                                 runSummary: root.selectedRun
 
                                 onHeightRequested: function(nextHeight) {
+                                    const bottomInFrame =
+                                        githubCameraBody.mapToItem(
+                                            frame,
+                                            0,
+                                            githubCameraBody.height - 4
+                                        ).y;
+
+                                    const maxHeight = Math.max(
+                                        300,
+                                        bottomInFrame - 18
+                                    );
+
                                     root.runInspectorHeight = Math.round(
-                                        Math.max(300, nextHeight)
+                                        Math.max(
+                                            300,
+                                            Math.min(maxHeight, nextHeight)
+                                        )
                                     );
                                 }
 

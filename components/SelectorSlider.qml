@@ -7,7 +7,7 @@ Rectangle {
     property int count: 0
     property int currentIndex: -1
     property color accentColor: Colors.cyan
-    property color handleColor: Colors.magenta
+    property color handleColor: Colors.white
     property string sideLabel: ""
     property bool enabledSlider: count > 1
 
@@ -179,11 +179,11 @@ Rectangle {
                 y: slider.handleYForIndex()
 
                 scale: dragArea.pressed ? 0.97 : 1.0
-                color: dragArea.pressed ? Colors.yellow : "#211A27"
+                color: dragArea.pressed ? Colors.yellow : Colors.white
                 border.width: 1
                 border.color: dragArea.pressed
                               ? Colors.orange
-                              : slider.handleColor
+                              : Colors.white
 
                 RectangularShadow {
                     anchors.fill: parent
@@ -207,8 +207,8 @@ Rectangle {
                     anchors.topMargin: 3
                     height: 2
                     radius: 1
-                    color: dragArea.pressed ? Colors.black : "#6C6073"
-                    opacity: 0.72
+                    color: dragArea.pressed ? Colors.black : Colors.white
+                    opacity: 0.48
                 }
 
                 Rectangle {
@@ -240,8 +240,8 @@ Rectangle {
                             radius: 1
                             color: dragArea.pressed
                                    ? Colors.black
-                                   : slider.handleColor
-                            opacity: 0.82
+                                   : Colors.black
+                            opacity: 0.58
                         }
                     }
                 }

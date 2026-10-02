@@ -5,6 +5,13 @@ Scope {
     id: coordinator
 
     property var roomService: null
+    property var evidenceProvider: null
+
+    property bool verificationPending: false
+    property string verificationRunId: ""
+    property string bridgeError: ""
+    property var lastGitEvidence: ({})
+    property var lastVerificationChecks: ({})
 
     HospitalOperatingAuthorityService {
         id: authority
@@ -37,10 +44,17 @@ Scope {
     }
 
     readonly property string state: certification.state
-    readonly property string lastError: certification.lastError
+    readonly property string lastError:
+        bridgeError
+        || certification.lastError
+        || authority.lastError
     readonly property string lastReason: certification.lastReason
 
     readonly property bool canVerify: certification.canVerify
+    readonly property bool canRequestVerification:
+        certification.canVerify
+        && evidenceProvider
+        && !verificationPending
     readonly property bool canCertify: certification.canCertify
     readonly property bool canArm: certification.canArm
     readonly property bool canIntegrate: certification.canIntegrate
@@ -53,6 +67,7 @@ Scope {
         string nextState,
         string eventType)
     signal certificationBlocked(string reason)
+    signal verificationEvidenceReady(var checks, var evidence)
 
     Connections {
         target: coordinator.roomService
@@ -99,8 +114,26 @@ Scope {
         }
     }
 
+    Connections {
+        target: coordinator.evidenceProvider
+        ignoreUnknownSignals: true
+
+        function onRequestFinished(packet) {
+            if (!coordinator.verificationPending)
+                return;
+
+            coordinator.verificationPending = false;
+            coordinator.verifyEvidencePacket(packet);
+        }
+    }
+
     function bindRoom(service) {
         roomService = service;
+        verificationPending = false;
+        verificationRunId = "";
+        bridgeError = "";
+        lastGitEvidence = ({});
+        lastVerificationChecks = ({});
 
         if (!roomService) {
             certification.bindRoom("", "");
@@ -157,11 +190,188 @@ Scope {
         if (!roomService)
             return false;
 
+        bridgeError = "";
+
         return certification.verifyCandidate(
             roomService.certificationSnapshot(),
             checks || {},
             runs || {}
         );
+    }
+
+    function checksFromEvidence(packet) {
+        const data = packet || {};
+        const target = data.target || {};
+        const github = data.github || {};
+        const facts = data.facts || {};
+        const completeness = data.completeness || {};
+        const summary = facts.runSummary || {};
+        const snapshot = roomService
+                         ? roomService.certificationSnapshot()
+                         : {};
+
+        const repositoryMatches =
+            String(target.repository || "")
+            === String(snapshot.repository || "");
+        const shaMatches =
+            String(target.sha || "")
+            === String(snapshot.head || "");
+
+        const total = Number(summary.total || 0);
+        const success = Number(summary.success || 0);
+        const active =
+            Number(summary.queued || 0)
+            + Number(summary.inProgress || 0);
+        const failed =
+            Number(summary.failure || 0)
+            + Number(summary.cancelled || 0)
+            + Number(summary.timedOut || 0)
+            + Number(summary.otherConclusion || 0);
+
+        let status = "PASS";
+        let reason = "EXACT-SHA RUNS CLEAN";
+
+        if (!repositoryMatches || !shaMatches) {
+            status = "FAIL";
+            reason = "EVIDENCE TARGET DOES NOT MATCH CANDIDATE";
+        } else if (String(completeness.requestError || "")) {
+            status = "ERROR";
+            reason = String(completeness.requestError);
+        } else if (String(github.lastError || "")) {
+            status = "ERROR";
+            reason = String(github.lastError);
+        } else if (!Boolean(completeness.githubAvailable)) {
+            status = "ERROR";
+            reason = "GITHUB EVIDENCE UNAVAILABLE";
+        } else if (!Boolean(completeness.exactRunQuery)) {
+            status = "WAITING";
+            reason = "EXACT-SHA RUN QUERY NOT COMPLETE";
+        } else if (String(completeness.inspectorError || "")) {
+            status = "ERROR";
+            reason = String(completeness.inspectorError);
+        } else if (total <= 0) {
+            status = "FAIL";
+            reason = "NO EXACT-SHA WORKFLOW RUNS";
+        } else if (active > 0) {
+            status = "WAITING";
+            reason = "WORKFLOW RUNS STILL ACTIVE";
+        } else if (failed > 0) {
+            status = "FAIL";
+            reason = "WORKFLOW RUN FAILED";
+        } else if (success !== total) {
+            status = "FAIL";
+            reason = "NOT ALL EXACT-SHA RUNS SUCCEEDED";
+        }
+
+        return {
+            passed: status === "PASS",
+            status: status,
+            reason: reason,
+            repositoryMatches: repositoryMatches,
+            shaMatches: shaMatches,
+            exactRunQuery: Boolean(completeness.exactRunQuery),
+            totalRuns: total,
+            successfulRuns: success,
+            activeRuns: active,
+            failedRuns: failed,
+            provider: String(data.provider || ""),
+            capturedAt: String(data.capturedAt || "")
+        };
+    }
+
+    function runsFromEvidence(packet) {
+        const data = packet || {};
+        const github = data.github || {};
+        const facts = data.facts || {};
+
+        return {
+            provider: String(data.provider || ""),
+            capturedAt: String(data.capturedAt || ""),
+            summary: facts.runSummary || {},
+            matchingRuns:
+                Array.isArray(github.matchingRuns)
+                ? github.matchingRuns.slice()
+                : [],
+            inspectedRun: github.inspectedRun || null,
+            completeness: data.completeness || {}
+        };
+    }
+
+    function requestVerification(runId) {
+        if (!roomService) {
+            bridgeError = "VERIFY // ROOM SERVICE MISSING";
+            return false;
+        }
+
+        if (!certification.canVerify) {
+            bridgeError =
+                certification.lastError
+                || "VERIFY // CANDIDATE REQUIRED";
+            return false;
+        }
+
+        if (!evidenceProvider
+                || typeof evidenceProvider.requestEvidence
+                    !== "function") {
+            bridgeError = "VERIFY // GIT EVIDENCE PROVIDER MISSING";
+            return false;
+        }
+
+        verificationPending = true;
+        verificationRunId = String(runId || "");
+        bridgeError = "";
+
+        const started = evidenceProvider.requestEvidence(
+            certification.candidateHead,
+            verificationRunId
+        );
+
+        if (!started) {
+            verificationPending = false;
+            bridgeError =
+                String(evidenceProvider.requestError || "")
+                || "VERIFY // EVIDENCE REQUEST REFUSED";
+            return false;
+        }
+
+        return true;
+    }
+
+    function verifyEvidencePacket(packet) {
+        if (!roomService || !certification.canVerify) {
+            bridgeError = "VERIFY // CANDIDATE NOT READY";
+            return false;
+        }
+
+        const checks = checksFromEvidence(packet);
+        const runs = runsFromEvidence(packet);
+
+        lastGitEvidence =
+            JSON.parse(JSON.stringify(packet || {}));
+        lastVerificationChecks =
+            JSON.parse(JSON.stringify(checks));
+
+        verificationEvidenceReady(
+            lastVerificationChecks,
+            lastGitEvidence
+        );
+
+        if (checks.status === "WAITING") {
+            bridgeError = checks.reason;
+            return false;
+        }
+
+        const accepted = certification.verifyCandidate(
+            roomService.certificationSnapshot(),
+            checks,
+            runs
+        );
+
+        bridgeError = accepted
+                      ? ""
+                      : certification.lastError;
+
+        return accepted;
     }
 
     function certify() {

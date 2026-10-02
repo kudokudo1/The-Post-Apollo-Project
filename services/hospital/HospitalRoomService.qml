@@ -140,6 +140,7 @@ Scope {
 
     signal inspected()
     signal integrated()
+    signal postOpStarted()
     signal postOpFinished()
 
     function disarm() {
@@ -658,6 +659,8 @@ Scope {
         postOpExitCode = -1;
         postOpStdoutText = "";
         postOpStderrText = "";
+
+        postOpStarted();
 
         postOpProcess.exec([
             "bash",

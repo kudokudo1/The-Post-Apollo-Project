@@ -1546,7 +1546,7 @@ PanelWindow {
                                     iconPixelSize: 29
                                     enabledAction:
                                         !gitService.actionBusy
-                                        && gitService.selectedRemoteExists
+                                        && gitService.selectedRemoteTargetValid
                                     selectedAction: gitService.actionTitle === "PULL"
                                     onTriggered: gitService.runSyncAction("pull")
                                 }

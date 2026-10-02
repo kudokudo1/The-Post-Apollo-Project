@@ -423,11 +423,21 @@ Item {
                 }
 
                 Rectangle {
+                    id: selectorHead
+
                     x: 67
                     y: 2
                     width: 5
                     height: 5
                     color: dialRoot.markerColor
+
+                    layer.enabled: true
+                    layer.effect: MultiEffect {
+                        shadowEnabled: true
+                        shadowColor: dialRoot.markerColor
+                        shadowOpacity: 0.74
+                        shadowBlur: 0.62
+                    }
                 }
             }
         }
@@ -469,8 +479,14 @@ Item {
                         shadowColor: optionMark.index === dialRoot.currentIndex
                                      ? dialRoot.markerColor
                                      : dialRoot.labelColor
-                        shadowOpacity: optionMark.index === dialRoot.currentIndex ? 0.58 : 0.26
-                        shadowBlur: 0.35
+                        shadowOpacity:
+                            optionMark.index === dialRoot.currentIndex
+                            ? 0.92
+                            : 0.22
+                        shadowBlur:
+                            optionMark.index === dialRoot.currentIndex
+                            ? 0.72
+                            : 0.28
                     }
                 }
 

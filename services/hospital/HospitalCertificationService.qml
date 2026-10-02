@@ -278,6 +278,16 @@ Scope {
             || status === "CLEAN";
     }
 
+    function bindRoom(targetRepository, targetTeam) {
+        repository = String(targetRepository || "");
+        team = String(targetTeam || "");
+
+        if (hydrated)
+            hydrate();
+        else
+            history = [];
+    }
+
     function resetLiveState() {
         state = "IDLE";
         lastError = "";

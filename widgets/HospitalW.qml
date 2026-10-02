@@ -13,6 +13,11 @@ PanelWindow {
 
     property bool menuOpen: false
     property string selectedCommitSha: ""
+    property string activeView: "main"
+
+    function setActiveView(viewName) {
+        activeView = String(viewName || "main");
+    }
 
     function toggleCommitSelection(sha) {
         const candidate = String(sha || "");
@@ -162,6 +167,75 @@ PanelWindow {
             opacity: 0.10
             color: Colors.cyan
             transparentBorder: true
+        }
+    }
+
+    component NavButton: Rectangle {
+        id: navButton
+
+        property string label: ""
+        property string viewName: ""
+        property bool selected: root.activeView === viewName
+
+        width: 112
+        height: 34
+
+        color: selected ? Colors.dark : Colors.black
+        border.width: 1
+        border.color: selected ? Colors.cyan : Colors.magenta
+
+        RectangularShadow {
+            anchors.fill: parent
+            spread: 3
+            z: -1
+            opacity: navMouse.pressed
+                     ? 0.55
+                     : navMouse.containsMouse
+                     ? 0.42
+                     : selected
+                     ? 0.28
+                     : 0.18
+            color: selected ? Colors.cyan : Colors.magenta
+        }
+
+        GohuText {
+            id: navText
+
+            anchors.centerIn: parent
+            text: navButton.label
+            font.pixelSize: 9
+            color: navMouse.pressed
+                   ? Colors.orange
+                   : navButton.selected
+                   ? Colors.cyan
+                   : navMouse.containsMouse
+                   ? Colors.orange
+                   : Colors.white
+
+            layer.enabled: true
+            layer.effect: DropShadow {
+                radius: 6
+                samples: 7
+                opacity: navMouse.pressed
+                         ? 0.70
+                         : navButton.selected
+                         ? 0.46
+                         : navMouse.containsMouse
+                         ? 0.42
+                         : 0.16
+                color: navText.color
+                transparentBorder: true
+            }
+        }
+
+        MouseArea {
+            id: navMouse
+
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+
+            onClicked: root.setActiveView(navButton.viewName)
         }
     }
 
@@ -412,6 +486,33 @@ PanelWindow {
                     z: -1
                     opacity: 0.34
                     color: Colors.cyan
+                }
+            }
+
+            Row {
+                id: hospitalNavigation
+
+                width: parent.width
+                spacing: 8
+
+                NavButton {
+                    label: "MAIN"
+                    viewName: "main"
+                }
+
+                NavButton {
+                    label: "PHONE"
+                    viewName: "phone"
+                }
+
+                NavButton {
+                    label: "INTERCOM"
+                    viewName: "intercom"
+                }
+
+                NavButton {
+                    label: "REPORTS"
+                    viewName: "reports"
                 }
             }
 
@@ -1248,6 +1349,88 @@ PanelWindow {
                     }
                 }
             }
+        }
+
+        Rectangle {
+            id: swappedView
+
+            visible: root.activeView !== "main"
+            z: 50
+
+            anchors {
+                top: parent.top
+                topMargin: 154
+                left: parent.left
+                right: parent.right
+                bottom: parent.bottom
+                margins: 0
+            }
+
+            color: Colors.black
+            border.width: 1
+            border.color: root.activeView === "phone"
+                          ? Colors.orange
+                          : root.activeView === "intercom"
+                          ? Colors.magenta
+                          : Colors.cyan
+
+            RectangularShadow {
+                anchors.fill: parent
+                spread: 4
+                z: -1
+                opacity: 0.22
+                color: swappedView.border.color
+            }
+
+            Column {
+                anchors {
+                    fill: parent
+                    margins: 16
+                }
+
+                spacing: 10
+
+                GohuText {
+                    text: root.activeView === "phone"
+                          ? "PHONE // DIRECT AI"
+                          : root.activeView === "intercom"
+                          ? "INTERCOM // WORK ROUTING"
+                          : "REPORTS // LOGS & EVIDENCE"
+                    font.pixelSize: 18
+                    color: swappedView.border.color
+                }
+
+                GohuText {
+                    width: parent.width
+                    text: root.activeView === "phone"
+                          ? "WINDOW READY // DIRECT PROVIDER CONNECTION"
+                          : root.activeView === "intercom"
+                          ? "WINDOW READY // ROOM CONNECTION"
+                          : "WINDOW READY // REPORT COLLECTION"
+                    font.pixelSize: 10
+                    color: Colors.cyan
+                }
+
+                Rectangle {
+                    width: parent.width
+                    height: 1
+                    color: swappedView.border.color
+                }
+
+                GohuText {
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    text: root.activeView === "phone"
+                          ? "The phone will connect directly to an available AI provider."
+                          : root.activeView === "intercom"
+                          ? "The intercom will send work to the appropriate Hospital room."
+                          : "The report desk will collect and preserve patient evidence."
+                    font.pixelSize: 11
+                    color: Colors.white
+                }
+            }
+        }
+
         }
 
     }

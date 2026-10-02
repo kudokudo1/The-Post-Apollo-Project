@@ -540,6 +540,9 @@ PanelWindow {
         property bool enabledAction: false
         property bool selectedAction: false
         property bool primaryBlue: false
+        property bool orangeAccent: false
+        property bool loading: false
+        property real loadingProgress: 0.0
         property string leftIcon: ""
         property string rightIcon: ""
         property int iconPixelSize: 24
@@ -557,6 +560,8 @@ PanelWindow {
             ? Colors.black
             : primaryBlue
             ? Colors.white
+            : orangeAccent
+            ? Colors.orange
             : selectedAction
             ? Colors.magenta
             : hovered
@@ -585,6 +590,8 @@ PanelWindow {
             ? Colors.magenta
             : primaryBlue
             ? (enabledAction ? Colors.blue : Colors.dark)
+            : orangeAccent && hovered
+            ? Colors.yellow
             : hovered || selectedAction
             ? Colors.yellow
             : Colors.black
@@ -595,6 +602,8 @@ PanelWindow {
             ? Colors.magenta
             : primaryBlue
             ? (hovered ? Colors.cyan : Colors.blue)
+            : orangeAccent
+            ? Colors.orange
             : hovered
             ? Colors.orange
             : selectedAction
@@ -610,6 +619,74 @@ PanelWindow {
             }
         }
 
+        onLoadingChanged: {
+            if (loading) {
+                loadingProgress = 0.0;
+                loadingFillAnimation.restart();
+            } else {
+                loadingFillAnimation.stop();
+                loadingProgress = 0.0;
+            }
+        }
+
+        SequentialAnimation {
+            id: loadingFillAnimation
+            running: false
+            loops: Animation.Infinite
+
+            NumberAnimation {
+                target: actionButton
+                property: "loadingProgress"
+                from: 0.0
+                to: 0.78
+                duration: 1500
+                easing.type: Easing.OutCubic
+            }
+
+            NumberAnimation {
+                target: actionButton
+                property: "loadingProgress"
+                from: 0.78
+                to: 0.94
+                duration: 1600
+                easing.type: Easing.OutQuad
+            }
+
+            PauseAnimation {
+                duration: 260
+            }
+
+            ScriptAction {
+                script: actionButton.loadingProgress = 0.12
+            }
+        }
+
+        Rectangle {
+            id: loadingFill
+
+            visible: actionButton.loading
+            anchors {
+                left: parent.left
+                bottom: parent.bottom
+                leftMargin: 1
+                bottomMargin: 1
+            }
+
+            width: Math.max(
+                0,
+                (parent.width - 2) * actionButton.loadingProgress
+            )
+            height: 4
+            z: 1
+
+            color:
+                actionButton.primaryBlue
+                ? Colors.orange
+                : Colors.yellow
+
+            opacity: 0.95
+        }
+
         GohuText {
             id: actionText
             anchors.centerIn: parent
@@ -618,6 +695,7 @@ PanelWindow {
                 && actionButton.rightIcon.length === 0
             text: actionButton.label
             font.pixelSize: 11
+            z: 2
             color: actionButton.contentColor
             opacity: actionButton.contentOpacity
 
@@ -644,6 +722,7 @@ PanelWindow {
         Row {
             anchors.centerIn: parent
             spacing: 6
+            z: 2
             visible:
                 actionButton.leftIcon.length > 0
                 || actionButton.rightIcon.length > 0
@@ -724,6 +803,8 @@ PanelWindow {
                 ? Colors.magenta
                 : actionButton.primaryBlue
                 ? Colors.blue
+                : actionButton.orangeAccent
+                ? Colors.orange
                 : actionButton.hovered || actionButton.selectedAction
                 ? Colors.orange
                 : Colors.cyan
@@ -2091,8 +2172,11 @@ PanelWindow {
                                                                         width: 184
                                                                         height: 38
                                                                         primaryBlue: true
+                                                                        loading:
+                                                                            githubService.factoryBusy
+                                                                            && githubService.factoryMode === "install"
                                                                         label: githubService.factoryBusy && githubService.factoryMode === "install"
-                                                                               ? "SAVING"
+                                                                               ? "SAVING // INSTALLING"
                                                                                : "SAVE WORKFLOW"
                                                                         enabledAction: githubService.available
                                                                                        && !githubService.factoryBusy
@@ -2285,6 +2369,7 @@ PanelWindow {
                                                                             width: 76
                                                                             height: 30
                                                                             label: root.runInspectorOpen ? "HIDE" : "DETAILS"
+                                                                            orangeAccent: true
                                                                             enabledAction: !!root.selectedRun
                                                                                            && !githubService.refreshing
                                                                             selectedAction: root.runInspectorOpen

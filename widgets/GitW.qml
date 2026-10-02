@@ -621,7 +621,7 @@ PanelWindow {
             : orangeAccent
             ? Colors.orange
             : orangeTextOnly
-            ? Colors.cyan
+            ? (hovered ? Colors.orange : Colors.cyan)
             : hovered
             ? Colors.orange
             : selectedAction
@@ -759,7 +759,7 @@ PanelWindow {
                     : actionButton.orangeAccent
                     ? Colors.orange
                     : actionButton.orangeTextOnly
-                    ? Colors.cyan
+                    ? Colors.orange
                     : actionButton.hovered || actionButton.selectedAction
                     ? Colors.orange
                     : Colors.cyan
@@ -793,7 +793,7 @@ PanelWindow {
                     : actionButton.orangeAccent
                     ? Colors.orange
                     : actionButton.orangeTextOnly
-                    ? Colors.cyan
+                    ? Colors.orange
                     : actionButton.hovered || actionButton.selectedAction
                     ? Colors.orange
                     : Colors.cyan
@@ -1943,6 +1943,7 @@ PanelWindow {
 
                             width: parent.width
                             height: parent.height - 178
+                            z: root.workflowMenuOpen ? 700 : 0
 
                             Item {
                                 id: githubControlCamera
@@ -2516,10 +2517,10 @@ PanelWindow {
                                 
                                                             visible: root.workflowMenuOpen
                                                                      && githubService.workflowCount > 0
-                                                            z: 500
+                                                            z: 1200
                                 
                                                             x: 9
-                                                            y: 348
+                                                            y: 316
                                                             width: parent.width - 18
                                 
                                                             height: Math.min(githubService.workflowCount, 5) * 30 + 8

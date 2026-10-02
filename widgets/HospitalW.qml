@@ -99,6 +99,11 @@ PanelWindow {
         originUrl: patientService.origin
     }
 
+    HospitalAuditService {
+        id: auditService
+        repository: githubService.repoSlug
+    }
+
     // Patient identity comes from HospitalService. Once local Git has resolved
     // the origin, hand only that identity to the PX-backed GitHub reader.
     Connections {
@@ -1119,10 +1124,48 @@ PanelWindow {
                     }
 
                     GohuText {
-                        text: "AUDIT"
+                        id: auditAction
+
+                        text: auditService.running
+                              ? "AUDIT // RUNNING"
+                              : auditService.available
+                              ? "AUDIT // " + auditService.status
+                              : "AUDIT"
                         font.pixelSize: 10
-                        color: Colors.cyan
-                        opacity: 0.45
+                        color: auditMouse.containsMouse
+                               ? Colors.orange
+                               : auditService.available
+                               ? Colors.magenta
+                               : auditService.lastError
+                               ? Colors.red
+                               : Colors.cyan
+                        opacity: auditService.running ? 0.60 : 1.0
+
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 7
+                            opacity: auditMouse.containsMouse
+                                     ? 0.52
+                                     : auditService.available
+                                     ? 0.42
+                                     : auditService.lastError
+                                     ? 0.44
+                                     : 0.28
+                            color: auditAction.color
+                            transparentBorder: true
+                        }
+
+                        MouseArea {
+                            id: auditMouse
+                            anchors.fill: parent
+                            anchors.margins: -8
+                            hoverEnabled: true
+                            enabled: !auditService.running && auditService.repository.length > 0
+                            cursorShape: Qt.PointingHandCursor
+
+                            onClicked: auditService.runAudit()
+                        }
                     }
 
                     GohuText {
@@ -1175,7 +1218,15 @@ PanelWindow {
                         bottomMargin: 5
                     }
 
-                    text: !hospitalGitService.available
+                    text: auditService.running
+                          ? "PX AUDIT RUNNING // " + auditService.repository
+                          : auditService.available
+                          ? "AUDIT " + auditService.status
+                            + " // " + String(auditService.workflowCount) + " WORKFLOWS"
+                            + " // " + String(auditService.runCount) + " RECENT RUNS"
+                          : auditService.lastError
+                          ? "AUDIT ERROR // " + auditService.lastError
+                          : !hospitalGitService.available
                           ? "LOCAL PATIENT OFFLINE"
                           : githubService.refreshing
                           ? "LOCAL LIVE // PX → GITHUB READING"

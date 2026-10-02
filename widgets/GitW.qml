@@ -542,6 +542,7 @@ PanelWindow {
         property bool primaryBlue: false
         property bool orangeAccent: false
         property bool loading: false
+        property bool loadingSucceeded: true
         property bool loadingComplete: false
         property bool loadingWasActive: false
         property real loadingProgress: 0.0
@@ -571,7 +572,12 @@ PanelWindow {
             : Colors.cyan
 
         readonly property real contentOpacity:
-            pressed || hovered || selectedAction || enabledAction
+            pressed
+            || hovered
+            || selectedAction
+            || enabledAction
+            || loading
+            || loadingComplete
             ? 1.0
             : 0.34
 
@@ -635,8 +641,14 @@ PanelWindow {
             if (loadingWasActive) {
                 loadingWasActive = false;
                 loadingPrefill.stop();
-                loadingComplete = true;
-                loadingCompletion.restart();
+
+                if (loadingSucceeded) {
+                    loadingComplete = true;
+                    loadingCompletion.restart();
+                } else {
+                    loadingComplete = false;
+                    loadingProgress = 0.0;
+                }
             }
         }
 
@@ -665,7 +677,7 @@ PanelWindow {
 
         Timer {
             id: loadingReset
-            interval: 700
+            interval: 2200
             repeat: false
 
             onTriggered: {
@@ -2203,9 +2215,15 @@ PanelWindow {
                                                                         loading:
                                                                             githubService.factoryBusy
                                                                             && githubService.factoryMode === "install"
+                                                                        loadingSucceeded:
+                                                                            githubService.factoryValidationStatus === "PASS"
+                                                                            && (
+                                                                                !!githubService.factoryInstallCommit
+                                                                                || !!githubService.factoryPullRequest
+                                                                            )
                                                                         label:
                                                                             saveWorkflowButton.loadingComplete
-                                                                            ? "READY"
+                                                                            ? "COMPLETE"
                                                                             : githubService.factoryBusy
                                                                               && githubService.factoryMode === "install"
                                                                             ? "SAVING // INSTALLING"
@@ -2278,6 +2296,7 @@ PanelWindow {
                                                                         ActionButton {
                                                                             width: parent.width - 258
                                                                             height: 30
+                                                                            orangeAccent: true
                                                                             enabledAction: githubService.available
                                                                                            && githubService.workflowCount > 0
                                                                                            && !githubService.refreshing
@@ -2294,6 +2313,7 @@ PanelWindow {
                                                                         ActionButton {
                                                                             width: 34
                                                                             height: 30
+                                                                            orangeAccent: true
                                                                             label: root.workflowMenuOpen ? "▴" : "▾"
                                                                             enabledAction: githubService.available
                                                                                            && githubService.workflowCount > 0
@@ -2524,9 +2544,7 @@ PanelWindow {
                                                                                 color:
                                                                                     parent.selected
                                                                                     ? Colors.magenta
-                                                                                    : workflowChoiceMouse.containsMouse
-                                                                                    ? Colors.orange
-                                                                                    : Colors.cyan
+                                                                                    : Colors.orange
                                                                                 elide: Text.ElideRight
                                                                             }
                                 
@@ -2537,8 +2555,8 @@ PanelWindow {
                                                                                     bottom: parent.bottom
                                                                                 }
                                                                                 height: 1
-                                                                                color: Colors.cyan
-                                                                                opacity: 0.18
+                                                                                color: Colors.orange
+                                                                                opacity: 0.24
                                                                             }
                                 
                                                                             MouseArea {

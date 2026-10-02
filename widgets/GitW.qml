@@ -1214,7 +1214,7 @@ PanelWindow {
 
                                 ActionButton {
                                     width: 94
-                                    label: "← PULL"
+                                    label: "◂ PULL"
                                     enabledAction:
                                         !gitService.actionBusy
                                         && gitService.selectedRemoteExists
@@ -1236,7 +1236,7 @@ PanelWindow {
                                     width: 124
                                     label:
                                         gitService.selectedRemoteExists
-                                        ? "PUSH →"
+                                        ? "PUSH ▸"
                                         : "CREATE REMOTE"
                                     enabledAction:
                                         !gitService.actionBusy

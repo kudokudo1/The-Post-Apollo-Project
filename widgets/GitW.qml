@@ -852,6 +852,7 @@ PanelWindow {
             count: gitService.repoCount
             currentIndex: gitService.repoIndexOfPath(gitService.repoPath)
             accentColor: Colors.magenta
+            handleGlowColor: Colors.orange
             sideLabel: "REPO"
 
             onIndexRequested: function(index) {
@@ -876,6 +877,7 @@ PanelWindow {
             count: gitService.remoteBranchCount
             currentIndex: gitService.selectedRemoteIndex
             accentColor: Colors.orange
+            handleGlowColor: Colors.cyan
             sideLabel: "REMOTE"
 
             onIndexRequested: function(index) {

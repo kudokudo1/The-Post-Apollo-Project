@@ -141,3 +141,37 @@ Certification accepts the Git/GitHub verification packet only when it identifies
 
 Hospital also rejects evidence when the provider reports that the exact-SHA query or inspected run targeted a different SHA than the candidate.
 
+
+
+## Verification commit point
+
+Verification uses two remote snapshot checks.
+
+1. Hospital checks the candidate room HEAD and base HEAD before requesting Git/GitHub evidence.
+2. GitEvidenceProvider gathers exact-SHA evidence.
+3. Hospital checks the same remote room HEAD and base HEAD again immediately before committing the VERIFIED transition.
+
+This closes the evidence-request race: a branch that moves while GitHub evidence is being collected cannot become VERIFIED against stale remote state.
+
+The coordinator's legacy direct `verify(checks, runs)` injection path is disabled. Production verification must enter through the Git evidence provider contract.
+
+## Evidence retention
+
+Verification checks and workflow/run evidence are retained as certification-owned state after VERIFIED.
+
+Later transitions such as CERTIFIED, ARMED, INTEGRATING, POST_OP, and IN_MAIN must carry forward the evidence that justified verification rather than rebuilding a packet that silently drops it.
+
+PX PREPARE exposes both:
+
+- `files` — the existing short operator preview
+- `changed_files` — the complete changed-file evidence list
+
+Hospital freezes the complete list into the certification snapshot when the extended PX contract is available.
+
+## Exact host-slot identity
+
+A HOST lease requires a non-empty team, branch, and exact HEAD.
+
+Same-team ownership is not sufficient to recover or reuse a lease. Recovery requires the persisted lease id, branch, and HEAD to all be present and to match the selected room exactly.
+
+If Hospital restarts after HOST acquisition but before the ARMED transition, a matching recovered lease still passes through `armCertified()`; recovering authority does not skip the certification state transition.

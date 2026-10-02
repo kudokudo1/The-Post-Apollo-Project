@@ -10,6 +10,7 @@ Item {
     required property var runSummary
 
     signal closeRequested()
+    signal heightRequested(real height)
 
     readonly property var detail:
         githubService && githubService.inspectedRun
@@ -126,14 +127,23 @@ Item {
 
         property string label: ""
         property bool enabledAction: true
+        property bool danger: false
 
         signal triggered()
 
         height: 28
-        color: mouse.containsMouse && enabledAction ? Colors.yellow : Colors.black
+        color:
+            danger && mouse.containsMouse && enabledAction
+            ? Colors.red
+            : mouse.containsMouse && enabledAction
+            ? Colors.yellow
+            : Colors.black
+
         border.width: 1
         border.color:
-            !enabledAction
+            danger
+            ? Colors.red
+            : !enabledAction
             ? Colors.cyan
             : mouse.containsMouse
             ? Colors.orange
@@ -142,9 +152,13 @@ Item {
         GohuText {
             anchors.centerIn: parent
             text: button.label
-            font.pixelSize: 9
+            font.pixelSize: 10
             color:
-                !button.enabledAction
+                button.danger
+                ? (mouse.containsMouse && button.enabledAction
+                   ? Colors.black
+                   : Colors.red)
+                : !button.enabledAction
                 ? Colors.cyan
                 : mouse.containsMouse
                 ? Colors.orange
@@ -189,10 +203,39 @@ Item {
 
             // ===== DRAWER HEADER ==================================
 
+            MouseArea {
+                id: resizeHandle
+
+                width: parent.width - 276
+                height: 30
+
+                hoverEnabled: true
+                cursorShape: Qt.SizeVerCursor
+
+                property real startHeight: 0
+                property real startSceneY: 0
+
+                onPressed: function(mouse) {
+                    startHeight = root.height;
+                    startSceneY = mapToItem(null, mouse.x, mouse.y).y;
+                }
+
+                onPositionChanged: function(mouse) {
+                    if (!pressed)
+                        return;
+
+                    const sceneY = mapToItem(null, mouse.x, mouse.y).y;
+                    root.heightRequested(
+                        startHeight + (startSceneY - sceneY)
+                    );
+                }
+            }
+
             Row {
                 width: parent.width
                 height: 30
                 spacing: 7
+                z: 2
 
                 GohuText {
                     width: parent.width - 276
@@ -204,7 +247,7 @@ Item {
                         + " // "
                         + root.field("workflowName", "UNKNOWN WORKFLOW")
 
-                    font.pixelSize: 13
+                    font.pixelSize: 15
                     color: Colors.magenta
                     elide: Text.ElideRight
                 }
@@ -219,7 +262,7 @@ Item {
                         : root.field("conclusion", root.field("status", "READY")).toUpperCase()
 
                     horizontalAlignment: Text.AlignRight
-                    font.pixelSize: 9
+                    font.pixelSize: 10
 
                     color:
                         root.githubService.inspectorBusy
@@ -246,6 +289,7 @@ Item {
                 DrawerButton {
                     width: 74
                     label: "CLOSE"
+                    danger: true
 
                     onTriggered: root.closeRequested()
                 }
@@ -284,7 +328,7 @@ Item {
 
                         GohuText {
                             text: "RUN IDENTITY"
-                            font.pixelSize: 12
+                            font.pixelSize: 13
                             color: Colors.magenta
                         }
 
@@ -297,14 +341,14 @@ Item {
                             GohuText {
                                 width: 72
                                 text: "BRANCH"
-                                font.pixelSize: 8
+                                font.pixelSize: 9
                                 color: Colors.orange
                             }
 
                             GohuText {
                                 width: 238
                                 text: root.field("headBranch", "—")
-                                font.pixelSize: 9
+                                font.pixelSize: 10
                                 color: Colors.white
                                 elide: Text.ElideRight
                             }
@@ -312,14 +356,14 @@ Item {
                             GohuText {
                                 width: 72
                                 text: "COMMIT"
-                                font.pixelSize: 8
+                                font.pixelSize: 9
                                 color: Colors.orange
                             }
 
                             GohuText {
                                 width: 238
                                 text: root.compactSha(root.field("headSha", "—"))
-                                font.pixelSize: 9
+                                font.pixelSize: 10
                                 color: Colors.cyan
                                 elide: Text.ElideRight
                             }
@@ -327,14 +371,14 @@ Item {
                             GohuText {
                                 width: 72
                                 text: "EVENT"
-                                font.pixelSize: 8
+                                font.pixelSize: 9
                                 color: Colors.orange
                             }
 
                             GohuText {
                                 width: 238
                                 text: root.field("event", "—").toUpperCase()
-                                font.pixelSize: 9
+                                font.pixelSize: 10
                                 color: Colors.white
                                 elide: Text.ElideRight
                             }
@@ -342,14 +386,14 @@ Item {
                             GohuText {
                                 width: 72
                                 text: "DURATION"
-                                font.pixelSize: 8
+                                font.pixelSize: 9
                                 color: Colors.orange
                             }
 
                             GohuText {
                                 width: 238
                                 text: root.durationText()
-                                font.pixelSize: 9
+                                font.pixelSize: 10
                                 color: Colors.white
                             }
 
@@ -368,7 +412,7 @@ Item {
                                         root.field("createdAt", "")
                                     )
                                 )
-                                font.pixelSize: 8
+                                font.pixelSize: 9
                                 color: Colors.white
                                 elide: Text.ElideRight
                             }
@@ -388,7 +432,7 @@ Item {
                             GohuText {
                                 width: parent.width - 66
                                 text: "JOBS / STEPS"
-                                font.pixelSize: 10
+                                font.pixelSize: 11
                                 color: Colors.magenta
                             }
 
@@ -396,7 +440,7 @@ Item {
                                 width: 66
                                 text: String(root.stepRows.length)
                                 horizontalAlignment: Text.AlignRight
-                                font.pixelSize: 9
+                                font.pixelSize: 10
                                 color: Colors.orange
                             }
                         }
@@ -446,7 +490,7 @@ Item {
                                                 width: 22
                                                 anchors.verticalCenter: parent.verticalCenter
                                                 text: String(index + 1)
-                                                font.pixelSize: 8
+                                                font.pixelSize: 9
                                                 color: Colors.orange
                                             }
 
@@ -454,7 +498,7 @@ Item {
                                                 width: parent.width - 96
                                                 anchors.verticalCenter: parent.verticalCenter
                                                 text: String(modelData.name || "STEP")
-                                                font.pixelSize: 8
+                                                font.pixelSize: 9
                                                 color: Colors.white
                                                 elide: Text.ElideRight
                                             }
@@ -469,7 +513,7 @@ Item {
                                                         || "UNKNOWN"
                                                     ).toUpperCase()
                                                 horizontalAlignment: Text.AlignRight
-                                                font.pixelSize: 7
+                                                font.pixelSize: 8
                                                 color:
                                                     root.resultColor(
                                                         modelData.status,
@@ -531,7 +575,7 @@ Item {
                             GohuText {
                                 width: parent.width - 118
                                 text: "OUTPUT // LOG STREAM"
-                                font.pixelSize: 12
+                                font.pixelSize: 13
                                 color: Colors.magenta
                             }
 
@@ -544,7 +588,7 @@ Item {
                                     ? "ERROR"
                                     : "RUN LOG"
                                 horizontalAlignment: Text.AlignRight
-                                font.pixelSize: 8
+                                font.pixelSize: 9
                                 color:
                                     root.githubService.inspectorError
                                     ? Colors.red
@@ -589,7 +633,7 @@ Item {
 
                                 textFormat: Text.PlainText
                                 wrapMode: Text.WrapAnywhere
-                                font.pixelSize: 10
+                                font.pixelSize: 11
                                 color:
                                     root.githubService.inspectorError
                                     ? Colors.red

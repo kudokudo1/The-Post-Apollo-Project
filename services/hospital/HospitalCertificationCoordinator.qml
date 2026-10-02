@@ -692,50 +692,60 @@ Scope {
         if (!roomService)
             return false;
 
-        if (hostSlotOwned)
-            return roomService.armPrepared();
+        if (!hostSlotOwned) {
+            if (!authority.acquireSlot(
+                    roomService.team,
+                    roomService.branch,
+                    roomService.head,
+                    "CERTIFICATION ARMED"
+                )) {
+                bridgeError = authority.lastError;
+                return false;
+            }
 
-        if (!authority.acquireSlot(
-                roomService.team,
-                roomService.branch,
-                roomService.head,
-                "CERTIFICATION ARMED"
-            )) {
-            return false;
+            hostLeaseId = authority.ownerLeaseId;
         }
-
-        hostLeaseId = authority.ownerLeaseId;
 
         if (!certification.armCertified(
                 roomService.certificationSnapshot()
             )) {
-            authority.releaseSlot(
-                roomService.team,
-                hostLeaseId,
-                "CERTIFICATION ARM FAILED"
-            );
-            hostLeaseId = "";
+            if (hostSlotOwned) {
+                authority.releaseSlot(
+                    roomService.team,
+                    hostLeaseId,
+                    "CERTIFICATION ARM FAILED"
+                );
+                hostLeaseId = "";
+            }
+
+            bridgeError = certification.lastError;
             return false;
         }
 
         const armed = roomService.armPrepared();
 
         if (!armed) {
-            authority.releaseSlot(
-                roomService.team,
-                hostLeaseId,
-                "ROOM ARM FAILED"
-            );
-            hostLeaseId = "";
+            if (hostSlotOwned) {
+                authority.releaseSlot(
+                    roomService.team,
+                    hostLeaseId,
+                    "ROOM ARM FAILED"
+                );
+                hostLeaseId = "";
+            }
 
             certification.reopen(
                 "ROOM ARM FAILED",
                 roomService.certificationSnapshot()
             );
 
+            bridgeError =
+                String(roomService.lastError || roomService.summary || "")
+                || certification.lastError;
             return false;
         }
 
+        bridgeError = "";
         return true;
     }
 

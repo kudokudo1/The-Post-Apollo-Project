@@ -164,20 +164,24 @@ Scope {
             const requestedBranch = String(branch || "");
             const requestedHead = String(head || "");
 
+            const snapshotIncomplete =
+                !ownerLeaseId
+                || !ownerBranch
+                || !ownerHead
+                || !requestedBranch
+                || !requestedHead;
             const branchMismatch =
-                requestedBranch.length > 0
-                && ownerBranch.length > 0
-                && requestedBranch !== ownerBranch;
+                requestedBranch !== ownerBranch;
             const headMismatch =
-                requestedHead.length > 0
-                && ownerHead.length > 0
-                && requestedHead !== ownerHead;
+                requestedHead !== ownerHead;
 
-            if (branchMismatch || headMismatch) {
+            if (snapshotIncomplete
+                    || branchMismatch
+                    || headMismatch) {
                 lastError =
                     "AUTHORITY COLLISION // "
                     + requester
-                    + " ALREADY OWNS DIFFERENT SNAPSHOT";
+                    + " ALREADY OWNS DIFFERENT OR INCOMPLETE SNAPSHOT";
 
                 appendEvent(
                     "OWNERSHIP_CHANGE_REFUSED",
@@ -185,8 +189,10 @@ Scope {
                     {
                         currentBranch: ownerBranch,
                         currentHead: ownerHead,
+                        currentLeaseId: ownerLeaseId,
                         requestedBranch: requestedBranch,
-                        requestedHead: requestedHead
+                        requestedHead: requestedHead,
+                        snapshotIncomplete: snapshotIncomplete
                     }
                 );
 
@@ -241,17 +247,19 @@ Scope {
         const requestedBranch = String(branch || "");
         const requestedHead = String(head || "");
 
-        if (!hydrated || ownerTeam !== requester)
+        if (!hydrated
+                || ownerTeam !== requester
+                || !ownerLeaseId
+                || !ownerBranch
+                || !ownerHead
+                || !requestedBranch
+                || !requestedHead)
             return "";
 
-        if (requestedBranch.length > 0
-                && ownerBranch.length > 0
-                && requestedBranch !== ownerBranch)
+        if (requestedBranch !== ownerBranch)
             return "";
 
-        if (requestedHead.length > 0
-                && ownerHead.length > 0
-                && requestedHead !== ownerHead)
+        if (requestedHead !== ownerHead)
             return "";
 
         return ownerLeaseId;

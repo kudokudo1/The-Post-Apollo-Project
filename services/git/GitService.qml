@@ -13,8 +13,10 @@ Scope {
     property bool actionBusy: false
 
     property string pullMode: "ff-only"
-    readonly property string pullModeLabel: "FF"
-    readonly property string pullModeIcon: "⏭"
+    readonly property string pullModeLabel:
+        pullMode === "ff-only" ? "FF" : "MRG"
+    readonly property string pullModeIcon:
+        pullMode === "ff-only" ? "⏭" : "⇄"
 
     property string repoPath: ""
     property string repoLabel: "LIVE QUICKSHELL"
@@ -576,17 +578,24 @@ Scope {
     function describePullMode() {
         actionTitle = "PULL MODE";
         actionExitCode = 0;
-        actionOutput =
-            "PULL MODE // FF ONLY"
-            + "\nFast-forward the current local branch when history is clean."
-            + "\nIf Git would need a merge, Pull stops instead."
-            + "\nNothing was changed.";
+
+        if (pullMode === "ff-only") {
+            actionOutput =
+                "PULL MODE // FF ONLY"
+                + "\nFast-forward the current local branch when history is clean."
+                + "\nIf Git would need a merge, Pull stops instead."
+                + "\nNothing was changed.";
+        } else {
+            actionOutput =
+                "PULL MODE // MERGE"
+                + "\nPull the selected remote branch and merge divergent history."
+                + "\nThis mode can create a merge commit or leave conflicts to resolve."
+                + "\nNothing was changed yet.";
+        }
     }
 
     function cyclePullMode() {
-        // Only one real pull policy exists today. This actuator is already
-        // wired as the future mode selector, but it never advertises a fake
-        // second mode.
+        pullMode = pullMode === "ff-only" ? "merge" : "ff-only";
         describePullMode();
     }
 
@@ -655,16 +664,26 @@ Scope {
                 '  pull)',
                 '    remote="${target%%/*}"',
                 '    remote_branch="${target#*/}"',
-                '    if [ "$pull_mode" != "ff-only" ]; then',
-                '      printf "UNKNOWN PULL MODE // %s\\n" "$pull_mode"',
-                '      rc=2',
-                '    else',
-                '      printf "PULL // FF ONLY // %s -> current local branch\\n" "$target"',
-                '      git -C "$repo" fetch --prune "$remote" || rc=$?',
-                '      if [ "$rc" -eq 0 ]; then',
-                '        git -C "$repo" pull --ff-only "$remote" "$remote_branch" || rc=$?',
-                '      fi',
-                '    fi',
+                '    case "$pull_mode" in',
+                '      ff-only)',
+                '        printf "PULL // FF ONLY // %s -> current local branch\\n" "$target"',
+                '        git -C "$repo" fetch --prune "$remote" || rc=$?',
+                '        if [ "$rc" -eq 0 ]; then',
+                '          git -C "$repo" pull --ff-only "$remote" "$remote_branch" || rc=$?',
+                '        fi',
+                '        ;;',
+                '      merge)',
+                '        printf "PULL // MERGE // %s -> current local branch\\n" "$target"',
+                '        git -C "$repo" fetch --prune "$remote" || rc=$?',
+                '        if [ "$rc" -eq 0 ]; then',
+                '          git -C "$repo" pull --no-rebase "$remote" "$remote_branch" || rc=$?',
+                '        fi',
+                '        ;;',
+                '      *)',
+                '        printf "UNKNOWN PULL MODE // %s\\n" "$pull_mode"',
+                '        rc=2',
+                '        ;;',
+                '    esac',
                 '    ;;',
                 '  push)',
                 '    remote="${target%%/*}"',

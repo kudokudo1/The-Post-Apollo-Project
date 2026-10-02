@@ -858,6 +858,7 @@ PanelWindow {
                                         && !roomService.running
                                         && !roomService.rehearsing
                                         && !roomService.integrating
+                                        && !roomService.armed
 
                                     width:
                                         (
@@ -936,6 +937,7 @@ PanelWindow {
                                         && !roomService.running
                                         && !roomService.rehearsing
                                         && !roomService.integrating
+                                        && !roomService.armed
 
                                     width:
                                         (
@@ -1020,6 +1022,7 @@ PanelWindow {
                                 && !roomService.running
                                 && !roomService.rehearsing
                                 && !roomService.integrating
+                                && !roomService.armed
 
                             width: parent.width
                             height: 24
@@ -1111,7 +1114,10 @@ PanelWindow {
                                 id: armButton
 
                                 readonly property bool enabledAction:
-                                    roomService.canArm
+                                    (
+                                        roomService.canArm
+                                        || roomService.canArmMerge
+                                    )
                                     && !roomService.running
                                     && !roomService.rehearsing
                                     && !roomService.integrating
@@ -1154,7 +1160,13 @@ PanelWindow {
                                     anchors.centerIn: parent
                                     text:
                                         roomService.armed
-                                        ? "ARMED"
+                                        ? (
+                                            roomService.armedMode === "MERGE"
+                                            ? "MERGE ARMED"
+                                            : "ARMED"
+                                          )
+                                        : roomService.canArmMerge
+                                        ? "ARM MERGE"
                                         : "ARM"
                                     font.pixelSize: 9
                                     color:
@@ -1227,6 +1239,8 @@ PanelWindow {
                                     text:
                                         roomService.integrating
                                         ? "VERIFYING"
+                                        : roomService.armedMode === "MERGE"
+                                        ? "MERGE"
                                         : "INTEGRATE"
                                     font.pixelSize: 9
                                     color:

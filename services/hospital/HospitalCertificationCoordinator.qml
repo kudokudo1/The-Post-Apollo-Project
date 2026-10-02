@@ -91,9 +91,19 @@ Scope {
     Connections {
         target: coordinator.roomService
 
+        function onBranchChanged() {
+            coordinator.recoverHostLease();
+        }
+
+        function onHeadChanged() {
+            coordinator.recoverHostLease();
+        }
+
         function onInspected() {
             if (!coordinator.roomService)
                 return;
+
+            coordinator.recoverHostLease();
 
             if (String(coordinator.roomService.action || "") !== "PREPARE")
                 return;
@@ -301,10 +311,19 @@ Scope {
             return false;
         }
 
+        const roomBranch = String(roomService.branch || "");
+        const roomHead = String(roomService.head || "");
+
+        if ((authority.ownerBranch && !roomBranch)
+                || (authority.ownerHead && !roomHead)) {
+            hostLeaseId = "";
+            return false;
+        }
+
         const recovered = authority.recoverLease(
             roomService.team,
-            roomService.branch,
-            roomService.head
+            roomBranch,
+            roomHead
         );
 
         hostLeaseId = String(recovered || "");

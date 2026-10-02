@@ -660,6 +660,38 @@ Scope {
         ]);
     }
 
+    function friendlyActionError(message) {
+        const raw = String(message || "").trim();
+        const lower = raw.toLowerCase();
+
+        if (
+            actionTitle === "PULL"
+            && (
+                lower.indexOf("not possible to fast-forward") >= 0
+                || lower.indexOf("not possible to fast forward") >= 0
+                || lower.indexOf("divergent") >= 0
+                || lower.indexOf("non-fast-forward") >= 0
+            )
+        ) {
+            return "PULL STOPPED // branches have diverged"
+                 + "\nFAST-FORWARD ONLY // no merge was created"
+                 + "\nOpen Lazygit or choose a deliberate merge/rebase operation.";
+        }
+
+        if (
+            actionTitle === "PULL"
+            && (
+                lower.indexOf("couldn't find remote ref") >= 0
+                || lower.indexOf("could not find remote ref") >= 0
+            )
+        ) {
+            return "PULL STOPPED // remote branch was not found"
+                 + "\nChoose an existing remote target and try again.";
+        }
+
+        return "ERR: " + raw;
+    }
+
     function consumeActionLine(line) {
         const raw = String(line || "");
 
@@ -748,7 +780,7 @@ Scope {
                 if (message.length > 0)
                     gitService.actionOutput += (
                         gitService.actionOutput.length > 0 ? "\n" : ""
-                    ) + "ERR: " + message;
+                    ) + gitService.friendlyActionError(message);
             }
         }
     }

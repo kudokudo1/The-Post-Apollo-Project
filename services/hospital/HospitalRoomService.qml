@@ -192,6 +192,49 @@ Scope {
         lastError = "";
     }
 
+    function certificationSnapshot() {
+        return {
+            repository: repository,
+            team: team,
+            branch: branch,
+            head: head,
+            base: base,
+            baseHead: baseHead,
+            relation: relation,
+            mode: integrationMode,
+            diffFileCount: diffFileCount,
+            additions: additions,
+            deletions: deletions,
+            rehearsal: {
+                status: rehearsalStatus,
+                mergeBase: rehearsalMergeBase,
+                resultTree: rehearsalResultTree,
+                conflicts: rehearsalConflicts,
+                changedFiles: rehearsalChangedFiles,
+                fileCount: rehearsalFileCount,
+                additions: rehearsalAdditions,
+                deletions: rehearsalDeletions
+            }
+        };
+    }
+
+    function postOpSnapshot() {
+        const snapshot = certificationSnapshot();
+
+        snapshot.postOp = {
+            status: postOpStatus,
+            operation: postOpOperation,
+            expectedBaseHead: postOpExpectedBaseHead,
+            expectedRoomHead: postOpExpectedRoomHead,
+            currentBaseHead: postOpCurrentBaseHead,
+            currentRoomHead: postOpCurrentRoomHead,
+            currentRelation: postOpCurrentRelation,
+            roomBranchUnchanged: postOpRoomUnchanged
+        };
+
+        return snapshot;
+    }
+
     function runInspection(mode) {
         if (running || rehearsing || integrating || postOpRunning)
             return;

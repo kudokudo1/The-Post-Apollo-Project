@@ -2455,7 +2455,7 @@ PanelWindow {
                                     bottomMargin: 4
                                 }
 
-                                height: 300
+                                height: 350
 
                                 githubService: githubService
                                 runSummary: root.selectedRun

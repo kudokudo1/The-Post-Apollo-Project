@@ -118,6 +118,7 @@ PanelWindow {
         id: roomService
         repository: githubService.repoSlug
         team: root.selectedRoomTeam
+        localRepoPath: patientService.repoRoot
     }
 
     Connections {
@@ -560,7 +561,7 @@ PanelWindow {
                 id: patientRoomRow
 
                 width: parent.width
-                height: 190
+                height: 226
                 spacing: 10
 
                 Rectangle {
@@ -904,6 +905,99 @@ PanelWindow {
                             }
                         }
 
+                        Row {
+                            id: roomOperationActions
+
+                            width: parent.width
+                            height: 24
+                            spacing: 6
+
+                            Repeater {
+                                model: ["REFRESH", "LAZYGIT", "PREPARE"]
+
+                                Rectangle {
+                                    id: roomOperationButton
+
+                                    required property string modelData
+                                    readonly property bool enabledAction:
+                                        root.selectedRoomTeam.length > 0
+                                        && !roomService.running
+
+                                    width:
+                                        (
+                                            roomOperationActions.width
+                                            - roomOperationActions.spacing * 2
+                                        ) / 3
+                                    height: parent.height
+
+                                    color:
+                                        roomOperationMouse.pressed
+                                        ? Colors.orange
+                                        : roomService.action === modelData
+                                        ? Colors.magenta
+                                        : Colors.black
+                                    border.width: 1
+                                    border.color:
+                                        roomOperationMouse.containsMouse
+                                        ? Colors.orange
+                                        : modelData === "PREPARE"
+                                          && roomService.action === "PREPARE"
+                                        ? Colors.magenta
+                                        : Colors.cyan
+                                    opacity: enabledAction ? 1.0 : 0.48
+
+                                    GohuText {
+                                        anchors.centerIn: parent
+                                        text:
+                                            roomService.running
+                                            && roomService.action
+                                               === roomOperationButton.modelData
+                                            ? "READING"
+                                            : roomOperationButton.modelData
+                                        font.pixelSize: 8
+                                        color:
+                                            roomOperationMouse.pressed
+                                            ? Colors.black
+                                            : Colors.cyan
+                                    }
+
+                                    MouseArea {
+                                        id: roomOperationMouse
+
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        enabled: roomOperationButton.enabledAction
+                                        cursorShape:
+                                            enabled
+                                            ? Qt.PointingHandCursor
+                                            : Qt.ArrowCursor
+
+                                        onClicked: {
+                                            if (roomOperationButton.modelData
+                                                    === "REFRESH") {
+                                                patientService.refresh();
+                                                auditService.runAudit();
+                                                roomService.runInspection(
+                                                    "status"
+                                                );
+                                                return;
+                                            }
+
+                                            if (roomOperationButton.modelData
+                                                    === "LAZYGIT") {
+                                                roomService.launchLazygit();
+                                                return;
+                                            }
+
+                                            roomService.runInspection(
+                                                "prepare"
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         GohuText {
                             width: parent.width
                             text: roomService.summary
@@ -911,6 +1005,10 @@ PanelWindow {
                             color:
                                 roomService.lastError
                                 ? Colors.red
+                                : roomService.integrationMode === "DIVERGED"
+                                ? Colors.magenta
+                                : roomService.integrationMode === "FAST_FORWARD"
+                                ? Colors.orange
                                 : roomService.available
                                 ? Colors.cyan
                                 : Colors.magenta

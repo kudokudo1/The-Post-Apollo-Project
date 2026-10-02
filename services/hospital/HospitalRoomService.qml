@@ -21,6 +21,7 @@ Scope {
     property string armedBase: ""
     property string armedBaseHead: ""
     property string armedMode: ""
+    property string armedResultTree: ""
 
     readonly property bool canArm:
         available
@@ -35,6 +36,17 @@ Scope {
         available
         && action === "PREPARE"
         && integrationMode === "DIVERGED"
+        && head.length > 0
+        && base.length > 0
+        && baseHead.length > 0
+        && team.length > 0
+
+    readonly property bool canArmMerge:
+        available
+        && action === "PREPARE"
+        && integrationMode === "DIVERGED"
+        && rehearsalStatus === "CLEAN_MERGE"
+        && rehearsalResultTree.length > 0
         && head.length > 0
         && base.length > 0
         && baseHead.length > 0
@@ -111,6 +123,7 @@ Scope {
         armedBase = "";
         armedBaseHead = "";
         armedMode = "";
+        armedResultTree = "";
     }
 
     function clearResult() {
@@ -414,11 +427,20 @@ Scope {
     }
 
     function armPrepared() {
-        if (!canArm) {
-            if (integrationMode && integrationMode !== "FAST_FORWARD")
+        const mergeArm = canArmMerge;
+        const fastForwardArm = canArm;
+
+        if (!mergeArm && !fastForwardArm) {
+            if (rehearsalStatus === "CONFLICTS")
+                summary = "ARM MERGE REFUSED // REHEARSAL CONFLICTS";
+            else if (integrationMode === "DIVERGED")
+                summary = "ARM MERGE REFUSED // CLEAN REHEARSAL REQUIRED";
+            else if (integrationMode
+                    && integrationMode !== "FAST_FORWARD")
                 summary = "ARM REFUSED // " + integrationMode;
             else
-                summary = "ARM REFUSED // PREPARE FAST_FORWARD FIRST";
+                summary = "ARM REFUSED // PREPARE FIRST";
+
             return false;
         }
 
@@ -428,18 +450,28 @@ Scope {
         armedHead = String(head || "");
         armedBase = String(base || "");
         armedBaseHead = String(baseHead || "");
-        armedMode = String(integrationMode || "");
+        armedMode = mergeArm ? "MERGE" : "FAST_FORWARD";
+        armedResultTree =
+            mergeArm
+            ? String(rehearsalResultTree || "")
+            : "";
         armed = true;
         lastError = "";
 
-        summary = "ARMED // "
+        summary = (mergeArm ? "MERGE ARMED // " : "ARMED // ")
                   + armedTeam
                   + " // "
                   + armedHead.slice(0, 8)
                   + " → "
                   + armedBase
                   + "@"
-                  + armedBaseHead.slice(0, 8);
+                  + armedBaseHead.slice(0, 8)
+                  + (
+                      mergeArm
+                      ? " // TREE "
+                        + armedResultTree.slice(0, 8)
+                      : ""
+                  );
 
         return true;
     }
@@ -449,15 +481,24 @@ Scope {
             return;
 
         if (!armed) {
-            lastError = "INTEGRATE REFUSED // NOT ARMED";
+            lastError = "EXECUTE REFUSED // NOT ARMED";
             summary = lastError;
             return;
         }
 
         const localPath = String(localRepoPath || "").trim();
+        const mergeMode = armedMode === "MERGE";
 
         if (!localPath) {
-            lastError = "INTEGRATE REFUSED // LOCAL PATIENT NOT READY";
+            lastError = (mergeMode ? "MERGE" : "INTEGRATE")
+                        + " REFUSED // LOCAL PATIENT NOT READY";
+            summary = lastError;
+            disarm();
+            return;
+        }
+
+        if (mergeMode && !armedResultTree) {
+            lastError = "MERGE REFUSED // NO ARMED REHEARSAL TREE";
             summary = lastError;
             disarm();
             return;
@@ -465,7 +506,8 @@ Scope {
 
         integrating = true;
         lastError = "";
-        summary = "INTEGRATE // VERIFYING ARMED SNAPSHOT";
+        summary = (mergeMode ? "MERGE" : "INTEGRATE")
+                  + " // VERIFYING ARMED SNAPSHOT";
 
         integrateExitSeen = false;
         integrateStdoutSeen = false;
@@ -474,19 +516,36 @@ Scope {
         integrateStdoutText = "";
         integrateStderrText = "";
 
-        integrateProcess.exec([
-            "bash",
-            "-lc",
-            'exec "$HOME/.local/bin/px" integrate "$1" "$2" "$3" "$4" "$5" "$6" "$7"',
-            "px-integrate",
-            armedRepository,
-            armedTeam,
-            armedBranch,
-            armedHead,
-            armedBase,
-            armedBaseHead,
-            localPath
-        ]);
+        if (mergeMode) {
+            integrateProcess.exec([
+                "bash",
+                "-lc",
+                'exec "$HOME/.local/bin/px" merge "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8"',
+                "px-merge",
+                armedRepository,
+                armedTeam,
+                armedBranch,
+                armedHead,
+                armedBase,
+                armedBaseHead,
+                armedResultTree,
+                localPath
+            ]);
+        } else {
+            integrateProcess.exec([
+                "bash",
+                "-lc",
+                'exec "$HOME/.local/bin/px" integrate "$1" "$2" "$3" "$4" "$5" "$6" "$7"',
+                "px-integrate",
+                armedRepository,
+                armedTeam,
+                armedBranch,
+                armedHead,
+                armedBase,
+                armedBaseHead,
+                localPath
+            ]);
+        }
 
         integrateWatchdog.restart();
     }
@@ -555,6 +614,9 @@ Scope {
                 || !integrateStderrSeen)
             return;
 
+        const mergeMode = armedMode === "MERGE";
+        const operationLabel = mergeMode ? "MERGE" : "INTEGRATE";
+
         integrating = false;
         integrateWatchdog.stop();
 
@@ -563,9 +625,10 @@ Scope {
             lastError = String(
                 integrateStderrText
                 || integrateStdoutText
-                || ("PX INTEGRATE EXIT " + integrateExitCode)
+                || ("PX " + operationLabel
+                    + " EXIT " + integrateExitCode)
             ).trim();
-            summary = "INTEGRATE REFUSED // " + lastError;
+            summary = operationLabel + " REFUSED // " + lastError;
             disarm();
             return;
         }
@@ -574,15 +637,20 @@ Scope {
             const data = JSON.parse(
                 String(integrateStdoutText || "").trim()
             );
+            const status =
+                String(data.status || "").toUpperCase();
+            const expectedStatus =
+                mergeMode ? "MERGED" : "INTEGRATED";
 
-            if (String(data.status || "").toUpperCase()
-                    !== "INTEGRATED")
-                throw new Error("UNEXPECTED INTEGRATE RESPONSE");
+            if (status !== expectedStatus)
+                throw new Error(
+                    "UNEXPECTED " + operationLabel + " RESPONSE"
+                );
 
-            action = "INTEGRATE";
+            action = mergeMode ? "MERGE" : "INTEGRATE";
             available = true;
             lastError = "";
-            summary = "INTEGRATED // "
+            summary = expectedStatus + " // "
                       + String(data.base || armedBase)
                       + " // "
                       + String(data.old_base_head || "")
@@ -595,7 +663,9 @@ Scope {
             integrated();
         } catch (error) {
             available = false;
-            lastError = "INTEGRATE PARSE // " + String(error);
+            lastError = operationLabel
+                        + " PARSE // "
+                        + String(error);
             summary = lastError;
             disarm();
         }
@@ -719,7 +789,7 @@ Scope {
 
     Timer {
         id: integrateWatchdog
-        interval: 20000
+        interval: 45000
         repeat: false
 
         onTriggered: {

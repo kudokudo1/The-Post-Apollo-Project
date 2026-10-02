@@ -77,6 +77,8 @@ Item {
         // ===== COMPLETE WORKFLOW LIBRARY =======================
 
         Rectangle {
+            id: workflowPane
+
             width: (parent.width - 10) * 0.54
             height: parent.height
 
@@ -207,7 +209,7 @@ Item {
         // ===== EXECUTION / SAVED SETS ==========================
 
         Column {
-            width: parent.width - parent.children[0].width - 10
+            width: parent.width - workflowPane.width - 10
             height: parent.height
             spacing: 10
 

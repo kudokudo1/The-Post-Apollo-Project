@@ -43,6 +43,19 @@ Scope {
     Connections {
         target: coordinator.roomService
 
+        function onInspected() {
+            if (!coordinator.roomService)
+                return;
+
+            if (String(coordinator.roomService.action || "") !== "PREPARE")
+                return;
+
+            coordinator.refreshBinding();
+            coordinator.certification.beginCandidate(
+                coordinator.roomService.certificationSnapshot()
+            );
+        }
+
         function onPostOpStarted() {
             if (!coordinator.roomService)
                 return;

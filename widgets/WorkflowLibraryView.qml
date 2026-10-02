@@ -102,7 +102,7 @@ Item {
                     spacing: 6
 
                     Row {
-                        width: parent.width
+                        width: parent.width - 8
                         height: 26
                         spacing: 6
 
@@ -122,7 +122,7 @@ Item {
                         }
 
                         LibraryButton {
-                            width: 78
+                            width: 72
                             label:
                                 root.githubService.actionBusy
                                 ? "RUNNING"
@@ -509,92 +509,210 @@ Item {
                     }
                 }
 
-                Flickable {
+                Item {
                     width: parent.width
                     height: parent.height - 31
 
-                    clip: true
-                    contentWidth: width
-                    contentHeight: workflowColumn.height
-                    boundsBehavior: Flickable.StopAtBounds
+                    Flickable {
+                        id: workflowFlick
 
-                    Column {
-                        id: workflowColumn
+                        anchors {
+                            left: parent.left
+                            right: workflowScrollTrack.left
+                            top: parent.top
+                            bottom: parent.bottom
+                            rightMargin: 7
+                        }
 
-                        width: parent.width
-                        spacing: 5
+                        clip: true
+                        contentWidth: width
+                        contentHeight: workflowColumn.height
+                        boundsBehavior: Flickable.StopAtBounds
 
-                        Repeater {
-                            model: root.libraryStore.workflows
+                        Column {
+                            id: workflowColumn
 
-                            Rectangle {
-                                required property int index
-                                required property var modelData
+                            width: parent.width
+                            spacing: 5
 
-                                width: workflowColumn.width
-                                height: 48
+                            Repeater {
+                                model: root.libraryStore.workflows
 
-                                color: Colors.black
-                                border.width: 1
-                                border.color: Colors.orange
+                                Rectangle {
+                                    required property int index
+                                    required property var modelData
 
-                                Row {
-                                    anchors {
-                                        fill: parent
-                                        margins: 6
-                                    }
+                                    width: workflowColumn.width
+                                    height: 48
 
-                                    spacing: 6
+                                    color: Colors.black
+                                    border.width: 1
+                                    border.color: Colors.orange
 
-                                    Column {
-                                        width: parent.width - 142
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        spacing: 2
-
-                                        GohuText {
-                                            width: parent.width
-                                            text: String(modelData.name || modelData.path || "UNKNOWN")
-                                            font.pixelSize: 9
-                                            color: Colors.white
-                                            elide: Text.ElideRight
+                                    Row {
+                                        anchors {
+                                            fill: parent
+                                            margins: 6
                                         }
 
-                                        GohuText {
-                                            width: parent.width
-                                            text: String(modelData.path || "")
-                                            font.pixelSize: 7
-                                            color: Colors.orange
-                                            opacity: 0.78
-                                            elide: Text.ElideMiddle
+                                        spacing: 6
+
+                                        Column {
+                                            width: parent.width - 142
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            spacing: 2
+
+                                            GohuText {
+                                                width: parent.width
+                                                text: String(modelData.name || modelData.path || "UNKNOWN")
+                                                font.pixelSize: 9
+                                                color: Colors.white
+                                                elide: Text.ElideRight
+                                            }
+
+                                            GohuText {
+                                                width: parent.width
+                                                text: String(modelData.path || "")
+                                                font.pixelSize: 7
+                                                color: Colors.orange
+                                                opacity: 0.78
+                                                elide: Text.ElideMiddle
+                                            }
                                         }
-                                    }
 
-                                    LibraryButton {
-                                        width: 62
-                                        label: "LOAD"
+                                        LibraryButton {
+                                            width: 62
+                                            label: "LOAD"
 
-                                        onTriggered: root.workflowSelected(index)
-                                    }
+                                            onTriggered: root.workflowSelected(index)
+                                        }
 
-                                    LibraryButton {
-                                        width: 68
-                                        label: "+ QUEUE"
+                                        LibraryButton {
+                                            width: 68
+                                            label: "+ QUEUE"
 
-                                        onTriggered: root.libraryStore.addWorkflow(modelData)
+                                            onTriggered: root.libraryStore.addWorkflow(modelData)
+                                        }
                                     }
                                 }
                             }
+
+                            GohuText {
+                                width: parent.width
+                                visible: root.libraryStore.workflows.length === 0
+
+                                text: "NO SAVED WORKFLOWS"
+                                horizontalAlignment: Text.AlignHCenter
+                                font.pixelSize: 9
+                                color: Colors.cyan
+                                opacity: 0.42
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        id: workflowScrollTrack
+
+                        anchors {
+                            right: parent.right
+                            top: parent.top
+                            bottom: parent.bottom
                         }
 
-                        GohuText {
-                            width: parent.width
-                            visible: root.libraryStore.workflows.length === 0
+                        width: 9
+                        color: Colors.black
+                        border.width: 1
+                        border.color: Colors.orange
+                        opacity:
+                            workflowFlick.contentHeight > workflowFlick.height
+                            ? 1.0
+                            : 0.28
 
-                            text: "NO SAVED WORKFLOWS"
-                            horizontalAlignment: Text.AlignHCenter
-                            font.pixelSize: 9
-                            color: Colors.cyan
-                            opacity: 0.42
+                        readonly property real maxContentY:
+                            Math.max(
+                                0,
+                                workflowFlick.contentHeight - workflowFlick.height
+                            )
+
+                        readonly property real thumbTravel:
+                            Math.max(0, height - workflowScrollThumb.height)
+
+                        Rectangle {
+                            id: workflowScrollThumb
+
+                            x: 2
+                            width: parent.width - 4
+
+                            height:
+                                Math.max(
+                                    26,
+                                    parent.height
+                                    * Math.min(
+                                        1,
+                                        workflowFlick.height
+                                        / Math.max(workflowFlick.contentHeight, 1)
+                                    )
+                                )
+
+                            y:
+                                workflowScrollTrack.maxContentY > 0
+                                ? (
+                                      workflowFlick.contentY
+                                      / workflowScrollTrack.maxContentY
+                                  )
+                                  * workflowScrollTrack.thumbTravel
+                                : 0
+
+                            color: Colors.orange
+                            opacity:
+                                workflowFlick.contentHeight > workflowFlick.height
+                                ? 0.92
+                                : 0.24
+                        }
+
+                        MouseArea {
+                            id: workflowScrollMouse
+
+                            anchors.fill: parent
+                            enabled:
+                                workflowFlick.contentHeight > workflowFlick.height
+
+                            property real dragOffset: 0
+
+                            onPressed: function(mouse) {
+                                if (mouse.y >= workflowScrollThumb.y
+                                        && mouse.y <= workflowScrollThumb.y
+                                                           + workflowScrollThumb.height) {
+                                    dragOffset = mouse.y - workflowScrollThumb.y;
+                                } else {
+                                    dragOffset = workflowScrollThumb.height / 2;
+                                    updateScroll(mouse.y);
+                                }
+                            }
+
+                            onPositionChanged: function(mouse) {
+                                if (pressed)
+                                    updateScroll(mouse.y);
+                            }
+
+                            function updateScroll(pointerY) {
+                                const travel = workflowScrollTrack.thumbTravel;
+
+                                if (travel <= 0)
+                                    return;
+
+                                const thumbY = Math.max(
+                                    0,
+                                    Math.min(
+                                        travel,
+                                        pointerY - dragOffset
+                                    )
+                                );
+
+                                workflowFlick.contentY =
+                                    (thumbY / travel)
+                                    * workflowScrollTrack.maxContentY;
+                            }
                         }
                     }
                 }

@@ -212,7 +212,9 @@ PanelWindow {
 
         property string team: ""
         property string responsibility: ""
-        property string stateText: "UNVERIFIED"
+        property string stateText: auditService.roomLabel(roomRow.team)
+        readonly property string telemetryState:
+            auditService.roomState(roomRow.team)
 
         width: roomsColumn.width
         height: 30
@@ -282,7 +284,24 @@ PanelWindow {
 
             text: roomRow.stateText
             font.pixelSize: 9
-            color: Colors.cyan
+            color: roomRow.telemetryState === "MISSING"
+                   ? Colors.red
+                   : roomRow.telemetryState === "IN_MAIN"
+                     || roomRow.telemetryState === "AT_MAIN"
+                   ? Colors.orange
+                   : roomRow.telemetryState === "DIVERGED"
+                   ? Colors.magenta
+                   : Colors.cyan
+            opacity: roomRow.telemetryState === "WAITING" ? 0.58 : 1.0
+
+            layer.enabled: true
+            layer.effect: DropShadow {
+                radius: 5
+                samples: 7
+                opacity: roomRow.telemetryState === "WAITING" ? 0.14 : 0.38
+                color: parent.color
+                transparentBorder: true
+            }
         }
     }
 
@@ -760,6 +779,7 @@ PanelWindow {
                           ? "AUDIT " + auditService.status
                             + " // " + String(auditService.workflowCount) + " WORKFLOWS"
                             + " // " + String(auditService.runCount) + " RECENT RUNS"
+                            + " // " + String(auditService.rooms.length) + " ROOMS"
                           : auditService.lastError
                           ? "AUDIT ERROR // " + auditService.lastError
                           : !hospitalGitService.available

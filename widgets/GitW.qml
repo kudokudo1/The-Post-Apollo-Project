@@ -17,6 +17,7 @@ PanelWindow {
     property int selectedWorkflowIndex: 0
     property int selectedRunIndex: 0
     property string selectedGitCommitSha: ""
+    property var activeTextEditor: null
 
     readonly property var selectedWorkflow:
         githubService.workflows.length > 0
@@ -76,12 +77,9 @@ PanelWindow {
     }
 
     function releaseTextFocusAt(item, x, y) {
-        const focused = root.activeFocusItem;
+        const focused = root.activeTextEditor;
 
-        if (!focused || focused === item)
-            return;
-
-        if (typeof focused.mapFromItem !== "function")
+        if (!focused || typeof focused.mapFromItem !== "function")
             return;
 
         const local = focused.mapFromItem(item, x, y);
@@ -91,8 +89,11 @@ PanelWindow {
             && local.x <= focused.width
             && local.y <= focused.height;
 
-        if (!inside)
-            frame.forceActiveFocus(Qt.MouseFocusReason);
+        if (!inside) {
+            focused.deselect();
+            focused.focus = false;
+            root.activeTextEditor = null;
+        }
     }
 
     function open() {
@@ -399,10 +400,14 @@ PanelWindow {
 
             onActiveFocusChanged: {
                 if (activeFocus) {
+                    root.activeTextEditor = input;
                     text = selectorInput.valueText;
                     selectAll();
                 } else {
                     text = selectorInput.valueText;
+
+                    if (root.activeTextEditor === input)
+                        root.activeTextEditor = null;
                 }
             }
         }
@@ -1910,6 +1915,13 @@ PanelWindow {
                                         selectedTextColor: Colors.black
 
                                         onTextChanged: githubService.clearFactoryResult()
+
+                                        onActiveFocusChanged: {
+                                            if (activeFocus)
+                                                root.activeTextEditor = factoryNameInput;
+                                            else if (root.activeTextEditor === factoryNameInput)
+                                                root.activeTextEditor = null;
+                                        }
                                     }
                                 }
 

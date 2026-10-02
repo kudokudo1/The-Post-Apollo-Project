@@ -16,7 +16,9 @@ Scope {
         githubService ? String(githubService.repoSlug || "") : ""
 
     readonly property string currentHead:
-        gitService ? String(gitService.head || "") : ""
+        gitService
+        ? String(gitService.headFull || gitService.head || "")
+        : ""
 
     readonly property string currentBranch:
         gitService ? String(gitService.branch || "") : ""

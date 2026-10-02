@@ -132,7 +132,7 @@ PanelWindow {
     Connections {
         target: roomService
 
-        function onIntegrated() {
+        function onPostOpFinished() {
             patientService.refresh();
             githubService.refresh();
             auditService.runAudit();
@@ -571,7 +571,7 @@ PanelWindow {
                 id: patientRoomRow
 
                 width: parent.width
-                height: 310
+                height: 328
                 spacing: 10
 
                 Rectangle {
@@ -858,6 +858,7 @@ PanelWindow {
                                         && !roomService.running
                                         && !roomService.rehearsing
                                         && !roomService.integrating
+                                        && !roomService.postOpRunning
                                         && !roomService.armed
 
                                     width:
@@ -937,6 +938,7 @@ PanelWindow {
                                         && !roomService.running
                                         && !roomService.rehearsing
                                         && !roomService.integrating
+                                        && !roomService.postOpRunning
                                         && !roomService.armed
 
                                     width:
@@ -1022,6 +1024,7 @@ PanelWindow {
                                 && !roomService.running
                                 && !roomService.rehearsing
                                 && !roomService.integrating
+                                && !roomService.postOpRunning
                                 && !roomService.armed
 
                             width: parent.width
@@ -1121,6 +1124,7 @@ PanelWindow {
                                     && !roomService.running
                                     && !roomService.rehearsing
                                     && !roomService.integrating
+                                    && !roomService.postOpRunning
 
                                 width:
                                     (
@@ -1200,6 +1204,7 @@ PanelWindow {
                                     && !roomService.running
                                     && !roomService.rehearsing
                                     && !roomService.integrating
+                                    && !roomService.postOpRunning
 
                                 width:
                                     (
@@ -1237,7 +1242,9 @@ PanelWindow {
                                 GohuText {
                                     anchors.centerIn: parent
                                     text:
-                                        roomService.integrating
+                                        roomService.postOpRunning
+                                        ? "POST-OP"
+                                        : roomService.integrating
                                         ? "VERIFYING"
                                         : roomService.armedMode === "MERGE"
                                         ? "MERGE"
@@ -1274,6 +1281,10 @@ PanelWindow {
                             color:
                                 roomService.lastError
                                 ? Colors.red
+                                : roomService.postOpStatus === "POST_OP_CLEAN"
+                                ? Colors.cyan
+                                : roomService.postOpRunning
+                                ? Colors.orange
                                 : roomService.armed
                                 ? Colors.orange
                                 : roomService.integrationMode === "DIVERGED"
@@ -1295,6 +1306,15 @@ PanelWindow {
                                 roomService.rehearsalStatus === "CONFLICTS"
                                 ? Colors.red
                                 : Colors.orange
+                            elide: Text.ElideRight
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            visible: roomService.postOpDetail.length > 0
+                            text: roomService.postOpDetail
+                            font.pixelSize: 8
+                            color: Colors.cyan
                             elide: Text.ElideRight
                         }
                     }

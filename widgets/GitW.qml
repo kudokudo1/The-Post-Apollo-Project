@@ -12,6 +12,7 @@ PanelWindow {
 
     property bool menuOpen: false
     property string activePage: "git"
+    property string githubView: "control"
     property string factoryTemplate: "smoke"
     property string factoryTrigger: "manual"
     property int selectedWorkflowIndex: 0
@@ -121,6 +122,63 @@ PanelWindow {
         githubService.refresh();
     }
 
+    function showGithubControl() {
+        root.workflowMenuOpen = false;
+        root.githubView = "control";
+    }
+
+    function showGithubLibrary() {
+        root.workflowMenuOpen = false;
+        root.githubView = "library";
+    }
+
+    function githubStateText() {
+        if (githubService.factoryBusy)
+            return githubService.factoryMode === "install"
+                   ? "SAVING // VALIDATING + INSTALLING"
+                   : "PREVIEWING // VALIDATING";
+
+        if (githubService.factoryInstallCommit)
+            return "WORKFLOW INSTALLED // "
+                   + githubService.factoryInstallCommit.slice(0, 10);
+
+        if (githubService.factoryPullRequest)
+            return "WORKFLOW PR READY // " + githubService.factoryPullRequest;
+
+        if (githubService.factoryValidationStatus === "PASS")
+            return "FACTORY PASS // " + githubService.factoryPath;
+
+        if (githubService.factoryValidationStatus === "FAIL"
+                || githubService.factoryValidationStatus === "ERROR")
+            return githubService.factoryValidationStatus
+                   + " // "
+                   + (githubService.factoryValidationMessage || "PX FACTORY ERROR");
+
+        if (githubService.actionBusy)
+            return githubService.actionResult;
+
+        if (githubService.actionResult !== "READY")
+            return githubService.actionResult;
+
+        return githubService.available
+               ? "ACTIVE // PX CONTROL READY"
+               : "WAITING";
+    }
+
+    function githubStateColor() {
+        if (githubService.factoryValidationStatus === "FAIL"
+                || githubService.factoryValidationStatus === "ERROR"
+                || githubService.lastError
+                || String(githubService.actionResult || "").indexOf("ERROR") === 0)
+            return Colors.red;
+
+        if (githubService.factoryValidationStatus === "PASS"
+                || githubService.factoryInstallCommit)
+            return Colors.orange;
+
+        return Colors.white;
+    }
+
     function cycleFactoryTemplate() {
         root.factoryTemplate = root.factoryTemplate === "smoke"
                                ? "shell-check"
@@ -186,14 +244,9 @@ PanelWindow {
         originUrl: gitService.origin
     }
 
-    WorkflowLibraryW {
-        id: workflowLibraryWindow
+    WorkflowLibraryStore {
+        id: workflowLibraryStore
         githubService: githubService
-
-        onWorkflowSelected: function(index) {
-            root.selectedWorkflowIndex = index;
-            root.workflowMenuOpen = false;
-        }
     }
 
     Connections {
@@ -1570,6 +1623,8 @@ PanelWindow {
                 }
 
                 Item {
+                    id: githubPage
+
                     anchors.fill: parent
                     visible: root.activePage === "github"
 
@@ -1577,11 +1632,11 @@ PanelWindow {
                         anchors.fill: parent
                         spacing: 10
 
-                        // ===== REMOTE IDENTITY =========================
+                        // ===== REMOTE IDENTITY + PX TELEMETRY =========
 
                         Rectangle {
                             width: parent.width
-                            height: 80
+                            height: 100
 
                             color: Colors.dark
                             border.width: 1
@@ -1598,10 +1653,10 @@ PanelWindow {
                             Column {
                                 anchors {
                                     fill: parent
-                                    margins: 10
+                                    margins: 9
                                 }
 
-                                spacing: 5
+                                spacing: 4
 
                                 Row {
                                     width: parent.width
@@ -1614,19 +1669,24 @@ PanelWindow {
 
                                     GohuText {
                                         width: 120
-                                        text: githubService.refreshing
-                                              ? "READING"
-                                              : githubService.available
-                                              ? "LIVE // PX"
-                                              : "OFFLINE"
+                                        text:
+                                            githubService.refreshing
+                                            ? "READING"
+                                            : githubService.available
+                                            ? "LIVE // PX"
+                                            : "OFFLINE"
                                         horizontalAlignment: Text.AlignRight
                                         font.pixelSize: 9
-                                        color: githubService.available ? Colors.orange : Colors.red
+                                        color:
+                                            githubService.available
+                                            ? Colors.orange
+                                            : Colors.red
                                     }
                                 }
 
                                 Row {
                                     width: parent.width
+                                    height: 15
                                     spacing: 10
 
                                     OrangeLabel {
@@ -1642,6 +1702,7 @@ PanelWindow {
 
                                 Row {
                                     width: parent.width
+                                    height: 15
                                     spacing: 10
 
                                     MetaLabel {
@@ -1651,749 +1712,864 @@ PanelWindow {
 
                                     MetaValue {
                                         width: parent.width - 102
-                                        text: githubService.lastError
-                                              ? "ERROR // " + githubService.lastError
-                                              : githubService.available
-                                              ? "PX CONTROL READY"
-                                              : "WAITING"
-                                        color: githubService.lastError ? Colors.red : Colors.white
+                                        text:
+                                            githubService.lastError
+                                            ? "ERROR // " + githubService.lastError
+                                            : githubService.available
+                                            ? "PX CONTROL READY"
+                                            : "WAITING"
+                                        color:
+                                            githubService.lastError
+                                            ? Colors.red
+                                            : Colors.white
                                     }
                                 }
-                            }
-                        }
-
-                        // ===== WORKFLOW FACTORY / MIXER ===============
-
-                        Rectangle {
-                            width: parent.width
-                            height: 250
-
-                            color: Colors.dark
-                            border.width: 1
-                            border.color: Colors.orange
-
-                            RectangularShadow {
-                                anchors.fill: parent
-                                spread: 4
-                                z: -1
-                                opacity: 0.22
-                                color: Colors.orange
-                            }
-
-                            SectionLabel {
-                                anchors {
-                                    left: parent.left
-                                    top: parent.top
-                                    leftMargin: 10
-                                    topMargin: 8
-                                }
-
-                                text: "WORKFLOW FACTORY // MIXER"
-                            }
-
-                            GohuText {
-                                anchors {
-                                    right: parent.right
-                                    top: parent.top
-                                    rightMargin: 10
-                                    topMargin: 9
-                                }
-
-                                text: "STATE → CONFIGURE → PREVIEW → SAVE"
-                                font.pixelSize: 8
-                                color: Colors.white
-                                opacity: 0.72
-                            }
-
-                            Row {
-                                id: factoryBody
-
-                                anchors {
-                                    left: parent.left
-                                    right: parent.right
-                                    top: parent.top
-                                    leftMargin: 10
-                                    rightMargin: 10
-                                    topMargin: 31
-                                }
-
-                                height: 160
-                                spacing: 10
 
                                 Row {
-                                    id: dialBayRow
+                                    width: parent.width
+                                    height: 18
+                                    spacing: 10
 
-                                    width: 444
-                                    height: parent.height
-                                    spacing: 8
-
-                                    Rectangle {
-                                        width: (dialBayRow.width - 16) / 3
-                                        height: parent.height
-
-                                        color: Colors.black
-                                        border.width: 1
-                                        border.color: Colors.cyan
-
-                                        SelectorDial {
-                                            anchors {
-                                                fill: parent
-                                                margins: 3
-                                            }
-
-                                            labelText: "IGNITION"
-                                            options: ["manual", "push", "manual+push"]
-                                            displayOptions: ["MAN", "PUSH", "M+P"]
-                                            currentIndex: root.factoryTrigger === "push"
-                                                          ? 1
-                                                          : root.factoryTrigger === "manual+push"
-                                                          ? 2
-                                                          : 0
-                                            readoutText: root.factoryTrigger.toUpperCase()
-
-                                            onSelectionRequested: function(index, value) {
-                                                const next = String(value);
-
-                                                if (root.factoryTrigger === next)
-                                                    return;
-
-                                                root.factoryTrigger = next;
-                                                githubService.clearFactoryResult();
-                                            }
-                                        }
+                                    BlueLabel {
+                                        width: 92
+                                        text: "PX / STATE"
                                     }
-
-                                    Rectangle {
-                                        width: (dialBayRow.width - 16) / 3
-                                        height: parent.height
-
-                                        color: Colors.black
-                                        border.width: 1
-                                        border.color: Colors.cyan
-
-                                        SelectorDial {
-                                            anchors {
-                                                fill: parent
-                                                margins: 3
-                                            }
-
-                                            labelText: "OPERATION"
-                                            options: ["smoke", "shell-check"]
-                                            displayOptions: ["SMOKE", "SHELL"]
-                                            currentIndex: root.factoryTemplate === "shell-check" ? 1 : 0
-                                            readoutText: root.factoryTemplate.toUpperCase()
-
-                                            onSelectionRequested: function(index, value) {
-                                                const next = String(value);
-
-                                                if (root.factoryTemplate === next)
-                                                    return;
-
-                                                root.factoryTemplate = next;
-                                                githubService.clearFactoryResult();
-                                            }
-                                        }
-                                    }
-
-                                    Rectangle {
-                                        width: (dialBayRow.width - 16) / 3
-                                        height: parent.height
-
-                                        color: Colors.black
-                                        border.width: 1
-                                        border.color: Colors.cyan
-
-                                        SelectorDial {
-                                            anchors {
-                                                fill: parent
-                                                margins: 3
-                                            }
-
-                                            labelText: "TARGET"
-                                            options: ["current-repo"]
-                                            displayOptions: ["REPO"]
-                                            currentIndex: 0
-                                            interactive: false
-                                            readoutText: "CURRENT REPO"
-                                        }
-                                    }
-                                }
-
-                                Rectangle {
-                                    width: factoryBody.width - dialBayRow.width - 10
-                                    height: parent.height
-
-                                    color: Colors.black
-                                    border.width: 1
-                                    border.color: Colors.magenta
-
-                                    Column {
-                                        anchors {
-                                            fill: parent
-                                            margins: 8
-                                        }
-
-                                        spacing: 5
-
-                                        Row {
-                                            width: parent.width
-
-                                            GohuText {
-                                                width: parent.width - 76
-                                                text: "CODE // UNDER THE HOOD"
-                                                font.pixelSize: 10
-                                                color: Colors.magenta
-                                            }
-
-                                            GohuText {
-                                                width: 76
-                                                text: githubService.factoryValidationStatus
-                                                horizontalAlignment: Text.AlignRight
-                                                font.pixelSize: 7
-                                                color: githubService.factoryValidationStatus === "PASS"
-                                                       ? Colors.orange
-                                                       : githubService.factoryValidationStatus === "FAIL"
-                                                         || githubService.factoryValidationStatus === "ERROR"
-                                                       ? Colors.red
-                                                       : Colors.white
-                                            }
-                                        }
-
-                                        Rectangle {
-                                            width: parent.width
-                                            height: 123
-                                            color: Colors.dark
-                                            border.width: 1
-                                            border.color: Colors.blue
-                                            clip: true
-
-                                            GohuText {
-                                                anchors {
-                                                    fill: parent
-                                                    margins: 7
-                                                }
-
-                                                text: githubService.factoryYaml
-                                                      ? githubService.factoryYaml
-                                                      : "PREVIEW WILL RENDER THE REAL GITHUB WORKFLOW YAML HERE.\n\nTHE DIALS CHANGE THE CODE; THEY DO NOT HIDE IT."
-                                                textFormat: Text.PlainText
-                                                wrapMode: Text.WrapAnywhere
-                                                font.pixelSize: 8
-                                                color: githubService.factoryYaml ? Colors.white : Colors.cyan
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            Row {
-                                anchors {
-                                    left: parent.left
-                                    right: parent.right
-                                    bottom: parent.bottom
-                                    leftMargin: 10
-                                    rightMargin: 10
-                                    bottomMargin: 9
-                                }
-
-                                height: 38
-                                spacing: 8
-
-                                Rectangle {
-                                    width: parent.width - 348
-                                    height: 34
-                                    color: Colors.black
-                                    border.width: 1
-                                    border.color: factoryNameInput.activeFocus ? Colors.magenta : Colors.orange
 
                                     GohuText {
-                                        anchors {
-                                            left: parent.left
-                                            verticalCenter: parent.verticalCenter
-                                            leftMargin: 8
-                                        }
-
-                                        visible: factoryNameInput.text.length === 0 && !factoryNameInput.activeFocus
-                                        text: "WORKFLOW NAME"
+                                        width: parent.width - 102
+                                        text: root.githubStateText()
                                         font.pixelSize: 9
-                                        color: Colors.white
-                                        opacity: 0.45
+                                        color: root.githubStateColor()
+                                        elide: Text.ElideRight
                                     }
-
-                                    TextInput {
-                                        id: factoryNameInput
-
-                                        anchors {
-                                            fill: parent
-                                            margins: 6
-                                        }
-
-                                        activeFocusOnPress: true
-                                        selectByMouse: true
-                                        verticalAlignment: TextInput.AlignVCenter
-                                        clip: true
-                                        font.family: "GohuFont 11 Nerd Font Mono"
-                                        font.pixelSize: 10
-                                        color: Colors.white
-                                        selectionColor: Colors.magenta
-                                        selectedTextColor: Colors.black
-
-                                        onTextChanged: githubService.clearFactoryResult()
-
-                                        onActiveFocusChanged: {
-                                            if (activeFocus)
-                                                root.activeTextEditor = factoryNameInput;
-                                            else if (root.activeTextEditor === factoryNameInput)
-                                                root.activeTextEditor = null;
-                                        }
-                                    }
-                                }
-
-                                ActionButton {
-                                    width: 148
-                                    height: 34
-                                    label: githubService.factoryBusy && githubService.factoryMode === "preview"
-                                           ? "PREVIEWING"
-                                           : "PREVIEW CODE"
-                                    enabledAction: githubService.available
-                                                   && !githubService.factoryBusy
-                                                   && factoryNameInput.text.trim().length > 0
-                                    onTriggered: githubService.previewWorkflow(
-                                        root.factoryTemplate,
-                                        factoryNameInput.text.trim(),
-                                        root.factoryTrigger
-                                    )
-                                }
-
-                                ActionButton {
-                                    width: 184
-                                    height: 38
-                                    primaryBlue: true
-                                    label: githubService.factoryBusy && githubService.factoryMode === "install"
-                                           ? "SAVING"
-                                           : "SAVE WORKFLOW"
-                                    enabledAction: githubService.available
-                                                   && !githubService.factoryBusy
-                                                   && githubService.factoryMode === "preview"
-                                                   && githubService.factoryValidationStatus === "PASS"
-                                                   && githubService.factoryLastTemplate === root.factoryTemplate
-                                                   && githubService.factoryLastTrigger === root.factoryTrigger
-                                                   && githubService.factoryLastSlug === factoryNameInput.text.trim()
-                                    onTriggered: githubService.installWorkflow(
-                                        root.factoryTemplate,
-                                        factoryNameInput.text.trim(),
-                                        root.factoryTrigger
-                                    )
                                 }
                             }
                         }
 
-                        // ===== SAVED MACHINES ==========================
+                        // ===== ACTIVE GITHUB CAMERA ====================
 
-                        Rectangle {
-                            id: workflowLibrary
+                        Item {
+                            id: githubCameraBody
 
                             width: parent.width
-                            height: 92
-                            z: root.workflowMenuOpen ? 300 : 0
+                            height: parent.height - 178
 
-                            color: Colors.dark
-                            border.width: 1
-                            border.color: Colors.cyan
+                            Item {
+                                id: githubControlCamera
 
-                            RectangularShadow {
                                 anchors.fill: parent
-                                spread: 3
-                                z: -1
-                                opacity: 0.20
-                                color: Colors.cyan
-                            }
-
-                            Column {
-                                anchors {
-                                    fill: parent
-                                    margins: 9
-                                }
-
-                                spacing: 6
-
-                                Row {
-                                    width: parent.width
-
-                                    SectionLabel {
-                                        width: parent.width - 90
-                                        text: "WORKFLOW LIBRARY // SAVED MACHINES"
-                                    }
-
-                                    GohuText {
-                                        width: 90
-                                        text: String(githubService.workflowCount) + " INSTALLED"
-                                        horizontalAlignment: Text.AlignRight
-                                        font.pixelSize: 8
-                                        color: Colors.orange
-                                    }
-                                }
-
-                                Row {
-                                    width: parent.width
-                                    height: 32
-                                    spacing: 8
-
-                                    ActionButton {
-                                        width: parent.width - 370
-                                        height: 30
-                                        enabledAction: githubService.available
-                                                       && githubService.workflowCount > 0
-                                                       && !githubService.refreshing
-                                                       && !githubService.actionBusy
-                                        label: root.selectedWorkflow
-                                               ? String(root.selectedWorkflowIndex + 1)
-                                                 + "/" + String(githubService.workflowCount)
-                                                 + " // "
-                                                 + String(root.selectedWorkflow.name || root.selectedWorkflow.path || "UNKNOWN")
-                                               : "0 // NO WORKFLOWS"
-                                        onTriggered: root.cycleWorkflow()
-                                    }
-
-                                    ActionButton {
-                                        width: 34
-                                        height: 30
-                                        label: root.workflowMenuOpen ? "▴" : "▾"
-                                        enabledAction: githubService.available
-                                                       && githubService.workflowCount > 0
-                                                       && !githubService.refreshing
-                                                       && !githubService.actionBusy
-                                        selectedAction: root.workflowMenuOpen
-                                        onTriggered: root.workflowMenuOpen = !root.workflowMenuOpen
-                                    }
-
-                                    ActionButton {
-                                        width: 100
-                                        height: 30
-                                        label: "REFRESH"
-                                        enabledAction: !githubService.refreshing
-                                                       && !githubService.actionBusy
-                                                       && !githubService.factoryBusy
-                                        onTriggered: githubService.refresh()
-                                    }
-
-                                    ActionButton {
-                                        width: 100
-                                        height: 30
-                                        label: githubService.actionBusy && githubService.actionKind === "run"
-                                               ? "RUNNING"
-                                               : "RUN"
-                                        enabledAction: root.selectedWorkflow
-                                                       && !githubService.refreshing
-                                                       && !githubService.actionBusy
-                                                       && !githubService.factoryBusy
-                                        onTriggered: githubService.runWorkflow(
-                                            String(root.selectedWorkflow.path || root.selectedWorkflow.name || "")
-                                        )
-                                    }
-
-                                    ActionButton {
-                                        width: 104
-                                        height: 30
-                                        label: "LIBRARY"
-                                        enabledAction: githubService.available
-                                        selectedAction: workflowLibraryWindow.menuOpen
-                                        onTriggered: {
-                                            root.workflowMenuOpen = false;
-                                            workflowLibraryWindow.toggle();
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        Rectangle {
-                            id: workflowDropdown
-
-                            visible: root.workflowMenuOpen
-                                     && githubService.workflowCount > 0
-                            z: 500
-
-                            anchors {
-                                left: workflowLibrary.left
-                                right: workflowLibrary.right
-                                top: workflowLibrary.bottom
-                                leftMargin: 9
-                                rightMargin: 9
-                                topMargin: 4
-                            }
-
-                            height: Math.min(githubService.workflowCount, 5) * 30 + 8
-                            color: Colors.black
-                            border.width: 1
-                            border.color: Colors.orange
-                            clip: true
-
-                            RectangularShadow {
-                                anchors.fill: parent
-                                spread: 4
-                                z: -1
-                                opacity: 0.28
-                                color: Colors.orange
-                            }
-
-                            Flickable {
-                                anchors {
-                                    fill: parent
-                                    margins: 4
-                                }
-
-                                clip: true
-                                contentWidth: width
-                                contentHeight: workflowMenuColumn.height
-                                boundsBehavior: Flickable.StopAtBounds
+                                visible: root.githubView === "control"
 
                                 Column {
-                                    id: workflowMenuColumn
-                                    width: parent.width
-                                    spacing: 0
+                                    anchors.fill: parent
+                                    spacing: 10
 
-                                    Repeater {
-                                        model: githubService.workflows
+                                    Rectangle {
+                                                                width: parent.width
+                                                                height: 242
+                                    
+                                                                color: Colors.dark
+                                                                border.width: 1
+                                                                border.color: Colors.orange
+                                    
+                                                                RectangularShadow {
+                                                                    anchors.fill: parent
+                                                                    spread: 4
+                                                                    z: -1
+                                                                    opacity: 0.22
+                                                                    color: Colors.orange
+                                                                }
+                                    
+                                                                SectionLabel {
+                                                                    anchors {
+                                                                        left: parent.left
+                                                                        top: parent.top
+                                                                        leftMargin: 10
+                                                                        topMargin: 8
+                                                                    }
+                                    
+                                                                    text: "WORKFLOW FACTORY // MIXER"
+                                                                }
+                                    
+                                                                GohuText {
+                                                                    anchors {
+                                                                        right: parent.right
+                                                                        top: parent.top
+                                                                        rightMargin: 10
+                                                                        topMargin: 9
+                                                                    }
+                                    
+                                                                    text: "STATE → CONFIGURE → PREVIEW → SAVE"
+                                                                    font.pixelSize: 8
+                                                                    color: Colors.white
+                                                                    opacity: 0.72
+                                                                }
+                                    
+                                                                Row {
+                                                                    id: factoryBody
+                                    
+                                                                    anchors {
+                                                                        left: parent.left
+                                                                        right: parent.right
+                                                                        top: parent.top
+                                                                        leftMargin: 10
+                                                                        rightMargin: 10
+                                                                        topMargin: 31
+                                                                    }
+                                    
+                                                                    height: 160
+                                                                    spacing: 10
+                                    
+                                                                    Row {
+                                                                        id: dialBayRow
+                                    
+                                                                        width: 444
+                                                                        height: parent.height
+                                                                        spacing: 8
+                                    
+                                                                        Rectangle {
+                                                                            width: (dialBayRow.width - 16) / 3
+                                                                            height: parent.height
+                                    
+                                                                            color: Colors.black
+                                                                            border.width: 1
+                                                                            border.color: Colors.cyan
+                                    
+                                                                            SelectorDial {
+                                                                                anchors {
+                                                                                    fill: parent
+                                                                                    margins: 3
+                                                                                }
+                                    
+                                                                                labelText: "IGNITION"
+                                                                                options: ["manual", "push", "manual+push"]
+                                                                                displayOptions: ["MAN", "PUSH", "M+P"]
+                                                                                currentIndex: root.factoryTrigger === "push"
+                                                                                              ? 1
+                                                                                              : root.factoryTrigger === "manual+push"
+                                                                                              ? 2
+                                                                                              : 0
+                                                                                readoutText: root.factoryTrigger.toUpperCase()
+                                    
+                                                                                onSelectionRequested: function(index, value) {
+                                                                                    const next = String(value);
+                                    
+                                                                                    if (root.factoryTrigger === next)
+                                                                                        return;
+                                    
+                                                                                    root.factoryTrigger = next;
+                                                                                    githubService.clearFactoryResult();
+                                                                                }
+                                                                            }
+                                                                        }
+                                    
+                                                                        Rectangle {
+                                                                            width: (dialBayRow.width - 16) / 3
+                                                                            height: parent.height
+                                    
+                                                                            color: Colors.black
+                                                                            border.width: 1
+                                                                            border.color: Colors.cyan
+                                    
+                                                                            SelectorDial {
+                                                                                anchors {
+                                                                                    fill: parent
+                                                                                    margins: 3
+                                                                                }
+                                    
+                                                                                labelText: "OPERATION"
+                                                                                options: ["smoke", "shell-check"]
+                                                                                displayOptions: ["SMOKE", "SHELL"]
+                                                                                currentIndex: root.factoryTemplate === "shell-check" ? 1 : 0
+                                                                                readoutText: root.factoryTemplate.toUpperCase()
+                                    
+                                                                                onSelectionRequested: function(index, value) {
+                                                                                    const next = String(value);
+                                    
+                                                                                    if (root.factoryTemplate === next)
+                                                                                        return;
+                                    
+                                                                                    root.factoryTemplate = next;
+                                                                                    githubService.clearFactoryResult();
+                                                                                }
+                                                                            }
+                                                                        }
+                                    
+                                                                        Rectangle {
+                                                                            width: (dialBayRow.width - 16) / 3
+                                                                            height: parent.height
+                                    
+                                                                            color: Colors.black
+                                                                            border.width: 1
+                                                                            border.color: Colors.cyan
+                                    
+                                                                            SelectorDial {
+                                                                                anchors {
+                                                                                    fill: parent
+                                                                                    margins: 3
+                                                                                }
+                                    
+                                                                                labelText: "TARGET"
+                                                                                options: ["current-repo"]
+                                                                                displayOptions: ["REPO"]
+                                                                                currentIndex: 0
+                                                                                interactive: false
+                                                                                readoutText: "CURRENT REPO"
+                                                                            }
+                                                                        }
+                                                                    }
+                                    
+                                                                    Rectangle {
+                                                                        width: factoryBody.width - dialBayRow.width - 10
+                                                                        height: parent.height
+                                    
+                                                                        color: Colors.black
+                                                                        border.width: 1
+                                                                        border.color: Colors.magenta
+                                    
+                                                                        Column {
+                                                                            anchors {
+                                                                                fill: parent
+                                                                                margins: 8
+                                                                            }
+                                    
+                                                                            spacing: 5
+                                    
+                                                                            Row {
+                                                                                width: parent.width
+                                    
+                                                                                GohuText {
+                                                                                    width: parent.width - 76
+                                                                                    text: "CODE // UNDER THE HOOD"
+                                                                                    font.pixelSize: 10
+                                                                                    color: Colors.magenta
+                                                                                }
+                                    
+                                                                                GohuText {
+                                                                                    width: 76
+                                                                                    text: githubService.factoryValidationStatus
+                                                                                    horizontalAlignment: Text.AlignRight
+                                                                                    font.pixelSize: 7
+                                                                                    color: githubService.factoryValidationStatus === "PASS"
+                                                                                           ? Colors.orange
+                                                                                           : githubService.factoryValidationStatus === "FAIL"
+                                                                                             || githubService.factoryValidationStatus === "ERROR"
+                                                                                           ? Colors.red
+                                                                                           : Colors.white
+                                                                                }
+                                                                            }
+                                    
+                                                                            Rectangle {
+                                                                                width: parent.width
+                                                                                height: 123
+                                                                                color: Colors.dark
+                                                                                border.width: 1
+                                                                                border.color: Colors.blue
+                                                                                clip: true
+                                    
+                                                                                GohuText {
+                                                                                    anchors {
+                                                                                        fill: parent
+                                                                                        margins: 7
+                                                                                    }
+                                    
+                                                                                    text: githubService.factoryYaml
+                                                                                          ? githubService.factoryYaml
+                                                                                          : "PREVIEW WILL RENDER THE REAL GITHUB WORKFLOW YAML HERE.\n\nTHE DIALS CHANGE THE CODE; THEY DO NOT HIDE IT."
+                                                                                    textFormat: Text.PlainText
+                                                                                    wrapMode: Text.WrapAnywhere
+                                                                                    font.pixelSize: 8
+                                                                                    color: githubService.factoryYaml ? Colors.white : Colors.cyan
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                    
+                                                                Row {
+                                                                    anchors {
+                                                                        left: parent.left
+                                                                        right: parent.right
+                                                                        bottom: parent.bottom
+                                                                        leftMargin: 10
+                                                                        rightMargin: 10
+                                                                        bottomMargin: 9
+                                                                    }
+                                    
+                                                                    height: 38
+                                                                    spacing: 8
+                                    
+                                                                    Rectangle {
+                                                                        width: parent.width - 348
+                                                                        height: 34
+                                                                        color: Colors.black
+                                                                        border.width: 1
+                                                                        border.color: factoryNameInput.activeFocus ? Colors.magenta : Colors.orange
+                                    
+                                                                        GohuText {
+                                                                            anchors {
+                                                                                left: parent.left
+                                                                                verticalCenter: parent.verticalCenter
+                                                                                leftMargin: 8
+                                                                            }
+                                    
+                                                                            visible: factoryNameInput.text.length === 0 && !factoryNameInput.activeFocus
+                                                                            text: "WORKFLOW NAME"
+                                                                            font.pixelSize: 9
+                                                                            color: Colors.white
+                                                                            opacity: 0.45
+                                                                        }
+                                    
+                                                                        TextInput {
+                                                                            id: factoryNameInput
+                                    
+                                                                            anchors {
+                                                                                fill: parent
+                                                                                margins: 6
+                                                                            }
+                                    
+                                                                            activeFocusOnPress: true
+                                                                            selectByMouse: true
+                                                                            verticalAlignment: TextInput.AlignVCenter
+                                                                            clip: true
+                                                                            font.family: "GohuFont 11 Nerd Font Mono"
+                                                                            font.pixelSize: 10
+                                                                            color: Colors.white
+                                                                            selectionColor: Colors.magenta
+                                                                            selectedTextColor: Colors.black
+                                    
+                                                                            onTextChanged: githubService.clearFactoryResult()
+                                    
+                                                                            onActiveFocusChanged: {
+                                                                                if (activeFocus)
+                                                                                    root.activeTextEditor = factoryNameInput;
+                                                                                else if (root.activeTextEditor === factoryNameInput)
+                                                                                    root.activeTextEditor = null;
+                                                                            }
+                                                                        }
+                                                                    }
+                                    
+                                                                    ActionButton {
+                                                                        width: 148
+                                                                        height: 34
+                                                                        label: githubService.factoryBusy && githubService.factoryMode === "preview"
+                                                                               ? "PREVIEWING"
+                                                                               : "PREVIEW CODE"
+                                                                        enabledAction: githubService.available
+                                                                                       && !githubService.factoryBusy
+                                                                                       && factoryNameInput.text.trim().length > 0
+                                                                        onTriggered: githubService.previewWorkflow(
+                                                                            root.factoryTemplate,
+                                                                            factoryNameInput.text.trim(),
+                                                                            root.factoryTrigger
+                                                                        )
+                                                                    }
+                                    
+                                                                    ActionButton {
+                                                                        width: 184
+                                                                        height: 38
+                                                                        primaryBlue: true
+                                                                        label: githubService.factoryBusy && githubService.factoryMode === "install"
+                                                                               ? "SAVING"
+                                                                               : "SAVE WORKFLOW"
+                                                                        enabledAction: githubService.available
+                                                                                       && !githubService.factoryBusy
+                                                                                       && githubService.factoryMode === "preview"
+                                                                                       && githubService.factoryValidationStatus === "PASS"
+                                                                                       && githubService.factoryLastTemplate === root.factoryTemplate
+                                                                                       && githubService.factoryLastTrigger === root.factoryTrigger
+                                                                                       && githubService.factoryLastSlug === factoryNameInput.text.trim()
+                                                                        onTriggered: githubService.installWorkflow(
+                                                                            root.factoryTemplate,
+                                                                            factoryNameInput.text.trim(),
+                                                                            root.factoryTrigger
+                                                                        )
+                                                                    }
+                                                                }
+                                                            }
 
-                                        Rectangle {
-                                            required property int index
-                                            required property var modelData
+                                    Rectangle {
+                                                                id: workflowLibrary
+                                    
+                                                                width: parent.width
+                                                                height: 92
+                                                                z: root.workflowMenuOpen ? 300 : 0
+                                    
+                                                                color: Colors.dark
+                                                                border.width: 1
+                                                                border.color: Colors.cyan
+                                    
+                                                                RectangularShadow {
+                                                                    anchors.fill: parent
+                                                                    spread: 3
+                                                                    z: -1
+                                                                    opacity: 0.20
+                                                                    color: Colors.cyan
+                                                                }
+                                    
+                                                                Column {
+                                                                    anchors {
+                                                                        fill: parent
+                                                                        margins: 9
+                                                                    }
+                                    
+                                                                    spacing: 6
+                                    
+                                                                    Row {
+                                                                        width: parent.width
+                                    
+                                                                        SectionLabel {
+                                                                            width: parent.width - 90
+                                                                            text: "WORKFLOW LIBRARY // SAVED MACHINES"
+                                                                        }
+                                    
+                                                                        GohuText {
+                                                                            width: 90
+                                                                            text: String(githubService.workflowCount) + " INSTALLED"
+                                                                            horizontalAlignment: Text.AlignRight
+                                                                            font.pixelSize: 8
+                                                                            color: Colors.orange
+                                                                        }
+                                                                    }
+                                    
+                                                                    Row {
+                                                                        width: parent.width
+                                                                        height: 32
+                                                                        spacing: 8
+                                    
+                                                                        ActionButton {
+                                                                            width: parent.width - 258
+                                                                            height: 30
+                                                                            enabledAction: githubService.available
+                                                                                           && githubService.workflowCount > 0
+                                                                                           && !githubService.refreshing
+                                                                                           && !githubService.actionBusy
+                                                                            label: root.selectedWorkflow
+                                                                                   ? String(root.selectedWorkflowIndex + 1)
+                                                                                     + "/" + String(githubService.workflowCount)
+                                                                                     + " // "
+                                                                                     + String(root.selectedWorkflow.name || root.selectedWorkflow.path || "UNKNOWN")
+                                                                                   : "0 // NO WORKFLOWS"
+                                                                            onTriggered: root.cycleWorkflow()
+                                                                        }
+                                    
+                                                                        ActionButton {
+                                                                            width: 34
+                                                                            height: 30
+                                                                            label: root.workflowMenuOpen ? "▴" : "▾"
+                                                                            enabledAction: githubService.available
+                                                                                           && githubService.workflowCount > 0
+                                                                                           && !githubService.refreshing
+                                                                                           && !githubService.actionBusy
+                                                                            selectedAction: root.workflowMenuOpen
+                                                                            onTriggered: root.workflowMenuOpen = !root.workflowMenuOpen
+                                                                        }
+                                    
+                                                                        ActionButton {
+                                                                            width: 100
+                                                                            height: 30
+                                                                            label: "REFRESH"
+                                                                            enabledAction: !githubService.refreshing
+                                                                                           && !githubService.actionBusy
+                                                                                           && !githubService.factoryBusy
+                                                                            onTriggered: githubService.refresh()
+                                                                        }
+                                    
+                                                                        ActionButton {
+                                                                            width: 100
+                                                                            height: 30
+                                                                            label: githubService.actionBusy && githubService.actionKind === "run"
+                                                                                   ? "RUNNING"
+                                                                                   : "RUN"
+                                                                            enabledAction: root.selectedWorkflow
+                                                                                           && !githubService.refreshing
+                                                                                           && !githubService.actionBusy
+                                                                                           && !githubService.factoryBusy
+                                                                            onTriggered: githubService.runWorkflow(
+                                                                                String(root.selectedWorkflow.path || root.selectedWorkflow.name || "")
+                                                                            )
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
 
-                                            width: workflowMenuColumn.width
-                                            height: 30
+                                    Rectangle {
+                                                                width: parent.width
+                                                                height: 92
+                                    
+                                                                color: Colors.dark
+                                                                border.width: 1
+                                                                border.color: Colors.blue
+                                    
+                                                                RectangularShadow {
+                                                                    anchors.fill: parent
+                                                                    spread: 3
+                                                                    z: -1
+                                                                    opacity: 0.20
+                                                                    color: Colors.blue
+                                                                }
+                                    
+                                                                Column {
+                                                                    anchors {
+                                                                        fill: parent
+                                                                        margins: 9
+                                                                    }
+                                    
+                                                                    spacing: 6
+                                    
+                                                                    Row {
+                                                                        width: parent.width
+                                    
+                                                                        SectionLabel {
+                                                                            width: parent.width - 90
+                                                                            text: "RUNS // RESULT STATE"
+                                                                        }
+                                    
+                                                                        GohuText {
+                                                                            width: 90
+                                                                            text: String(githubService.runCount) + " RECENT"
+                                                                            horizontalAlignment: Text.AlignRight
+                                                                            font.pixelSize: 8
+                                                                            color: Colors.orange
+                                                                        }
+                                                                    }
+                                    
+                                                                    Row {
+                                                                        width: parent.width
+                                                                        height: 32
+                                                                        spacing: 8
+                                    
+                                                                        ActionButton {
+                                                                            width: parent.width - 220
+                                                                            height: 30
+                                                                            enabledAction: githubService.available
+                                                                                           && githubService.runCount > 0
+                                                                                           && !githubService.refreshing
+                                                                                           && !githubService.actionBusy
+                                                                            label: root.selectedRun
+                                                                                   ? String(root.selectedRunIndex + 1)
+                                                                                     + "/" + String(githubService.runCount)
+                                                                                     + " // #"
+                                                                                     + String(root.selectedRun.databaseId || "?")
+                                                                                     + " // "
+                                                                                     + String(root.selectedRun.status || "UNKNOWN").toUpperCase()
+                                                                                     + " // "
+                                                                                     + String(root.selectedRun.conclusion || "")
+                                                                                   : "0 // NO RUNS"
+                                                                            onTriggered: root.cycleRun()
+                                                                        }
+                                    
+                                                                        ActionButton {
+                                                                            width: 102
+                                                                            height: 30
+                                                                            label: githubService.actionBusy && githubService.actionKind === "rerun"
+                                                                                   ? "RERUNNING"
+                                                                                   : "RERUN"
+                                                                            enabledAction: root.selectedRun
+                                                                                           && root.selectedRunStatus === "completed"
+                                                                                           && !githubService.refreshing
+                                                                                           && !githubService.actionBusy
+                                                                                           && !githubService.factoryBusy
+                                                                            onTriggered: githubService.rerunRun(root.selectedRun.databaseId)
+                                                                        }
+                                    
+                                                                        ActionButton {
+                                                                            width: 102
+                                                                            height: 30
+                                                                            label: githubService.actionBusy && githubService.actionKind === "cancel"
+                                                                                   ? "CANCELLING"
+                                                                                   : "CANCEL"
+                                                                            enabledAction: root.selectedRun
+                                                                                           && root.selectedRunStatus !== "completed"
+                                                                                           && !githubService.refreshing
+                                                                                           && !githubService.actionBusy
+                                                                                           && !githubService.factoryBusy
+                                                                            onTriggered: githubService.cancelRun(root.selectedRun.databaseId)
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                }
 
-                                            readonly property bool selected:
-                                                index === root.selectedWorkflowIndex
+                                Rectangle {
+                                                            id: workflowDropdown
+                                
+                                                            visible: root.workflowMenuOpen
+                                                                     && githubService.workflowCount > 0
+                                                            z: 500
+                                
+                                                            anchors {
+                                                                left: workflowLibrary.left
+                                                                right: workflowLibrary.right
+                                                                top: workflowLibrary.bottom
+                                                                leftMargin: 9
+                                                                rightMargin: 9
+                                                                topMargin: 4
+                                                            }
+                                
+                                                            height: Math.min(githubService.workflowCount, 5) * 30 + 8
+                                                            color: Colors.black
+                                                            border.width: 1
+                                                            border.color: Colors.orange
+                                                            clip: true
+                                
+                                                            RectangularShadow {
+                                                                anchors.fill: parent
+                                                                spread: 4
+                                                                z: -1
+                                                                opacity: 0.28
+                                                                color: Colors.orange
+                                                            }
+                                
+                                                            Flickable {
+                                                                anchors {
+                                                                    fill: parent
+                                                                    margins: 4
+                                                                }
+                                
+                                                                clip: true
+                                                                contentWidth: width
+                                                                contentHeight: workflowMenuColumn.height
+                                                                boundsBehavior: Flickable.StopAtBounds
+                                
+                                                                Column {
+                                                                    id: workflowMenuColumn
+                                                                    width: parent.width
+                                                                    spacing: 0
+                                
+                                                                    Repeater {
+                                                                        model: githubService.workflows
+                                
+                                                                        Rectangle {
+                                                                            required property int index
+                                                                            required property var modelData
+                                
+                                                                            width: workflowMenuColumn.width
+                                                                            height: 30
+                                
+                                                                            readonly property bool selected:
+                                                                                index === root.selectedWorkflowIndex
+                                
+                                                                            color:
+                                                                                selected
+                                                                                ? Colors.yellow
+                                                                                : workflowChoiceMouse.containsMouse
+                                                                                ? Colors.dark
+                                                                                : Colors.black
+                                
+                                                                            border.width: 0
+                                
+                                                                            GohuText {
+                                                                                anchors {
+                                                                                    left: parent.left
+                                                                                    right: parent.right
+                                                                                    verticalCenter: parent.verticalCenter
+                                                                                    leftMargin: 8
+                                                                                    rightMargin: 8
+                                                                                }
+                                
+                                                                                text:
+                                                                                    String(index + 1)
+                                                                                    + " // "
+                                                                                    + String(
+                                                                                        modelData.name
+                                                                                        || modelData.path
+                                                                                        || "UNKNOWN"
+                                                                                    )
+                                                                                font.pixelSize: 9
+                                                                                color:
+                                                                                    parent.selected
+                                                                                    ? Colors.magenta
+                                                                                    : workflowChoiceMouse.containsMouse
+                                                                                    ? Colors.orange
+                                                                                    : Colors.cyan
+                                                                                elide: Text.ElideRight
+                                                                            }
+                                
+                                                                            Rectangle {
+                                                                                anchors {
+                                                                                    left: parent.left
+                                                                                    right: parent.right
+                                                                                    bottom: parent.bottom
+                                                                                }
+                                                                                height: 1
+                                                                                color: Colors.cyan
+                                                                                opacity: 0.18
+                                                                            }
+                                
+                                                                            MouseArea {
+                                                                                id: workflowChoiceMouse
+                                                                                anchors.fill: parent
+                                                                                hoverEnabled: true
+                                                                                cursorShape: Qt.PointingHandCursor
+                                                                                onClicked: root.selectWorkflow(index)
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                            }
 
-                                            color:
-                                                selected
-                                                ? Colors.yellow
-                                                : workflowChoiceMouse.containsMouse
-                                                ? Colors.dark
-                                                : Colors.black
+                            WorkflowLibraryView {
+                                anchors.fill: parent
+                                visible: root.githubView === "library"
 
-                                            border.width: 0
+                                githubService: githubService
+                                libraryStore: workflowLibraryStore
 
-                                            GohuText {
-                                                anchors {
-                                                    left: parent.left
-                                                    right: parent.right
-                                                    verticalCenter: parent.verticalCenter
-                                                    leftMargin: 8
-                                                    rightMargin: 8
-                                                }
+                                onWorkflowSelected: function(index) {
+                                    root.selectedWorkflowIndex = index;
+                                    root.showGithubControl();
+                                }
+                            }
+                        }
 
-                                                text:
-                                                    String(index + 1)
-                                                    + " // "
-                                                    + String(
-                                                        modelData.name
-                                                        || modelData.path
-                                                        || "UNKNOWN"
-                                                    )
-                                                font.pixelSize: 9
-                                                color:
-                                                    parent.selected
-                                                    ? Colors.magenta
-                                                    : workflowChoiceMouse.containsMouse
-                                                    ? Colors.orange
-                                                    : Colors.cyan
-                                                elide: Text.ElideRight
-                                            }
+                        // ===== APPCONTROL-STYLE GITHUB MODE RAIL ======
 
-                                            Rectangle {
-                                                anchors {
-                                                    left: parent.left
-                                                    right: parent.right
-                                                    bottom: parent.bottom
-                                                }
-                                                height: 1
-                                                color: Colors.cyan
-                                                opacity: 0.18
-                                            }
+                        Row {
+                            id: githubModeButtonRow
 
-                                            MouseArea {
-                                                id: workflowChoiceMouse
-                                                anchors.fill: parent
-                                                hoverEnabled: true
-                                                cursorShape: Qt.PointingHandCursor
-                                                onClicked: root.selectWorkflow(index)
-                                            }
+                            width: parent.width
+                            height: 58
+                            spacing: 8
+
+                            Repeater {
+                                model: [
+                                    {
+                                        name: "CONTROL",
+                                        key: "control",
+                                        symbol: "◎"
+                                    },
+                                    {
+                                        name: "LIBRARY",
+                                        key: "library",
+                                        symbol: "▤"
+                                    }
+                                ]
+
+                                Rectangle {
+                                    id: githubModeButton
+
+                                    required property int index
+                                    required property var modelData
+
+                                    readonly property bool isSelected:
+                                        root.githubView === modelData.key
+
+                                    readonly property bool isHovered:
+                                        githubModeMouse.containsMouse
+
+                                    readonly property bool isPressed:
+                                        githubModeMouse.pressed
+
+                                    readonly property color contentColor:
+                                        isPressed
+                                        ? Colors.black
+                                        : isSelected
+                                        ? Colors.magenta
+                                        : isHovered
+                                        ? Colors.orange
+                                        : Colors.cyan
+
+                                    width:
+                                        (
+                                            githubModeButtonRow.width
+                                            - githubModeButtonRow.spacing
+                                        )
+                                        / 2
+
+                                    height: parent.height
+
+                                    scale:
+                                        isPressed
+                                        ? 0.99
+                                        : isHovered
+                                        ? 1.025
+                                        : isSelected
+                                        ? 1.01
+                                        : 1.0
+
+                                    color:
+                                        isPressed
+                                        ? Colors.magenta
+                                        : isHovered || isSelected
+                                        ? Colors.yellow
+                                        : Colors.black
+
+                                    border.width: 1
+                                    border.color:
+                                        isHovered || isPressed || isSelected
+                                        ? Colors.orange
+                                        : Colors.cyan
+
+                                    Behavior on scale {
+                                        NumberAnimation {
+                                            duration: 90
+                                            easing.type: Easing.OutQuad
                                         }
                                     }
-                                }
-                            }
-                        }
 
-                        // ===== RUNS / RESULT STATE =====================
+                                    Column {
+                                        width: parent.width
+                                        anchors.centerIn: parent
+                                        spacing: 1
 
-                        Rectangle {
-                            width: parent.width
-                            height: 92
+                                        NotoText {
+                                            width: parent.width
+                                            text: modelData.symbol
+                                            horizontalAlignment: Text.AlignHCenter
+                                            font.pixelSize: 19
+                                            color: githubModeButton.contentColor
+                                        }
 
-                            color: Colors.dark
-                            border.width: 1
-                            border.color: Colors.blue
-
-                            RectangularShadow {
-                                anchors.fill: parent
-                                spread: 3
-                                z: -1
-                                opacity: 0.20
-                                color: Colors.blue
-                            }
-
-                            Column {
-                                anchors {
-                                    fill: parent
-                                    margins: 9
-                                }
-
-                                spacing: 6
-
-                                Row {
-                                    width: parent.width
-
-                                    SectionLabel {
-                                        width: parent.width - 90
-                                        text: "RUNS // RESULT STATE"
+                                        GohuText {
+                                            width: parent.width
+                                            text: modelData.name
+                                            horizontalAlignment: Text.AlignHCenter
+                                            font.pixelSize: 10
+                                            color: githubModeButton.contentColor
+                                        }
                                     }
 
-                                    GohuText {
-                                        width: 90
-                                        text: String(githubService.runCount) + " RECENT"
-                                        horizontalAlignment: Text.AlignRight
-                                        font.pixelSize: 8
+                                    MouseArea {
+                                        id: githubModeMouse
+
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+
+                                        onClicked: {
+                                            if (modelData.key === "library")
+                                                root.showGithubLibrary();
+                                            else
+                                                root.showGithubControl();
+                                        }
+                                    }
+
+                                    RectangularShadow {
+                                        anchors.fill: parent
+
+                                        spread:
+                                            githubModeButton.isHovered
+                                            ? 6
+                                            : githubModeButton.isSelected
+                                            ? 4
+                                            : 2
+
+                                        z: -1
+
+                                        opacity:
+                                            githubModeButton.isPressed
+                                            ? 0.62
+                                            : githubModeButton.isHovered
+                                            ? 0.56
+                                            : githubModeButton.isSelected
+                                            ? 0.46
+                                            : 0.10
+
                                         color: Colors.orange
                                     }
-                                }
-
-                                Row {
-                                    width: parent.width
-                                    height: 32
-                                    spacing: 8
-
-                                    ActionButton {
-                                        width: parent.width - 220
-                                        height: 30
-                                        enabledAction: githubService.available
-                                                       && githubService.runCount > 0
-                                                       && !githubService.refreshing
-                                                       && !githubService.actionBusy
-                                        label: root.selectedRun
-                                               ? String(root.selectedRunIndex + 1)
-                                                 + "/" + String(githubService.runCount)
-                                                 + " // #"
-                                                 + String(root.selectedRun.databaseId || "?")
-                                                 + " // "
-                                                 + String(root.selectedRun.status || "UNKNOWN").toUpperCase()
-                                                 + " // "
-                                                 + String(root.selectedRun.conclusion || "")
-                                               : "0 // NO RUNS"
-                                        onTriggered: root.cycleRun()
-                                    }
-
-                                    ActionButton {
-                                        width: 102
-                                        height: 30
-                                        label: githubService.actionBusy && githubService.actionKind === "rerun"
-                                               ? "RERUNNING"
-                                               : "RERUN"
-                                        enabledAction: root.selectedRun
-                                                       && root.selectedRunStatus === "completed"
-                                                       && !githubService.refreshing
-                                                       && !githubService.actionBusy
-                                                       && !githubService.factoryBusy
-                                        onTriggered: githubService.rerunRun(root.selectedRun.databaseId)
-                                    }
-
-                                    ActionButton {
-                                        width: 102
-                                        height: 30
-                                        label: githubService.actionBusy && githubService.actionKind === "cancel"
-                                               ? "CANCELLING"
-                                               : "CANCEL"
-                                        enabledAction: root.selectedRun
-                                                       && root.selectedRunStatus !== "completed"
-                                                       && !githubService.refreshing
-                                                       && !githubService.actionBusy
-                                                       && !githubService.factoryBusy
-                                        onTriggered: githubService.cancelRun(root.selectedRun.databaseId)
-                                    }
-                                }
-                            }
-                        }
-
-                        // ===== BRIDGE / FACTORY FEEDBACK ===============
-
-                        Rectangle {
-                            width: parent.width
-                            height: 50
-
-                            color: Colors.dark
-                            border.width: 1
-                            border.color: Colors.magenta
-
-                            Row {
-                                anchors {
-                                    fill: parent
-                                    margins: 9
-                                }
-
-                                spacing: 10
-
-                                BlueLabel {
-                                    width: 90
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: "PX / STATE"
-                                }
-
-                                GohuText {
-                                    width: parent.width - 100
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: {
-                                        if (githubService.factoryBusy)
-                                            return githubService.factoryMode === "install"
-                                                   ? "SAVING // VALIDATING + INSTALLING"
-                                                   : "PREVIEWING // VALIDATING";
-
-                                        if (githubService.factoryInstallCommit)
-                                            return "WORKFLOW INSTALLED // "
-                                                   + githubService.factoryInstallCommit.slice(0, 10);
-
-                                        if (githubService.factoryPullRequest)
-                                            return "WORKFLOW PR READY // " + githubService.factoryPullRequest;
-
-                                        if (githubService.factoryValidationStatus === "PASS")
-                                            return "FACTORY PASS // " + githubService.factoryPath;
-
-                                        if (githubService.factoryValidationStatus === "FAIL"
-                                                || githubService.factoryValidationStatus === "ERROR")
-                                            return githubService.factoryValidationStatus
-                                                   + " // "
-                                                   + (githubService.factoryValidationMessage || "PX FACTORY ERROR");
-
-                                        if (githubService.actionBusy)
-                                            return githubService.actionResult;
-
-                                        if (githubService.actionResult !== "READY")
-                                            return githubService.actionResult;
-
-                                        return githubService.available
-                                               ? "ACTIVE // PX CONTROL READY"
-                                               : "WAITING";
-                                    }
-
-                                    font.pixelSize: 9
-                                    color: githubService.factoryValidationStatus === "FAIL"
-                                           || githubService.factoryValidationStatus === "ERROR"
-                                           || githubService.lastError
-                                           ? Colors.red
-                                           : githubService.factoryValidationStatus === "PASS"
-                                           ? Colors.orange
-                                           : Colors.white
-                                    elide: Text.ElideRight
                                 }
                             }
                         }

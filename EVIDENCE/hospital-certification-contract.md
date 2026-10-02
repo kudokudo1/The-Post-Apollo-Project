@@ -122,4 +122,10 @@ If the room HEAD or target base HEAD changes before verification/certification/a
 
 services/hospital/HospitalCertificationService.qml implements the state machine and persistent event history.
 
+services/hospital/HospitalCertificationCoordinator.qml is the backend bridge from the existing HospitalRoomService snapshots into the certification service. It keeps the UI from having to know the certification internals.
+
+services/hospital/HospitalHistoryService.qml provides the persistent Hospital-wide event timeline.
+
+services/hospital/HospitalOperatingAuthorityService.qml provides the serialized host-slot owner/queue contract.
+
 The UI integration is intentionally separate so the service contract can stabilize before another lane edits HospitalW.qml.

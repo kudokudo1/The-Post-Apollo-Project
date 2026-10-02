@@ -1321,7 +1321,7 @@ PanelWindow {
                                         ActionButton {
                                             width: 28
                                             height: 28
-                                            label: "‹"
+                                            label: "<"
                                             enabledAction: gitService.repoCount > 1
                                             onTriggered: gitService.cycleRepo(-1)
                                         }
@@ -1340,7 +1340,7 @@ PanelWindow {
                                         ActionButton {
                                             width: 28
                                             height: 28
-                                            label: "›"
+                                            label: ">"
                                             enabledAction: gitService.repoCount > 1
                                             onTriggered: gitService.cycleRepo(1)
                                         }
@@ -1430,7 +1430,7 @@ PanelWindow {
                                         ActionButton {
                                             width: 28
                                             height: 28
-                                            label: "‹"
+                                            label: "<"
                                             enabledAction: gitService.remoteBranchCount > 0
                                             onTriggered: gitService.cycleRemote(-1)
                                         }
@@ -1452,7 +1452,7 @@ PanelWindow {
                                         ActionButton {
                                             width: 28
                                             height: 28
-                                            label: "›"
+                                            label: ">"
                                             enabledAction: gitService.remoteBranchCount > 0
                                             onTriggered: gitService.cycleRemote(1)
                                         }
@@ -2364,7 +2364,7 @@ PanelWindow {
                                                                             width: 34
                                                                             height: 30
                                                                             orangeAccent: true
-                                                                            label: root.workflowMenuOpen ? "▴" : "▾"
+                                                                            label: root.workflowMenuOpen ? "▲" : "▼"
                                                                             enabledAction: githubService.available
                                                                                            && githubService.workflowCount > 0
                                                                                            && !githubService.refreshing

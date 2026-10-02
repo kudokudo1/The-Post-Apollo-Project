@@ -32,7 +32,7 @@ PanelWindow {
         selectedRun ? String(selectedRun.status || "").toLowerCase() : ""
 
     // One physical machine, two cameras. Page changes never resize the chassis.
-    property int panelWidth: 860
+    property int panelWidth: 920
     property int panelHeight: 790
     property int panelTopMargin: 0
     property int panelLeftMargin: 600
@@ -144,8 +144,6 @@ PanelWindow {
             githubService.refresh();
     }
 
-    Component.onCompleted: gitService.refresh()
-
     GitService {
         id: gitService
     }
@@ -171,14 +169,6 @@ PanelWindow {
             else if (root.selectedRunIndex >= githubService.runs.length)
                 root.selectedRunIndex = 0;
         }
-    }
-
-    Timer {
-        interval: 10000
-        repeat: true
-        running: root.menuOpen && root.activePage === "git"
-
-        onTriggered: gitService.refresh()
     }
 
     Timer {
@@ -742,7 +732,7 @@ PanelWindow {
             z: 100
             anchors {
                 left: parent.left
-                leftMargin: 2
+                leftMargin: 10
                 top: parent.top
                 topMargin: 138
                 bottom: parent.bottom
@@ -766,7 +756,7 @@ PanelWindow {
             z: 100
             anchors {
                 right: parent.right
-                rightMargin: 2
+                rightMargin: 10
                 top: parent.top
                 topMargin: 138
                 bottom: parent.bottom
@@ -786,7 +776,10 @@ PanelWindow {
         Column {
             anchors {
                 fill: parent
-                margins: 18
+                topMargin: 18
+                bottomMargin: 18
+                leftMargin: root.activePage === "git" ? 46 : 18
+                rightMargin: root.activePage === "git" ? 46 : 18
             }
 
             spacing: 12

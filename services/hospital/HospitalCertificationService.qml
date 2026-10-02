@@ -66,6 +66,10 @@ Scope {
     signal evidenceRecorded(var packet)
     signal certificationBlocked(string reason)
 
+    HospitalHistoryService {
+        id: hospitalHistory
+    }
+
     FileView {
         id: historyFile
 
@@ -380,6 +384,21 @@ Scope {
                          : [];
         allEvents.push(event);
         historyAdapter.events = allEvents;
+
+        hospitalHistory.record(
+            eventType,
+            normalized.team,
+            state,
+            {
+                repository: normalized.repository,
+                branch: normalized.branch,
+                head: normalized.head,
+                base: normalized.base,
+                baseHead: normalized.baseHead,
+                reason: lastReason,
+                packet: evidencePacket
+            }
+        );
 
         evidenceRecorded(evidencePacket);
         certificationChanged(previousState, state, eventType);

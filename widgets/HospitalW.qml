@@ -13,10 +13,18 @@ PanelWindow {
 
     property bool menuOpen: false
     property string selectedCommitSha: ""
+    property string selectedRoomTeam: ""
+    readonly property var selectedRoomData:
+        auditService.roomFor(selectedRoomTeam)
 
     function toggleCommitSelection(sha) {
         const candidate = String(sha || "");
         selectedCommitSha = selectedCommitSha === candidate ? "" : candidate;
+    }
+
+    function toggleRoomSelection(team) {
+        const candidate = String(team || "");
+        selectedRoomTeam = selectedRoomTeam === candidate ? "" : candidate;
     }
 
     property int panelWidth: 700
@@ -225,30 +233,33 @@ PanelWindow {
             ? Colors.magenta
             : Colors.cyan
 
+        readonly property bool selected:
+            root.selectedRoomTeam === roomRow.team
+
         width: roomsColumn.width
-        height: 30
+        height: 44
 
         color: Colors.dark
-        border.width: 1
-        border.color: Colors.magenta
+        border.width: selected ? 2 : 1
+        border.color: selected ? Colors.orange : Colors.magenta
 
         RectangularShadow {
             anchors.fill: parent
-            spread: 3
+            spread: selected ? 5 : 3
             z: -1
-            opacity: 0.28
-            color: Colors.magenta
+            opacity: selected ? 0.42 : 0.28
+            color: selected ? Colors.orange : Colors.magenta
         }
 
         GohuText {
             anchors {
                 left: parent.left
                 verticalCenter: parent.verticalCenter
-                leftMargin: 10
+                leftMargin: 12
             }
 
             text: roomRow.team
-            font.pixelSize: 12
+            font.pixelSize: 14
             color: Colors.orange
 
             layer.enabled: true
@@ -265,12 +276,12 @@ PanelWindow {
             anchors {
                 left: parent.left
                 verticalCenter: parent.verticalCenter
-                leftMargin: 62
+                leftMargin: 74
             }
 
-            width: 440
+            width: 340
             text: roomRow.responsibility
-            font.pixelSize: 11
+            font.pixelSize: 13
             color: Colors.cyan
             elide: Text.ElideRight
 
@@ -292,7 +303,7 @@ PanelWindow {
             }
 
             text: roomRow.stateText
-            font.pixelSize: 9
+            font.pixelSize: 11
             color: roomRow.stateColor
             opacity: roomRow.telemetryState === "WAITING" ? 0.58 : 1.0
 
@@ -304,6 +315,14 @@ PanelWindow {
                 color: roomRow.stateColor
                 transparentBorder: true
             }
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+
+            onClicked: root.toggleRoomSelection(roomRow.team)
         }
     }
 
@@ -363,15 +382,28 @@ PanelWindow {
             opacity: 0.70
         }
 
-        Column {
-            id: content
+        Flickable {
+            id: hospitalScroll
 
             anchors {
                 fill: parent
-                margins: 18
+                leftMargin: 18
+                topMargin: 18
+                rightMargin: 34
+                bottomMargin: 18
             }
 
-            spacing: 12
+            clip: true
+            contentWidth: width
+            contentHeight: content.height
+            boundsBehavior: Flickable.StopAtBounds
+            flickDeceleration: 1800
+
+            Column {
+                id: content
+
+                width: hospitalScroll.width
+                spacing: 12
 
             // ===== HEADER =======================================
 
@@ -613,7 +645,7 @@ PanelWindow {
                 id: roomsColumn
 
                 width: parent.width
-                spacing: 4
+                spacing: 7
 
                 RoomRow { team: "T1"; responsibility: "SYSTEM / HUNTER" }
                 RoomRow { team: "T2"; responsibility: "FAVORITES" }
@@ -624,6 +656,131 @@ PanelWindow {
                 RoomRow { team: "T6"; responsibility: "APPLICATION AUDIO" }
                 RoomRow { team: "T7"; responsibility: "DESKTOP IDENTITY" }
                 RoomRow { team: "T8"; responsibility: "APPS" }
+            }
+
+            Rectangle {
+                id: roomDetail
+
+                width: parent.width
+                height: visible ? 170 : 0
+                visible: root.selectedRoomTeam.length > 0
+
+                color: Colors.dark
+                border.width: 1
+                border.color: Colors.orange
+
+                RectangularShadow {
+                    anchors.fill: parent
+                    spread: 4
+                    z: -1
+                    opacity: 0.30
+                    color: Colors.orange
+                }
+
+                Column {
+                    anchors {
+                        fill: parent
+                        margins: 12
+                    }
+
+                    spacing: 7
+
+                    GohuText {
+                        text: {
+                            const room = root.selectedRoomData || {};
+                            const responsibility =
+                                String(room.responsibility || "");
+                            return "ROOM // " + root.selectedRoomTeam
+                                   + (responsibility
+                                      ? " // " + responsibility
+                                      : "");
+                        }
+                        font.pixelSize: 13
+                        color: Colors.orange
+                    }
+
+                    Row {
+                        spacing: 10
+
+                        MetaLabel {
+                            width: 92
+                            text: "BRANCH"
+                        }
+
+                        CyanValue {
+                            width: roomDetail.width - 130
+                            text: {
+                                const room = root.selectedRoomData || {};
+                                return String(room.branch || "NO DATA");
+                            }
+                        }
+                    }
+
+                    Row {
+                        spacing: 10
+
+                        MetaLabel {
+                            width: 92
+                            text: "HEAD"
+                        }
+
+                        BlueValue {
+                            width: roomDetail.width - 130
+                            text: {
+                                const room = root.selectedRoomData || {};
+                                const head = String(room.head || "");
+                                return head ? head.slice(0, 12) : "NO DATA";
+                            }
+                        }
+                    }
+
+                    Row {
+                        spacing: 10
+
+                        MetaLabel {
+                            width: 92
+                            text: "RELATION"
+                        }
+
+                        GohuText {
+                            text: {
+                                const room = root.selectedRoomData || {};
+                                const state =
+                                    String(room.state || "WAITING");
+                                const ahead = Number(room.ahead || 0);
+                                const behind = Number(room.behind || 0);
+                                return state + " // +" + ahead
+                                       + " / -" + behind;
+                            }
+                            font.pixelSize: 11
+                            color: Colors.magenta
+                        }
+                    }
+
+                    Row {
+                        spacing: 10
+
+                        MetaLabel {
+                            width: 92
+                            text: "LAST TOUCH"
+                        }
+
+                        MetaValue {
+                            width: roomDetail.width - 130
+                            text: {
+                                const room = root.selectedRoomData || {};
+                                return String(room.updated_at || "NO DATA");
+                            }
+                        }
+                    }
+
+                    GohuText {
+                        text: "CLICK SELECTED ROOM AGAIN TO CLOSE"
+                        font.pixelSize: 9
+                        color: Colors.cyan
+                        opacity: 0.64
+                    }
+                }
             }
 
             // ===== ACTION BAY ===================================
@@ -808,5 +965,105 @@ PanelWindow {
             }
         }
 
+        Rectangle {
+            id: scrollRail
+
+            width: 8
+            anchors {
+                top: parent.top
+                right: parent.right
+                bottom: parent.bottom
+                topMargin: 20
+                rightMargin: 16
+                bottomMargin: 20
+            }
+
+            visible: hospitalScroll.contentHeight > hospitalScroll.height
+            color: Colors.dark
+            border.width: 1
+            border.color: Colors.cyan
+            opacity: visible ? 0.82 : 0.0
+
+            Rectangle {
+                id: scrollThumb
+
+                width: 10
+                height: Math.max(
+                    48,
+                    scrollRail.height
+                    * Math.min(
+                        1.0,
+                        hospitalScroll.height
+                        / Math.max(1, hospitalScroll.contentHeight)
+                    )
+                )
+
+                x: -1
+                y: {
+                    const maxContentY = Math.max(
+                        1,
+                        hospitalScroll.contentHeight
+                        - hospitalScroll.height
+                    );
+                    const travel = Math.max(
+                        0,
+                        scrollRail.height - height
+                    );
+                    return travel
+                           * hospitalScroll.contentY
+                           / maxContentY;
+                }
+
+                radius: 5
+                color: Colors.white
+                border.width: 1
+                border.color: Colors.cyan
+
+                RectangularShadow {
+                    anchors.fill: parent
+                    spread: 3
+                    z: -1
+                    opacity: 0.44
+                    color: Colors.cyan
+                }
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+
+                function seek(pointerY) {
+                    const maxContentY = Math.max(
+                        0,
+                        hospitalScroll.contentHeight
+                        - hospitalScroll.height
+                    );
+                    const travel = Math.max(
+                        1,
+                        scrollRail.height - scrollThumb.height
+                    );
+                    const thumbY = Math.max(
+                        0,
+                        Math.min(
+                            travel,
+                            pointerY - scrollThumb.height / 2
+                        )
+                    );
+
+                    hospitalScroll.contentY =
+                        maxContentY * thumbY / travel;
+                }
+
+                onPressed: function(mouse) {
+                    seek(mouse.y);
+                }
+
+                onPositionChanged: function(mouse) {
+                    if (pressed)
+                        seek(mouse.y);
+                }
+            }
+        }
     }
 }

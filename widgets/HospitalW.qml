@@ -571,7 +571,7 @@ PanelWindow {
                 id: patientRoomRow
 
                 width: parent.width
-                height: 258
+                height: 310
                 spacing: 10
 
                 Rectangle {
@@ -856,6 +856,8 @@ PanelWindow {
                                     readonly property bool enabledAction:
                                         root.selectedRoomTeam.length > 0
                                         && !roomService.running
+                                        && !roomService.rehearsing
+                                        && !roomService.integrating
 
                                     width:
                                         (
@@ -932,6 +934,8 @@ PanelWindow {
                                     readonly property bool enabledAction:
                                         root.selectedRoomTeam.length > 0
                                         && !roomService.running
+                                        && !roomService.rehearsing
+                                        && !roomService.integrating
 
                                     width:
                                         (
@@ -1008,6 +1012,94 @@ PanelWindow {
                             }
                         }
 
+                        Rectangle {
+                            id: rehearseButton
+
+                            readonly property bool enabledAction:
+                                roomService.canRehearse
+                                && !roomService.running
+                                && !roomService.rehearsing
+                                && !roomService.integrating
+
+                            width: parent.width
+                            height: 24
+
+                            color:
+                                rehearseMouse.pressed
+                                ? Colors.orange
+                                : roomService.rehearsing
+                                ? Colors.magenta
+                                : Colors.black
+                            border.width:
+                                roomService.rehearsalStatus.length > 0
+                                ? 2 : 1
+                            border.color:
+                                roomService.rehearsalStatus === "CONFLICTS"
+                                ? Colors.red
+                                : roomService.rehearsalStatus === "CLEAN_MERGE"
+                                ? Colors.orange
+                                : rehearseMouse.containsMouse
+                                ? Colors.orange
+                                : Colors.cyan
+                            opacity:
+                                enabledAction
+                                || roomService.rehearsing
+                                || roomService.rehearsalStatus.length > 0
+                                ? 1.0 : 0.42
+
+                            RectangularShadow {
+                                anchors.fill: parent
+                                spread:
+                                    roomService.rehearsalStatus.length > 0
+                                    ? 4 : 2
+                                z: -1
+                                opacity:
+                                    roomService.rehearsalStatus.length > 0
+                                    ? 0.34 : 0.12
+                                color:
+                                    roomService.rehearsalStatus === "CONFLICTS"
+                                    ? Colors.red
+                                    : roomService.rehearsalStatus === "CLEAN_MERGE"
+                                    ? Colors.orange
+                                    : Colors.cyan
+                            }
+
+                            GohuText {
+                                anchors.centerIn: parent
+                                text:
+                                    roomService.rehearsing
+                                    ? "REHEARSING // ISOLATED"
+                                    : roomService.rehearsalStatus === "CONFLICTS"
+                                    ? "REHEARSE // CONFLICTS"
+                                    : roomService.rehearsalStatus === "CLEAN_MERGE"
+                                    ? "REHEARSE // CLEAN MERGE"
+                                    : "REHEARSE MERGE"
+                                font.pixelSize: 9
+                                color:
+                                    rehearseMouse.pressed
+                                    ? Colors.black
+                                    : roomService.rehearsalStatus === "CONFLICTS"
+                                    ? Colors.red
+                                    : roomService.rehearsalStatus === "CLEAN_MERGE"
+                                    ? Colors.orange
+                                    : Colors.cyan
+                            }
+
+                            MouseArea {
+                                id: rehearseMouse
+
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                enabled: rehearseButton.enabledAction
+                                cursorShape:
+                                    enabled
+                                    ? Qt.PointingHandCursor
+                                    : Qt.ArrowCursor
+
+                                onClicked: roomService.rehearsePrepared()
+                            }
+                        }
+
                         Row {
                             id: integrationGateActions
 
@@ -1021,6 +1113,7 @@ PanelWindow {
                                 readonly property bool enabledAction:
                                     roomService.canArm
                                     && !roomService.running
+                                    && !roomService.rehearsing
                                     && !roomService.integrating
 
                                 width:
@@ -1093,6 +1186,7 @@ PanelWindow {
                                 readonly property bool enabledAction:
                                     roomService.armed
                                     && !roomService.running
+                                    && !roomService.rehearsing
                                     && !roomService.integrating
 
                                 width:
@@ -1175,6 +1269,18 @@ PanelWindow {
                                 : roomService.available
                                 ? Colors.cyan
                                 : Colors.magenta
+                            elide: Text.ElideRight
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            visible: roomService.rehearsalDetail.length > 0
+                            text: roomService.rehearsalDetail
+                            font.pixelSize: 8
+                            color:
+                                roomService.rehearsalStatus === "CONFLICTS"
+                                ? Colors.red
+                                : Colors.orange
                             elide: Text.ElideRight
                         }
                     }

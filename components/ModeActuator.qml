@@ -13,7 +13,7 @@ Rectangle {
     signal triggered()
 
     width: 52
-    height: 36
+    height: 40
     radius: 2
 
     readonly property bool hovered:
@@ -63,12 +63,13 @@ Rectangle {
 
     Column {
         anchors.centerIn: parent
-        spacing: -1
+        anchors.verticalCenterOffset: 2
+        spacing: -2
 
         NotoText {
             anchors.horizontalCenter: parent.horizontalCenter
             text: actuator.icon
-            font.pixelSize: 22
+            font.pixelSize: 21
             color:
                 actuator.pressed
                 ? Colors.black
@@ -80,7 +81,7 @@ Rectangle {
         GohuText {
             anchors.horizontalCenter: parent.horizontalCenter
             text: actuator.tag
-            font.pixelSize: 9
+            font.pixelSize: 10
             color:
                 actuator.pressed
                 ? Colors.black

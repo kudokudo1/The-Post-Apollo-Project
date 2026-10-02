@@ -435,8 +435,8 @@ Item {
                     layer.effect: MultiEffect {
                         shadowEnabled: true
                         shadowColor: dialRoot.markerColor
-                        shadowOpacity: 0.74
-                        shadowBlur: 0.62
+                        shadowOpacity: 0.85
+                        shadowBlur: 0.75
                     }
                 }
             }

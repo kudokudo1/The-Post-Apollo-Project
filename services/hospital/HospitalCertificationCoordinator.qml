@@ -203,7 +203,25 @@ Scope {
             return false;
         }
 
-        return roomService.armPrepared();
+        const armed = roomService.armPrepared();
+
+        if (!armed) {
+            authority.releaseSlot(
+                roomService.team,
+                hostLeaseId,
+                "ROOM ARM FAILED"
+            );
+            hostLeaseId = "";
+
+            certification.reopen(
+                "ROOM ARM FAILED",
+                roomService.certificationSnapshot()
+            );
+
+            return false;
+        }
+
+        return true;
     }
 
     function integrate() {

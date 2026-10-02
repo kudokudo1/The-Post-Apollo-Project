@@ -66,7 +66,7 @@ Rectangle {
     Column {
         anchors.centerIn: parent
         anchors.verticalCenterOffset: -2
-        spacing: -2
+        spacing: -4
 
         NotoText {
             anchors.horizontalCenter: parent.horizontalCenter

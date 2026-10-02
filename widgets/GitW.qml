@@ -725,8 +725,8 @@ PanelWindow {
             opacity: 0.70
         }
 
-        IndexRail {
-            id: repoRail
+        SelectorSlider {
+            id: repoSlider
 
             visible: root.activePage === "git"
             z: 100
@@ -749,8 +749,8 @@ PanelWindow {
             }
         }
 
-        IndexRail {
-            id: remoteRail
+        SelectorSlider {
+            id: remoteSlider
 
             visible: root.activePage === "git"
             z: 100
@@ -778,8 +778,8 @@ PanelWindow {
                 fill: parent
                 topMargin: 18
                 bottomMargin: 18
-                leftMargin: root.activePage === "git" ? 46 : 18
-                rightMargin: root.activePage === "git" ? 46 : 18
+                leftMargin: root.activePage === "git" ? 64 : 18
+                rightMargin: root.activePage === "git" ? 64 : 18
             }
 
             spacing: 12

@@ -140,6 +140,7 @@ Scope {
 
     signal inspected()
     signal integrated()
+    signal integrationFailed(string reason, bool uncertain)
     signal postOpStarted()
     signal postOpFinished()
 
@@ -563,6 +564,7 @@ Scope {
         if (!armed) {
             lastError = "EXECUTE REFUSED // NOT ARMED";
             summary = lastError;
+            integrationFailed(lastError, false);
             return;
         }
 
@@ -574,6 +576,7 @@ Scope {
                         + " REFUSED // LOCAL PATIENT NOT READY";
             summary = lastError;
             disarm();
+            integrationFailed(lastError, false);
             return;
         }
 
@@ -581,6 +584,7 @@ Scope {
             lastError = "MERGE REFUSED // NO ARMED REHEARSAL TREE";
             summary = lastError;
             disarm();
+            integrationFailed(lastError, false);
             return;
         }
 
@@ -826,6 +830,7 @@ Scope {
             ).trim();
             summary = operationLabel + " REFUSED // " + lastError;
             disarm();
+            integrationFailed(lastError, true);
             return;
         }
 
@@ -882,6 +887,7 @@ Scope {
                         + String(error);
             summary = lastError;
             disarm();
+            integrationFailed(lastError, true);
         }
     }
 
@@ -1063,6 +1069,10 @@ Scope {
             roomService.lastError = "PX INTEGRATE TIMEOUT";
             roomService.summary = roomService.lastError;
             roomService.disarm();
+            roomService.integrationFailed(
+                roomService.lastError,
+                true
+            );
 
             if (integrateProcess.running)
                 integrateProcess.running = false;

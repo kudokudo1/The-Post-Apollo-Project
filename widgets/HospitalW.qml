@@ -129,6 +129,16 @@ PanelWindow {
         }
     }
 
+    Connections {
+        target: roomService
+
+        function onIntegrated() {
+            patientService.refresh();
+            githubService.refresh();
+            auditService.runAudit();
+        }
+    }
+
     Timer {
         interval: 3000
         repeat: true
@@ -561,7 +571,7 @@ PanelWindow {
                 id: patientRoomRow
 
                 width: parent.width
-                height: 226
+                height: 258
                 spacing: 10
 
                 Rectangle {
@@ -998,6 +1008,157 @@ PanelWindow {
                             }
                         }
 
+                        Row {
+                            id: integrationGateActions
+
+                            width: parent.width
+                            height: 24
+                            spacing: 6
+
+                            Rectangle {
+                                id: armButton
+
+                                readonly property bool enabledAction:
+                                    roomService.canArm
+                                    && !roomService.running
+                                    && !roomService.integrating
+
+                                width:
+                                    (
+                                        integrationGateActions.width
+                                        - integrationGateActions.spacing
+                                    ) / 2
+                                height: parent.height
+
+                                color:
+                                    armMouse.pressed
+                                    ? Colors.orange
+                                    : roomService.armed
+                                    ? Colors.orange
+                                    : Colors.black
+                                border.width: roomService.armed ? 2 : 1
+                                border.color:
+                                    roomService.armed
+                                    ? Colors.orange
+                                    : armMouse.containsMouse
+                                    ? Colors.orange
+                                    : Colors.cyan
+                                opacity: enabledAction || roomService.armed
+                                         ? 1.0 : 0.42
+
+                                RectangularShadow {
+                                    anchors.fill: parent
+                                    spread: roomService.armed ? 4 : 2
+                                    z: -1
+                                    opacity: roomService.armed ? 0.38 : 0.14
+                                    color:
+                                        roomService.armed
+                                        ? Colors.orange
+                                        : Colors.cyan
+                                }
+
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    text:
+                                        roomService.armed
+                                        ? "ARMED"
+                                        : "ARM"
+                                    font.pixelSize: 9
+                                    color:
+                                        roomService.armed
+                                        ? Colors.black
+                                        : Colors.cyan
+                                }
+
+                                MouseArea {
+                                    id: armMouse
+
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    enabled:
+                                        armButton.enabledAction
+                                        && !roomService.armed
+                                    cursorShape:
+                                        enabled
+                                        ? Qt.PointingHandCursor
+                                        : Qt.ArrowCursor
+
+                                    onClicked: roomService.armPrepared()
+                                }
+                            }
+
+                            Rectangle {
+                                id: integrateButton
+
+                                readonly property bool enabledAction:
+                                    roomService.armed
+                                    && !roomService.running
+                                    && !roomService.integrating
+
+                                width:
+                                    (
+                                        integrationGateActions.width
+                                        - integrationGateActions.spacing
+                                    ) / 2
+                                height: parent.height
+
+                                color:
+                                    integrateMouse.pressed
+                                    ? Colors.orange
+                                    : roomService.integrating
+                                    ? Colors.magenta
+                                    : Colors.black
+                                border.width: roomService.armed ? 2 : 1
+                                border.color:
+                                    roomService.armed
+                                    ? Colors.red
+                                    : Colors.cyan
+                                opacity: enabledAction
+                                         || roomService.integrating
+                                         ? 1.0 : 0.42
+
+                                RectangularShadow {
+                                    anchors.fill: parent
+                                    spread: roomService.armed ? 4 : 2
+                                    z: -1
+                                    opacity: roomService.armed ? 0.34 : 0.12
+                                    color:
+                                        roomService.armed
+                                        ? Colors.red
+                                        : Colors.cyan
+                                }
+
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    text:
+                                        roomService.integrating
+                                        ? "VERIFYING"
+                                        : "INTEGRATE"
+                                    font.pixelSize: 9
+                                    color:
+                                        integrateMouse.pressed
+                                        ? Colors.black
+                                        : roomService.armed
+                                        ? Colors.red
+                                        : Colors.cyan
+                                }
+
+                                MouseArea {
+                                    id: integrateMouse
+
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    enabled: integrateButton.enabledAction
+                                    cursorShape:
+                                        enabled
+                                        ? Qt.PointingHandCursor
+                                        : Qt.ArrowCursor
+
+                                    onClicked: roomService.integrateArmed()
+                                }
+                            }
+                        }
+
                         GohuText {
                             width: parent.width
                             text: roomService.summary
@@ -1005,6 +1166,8 @@ PanelWindow {
                             color:
                                 roomService.lastError
                                 ? Colors.red
+                                : roomService.armed
+                                ? Colors.orange
                                 : roomService.integrationMode === "DIVERGED"
                                 ? Colors.magenta
                                 : roomService.integrationMode === "FAST_FORWARD"

@@ -215,6 +215,15 @@ PanelWindow {
         property string stateText: auditService.roomLabel(roomRow.team)
         readonly property string telemetryState:
             auditService.roomState(roomRow.team)
+        readonly property color stateColor:
+            telemetryState === "MISSING"
+            ? Colors.red
+            : telemetryState === "IN_MAIN"
+              || telemetryState === "AT_MAIN"
+            ? Colors.orange
+            : telemetryState === "DIVERGED"
+            ? Colors.magenta
+            : Colors.cyan
 
         width: roomsColumn.width
         height: 30
@@ -284,14 +293,7 @@ PanelWindow {
 
             text: roomRow.stateText
             font.pixelSize: 9
-            color: roomRow.telemetryState === "MISSING"
-                   ? Colors.red
-                   : roomRow.telemetryState === "IN_MAIN"
-                     || roomRow.telemetryState === "AT_MAIN"
-                   ? Colors.orange
-                   : roomRow.telemetryState === "DIVERGED"
-                   ? Colors.magenta
-                   : Colors.cyan
+            color: roomRow.stateColor
             opacity: roomRow.telemetryState === "WAITING" ? 0.58 : 1.0
 
             layer.enabled: true
@@ -299,7 +301,7 @@ PanelWindow {
                 radius: 5
                 samples: 7
                 opacity: roomRow.telemetryState === "WAITING" ? 0.14 : 0.38
-                color: parent.color
+                color: roomRow.stateColor
                 transparentBorder: true
             }
         }

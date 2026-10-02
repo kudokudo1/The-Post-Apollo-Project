@@ -764,7 +764,7 @@ PanelWindow {
             }
 
             count: gitService.remoteBranchCount
-            currentIndex: gitService.remoteIndexOf(gitService.selectedRemoteBranch)
+            currentIndex: gitService.selectedRemoteIndex
             accentColor: Colors.cyan
             sideLabel: "REMOTE"
 

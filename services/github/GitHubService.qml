@@ -214,6 +214,51 @@ Scope {
         runRemoteAction("run", workflowPath);
     }
 
+    function runWorkflowBatch(workflowPaths) {
+        if (actionBusy || refreshing)
+            return;
+
+        if (!repoSlug) {
+            actionResult = "ERROR // NO GITHUB REPOSITORY";
+            return;
+        }
+
+        const targets = Array.isArray(workflowPaths)
+            ? workflowPaths
+                .map(function(path) { return String(path || "").trim(); })
+                .filter(function(path) { return path.length > 0; })
+            : [];
+
+        if (targets.length === 0) {
+            actionResult = "ERROR // QUEUE EMPTY";
+            return;
+        }
+
+        actionBusy = true;
+        actionKind = "batch";
+        actionResult = "QUEUE // DISPATCHING " + String(targets.length);
+        actionExitSeen = false;
+        actionStdoutSeen = false;
+        actionStderrSeen = false;
+        actionExitCode = -1;
+        actionStdoutText = "";
+        actionStderrText = "";
+
+        const args = [
+            "bash",
+            "-lc",
+            'repo="$1"; shift; for workflow in "$@"; do "$HOME/.local/bin/px" run "$repo" "$workflow" || exit $?; done',
+            "px-batch",
+            repoSlug
+        ];
+
+        for (let i = 0; i < targets.length; ++i)
+            args.push(targets[i]);
+
+        remoteActionProcess.exec(args);
+        actionWatchdog.restart();
+    }
+
     function rerunRun(runId) {
         runRemoteAction("rerun", String(runId || ""));
     }
@@ -277,7 +322,10 @@ Scope {
         actionWatchdog.stop();
 
         if (actionExitCode === 0) {
-            actionResult = actionKind.toUpperCase() + " // OK";
+            actionResult =
+                actionKind === "batch"
+                ? "QUEUE // DISPATCHED"
+                : actionKind.toUpperCase() + " // OK";
             refresh();
             return;
         }

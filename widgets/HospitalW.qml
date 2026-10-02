@@ -4,6 +4,7 @@ import Quickshell.Wayland
 import qs.components
 import "../services/git"
 import "../services/hospital"
+import "../services/github"
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 
@@ -12,14 +13,24 @@ PanelWindow {
 
     property bool menuOpen: false
     property string selectedCommitSha: ""
+    property string selectedRoomTeam: ""
+    readonly property var selectedRoomData:
+        auditService.roomFor(selectedRoomTeam)
 
     function toggleCommitSelection(sha) {
         const candidate = String(sha || "");
         selectedCommitSha = selectedCommitSha === candidate ? "" : candidate;
     }
 
+    function toggleRoomSelection(team) {
+        const candidate = String(team || "");
+        selectedRoomTeam = selectedRoomTeam === candidate ? "" : candidate;
+    }
+
+    onSelectedRoomTeamChanged: roomService.clearResult()
+
     property int panelWidth: 700
-    property int panelHeight: 875
+    property int panelHeight: 1320
     property int panelTopMargin: 0
     property int panelLeftMargin: 50
     property int frameInset: 8
@@ -93,6 +104,41 @@ PanelWindow {
         id: patientService
     }
 
+    GitHubService {
+        id: githubService
+        originUrl: patientService.origin
+    }
+
+    HospitalAuditService {
+        id: auditService
+        repository: githubService.repoSlug
+    }
+
+    HospitalRoomService {
+        id: roomService
+        repository: githubService.repoSlug
+        team: root.selectedRoomTeam
+        localRepoPath: patientService.repoRoot
+    }
+
+    Connections {
+        target: patientService
+
+        function onRefreshed() {
+            githubService.refresh();
+        }
+    }
+
+    Connections {
+        target: roomService
+
+        function onPostOpFinished() {
+            patientService.refresh();
+            githubService.refresh();
+            auditService.runAudit();
+        }
+    }
+
     Timer {
         interval: 3000
         repeat: true
@@ -144,37 +190,95 @@ PanelWindow {
         }
     }
 
+    component OrangeLabel: GohuText {
+        font.pixelSize: 10
+        color: Colors.orange
+
+        layer.enabled: true
+        layer.effect: DropShadow {
+            radius: 5
+            samples: 7
+            opacity: 0.38
+            color: Colors.orange
+            transparentBorder: true
+        }
+    }
+
+    component CyanValue: GohuText {
+        font.pixelSize: 11
+        color: Colors.cyan
+        elide: Text.ElideRight
+
+        layer.enabled: true
+        layer.effect: DropShadow {
+            radius: 5
+            samples: 7
+            opacity: 0.30
+            color: Colors.cyan
+            transparentBorder: true
+        }
+    }
+
+    component BlueValue: GohuText {
+        font.pixelSize: 11
+        color: Colors.blue
+        elide: Text.ElideRight
+
+        layer.enabled: true
+        layer.effect: DropShadow {
+            radius: 7
+            samples: 9
+            opacity: 0.48
+            color: Colors.cyan
+            transparentBorder: true
+        }
+    }
+
     component RoomRow: Rectangle {
         id: roomRow
 
         property string team: ""
         property string responsibility: ""
-        property string stateText: "UNVERIFIED"
+        property string stateText: auditService.roomLabel(roomRow.team)
+        readonly property string telemetryState:
+            auditService.roomState(roomRow.team)
+        readonly property color stateColor:
+            telemetryState === "MISSING"
+            ? Colors.red
+            : telemetryState === "IN_MAIN"
+              || telemetryState === "AT_MAIN"
+            ? Colors.orange
+            : telemetryState === "DIVERGED"
+            ? Colors.magenta
+            : Colors.cyan
+
+        readonly property bool selected:
+            root.selectedRoomTeam === roomRow.team
 
         width: roomsColumn.width
-        height: 30
+        height: 44
 
         color: Colors.dark
-        border.width: 1
-        border.color: Colors.magenta
+        border.width: selected ? 2 : 1
+        border.color: selected ? Colors.orange : Colors.magenta
 
         RectangularShadow {
             anchors.fill: parent
-            spread: 3
+            spread: selected ? 5 : 3
             z: -1
-            opacity: 0.28
-            color: Colors.magenta
+            opacity: selected ? 0.42 : 0.28
+            color: selected ? Colors.orange : Colors.magenta
         }
 
         GohuText {
             anchors {
                 left: parent.left
                 verticalCenter: parent.verticalCenter
-                leftMargin: 10
+                leftMargin: 12
             }
 
             text: roomRow.team
-            font.pixelSize: 12
+            font.pixelSize: 14
             color: Colors.orange
 
             layer.enabled: true
@@ -191,12 +295,12 @@ PanelWindow {
             anchors {
                 left: parent.left
                 verticalCenter: parent.verticalCenter
-                leftMargin: 62
+                leftMargin: 74
             }
 
-            width: 440
+            width: 340
             text: roomRow.responsibility
-            font.pixelSize: 11
+            font.pixelSize: 13
             color: Colors.cyan
             elide: Text.ElideRight
 
@@ -218,8 +322,26 @@ PanelWindow {
             }
 
             text: roomRow.stateText
-            font.pixelSize: 9
-            color: Colors.cyan
+            font.pixelSize: 11
+            color: roomRow.stateColor
+            opacity: roomRow.telemetryState === "WAITING" ? 0.58 : 1.0
+
+            layer.enabled: true
+            layer.effect: DropShadow {
+                radius: 5
+                samples: 7
+                opacity: roomRow.telemetryState === "WAITING" ? 0.14 : 0.38
+                color: roomRow.stateColor
+                transparentBorder: true
+            }
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+
+            onClicked: root.toggleRoomSelection(roomRow.team)
         }
     }
 
@@ -270,6 +392,8 @@ PanelWindow {
         border.color: Colors.magenta
 
         Rectangle {
+            id: innerFrame
+
             anchors.fill: parent
             anchors.margins: root.frameInset
 
@@ -279,12 +403,42 @@ PanelWindow {
             opacity: 0.70
         }
 
+        Rectangle {
+            id: bottomStop
+
+            height: 2
+            anchors {
+                left: parent.left
+                right: parent.right
+                bottom: parent.bottom
+                leftMargin: root.frameInset
+                rightMargin: root.frameInset
+                bottomMargin: root.frameInset
+            }
+
+            color: Colors.cyan
+            opacity: 1.0
+
+            RectangularShadow {
+                anchors.fill: parent
+                spread: 3
+                z: -1
+                opacity: 0.34
+                color: Colors.cyan
+            }
+        }
+
+        // Fixed diagnostic/header zone. Nothing above OPERATING ROOMS scrolls.
         Column {
-            id: content
+            id: fixedTop
 
             anchors {
-                fill: parent
-                margins: 18
+                top: parent.top
+                left: parent.left
+                right: parent.right
+                topMargin: 18
+                leftMargin: 18
+                rightMargin: 18
             }
 
             spacing: 12
@@ -396,608 +550,120 @@ PanelWindow {
 
             // ===== PATIENT TOPOLOGY =============================
 
-            Rectangle {
+            BranchMap {
                 id: topologyFrame
 
                 width: parent.width
                 height: 190
 
-                color: Colors.dark
-                border.width: 1
-                border.color: Colors.cyan
-
-                RectangularShadow {
-                    anchors.fill: parent
-                    spread: 3
-                    z: -1
-                    opacity: 0.20
-                    color: Colors.cyan
-                }
-
-                Column {
-                    anchors {
-                        fill: parent
-                        margins: 10
-                    }
-
-                    spacing: 6
-
-                    Item {
-                        width: parent.width
-                        height: 18
-
-                        SectionLabel {
-                            anchors.left: parent.left
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: root.selectedCommitSha
-                                  ? "PATIENT TOPOLOGY // SELECTED "
-                                    + root.selectedCommitSha.slice(0, 8)
-                                  : "PATIENT TOPOLOGY"
-                        }
-
-                        Row {
-                            anchors.right: parent.right
-                            anchors.verticalCenter: parent.verticalCenter
-                            spacing: 3
-
-                            MetaLabel {
-                                visible: patientService.refreshing
-                                text: "READING GIT GRAPH"
-                            }
-
-                            GohuText {
-                                visible: !patientService.refreshing
-                                text: String(patientService.commitCount)
-                                font.pixelSize: 10
-                                color: Colors.orange
-
-                                layer.enabled: true
-                                layer.effect: DropShadow {
-                                    radius: 5
-                                    samples: 7
-                                    opacity: 0.42
-                                    color: Colors.orange
-                                    transparentBorder: true
-                                }
-                            }
-
-                            MetaLabel {
-                                visible: !patientService.refreshing
-                                text: "COMMITS //"
-                            }
-
-                            GohuText {
-                                visible: !patientService.refreshing
-                                text: String(patientService.branchCount)
-                                font.pixelSize: 10
-                                color: Colors.orange
-
-                                layer.enabled: true
-                                layer.effect: DropShadow {
-                                    radius: 5
-                                    samples: 7
-                                    opacity: 0.42
-                                    color: Colors.orange
-                                    transparentBorder: true
-                                }
-                            }
-
-                            MetaLabel {
-                                visible: !patientService.refreshing
-                                text: "REFS"
-                            }
-                        }
-                    }
-
-                    Flickable {
-                        id: topologyFlick
-
-                        width: parent.width
-                        height: 146
-
-                        clip: true
-                        boundsBehavior: Flickable.StopAtBounds
-                        contentWidth: width
-                        contentHeight: Math.max(height, patientService.commitCount * topologyBody.rowHeight)
-
-                        Item {
-                            id: topologyBody
-
-                            width: topologyFlick.width
-                            height: topologyFlick.contentHeight
-
-                            property real rowHeight: 24
-                            property real laneWidth: 22
-                            property real laneAreaWidth:
-                                Math.min(190, 44 + (patientService.maxLane + 1) * laneWidth)
-
-                            function laneColor(laneNumber) {
-                                const lane = Number(laneNumber || 0) % 6;
-
-                                if (lane === 0)
-                                    return Colors.orange;
-                                if (lane === 1)
-                                    return Colors.cyan;
-                                if (lane === 2)
-                                    return Colors.magenta;
-                                if (lane === 3)
-                                    return Colors.blue;
-                                if (lane === 4)
-                                    return Colors.green;
-
-                                return Colors.red;
-                            }
-
-                            function nodeX(laneNumber) {
-                                return 14 + Number(laneNumber || 0) * laneWidth;
-                            }
-
-                            function escapeStyled(value) {
-                                return String(value || "")
-                                    .replace(/&/g, "&amp;")
-                                    .replace(/</g, "&lt;")
-                                    .replace(/>/g, "&gt;");
-                            }
-
-                            function graphMetadataMarkup(refValue, subjectValue, headRow) {
-                                const refs = String(refValue || "")
-                                    .split(" • ")
-                                    .filter(function(name) { return name.length > 0; });
-                                const pieces = [];
-
-                                for (let i = 0; i < refs.length; ++i) {
-                                    const name = refs[i];
-                                    const color = name.indexOf("origin/") === 0
-                                        ? String(Colors.white)
-                                        : String(Colors.cyan);
-
-                                    pieces.push(
-                                        "<font color=\"" + color + "\">"
-                                        + escapeStyled(name)
-                                        + "</font>"
-                                    );
-                                }
-
-                                let result = pieces.join(
-                                    "<font color=\"" + String(Colors.white) + "\"> • </font>"
-                                );
-
-                                const subject = String(subjectValue || "");
-
-                                if (subject) {
-                                    if (result)
-                                        result += "<font color=\"" + String(Colors.white) + "\">  //  </font>";
-                                    else
-                                        result += "<font color=\"" + String(Colors.white) + "\">//  </font>";
-
-                                    result += "<font color=\""
-                                        + String(
-                                            headRow
-                                            ? Colors.yellow
-                                            : refs.length > 0
-                                            ? Colors.cyan
-                                            : Colors.blue
-                                        )
-                                        + "\">"
-                                        + escapeStyled(subject)
-                                        + "</font>";
-                                }
-
-                                return result;
-                            }
-
-                            Canvas {
-                                id: graphCanvas
-
-                                anchors.fill: parent
-
-                                onWidthChanged: requestPaint()
-                                onHeightChanged: requestPaint()
-
-                                onPaint: {
-                                    const ctx = getContext("2d");
-
-                                    ctx.globalAlpha = 1.0;
-                                    ctx.clearRect(0, 0, width, height);
-                                    ctx.lineWidth = 1.35;
-
-                                    for (let i = 0; i < patientService.commitCount; ++i) {
-                                        const row = patientService.commitAt(i);
-
-                                        if (!row)
-                                            continue;
-
-                                        const parents = String(row.parents || "").trim();
-
-                                        if (!parents)
-                                            continue;
-
-                                        const parentList = parents.split(/\s+/);
-                                        const x1 = topologyBody.nodeX(row.lane);
-                                        const y1 = i * topologyBody.rowHeight + topologyBody.rowHeight / 2;
-
-                                        for (let p = 0; p < parentList.length; ++p) {
-                                            const parentIndex = patientService.indexOfSha(parentList[p]);
-
-                                            if (parentIndex < 0)
-                                                continue;
-
-                                            const parentRow = patientService.commitAt(parentIndex);
-
-                                            if (!parentRow)
-                                                continue;
-
-                                            const x2 = topologyBody.nodeX(parentRow.lane);
-                                            const y2 = parentIndex * topologyBody.rowHeight
-                                                     + topologyBody.rowHeight / 2;
-                                            const middleY = y1 + (y2 - y1) * 0.52;
-
-                                            ctx.beginPath();
-                                            ctx.strokeStyle = String(topologyBody.laneColor(row.lane));
-                                            ctx.globalAlpha = 0.72;
-                                            ctx.moveTo(x1, y1);
-                                            ctx.lineTo(x1, middleY);
-                                            ctx.lineTo(x2, middleY);
-                                            ctx.lineTo(x2, y2);
-                                            ctx.stroke();
-                                        }
-                                    }
-
-                                    ctx.globalAlpha = 1.0;
-                                }
-                            }
-
-                            Repeater {
-                                model: patientService.topologyModel
-
-                                delegate: Item {
-                                    id: topologyRow
-
-                                    width: topologyBody.width
-                                    height: topologyBody.rowHeight
-                                    y: index * topologyBody.rowHeight
-
-                                    readonly property bool selected:
-                                        root.selectedCommitSha === String(sha || "")
-
-                                    Rectangle {
-                                        width: isHead || String(refsText || "").length > 0 ? 10 : 8
-                                        height: width
-                                        radius: width / 2
-                                        x: topologyBody.nodeX(lane) - width / 2
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        color: Colors.dark
-                                        z: 1
-                                    }
-
-                                    NotoText {
-                                        id: topologySelectionGlow
-
-                                        width: 20
-                                        height: parent.height
-                                        x: topologyBody.nodeX(lane) - width / 2
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        z: 2
-                                        visible: topologyRow.selected
-
-                                        readonly property bool refLandmark:
-                                            String(refsText || "").length > 0
-
-                                        text: isHead || refLandmark ? "★" : "✧"
-                                        font.pixelSize: isHead ? 15 : refLandmark ? 13 : 13
-                                        horizontalAlignment: Text.AlignHCenter
-                                        verticalAlignment: Text.AlignVCenter
-                                        color: Colors.orange
-
-                                        layer.enabled: true
-                                        layer.effect: DropShadow {
-                                            radius: 15
-                                            samples: 25
-                                            opacity: 1.0
-                                            color: Colors.orange
-                                            transparentBorder: true
-                                        }
-                                    }
-
-                                    NotoText {
-                                        id: topologyStar
-
-                                        width: 20
-                                        height: parent.height
-                                        x: topologyBody.nodeX(lane) - width / 2
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        z: 3
-
-                                        readonly property bool refLandmark:
-                                            String(refsText || "").length > 0
-                                        readonly property color starColor:
-                                            isHead
-                                            ? Colors.yellow
-                                            : topologyBody.laneColor(lane)
-
-                                        text: isHead || refLandmark ? "★" : "✧"
-                                        font.pixelSize: isHead ? 15 : refLandmark ? 13 : 13
-                                        horizontalAlignment: Text.AlignHCenter
-                                        verticalAlignment: Text.AlignVCenter
-                                        color: starColor
-
-                                        layer.enabled: true
-                                        layer.effect: DropShadow {
-                                            radius: isHead ? 7 : 5
-                                            samples: isHead ? 9 : 7
-                                            opacity: isHead
-                                                     ? 0.78
-                                                     : topologyStar.refLandmark
-                                                     ? 0.48
-                                                     : 0.38
-                                            color: topologyStar.starColor
-                                            transparentBorder: true
-                                        }
-                                    }
-
-                                    Row {
-                                        x: topologyBody.laneAreaWidth
-                                        width: parent.width - x - 6
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        spacing: 4
-
-                                        GohuText {
-                                            text: shortSha
-                                            font.pixelSize: 9
-                                            color: Colors.orange
-
-                                            layer.enabled: true
-                                            layer.effect: DropShadow {
-                                                radius: 5
-                                                samples: 7
-                                                opacity: 0.40
-                                                color: Colors.orange
-                                                transparentBorder: true
-                                            }
-                                        }
-
-                                        GohuText {
-                                            width: parent.width - implicitWidth - 4
-                                            text: topologyBody.graphMetadataMarkup(refsText, subject, isHead)
-                                            textFormat: Text.StyledText
-                                            font.pixelSize: 9
-                                            color: Colors.white
-                                            elide: Text.ElideRight
-
-                                            layer.enabled: true
-                                            layer.effect: DropShadow {
-                                                radius: isHead ? 6 : 6
-                                                samples: isHead ? 7 : 9
-                                                opacity: isHead ? 0.46 : 0.38
-                                                color: isHead ? Colors.yellow : Colors.cyan
-                                                transparentBorder: true
-                                            }
-                                        }
-                                    }
-
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        z: 20
-                                        acceptedButtons: Qt.LeftButton
-                                        hoverEnabled: true
-                                        preventStealing: false
-                                        cursorShape: Qt.PointingHandCursor
-
-                                        onClicked: {
-                                            root.toggleCommitSelection(sha);
-                                        }
-                                    }
-                                }
-                            }
-
-                            Connections {
-                                target: patientService
-
-                                function onTopologyRevisionChanged() {
-                                    graphCanvas.requestPaint();
-
-                                    if (root.selectedCommitSha
-                                            && patientService.indexOfSha(root.selectedCommitSha) < 0)
-                                        root.selectedCommitSha = "";
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Read-only scroll indicator. This is deliberately outside the
-                // Flickable/content hierarchy so it cannot affect graph geometry.
-                Item {
-                    id: topologyScrollIndicator
-
-                    anchors {
-                        top: parent.top
-                        bottom: parent.bottom
-                        right: parent.right
-                        topMargin: 36
-                        bottomMargin: 10
-                        rightMargin: 5
-                    }
-
-                    width: 14
-                    z: 50
-
-                    readonly property bool canScroll:
-                        topologyFlick.contentHeight > topologyFlick.height + 1
-                    readonly property bool active:
-                        canScroll
-                        && (topologyFlick.moving
-                            || topologyFlick.dragging
-                            || topologyFlick.flicking)
-
-                    opacity: active ? 1.0 : 0.0
-
-                    Behavior on opacity {
-                        NumberAnimation {
-                            duration: 120
-                        }
-                    }
-
-                    Rectangle {
-                        id: topologyScrollRail
-
-                        width: 1
-                        anchors {
-                            top: parent.top
-                            bottom: parent.bottom
-                            horizontalCenter: parent.horizontalCenter
-                        }
-
-                        color: Colors.cyan
-                        opacity: 0.62
-
-                        layer.enabled: true
-                        layer.effect: DropShadow {
-                            radius: 4
-                            samples: 5
-                            opacity: 0.32
-                            color: Colors.cyan
-                            transparentBorder: true
-                        }
-                    }
-
-                    NotoText {
-                        id: topologyScrollStar
-
-                        width: parent.width
-                        height: 16
-                        x: 0
-
-                        readonly property real scrollRange:
-                            Math.max(
-                                0.0001,
-                                1.0 - topologyFlick.visibleArea.heightRatio
-                            )
-                        readonly property real scrollFraction:
-                            Math.max(
-                                0.0,
-                                Math.min(
-                                    1.0,
-                                    topologyFlick.visibleArea.yPosition / scrollRange
-                                )
-                            )
-
-                        y: scrollFraction * Math.max(0, parent.height - height)
-
-                        text: "★"
-                        font.pixelSize: 12
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                        color: Colors.orange
-
-                        layer.enabled: true
-                        layer.effect: DropShadow {
-                            radius: 6
-                            samples: 7
-                            opacity: 0.68
-                            color: Colors.orange
-                            transparentBorder: true
-                        }
-                    }
+                topologyService: patientService
+                titleText: "PATIENT TOPOLOGY"
+                selectedSha: root.selectedCommitSha
+
+                onCommitSelected: function(sha) {
+                    root.toggleCommitSelection(sha);
                 }
             }
 
             // ===== PATIENT ======================================
 
-            Rectangle {
+            Row {
+                id: patientRoomRow
+
                 width: parent.width
-                height: 118
+                height: 328
+                spacing: 10
 
-                color: Colors.dark
-                border.width: 1
-                border.color: Colors.magenta
+                Rectangle {
+                    id: patientPane
 
-                RectangularShadow {
-                    anchors.fill: parent
-                    spread: 4
-                    z: -1
-                    opacity: 0.22
-                    color: Colors.magenta
-                }
+                    width: (parent.width - parent.spacing) / 2
+                    height: parent.height
 
-                Column {
-                    anchors {
-                        fill: parent
-                        margins: 12
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: Colors.magenta
+
+                    RectangularShadow {
+                        anchors.fill: parent
+                        spread: 4
+                        z: -1
+                        opacity: 0.22
+                        color: Colors.magenta
                     }
 
-                    spacing: 7
-
-                    SectionLabel {
-                        text: "PATIENT"
-                    }
-
-                    Row {
-                        spacing: 10
-
-                        MetaLabel {
-                            width: 110
-                            text: "REPOSITORY"
+                    Column {
+                        anchors {
+                            fill: parent
+                            margins: 12
                         }
 
-                        MetaValue {
-                            width: 500
-                            text: patientService.repository
-                            color: Colors.orange
+                        spacing: 8
 
-                            layer.effect: DropShadow {
-                                radius: 5
-                                samples: 7
-                                opacity: 0.28
-                                color: Colors.orange
-                                transparentBorder: true
-                            }
-                        }
-                    }
-
-                    Row {
-                        spacing: 10
-
-                        MetaLabel {
-                            width: 110
-                            text: "BRANCH"
-                        }
-
-                        MetaValue {
-                            width: 500
-                            text: patientService.branch
-
-                            layer.effect: DropShadow {
-                                radius: 7
-                                samples: 9
-                                opacity: 0.34
-                                color: Colors.cyan
-                                transparentBorder: true
-                            }
-                        }
-                    }
-
-                    Row {
-                        spacing: 10
-
-                        MetaLabel {
-                            width: 110
-                            text: "PATIENT HEAD"
+                        SectionLabel {
+                            text: "PATIENT"
                         }
 
                         Row {
-                            width: 500
-                            spacing: 0
+                            spacing: 8
+
+                            MetaLabel {
+                                width: 76
+                                text: "REPOSITORY"
+                            }
 
                             MetaValue {
-                                text: patientService.head + " // "
+                                width: patientPane.width - 108
+                                text: patientService.repository
+                                color: Colors.orange
+                                elide: Text.ElideRight
+
                                 layer.effect: DropShadow {
-                                    radius: 7
-                                    samples: 9
-                                    opacity: 0.34
-                                    color: Colors.cyan
+                                    radius: 5
+                                    samples: 7
+                                    opacity: 0.28
+                                    color: Colors.orange
                                     transparentBorder: true
                                 }
+                            }
+                        }
+
+                        Row {
+                            spacing: 8
+
+                            OrangeLabel {
+                                width: 76
+                                text: "BRANCH"
+                            }
+
+                            CyanValue {
+                                width: patientPane.width - 108
+                                text: patientService.branch
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        Row {
+                            spacing: 8
+
+                            MetaLabel {
+                                width: 76
+                                text: "HEAD"
+                            }
+
+                            BlueValue {
+                                width: patientPane.width - 108
+                                text: patientService.head
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        Row {
+                            spacing: 8
+
+                            MetaLabel {
+                                width: 76
+                                text: "WORKTREE"
                             }
 
                             GohuText {
@@ -1006,9 +672,10 @@ PanelWindow {
                                         .trim()
                                         .toUpperCase() === "CLEAN"
 
+                                width: patientPane.width - 108
                                 text: patientService.worktree
-                                font.pixelSize: 11
-                                opacity: 1.0
+                                font.pixelSize: 10
+                                elide: Text.ElideRight
                                 color: cleanState ? Colors.orange : Colors.white
 
                                 layer.enabled: true
@@ -1023,6 +690,635 @@ PanelWindow {
                         }
                     }
                 }
+
+                Rectangle {
+                    id: roomPane
+
+                    width: (parent.width - parent.spacing) / 2
+                    height: parent.height
+
+                    color: Colors.dark
+                    border.width: 1
+                    border.color:
+                        root.selectedRoomTeam.length > 0
+                        ? Colors.orange
+                        : Colors.magenta
+
+                    RectangularShadow {
+                        anchors.fill: parent
+                        spread: 4
+                        z: -1
+                        opacity:
+                            root.selectedRoomTeam.length > 0
+                            ? 0.30
+                            : 0.18
+                        color:
+                            root.selectedRoomTeam.length > 0
+                            ? Colors.orange
+                            : Colors.magenta
+                    }
+
+                    Column {
+                        anchors {
+                            fill: parent
+                            margins: 12
+                        }
+
+                        spacing: 8
+
+                        SectionLabel {
+                            text:
+                                root.selectedRoomTeam.length > 0
+                                ? "ROOM // " + root.selectedRoomTeam
+                                : "ROOM // NONE SELECTED"
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text: {
+                                const room = root.selectedRoomData || {};
+                                return String(
+                                    room.responsibility
+                                    || "SELECT AN OPERATING ROOM"
+                                );
+                            }
+                            font.pixelSize: 10
+                            color: Colors.orange
+                            elide: Text.ElideRight
+                        }
+
+                        Row {
+                            spacing: 8
+
+                            MetaLabel {
+                                width: 66
+                                text: "BRANCH"
+                            }
+
+                            CyanValue {
+                                width: roomPane.width - 98
+                                text: {
+                                    const room = root.selectedRoomData || {};
+                                    return String(room.branch || "NO DATA");
+                                }
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        Row {
+                            spacing: 8
+
+                            MetaLabel {
+                                width: 66
+                                text: "HEAD"
+                            }
+
+                            BlueValue {
+                                width: roomPane.width - 98
+                                text: {
+                                    const room = root.selectedRoomData || {};
+                                    const head = String(room.head || "");
+                                    return head ? head.slice(0, 12) : "NO DATA";
+                                }
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        Row {
+                            spacing: 8
+
+                            MetaLabel {
+                                width: 66
+                                text: "RELATION"
+                            }
+
+                            GohuText {
+                                width: roomPane.width - 98
+                                text: {
+                                    const room = root.selectedRoomData || {};
+
+                                    if (!root.selectedRoomTeam.length)
+                                        return "WAITING";
+
+                                    const state =
+                                        String(room.state || "WAITING");
+                                    const ahead = Number(room.ahead || 0);
+                                    const behind = Number(room.behind || 0);
+
+                                    return state
+                                           + " // +" + ahead
+                                           + " / -" + behind;
+                                }
+                                font.pixelSize: 10
+                                color: Colors.magenta
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        Row {
+                            spacing: 8
+
+                            MetaLabel {
+                                width: 66
+                                text: "TOUCHED"
+                            }
+
+                            MetaValue {
+                                width: roomPane.width - 98
+                                text: {
+                                    const room = root.selectedRoomData || {};
+                                    return String(
+                                        room.updated_at
+                                        || "NO DATA"
+                                    );
+                                }
+                                elide: Text.ElideRight
+                            }
+                        }
+
+
+                        Row {
+                            id: roomInspectActions
+
+                            width: parent.width
+                            height: 24
+                            spacing: 6
+
+                            Repeater {
+                                model: ["STATUS", "DIFF", "LOG"]
+
+                                Rectangle {
+                                    id: roomInspectButton
+
+                                    required property string modelData
+                                    readonly property bool selectedAction:
+                                        roomService.action === modelData
+                                    readonly property bool enabledAction:
+                                        root.selectedRoomTeam.length > 0
+                                        && !roomService.running
+                                        && !roomService.rehearsing
+                                        && !roomService.integrating
+                                        && !roomService.postOpRunning
+                                        && !roomService.armed
+
+                                    width:
+                                        (
+                                            roomInspectActions.width
+                                            - roomInspectActions.spacing * 2
+                                        ) / 3
+                                    height: parent.height
+
+                                    color:
+                                        roomInspectMouse.pressed
+                                        ? Colors.orange
+                                        : selectedAction
+                                        ? Colors.magenta
+                                        : Colors.black
+                                    border.width: 1
+                                    border.color:
+                                        roomInspectMouse.containsMouse
+                                        ? Colors.orange
+                                        : selectedAction
+                                        ? Colors.magenta
+                                        : Colors.cyan
+                                    opacity: enabledAction ? 1.0 : 0.48
+
+                                    GohuText {
+                                        anchors.centerIn: parent
+                                        text:
+                                            roomService.running
+                                            && roomService.action
+                                               === roomInspectButton.modelData
+                                            ? "READING"
+                                            : roomInspectButton.modelData
+                                        font.pixelSize: 9
+                                        color:
+                                            roomInspectMouse.pressed
+                                            ? Colors.black
+                                            : Colors.cyan
+                                    }
+
+                                    MouseArea {
+                                        id: roomInspectMouse
+
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        enabled: roomInspectButton.enabledAction
+                                        cursorShape:
+                                            enabled
+                                            ? Qt.PointingHandCursor
+                                            : Qt.ArrowCursor
+
+                                        onClicked:
+                                            roomService.runInspection(
+                                                roomInspectButton.modelData
+                                                    .toLowerCase()
+                                            )
+                                    }
+                                }
+                            }
+                        }
+
+                        Row {
+                            id: roomOperationActions
+
+                            width: parent.width
+                            height: 24
+                            spacing: 6
+
+                            Repeater {
+                                model: ["REFRESH", "LAZYGIT", "PREPARE"]
+
+                                Rectangle {
+                                    id: roomOperationButton
+
+                                    required property string modelData
+                                    readonly property bool enabledAction:
+                                        root.selectedRoomTeam.length > 0
+                                        && !roomService.running
+                                        && !roomService.rehearsing
+                                        && !roomService.integrating
+                                        && !roomService.postOpRunning
+                                        && !roomService.armed
+
+                                    width:
+                                        (
+                                            roomOperationActions.width
+                                            - roomOperationActions.spacing * 2
+                                        ) / 3
+                                    height: parent.height
+
+                                    color:
+                                        roomOperationMouse.pressed
+                                        ? Colors.orange
+                                        : roomService.action === modelData
+                                        ? Colors.magenta
+                                        : Colors.black
+                                    border.width: 1
+                                    border.color:
+                                        roomOperationMouse.containsMouse
+                                        ? Colors.orange
+                                        : modelData === "PREPARE"
+                                          && roomService.action === "PREPARE"
+                                        ? Colors.magenta
+                                        : Colors.cyan
+                                    opacity: enabledAction ? 1.0 : 0.48
+
+                                    GohuText {
+                                        anchors.centerIn: parent
+                                        text:
+                                            roomService.running
+                                            && roomService.action
+                                               === roomOperationButton.modelData
+                                            ? "READING"
+                                            : roomOperationButton.modelData
+                                        font.pixelSize: 8
+                                        color:
+                                            roomOperationMouse.pressed
+                                            ? Colors.black
+                                            : Colors.cyan
+                                    }
+
+                                    MouseArea {
+                                        id: roomOperationMouse
+
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        enabled: roomOperationButton.enabledAction
+                                        cursorShape:
+                                            enabled
+                                            ? Qt.PointingHandCursor
+                                            : Qt.ArrowCursor
+
+                                        onClicked: {
+                                            if (roomOperationButton.modelData
+                                                    === "REFRESH") {
+                                                patientService.refresh();
+                                                auditService.runAudit();
+                                                roomService.runInspection(
+                                                    "status"
+                                                );
+                                                return;
+                                            }
+
+                                            if (roomOperationButton.modelData
+                                                    === "LAZYGIT") {
+                                                roomService.launchLazygit();
+                                                return;
+                                            }
+
+                                            roomService.runInspection(
+                                                "prepare"
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            id: rehearseButton
+
+                            readonly property bool enabledAction:
+                                roomService.canRehearse
+                                && !roomService.running
+                                && !roomService.rehearsing
+                                && !roomService.integrating
+                                && !roomService.postOpRunning
+                                && !roomService.armed
+
+                            width: parent.width
+                            height: 24
+
+                            color:
+                                rehearseMouse.pressed
+                                ? Colors.orange
+                                : roomService.rehearsing
+                                ? Colors.magenta
+                                : Colors.black
+                            border.width:
+                                roomService.rehearsalStatus.length > 0
+                                ? 2 : 1
+                            border.color:
+                                roomService.rehearsalStatus === "CONFLICTS"
+                                ? Colors.red
+                                : roomService.rehearsalStatus === "CLEAN_MERGE"
+                                ? Colors.orange
+                                : rehearseMouse.containsMouse
+                                ? Colors.orange
+                                : Colors.cyan
+                            opacity:
+                                enabledAction
+                                || roomService.rehearsing
+                                || roomService.rehearsalStatus.length > 0
+                                ? 1.0 : 0.42
+
+                            RectangularShadow {
+                                anchors.fill: parent
+                                spread:
+                                    roomService.rehearsalStatus.length > 0
+                                    ? 4 : 2
+                                z: -1
+                                opacity:
+                                    roomService.rehearsalStatus.length > 0
+                                    ? 0.34 : 0.12
+                                color:
+                                    roomService.rehearsalStatus === "CONFLICTS"
+                                    ? Colors.red
+                                    : roomService.rehearsalStatus === "CLEAN_MERGE"
+                                    ? Colors.orange
+                                    : Colors.cyan
+                            }
+
+                            GohuText {
+                                anchors.centerIn: parent
+                                text:
+                                    roomService.rehearsing
+                                    ? "REHEARSING // ISOLATED"
+                                    : roomService.rehearsalStatus === "CONFLICTS"
+                                    ? "REHEARSE // CONFLICTS"
+                                    : roomService.rehearsalStatus === "CLEAN_MERGE"
+                                    ? "REHEARSE // CLEAN MERGE"
+                                    : "REHEARSE MERGE"
+                                font.pixelSize: 9
+                                color:
+                                    rehearseMouse.pressed
+                                    ? Colors.black
+                                    : roomService.rehearsalStatus === "CONFLICTS"
+                                    ? Colors.red
+                                    : roomService.rehearsalStatus === "CLEAN_MERGE"
+                                    ? Colors.orange
+                                    : Colors.cyan
+                            }
+
+                            MouseArea {
+                                id: rehearseMouse
+
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                enabled: rehearseButton.enabledAction
+                                cursorShape:
+                                    enabled
+                                    ? Qt.PointingHandCursor
+                                    : Qt.ArrowCursor
+
+                                onClicked: roomService.rehearsePrepared()
+                            }
+                        }
+
+                        Row {
+                            id: integrationGateActions
+
+                            width: parent.width
+                            height: 24
+                            spacing: 6
+
+                            Rectangle {
+                                id: armButton
+
+                                readonly property bool enabledAction:
+                                    (
+                                        roomService.canArm
+                                        || roomService.canArmMerge
+                                    )
+                                    && !roomService.running
+                                    && !roomService.rehearsing
+                                    && !roomService.integrating
+                                    && !roomService.postOpRunning
+
+                                width:
+                                    (
+                                        integrationGateActions.width
+                                        - integrationGateActions.spacing
+                                    ) / 2
+                                height: parent.height
+
+                                color:
+                                    armMouse.pressed
+                                    ? Colors.orange
+                                    : roomService.armed
+                                    ? Colors.orange
+                                    : Colors.black
+                                border.width: roomService.armed ? 2 : 1
+                                border.color:
+                                    roomService.armed
+                                    ? Colors.orange
+                                    : armMouse.containsMouse
+                                    ? Colors.orange
+                                    : Colors.cyan
+                                opacity: enabledAction || roomService.armed
+                                         ? 1.0 : 0.42
+
+                                RectangularShadow {
+                                    anchors.fill: parent
+                                    spread: roomService.armed ? 4 : 2
+                                    z: -1
+                                    opacity: roomService.armed ? 0.38 : 0.14
+                                    color:
+                                        roomService.armed
+                                        ? Colors.orange
+                                        : Colors.cyan
+                                }
+
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    text:
+                                        roomService.armed
+                                        ? (
+                                            roomService.armedMode === "MERGE"
+                                            ? "MERGE ARMED"
+                                            : "ARMED"
+                                          )
+                                        : roomService.canArmMerge
+                                        ? "ARM MERGE"
+                                        : "ARM"
+                                    font.pixelSize: 9
+                                    color:
+                                        roomService.armed
+                                        ? Colors.black
+                                        : Colors.cyan
+                                }
+
+                                MouseArea {
+                                    id: armMouse
+
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    enabled:
+                                        armButton.enabledAction
+                                        && !roomService.armed
+                                    cursorShape:
+                                        enabled
+                                        ? Qt.PointingHandCursor
+                                        : Qt.ArrowCursor
+
+                                    onClicked: roomService.armPrepared()
+                                }
+                            }
+
+                            Rectangle {
+                                id: integrateButton
+
+                                readonly property bool enabledAction:
+                                    roomService.armed
+                                    && !roomService.running
+                                    && !roomService.rehearsing
+                                    && !roomService.integrating
+                                    && !roomService.postOpRunning
+
+                                width:
+                                    (
+                                        integrationGateActions.width
+                                        - integrationGateActions.spacing
+                                    ) / 2
+                                height: parent.height
+
+                                color:
+                                    integrateMouse.pressed
+                                    ? Colors.orange
+                                    : roomService.integrating
+                                    ? Colors.magenta
+                                    : Colors.black
+                                border.width: roomService.armed ? 2 : 1
+                                border.color:
+                                    roomService.armed
+                                    ? Colors.red
+                                    : Colors.cyan
+                                opacity: enabledAction
+                                         || roomService.integrating
+                                         ? 1.0 : 0.42
+
+                                RectangularShadow {
+                                    anchors.fill: parent
+                                    spread: roomService.armed ? 4 : 2
+                                    z: -1
+                                    opacity: roomService.armed ? 0.34 : 0.12
+                                    color:
+                                        roomService.armed
+                                        ? Colors.red
+                                        : Colors.cyan
+                                }
+
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    text:
+                                        roomService.postOpRunning
+                                        ? "POST-OP"
+                                        : roomService.integrating
+                                        ? "VERIFYING"
+                                        : roomService.armedMode === "MERGE"
+                                        ? "MERGE"
+                                        : "INTEGRATE"
+                                    font.pixelSize: 9
+                                    color:
+                                        integrateMouse.pressed
+                                        ? Colors.black
+                                        : roomService.armed
+                                        ? Colors.red
+                                        : Colors.cyan
+                                }
+
+                                MouseArea {
+                                    id: integrateMouse
+
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    enabled: integrateButton.enabledAction
+                                    cursorShape:
+                                        enabled
+                                        ? Qt.PointingHandCursor
+                                        : Qt.ArrowCursor
+
+                                    onClicked: roomService.integrateArmed()
+                                }
+                            }
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text: roomService.summary
+                            font.pixelSize: 9
+                            color:
+                                roomService.lastError
+                                ? Colors.red
+                                : roomService.postOpStatus === "POST_OP_CLEAN"
+                                ? Colors.cyan
+                                : roomService.postOpRunning
+                                ? Colors.orange
+                                : roomService.armed
+                                ? Colors.orange
+                                : roomService.integrationMode === "DIVERGED"
+                                ? Colors.magenta
+                                : roomService.integrationMode === "FAST_FORWARD"
+                                ? Colors.orange
+                                : roomService.available
+                                ? Colors.cyan
+                                : Colors.magenta
+                            elide: Text.ElideRight
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            visible: roomService.rehearsalDetail.length > 0
+                            text: roomService.rehearsalDetail
+                            font.pixelSize: 8
+                            color:
+                                roomService.rehearsalStatus === "CONFLICTS"
+                                ? Colors.red
+                                : Colors.orange
+                            elide: Text.ElideRight
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            visible: roomService.postOpDetail.length > 0
+                            text: roomService.postOpDetail
+                            font.pixelSize: 8
+                            color: Colors.cyan
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
             }
 
             // ===== OPERATING ROOMS ==============================
@@ -1031,11 +1327,41 @@ PanelWindow {
                 text: "OPERATING ROOMS"
             }
 
+
+        }
+
+        // Only the operating-room selector/detail surface scrolls.
+        Flickable {
+            id: hospitalScroll
+
+            anchors {
+                top: fixedTop.bottom
+                bottom: actionBay.top
+                left: parent.left
+                right: parent.right
+                topMargin: 8
+                bottomMargin: 10
+                leftMargin: 18
+                rightMargin: 18
+            }
+
+            clip: true
+            contentWidth: width
+            contentHeight: scrollContent.height
+            boundsBehavior: Flickable.StopAtBounds
+            flickDeceleration: 1800
+
+            Column {
+                id: scrollContent
+
+                width: hospitalScroll.width
+                spacing: 12
+
             Column {
                 id: roomsColumn
 
                 width: parent.width
-                spacing: 4
+                spacing: 7
 
                 RoomRow { team: "T1"; responsibility: "SYSTEM / HUNTER" }
                 RoomRow { team: "T2"; responsibility: "FAVORITES" }
@@ -1048,11 +1374,22 @@ PanelWindow {
                 RoomRow { team: "T8"; responsibility: "APPS" }
             }
 
-            // ===== ACTION BAY ===================================
 
-            Rectangle {
-                width: parent.width
-                height: 54
+            }
+        }
+
+        Rectangle {
+            id: actionBay
+
+            height: 54
+            anchors {
+                left: parent.left
+                right: parent.right
+                bottom: bottomStop.top
+                leftMargin: 18
+                rightMargin: 18
+                bottomMargin: 8
+            }
 
                 color: Colors.dark
                 border.width: 1
@@ -1103,17 +1440,89 @@ PanelWindow {
                     }
 
                     GohuText {
-                        text: "AUDIT"
+                        id: auditAction
+
+                        text: auditService.running
+                              ? "AUDIT // RUNNING"
+                              : auditService.available
+                              ? "AUDIT // " + auditService.status
+                              : "AUDIT"
                         font.pixelSize: 10
-                        color: Colors.cyan
-                        opacity: 0.45
+                        color: auditMouse.containsMouse
+                               ? Colors.orange
+                               : auditService.available
+                               ? Colors.magenta
+                               : auditService.lastError
+                               ? Colors.red
+                               : Colors.cyan
+                        opacity: auditService.running ? 0.60 : 1.0
+
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 7
+                            opacity: auditMouse.containsMouse
+                                     ? 0.52
+                                     : auditService.available
+                                     ? 0.42
+                                     : auditService.lastError
+                                     ? 0.44
+                                     : 0.28
+                            color: auditAction.color
+                            transparentBorder: true
+                        }
+
+                        MouseArea {
+                            id: auditMouse
+                            anchors.fill: parent
+                            anchors.margins: -8
+                            hoverEnabled: true
+                            enabled: !auditService.running && auditService.repository.length > 0
+                            cursorShape: Qt.PointingHandCursor
+
+                            onClicked: auditService.runAudit()
+                        }
                     }
 
                     GohuText {
-                        text: "GITHUB"
+                        id: githubAction
+
+                        text: githubService.refreshing
+                              ? "GITHUB // READING"
+                              : githubService.available
+                              ? "GITHUB // LIVE"
+                              : "GITHUB"
                         font.pixelSize: 10
-                        color: Colors.cyan
-                        opacity: 0.45
+                        color: githubMouse.containsMouse
+                               ? Colors.orange
+                               : githubService.available
+                               ? Colors.magenta
+                               : Colors.cyan
+                        opacity: githubService.refreshing ? 0.60 : 1.0
+
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 7
+                            opacity: githubMouse.containsMouse
+                                     ? 0.52
+                                     : githubService.available
+                                     ? 0.42
+                                     : 0.28
+                            color: githubAction.color
+                            transparentBorder: true
+                        }
+
+                        MouseArea {
+                            id: githubMouse
+                            anchors.fill: parent
+                            anchors.margins: -8
+                            hoverEnabled: true
+                            enabled: !githubService.refreshing && githubService.repoSlug.length > 0
+                            cursorShape: Qt.PointingHandCursor
+
+                            onClicked: githubService.refresh()
+                        }
                     }
                 }
 
@@ -1125,9 +1534,24 @@ PanelWindow {
                         bottomMargin: 5
                     }
 
-                    text: hospitalGitService.available
-                          ? "LOCAL PATIENT LIVE // ACTUATORS OFFLINE"
-                          : "LOCAL PATIENT OFFLINE"
+                    text: auditService.running
+                          ? "PX AUDIT RUNNING // " + auditService.repository
+                          : auditService.available
+                          ? "AUDIT " + auditService.status
+                            + " // " + String(auditService.workflowCount) + " WORKFLOWS"
+                            + " // " + String(auditService.runCount) + " RECENT RUNS"
+                            + " // " + String(auditService.rooms.length) + " ROOMS"
+                          : auditService.lastError
+                          ? "AUDIT ERROR // " + auditService.lastError
+                          : !hospitalGitService.available
+                          ? "LOCAL PATIENT OFFLINE"
+                          : githubService.refreshing
+                          ? "LOCAL LIVE // PX → GITHUB READING"
+                          : githubService.available
+                          ? "LOCAL + PX/GITHUB LIVE // WRITE ACTUATORS OFFLINE"
+                          : githubService.lastError
+                          ? "LOCAL LIVE // PX/GITHUB OFFLINE"
+                          : "LOCAL LIVE // PX/GITHUB NOT REQUESTED"
                     font.pixelSize: 8
                     color: Colors.magenta
 
@@ -1141,7 +1565,193 @@ PanelWindow {
                     }
                 }
             }
-        }
 
+        // AppControl / CPU++ selector scrollbar geometry.
+        Rectangle {
+            id: scrollRail
+
+            width: 10
+
+            anchors {
+                top: hospitalScroll.top
+                bottom: hospitalScroll.bottom
+                right: parent.right
+                topMargin: 0
+                bottomMargin: 0
+                rightMargin: 3
+            }
+
+            color: Colors.cyan
+
+            readonly property bool scrollable:
+                hospitalScroll.contentHeight
+                > hospitalScroll.height
+
+            opacity: 1.0
+            visible: true
+            z: 300
+
+            property real maxContentY:
+                Math.max(
+                    0,
+                    hospitalScroll.contentHeight
+                    - hospitalScroll.height
+                )
+
+            property real handleTravel:
+                Math.max(
+                    0,
+                    height - scrollThumb.height
+                )
+
+            function setScrollFromHandleY(handleY) {
+                if (maxContentY <= 0 || handleTravel <= 0)
+                    return;
+
+                const clampedY =
+                    Math.max(
+                        0,
+                        Math.min(handleTravel, handleY)
+                    );
+
+                hospitalScroll.contentY =
+                    (clampedY / handleTravel) * maxContentY;
+            }
+
+            RectangularShadow {
+                anchors.fill: parent
+                spread: 2
+                z: -1
+                opacity: 0.24
+                color: parent.color
+            }
+
+            Rectangle {
+                id: scrollThumb
+
+                width: 6
+                anchors.horizontalCenter: parent.horizontalCenter
+
+                height:
+                    scrollRail.scrollable
+                    ? Math.max(
+                        30,
+                        parent.height
+                        * Math.min(
+                            1.0,
+                            hospitalScroll.visibleArea.heightRatio
+                        )
+                    )
+                    : 42
+
+                y: {
+                    if (!scrollRail.scrollable)
+                        return 0;
+
+                    const ratio =
+                        Math.max(
+                            0.0,
+                            Math.min(
+                                1.0,
+                                Number(
+                                    hospitalScroll.visibleArea.heightRatio
+                                    || 0
+                                )
+                            )
+                        );
+
+                    const maxPosition =
+                        Math.max(0.0, 1.0 - ratio);
+
+                    const position =
+                        Math.max(
+                            0.0,
+                            Math.min(
+                                maxPosition,
+                                Number(
+                                    hospitalScroll.visibleArea.yPosition
+                                    || 0
+                                )
+                            )
+                        );
+
+                    if (maxPosition <= 0
+                            || scrollRail.handleTravel <= 0)
+                        return 0;
+
+                    return (
+                        position / maxPosition
+                    ) * scrollRail.handleTravel;
+                }
+
+                color: Colors.magenta
+                opacity: 1.0
+
+                RectangularShadow {
+                    anchors.fill: parent
+                    spread: 2
+                    z: -1
+                    opacity: 0.28
+                    color: Colors.magenta
+                }
+            }
+
+            MouseArea {
+                id: scrollMouse
+
+                anchors.fill: parent
+                hoverEnabled: true
+                acceptedButtons: Qt.LeftButton
+                enabled: scrollRail.scrollable
+                cursorShape: scrollRail.scrollable
+                             ? Qt.SizeVerCursor
+                             : Qt.ArrowCursor
+
+                property real dragOffset: 0
+
+                onPressed: function(mouse) {
+                    const handleTop = scrollThumb.y;
+                    const handleBottom =
+                        scrollThumb.y
+                        + scrollThumb.height;
+
+                    dragOffset =
+                        mouse.y >= handleTop
+                        && mouse.y <= handleBottom
+                        ? mouse.y - handleTop
+                        : scrollThumb.height / 2;
+
+                    scrollRail.setScrollFromHandleY(
+                        mouse.y - dragOffset
+                    );
+                }
+
+                onPositionChanged: function(mouse) {
+                    if (pressed)
+                        scrollRail.setScrollFromHandleY(
+                            mouse.y - dragOffset
+                        );
+                }
+
+                onWheel: function(wheel) {
+                    const step =
+                        wheel.angleDelta.y > 0
+                        ? -90
+                        : 90;
+
+                    hospitalScroll.contentY =
+                        Math.max(
+                            0,
+                            Math.min(
+                                scrollRail.maxContentY,
+                                hospitalScroll.contentY
+                                + step
+                            )
+                        );
+
+                    wheel.accepted = true;
+                }
+            }
+        }
     }
 }

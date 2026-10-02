@@ -10,7 +10,7 @@ Rectangle {
     implicitWidth: Math.max(118, gitMark.implicitWidth + 18)
     implicitHeight: 50
 
-    color: dock.menuOpen ? Colors.yellow : Colors.black
+    color: Colors.black
 
     property bool menuOpen: false
 
@@ -28,31 +28,27 @@ Rectangle {
             spacing: 5
 
             GohuText {
-                text: ""
-                font.pixelSize: 30
-                anchors.verticalCenter: parent.verticalCenter
+                id: gitDataMark
 
-                color: dock.menuOpen
-                       ? Colors.orange
-                       : mouse.pressed
-                       ? Colors.magenta
-                       : mouse.containsMouse
-                       ? Colors.orange
-                       : Colors.white
+                text: ""
+                font.pixelSize: 38
+                anchors.verticalCenter: parent.verticalCenter
+                color: Colors.white
+                opacity: 1.0
+
+                transform: Scale {
+                    origin.x: gitDataMark.width / 2
+                    origin.y: gitDataMark.height / 2
+                    xScale: 0.54
+                    yScale: 1.26
+                }
             }
 
             GohuText {
                 text: "≽(•⩊•マ≼"
                 font.pixelSize: 16
                 anchors.verticalCenter: parent.verticalCenter
-
-                color: dock.menuOpen
-                       ? Colors.orange
-                       : mouse.pressed
-                       ? Colors.magenta
-                       : mouse.containsMouse
-                       ? Colors.orange
-                       : Colors.white
+                color: Colors.yellow
             }
         }
 
@@ -61,16 +57,16 @@ Rectangle {
             source: gitMark
             horizontalOffset: 0
             verticalOffset: 0
-            radius: dock.menuOpen ? 18 : 14
-            samples: dock.menuOpen ? 21 : 15
+            radius: dock.menuOpen || mouse.containsMouse || mouse.pressed ? 18 : 14
+            samples: dock.menuOpen || mouse.containsMouse || mouse.pressed ? 21 : 15
             color: Colors.orange
             opacity: dock.menuOpen
                      ? 1.0
                      : mouse.pressed
                      ? 1.0
                      : mouse.containsMouse
-                     ? 0.82
-                     : 0.58
+                     ? 0.96
+                     : 0.76
             transparentBorder: true
         }
     }
@@ -94,7 +90,7 @@ Rectangle {
         anchors.fill: parent
         spread: 3
         z: -1
-        color: Colors.orange
+        color: Colors.yellow
         opacity: dock.menuOpen
                  ? 0.86
                  : mouse.pressed
@@ -108,7 +104,7 @@ Rectangle {
         anchors.fill: parent
         spread: 10
         z: 1
-        color: Colors.orange
+        color: Colors.yellow
         opacity: dock.menuOpen
                  ? 0.22
                  : mouse.pressed

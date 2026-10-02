@@ -4,3 +4,9 @@ singleton Colors 1.0 Colors.qml
 singleton GohuFont 1.0 GohuFont.qml
 GohuText 1.0 GohuText.qml
 NotoText 1.0 NotoText.qml
+SelectorDial 1.0 SelectorDial.qml
+
+BranchMap 1.0 BranchMap.qml
+IndexRail 1.0 IndexRail.qml
+SelectorSlider 1.0 SelectorSlider.qml
+ModeActuator 1.0 ModeActuator.qml

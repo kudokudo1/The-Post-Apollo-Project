@@ -966,351 +966,181 @@ PanelWindow {
         }
         }
 
+        // AppControl / CPU++ selector scrollbar geometry.
         Rectangle {
             id: scrollRail
 
-            width: 40
+            width: 10
+
             anchors {
                 top: parent.top
-                right: parent.right
                 bottom: parent.bottom
+                right: parent.right
                 topMargin: 20
-                rightMargin: 8
                 bottomMargin: 20
+                rightMargin: 10
             }
 
-            visible: hospitalScroll.contentHeight > hospitalScroll.height
-            radius: 2
-            color: "#09070D"
-            border.width: 1
-            border.color: Colors.cyan
-            opacity: visible ? 1.0 : 0.0
+            color: Colors.cyan
+
+            opacity:
+                hospitalScroll.contentHeight
+                > hospitalScroll.height
+                ? 0.90 : 0.0
+
+            visible: opacity > 0.0
+            z: 300
+
+            property real maxContentY:
+                Math.max(
+                    0,
+                    hospitalScroll.contentHeight
+                    - hospitalScroll.height
+                )
+
+            property real handleTravel:
+                Math.max(
+                    0,
+                    height - scrollThumb.height
+                )
+
+            function setScrollFromHandleY(handleY) {
+                if (maxContentY <= 0 || handleTravel <= 0)
+                    return;
+
+                const clampedY =
+                    Math.max(
+                        0,
+                        Math.min(handleTravel, handleY)
+                    );
+
+                hospitalScroll.contentY =
+                    (clampedY / handleTravel) * maxContentY;
+            }
 
             RectangularShadow {
                 anchors.fill: parent
-                spread: 4
-                z: -2
-                opacity: 0.22
-                color: Colors.cyan
+                spread: 2
+                z: -1
+                opacity: 0.24
+                color: parent.color
             }
 
             Rectangle {
-                anchors.fill: parent
-                anchors.margins: 3
-                radius: 2
-                color: "#120E16"
-                border.width: 1
-                border.color: "#322739"
-            }
+                id: scrollThumb
 
-            GohuText {
-                anchors {
-                    horizontalCenter: parent.horizontalCenter
-                    top: parent.top
-                    topMargin: 13
-                }
+                width: 6
+                anchors.horizontalCenter: parent.horizontalCenter
 
-                rotation: -90
-                transformOrigin: Item.Center
-                text: "SCROLL"
-                font.pixelSize: 8
-                color: Colors.cyan
-                opacity: 0.94
-            }
+                height:
+                    Math.max(
+                        30,
+                        parent.height
+                        * Math.min(
+                            1.0,
+                            hospitalScroll.visibleArea.heightRatio
+                        )
+                    )
 
-            Item {
-                id: scrollScaleArea
-
-                anchors {
-                    top: parent.top
-                    bottom: parent.bottom
-                    left: parent.left
-                    right: parent.right
-                    topMargin: 38
-                    bottomMargin: 26
-                    leftMargin: 4
-                    rightMargin: 4
-                }
-
-                Repeater {
-                    model: 11
-
-                    Item {
-                        width: scrollScaleArea.width
-                        height: 1
-                        y: (scrollScaleArea.height - 1)
-                           * index / 10
-
-                        Rectangle {
-                            width: index % 4 === 0 ? 8 : 5
-                            height: 1
-                            anchors.left: parent.left
-                            color: Colors.cyan
-                            opacity: index % 4 === 0 ? 0.68 : 0.32
-                        }
-
-                        Rectangle {
-                            width: index % 4 === 0 ? 8 : 5
-                            height: 1
-                            anchors.right: parent.right
-                            color: Colors.cyan
-                            opacity: index % 4 === 0 ? 0.68 : 0.32
-                        }
-                    }
-                }
-
-                Rectangle {
-                    id: scrollSlot
-
-                    width: 12
-                    anchors {
-                        top: parent.top
-                        bottom: parent.bottom
-                        horizontalCenter: parent.horizontalCenter
-                    }
-
-                    radius: 6
-                    color: "#030205"
-                    border.width: 1
-                    border.color: "#35283D"
-
-                    RectangularShadow {
-                        anchors.fill: parent
-                        spread: 2
-                        z: -1
-                        opacity: 0.30
-                        color: Colors.black
-                    }
-
-                    Rectangle {
-                        width: 2
-                        anchors {
-                            top: parent.top
-                            bottom: parent.bottom
-                            horizontalCenter: parent.horizontalCenter
-                            topMargin: 6
-                            bottomMargin: 6
-                        }
-
-                        color: Colors.cyan
-                        opacity: 0.48
-                    }
-
-                    RectangularShadow {
-                        x: scrollThumb.x
-                        y: scrollThumb.y
-                        width: scrollThumb.width
-                        height: scrollThumb.height
-                        z: 2
-                        spread: scrollDragArea.pressed ? 3 : 5
-                        opacity: scrollDragArea.pressed ? 0.42 : 0.62
-                        color: scrollDragArea.pressed
-                               ? Colors.orange
-                               : Colors.magenta
-                    }
-
-                    Rectangle {
-                        id: scrollThumb
-
-                        width: 28
-                        height: Math.max(
-                            52,
+                y: {
+                    const ratio =
+                        Math.max(
+                            0.0,
                             Math.min(
-                                120,
-                                scrollSlot.height
-                                * Math.min(
-                                    1.0,
-                                    hospitalScroll.height
-                                    / Math.max(
-                                        1,
-                                        hospitalScroll.contentHeight
-                                    )
+                                1.0,
+                                Number(
+                                    hospitalScroll.visibleArea.heightRatio
+                                    || 0
                                 )
                             )
-                        )
+                        );
 
-                        radius: 3
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        z: 3
+                    const maxPosition =
+                        Math.max(0.0, 1.0 - ratio);
 
-                        y: {
-                            const maxContentY = Math.max(
-                                1,
-                                hospitalScroll.contentHeight
-                                - hospitalScroll.height
-                            );
-                            const travel = Math.max(
-                                0,
-                                scrollSlot.height - height
-                            );
-                            return travel
-                                   * hospitalScroll.contentY
-                                   / maxContentY;
-                        }
+                    const position =
+                        Math.max(
+                            0.0,
+                            Math.min(
+                                maxPosition,
+                                Number(
+                                    hospitalScroll.visibleArea.yPosition
+                                    || 0
+                                )
+                            )
+                        );
 
-                        scale: scrollDragArea.pressed ? 0.97 : 1.0
-                        color: scrollDragArea.pressed
-                               ? Colors.yellow
-                               : Colors.white
-                        border.width: 1
-                        border.color: scrollDragArea.pressed
-                                      ? Colors.orange
-                                      : Colors.white
+                    if (maxPosition <= 0
+                            || scrollRail.handleTravel <= 0)
+                        return 0;
 
-                        Rectangle {
-                            anchors {
-                                left: parent.left
-                                right: parent.right
-                                top: parent.top
-                                leftMargin: 3
-                                rightMargin: 3
-                                topMargin: 3
-                            }
+                    return (
+                        position / maxPosition
+                    ) * scrollRail.handleTravel;
+                }
 
-                            height: 2
-                            radius: 1
-                            color: scrollDragArea.pressed
-                                   ? Colors.black
-                                   : Colors.white
-                            opacity: 0.48
-                        }
+                color: Colors.magenta
 
-                        Rectangle {
-                            anchors {
-                                left: parent.left
-                                right: parent.right
-                                bottom: parent.bottom
-                                leftMargin: 3
-                                rightMargin: 3
-                                bottomMargin: 3
-                            }
+                RectangularShadow {
+                    anchors.fill: parent
+                    spread: 2
+                    z: -1
+                    opacity: 0.28
+                    color: Colors.magenta
+                }
+            }
 
-                            height: 3
-                            radius: 1
-                            color: Colors.black
-                            opacity: 0.72
-                        }
+            MouseArea {
+                id: scrollMouse
 
-                        Column {
-                            anchors.centerIn: parent
-                            spacing: 4
+                anchors.fill: parent
+                hoverEnabled: true
+                acceptedButtons: Qt.LeftButton
+                cursorShape: Qt.SizeVerCursor
 
-                            Repeater {
-                                model: 5
+                property real dragOffset: 0
 
-                                Rectangle {
-                                    width: 16
-                                    height: 2
-                                    radius: 1
-                                    color: Colors.black
-                                    opacity: 0.58
-                                }
-                            }
-                        }
+                onPressed: function(mouse) {
+                    const handleTop = scrollThumb.y;
+                    const handleBottom =
+                        scrollThumb.y
+                        + scrollThumb.height;
 
-                        Behavior on scale {
-                            NumberAnimation {
-                                duration: 70
-                                easing.type: Easing.OutQuad
-                            }
-                        }
-                    }
+                    dragOffset =
+                        mouse.y >= handleTop
+                        && mouse.y <= handleBottom
+                        ? mouse.y - handleTop
+                        : scrollThumb.height / 2;
 
-                    MouseArea {
-                        id: scrollDragArea
+                    scrollRail.setScrollFromHandleY(
+                        mouse.y - dragOffset
+                    );
+                }
 
-                        anchors {
-                            top: parent.top
-                            bottom: parent.bottom
-                            horizontalCenter: parent.horizontalCenter
-                        }
+                onPositionChanged: function(mouse) {
+                    if (pressed)
+                        scrollRail.setScrollFromHandleY(
+                            mouse.y - dragOffset
+                        );
+                }
 
-                        width: scrollRail.width
-                        hoverEnabled: true
-                        acceptedButtons: Qt.LeftButton
-                        cursorShape: Qt.SizeVerCursor
+                onWheel: function(wheel) {
+                    const step =
+                        wheel.angleDelta.y > 0
+                        ? -90
+                        : 90;
 
-                        property real dragOffset: 0
+                    hospitalScroll.contentY =
+                        Math.max(
+                            0,
+                            Math.min(
+                                scrollRail.maxContentY,
+                                hospitalScroll.contentY
+                                + step
+                            )
+                        );
 
-                        function seek(handleY) {
-                            const maxContentY = Math.max(
-                                0,
-                                hospitalScroll.contentHeight
-                                - hospitalScroll.height
-                            );
-                            const travel = Math.max(
-                                1,
-                                scrollSlot.height
-                                - scrollThumb.height
-                            );
-                            const clampedY = Math.max(
-                                0,
-                                Math.min(travel, handleY)
-                            );
-
-                            hospitalScroll.contentY =
-                                maxContentY * clampedY / travel;
-                        }
-
-                        onPressed: function(mouse) {
-                            const localY =
-                                mapToItem(
-                                    scrollSlot,
-                                    mouse.x,
-                                    mouse.y
-                                ).y;
-                            const handleTop = scrollThumb.y;
-                            const handleBottom =
-                                scrollThumb.y
-                                + scrollThumb.height;
-
-                            dragOffset =
-                                localY >= handleTop
-                                && localY <= handleBottom
-                                ? localY - handleTop
-                                : scrollThumb.height / 2;
-
-                            seek(localY - dragOffset);
-                        }
-
-                        onPositionChanged: function(mouse) {
-                            if (!pressed)
-                                return;
-
-                            const localY =
-                                mapToItem(
-                                    scrollSlot,
-                                    mouse.x,
-                                    mouse.y
-                                ).y;
-
-                            seek(localY - dragOffset);
-                        }
-
-                        onWheel: function(wheel) {
-                            const maxContentY = Math.max(
-                                0,
-                                hospitalScroll.contentHeight
-                                - hospitalScroll.height
-                            );
-                            const step =
-                                wheel.angleDelta.y > 0
-                                ? -90
-                                : 90;
-
-                            hospitalScroll.contentY =
-                                Math.max(
-                                    0,
-                                    Math.min(
-                                        maxContentY,
-                                        hospitalScroll.contentY
-                                        + step
-                                    )
-                                );
-
-                            wheel.accepted = true;
-                        }
-                    }
+                    wheel.accepted = true;
                 }
             }
         }

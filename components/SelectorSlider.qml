@@ -8,6 +8,7 @@ Rectangle {
     property int currentIndex: -1
     property color accentColor: Colors.cyan
     property color handleColor: Colors.white
+    property color handleGlowColor: Colors.magenta
     property string sideLabel: ""
     property bool enabledSlider: count > 1
 
@@ -192,7 +193,7 @@ Rectangle {
                     opacity: dragArea.pressed ? 0.42 : 0.62
                     color: dragArea.pressed
                            ? Colors.orange
-                           : Colors.magenta
+                           : slider.handleGlowColor
                 }
 
                 Rectangle {

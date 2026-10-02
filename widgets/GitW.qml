@@ -19,6 +19,7 @@ PanelWindow {
     property bool workflowMenuOpen: false
     property int selectedRunIndex: 0
     property bool runInspectorOpen: false
+    property int runInspectorHeight: 400
     property string selectedGitCommitSha: ""
     property var activeTextEditor: null
 
@@ -2455,10 +2456,22 @@ PanelWindow {
                                     bottomMargin: 4
                                 }
 
-                                height: 350
+                                height: root.runInspectorHeight
 
                                 githubService: githubService
                                 runSummary: root.selectedRun
+
+                                onHeightRequested: function(nextHeight) {
+                                    root.runInspectorHeight = Math.round(
+                                        Math.max(
+                                            300,
+                                            Math.min(
+                                                githubCameraBody.height - 20,
+                                                nextHeight
+                                            )
+                                        )
+                                    );
+                                }
 
                                 onCloseRequested:
                                     root.runInspectorOpen = false

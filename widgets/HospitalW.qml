@@ -964,6 +964,7 @@ PanelWindow {
                 }
             }
         }
+        }
 
         Rectangle {
             id: scrollRail

@@ -526,6 +526,8 @@ PanelWindow {
                     spacing: 12
 
                     Rectangle {
+                        id: queuePane
+
                         width: parent.width
                         height: (parent.height - 12) * 0.58
                         color: Colors.dark
@@ -730,7 +732,7 @@ PanelWindow {
 
                     Rectangle {
                         width: parent.width
-                        height: parent.height - parent.children[0].height - 12
+                        height: parent.height - queuePane.height - 12
                         color: Colors.dark
                         border.width: 1
                         border.color: Colors.blue

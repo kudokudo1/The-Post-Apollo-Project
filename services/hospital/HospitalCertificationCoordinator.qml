@@ -6,6 +6,20 @@ Scope {
 
     property var roomService: null
 
+    HospitalOperatingAuthorityService {
+        id: authority
+    }
+
+    property string hostLeaseId: ""
+
+    readonly property bool hostSlotOwned:
+        roomService
+        && hostLeaseId.length > 0
+        && authority.isOwner(
+            roomService.team,
+            hostLeaseId
+        )
+
     HospitalCertificationService {
         id: certification
 
@@ -72,6 +86,16 @@ Scope {
             certification.completePostOp(
                 coordinator.roomService.postOpSnapshot()
             );
+
+            if (certification.state === "IN_MAIN"
+                    && coordinator.hostSlotOwned) {
+                authority.releaseSlot(
+                    coordinator.roomService.team,
+                    coordinator.hostLeaseId,
+                    "POST-OP COMPLETE"
+                );
+                coordinator.hostLeaseId = "";
+            }
         }
     }
 
@@ -153,10 +177,31 @@ Scope {
         if (!roomService)
             return false;
 
+        if (hostSlotOwned)
+            return roomService.armPrepared();
+
+        if (!authority.acquireSlot(
+                roomService.team,
+                roomService.branch,
+                roomService.head,
+                "CERTIFICATION ARMED"
+            )) {
+            return false;
+        }
+
+        hostLeaseId = authority.ownerLeaseId;
+
         if (!certification.armCertified(
                 roomService.certificationSnapshot()
-            ))
+            )) {
+            authority.releaseSlot(
+                roomService.team,
+                hostLeaseId,
+                "CERTIFICATION ARM FAILED"
+            );
+            hostLeaseId = "";
             return false;
+        }
 
         return roomService.armPrepared();
     }
@@ -164,6 +209,12 @@ Scope {
     function integrate() {
         if (!roomService)
             return false;
+
+        if (!hostSlotOwned) {
+            certification.lastError =
+                "INTEGRATE REFUSED // HOST SLOT NOT OWNED";
+            return false;
+        }
 
         if (!certification.beginIntegration(
                 roomService.certificationSnapshot()
@@ -196,9 +247,20 @@ Scope {
         if (!roomService)
             return false;
 
-        return certification.reopen(
+        const reopened = certification.reopen(
             reason || "ROOM REOPENED",
             roomService.certificationSnapshot()
         );
+
+        if (reopened && hostSlotOwned) {
+            authority.releaseSlot(
+                roomService.team,
+                hostLeaseId,
+                "ROOM REOPENED"
+            );
+            hostLeaseId = "";
+        }
+
+        return reopened;
     }
 }

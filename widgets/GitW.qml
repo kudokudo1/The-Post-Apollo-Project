@@ -18,6 +18,7 @@ PanelWindow {
     property int selectedWorkflowIndex: 0
     property bool workflowMenuOpen: false
     property int selectedRunIndex: 0
+    property bool runInspectorOpen: false
     property string selectedGitCommitSha: ""
     property var activeTextEditor: null
 
@@ -112,6 +113,7 @@ PanelWindow {
 
     function showGitPage() {
         root.workflowMenuOpen = false;
+        root.runInspectorOpen = false;
         root.activePage = "git";
         gitService.refresh();
     }
@@ -129,6 +131,7 @@ PanelWindow {
 
     function showGithubLibrary() {
         root.workflowMenuOpen = false;
+        root.runInspectorOpen = false;
         root.githubView = "library";
     }
 
@@ -223,6 +226,24 @@ PanelWindow {
             return;
 
         root.selectedRunIndex = (root.selectedRunIndex + 1) % count;
+
+        if (root.runInspectorOpen) {
+            const run = githubService.runs[root.selectedRunIndex];
+
+            if (run)
+                githubService.inspectRun(run.databaseId);
+        }
+    }
+
+    function toggleRunInspector() {
+        if (!root.selectedRun)
+            return;
+
+        root.workflowMenuOpen = false;
+        root.runInspectorOpen = !root.runInspectorOpen;
+
+        if (root.runInspectorOpen)
+            githubService.inspectRun(root.selectedRun.databaseId);
     }
 
     onMenuOpenChanged: {
@@ -2238,9 +2259,9 @@ PanelWindow {
                                                                         width: parent.width
                                                                         height: 32
                                                                         spacing: 8
-                                    
+
                                                                         ActionButton {
-                                                                            width: parent.width - 220
+                                                                            width: parent.width - 304
                                                                             height: 30
                                                                             enabledAction: githubService.available
                                                                                            && githubService.runCount > 0
@@ -2258,7 +2279,17 @@ PanelWindow {
                                                                                    : "0 // NO RUNS"
                                                                             onTriggered: root.cycleRun()
                                                                         }
-                                    
+
+                                                                        ActionButton {
+                                                                            width: 76
+                                                                            height: 30
+                                                                            label: root.runInspectorOpen ? "HIDE" : "DETAILS"
+                                                                            enabledAction: !!root.selectedRun
+                                                                                           && !githubService.refreshing
+                                                                            selectedAction: root.runInspectorOpen
+                                                                            onTriggered: root.toggleRunInspector()
+                                                                        }
+
                                                                         ActionButton {
                                                                             width: 102
                                                                             height: 30
@@ -2272,7 +2303,7 @@ PanelWindow {
                                                                                            && !githubService.factoryBusy
                                                                             onTriggered: githubService.rerunRun(root.selectedRun.databaseId)
                                                                         }
-                                    
+
                                                                         ActionButton {
                                                                             width: 102
                                                                             height: 30
@@ -2404,6 +2435,33 @@ PanelWindow {
                                                                 }
                                                             }
                                                         }
+                            }
+
+                            RunInspectorDrawer {
+                                id: runInspectorDrawer
+
+                                visible:
+                                    root.githubView === "control"
+                                    && root.runInspectorOpen
+
+                                z: 900
+
+                                anchors {
+                                    left: parent.left
+                                    right: parent.right
+                                    bottom: parent.bottom
+                                    leftMargin: 6
+                                    rightMargin: 6
+                                    bottomMargin: 4
+                                }
+
+                                height: 300
+
+                                githubService: githubService
+                                runSummary: root.selectedRun
+
+                                onCloseRequested:
+                                    root.runInspectorOpen = false
                             }
 
                             WorkflowLibraryView {

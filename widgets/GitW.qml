@@ -186,6 +186,16 @@ PanelWindow {
         originUrl: gitService.origin
     }
 
+    WorkflowLibraryW {
+        id: workflowLibraryWindow
+        githubService: githubService
+
+        onWorkflowSelected: function(index) {
+            root.selectedWorkflowIndex = index;
+            root.workflowMenuOpen = false;
+        }
+    }
+
     Connections {
         target: githubService
 
@@ -2082,18 +2092,15 @@ PanelWindow {
                                         )
                                     }
 
-                                    Rectangle {
+                                    ActionButton {
                                         width: 104
                                         height: 30
-                                        color: Colors.black
-                                        border.width: 1
-                                        border.color: Colors.blue
-
-                                        GohuText {
-                                            anchors.centerIn: parent
-                                            text: "ASSIGN // NEXT"
-                                            font.pixelSize: 8
-                                            color: Colors.white
+                                        label: "LIBRARY"
+                                        enabledAction: githubService.available
+                                        selectedAction: workflowLibraryWindow.menuOpen
+                                        onTriggered: {
+                                            root.workflowMenuOpen = false;
+                                            workflowLibraryWindow.toggle();
                                         }
                                     }
                                 }
@@ -2116,7 +2123,7 @@ PanelWindow {
                                 topMargin: 4
                             }
 
-                            height: Math.min(githubService.workflowCount, 6) * 30 + 8
+                            height: Math.min(githubService.workflowCount, 5) * 30 + 8
                             color: Colors.black
                             border.width: 1
                             border.color: Colors.orange

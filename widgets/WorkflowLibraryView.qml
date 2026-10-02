@@ -74,142 +74,12 @@ Item {
         anchors.fill: parent
         spacing: 10
 
-        // ===== COMPLETE WORKFLOW LIBRARY =======================
-
-        Rectangle {
-            id: workflowPane
-
-            width: (parent.width - 10) * 0.54
-            height: parent.height
-
-            color: Colors.dark
-            border.width: 1
-            border.color: Colors.cyan
-
-            Column {
-                anchors {
-                    fill: parent
-                    margins: 9
-                }
-
-                spacing: 7
-
-                Row {
-                    width: parent.width
-                    height: 24
-
-                    GohuText {
-                        width: parent.width - 100
-                        text: "ALL WORKFLOWS"
-                        font.pixelSize: 12
-                        color: Colors.magenta
-                    }
-
-                    GohuText {
-                        width: 100
-                        text: String(root.libraryStore.workflows.length) + " MACHINES"
-                        horizontalAlignment: Text.AlignRight
-                        font.pixelSize: 8
-                        color: Colors.orange
-                    }
-                }
-
-                Flickable {
-                    width: parent.width
-                    height: parent.height - 31
-
-                    clip: true
-                    contentWidth: width
-                    contentHeight: workflowColumn.height
-                    boundsBehavior: Flickable.StopAtBounds
-
-                    Column {
-                        id: workflowColumn
-
-                        width: parent.width
-                        spacing: 5
-
-                        Repeater {
-                            model: root.libraryStore.workflows
-
-                            Rectangle {
-                                required property int index
-                                required property var modelData
-
-                                width: workflowColumn.width
-                                height: 48
-
-                                color: Colors.black
-                                border.width: 1
-                                border.color: Colors.cyan
-
-                                Row {
-                                    anchors {
-                                        fill: parent
-                                        margins: 6
-                                    }
-
-                                    spacing: 6
-
-                                    Column {
-                                        width: parent.width - 142
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        spacing: 2
-
-                                        GohuText {
-                                            width: parent.width
-                                            text: String(modelData.name || modelData.path || "UNKNOWN")
-                                            font.pixelSize: 9
-                                            color: Colors.white
-                                            elide: Text.ElideRight
-                                        }
-
-                                        GohuText {
-                                            width: parent.width
-                                            text: String(modelData.path || "")
-                                            font.pixelSize: 7
-                                            color: Colors.cyan
-                                            opacity: 0.70
-                                            elide: Text.ElideMiddle
-                                        }
-                                    }
-
-                                    LibraryButton {
-                                        width: 62
-                                        label: "LOAD"
-
-                                        onTriggered: root.workflowSelected(index)
-                                    }
-
-                                    LibraryButton {
-                                        width: 68
-                                        label: "+ QUEUE"
-
-                                        onTriggered: root.libraryStore.addWorkflow(modelData)
-                                    }
-                                }
-                            }
-                        }
-
-                        GohuText {
-                            width: parent.width
-                            visible: root.libraryStore.workflows.length === 0
-
-                            text: "NO SAVED WORKFLOWS"
-                            horizontalAlignment: Text.AlignHCenter
-                            font.pixelSize: 9
-                            color: Colors.cyan
-                            opacity: 0.42
-                        }
-                    }
-                }
-            }
-        }
-
         // ===== EXECUTION / SAVED SETS ==========================
 
         Column {
-            width: parent.width - workflowPane.width - 10
+            id: executionPane
+
+            width: (parent.width - 10) * 0.46
             height: parent.height
             spacing: 10
 
@@ -237,7 +107,7 @@ Item {
                         spacing: 6
 
                         GohuText {
-                            width: parent.width - 158
+                            width: parent.width - 146
                             text: "RUN QUEUE // ORDER"
                             font.pixelSize: 11
                             color: Colors.magenta
@@ -252,7 +122,7 @@ Item {
                         }
 
                         LibraryButton {
-                            width: 90
+                            width: 78
                             label:
                                 root.githubService.actionBusy
                                 ? "RUNNING"
@@ -593,6 +463,138 @@ Item {
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ===== COMPLETE WORKFLOW LIBRARY =======================
+
+        Rectangle {
+            id: workflowPane
+
+            width: (parent.width - 10) * 0.54
+            height: parent.height
+
+            color: Colors.dark
+            border.width: 1
+            border.color: Colors.cyan
+
+            Column {
+                anchors {
+                    fill: parent
+                    margins: 9
+                }
+
+                spacing: 7
+
+                Row {
+                    width: parent.width
+                    height: 24
+
+                    GohuText {
+                        width: parent.width - 100
+                        text: "ALL WORKFLOWS"
+                        font.pixelSize: 12
+                        color: Colors.magenta
+                    }
+
+                    GohuText {
+                        width: 100
+                        text: String(root.libraryStore.workflows.length) + " MACHINES"
+                        horizontalAlignment: Text.AlignRight
+                        font.pixelSize: 8
+                        color: Colors.orange
+                    }
+                }
+
+                Flickable {
+                    width: parent.width
+                    height: parent.height - 31
+
+                    clip: true
+                    contentWidth: width
+                    contentHeight: workflowColumn.height
+                    boundsBehavior: Flickable.StopAtBounds
+
+                    Column {
+                        id: workflowColumn
+
+                        width: parent.width
+                        spacing: 5
+
+                        Repeater {
+                            model: root.libraryStore.workflows
+
+                            Rectangle {
+                                required property int index
+                                required property var modelData
+
+                                width: workflowColumn.width
+                                height: 48
+
+                                color: Colors.black
+                                border.width: 1
+                                border.color: Colors.orange
+
+                                Row {
+                                    anchors {
+                                        fill: parent
+                                        margins: 6
+                                    }
+
+                                    spacing: 6
+
+                                    Column {
+                                        width: parent.width - 142
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        spacing: 2
+
+                                        GohuText {
+                                            width: parent.width
+                                            text: String(modelData.name || modelData.path || "UNKNOWN")
+                                            font.pixelSize: 9
+                                            color: Colors.white
+                                            elide: Text.ElideRight
+                                        }
+
+                                        GohuText {
+                                            width: parent.width
+                                            text: String(modelData.path || "")
+                                            font.pixelSize: 7
+                                            color: Colors.orange
+                                            opacity: 0.78
+                                            elide: Text.ElideMiddle
+                                        }
+                                    }
+
+                                    LibraryButton {
+                                        width: 62
+                                        label: "LOAD"
+
+                                        onTriggered: root.workflowSelected(index)
+                                    }
+
+                                    LibraryButton {
+                                        width: 68
+                                        label: "+ QUEUE"
+
+                                        onTriggered: root.libraryStore.addWorkflow(modelData)
+                                    }
+                                }
+                            }
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            visible: root.libraryStore.workflows.length === 0
+
+                            text: "NO SAVED WORKFLOWS"
+                            horizontalAlignment: Text.AlignHCenter
+                            font.pixelSize: 9
+                            color: Colors.cyan
+                            opacity: 0.42
                         }
                     }
                 }

@@ -1,0 +1,32 @@
+name: T6 Certification Evidence
+
+on:
+  push:
+    branches:
+      - team6/application-audio-service
+  pull_request:
+    branches:
+      - team6/application-audio-service
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-contract:
+    name: T6 static contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+      - name: Validate application audio contract
+        run: python3 services/audio/validate_audio_contract.py
+
+  donor-anatomy:
+    name: T6 donor anatomy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+      - name: Validate donor audio anatomy
+        run: python3 services/audio/validate_donor_audio_anatomy.py

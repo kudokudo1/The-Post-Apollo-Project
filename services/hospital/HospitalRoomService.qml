@@ -113,6 +113,7 @@ Scope {
     property bool exitSeen: false
     property bool stdoutSeen: false
     property bool stderrSeen: false
+    property bool inspectFinishQueued: false
     property int exitCode: -1
     property string stdoutText: ""
     property string stderrText: ""
@@ -281,6 +282,7 @@ Scope {
         exitSeen = false;
         stdoutSeen = false;
         stderrSeen = false;
+        inspectFinishQueued = false;
         exitCode = -1;
         stdoutText = "";
         stderrText = "";
@@ -778,11 +780,30 @@ Scope {
     }
 
     function maybeFinish() {
-        if (!running || !exitSeen || !stdoutSeen || !stderrSeen)
+        if (!running
+                || !exitSeen
+                || !stdoutSeen
+                || !stderrSeen
+                || inspectFinishQueued)
             return;
 
-        running = false;
+        // QProcess, StdioCollector, and several UI bindings can all settle
+        // in the same event-stack frame. Defer the visible room-state
+        // mutation one tick so Text bindings update after process teardown.
+        inspectFinishQueued = true;
         watchdog.stop();
+
+        Qt.callLater(function() {
+            roomService.finishInspection();
+        });
+    }
+
+    function finishInspection() {
+        if (!inspectFinishQueued || !running)
+            return;
+
+        inspectFinishQueued = false;
+        running = false;
 
         if (exitCode !== 0) {
             available = false;
@@ -1004,6 +1025,7 @@ Scope {
             if (!roomService.running)
                 return;
 
+            roomService.inspectFinishQueued = false;
             roomService.running = false;
             roomService.available = false;
             roomService.lastError = "PX ROOM TIMEOUT";

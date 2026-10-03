@@ -162,7 +162,10 @@ for observation_token in (
     'lifetimeClass: "ephemeral"',
     "generation: observationGeneration",
     "aliases: aliases",
-    "relationships: []",
+    "const relationships = [];",
+    "relationships: relationships",
+    'kind: "EXACT_PID"',
+    'targetProvider: "PROCFS"',
 ):
     if observation_token not in text:
         errors.append(f"missing Team 7 observation adapter token: {observation_token}")

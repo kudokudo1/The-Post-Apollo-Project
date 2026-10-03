@@ -109,7 +109,7 @@ Scope {
                 return;
 
             coordinator.refreshBinding();
-            coordinator.certification.beginCandidate(
+            certification.beginCandidate(
                 coordinator.roomService.certificationSnapshot()
             );
         }

@@ -381,6 +381,26 @@ Scope {
         if (!roomService)
             return false;
 
+        bridgeError = "";
+
+        if (certification.state === "BLOCKED") {
+            if (!certification.reopen(
+                    "NEW PREPARE REQUEST",
+                    roomService.certificationSnapshot()
+                )) {
+                bridgeError =
+                    certification.lastError
+                    || "PREPARE // REOPEN FAILED";
+                return false;
+            }
+        } else if (certification.state !== "IDLE"
+                && certification.state !== "REOPENED") {
+            bridgeError =
+                "PREPARE REFUSED // STATE "
+                + certification.state;
+            return false;
+        }
+
         roomService.runInspection("prepare");
         return true;
     }

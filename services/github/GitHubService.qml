@@ -789,9 +789,9 @@ Scope {
         if (!workflowDone || !runsDone)
             return;
 
-        refreshing = false;
-        watchdog.stop();
         available = !lastError;
+        watchdog.stop();
+        refreshing = false;
     }
 
     Process {

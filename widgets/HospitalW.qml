@@ -1372,7 +1372,11 @@ PanelWindow {
                                 ? "CERT // "
                                   + certificationCoordinator.state
                                   + " // "
-                                  + roomService.summary
+                                  + (
+                                      certificationCoordinator.lastError
+                                      ? certificationCoordinator.lastError
+                                      : roomService.summary
+                                    )
                                 : roomService.summary
                             font.pixelSize: 9
                             color:

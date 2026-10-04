@@ -147,6 +147,7 @@ PanelWindow {
 
         function onRefreshed() {
             githubService.refresh();
+            auditService.runAudit();
         }
     }
 
@@ -277,7 +278,7 @@ PanelWindow {
             root.selectedRoomTeam === roomRow.team
 
         width: roomsColumn.width
-        height: 44
+        height: 54
 
         color: Colors.dark
         border.width: selected ? 2 : 1
@@ -294,13 +295,17 @@ PanelWindow {
         GohuText {
             anchors {
                 left: parent.left
-                verticalCenter: parent.verticalCenter
+                right: roomStateText.left
+                top: parent.top
                 leftMargin: 12
+                rightMargin: 10
+                topMargin: 7
             }
 
             text: roomRow.team
-            font.pixelSize: 14
+            font.pixelSize: 13
             color: Colors.orange
+            elide: Text.ElideRight
 
             layer.enabled: true
             layer.effect: DropShadow {
@@ -315,13 +320,15 @@ PanelWindow {
         GohuText {
             anchors {
                 left: parent.left
-                verticalCenter: parent.verticalCenter
-                leftMargin: 74
+                right: roomStateText.left
+                bottom: parent.bottom
+                leftMargin: 12
+                rightMargin: 10
+                bottomMargin: 7
             }
 
-            width: 340
             text: roomRow.responsibility
-            font.pixelSize: 13
+            font.pixelSize: 9
             color: Colors.cyan
             elide: Text.ElideRight
 
@@ -336,14 +343,18 @@ PanelWindow {
         }
 
         GohuText {
+            id: roomStateText
+
             anchors {
                 right: parent.right
                 verticalCenter: parent.verticalCenter
                 rightMargin: 10
             }
 
+            width: 105
+            horizontalAlignment: Text.AlignRight
             text: roomRow.stateText
-            font.pixelSize: 11
+            font.pixelSize: 9
             color: roomRow.stateColor
             opacity: roomRow.telemetryState === "WAITING" ? 0.58 : 1.0
 
@@ -750,10 +761,12 @@ PanelWindow {
                         spacing: 8
 
                         SectionLabel {
+                            width: parent.width
                             text:
                                 root.selectedRoomTeam.length > 0
                                 ? "ROOM // " + root.selectedRoomTeam
                                 : "ROOM // NONE SELECTED"
+                            elide: Text.ElideRight
                         }
 
                         GohuText {
@@ -1465,15 +1478,22 @@ PanelWindow {
                 width: parent.width
                 spacing: 7
 
-                RoomRow { team: "T1"; responsibility: "SYSTEM / HUNTER" }
-                RoomRow { team: "T2"; responsibility: "FAVORITES" }
-                RoomRow { team: "T3-F"; responsibility: "FILES" }
-                RoomRow { team: "T3-R"; responsibility: "REMOTE" }
-                RoomRow { team: "T4"; responsibility: "CPU++" }
-                RoomRow { team: "T5"; responsibility: "TABS / SURFACE" }
-                RoomRow { team: "T6"; responsibility: "APPLICATION AUDIO" }
-                RoomRow { team: "T7"; responsibility: "DESKTOP IDENTITY" }
-                RoomRow { team: "T8"; responsibility: "APPS" }
+                Repeater {
+                    model: auditService.rooms
+
+                    RoomRow {
+                        team: String(
+                            modelData.team
+                            || modelData.branch
+                            || ""
+                        )
+
+                        responsibility: String(
+                            modelData.responsibility
+                            || "AUTO DISCOVERED"
+                        )
+                    }
+                }
             }
 
 

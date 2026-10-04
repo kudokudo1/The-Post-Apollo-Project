@@ -1,6 +1,6 @@
 ✦︎✦︎✦︎ Meta Apollo Logos //
 
-# 🖳 POST-APOLLO // TASKBARS
+# 🖳 TASKBARS // POST-APOLLO
 
 ![](BUILD/assets/design/chassis/focus-rail.svg)
 

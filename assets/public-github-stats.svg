@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="235" viewBox="0 0 520 235">
+  <rect width="520" height="235" rx="8" fill="#1B0623"/>
+  <rect x="0.5" y="0.5" width="519" height="234" rx="8" fill="none" stroke="#55CFCA" stroke-opacity="0.85"/>
+
+  <style>
+    .title { font: 600 18px ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; fill: #55CFCA; }
+    .label { font: 600 13px ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; fill: #DCF3FA; }
+    .value { font: 700 14px ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; fill: #F2BE4E; }
+    .small { font: 600 9px ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; fill: #C74EC7; letter-spacing: 1px; }
+    .grade { font: 700 26px ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; fill: #DCF3FA; }
+  </style>
+
+  <text x="22" y="31" class="title">KUDO // PUBLIC GITHUB</text>
+  <text x="22" y="50" class="small">CURRENT PUBLIC SNAPSHOT</text>
+
+  <g transform="translate(22,0)">
+    <text x="0" y="82" class="label">★  STARS EARNED</text>
+    <text x="300" y="82" text-anchor="end" class="value">2</text>
+
+    <text x="0" y="108" class="label">◷  COMMITS // LAST YEAR</text>
+    <text x="300" y="108" text-anchor="end" class="value">409</text>
+
+    <text x="0" y="134" class="label">⑂  PULL REQUESTS</text>
+    <text x="300" y="134" text-anchor="end" class="value">9</text>
+
+    <text x="0" y="160" class="label">!  ISSUES</text>
+    <text x="300" y="160" text-anchor="end" class="value">0</text>
+
+    <text x="0" y="186" class="label">◈  PUBLIC // PRIVATE</text>
+    <text x="300" y="186" text-anchor="end" class="value">5 // 12</text>
+  </g>
+
+  <circle cx="435" cy="118" r="45" fill="none" stroke="#3E174A" stroke-width="8"/>
+  <circle cx="435" cy="118" r="45" fill="none" stroke="#C74EC7" stroke-width="8"
+          stroke-linecap="round" stroke-dasharray="155 128" transform="rotate(-90 435 118)"/>
+  <text x="435" y="126" text-anchor="middle" class="grade">C+</text>
+  <text x="435" y="204" text-anchor="middle" class="small">PUBLIC RANK</text>
+</svg>

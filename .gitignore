@@ -25,3 +25,6 @@ archive/
 # Local backup snapshots
 *.backup
 *.backup-*
+
+# Local workflow library state
+workflow-sets.json

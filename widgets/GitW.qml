@@ -22,6 +22,9 @@ PanelWindow {
     property int runInspectorHeight: 400
     property string selectedGitCommitSha: ""
     property var activeTextEditor: null
+    property var gitKeyboardControls: []
+    property var gitKeyboardControl: null
+    property bool dialControlMode: false
 
     readonly property var selectedWorkflow:
         githubService.workflows.length > 0
@@ -78,6 +81,442 @@ PanelWindow {
         y: 0
         width: root.menuOpen ? root.width : 0
         height: root.menuOpen ? root.height : 0
+    }
+
+    Shortcut {
+        sequence: "Esc"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.close()
+    }
+
+    Shortcut {
+        sequence: "Left"
+        context: Qt.ApplicationShortcut
+        enabled:
+            root.menuOpen
+            && !root.dialControlMode
+            && !root.activeTextEditor
+        onActivated: root.moveGitKeyboardControl(-1, 0)
+    }
+
+    Shortcut {
+        sequence: "Right"
+        context: Qt.ApplicationShortcut
+        enabled:
+            root.menuOpen
+            && !root.dialControlMode
+            && !root.activeTextEditor
+        onActivated: root.moveGitKeyboardControl(1, 0)
+    }
+
+    Shortcut {
+        sequence: "Up"
+        context: Qt.ApplicationShortcut
+        enabled:
+            root.menuOpen
+            && !root.dialControlMode
+            && !root.activeTextEditor
+        onActivated: root.moveGitKeyboardControl(0, -1)
+    }
+
+    Shortcut {
+        sequence: "Down"
+        context: Qt.ApplicationShortcut
+        enabled:
+            root.menuOpen
+            && !root.dialControlMode
+            && !root.activeTextEditor
+        onActivated: root.moveGitKeyboardControl(0, 1)
+    }
+
+    Shortcut {
+        sequence: "Return"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen && !root.activeTextEditor
+        onActivated: root.activateGitKeyboardControl()
+    }
+
+    Shortcut {
+        sequence: "Enter"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen && !root.activeTextEditor
+        onActivated: root.activateGitKeyboardControl()
+    }
+
+    Shortcut {
+        sequence: "Shift+Left"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.selectPrimaryMode(-1)
+    }
+
+    Shortcut {
+        sequence: "Shift+Up"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.selectPrimaryMode(-1)
+    }
+
+    Shortcut {
+        sequence: "Shift+Right"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.selectPrimaryMode(1)
+    }
+
+    Shortcut {
+        sequence: "Shift+Down"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.selectPrimaryMode(1)
+    }
+
+    Shortcut {
+        sequence: "Alt+Left"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen && root.activePage === "github"
+        onActivated: root.selectBottomMode(-1)
+    }
+
+    Shortcut {
+        sequence: "Alt+Up"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen && root.activePage === "github"
+        onActivated: root.selectBottomMode(-1)
+    }
+
+    Shortcut {
+        sequence: "Alt+Right"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen && root.activePage === "github"
+        onActivated: root.selectBottomMode(1)
+    }
+
+    Shortcut {
+        sequence: "Alt+Down"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen && root.activePage === "github"
+        onActivated: root.selectBottomMode(1)
+    }
+
+    Shortcut {
+        sequence: "Shift+S"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.invokeGitHotkey("STATUS")
+    }
+
+    Shortcut {
+        sequence: "Shift+D"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.invokeGitHotkey("DIFF")
+    }
+
+    Shortcut {
+        sequence: "Shift+L"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.invokeGitHotkey("LOG")
+    }
+
+    Shortcut {
+        sequence: "Shift+R"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.invokeGitHotkey("REFRESH")
+    }
+
+    Shortcut {
+        sequence: "Shift+G"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.invokeGitHotkey("LAZYGIT")
+    }
+
+    function registerGitKeyboardControl(item) {
+        if (!item || gitKeyboardControls.indexOf(item) >= 0)
+            return;
+
+        const next = gitKeyboardControls.slice();
+        next.push(item);
+        gitKeyboardControls = next;
+    }
+
+    function unregisterGitKeyboardControl(item) {
+        const index = gitKeyboardControls.indexOf(item);
+
+        if (index < 0)
+            return;
+
+        const next = gitKeyboardControls.slice();
+        next.splice(index, 1);
+        gitKeyboardControls = next;
+
+        if (gitKeyboardControl === item) {
+            gitKeyboardControl = null;
+            dialControlMode = false;
+        }
+    }
+
+    function gitControlIsDial(item) {
+        return !!item && typeof item.stepIndex === "function";
+    }
+
+    function gitControlVisible(item) {
+        if (!item)
+            return false;
+
+        let node = item;
+
+        while (node && node !== frame) {
+            if (node.visible === false || Number(node.opacity) <= 0)
+                return false;
+
+            node = node.parent;
+        }
+
+        return node === frame;
+    }
+
+    function gitControlEnabled(item) {
+        if (!item || !gitControlVisible(item))
+            return false;
+
+        if (gitControlIsDial(item))
+            return !!item.interactive;
+
+        if (item.keyboardNavigable === false)
+            return false;
+
+        if (typeof item.enabledAction !== "undefined")
+            return !!item.enabledAction;
+
+        return true;
+    }
+
+    function availableGitKeyboardControls() {
+        const available = [];
+
+        for (let i = 0; i < gitKeyboardControls.length; ++i) {
+            const item = gitKeyboardControls[i];
+
+            if (gitControlEnabled(item))
+                available.push(item);
+        }
+
+        return available;
+    }
+
+    function firstGitKeyboardControl() {
+        const available = availableGitKeyboardControls();
+
+        if (available.length === 0)
+            return null;
+
+        let best = available[0];
+        let bestPoint = best.mapToItem(
+            frame,
+            best.width / 2,
+            best.height / 2
+        );
+
+        for (let i = 1; i < available.length; ++i) {
+            const candidate = available[i];
+            const point = candidate.mapToItem(
+                frame,
+                candidate.width / 2,
+                candidate.height / 2
+            );
+
+            if (point.y < bestPoint.y - 2
+                    || (
+                        Math.abs(point.y - bestPoint.y) <= 2
+                        && point.x < bestPoint.x
+                    )) {
+                best = candidate;
+                bestPoint = point;
+            }
+        }
+
+        return best;
+    }
+
+    function ensureGitKeyboardControl() {
+        if (gitControlEnabled(gitKeyboardControl))
+            return;
+
+        gitKeyboardControl = firstGitKeyboardControl();
+        dialControlMode = false;
+    }
+
+    function clearGitKeyboardControl() {
+        if (gitControlIsDial(gitKeyboardControl))
+            gitKeyboardControl.focus = false;
+
+        gitKeyboardControl = null;
+        dialControlMode = false;
+    }
+
+    function moveGitKeyboardControl(dx, dy) {
+        if (dialControlMode)
+            return;
+
+        ensureGitKeyboardControl();
+
+        const current = gitKeyboardControl;
+
+        if (!current)
+            return;
+
+        const available = availableGitKeyboardControls();
+        const currentPoint = current.mapToItem(
+            frame,
+            current.width / 2,
+            current.height / 2
+        );
+        const horizontal = Number(dx || 0) !== 0;
+        let best = null;
+        let bestScore = Number.MAX_VALUE;
+
+        for (let i = 0; i < available.length; ++i) {
+            const candidate = available[i];
+
+            if (candidate === current)
+                continue;
+
+            const point = candidate.mapToItem(
+                frame,
+                candidate.width / 2,
+                candidate.height / 2
+            );
+            const deltaX = point.x - currentPoint.x;
+            const deltaY = point.y - currentPoint.y;
+
+            if (dx < 0 && deltaX >= -2)
+                continue;
+            if (dx > 0 && deltaX <= 2)
+                continue;
+            if (dy < 0 && deltaY >= -2)
+                continue;
+            if (dy > 0 && deltaY <= 2)
+                continue;
+
+            const primary = horizontal
+                ? Math.abs(deltaX)
+                : Math.abs(deltaY);
+            const secondary = horizontal
+                ? Math.abs(deltaY)
+                : Math.abs(deltaX);
+            const score = primary * 1000 + secondary;
+
+            if (score < bestScore) {
+                best = candidate;
+                bestScore = score;
+            }
+        }
+
+        if (best)
+            gitKeyboardControl = best;
+    }
+
+    function activateGitKeyboardControl() {
+        ensureGitKeyboardControl();
+
+        const item = gitKeyboardControl;
+
+        if (!gitControlEnabled(item))
+            return;
+
+        if (gitControlIsDial(item)) {
+            dialControlMode = !dialControlMode;
+
+            if (dialControlMode)
+                item.forceActiveFocus();
+            else
+                item.focus = false;
+
+            return;
+        }
+
+        item.triggered();
+    }
+
+    function selectPrimaryMode(direction) {
+        const target = Number(direction || 0) < 0
+            ? "git"
+            : "github";
+
+        if (target === activePage)
+            return;
+
+        clearGitKeyboardControl();
+
+        if (target === "git")
+            showGitPage();
+        else
+            showGithubPage();
+
+        Qt.callLater(ensureGitKeyboardControl);
+    }
+
+    function selectBottomMode(direction) {
+        if (activePage !== "github")
+            return;
+
+        const target = Number(direction || 0) < 0
+            ? "control"
+            : "library";
+
+        if (target === githubView)
+            return;
+
+        clearGitKeyboardControl();
+
+        if (target === "control")
+            showGithubControl();
+        else
+            showGithubLibrary();
+
+        Qt.callLater(ensureGitKeyboardControl);
+    }
+
+    function invokeGitHotkey(actionName) {
+        if (!menuOpen)
+            return;
+
+        const action = String(actionName || "");
+
+        if (action === "REFRESH") {
+            if (activePage === "github")
+                githubService.refresh();
+            else
+                gitService.refresh();
+
+            return;
+        }
+
+        if (activePage !== "git")
+            return;
+
+        if (action === "STATUS") {
+            gitService.runReadAction("status");
+            return;
+        }
+
+        if (action === "DIFF") {
+            gitService.runReadAction("diff");
+            return;
+        }
+
+        if (action === "LOG") {
+            gitService.runReadAction("log");
+            return;
+        }
+
+        if (action === "LAZYGIT")
+            gitService.launchLazygit();
     }
 
     function releaseTextFocusAt(item, x, y) {
@@ -248,13 +687,17 @@ PanelWindow {
     }
 
     onMenuOpenChanged: {
-        if (!root.menuOpen)
+        if (!root.menuOpen) {
+            root.clearGitKeyboardControl();
             return;
+        }
 
         gitService.refresh();
 
         if (root.activePage === "github")
             githubService.refresh();
+
+        Qt.callLater(root.ensureGitKeyboardControl);
     }
 
     GitService {
@@ -540,6 +983,13 @@ PanelWindow {
         property string label: ""
         property bool enabledAction: false
         property bool selectedAction: false
+        property bool keyboardNavigable:
+            label !== "<"
+            && label !== ">"
+            && label !== "▲"
+            && label !== "▼"
+        readonly property bool keyboardSelected:
+            root.gitKeyboardControl === actionButton
         property bool primaryBlue: false
         property bool orangeAccent: false
         property bool orangeTextOnly: false
@@ -555,6 +1005,12 @@ PanelWindow {
         property int iconVerticalOffset: 0
 
         signal triggered()
+
+        Component.onCompleted:
+            root.registerGitKeyboardControl(actionButton)
+
+        Component.onDestruction:
+            root.unregisterGitKeyboardControl(actionButton)
 
         readonly property bool hovered:
             enabledAction && actionMouse.containsMouse
@@ -611,9 +1067,11 @@ PanelWindow {
             ? Colors.yellow
             : Colors.black
 
-        border.width: 1
+        border.width: keyboardSelected ? 2 : 1
         border.color:
-            pressed
+            keyboardSelected
+            ? Colors.orange
+            : pressed
             ? (redAccent ? Colors.red : Colors.magenta)
             : primaryBlue
             ? (hovered ? Colors.cyan : Colors.blue)
@@ -1745,6 +2203,7 @@ PanelWindow {
                                     anchors.verticalCenter: parent.verticalCenter
                                     anchors.verticalCenterOffset: 2
                                     label: gitService.pullSourceLabel
+                                    keyboardNavigable: false
                                     orangeAccent:
                                         gitService.pullSourceMode === "target"
                                     enabledAction: !gitService.actionBusy
@@ -2170,10 +2629,19 @@ PanelWindow {
                                                                             border.color: Colors.cyan
 
                                                                             SelectorDial {
+                                                                                id: ignitionDial
+
                                                                                 anchors {
                                                                                     fill: parent
                                                                                     margins: 3
                                                                                 }
+
+                                                                                keyboardSelected:
+                                                                                    root.gitKeyboardControl === ignitionDial
+                                                                                Component.onCompleted:
+                                                                                    root.registerGitKeyboardControl(ignitionDial)
+                                                                                Component.onDestruction:
+                                                                                    root.unregisterGitKeyboardControl(ignitionDial)
 
                                                                                 labelText: "IGNITION"
                                                                                 options: ["manual", "push", "manual+push"]
@@ -2206,10 +2674,19 @@ PanelWindow {
                                                                             border.color: Colors.cyan
 
                                                                             SelectorDial {
+                                                                                id: operationDial
+
                                                                                 anchors {
                                                                                     fill: parent
                                                                                     margins: 3
                                                                                 }
+
+                                                                                keyboardSelected:
+                                                                                    root.gitKeyboardControl === operationDial
+                                                                                Component.onCompleted:
+                                                                                    root.registerGitKeyboardControl(operationDial)
+                                                                                Component.onDestruction:
+                                                                                    root.unregisterGitKeyboardControl(operationDial)
 
                                                                                 labelText: "OPERATION"
                                                                                 options: ["smoke", "shell-check"]
@@ -2238,10 +2715,19 @@ PanelWindow {
                                                                             border.color: Colors.cyan
 
                                                                             SelectorDial {
+                                                                                id: targetDial
+
                                                                                 anchors {
                                                                                     fill: parent
                                                                                     margins: 3
                                                                                 }
+
+                                                                                keyboardSelected:
+                                                                                    root.gitKeyboardControl === targetDial
+                                                                                Component.onCompleted:
+                                                                                    root.registerGitKeyboardControl(targetDial)
+                                                                                Component.onDestruction:
+                                                                                    root.unregisterGitKeyboardControl(targetDial)
 
                                                                                 labelText: "TARGET"
                                                                                 options: ["current-repo"]

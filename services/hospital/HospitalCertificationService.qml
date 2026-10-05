@@ -24,6 +24,9 @@ Scope {
     property bool hydrated: false
     property bool evidenceReady: false
 
+    property var verificationChecks: ({})
+    property var verificationRuns: ({})
+
     property var evidencePacket: ({})
     property var history: []
 
@@ -233,8 +236,8 @@ Scope {
             },
 
             rehearsal: normalized.rehearsal,
-            checks: normalized.checks,
-            runs: normalized.runs,
+            checks: verificationChecks,
+            runs: verificationRuns,
             postOp: normalized.postOp,
 
             reason: lastReason,
@@ -305,6 +308,8 @@ Scope {
         postOpHead = "";
 
         evidenceReady = false;
+        verificationChecks = ({});
+        verificationRuns = ({});
         evidencePacket = ({});
         history = [];
     }
@@ -342,6 +347,8 @@ Scope {
         armedHead = String(packet.armedHead || "");
         postOpHead = String(packet.postOpHead || "");
 
+        verificationChecks = packet.checks || ({});
+        verificationRuns = packet.runs || ({});
         evidencePacket = packet;
         evidenceReady =
             state === "VERIFIED"
@@ -435,6 +442,8 @@ Scope {
         armedHead = "";
         postOpHead = "";
         evidenceReady = false;
+        verificationChecks = ({});
+        verificationRuns = ({});
         lastReason = "PREPARE SNAPSHOT ACCEPTED";
         lastError = "";
 
@@ -462,6 +471,11 @@ Scope {
 
         if (!normalized)
             return false;
+
+        verificationChecks = checks || ({});
+        verificationRuns = runs || ({});
+        normalized.checks = verificationChecks;
+        normalized.runs = verificationRuns;
 
         if (normalized.head !== candidateHead) {
             block(
@@ -514,9 +528,6 @@ Scope {
         evidenceReady = true;
         lastReason = "CANDIDATE VERIFIED";
         lastError = "";
-
-        normalized.checks = checks || {};
-        normalized.runs = runs || {};
 
         recordTransition(
             "VERIFIED",

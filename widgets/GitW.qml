@@ -1300,7 +1300,7 @@ PanelWindow {
                                 height: parent.height
                                 color: Colors.dark
                                 border.width: 1
-                                border.color: Colors.cyan
+                                border.color: Colors.orange
 
                                 Column {
                                     anchors {
@@ -1311,6 +1311,15 @@ PanelWindow {
 
                                     MetaLabel {
                                         text: "REPOSITORY"
+                                        color: Colors.orange
+
+                                        layer.effect: DropShadow {
+                                            radius: 5
+                                            samples: 7
+                                            opacity: 0.38
+                                            color: Colors.orange
+                                            transparentBorder: true
+                                        }
                                     }
 
                                     Row {
@@ -1460,6 +1469,14 @@ PanelWindow {
                                     MetaLabel {
                                         text: "REMOTE TARGET"
                                         color: Colors.magenta
+
+                                        layer.effect: DropShadow {
+                                            radius: 6
+                                            samples: 7
+                                            opacity: 0.48
+                                            color: Colors.magenta
+                                            transparentBorder: true
+                                        }
                                     }
 
                                     Row {

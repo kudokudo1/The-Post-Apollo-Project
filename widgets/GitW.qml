@@ -296,7 +296,6 @@ PanelWindow {
             gitKeyboardFocusAnchor.forceActiveFocus();
 
             if (requestSurface === true)
-                root.requestActivate();
         });
     }
 

@@ -20,6 +20,7 @@ PanelWindow {
     property var lastOpenAuditByFloor: ({})
     property string auditedRoomTeam: ""
     property string pendingRoomAuditTeam: ""
+    property string roomAuditInFlightTeam: ""
     readonly property var selectedRoomData:
         auditService.roomFor(selectedRoomTeam)
     readonly property string selectedRoomBranch: {
@@ -102,6 +103,7 @@ PanelWindow {
             return;
         }
 
+        roomAuditInFlightTeam = candidate;
         auditService.runAudit(false);
     }
 
@@ -127,6 +129,9 @@ PanelWindow {
             auditedRoomTeam = "";
             pendingRoomAuditTeam = candidate;
         }
+
+        if (!auditService.running)
+            roomAuditInFlightTeam = candidate;
 
         auditService.runAudit(false);
     }
@@ -498,15 +503,27 @@ PanelWindow {
         target: auditService
 
         function onAudited() {
-            const candidate = String(root.pendingRoomAuditTeam || "");
+            const candidate = String(root.roomAuditInFlightTeam || "");
 
             if (!candidate)
                 return;
+
+            root.roomAuditInFlightTeam = "";
 
             if (root.selectedRoomTeam === candidate) {
                 root.auditedRoomTeam = candidate;
                 root.pendingRoomAuditTeam = "";
             }
+        }
+
+        function onRunningChanged() {
+            if (auditService.running || !root.roomAuditInFlightTeam)
+                return;
+
+            // A failed Room-entry audit does not count as fresh. Leave the
+            // button at AUDIT so the Room can be retried explicitly or on re-entry.
+            if (auditService.lastError)
+                root.roomAuditInFlightTeam = "";
         }
     }
 

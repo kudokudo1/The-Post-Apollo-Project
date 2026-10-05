@@ -212,6 +212,8 @@ PanelWindow {
                 screen: Quickshell.screens.find(s => s.name === "DP-5")
                 keyboardActive:
                     shellRoot.controlKeyboardOwner === "hospital"
+                keyboardLock:
+                    hospitalWindow.menuOpen && gitWindow.menuOpen
 
                 onKeyboardOwnershipRequested:
                     shellRoot.controlKeyboardOwner = "hospital"
@@ -250,6 +252,8 @@ PanelWindow {
                 screen: Quickshell.screens.find(s => s.name === "DP-5")
                 keyboardActive:
                     shellRoot.controlKeyboardOwner === "git"
+                keyboardLock:
+                    hospitalWindow.menuOpen && gitWindow.menuOpen
 
                 onKeyboardOwnershipRequested:
                     shellRoot.controlKeyboardOwner = "git"

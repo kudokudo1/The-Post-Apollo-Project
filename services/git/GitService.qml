@@ -36,6 +36,9 @@ Scope {
 
     property string repoPath: ""
     property string repoLabel: "LIVE QUICKSHELL"
+    property string repoRemoteUrl: ""
+    property string repoRemoteSlug: ""
+    property bool repoIsLocal: true
     property string preferredRepoQuery: ""
     property string repoRoot: ""
     property string repository: "NOT CONNECTED"
@@ -145,6 +148,54 @@ Scope {
         return -1;
     }
 
+    function githubSlugFromUrl(urlValue) {
+        let value = String(urlValue || "").trim();
+
+        if (!value)
+            return "";
+
+        if (value.indexOf("git@github.com:") === 0)
+            value = value.slice("git@github.com:".length);
+        else if (value.indexOf("ssh://git@github.com/") === 0)
+            value = value.slice("ssh://git@github.com/".length);
+        else if (value.indexOf("https://github.com/") === 0)
+            value = value.slice("https://github.com/".length);
+        else if (value.indexOf("http://github.com/") === 0)
+            value = value.slice("http://github.com/".length);
+        else
+            return "";
+
+        if (value.endsWith(".git"))
+            value = value.slice(0, -4);
+
+        return value;
+    }
+
+    function repoIndexOfSlug(slugValue) {
+        const needle = String(slugValue || "").trim().toLowerCase();
+
+        if (!needle)
+            return -1;
+
+        for (let i = 0; i < repoRows.count; ++i) {
+            if (String(repoRows.get(i).remoteSlug || "").toLowerCase() === needle)
+                return i;
+        }
+
+        return -1;
+    }
+
+    function applyRepoRow(row) {
+        if (!row)
+            return;
+
+        repoPath = String(row.path || "");
+        repoLabel = String(row.label || "REPOSITORY");
+        repoRemoteUrl = String(row.remoteUrl || "");
+        repoRemoteSlug = String(row.remoteSlug || "");
+        repoIsLocal = Boolean(row.isLocal);
+    }
+
     function localIndexOf(name) {
         const needle = String(name || "");
         for (let i = 0; i < localBranchRows.count; ++i) {
@@ -183,16 +234,23 @@ Scope {
             [
                 'live="$HOME/.config/quickshell"',
                 'if git -C "$live" rev-parse --is-inside-work-tree >/dev/null 2>&1; then',
-                '  printf "REPO\\tLIVE QUICKSHELL\\t%s\\n" "$(git -C "$live" rev-parse --show-toplevel)"',
+                '  root="$(git -C "$live" rev-parse --show-toplevel)"',
+                '  origin="$(git -C "$root" remote get-url origin 2>/dev/null || true)"',
+                '  printf "REPO\\tLIVE QUICKSHELL\\t%s\\t%s\\n" "$root" "$origin"',
                 'fi',
                 'for gitdir in "$HOME"/Projects/*/.git; do',
                 '  [ -e "$gitdir" ] || continue',
                 '  root="${gitdir%/.git}"',
                 '  if git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then',
                 '    name="$(basename "$root")"',
-                '    printf "REPO\\t%s\\t%s\\n" "$name" "$(git -C "$root" rev-parse --show-toplevel)"',
+                '    root="$(git -C "$root" rev-parse --show-toplevel)"',
+                '    origin="$(git -C "$root" remote get-url origin 2>/dev/null || true)"',
+                '    printf "REPO\\t%s\\t%s\\t%s\\n" "$name" "$root" "$origin"',
                 '  fi',
                 'done',
+                'if command -v gh >/dev/null 2>&1; then',
+                '  gh repo list --limit 200 --json name,nameWithOwner,url --jq '"'"'.[] | ["REMOTE", .name, .nameWithOwner, .url] | @tsv'"'"' 2>/dev/null || true',
+                'fi',
                 'printf "DONE\\t\\n"'
             ].join("\n")
         ]);
@@ -205,9 +263,54 @@ Scope {
 
         if (key === "REPO") {
             const label = parts.length > 1 ? parts[1] : "REPOSITORY";
-            const pathValue = parts.length > 2 ? parts.slice(2).join("\t") : "";
-            if (pathValue && repoIndexOfPath(pathValue) < 0)
-                repoRows.append({ label: label, path: pathValue });
+            const pathValue = parts.length > 2 ? parts[2] : "";
+            const remoteUrl = parts.length > 3 ? parts.slice(3).join("\t") : "";
+            const remoteSlug = githubSlugFromUrl(remoteUrl);
+
+            if (pathValue && repoIndexOfPath(pathValue) < 0) {
+                repoRows.append({
+                    label: label,
+                    path: pathValue,
+                    localPath: pathValue,
+                    remoteUrl: remoteUrl,
+                    remoteSlug: remoteSlug,
+                    isLocal: true
+                });
+            }
+            return;
+        }
+
+        if (key === "REMOTE") {
+            const label = parts.length > 1 ? parts[1] : "GITHUB REPOSITORY";
+            const remoteSlug = parts.length > 2 ? parts[2] : "";
+            const remoteUrl = parts.length > 3 ? parts.slice(3).join("\t") : "";
+            let index = repoIndexOfSlug(remoteSlug);
+
+            if (index < 0) {
+                const lowerLabel = label.toLowerCase();
+
+                for (let i = 0; i < repoRows.count; ++i) {
+                    const row = repoRows.get(i);
+                    if (String(row.label || "").toLowerCase() === lowerLabel) {
+                        index = i;
+                        break;
+                    }
+                }
+            }
+
+            if (index >= 0) {
+                repoRows.setProperty(index, "remoteUrl", remoteUrl);
+                repoRows.setProperty(index, "remoteSlug", remoteSlug);
+            } else if (remoteSlug) {
+                repoRows.append({
+                    label: label,
+                    path: "remote://" + remoteSlug,
+                    localPath: "",
+                    remoteUrl: remoteUrl,
+                    remoteSlug: remoteSlug,
+                    isLocal: false
+                });
+            }
             return;
         }
 
@@ -224,9 +327,13 @@ Scope {
                         const row = repoRows.get(i);
                         const label = String(row.label || "").toLowerCase();
                         const pathValue = String(row.path || "").toLowerCase();
+                        const remoteSlug =
+                            String(row.remoteSlug || "").toLowerCase();
 
                         if (label === needle
-                                || pathValue.endsWith("/" + needle)) {
+                                || pathValue.endsWith("/" + needle)
+                                || remoteSlug === needle
+                                || remoteSlug.endsWith("/" + needle)) {
                             index = i;
                             break;
                         }
@@ -237,8 +344,7 @@ Scope {
                     index = 0;
 
                 const row = repoRows.get(index);
-                repoPath = String(row.path || "");
-                repoLabel = String(row.label || "REPOSITORY");
+                applyRepoRow(row);
             }
             repositoriesChanged();
             refresh();
@@ -250,8 +356,7 @@ Scope {
         if (!row)
             return;
 
-        repoPath = String(row.path || "");
-        repoLabel = String(row.label || "REPOSITORY");
+        applyRepoRow(row);
         selectedLocalBranch = "";
         selectedLocalHead = "";
         selectedLocalUpstream = "";
@@ -289,10 +394,14 @@ Scope {
             const row = repoRows.get(i);
             const label = String(row.label || "");
             const pathValue = String(row.path || "");
+            const remoteSlug = String(row.remoteSlug || "");
             const lowerLabel = label.toLowerCase();
             const lowerPath = pathValue.toLowerCase();
+            const lowerSlug = remoteSlug.toLowerCase();
 
-            if (lowerLabel === needle || lowerPath === needle) {
+            if (lowerLabel === needle
+                    || lowerPath === needle
+                    || lowerSlug === needle) {
                 selectRepo(i);
                 return true;
             }
@@ -302,6 +411,7 @@ Scope {
                 && (
                     lowerLabel.indexOf(needle) >= 0
                     || lowerPath.indexOf(needle) >= 0
+                    || lowerSlug.indexOf(needle) >= 0
                 )
             )
                 partialIndex = i;
@@ -637,6 +747,49 @@ Scope {
         if (refreshing)
             return;
 
+        if (!repoIsLocal || String(repoPath || "").indexOf("remote://") === 0) {
+            available = false;
+            refreshing = false;
+            refreshPending = false;
+            refreshRepoPath = repoPath;
+            lastError = "";
+            repoRoot = "REMOTE ONLY";
+            repository = repoRemoteSlug
+                ? repoRemoteSlug.split("/").pop()
+                : repoLabel;
+            branch = "NO LOCAL BRANCH";
+            head = "NO LOCAL HEAD";
+            headFull = "NO LOCAL HEAD";
+            worktree = "NO LOCAL BED";
+            origin = repoRemoteUrl || (
+                repoRemoteSlug
+                ? "https://github.com/" + repoRemoteSlug
+                : "NO ORIGIN"
+            );
+            upstream = "";
+            ahead = 0;
+            behind = 0;
+            selectedLocalBranch = "";
+            selectedLocalHead = "";
+            selectedLocalUpstream = "";
+            selectedLocalIndex = -1;
+            selectedRemoteBranch = "";
+            selectedRemoteExists = false;
+            selectedRemoteIndex = -1;
+            localBranchRows.clear();
+            remoteBranchRows.clear();
+            topologyRows.clear();
+            topologyRevision += 1;
+            actionTitle = "REMOTE REPOSITORY";
+            actionExitCode = 0;
+            actionOutput =
+                "GITHUB REPOSITORY // " + (repoRemoteSlug || repoLabel)
+                + "\nNo local checkout is registered on this machine."
+                + "\nGitHub controls remain available.";
+            refreshed();
+            return;
+        }
+
         refreshing = true;
         refreshRepoPath = repoPath;
         lastError = "";
@@ -842,6 +995,15 @@ Scope {
         if (actionBusy)
             return;
 
+        if (!repoIsLocal || String(repoPath || "").indexOf("remote://") === 0) {
+            actionTitle = String(kind || "GIT").toUpperCase();
+            actionExitCode = 1;
+            actionOutput =
+                "LOCAL CHECKOUT REQUIRED // " + (repoRemoteSlug || repoLabel)
+                + "\nThis repository exists on GitHub but has no local working tree here.";
+            return;
+        }
+
         const action = String(kind || "").toLowerCase();
         const allowed = ["status", "diff", "log", "fetch", "pull", "push"];
         const localTarget = selectedLocalBranch || branch;
@@ -1020,6 +1182,15 @@ Scope {
     }
 
     function launchLazygit() {
+        if (!repoIsLocal || String(repoPath || "").indexOf("remote://") === 0) {
+            actionTitle = "LAZYGIT";
+            actionExitCode = 1;
+            actionOutput =
+                "LOCAL CHECKOUT REQUIRED // " + (repoRemoteSlug || repoLabel)
+                + "\nLazygit needs a local working tree.";
+            return;
+        }
+
         Quickshell.execDetached([
             "bash",
             "-lc",

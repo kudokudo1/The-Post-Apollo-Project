@@ -21,6 +21,8 @@ PanelWindow {
     property string auditedRoomTeam: ""
     property string pendingRoomAuditTeam: ""
     property string roomAuditInFlightTeam: ""
+    property bool roomControlMode: false
+    property string roomControlAction: ""
     readonly property var selectedRoomData:
         auditService.roomFor(selectedRoomTeam)
     readonly property string selectedRoomBranch: {
@@ -129,6 +131,231 @@ PanelWindow {
         );
 
         selectRoomIndex(index);
+    }
+
+    readonly property var roomControlLayout: [
+        { name: "STATUS", x: 0, y: 0 },
+        { name: "DIFF", x: 1, y: 0 },
+        { name: "LOG", x: 2, y: 0 },
+        { name: "REFRESH", x: 0, y: 1 },
+        { name: "LAZYGIT", x: 1, y: 1 },
+        { name: "PREPARE", x: 2, y: 1 },
+        { name: "REHEARSE", x: 1, y: 2 },
+        { name: "ARM", x: 0, y: 3 },
+        { name: "INTEGRATE", x: 2, y: 3 }
+    ]
+
+    readonly property bool roomBaseActionsEnabled:
+        root.selectedRoomTeam.length > 0
+        && !roomService.running
+        && !roomService.rehearsing
+        && !roomService.integrating
+        && !roomService.postOpRunning
+        && !roomService.armed
+
+    function roomControlEnabled(name) {
+        const action = String(name || "");
+
+        if (action === "STATUS"
+                || action === "DIFF"
+                || action === "LOG"
+                || action === "REFRESH"
+                || action === "LAZYGIT"
+                || action === "PREPARE")
+            return roomBaseActionsEnabled;
+
+        if (action === "REHEARSE")
+            return rehearseButton.enabledAction;
+
+        if (action === "ARM")
+            return armButton.enabledAction && !roomService.armed;
+
+        if (action === "INTEGRATE")
+            return integrateButton.enabledAction;
+
+        return false;
+    }
+
+    function firstEnabledRoomControl() {
+        const layout = roomControlLayout || [];
+
+        for (let i = 0; i < layout.length; ++i) {
+            const name = String(layout[i].name || "");
+
+            if (roomControlEnabled(name))
+                return name;
+        }
+
+        return "";
+    }
+
+    function enterRoomControls() {
+        if (!selectedRoomTeam)
+            return;
+
+        roomControlMode = true;
+
+        if (!roomControlEnabled(roomControlAction))
+            roomControlAction = firstEnabledRoomControl();
+    }
+
+    function leaveRoomControls() {
+        roomControlMode = false;
+        roomControlAction = "";
+    }
+
+    function moveRoomControl(dx, dy) {
+        if (!roomControlMode) {
+            if (Number(dy || 0) < 0)
+                cycleRoom(-1);
+            else if (Number(dy || 0) > 0)
+                cycleRoom(1);
+            else if (Number(dx || 0) < 0)
+                cycleFloor(-1);
+            else if (Number(dx || 0) > 0)
+                cycleFloor(1);
+            return;
+        }
+
+        if (!roomControlEnabled(roomControlAction))
+            roomControlAction = firstEnabledRoomControl();
+
+        const layout = roomControlLayout || [];
+        let current = null;
+
+        for (let i = 0; i < layout.length; ++i) {
+            if (String(layout[i].name || "") === roomControlAction) {
+                current = layout[i];
+                break;
+            }
+        }
+
+        if (!current) {
+            roomControlAction = firstEnabledRoomControl();
+            return;
+        }
+
+        let bestName = "";
+        let bestScore = Number.MAX_VALUE;
+        const horizontal = Number(dx || 0) !== 0;
+
+        for (let i = 0; i < layout.length; ++i) {
+            const candidate = layout[i];
+            const name = String(candidate.name || "");
+
+            if (!name
+                    || name === roomControlAction
+                    || !roomControlEnabled(name))
+                continue;
+
+            const deltaX = Number(candidate.x) - Number(current.x);
+            const deltaY = Number(candidate.y) - Number(current.y);
+
+            if (dx < 0 && deltaX >= 0)
+                continue;
+            if (dx > 0 && deltaX <= 0)
+                continue;
+            if (dy < 0 && deltaY >= 0)
+                continue;
+            if (dy > 0 && deltaY <= 0)
+                continue;
+
+            const primary = horizontal ? Math.abs(deltaX) : Math.abs(deltaY);
+            const secondary = horizontal ? Math.abs(deltaY) : Math.abs(deltaX);
+            const score = primary * 100 + secondary;
+
+            if (score < bestScore) {
+                bestScore = score;
+                bestName = name;
+            }
+        }
+
+        if (bestName)
+            roomControlAction = bestName;
+    }
+
+    function activateRoomControl() {
+        const action = String(roomControlAction || "");
+
+        if (!roomControlMode || !roomControlEnabled(action))
+            return;
+
+        if (action === "STATUS"
+                || action === "DIFF"
+                || action === "LOG") {
+            roomService.runInspection(action.toLowerCase());
+            return;
+        }
+
+        if (action === "REFRESH") {
+            patientService.refresh();
+            root.runAuditForCurrentRoom();
+            roomService.runInspection("status");
+            return;
+        }
+
+        if (action === "LAZYGIT") {
+            roomService.launchLazygit();
+            return;
+        }
+
+        if (action === "PREPARE") {
+            certificationCoordinator.prepare();
+            return;
+        }
+
+        if (action === "REHEARSE") {
+            certificationCoordinator.rehearse();
+            return;
+        }
+
+        if (action === "ARM") {
+            const gateState = certificationCoordinator.state;
+
+            if (gateState === "CANDIDATE") {
+                certificationCoordinator.requestVerification("");
+                return;
+            }
+
+            if (gateState === "VERIFIED") {
+                certificationCoordinator.certify();
+                return;
+            }
+
+            if (gateState === "CERTIFIED")
+                certificationCoordinator.arm();
+
+            return;
+        }
+
+        if (action === "INTEGRATE")
+            certificationCoordinator.integrate();
+    }
+
+    function handleRoomEnter() {
+        if (!selectedRoomTeam) {
+            selectRoomIndex(0);
+            return;
+        }
+
+        if (!roomControlMode) {
+            enterRoomControls();
+            return;
+        }
+
+        activateRoomControl();
+    }
+
+    function ensureFirstRoomSelected() {
+        const rows = auditService.rooms || [];
+
+        if (!menuOpen
+                || selectedRoomTeam
+                || !Array.isArray(rows)
+                || rows.length === 0)
+            return;
+
+        selectRoomIndex(0);
     }
 
     function scheduleRoomEntryAudit(team) {
@@ -268,6 +495,7 @@ PanelWindow {
     }
 
     onSelectedRoomTeamChanged: {
+        root.leaveRoomControls();
         roomService.clearResult();
         certificationCoordinator.bindRoom(roomService);
         root.scheduleRoomEntryAudit(root.selectedRoomTeam);
@@ -334,28 +562,42 @@ PanelWindow {
         sequence: "Up"
         context: Qt.ApplicationShortcut
         enabled: root.menuOpen
-        onActivated: root.cycleRoom(-1)
+        onActivated: root.moveRoomControl(0, -1)
     }
 
     Shortcut {
         sequence: "Down"
         context: Qt.ApplicationShortcut
         enabled: root.menuOpen
-        onActivated: root.cycleRoom(1)
+        onActivated: root.moveRoomControl(0, 1)
     }
 
     Shortcut {
         sequence: "Left"
         context: Qt.ApplicationShortcut
         enabled: root.menuOpen
-        onActivated: root.cycleFloor(-1)
+        onActivated: root.moveRoomControl(-1, 0)
     }
 
     Shortcut {
         sequence: "Right"
         context: Qt.ApplicationShortcut
         enabled: root.menuOpen
-        onActivated: root.cycleFloor(1)
+        onActivated: root.moveRoomControl(1, 0)
+    }
+
+    Shortcut {
+        sequence: "Return"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.handleRoomEnter()
+    }
+
+    Shortcut {
+        sequence: "Enter"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.handleRoomEnter()
     }
 
     Shortcut {
@@ -423,9 +665,12 @@ PanelWindow {
     }
 
     onMenuOpenChanged: {
-        if (!root.menuOpen)
+        if (!root.menuOpen) {
+            root.leaveRoomControls();
             return;
+        }
 
+        root.ensureFirstRoomSelected();
         root.requestOpenAudit();
         floorService.discover();
     }
@@ -572,6 +817,8 @@ PanelWindow {
         target: auditService
 
         function onAudited() {
+            root.ensureFirstRoomSelected();
+
             const candidate = String(root.roomAuditInFlightTeam || "");
 
             if (!candidate)
@@ -1956,6 +2203,9 @@ PanelWindow {
                                     required property string modelData
                                     readonly property bool selectedAction:
                                         roomService.action === modelData
+                                    readonly property bool keyboardSelected:
+                                        root.roomControlMode
+                                        && root.roomControlAction === modelData
                                     readonly property bool enabledAction:
                                         root.selectedRoomTeam.length > 0
                                         && !roomService.running
@@ -1977,9 +2227,11 @@ PanelWindow {
                                         : selectedAction
                                         ? Colors.magenta
                                         : Colors.black
-                                    border.width: 1
+                                    border.width: keyboardSelected ? 2 : 1
                                     border.color:
-                                        roomInspectMouse.containsMouse
+                                        keyboardSelected
+                                        ? Colors.orange
+                                        : roomInspectMouse.containsMouse
                                         ? Colors.orange
                                         : selectedAction
                                         ? Colors.magenta
@@ -1998,6 +2250,8 @@ PanelWindow {
                                         color:
                                             roomInspectMouse.pressed
                                             ? Colors.black
+                                            : roomInspectButton.keyboardSelected
+                                            ? Colors.orange
                                             : Colors.cyan
                                     }
 
@@ -2036,6 +2290,9 @@ PanelWindow {
                                     id: roomOperationButton
 
                                     required property string modelData
+                                    readonly property bool keyboardSelected:
+                                        root.roomControlMode
+                                        && root.roomControlAction === modelData
                                     readonly property bool enabledAction:
                                         root.selectedRoomTeam.length > 0
                                         && !roomService.running
@@ -2057,9 +2314,11 @@ PanelWindow {
                                         : roomService.action === modelData
                                         ? Colors.magenta
                                         : Colors.black
-                                    border.width: 1
+                                    border.width: keyboardSelected ? 2 : 1
                                     border.color:
-                                        roomOperationMouse.containsMouse
+                                        keyboardSelected
+                                        ? Colors.orange
+                                        : roomOperationMouse.containsMouse
                                         ? Colors.orange
                                         : modelData === "PREPARE"
                                           && roomService.action === "PREPARE"
@@ -2079,6 +2338,8 @@ PanelWindow {
                                         color:
                                             roomOperationMouse.pressed
                                             ? Colors.black
+                                            : roomOperationButton.keyboardSelected
+                                            ? Colors.orange
                                             : Colors.cyan
                                     }
 
@@ -2120,6 +2381,9 @@ PanelWindow {
                         Rectangle {
                             id: rehearseButton
 
+                            readonly property bool keyboardSelected:
+                                root.roomControlMode
+                                && root.roomControlAction === "REHEARSE"
                             readonly property bool enabledAction:
                                 roomService.canRehearse
                                 && !roomService.running
@@ -2138,10 +2402,13 @@ PanelWindow {
                                 ? Colors.magenta
                                 : Colors.black
                             border.width:
-                                roomService.rehearsalStatus.length > 0
+                                keyboardSelected
+                                || roomService.rehearsalStatus.length > 0
                                 ? 2 : 1
                             border.color:
-                                roomService.rehearsalStatus === "CONFLICTS"
+                                keyboardSelected
+                                ? Colors.orange
+                                : roomService.rehearsalStatus === "CONFLICTS"
                                 ? Colors.red
                                 : roomService.rehearsalStatus === "CLEAN_MERGE"
                                 ? Colors.orange
@@ -2217,6 +2484,9 @@ PanelWindow {
                             Rectangle {
                                 id: armButton
 
+                                readonly property bool keyboardSelected:
+                                    root.roomControlMode
+                                    && root.roomControlAction === "ARM"
                                 readonly property string gateState:
                                     certificationCoordinator.state
                                 readonly property bool rehearsalReady:
@@ -2260,12 +2530,15 @@ PanelWindow {
                                     ? Colors.magenta
                                     : Colors.black
                                 border.width:
-                                    roomService.armed
+                                    keyboardSelected
+                                    || roomService.armed
                                     || gateState === "VERIFIED"
                                     || gateState === "CERTIFIED"
                                     ? 2 : 1
                                 border.color:
-                                    roomService.armed
+                                    keyboardSelected
+                                    ? Colors.orange
+                                    : roomService.armed
                                     ? Colors.orange
                                     : gateState === "VERIFIED"
                                       || gateState === "CERTIFIED"
@@ -2369,6 +2642,9 @@ PanelWindow {
                             Rectangle {
                                 id: integrateButton
 
+                                readonly property bool keyboardSelected:
+                                    root.roomControlMode
+                                    && root.roomControlAction === "INTEGRATE"
                                 readonly property bool enabledAction:
                                     roomService.armed
                                     && certificationCoordinator.canIntegrate
@@ -2390,9 +2666,14 @@ PanelWindow {
                                     : roomService.integrating
                                     ? Colors.magenta
                                     : Colors.black
-                                border.width: roomService.armed ? 2 : 1
+                                border.width:
+                                    keyboardSelected
+                                    || roomService.armed
+                                    ? 2 : 1
                                 border.color:
-                                    roomService.armed
+                                    keyboardSelected
+                                    ? Colors.orange
+                                    : roomService.armed
                                     ? Colors.red
                                     : Colors.cyan
                                 opacity: enabledAction

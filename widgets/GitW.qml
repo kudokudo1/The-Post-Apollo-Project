@@ -1041,6 +1041,77 @@ PanelWindow {
         }
     }
 
+    component ScrollingStatusValue: Item {
+        id: statusValue
+
+        property string value: ""
+        property color valueColor: Colors.white
+        property int valuePixelSize: 9
+
+        clip: true
+
+        onValueChanged: {
+            Qt.callLater(function() {
+                statusScroll.contentX = 0;
+            });
+        }
+
+        Flickable {
+            id: statusScroll
+
+            anchors.fill: parent
+            clip: true
+            contentWidth:
+                Math.max(
+                    width,
+                    statusText.implicitWidth + 4
+                )
+            contentHeight: height
+            flickableDirection: Flickable.HorizontalFlick
+            boundsBehavior: Flickable.StopAtBounds
+            interactive: contentWidth > width
+
+            GohuText {
+                id: statusText
+
+                width: implicitWidth
+                height: statusScroll.height - 2
+                verticalAlignment: Text.AlignVCenter
+                text: statusValue.value
+                font.pixelSize: statusValue.valuePixelSize
+                color: statusValue.valueColor
+                wrapMode: Text.NoWrap
+            }
+        }
+
+        Rectangle {
+            visible: statusScroll.contentWidth > statusScroll.width
+            height: 2
+            width:
+                Math.max(
+                    8,
+                    parent.width
+                    * statusScroll.width
+                    / statusScroll.contentWidth
+                )
+            x:
+                (
+                    parent.width - width
+                )
+                * (
+                    statusScroll.contentX
+                    / Math.max(
+                        1,
+                        statusScroll.contentWidth
+                        - statusScroll.width
+                    )
+                  )
+            anchors.bottom: parent.bottom
+            color: statusValue.valueColor
+            opacity: 0.74
+        }
+    }
+
     component OrangeValue: GohuText {
         font.pixelSize: 11
         color: Colors.orange
@@ -2842,18 +2913,20 @@ PanelWindow {
                                         text: "BRIDGE"
                                     }
 
-                                    MetaValue {
+                                    ScrollingStatusValue {
                                         width: parent.width - 102
-                                        text:
+                                        height: parent.height
+                                        value:
                                             githubService.lastError
                                             ? "ERROR // " + githubService.lastError
                                             : githubService.available
                                             ? "PX CONTROL READY"
                                             : "WAITING"
-                                        color:
+                                        valueColor:
                                             githubService.lastError
                                             ? Colors.red
                                             : Colors.white
+                                        valuePixelSize: 9
                                     }
                                 }
 
@@ -2867,12 +2940,12 @@ PanelWindow {
                                         text: "PX / STATE"
                                     }
 
-                                    GohuText {
+                                    ScrollingStatusValue {
                                         width: parent.width - 102
-                                        text: root.githubStateText()
-                                        font.pixelSize: 9
-                                        color: root.githubStateColor()
-                                        elide: Text.ElideRight
+                                        height: parent.height
+                                        value: root.githubStateText()
+                                        valueColor: root.githubStateColor()
+                                        valuePixelSize: 9
                                     }
                                 }
                             }

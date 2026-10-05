@@ -102,6 +102,7 @@ Scope {
     property int diffFileCount: 0
     property int additions: 0
     property int deletions: 0
+    property var changedFiles: []
 
     property var commits: []
     property string latestCommitShort: ""
@@ -188,6 +189,7 @@ Scope {
         diffFileCount = 0;
         additions = 0;
         deletions = 0;
+        changedFiles = [];
         commits = [];
         latestCommitShort = "";
         latestCommitMessage = "";
@@ -208,6 +210,7 @@ Scope {
             diffFileCount: diffFileCount,
             additions: additions,
             deletions: deletions,
+            changedFiles: changedFiles,
             rehearsal: {
                 status: rehearsalStatus,
                 mergeBase: rehearsalMergeBase,
@@ -334,6 +337,10 @@ Scope {
             diffFileCount = Number(totals.files || 0);
             additions = Number(totals.additions || 0);
             deletions = Number(totals.deletions || 0);
+            changedFiles =
+                Array.isArray(data.files)
+                ? data.files
+                : [];
 
             summary = "DIFF // " + diffFileCount + " FILES"
                       + " // +" + additions
@@ -373,6 +380,12 @@ Scope {
             diffFileCount = Number(totals.files || 0);
             additions = Number(totals.additions || 0);
             deletions = Number(totals.deletions || 0);
+            changedFiles =
+                Array.isArray(data.changed_files)
+                ? data.changed_files
+                : Array.isArray(data.files)
+                ? data.files
+                : [];
 
             summary = "PREPARE // " + integrationMode
                       + " // " + diffFileCount + " FILES"

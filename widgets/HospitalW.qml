@@ -2248,10 +2248,7 @@ PanelWindow {
                             }
 
                             GohuText {
-                                width: roomPane.width - 98
-                                text: roomPresenceService.summary
-                                font.pixelSize: 10
-                                color:
+                                readonly property color presenceColor:
                                     roomPresenceService.running
                                     && !roomPresenceService.available
                                     ? Colors.orange
@@ -2270,6 +2267,11 @@ PanelWindow {
                                     : roomPresenceService.syncState === "SYNCED"
                                     ? Colors.orange
                                     : Colors.cyan
+
+                                width: roomPane.width - 98
+                                text: roomPresenceService.summary
+                                font.pixelSize: 10
+                                color: presenceColor
                                 elide: Text.ElideRight
 
                                 layer.enabled: true
@@ -2277,12 +2279,7 @@ PanelWindow {
                                     radius: 6
                                     samples: 7
                                     opacity: 0.26
-                                    color:
-                                        roomPresenceService.location === "MISSING"
-                                        ? Colors.red
-                                        : roomPresenceService.syncState === "SYNCED"
-                                        ? Colors.orange
-                                        : Colors.cyan
+                                    color: parent.presenceColor
                                     transparentBorder: true
                                 }
                             }

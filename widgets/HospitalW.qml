@@ -1402,55 +1402,116 @@ PanelWindow {
                     }
                 }
 
-                Rectangle {
+                Row {
                     anchors {
                         right: parent.right
                         verticalCenter: parent.verticalCenter
                     }
 
-                    width: 86
-                    height: 26
+                    spacing: 8
 
-                    color: Colors.dark
-                    border.width: 1
-                    border.color: Colors.magenta
+                    Rectangle {
+                        width: 86
+                        height: 26
 
-                    RectangularShadow {
-                        anchors.fill: parent
-                        spread: 3
-                        z: -1
-                        opacity: 0.38
-                        color: Colors.magenta
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: Colors.magenta
+
+                        RectangularShadow {
+                            anchors.fill: parent
+                            spread: 3
+                            z: -1
+                            opacity: 0.38
+                            color: Colors.magenta
+                        }
+
+                        GohuText {
+                            id: hospitalLocalStatusText
+
+                            anchors.centerIn: parent
+                            text:
+                                floorService.bedIsLive
+                                ? "LOCAL LIVE"
+                                : floorService.bedPath.length > 0
+                                ? "LOCAL BED"
+                                : "OFFLINE"
+                            font.pixelSize: 9
+                            color:
+                                floorService.bedIsLive
+                                ? Colors.magenta
+                                : floorService.bedPath.length > 0
+                                ? Colors.cyan
+                                : Colors.red
+
+                            layer.enabled: true
+                            layer.effect: DropShadow {
+                                radius: 10
+                                samples: 11
+                                opacity:
+                                    floorService.bedPath.length > 0
+                                    ? 0.82
+                                    : 0.44
+                                color: hospitalLocalStatusText.color
+                                transparentBorder: true
+                            }
+                        }
                     }
 
-                    GohuText {
-                        id: hospitalLocalStatusText
+                    Rectangle {
+                        id: hospitalCloseButton
 
-                        anchors.centerIn: parent
-                        text:
-                            floorService.bedIsLive
-                            ? "LOCAL LIVE"
-                            : floorService.bedPath.length > 0
-                            ? "LOCAL BED"
-                            : "OFFLINE"
-                        font.pixelSize: 9
+                        width: 30
+                        height: 26
+
                         color:
-                            floorService.bedIsLive
-                            ? Colors.magenta
-                            : floorService.bedPath.length > 0
-                            ? Colors.cyan
+                            hospitalCloseMouse.pressed
+                            ? Colors.red
+                            : Colors.dark
+                        border.width: 1
+                        border.color:
+                            hospitalCloseMouse.containsMouse
+                            ? Colors.white
                             : Colors.red
 
-                        layer.enabled: true
-                        layer.effect: DropShadow {
-                            radius: 10
-                            samples: 11
+                        RectangularShadow {
+                            anchors.fill: parent
+                            spread: 4
+                            z: -1
                             opacity:
-                                floorService.bedPath.length > 0
-                                ? 0.82
-                                : 0.44
-                            color: hospitalLocalStatusText.color
-                            transparentBorder: true
+                                hospitalCloseMouse.containsMouse
+                                ? 0.52
+                                : 0.30
+                            color: Colors.red
+                        }
+
+                        GohuText {
+                            anchors.centerIn: parent
+                            text: "X"
+                            font.pixelSize: 12
+                            color:
+                                hospitalCloseMouse.pressed
+                                ? Colors.black
+                                : Colors.red
+
+                            layer.enabled: true
+                            layer.effect: DropShadow {
+                                radius: 7
+                                samples: 9
+                                opacity: 0.58
+                                color: Colors.red
+                                transparentBorder: true
+                            }
+                        }
+
+                        MouseArea {
+                            id: hospitalCloseMouse
+
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+
+                            onClicked: root.close()
                         }
                     }
                 }

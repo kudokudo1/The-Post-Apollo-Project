@@ -18,6 +18,8 @@ PanelWindow {
     property int openAuditStaleInterval: 600000
     property bool openAuditPending: false
     property var lastOpenAuditByFloor: ({})
+    property string auditedRoomTeam: ""
+    property string pendingRoomAuditTeam: ""
     readonly property var selectedRoomData:
         auditService.roomFor(selectedRoomTeam)
     readonly property string selectedRoomBranch: {
@@ -51,6 +53,82 @@ PanelWindow {
     function toggleRoomSelection(team) {
         const candidate = String(team || "");
         selectedRoomTeam = selectedRoomTeam === candidate ? "" : candidate;
+    }
+
+    function roomTeamAtScrollPosition() {
+        const rows = auditService.rooms || [];
+
+        if (!Array.isArray(rows) || rows.length === 0)
+            return "";
+
+        // RoomRow is 54px high with 7px spacing. The settled Room is the
+        // row nearest the top edge of the operating-room viewport.
+        const stride = 61;
+        const index = Math.max(
+            0,
+            Math.min(
+                rows.length - 1,
+                Math.round(Number(hospitalScroll.contentY || 0) / stride)
+            )
+        );
+        const row = rows[index] || {};
+
+        return String(row.team || row.branch || "");
+    }
+
+    function scheduleRoomEntryAudit(team) {
+        const candidate = String(team || "").trim();
+
+        auditedRoomTeam = "";
+        pendingRoomAuditTeam = candidate;
+        roomEntryAuditTimer.stop();
+
+        if (!candidate || !menuOpen)
+            return;
+
+        roomEntryAuditTimer.restart();
+    }
+
+    function runPendingRoomAudit() {
+        const candidate = String(pendingRoomAuditTeam || "");
+
+        if (!candidate
+                || !menuOpen
+                || selectedRoomTeam !== candidate)
+            return;
+
+        if (auditService.running) {
+            roomEntryAuditRetry.restart();
+            return;
+        }
+
+        auditService.runAudit(false);
+    }
+
+    function settleRoomFromScroll() {
+        if (!menuOpen)
+            return;
+
+        const team = roomTeamAtScrollPosition();
+
+        if (!team)
+            return;
+
+        if (selectedRoomTeam !== team)
+            selectedRoomTeam = team;
+        else
+            scheduleRoomEntryAudit(team);
+    }
+
+    function runAuditForCurrentRoom() {
+        const candidate = String(selectedRoomTeam || "").trim();
+
+        if (candidate) {
+            auditedRoomTeam = "";
+            pendingRoomAuditTeam = candidate;
+        }
+
+        auditService.runAudit(false);
     }
 
     readonly property bool floorSwitchEnabled:
@@ -150,6 +228,7 @@ PanelWindow {
     onSelectedRoomTeamChanged: {
         roomService.clearResult();
         certificationCoordinator.bindRoom(roomService);
+        root.scheduleRoomEntryAudit(root.selectedRoomTeam);
     }
 
     // 700px content chassis + 44px floor-selector lane.
@@ -265,6 +344,27 @@ PanelWindow {
         interval: 75
         repeat: false
         onTriggered: root.maybeRunOpenAudit()
+    }
+
+    Timer {
+        id: roomScrollSettleTimer
+        interval: 420
+        repeat: false
+        onTriggered: root.settleRoomFromScroll()
+    }
+
+    Timer {
+        id: roomEntryAuditTimer
+        interval: 260
+        repeat: false
+        onTriggered: root.runPendingRoomAudit()
+    }
+
+    Timer {
+        id: roomEntryAuditRetry
+        interval: 180
+        repeat: false
+        onTriggered: root.runPendingRoomAudit()
     }
 
     HospitalFloorService {
@@ -391,6 +491,22 @@ PanelWindow {
 
         function onPostOpFinished() {
             patientService.refresh();
+        }
+    }
+
+    Connections {
+        target: auditService
+
+        function onAudited() {
+            const candidate = String(root.pendingRoomAuditTeam || "");
+
+            if (!candidate)
+                return;
+
+            if (root.selectedRoomTeam === candidate) {
+                root.auditedRoomTeam = candidate;
+                root.pendingRoomAuditTeam = "";
+            }
         }
     }
 
@@ -2236,6 +2352,14 @@ PanelWindow {
             boundsBehavior: Flickable.StopAtBounds
             flickDeceleration: 1800
 
+            onContentYChanged: {
+                root.auditedRoomTeam = "";
+                root.pendingRoomAuditTeam = "";
+                roomEntryAuditTimer.stop();
+                roomEntryAuditRetry.stop();
+                roomScrollSettleTimer.restart();
+            }
+
             Column {
                 id: scrollContent
 
@@ -2333,6 +2457,9 @@ PanelWindow {
 
                         text: auditService.visibleRunning
                               ? "AUDIT // RUNNING"
+                              : root.selectedRoomTeam.length > 0
+                                && root.auditedRoomTeam !== root.selectedRoomTeam
+                              ? "AUDIT"
                               : auditService.available
                               ? "AUDIT // " + auditService.status
                               : "AUDIT"
@@ -2369,7 +2496,7 @@ PanelWindow {
                             enabled: !auditService.running && auditService.repository.length > 0
                             cursorShape: Qt.PointingHandCursor
 
-                            onClicked: auditService.runAudit()
+                            onClicked: root.runAuditForCurrentRoom()
                         }
                     }
 

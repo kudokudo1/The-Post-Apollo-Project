@@ -136,12 +136,14 @@ PanelWindow {
 
         auditedRoomTeam = "";
         pendingRoomAuditTeam = candidate;
-        roomEntryAuditTimer.stop();
 
         if (!candidate || !menuOpen)
             return;
 
-        roomEntryAuditTimer.restart();
+        // Room entry owns the audit trigger. There is no settle/debounce
+        // window: run immediately, or remain queued behind an audit that is
+        // already in flight.
+        runPendingRoomAudit();
     }
 
     function runPendingRoomAudit() {
@@ -149,13 +151,9 @@ PanelWindow {
 
         if (!candidate
                 || !menuOpen
-                || selectedRoomTeam !== candidate)
+                || selectedRoomTeam !== candidate
+                || auditService.running)
             return;
-
-        if (auditService.running) {
-            roomEntryAuditRetry.restart();
-            return;
-        }
 
         roomAuditInFlightTeam = candidate;
         auditService.runAudit(false);
@@ -309,7 +307,7 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus:
         root.menuOpen
-        ? WlrKeyboardFocus.Exclusive
+        ? WlrKeyboardFocus.OnDemand
         : WlrKeyboardFocus.None
 
     color: "transparent"
@@ -441,20 +439,6 @@ PanelWindow {
         interval: 75
         repeat: false
         onTriggered: root.maybeRunOpenAudit()
-    }
-
-    Timer {
-        id: roomEntryAuditTimer
-        interval: 260
-        repeat: false
-        onTriggered: root.runPendingRoomAudit()
-    }
-
-    Timer {
-        id: roomEntryAuditRetry
-        interval: 180
-        repeat: false
-        onTriggered: root.runPendingRoomAudit()
     }
 
     HospitalFloorService {
@@ -602,13 +586,19 @@ PanelWindow {
         }
 
         function onRunningChanged() {
-            if (auditService.running || !root.roomAuditInFlightTeam)
+            if (auditService.running)
                 return;
 
-            // A failed Room-entry audit does not count as fresh. Leave the
-            // button at AUDIT so the Room can be retried explicitly or on re-entry.
-            if (auditService.lastError)
+            // A failed Room-entry audit does not count as fresh.
+            if (root.roomAuditInFlightTeam && auditService.lastError)
                 root.roomAuditInFlightTeam = "";
+
+            // If Room entry happened while another audit was running, launch
+            // the queued Room audit immediately when that audit releases.
+            if (!root.roomAuditInFlightTeam
+                    && root.pendingRoomAuditTeam
+                    && root.pendingRoomAuditTeam === root.selectedRoomTeam)
+                root.runPendingRoomAudit();
         }
     }
 
@@ -1699,13 +1689,94 @@ PanelWindow {
 
                         spacing: 8
 
-                        SectionLabel {
+                        Row {
                             width: parent.width
-                            text:
-                                root.selectedRoomTeam.length > 0
-                                ? "ROOM // " + root.selectedRoomTeam
-                                : "ROOM // NONE SELECTED"
-                            elide: Text.ElideRight
+                            height: 28
+                            spacing: 6
+
+                            SectionLabel {
+                                width: parent.width - 76
+                                anchors.verticalCenter: parent.verticalCenter
+                                text:
+                                    root.selectedRoomTeam.length > 0
+                                    ? "ROOM // " + root.selectedRoomTeam
+                                    : "ROOM // NONE SELECTED"
+                                elide: Text.ElideRight
+                            }
+
+                            Rectangle {
+                                width: 32
+                                height: 28
+                                anchors.verticalCenter: parent.verticalCenter
+                                color: roomUpMouse.pressed ? Colors.orange : Colors.black
+                                border.width: 1
+                                border.color:
+                                    roomUpMouse.containsMouse
+                                    ? Colors.orange
+                                    : Colors.cyan
+                                opacity:
+                                    auditService.rooms.length > 0
+                                    ? 1.0 : 0.42
+
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    text: "↑"
+                                    font.pixelSize: 12
+                                    color:
+                                        roomUpMouse.pressed
+                                        ? Colors.black
+                                        : Colors.cyan
+                                }
+
+                                MouseArea {
+                                    id: roomUpMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    enabled: auditService.rooms.length > 0
+                                    cursorShape:
+                                        enabled
+                                        ? Qt.PointingHandCursor
+                                        : Qt.ArrowCursor
+                                    onClicked: root.cycleRoom(-1)
+                                }
+                            }
+
+                            Rectangle {
+                                width: 32
+                                height: 28
+                                anchors.verticalCenter: parent.verticalCenter
+                                color: roomDownMouse.pressed ? Colors.orange : Colors.black
+                                border.width: 1
+                                border.color:
+                                    roomDownMouse.containsMouse
+                                    ? Colors.orange
+                                    : Colors.cyan
+                                opacity:
+                                    auditService.rooms.length > 0
+                                    ? 1.0 : 0.42
+
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    text: "↓"
+                                    font.pixelSize: 12
+                                    color:
+                                        roomDownMouse.pressed
+                                        ? Colors.black
+                                        : Colors.cyan
+                                }
+
+                                MouseArea {
+                                    id: roomDownMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    enabled: auditService.rooms.length > 0
+                                    cursorShape:
+                                        enabled
+                                        ? Qt.PointingHandCursor
+                                        : Qt.ArrowCursor
+                                    onClicked: root.cycleRoom(1)
+                                }
+                            }
                         }
 
                         GohuText {
@@ -2426,90 +2497,8 @@ PanelWindow {
 
             // ===== OPERATING ROOMS ==============================
 
-            Row {
-                width: parent.width
-                height: 28
-                spacing: 8
-
-                SectionLabel {
-                    width: parent.width - 72
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "OPERATING ROOMS"
-                }
-
-                Rectangle {
-                    width: 28
-                    height: 24
-                    anchors.verticalCenter: parent.verticalCenter
-                    color: roomUpMouse.pressed ? Colors.orange : Colors.black
-                    border.width: 1
-                    border.color:
-                        roomUpMouse.containsMouse
-                        ? Colors.orange
-                        : Colors.cyan
-                    opacity:
-                        auditService.rooms.length > 0
-                        ? 1.0 : 0.42
-
-                    GohuText {
-                        anchors.centerIn: parent
-                        text: "↑"
-                        font.pixelSize: 12
-                        color:
-                            roomUpMouse.pressed
-                            ? Colors.black
-                            : Colors.cyan
-                    }
-
-                    MouseArea {
-                        id: roomUpMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        enabled: auditService.rooms.length > 0
-                        cursorShape:
-                            enabled
-                            ? Qt.PointingHandCursor
-                            : Qt.ArrowCursor
-                        onClicked: root.cycleRoom(-1)
-                    }
-                }
-
-                Rectangle {
-                    width: 28
-                    height: 24
-                    anchors.verticalCenter: parent.verticalCenter
-                    color: roomDownMouse.pressed ? Colors.orange : Colors.black
-                    border.width: 1
-                    border.color:
-                        roomDownMouse.containsMouse
-                        ? Colors.orange
-                        : Colors.cyan
-                    opacity:
-                        auditService.rooms.length > 0
-                        ? 1.0 : 0.42
-
-                    GohuText {
-                        anchors.centerIn: parent
-                        text: "↓"
-                        font.pixelSize: 12
-                        color:
-                            roomDownMouse.pressed
-                            ? Colors.black
-                            : Colors.cyan
-                    }
-
-                    MouseArea {
-                        id: roomDownMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        enabled: auditService.rooms.length > 0
-                        cursorShape:
-                            enabled
-                            ? Qt.PointingHandCursor
-                            : Qt.ArrowCursor
-                        onClicked: root.cycleRoom(1)
-                    }
-                }
+            SectionLabel {
+                text: "OPERATING ROOMS"
             }
 
 

@@ -275,21 +275,10 @@ PanelWindow {
     }
 
     Connections {
-        target: patientService
-
-        function onRefreshed() {
-            githubService.refresh();
-            auditService.runAudit();
-        }
-    }
-
-    Connections {
         target: roomService
 
         function onPostOpFinished() {
             patientService.refresh();
-            githubService.refresh();
-            auditService.runAudit();
         }
     }
 
@@ -2152,7 +2141,7 @@ PanelWindow {
                     GohuText {
                         id: refreshAction
 
-                        text: patientService.refreshing ? "READING" : "REFRESH"
+                        text: patientService.refreshing ? "READING" : "LOCAL REFRESH"
                         font.pixelSize: 10
                         color: refreshMouse.containsMouse ? Colors.orange : Colors.cyan
                         opacity: patientService.refreshing ? 0.55 : 1.0
@@ -2293,8 +2282,8 @@ PanelWindow {
                           : githubService.available
                           ? (
                               floorService.bedIsLive
-                              ? "LOCAL LIVE + PX/GITHUB LIVE // WRITE ACTUATORS OFFLINE"
-                              : "LOCAL BED + PX/GITHUB LIVE // WRITE ACTUATORS OFFLINE"
+                              ? "LOCAL LIVE // GITHUB AVAILABLE"
+                              : "LOCAL BED // GITHUB AVAILABLE"
                             )
                           : githubService.lastError
                           ? (

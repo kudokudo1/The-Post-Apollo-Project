@@ -1178,63 +1178,119 @@ PanelWindow {
                     color: Colors.cyan
                 }
 
-                Rectangle {
+                Row {
                     anchors {
                         right: parent.right
                         verticalCenter: parent.verticalCenter
                     }
 
-                    width: 94
-                    height: 26
+                    spacing: 8
 
-                    color: Colors.dark
-                    border.width: 1
-                    border.color: Colors.orange
+                    Rectangle {
+                        width: 94
+                        height: 26
 
-                    RectangularShadow {
-                        anchors.fill: parent
-                        spread: 3
-                        z: -1
-                        opacity: {
-                            if (root.activePage === "git")
-                                return gitService.available ? 0.50 : 0.30;
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: Colors.orange
 
-                            return githubService.available ? 0.50 : 0.30;
+                        RectangularShadow {
+                            anchors.fill: parent
+                            spread: 3
+                            z: -1
+                            opacity: {
+                                if (root.activePage === "git")
+                                    return gitService.available ? 0.50 : 0.30;
+
+                                return githubService.available ? 0.50 : 0.30;
+                            }
+                            color: {
+                                if (root.activePage === "git")
+                                    return gitService.available ? Colors.orange : Colors.red;
+
+                                return githubService.available ? Colors.orange : Colors.red;
+                            }
                         }
-                        color: {
-                            if (root.activePage === "git")
-                                return gitService.available ? Colors.orange : Colors.red;
 
-                            return githubService.available ? Colors.orange : Colors.red;
+                        GohuText {
+                            id: pageStatusText
+                            anchors.centerIn: parent
+
+                            text: {
+                                if (root.activePage === "git")
+                                    return gitService.refreshing ? "READING" : gitService.available ? "LOCAL LIVE" : "OFFLINE";
+
+                                return githubService.refreshing ? "READING" : githubService.available ? "PX LIVE" : "OFFLINE";
+                            }
+
+                            font.pixelSize: 8
+                            color: {
+                                if (root.activePage === "git")
+                                    return gitService.available ? Colors.orange : Colors.red;
+
+                                return githubService.available ? Colors.orange : Colors.red;
+                            }
+
+                            layer.enabled: true
+                            layer.effect: DropShadow {
+                                radius: 10
+                                samples: 11
+                                opacity: 0.82
+                                color: pageStatusText.color
+                                transparentBorder: true
+                            }
                         }
                     }
 
-                    GohuText {
-                        id: pageStatusText
-                        anchors.centerIn: parent
+                    Rectangle {
+                        id: gitCloseButton
 
-                        text: {
-                            if (root.activePage === "git")
-                                return gitService.refreshing ? "READING" : gitService.available ? "LOCAL LIVE" : "OFFLINE";
+                        width: 32
+                        height: 28
 
-                            return githubService.refreshing ? "READING" : githubService.available ? "PX LIVE" : "OFFLINE";
+                        color:
+                            gitCloseMouse.pressed
+                            ? Colors.red
+                            : Colors.dark
+                        border.width: 1
+                        border.color: Colors.black
+
+                        RectangularShadow {
+                            anchors.fill: parent
+                            spread: 4
+                            z: -1
+                            opacity:
+                                gitCloseMouse.containsMouse
+                                ? 0.52
+                                : 0.30
+                            color: Colors.black
                         }
 
-                        font.pixelSize: 8
-                        color: {
-                            if (root.activePage === "git")
-                                return gitService.available ? Colors.orange : Colors.red;
+                        GohuText {
+                            anchors.centerIn: parent
+                            text: "X"
+                            font.pixelSize: 12
+                            color:
+                                gitCloseMouse.pressed
+                                ? Colors.black
+                                : Colors.red
 
-                            return githubService.available ? Colors.orange : Colors.red;
+                            layer.enabled: true
+                            layer.effect: DropShadow {
+                                radius: 7
+                                samples: 9
+                                opacity: 0.58
+                                color: Colors.red
+                                transparentBorder: true
+                            }
                         }
 
-                        layer.enabled: true
-                        layer.effect: DropShadow {
-                            radius: 10
-                            samples: 11
-                            opacity: 0.82
-                            color: pageStatusText.color
-                            transparentBorder: true
+                        MouseArea {
+                            id: gitCloseMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.close()
                         }
                     }
                 }

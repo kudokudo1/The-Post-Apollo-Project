@@ -628,10 +628,7 @@ Scope {
                     'owner="$2"',
                     'view="$(gh project view "$number" --owner "$owner" --format json)" || exit $?',
                     'fields="$(gh project field-list "$number" --owner "$owner" --limit 100 --format json)" || exit $?',
-                    'mapfile -t field_names < <(printf "%s" "$fields" | jq -r ".fields[]? | .name // empty")',
-                    'args=(gh project item-list "$number" --owner "$owner" --limit 200 --format json)',
-                    'for field in "${field_names[@]}"; do [ -n "$field" ] && args+=(--field "$field"); done',
-                    'items="$("${args[@]}")" || exit $?',
+                    'items="$(gh project item-list "$number" --owner "$owner" --limit 200 --format json)" || exit $?',
                     "jq -nc --argjson view \"$view\" --argjson fields \"$fields\" --argjson items \"$items\" '{view:$view,fields:$fields,items:$items}'"
                 ].join("\n"),
                 "pa-project-detail",

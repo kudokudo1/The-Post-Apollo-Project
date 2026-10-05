@@ -137,7 +137,12 @@ Scope {
                               "SKIPPED"
                           ].indexOf(conclusion) >= 0) {
                 passed += 1;
-            } else if (bucket === "pending") {
+            } else if (bucket === "pending"
+                       || status === "QUEUED"
+                       || status === "IN_PROGRESS"
+                       || status === "WAITING"
+                       || status === "REQUESTED"
+                       || status === "PENDING") {
                 pending += 1;
             } else if (status === "COMPLETED"
                        && !conclusion) {
@@ -243,9 +248,6 @@ Scope {
         const state = pullReviewState(row);
         const approvals = pullApprovalCount(row);
 
-        if (approvals <= 0)
-            return state;
-
         return (
             state
             + " // "
@@ -317,19 +319,191 @@ Scope {
             "-lc",
             [
                 'repo="$1"',
-                'rows="$(gh pr list --repo "$repo" --state all --limit 1000 --json number,title,state,url,isDraft,author,headRefName,baseRefName,updatedAt,reviewDecision,latestReviews,reviewRequests)" || exit $?',
+                'rows="$(gh pr list --repo "$repo" --state all --limit 1000 --json number,title,state,url,isDraft,author,headRefName,baseRefName,headRefOid,updatedAt,reviewDecision,latestReviews,reviewRequests)" || exit $?',
                 'tmpdir="$(mktemp -d)"',
                 "trap 'rm -rf \"$tmpdir\"' EXIT",
-                "while IFS= read -r number; do",
+                "while IFS=
+                'wait || true',
+                "checks_json=\"$(jq -s '.' \"$tmpdir\"/*.json 2>/dev/null || printf '[]')\"",
+                "jq -nc --argjson rows \"$rows\" --argjson checks \"$checks_json\" '$rows | map(. as $row | (($checks | map(select(.number == $row.number)) | first) // {checks:[]}) as $detail | $row + {checks:$detail.checks})'"
+            ].join("\n"),
+            "pa-github-pulls",
+            cleanRepo
+        ]);
+        pullsWatchdog.restart();
+        return true;
+    }
+
+    function maybeFinishIssues() {
+        if (!issuesBusy
+                || !issuesStdoutSeen
+                || !issuesStderrSeen
+                || !issuesExitSeen)
+            return;
+
+        issuesBusy = false;
+        issuesWatchdog.stop();
+
+        const output = String(issuesStdout || "").trim();
+        const error = String(issuesStderr || "").trim();
+
+        if (issuesExitCode !== 0) {
+            issuesError = error || output || "ISSUE LIST FAILED";
+            issuesStateText = "ERROR // " + issuesError;
+            issues = [];
+            issuesRefreshed();
+            return;
+        }
+
+        try {
+            const parsed = JSON.parse(output || "[]");
+            issues = Array.isArray(parsed) ? parsed : [];
+            issuesStateText =
+                "ISSUES READY // "
+                + String(issues.length);
+            issuesError = "";
+        } catch (parseError) {
+            issues = [];
+            issuesError = "ISSUE RESPONSE PARSE // " + String(parseError);
+            issuesStateText = "ERROR // " + issuesError;
+        }
+
+        issuesRefreshed();
+    }
+
+    function maybeFinishPulls() {
+        if (!pullsBusy
+                || !pullsStdoutSeen
+                || !pullsStderrSeen
+                || !pullsExitSeen)
+            return;
+
+        pullsBusy = false;
+        pullsWatchdog.stop();
+
+        const output = String(pullsStdout || "").trim();
+        const error = String(pullsStderr || "").trim();
+
+        if (pullsExitCode !== 0) {
+            pullsError = error || output || "PULL REQUEST LIST FAILED";
+            pullsStateText = "ERROR // " + pullsError;
+            pulls = [];
+            pullsRefreshed();
+            return;
+        }
+
+        try {
+            const parsed = JSON.parse(output || "[]");
+            pulls = Array.isArray(parsed) ? parsed : [];
+            pullsStateText =
+                "PULLS READY // "
+                + String(pulls.length);
+            pullsError = "";
+        } catch (parseError) {
+            pulls = [];
+            pullsError = "PULL RESPONSE PARSE // " + String(parseError);
+            pullsStateText = "ERROR // " + pullsError;
+        }
+
+        pullsRefreshed();
+    }
+
+    Process {
+        id: issuesProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                root.issuesStdout = this.text;
+                root.issuesStdoutSeen = true;
+                root.maybeFinishIssues();
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                root.issuesStderr = this.text;
+                root.issuesStderrSeen = true;
+                root.maybeFinishIssues();
+            }
+        }
+
+        onExited: function(exitCode, exitStatus) {
+            root.issuesExitCode = Number(exitCode);
+            root.issuesExitSeen = true;
+            root.maybeFinishIssues();
+        }
+    }
+
+    Process {
+        id: pullsProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                root.pullsStdout = this.text;
+                root.pullsStdoutSeen = true;
+                root.maybeFinishPulls();
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                root.pullsStderr = this.text;
+                root.pullsStderrSeen = true;
+                root.maybeFinishPulls();
+            }
+        }
+
+        onExited: function(exitCode, exitStatus) {
+            root.pullsExitCode = Number(exitCode);
+            root.pullsExitSeen = true;
+            root.maybeFinishPulls();
+        }
+    }
+
+    Timer {
+        id: issuesWatchdog
+        interval: 120000
+        repeat: false
+
+        onTriggered: {
+            root.issuesBusy = false;
+            root.issuesError = "ISSUE LIST TIMEOUT";
+            root.issuesStateText = "ERROR // " + root.issuesError;
+
+            if (issuesProcess.running)
+                issuesProcess.running = false;
+
+            root.issuesRefreshed();
+        }
+    }
+
+    Timer {
+        id: pullsWatchdog
+        interval: 120000
+        repeat: false
+
+        onTriggered: {
+            root.pullsBusy = false;
+            root.pullsError = "PULL REQUEST LIST TIMEOUT";
+            root.pullsStateText = "ERROR // " + root.pullsError;
+
+            if (pullsProcess.running)
+                pullsProcess.running = false;
+
+            root.pullsRefreshed();
+        }
+    }
+}
+\\t' read -r number sha; do",
                 '  (',
-                '    payload="$(gh pr checks "$number" --repo "$repo" --json bucket,state,name,workflow 2>/dev/null || true)"',
-                '    [ -n "$payload" ] || payload="[]"',
-                "    jq -nc --argjson number \"$number\" --argjson checks \"$payload\" '{number:$number,checks:$checks}' > \"$tmpdir/$number.json\"",
+                '    payload="$(gh api -H "Accept: application/vnd.github+json" "repos/$repo/commits/$sha/check-runs?per_page=100" 2>/dev/null || true)"',
+                '    checks="$(printf "%s" "$payload" | jq -c "[.check_runs[]? | {name:(.name // \"\"),status:(.status // \"\"),conclusion:(.conclusion // \"\")}]" 2>/dev/null || printf "[]")"',
+                "    jq -nc --argjson number \"$number\" --argjson checks \"$checks\" '{number:$number,checks:$checks}' > \"$tmpdir/$number.json\"",
                 '  ) &',
                 '  while [ "$(jobs -rp | wc -l)" -ge 8 ]; do',
                 '    wait -n || true',
                 '  done',
-                "done < <(printf \"%s\" \"$rows\" | jq -r '.[].number')",
+                "done < <(printf \"%s\" \"$rows\" | jq -r '.[] | [.number, .headRefOid] | @tsv')",
                 'wait || true',
                 "checks_json=\"$(jq -s '.' \"$tmpdir\"/*.json 2>/dev/null || printf '[]')\"",
                 "jq -nc --argjson rows \"$rows\" --argjson checks \"$checks_json\" '$rows | map(. as $row | (($checks | map(select(.number == $row.number)) | first) // {checks:[]}) as $detail | $row + {checks:$detail.checks})'"

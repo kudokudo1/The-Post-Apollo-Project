@@ -699,6 +699,31 @@ PanelWindow {
                     }
                     spacing: 8
 
+                    Column {
+                        width: parent.width - 92
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 3
+
+                        SectionLabel {
+                            text: "FLOOR // REPOSITORY"
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text:
+                                hospitalGitService.repoLabel
+                                + (
+                                    auditService.defaultBranch
+                                    ? "  //  DEFAULT "
+                                      + auditService.defaultBranch
+                                    : ""
+                                  )
+                            font.pixelSize: 11
+                            color: Colors.orange
+                            elide: Text.ElideRight
+                        }
+                    }
+
                     Rectangle {
                         id: floorPrevButton
 
@@ -752,31 +777,6 @@ PanelWindow {
                                 : Qt.ArrowCursor
 
                             onClicked: root.cycleFloor(-1)
-                        }
-                    }
-
-                    Column {
-                        width: parent.width - 92
-                        anchors.verticalCenter: parent.verticalCenter
-                        spacing: 3
-
-                        SectionLabel {
-                            text: "FLOOR // REPOSITORY"
-                        }
-
-                        GohuText {
-                            width: parent.width
-                            text:
-                                hospitalGitService.repoLabel
-                                + (
-                                    auditService.defaultBranch
-                                    ? "  //  DEFAULT "
-                                      + auditService.defaultBranch
-                                    : ""
-                                  )
-                            font.pixelSize: 11
-                            color: Colors.orange
-                            elide: Text.ElideRight
                         }
                     }
 

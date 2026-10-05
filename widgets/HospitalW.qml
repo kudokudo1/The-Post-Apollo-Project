@@ -1456,8 +1456,8 @@ PanelWindow {
                     Rectangle {
                         id: hospitalCloseButton
 
-                        width: 30
-                        height: 26
+                        width: 32
+                        height: 28
 
                         color:
                             hospitalCloseMouse.pressed

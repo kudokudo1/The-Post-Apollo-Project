@@ -40,6 +40,7 @@ Scope {
     property string fetchStderrText: ""
 
     signal remoteSnapshotReady(bool changed)
+    signal remoteCheckCompleted(bool refsChanged)
 
     function resetBaseline() {
         initialized = false;
@@ -127,8 +128,10 @@ Scope {
         // This is what prevents close/open/close/open from probing repeatedly.
         lastProbeAtMs = Date.now();
 
-        if (initialized && next === fingerprint)
+        if (initialized && next === fingerprint) {
+            remoteCheckCompleted(false);
             return;
+        }
 
         pendingFingerprint = next;
         fetchRemote(initialized);
@@ -190,6 +193,7 @@ Scope {
         initialized = true;
         lastError = "";
         remoteSnapshotReady(changed);
+        remoteCheckCompleted(changed);
     }
 
     onFloorKeyChanged: {

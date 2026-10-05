@@ -282,6 +282,10 @@ Scope {
         if (!floor)
             return false;
 
+        const previousFloorId = floorId;
+        const nextFloorId = String(floor.floorId || "");
+        const actualFloorChange = previousFloorId !== nextFloorId;
+
         if (floorId && bedPath) {
             const remembered = rememberedBedByFloor;
             remembered[floorId] = bedPath;
@@ -289,7 +293,7 @@ Scope {
         }
 
         selectedFloorIndex = index;
-        floorId = String(floor.floorId || "");
+        floorId = nextFloorId;
         floorLabel = String(floor.label || "REPOSITORY");
         floorOrigin = String(floor.origin || "");
 
@@ -341,7 +345,9 @@ Scope {
             bedChanged();
         }
 
-        floorChanged();
+        if (actualFloorChange)
+            floorChanged();
+
         return true;
     }
 

@@ -294,11 +294,25 @@ PanelWindow {
     }
 
     Timer {
-        interval: 3000
+        // Passive telemetry only. Keep this slow enough that the operator can
+        // actually work with the controls without the surface constantly
+        // repainting underneath them.
+        interval: 15000
         repeat: true
         running: root.menuOpen
 
-        onTriggered: patientService.refresh()
+        onTriggered: {
+            if (floorService.liveMoveArmed
+                    || floorService.moveRunning
+                    || roomService.running
+                    || roomService.rehearsing
+                    || roomService.integrating
+                    || roomService.postOpRunning
+                    || roomService.armed)
+                return;
+
+            patientService.refresh();
+        }
     }
 
     component SectionLabel: GohuText {

@@ -25,6 +25,7 @@ PanelWindow {
     property var gitKeyboardControls: []
     property var gitKeyboardControl: null
     property bool dialControlMode: false
+    property string gitSelectorSource: "keyboard"
 
     readonly property var selectedWorkflow:
         githubService.workflows.length > 0
@@ -348,7 +349,19 @@ PanelWindow {
             return;
 
         gitKeyboardControl = firstGitKeyboardControl();
+        gitSelectorSource = "keyboard";
         dialControlMode = false;
+    }
+
+    function selectGitControlFromMouse(item) {
+        if (!gitControlEnabled(item))
+            return;
+
+        gitKeyboardControl = item;
+        gitSelectorSource = "mouse";
+
+        if (dialControlMode && !gitControlIsDial(item))
+            dialControlMode = false;
     }
 
     function clearGitKeyboardControl() {
@@ -356,6 +369,7 @@ PanelWindow {
             gitKeyboardControl.focus = false;
 
         gitKeyboardControl = null;
+        gitSelectorSource = "keyboard";
         dialControlMode = false;
     }
 
@@ -364,6 +378,7 @@ PanelWindow {
             return;
 
         ensureGitKeyboardControl();
+        gitSelectorSource = "keyboard";
 
         const current = gitKeyboardControl;
 
@@ -376,6 +391,44 @@ PanelWindow {
             current.width / 2,
             current.height / 2
         );
+
+        // LOCAL Git has two explicit action rows. Up/Down should always hand
+        // between SYNC and LOCAL TOOLS instead of jumping to a farther control.
+        if (Number(dy || 0) !== 0
+                && typeof current.keyboardRow !== "undefined"
+                && Number(current.keyboardRow) >= 0) {
+            const targetRow =
+                Number(current.keyboardRow)
+                + (Number(dy) < 0 ? -1 : 1);
+            let rowBest = null;
+            let rowBestDistance = Number.MAX_VALUE;
+
+            for (let i = 0; i < available.length; ++i) {
+                const candidate = available[i];
+
+                if (typeof candidate.keyboardRow === "undefined"
+                        || Number(candidate.keyboardRow) !== targetRow)
+                    continue;
+
+                const point = candidate.mapToItem(
+                    frame,
+                    candidate.width / 2,
+                    candidate.height / 2
+                );
+                const distance = Math.abs(point.x - currentPoint.x);
+
+                if (distance < rowBestDistance) {
+                    rowBest = candidate;
+                    rowBestDistance = distance;
+                }
+            }
+
+            if (rowBest) {
+                gitKeyboardControl = rowBest;
+                return;
+            }
+        }
+
         const horizontal = Number(dx || 0) !== 0;
         let best = null;
         let bestScore = Number.MAX_VALUE;
@@ -423,6 +476,7 @@ PanelWindow {
 
     function activateGitKeyboardControl() {
         ensureGitKeyboardControl();
+        gitSelectorSource = "keyboard";
 
         const item = gitKeyboardControl;
 
@@ -988,8 +1042,15 @@ PanelWindow {
             && label !== ">"
             && label !== "▲"
             && label !== "▼"
+        property int keyboardRow: -1
         readonly property bool keyboardSelected:
             root.gitKeyboardControl === actionButton
+        readonly property bool keyboardSelector:
+            keyboardSelected
+            && root.gitSelectorSource === "keyboard"
+        readonly property bool mouseSelector:
+            keyboardSelected
+            && root.gitSelectorSource === "mouse"
         property bool primaryBlue: false
         property bool orangeAccent: false
         property bool orangeTextOnly: false
@@ -1020,6 +1081,8 @@ PanelWindow {
         readonly property color contentColor:
             pressed
             ? Colors.black
+            : keyboardSelector
+            ? Colors.magenta
             : primaryBlue
             ? Colors.white
             : redAccent
@@ -1028,8 +1091,6 @@ PanelWindow {
             ? Colors.orange
             : selectedAction
             ? Colors.magenta
-            : hovered
-            ? Colors.orange
             : Colors.cyan
 
         readonly property real contentOpacity:
@@ -1048,28 +1109,26 @@ PanelWindow {
         scale:
             pressed
             ? 0.99
-            : hovered
-            ? 1.025
-            : selectedAction
+            : keyboardSelector || selectedAction
             ? 1.01
             : 1.0
 
         color:
             pressed
             ? (redAccent ? Colors.red : Colors.magenta)
+            : keyboardSelector
+            ? Colors.yellow
             : primaryBlue
             ? (loading ? Colors.dark : enabledAction ? Colors.blue : Colors.dark)
-            : redAccent && hovered
-            ? Colors.red
-            : orangeAccent && hovered
-            ? Colors.yellow
-            : hovered || selectedAction
+            : selectedAction
             ? Colors.yellow
             : Colors.black
 
-        border.width: keyboardSelected ? 2 : 1
+        border.width:
+            keyboardSelector || mouseSelector
+            ? 2 : 1
         border.color:
-            keyboardSelected
+            keyboardSelector || mouseSelector
             ? Colors.orange
             : pressed
             ? (redAccent ? Colors.red : Colors.magenta)
@@ -1294,7 +1353,16 @@ PanelWindow {
             hoverEnabled: true
             enabled: actionButton.enabledAction
 
-            onClicked: actionButton.triggered()
+            onEntered:
+                root.selectGitControlFromMouse(actionButton)
+
+            onPositionChanged:
+                root.selectGitControlFromMouse(actionButton)
+
+            onClicked: {
+                root.selectGitControlFromMouse(actionButton);
+                actionButton.triggered();
+            }
         }
 
         RectangularShadow {
@@ -2175,6 +2243,7 @@ PanelWindow {
                                     anchors.verticalCenter: parent.verticalCenter
                                     anchors.verticalCenterOffset: 2
                                     label: "FETCH"
+                                    keyboardRow: 0
                                     enabledAction: !gitService.actionBusy
                                     selectedAction: gitService.actionTitle === "FETCH"
                                     onTriggered: gitService.runSyncAction("fetch")
@@ -2186,6 +2255,7 @@ PanelWindow {
                                     anchors.verticalCenter: parent.verticalCenter
                                     anchors.verticalCenterOffset: 2
                                     label: "PULL"
+                                    keyboardRow: 0
                                     leftIcon: "◂"
                                     iconPixelSize: 29
                                     enabledAction:
@@ -2235,6 +2305,7 @@ PanelWindow {
                                         gitService.selectedRemoteExists
                                         ? "PUSH"
                                         : "CREATE REMOTE"
+                                    keyboardRow: 0
                                     rightIcon:
                                         gitService.selectedRemoteExists
                                         ? "▸"
@@ -2260,6 +2331,7 @@ PanelWindow {
                                 width: 124
                                 height: 36
                                 label: "STATUS"
+                                keyboardRow: 1
                                 enabledAction: !gitService.actionBusy
                                 selectedAction: gitService.actionTitle === "STATUS"
                                 onTriggered: gitService.runReadAction("status")
@@ -2269,6 +2341,7 @@ PanelWindow {
                                 width: 124
                                 height: 36
                                 label: "DIFF"
+                                keyboardRow: 1
                                 enabledAction: !gitService.actionBusy
                                 selectedAction: gitService.actionTitle === "DIFF"
                                 onTriggered: gitService.runReadAction("diff")
@@ -2278,6 +2351,7 @@ PanelWindow {
                                 width: 124
                                 height: 36
                                 label: "LOG"
+                                keyboardRow: 1
                                 enabledAction: !gitService.actionBusy
                                 selectedAction: gitService.actionTitle === "LOG"
                                 onTriggered: gitService.runReadAction("log")
@@ -2287,6 +2361,7 @@ PanelWindow {
                                 width: 124
                                 height: 36
                                 label: "LAZYGIT"
+                                keyboardRow: 1
                                 enabledAction: true
                                 onTriggered: gitService.launchLazygit()
                             }

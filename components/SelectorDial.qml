@@ -11,6 +11,7 @@ Item {
     property string readoutText: selectedValue ? selectedValue.toUpperCase() : ""
     property bool interactive: options && options.length > 1
     property bool keyboardSelected: false
+    property var keyboardHost: null
 
     property color accentColor: Colors.cyan
     property color markerColor: Colors.orange
@@ -498,7 +499,20 @@ Item {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
 
+                    onEntered: {
+                        if (dialRoot.keyboardHost)
+                            dialRoot.keyboardHost.selectGitControlFromMouse(dialRoot);
+                    }
+
+                    onPositionChanged: {
+                        if (dialRoot.keyboardHost)
+                            dialRoot.keyboardHost.selectGitControlFromMouse(dialRoot);
+                    }
+
                     onClicked: {
+                        if (dialRoot.keyboardHost)
+                            dialRoot.keyboardHost.selectGitControlFromMouse(dialRoot);
+
                         dialRoot.forceActiveFocus();
                         dialRoot.requestIndex(optionMark.index);
                     }
@@ -520,19 +534,15 @@ Item {
                          ? Qt.ClosedHandCursor
                          : Qt.OpenHandCursor
 
-            onPressed: function(mouse) {
-                dialRoot.forceActiveFocus();
-                dialRoot.dragging = true;
-                dialRoot.dragDetentIndex = dialRoot.currentIndex;
-                dialRoot.lastPointerAngle = dialRoot.pointerAngle(
-                    mouse.x,
-                    mouse.y,
-                    width,
-                    height
-                );
+            onEntered: {
+                if (dialRoot.keyboardHost)
+                    dialRoot.keyboardHost.selectGitControlFromMouse(dialRoot);
             }
 
             onPositionChanged: function(mouse) {
+                if (dialRoot.keyboardHost)
+                    dialRoot.keyboardHost.selectGitControlFromMouse(dialRoot);
+
                 if (!pressed || !dialRoot.dragging)
                     return;
 
@@ -540,8 +550,6 @@ Item {
                 const cy = mouse.y - height / 2;
                 const radius = Math.sqrt(cx * cx + cy * cy);
 
-                // A real rotary gesture loses leverage at the axle. Ignore the
-                // center dead-zone instead of turning a straight drag into a slider.
                 if (radius < 15)
                     return;
 
@@ -557,6 +565,21 @@ Item {
                     dialRoot.dragDetentIndex = detent;
                     dialRoot.selectionRequested(detent, String(dialRoot.options[detent]));
                 }
+            }
+
+            onPressed: function(mouse) {
+                if (dialRoot.keyboardHost)
+                    dialRoot.keyboardHost.selectGitControlFromMouse(dialRoot);
+
+                dialRoot.forceActiveFocus();
+                dialRoot.dragging = true;
+                dialRoot.dragDetentIndex = dialRoot.currentIndex;
+                dialRoot.lastPointerAngle = dialRoot.pointerAngle(
+                    mouse.x,
+                    mouse.y,
+                    width,
+                    height
+                );
             }
 
             onReleased: {

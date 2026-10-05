@@ -1486,11 +1486,9 @@ PanelWindow {
                         }
 
                         NotoText {
-                            anchors.fill: parent
+                            anchors.centerIn: parent
                             text: "×"
-                            font.pixelSize: 28
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
+                            font.pixelSize: 31
                             color: Colors.red
 
                             layer.enabled: true

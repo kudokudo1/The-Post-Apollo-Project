@@ -342,6 +342,26 @@ Item {
 
                                 onTextChanged: root.setNameDraft = text
 
+                                onAccepted: {
+                                    focus = false;
+
+                                    if (root.keyboardHost) {
+                                        root.keyboardHost.activeTextEditor = null;
+                                        root.keyboardHost.restoreGitKeyboardFocus(false);
+                                    }
+                                }
+
+                                Keys.onEscapePressed: function(event) {
+                                    focus = false;
+
+                                    if (root.keyboardHost) {
+                                        root.keyboardHost.activeTextEditor = null;
+                                        root.keyboardHost.restoreGitKeyboardFocus(false);
+                                    }
+
+                                    event.accepted = true;
+                                }
+
                                 onActiveFocusChanged: {
                                     if (!root.keyboardHost)
                                         return;

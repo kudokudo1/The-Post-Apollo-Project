@@ -274,10 +274,10 @@ PanelWindow {
             roomControlAction = bestName;
     }
 
-    function activateRoomControl() {
-        const action = String(roomControlAction || "");
+    function performRoomControl(actionName) {
+        const action = String(actionName || "");
 
-        if (!roomControlMode || !roomControlEnabled(action))
+        if (!roomControlEnabled(action))
             return;
 
         if (action === "STATUS"
@@ -330,6 +330,20 @@ PanelWindow {
 
         if (action === "INTEGRATE")
             certificationCoordinator.integrate();
+    }
+
+    function activateRoomControl() {
+        if (!roomControlMode)
+            return;
+
+        performRoomControl(roomControlAction);
+    }
+
+    function invokeRoomShortcut(actionName) {
+        if (!menuOpen || !selectedRoomTeam)
+            return;
+
+        performRoomControl(actionName);
     }
 
     function handleRoomEnter() {
@@ -612,6 +626,69 @@ PanelWindow {
         context: Qt.ApplicationShortcut
         enabled: root.menuOpen
         onActivated: root.cycleBed(1)
+    }
+
+    Shortcut {
+        sequence: "Shift+S"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.invokeRoomShortcut("STATUS")
+    }
+
+    Shortcut {
+        sequence: "Shift+D"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.invokeRoomShortcut("DIFF")
+    }
+
+    Shortcut {
+        sequence: "Shift+L"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.invokeRoomShortcut("LOG")
+    }
+
+    Shortcut {
+        sequence: "Shift+R"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.invokeRoomShortcut("REFRESH")
+    }
+
+    Shortcut {
+        sequence: "Shift+G"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.invokeRoomShortcut("LAZYGIT")
+    }
+
+    Shortcut {
+        sequence: "Shift+P"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.invokeRoomShortcut("PREPARE")
+    }
+
+    Shortcut {
+        sequence: "Shift+M"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.invokeRoomShortcut("REHEARSE")
+    }
+
+    Shortcut {
+        sequence: "Shift+A"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.invokeRoomShortcut("ARM")
+    }
+
+    Shortcut {
+        sequence: "Shift+I"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.invokeRoomShortcut("INTEGRATE")
     }
 
     function open() {

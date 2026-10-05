@@ -91,6 +91,148 @@ Scope {
         return !!((row || {}).isDraft);
     }
 
+    function pullCheckCounts(row) {
+        const checks = Array.isArray((row || {}).statusCheckRollup)
+            ? row.statusCheckRollup
+            : [];
+        let passed = 0;
+        let failed = 0;
+        let pending = 0;
+
+        for (let i = 0; i < checks.length; ++i) {
+            const check = checks[i] || {};
+            const status = String(check.status || "").toUpperCase();
+            const conclusion = String(
+                check.conclusion
+                || check.state
+                || ""
+            ).toUpperCase();
+
+            if ([
+                    "FAILURE",
+                    "ERROR",
+                    "CANCELLED",
+                    "TIMED_OUT",
+                    "ACTION_REQUIRED",
+                    "STARTUP_FAILURE",
+                    "STALE"
+                ].indexOf(conclusion) >= 0) {
+                failed += 1;
+            } else if ([
+                           "SUCCESS",
+                           "NEUTRAL",
+                           "SKIPPED"
+                       ].indexOf(conclusion) >= 0) {
+                passed += 1;
+            } else if (status === "COMPLETED"
+                       && !conclusion) {
+                passed += 1;
+            } else {
+                pending += 1;
+            }
+        }
+
+        return {
+            total: checks.length,
+            passed: passed,
+            failed: failed,
+            pending: pending
+        };
+    }
+
+    function pullCheckState(row) {
+        const counts = pullCheckCounts(row);
+
+        if (counts.total === 0)
+            return "NONE";
+
+        if (counts.failed > 0)
+            return "FAIL";
+
+        if (counts.pending > 0)
+            return "PENDING";
+
+        return "PASS";
+    }
+
+    function pullCheckSummary(row) {
+        const counts = pullCheckCounts(row);
+        const state = pullCheckState(row);
+
+        if (state === "NONE")
+            return "NONE";
+
+        if (state === "FAIL")
+            return "FAIL // " + String(counts.failed) + " FAILED";
+
+        if (state === "PENDING")
+            return (
+                "PENDING // "
+                + String(counts.passed)
+                + "/"
+                + String(counts.total)
+            );
+
+        return (
+            "PASS // "
+            + String(counts.passed)
+            + "/"
+            + String(counts.total)
+        );
+    }
+
+    function pullApprovalCount(row) {
+        const reviews = Array.isArray((row || {}).latestReviews)
+            ? row.latestReviews
+            : [];
+        let count = 0;
+
+        for (let i = 0; i < reviews.length; ++i) {
+            const review = reviews[i] || {};
+            const state = String(review.state || "").toUpperCase();
+
+            if (state === "APPROVED")
+                count += 1;
+        }
+
+        return count;
+    }
+
+    function pullReviewState(row) {
+        const decision = String(
+            (row || {}).reviewDecision || ""
+        ).toUpperCase();
+
+        if (decision === "APPROVED")
+            return "APPROVED";
+
+        if (decision === "CHANGES_REQUESTED")
+            return "CHANGES REQUESTED";
+
+        if (decision === "REVIEW_REQUIRED")
+            return "REVIEW REQUIRED";
+
+        return pullApprovalCount(row) > 0
+            ? "APPROVED"
+            : "NO REVIEW";
+    }
+
+    function pullReviewSummary(row) {
+        const state = pullReviewState(row);
+        const approvals = pullApprovalCount(row);
+
+        if (approvals <= 0)
+            return state;
+
+        return (
+            state
+            + " // "
+            + String(approvals)
+            + " APPROVAL"
+            + (approvals === 1 ? "" : "S")
+        );
+    }
+
     function refreshIssues(repo) {
         const cleanRepo = String(repo || repoSlug || "").trim();
 
@@ -151,7 +293,7 @@ Scope {
         pullsProcess.exec([
             "bash",
             "-lc",
-            'exec gh pr list --repo "$1" --state all --limit 1000 --json number,title,state,url,isDraft,author,headRefName,baseRefName,updatedAt',
+            'exec gh pr list --repo "$1" --state all --limit 1000 --json number,title,state,url,isDraft,author,headRefName,baseRefName,updatedAt,reviewDecision,latestReviews,statusCheckRollup',
             "pa-github-pulls",
             cleanRepo
         ]);

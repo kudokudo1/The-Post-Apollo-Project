@@ -345,6 +345,10 @@ Item {
                         root.isPulls
                         ? root.workService.pullReviewState(modelData)
                         : ""
+                    readonly property string mergeState:
+                        root.isPulls
+                        ? root.workService.pullMergeState(modelData)
+                        : ""
 
                     width: sourceList.width
                     height: root.isPulls ? 86 : 68
@@ -428,10 +432,10 @@ Item {
                             width: parent.width
                             height: root.isPulls ? 15 : 0
                             visible: root.isPulls
-                            spacing: 10
+                            spacing: 8
 
                             GohuText {
-                                width: (parent.width - 10) / 2
+                                width: (parent.width - 16) / 3
                                 anchors.verticalCenter: parent.verticalCenter
                                 text:
                                     "CHECKS // "
@@ -441,7 +445,6 @@ Item {
                                 font.pixelSize: 8
                                 color:
                                     sourceRow.checkState === "FAIL"
-                                    || sourceRow.checkState === "ERROR"
                                     ? Colors.red
                                     : sourceRow.checkState === "PENDING"
                                     ? Colors.orange
@@ -456,7 +459,7 @@ Item {
                             }
 
                             GohuText {
-                                width: (parent.width - 10) / 2
+                                width: (parent.width - 16) / 3
                                 anchors.verticalCenter: parent.verticalCenter
                                 text:
                                     "APPROVAL // "
@@ -465,18 +468,39 @@ Item {
                                     )
                                 font.pixelSize: 8
                                 color:
-                                    sourceRow.reviewState === "CHANGES REQUESTED"
-                                    || sourceRow.reviewState === "ERROR"
+                                    sourceRow.reviewState === "CHANGES_REQUESTED"
                                     ? Colors.red
-                                    : sourceRow.reviewState === "REVIEW REQUIRED"
+                                    : sourceRow.reviewState === "REVIEW_REQUIRED"
                                     ? Colors.orange
                                     : sourceRow.reviewState === "APPROVED"
                                     ? Colors.cyan
                                     : Colors.white
                                 opacity:
-                                    sourceRow.reviewState === "NO REVIEW"
+                                    sourceRow.reviewState === "NONE"
                                     ? 0.46
                                     : 1.0
+                                elide: Text.ElideRight
+                            }
+
+                            GohuText {
+                                width: (parent.width - 16) / 3
+                                anchors.verticalCenter: parent.verticalCenter
+                                text:
+                                    "MERGE // "
+                                    + root.workService.pullMergeSummary(
+                                        sourceRow.modelData
+                                    )
+                                font.pixelSize: 8
+                                color:
+                                    sourceRow.mergeState === "BLOCKED"
+                                    || sourceRow.mergeState === "DIRTY"
+                                    ? Colors.red
+                                    : sourceRow.mergeState === "BEHIND"
+                                    || sourceRow.mergeState === "UNSTABLE"
+                                    ? Colors.orange
+                                    : sourceRow.mergeState === "CLEAN"
+                                    ? Colors.cyan
+                                    : Colors.white
                                 elide: Text.ElideRight
                             }
                         }

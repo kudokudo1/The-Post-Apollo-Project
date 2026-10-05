@@ -1466,7 +1466,10 @@ PanelWindow {
                             ? Colors.black
                             : Colors.dark
                         border.width: 1
-                        border.color: Colors.black
+                        border.color:
+                            hospitalCloseMouse.pressed
+                            ? Colors.black
+                            : Colors.red
 
                         RectangularShadow {
                             anchors.fill: parent
@@ -1485,7 +1488,7 @@ PanelWindow {
                         GohuText {
                             anchors.centerIn: parent
                             text: "X"
-                            font.pixelSize: 18
+                            font.pixelSize: 22
                             color: Colors.red
 
                             layer.enabled: true

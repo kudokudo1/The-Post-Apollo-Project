@@ -140,3 +140,28 @@ A same-team request that attempts to change the branch or HEAD of an already-hel
 Certification accepts the Git/GitHub verification packet only when it identifies itself as schema version 1 from provider `post-apollo.git-evidence`.
 
 Hospital also rejects evidence when the provider reports that the exact-SHA query or inspected run targeted a different SHA than the candidate.
+
+
+## Final verification commit point
+
+Production verification is committed only after two exact remote snapshot checks:
+
+1. Hospital confirms the candidate room HEAD and target base HEAD before requesting Git/GitHub evidence.
+2. GitEvidenceProvider gathers evidence for the frozen candidate SHA.
+3. Hospital repeats the remote room/base check immediately before the VERIFIED transition.
+
+This prevents a room or base that moves during evidence collection from becoming VERIFIED against stale remote state.
+
+The coordinator's legacy direct `verify(checks, runs)` path is disabled. Production verification enters through the Git evidence provider contract.
+
+## Evidence retention
+
+The checks and workflow/run evidence that justify VERIFIED are retained as certification-owned state and carried through CERTIFIED, ARMED, INTEGRATING, POST_OP, and IN_MAIN. Later transitions must not rebuild a packet that silently drops the evidence used for verification.
+
+PX PREPARE exposes a short `files` preview for the operator and a complete `changed_files` list for certification provenance. Hospital freezes the complete list into the certification snapshot when available.
+
+## Exact HOST identity
+
+HOST acquisition and recovery require a non-empty team, branch, and exact HEAD. Same-team ownership alone is not sufficient.
+
+If Hospital restarts after HOST acquisition but before the ARMED transition, a matching recovered lease still passes through the certification ARM transition; recovering authority does not skip certification state.

@@ -229,9 +229,18 @@ PanelWindow {
     function moveRoomControl(dx, dy) {
         if (bedControlMode) {
             // The Bed box has one keyboard-selectable action: MOVE BED.
-            // Left returns to the Room action grid; other arrows stay put.
-            if (Number(dx || 0) < 0)
+            // Left returns to the Room action grid. Down exits back to the
+            // Room selector while keeping the current Room selected.
+            if (Number(dx || 0) < 0) {
                 enterRoomControls();
+                return;
+            }
+
+            if (Number(dy || 0) > 0) {
+                leaveBedControls();
+                return;
+            }
+
             return;
         }
 
@@ -305,8 +314,16 @@ PanelWindow {
             return;
         }
 
-        if (Number(dx || 0) > 0)
+        if (Number(dx || 0) > 0) {
             enterBedControls();
+            return;
+        }
+
+        // When there is no enabled control below the current one, Down exits
+        // the Room action grid back to the Room selector. The Room itself
+        // stays selected, so the next Up/Down moves between Rooms.
+        if (Number(dy || 0) > 0)
+            leaveRoomControls();
     }
 
     function performRoomControl(actionName) {

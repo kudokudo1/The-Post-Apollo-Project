@@ -719,35 +719,69 @@ Scope {
     }
 
     function addPullRequest(url) {
-        const number = selectedNumber();
         const cleanUrl = String(url || "").trim();
         const lower = cleanUrl.toLowerCase();
 
-        if (!number || !cleanUrl) {
-            lastError = "PULL REQUEST ADD UNAVAILABLE // URL MISSING";
-            stateText = lastError;
-            return false;
-        }
-
-        if (lower.indexOf("github.com/") < 0
+        if (!cleanUrl
+                || lower.indexOf("github.com/") < 0
                 || lower.indexOf("/pull/") < 0) {
             lastError = "PULL REQUEST ADD UNAVAILABLE // EXPECTED GITHUB PR URL";
             stateText = lastError;
             return false;
         }
 
+        return addExistingItem(cleanUrl, "pull");
+    }
+
+    function containsItemUrl(url) {
+        const needle = String(url || "").trim();
+
+        if (!needle)
+            return false;
+
+        for (let i = 0; i < items.length; ++i) {
+            if (itemUrl(items[i]) === needle)
+                return true;
+        }
+
+        return false;
+    }
+
+    function addExistingItem(url, kind) {
+        const number = selectedNumber();
+        const cleanUrl = String(url || "").trim();
+        const cleanKind = String(kind || "item").toLowerCase();
+        const operationName =
+            cleanKind === "pull"
+            ? "add-pr"
+            : cleanKind === "issue"
+            ? "add-issue"
+            : "add-item";
+
+        if (!number || !cleanUrl) {
+            lastError =
+                "ADD TO PROJECT UNAVAILABLE // "
+                + (!number ? "PROJECT NOT SELECTED" : "ITEM URL MISSING");
+            stateText = lastError;
+            return false;
+        }
+
         return startOperation(
-            "add-pr",
+            operationName,
             [
                 "bash",
                 "-lc",
                 'exec gh project item-add "$1" --owner "$2" --url "$3" --format json',
-                "pa-project-pr-add",
+                "pa-project-item-add",
                 String(number),
                 owner,
                 cleanUrl
             ],
-            "ADDING PULL REQUEST"
+            cleanKind === "pull"
+            ? "ADDING PULL REQUEST"
+            : cleanKind === "issue"
+            ? "ADDING ISSUE"
+            : "ADDING PROJECT ITEM"
         );
     }
 

@@ -515,6 +515,9 @@ Item {
 
                         dialRoot.forceActiveFocus();
                         dialRoot.requestIndex(optionMark.index);
+
+                        if (dialRoot.keyboardHost)
+                            dialRoot.keyboardHost.restoreGitKeyboardFocus(false);
                     }
                 }
             }
@@ -585,11 +588,17 @@ Item {
             onReleased: {
                 dialRoot.dragging = false;
                 dialRoot.snapToCurrent();
+
+                if (dialRoot.keyboardHost)
+                    dialRoot.keyboardHost.restoreGitKeyboardFocus(false);
             }
 
             onCanceled: {
                 dialRoot.dragging = false;
                 dialRoot.snapToCurrent();
+
+                if (dialRoot.keyboardHost)
+                    dialRoot.keyboardHost.restoreGitKeyboardFocus(false);
             }
 
             onWheel: function(wheel) {
@@ -598,6 +607,10 @@ Item {
 
                 dialRoot.forceActiveFocus();
                 dialRoot.stepIndex(wheel.angleDelta.y > 0 ? -1 : 1);
+
+                if (dialRoot.keyboardHost)
+                    dialRoot.keyboardHost.restoreGitKeyboardFocus(false);
+
                 wheel.accepted = true;
             }
         }

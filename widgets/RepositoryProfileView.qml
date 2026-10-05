@@ -331,82 +331,150 @@ Item {
                             }
                         }
 
-                        Flickable {
+                        Item {
+                            id: catalogViewport
+
                             width: parent.width
                             height: parent.height - 34
-                            clip: true
-                            contentWidth: width
-                            contentHeight: catalogColumn.height
-                            boundsBehavior: Flickable.StopAtBounds
 
-                            Column {
-                                id: catalogColumn
+                            Flickable {
+                                id: catalogScroll
 
-                                width: parent.width
-                                spacing: 3
+                                anchors {
+                                    left: parent.left
+                                    top: parent.top
+                                    bottom: parent.bottom
+                                    right: catalogScrollTrack.left
+                                    rightMargin: 5
+                                }
 
-                                Repeater {
-                                    model: root.gitService.repoCount
+                                clip: true
+                                contentWidth: width
+                                contentHeight: catalogColumn.height
+                                flickableDirection: Flickable.VerticalFlick
+                                boundsBehavior: Flickable.StopAtBounds
 
-                                    Rectangle {
-                                        required property int index
+                                Column {
+                                    id: catalogColumn
 
-                                        readonly property var repoRow:
-                                            root.gitService.repoAt(index)
-                                        readonly property string slug:
-                                            repoRow
-                                            ? String(repoRow.remoteSlug || "")
-                                            : ""
+                                    width: catalogScroll.width
+                                    spacing: 4
 
-                                        width: catalogColumn.width
-                                        height: slug ? 28 : 0
-                                        visible: !!slug
-                                        color: Colors.black
-                                        border.width: 1
-                                        border.color:
-                                            root.profileStore.queueContains(slug)
-                                            ? Colors.blue
-                                            : Colors.dark
+                                    Repeater {
+                                        model: root.gitService.repoCount
 
-                                        Row {
-                                            anchors {
-                                                fill: parent
-                                                margins: 3
-                                            }
+                                        Rectangle {
+                                            required property int index
 
-                                            spacing: 4
+                                            readonly property var repoRow:
+                                                root.gitService.repoAt(index)
+                                            readonly property string slug:
+                                                repoRow
+                                                ? String(repoRow.remoteSlug || "")
+                                                : ""
 
-                                            GohuText {
-                                                width: parent.width - 66
-                                                anchors.verticalCenter: parent.verticalCenter
-                                                text: slug
-                                                font.pixelSize: 7
-                                                color:
-                                                    root.profileStore.queueContains(slug)
-                                                    ? Colors.blue
-                                                    : Colors.white
-                                                elide: Text.ElideRight
-                                            }
+                                            width: catalogColumn.width
+                                            height: slug ? 32 : 0
+                                            visible: !!slug
+                                            color: Colors.black
+                                            border.width: 1
+                                            border.color:
+                                                root.profileStore.queueContains(slug)
+                                                ? Colors.blue
+                                                : Colors.dark
 
-                                            ManagerButton {
-                                                width: 58
-                                                height: 22
-                                                label:
-                                                    root.profileStore.queueContains(slug)
-                                                    ? "ADDED"
-                                                    : "ADD"
-                                                primaryBlue:
-                                                    !root.profileStore.queueContains(slug)
-                                                enabledAction:
-                                                    !root.profileStore.queueContains(slug)
+                                            Row {
+                                                anchors {
+                                                    fill: parent
+                                                    margins: 4
+                                                }
 
-                                                onTriggered: {
-                                                    root.profileStore.addTarget(slug);
-                                                    root.markDirty();
+                                                spacing: 5
+
+                                                GohuText {
+                                                    width: parent.width - 68
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    text: slug
+                                                    font.pixelSize: 10
+                                                    color:
+                                                        root.profileStore.queueContains(slug)
+                                                        ? Colors.blue
+                                                        : Colors.white
+                                                    elide: Text.ElideRight
+                                                }
+
+                                                ManagerButton {
+                                                    width: 58
+                                                    height: 24
+                                                    label:
+                                                        root.profileStore.queueContains(slug)
+                                                        ? "ADDED"
+                                                        : "ADD"
+                                                    primaryBlue:
+                                                        !root.profileStore.queueContains(slug)
+                                                    enabledAction:
+                                                        !root.profileStore.queueContains(slug)
+
+                                                    onTriggered: {
+                                                        root.profileStore.addTarget(slug);
+                                                        root.markDirty();
+                                                    }
                                                 }
                                             }
                                         }
                                     }
+                                }
+                            }
+
+                            Rectangle {
+                                id: catalogScrollTrack
+
+                                width: 5
+                                anchors {
+                                    top: parent.top
+                                    bottom: parent.bottom
+                                    right: parent.right
+                                }
+
+                                color: Colors.black
+                                border.width: 1
+                                border.color: Colors.dark
+
+                                Rectangle {
+                                    width: parent.width
+                                    height:
+                                        catalogScroll.contentHeight <= 0
+                                        ? parent.height
+                                        : Math.max(
+                                            18,
+                                            parent.height
+                                            * Math.min(
+                                                1,
+                                                catalogScroll.height
+                                                / catalogScroll.contentHeight
+                                            )
+                                          )
+                                    y:
+                                        catalogScroll.contentHeight
+                                        <= catalogScroll.height
+                                        ? 0
+                                        : (
+                                            parent.height - height
+                                          )
+                                          * (
+                                              catalogScroll.contentY
+                                              / Math.max(
+                                                  1,
+                                                  catalogScroll.contentHeight
+                                                  - catalogScroll.height
+                                              )
+                                            )
+                                    color: Colors.cyan
+                                    opacity:
+                                        catalogScroll.contentHeight
+                                        > catalogScroll.height
+                                        ? 0.82
+                                        : 0.30
                                 }
                             }
                         }

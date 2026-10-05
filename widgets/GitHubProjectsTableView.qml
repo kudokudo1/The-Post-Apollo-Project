@@ -30,7 +30,7 @@ Item {
         property bool header: false
         property color accent: Colors.cyan
 
-        height: header ? 28 : 34
+        height: header ? 32 : 38
         color: header ? Colors.black : Colors.dark
         border.width: 1
         border.color: header ? accent : Colors.blue
@@ -44,7 +44,7 @@ Item {
 
             verticalAlignment: Text.AlignVCenter
             text: cell.value || "—"
-            font.pixelSize: cell.header ? 8 : 7
+            font.pixelSize: cell.header ? 10 : 9
             color: cell.header ? cell.accent : Colors.white
             opacity: cell.value ? 1.0 : 0.34
             elide: Text.ElideRight
@@ -67,7 +67,7 @@ Item {
                     + String(root.projectService.items.length)
                     + " WORK ITEM"
                     + (root.projectService.items.length === 1 ? "" : "S")
-                font.pixelSize: 9
+                font.pixelSize: 11
                 color: Colors.magenta
                 elide: Text.ElideRight
             }
@@ -79,9 +79,9 @@ Item {
                 text:
                     String(root.projectService.projectFieldNames().length)
                     + " PROJECT FIELDS"
-                font.pixelSize: 7
+                font.pixelSize: 8
                 color: Colors.cyan
-                opacity: 0.68
+                opacity: 0.74
             }
         }
 
@@ -245,7 +245,7 @@ Item {
                         width: tableScroll.width
                         visible: root.projectService.items.length === 0
                         text: "NO WORK ITEMS"
-                        font.pixelSize: 9
+                        font.pixelSize: 10
                         color: Colors.white
                         opacity: 0.38
                         horizontalAlignment: Text.AlignHCenter

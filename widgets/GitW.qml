@@ -1330,7 +1330,7 @@ PanelWindow {
                                             width: parent.width - 64
                                             valueText: gitService.repoLabel
                                             placeholderText: "TYPE REPO NAME"
-                                            accentColor: Colors.blue
+                                            accentColor: Colors.orange
 
                                             onSubmitted: function(value) {
                                                 gitService.selectRepoText(value);

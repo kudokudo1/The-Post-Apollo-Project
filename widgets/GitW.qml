@@ -631,10 +631,14 @@ PanelWindow {
         const action = String(actionName || "");
 
         if (action === "REFRESH") {
-            if (activePage === "github")
-                githubService.refresh();
-            else
+            if (activePage === "github") {
+                if (githubView === "profile")
+                    gitService.discoverRepos();
+                else
+                    githubService.refresh();
+            } else {
                 gitService.discoverRepos();
+            }
 
             return;
         }
@@ -767,6 +771,16 @@ PanelWindow {
     }
 
     function githubStateText() {
+        if (root.githubView === "profile") {
+            if (repositoryProfileService.busy)
+                return repositoryProfileService.resultText;
+
+            if (repositoryProfileService.reviewReady)
+                return "PROFILE BATCH // REVIEWED + ARMED";
+
+            return repositoryProfileService.resultText;
+        }
+
         if (githubService.factoryBusy)
             return githubService.factoryMode === "install"
                    ? "SAVING // VALIDATING + INSTALLING"
@@ -800,6 +814,18 @@ PanelWindow {
     }
 
     function githubStateColor() {
+        if (root.githubView === "profile") {
+            if (repositoryProfileService.lastError)
+                return Colors.red;
+
+            if (repositoryProfileService.reviewReady)
+                return Colors.orange;
+
+            return repositoryProfileService.busy
+                   ? Colors.blue
+                   : Colors.white;
+        }
+
         if (githubService.factoryValidationStatus === "FAIL"
                 || githubService.factoryValidationStatus === "ERROR"
                 || githubService.lastError

@@ -58,6 +58,26 @@ PanelWindow {
         hospitalGitService.selectRepo(requested);
     }
 
+    function cycleFloor(delta) {
+        if (!floorSwitchEnabled)
+            return;
+
+        const count = hospitalGitService.repoCount;
+        let current =
+            hospitalGitService.repoIndexOfPath(hospitalGitService.repoPath);
+
+        if (count <= 0)
+            return;
+
+        if (current < 0)
+            current = 0;
+
+        const requested =
+            (current + Number(delta || 0) + count) % count;
+
+        selectFloor(requested);
+    }
+
     onSelectedRoomTeamChanged: {
         roomService.clearResult();
         certificationCoordinator.bindRoom(roomService);
@@ -525,8 +545,8 @@ PanelWindow {
                 hospitalGitService.repoIndexOfPath(
                     hospitalGitService.repoPath
                 )
-            accentColor: Colors.magenta
-            handleGlowColor: Colors.orange
+            accentColor: Colors.cyan
+            handleGlowColor: Colors.magenta
             sideLabel: "FLOOR"
             enabledSlider: root.floorSwitchEnabled
 
@@ -677,9 +697,66 @@ PanelWindow {
                         fill: parent
                         margins: 8
                     }
+                    spacing: 8
+
+                    Rectangle {
+                        id: floorPrevButton
+
+                        width: 38
+                        height: 32
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        color:
+                            floorPrevMouse.pressed
+                            ? Colors.orange
+                            : Colors.black
+                        border.width: 1
+                        border.color:
+                            floorPrevMouse.containsMouse
+                            ? Colors.orange
+                            : Colors.cyan
+                        opacity: root.floorSwitchEnabled ? 1.0 : 0.42
+
+                        RectangularShadow {
+                            anchors.fill: parent
+                            spread: 2
+                            z: -1
+                            opacity:
+                                floorPrevMouse.containsMouse
+                                ? 0.34
+                                : 0.16
+                            color:
+                                floorPrevMouse.containsMouse
+                                ? Colors.orange
+                                : Colors.cyan
+                        }
+
+                        GohuText {
+                            anchors.centerIn: parent
+                            text: "<"
+                            font.pixelSize: 13
+                            color:
+                                floorPrevMouse.pressed
+                                ? Colors.black
+                                : Colors.cyan
+                        }
+
+                        MouseArea {
+                            id: floorPrevMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            enabled: root.floorSwitchEnabled
+                            cursorShape:
+                                enabled
+                                ? Qt.PointingHandCursor
+                                : Qt.ArrowCursor
+
+                            onClicked: root.cycleFloor(-1)
+                        }
+                    }
 
                     Column {
-                        width: parent.width
+                        width: parent.width - 92
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: 3
 
@@ -700,6 +777,62 @@ PanelWindow {
                             font.pixelSize: 11
                             color: Colors.orange
                             elide: Text.ElideRight
+                        }
+                    }
+
+                    Rectangle {
+                        id: floorNextButton
+
+                        width: 38
+                        height: 32
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        color:
+                            floorNextMouse.pressed
+                            ? Colors.orange
+                            : Colors.black
+                        border.width: 1
+                        border.color:
+                            floorNextMouse.containsMouse
+                            ? Colors.orange
+                            : Colors.cyan
+                        opacity: root.floorSwitchEnabled ? 1.0 : 0.42
+
+                        RectangularShadow {
+                            anchors.fill: parent
+                            spread: 2
+                            z: -1
+                            opacity:
+                                floorNextMouse.containsMouse
+                                ? 0.34
+                                : 0.16
+                            color:
+                                floorNextMouse.containsMouse
+                                ? Colors.orange
+                                : Colors.cyan
+                        }
+
+                        GohuText {
+                            anchors.centerIn: parent
+                            text: ">"
+                            font.pixelSize: 13
+                            color:
+                                floorNextMouse.pressed
+                                ? Colors.black
+                                : Colors.cyan
+                        }
+
+                        MouseArea {
+                            id: floorNextMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            enabled: root.floorSwitchEnabled
+                            cursorShape:
+                                enabled
+                                ? Qt.PointingHandCursor
+                                : Qt.ArrowCursor
+
+                            onClicked: root.cycleFloor(1)
                         }
                     }
                 }

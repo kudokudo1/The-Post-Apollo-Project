@@ -11,6 +11,9 @@ PanelWindow {
     id: root
 
     property bool menuOpen: false
+    property bool keyboardActive: true
+    signal keyboardOwnershipRequested()
+
     property string activePage: "git"
     property string githubView: "control"
     property string factoryTemplate: "smoke"
@@ -75,7 +78,7 @@ PanelWindow {
 
     // Both cameras contain typeable controls, so let Wayland grant focus
     // while the Git machine is open.
-    focusable: root.menuOpen
+    focusable: root.menuOpen && root.keyboardActive
 
     mask: Region {
         x: 0
@@ -92,16 +95,17 @@ PanelWindow {
         anchors.fill: parent
         focus:
             root.menuOpen
+            && root.keyboardActive
             && !root.activeTextEditor
             && !root.dialControlMode
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         z: -1000
     }
 
     Shortcut {
         sequence: "Esc"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.close()
     }
 
@@ -110,6 +114,7 @@ PanelWindow {
         context: Qt.ApplicationShortcut
         enabled:
             root.menuOpen
+            && root.keyboardActive
             && !root.dialControlMode
             && !root.activeTextEditor
         onActivated: root.moveGitKeyboardControl(-1, 0)
@@ -120,6 +125,7 @@ PanelWindow {
         context: Qt.ApplicationShortcut
         enabled:
             root.menuOpen
+            && root.keyboardActive
             && !root.dialControlMode
             && !root.activeTextEditor
         onActivated: root.moveGitKeyboardControl(1, 0)
@@ -130,6 +136,7 @@ PanelWindow {
         context: Qt.ApplicationShortcut
         enabled:
             root.menuOpen
+            && root.keyboardActive
             && !root.dialControlMode
             && !root.activeTextEditor
         onActivated: root.moveGitKeyboardControl(0, -1)
@@ -140,6 +147,7 @@ PanelWindow {
         context: Qt.ApplicationShortcut
         enabled:
             root.menuOpen
+            && root.keyboardActive
             && !root.dialControlMode
             && !root.activeTextEditor
         onActivated: root.moveGitKeyboardControl(0, 1)
@@ -148,142 +156,143 @@ PanelWindow {
     Shortcut {
         sequence: "Return"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && !root.activeTextEditor
+        enabled: root.menuOpen && root.keyboardActive && !root.activeTextEditor
         onActivated: root.activateGitKeyboardControl()
     }
 
     Shortcut {
         sequence: "Enter"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && !root.activeTextEditor
+        enabled: root.menuOpen && root.keyboardActive && !root.activeTextEditor
         onActivated: root.activateGitKeyboardControl()
     }
 
     Shortcut {
         sequence: "Shift+Left"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.selectPrimaryMode(-1)
     }
 
     Shortcut {
         sequence: "Shift+Up"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.selectPrimaryMode(-1)
     }
 
     Shortcut {
         sequence: "Shift+Right"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.selectPrimaryMode(1)
     }
 
     Shortcut {
         sequence: "Shift+Down"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.selectPrimaryMode(1)
     }
 
     Shortcut {
         sequence: "Alt+Left"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.activePage === "github"
+        enabled: root.menuOpen && root.keyboardActive && root.activePage === "github"
         onActivated: root.selectBottomMode(-1)
     }
 
     Shortcut {
         sequence: "Alt+Up"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.activePage === "github"
+        enabled: root.menuOpen && root.keyboardActive && root.activePage === "github"
         onActivated: root.selectBottomMode(-1)
     }
 
     Shortcut {
         sequence: "Alt+Right"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.activePage === "github"
+        enabled: root.menuOpen && root.keyboardActive && root.activePage === "github"
         onActivated: root.selectBottomMode(1)
     }
 
     Shortcut {
         sequence: "Alt+Down"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.activePage === "github"
+        enabled: root.menuOpen && root.keyboardActive && root.activePage === "github"
         onActivated: root.selectBottomMode(1)
     }
 
     Shortcut {
         sequence: "Shift+S"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.invokeGitHotkey("STATUS")
     }
 
     Shortcut {
         sequence: "Shift+D"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.invokeGitHotkey("DIFF")
     }
 
     Shortcut {
         sequence: "Shift+L"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.invokeGitHotkey("LOG")
     }
 
     Shortcut {
         sequence: "Shift+R"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.invokeGitHotkey("REFRESH")
     }
 
     Shortcut {
         sequence: "Shift+G"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.invokeGitHotkey("LAZYGIT")
     }
 
     Shortcut {
         sequence: "Shift+F"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.invokeGitHotkey("FETCH")
     }
 
     Shortcut {
         sequence: "Shift+P"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.invokeGitHotkey("PULL")
     }
 
     Shortcut {
         sequence: "Shift+U"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.invokeGitHotkey("UP")
     }
 
     Shortcut {
         sequence: "Alt+P"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.invokeGitHotkey("PUSH")
     }
 
     function restoreGitKeyboardFocus(requestSurface) {
-        if (!root.menuOpen)
+        if (!root.menuOpen || !root.keyboardActive)
             return;
 
         Qt.callLater(function() {
             if (!root.menuOpen
+                    || !root.keyboardActive
                     || root.activeTextEditor
                     || root.dialControlMode)
                 return;
@@ -697,6 +706,7 @@ PanelWindow {
     }
 
     function open() {
+        root.keyboardOwnershipRequested();
         root.menuOpen = true;
     }
 
@@ -705,7 +715,10 @@ PanelWindow {
     }
 
     function toggle() {
-        root.menuOpen = !root.menuOpen;
+        if (root.menuOpen)
+            root.close();
+        else
+            root.open();
     }
 
     function showGitPage() {
@@ -841,6 +854,11 @@ PanelWindow {
 
         if (root.runInspectorOpen)
             githubService.inspectRun(root.selectedRun.databaseId);
+    }
+
+    onKeyboardActiveChanged: {
+        if (root.menuOpen && root.keyboardActive)
+            root.restoreGitKeyboardFocus(true);
     }
 
     onMenuOpenChanged: {
@@ -1689,6 +1707,15 @@ PanelWindow {
 
         border.width: 1
         border.color: Colors.orange
+
+        HoverHandler {
+            enabled: root.menuOpen
+
+            onHoveredChanged: {
+                if (hovered && !root.keyboardActive)
+                    root.keyboardOwnershipRequested();
+            }
+        }
 
         TapHandler {
             acceptedButtons: Qt.LeftButton

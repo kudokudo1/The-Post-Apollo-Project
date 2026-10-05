@@ -716,7 +716,7 @@ PanelWindow {
     }
 
     Shortcut {
-        sequence: "Shift+L"
+        sequence: "Shift+F"
         context: Qt.ApplicationShortcut
         enabled: root.menuOpen && root.keyboardActive
         onActivated: root.invokeRoomShortcut("LOG")

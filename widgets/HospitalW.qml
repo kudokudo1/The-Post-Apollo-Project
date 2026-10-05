@@ -1487,6 +1487,7 @@ PanelWindow {
 
                         NotoText {
                             anchors.centerIn: parent
+                            anchors.verticalCenterOffset: 2
                             text: "×"
                             font.pixelSize: 31
                             color: Colors.red

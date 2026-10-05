@@ -230,24 +230,118 @@ Item {
                 }
             }
 
-            GohuText {
-                width: 240
-                anchors.verticalCenter: parent.verticalCenter
-                horizontalAlignment: Text.AlignRight
-                text:
+            Rectangle {
+                id: projectStateBox
+
+                readonly property string displayText:
                     root.projectService.busy
                     ? root.projectService.stateText
                     : root.projectService.lastError
-                    ? "ERROR"
+                    ? "ERROR // " + root.projectService.lastError
                     : root.projectService.stateText
-                font.pixelSize: 8
-                color:
+
+                width: 240
+                height: 38
+                anchors.verticalCenter: parent.verticalCenter
+                color: Colors.black
+                border.width: 1
+                border.color:
                     root.projectService.lastError
                     ? Colors.red
                     : root.projectService.busy
                     ? Colors.orange
-                    : Colors.white
-                elide: Text.ElideRight
+                    : Colors.cyan
+                clip: true
+
+                onDisplayTextChanged: {
+                    Qt.callLater(function() {
+                        projectStateScroll.contentY = 0;
+                    });
+                }
+
+                Flickable {
+                    id: projectStateScroll
+
+                    anchors {
+                        fill: parent
+                        margins: 4
+                    }
+
+                    clip: true
+                    contentWidth: width
+                    contentHeight:
+                        Math.max(
+                            height,
+                            projectStateText.implicitHeight
+                        )
+                    flickableDirection: Flickable.VerticalFlick
+                    boundsBehavior: Flickable.StopAtBounds
+                    interactive: contentHeight > height
+
+                    GohuText {
+                        id: projectStateText
+
+                        width:
+                            projectStateScroll.width
+                            - (
+                                projectStateScroll.contentHeight
+                                > projectStateScroll.height
+                                ? 5
+                                : 0
+                              )
+                        text: projectStateBox.displayText
+                        font.pixelSize: 8
+                        color:
+                            root.projectService.lastError
+                            ? Colors.red
+                            : root.projectService.busy
+                            ? Colors.orange
+                            : Colors.white
+                        wrapMode: Text.Wrap
+                        horizontalAlignment: Text.AlignRight
+                    }
+                }
+
+                Rectangle {
+                    visible:
+                        projectStateScroll.contentHeight
+                        > projectStateScroll.height
+                    width: 2
+                    height: parent.height - 8
+                    anchors {
+                        right: parent.right
+                        rightMargin: 2
+                        verticalCenter: parent.verticalCenter
+                    }
+                    color: Colors.dark
+
+                    Rectangle {
+                        width: parent.width
+                        height:
+                            Math.max(
+                                6,
+                                parent.height
+                                * projectStateScroll.height
+                                / projectStateScroll.contentHeight
+                            )
+                        y:
+                            (
+                                parent.height - height
+                            )
+                            * (
+                                projectStateScroll.contentY
+                                / Math.max(
+                                    1,
+                                    projectStateScroll.contentHeight
+                                    - projectStateScroll.height
+                                )
+                              )
+                        color:
+                            root.projectService.lastError
+                            ? Colors.red
+                            : Colors.orange
+                    }
+                }
             }
         }
 

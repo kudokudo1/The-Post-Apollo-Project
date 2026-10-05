@@ -593,7 +593,14 @@ PanelWindow {
         if (activePage !== "github")
             return;
 
-        const modes = ["control", "library", "profile", "projects"];
+        const modes = [
+            "control",
+            "library",
+            "profile",
+            "projects",
+            "issues",
+            "pulls"
+        ];
         let index = modes.indexOf(githubView);
 
         if (index < 0)
@@ -617,8 +624,12 @@ PanelWindow {
             showGithubLibrary();
         else if (target === "profile")
             showGithubProfile();
-        else
+        else if (target === "projects")
             showGithubProjects();
+        else if (target === "issues")
+            showGithubIssues();
+        else
+            showGithubPulls();
 
         Qt.callLater(ensureGitKeyboardControl);
         root.restoreGitKeyboardFocus(false);
@@ -636,6 +647,14 @@ PanelWindow {
                     gitService.discoverRepos();
                 else if (githubView === "projects")
                     githubProjectsService.refreshProjects();
+                else if (githubView === "issues")
+                    githubWorkItemsService.refreshIssues(
+                        gitService.repoRemoteSlug
+                    );
+                else if (githubView === "pulls")
+                    githubWorkItemsService.refreshPulls(
+                        gitService.repoRemoteSlug
+                    );
                 else
                     githubService.refresh();
             } else {
@@ -782,7 +801,41 @@ PanelWindow {
             githubProjectsService.refreshProjects();
     }
 
+    function showGithubIssues() {
+        root.workflowMenuOpen = false;
+        root.runInspectorOpen = false;
+        root.githubView = "issues";
+
+        githubWorkItemsService.refreshIssues(
+            gitService.repoRemoteSlug
+        );
+
+        if (!githubProjectsService.busy
+                && githubProjectsService.projects.length === 0)
+            githubProjectsService.refreshProjects();
+    }
+
+    function showGithubPulls() {
+        root.workflowMenuOpen = false;
+        root.runInspectorOpen = false;
+        root.githubView = "pulls";
+
+        githubWorkItemsService.refreshPulls(
+            gitService.repoRemoteSlug
+        );
+
+        if (!githubProjectsService.busy
+                && githubProjectsService.projects.length === 0)
+            githubProjectsService.refreshProjects();
+    }
+
     function githubStateText() {
+        if (root.githubView === "issues")
+            return githubWorkItemsService.issuesStateText;
+
+        if (root.githubView === "pulls")
+            return githubWorkItemsService.pullsStateText;
+
         if (root.githubView === "projects")
             return githubProjectsService.stateText;
 
@@ -829,6 +882,24 @@ PanelWindow {
     }
 
     function githubStateColor() {
+        if (root.githubView === "issues") {
+            if (githubWorkItemsService.issuesError)
+                return Colors.red;
+
+            return githubWorkItemsService.issuesBusy
+                   ? Colors.orange
+                   : Colors.white;
+        }
+
+        if (root.githubView === "pulls") {
+            if (githubWorkItemsService.pullsError)
+                return Colors.red;
+
+            return githubWorkItemsService.pullsBusy
+                   ? Colors.orange
+                   : Colors.white;
+        }
+
         if (root.githubView === "projects") {
             if (githubProjectsService.lastError)
                 return Colors.red;
@@ -971,6 +1042,11 @@ PanelWindow {
 
     GitHubProjectsService {
         id: githubProjectsService
+    }
+
+    GitHubWorkItemsService {
+        id: githubWorkItemsService
+        repoSlug: gitService.repoRemoteSlug
     }
 
     Connections {
@@ -3784,6 +3860,26 @@ PanelWindow {
                                     root.projectsExpanded = expanded;
                                 }
                             }
+
+                            GitHubWorkItemsView {
+                                anchors.fill: parent
+                                visible: root.githubView === "issues"
+
+                                kind: "issues"
+                                workService: githubWorkItemsService
+                                projectService: githubProjectsService
+                                gitService: gitService
+                            }
+
+                            GitHubWorkItemsView {
+                                anchors.fill: parent
+                                visible: root.githubView === "pulls"
+
+                                kind: "pulls"
+                                workService: githubWorkItemsService
+                                projectService: githubProjectsService
+                                gitService: gitService
+                            }
                         }
 
                         // ===== APPCONTROL-STYLE GITHUB MODE RAIL ======
@@ -3816,6 +3912,16 @@ PanelWindow {
                                         name: "PROJECTS",
                                         key: "projects",
                                         symbol: "⌗"
+                                    },
+                                    {
+                                        name: "ISSUES",
+                                        key: "issues",
+                                        symbol: "!"
+                                    },
+                                    {
+                                        name: "PULLS",
+                                        key: "pulls",
+                                        symbol: "⇄"
                                     }
                                 ]
 
@@ -3846,9 +3952,9 @@ PanelWindow {
                                     width:
                                         (
                                             githubModeButtonRow.width
-                                            - githubModeButtonRow.spacing * 3
+                                            - githubModeButtonRow.spacing * 5
                                         )
-                                        / 4
+                                        / 6
 
                                     height: parent.height
 
@@ -3917,6 +4023,10 @@ PanelWindow {
                                                 root.showGithubProfile();
                                             else if (modelData.key === "projects")
                                                 root.showGithubProjects();
+                                            else if (modelData.key === "issues")
+                                                root.showGithubIssues();
+                                            else if (modelData.key === "pulls")
+                                                root.showGithubPulls();
                                             else
                                                 root.showGithubControl();
                                         }

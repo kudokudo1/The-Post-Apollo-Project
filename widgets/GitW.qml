@@ -639,15 +639,21 @@ PanelWindow {
         }
 
         if (action === "PULL") {
-            if (!gitService.actionBusy
-                    && gitService.pullSourceTargetValid)
+            if (gitService.actionBusy)
+                return;
+
+            if (!gitService.repoIsLocal) {
+                if (gitService.repoRemoteSlug)
+                    gitService.runSyncAction("clone");
+            } else if (gitService.pullSourceTargetValid) {
                 gitService.runSyncAction("pull");
+            }
 
             return;
         }
 
         if (action === "UP") {
-            if (!gitService.actionBusy)
+            if (!gitService.actionBusy && gitService.repoIsLocal)
                 gitService.cyclePullSource();
 
             return;
@@ -655,6 +661,7 @@ PanelWindow {
 
         if (action === "PUSH") {
             if (!gitService.actionBusy
+                    && gitService.repoIsLocal
                     && !!gitService.selectedRemoteBranch)
                 gitService.runSyncAction("push");
 
@@ -2307,35 +2314,44 @@ PanelWindow {
                                     GohuText {
                                         width: parent.width
                                         text:
-                                            "PULL "
-                                            + (
-                                                gitService.pullSourceMode === "upstream"
-                                                ? "UPSTREAM "
-                                                : "TARGET "
-                                            )
-                                            + (
-                                                gitService.pullSourceTarget
-                                                ? gitService.pullSourceTarget
-                                                : "NONE"
-                                            )
-                                            + " → "
-                                            + (
-                                                gitService.selectedLocalBranch
-                                                ? gitService.selectedLocalBranch
-                                                : "NONE"
-                                            )
-                                            + " // PUSH "
-                                            + (
-                                                gitService.selectedLocalBranch
-                                                ? gitService.selectedLocalBranch
-                                                : "NONE"
-                                            )
-                                            + " → "
-                                            + (
-                                                gitService.selectedRemoteBranch
-                                                ? gitService.selectedRemoteBranch
-                                                : "REMOTE"
-                                            )
+                                            !gitService.repoIsLocal
+                                            ? "CLONE "
+                                              + (
+                                                  gitService.repoRemoteSlug
+                                                  || gitService.repoLabel
+                                                )
+                                              + " → ~/Projects/"
+                                              + gitService.repoLabel
+                                              + " // PUSH UNLOCKS AFTER CLONE"
+                                            : "PULL "
+                                              + (
+                                                  gitService.pullSourceMode === "upstream"
+                                                  ? "UPSTREAM "
+                                                  : "TARGET "
+                                                )
+                                              + (
+                                                  gitService.pullSourceTarget
+                                                  ? gitService.pullSourceTarget
+                                                  : "NONE"
+                                                )
+                                              + " → "
+                                              + (
+                                                  gitService.selectedLocalBranch
+                                                  ? gitService.selectedLocalBranch
+                                                  : "NONE"
+                                                )
+                                              + " // PUSH "
+                                              + (
+                                                  gitService.selectedLocalBranch
+                                                  ? gitService.selectedLocalBranch
+                                                  : "NONE"
+                                                )
+                                              + " → "
+                                              + (
+                                                  gitService.selectedRemoteBranch
+                                                  ? gitService.selectedRemoteBranch
+                                                  : "REMOTE"
+                                                )
                                         font.pixelSize: 8
                                         color: Colors.white
                                         elide: Text.ElideRight
@@ -2344,27 +2360,31 @@ PanelWindow {
                                     GohuText {
                                         width: parent.width
                                         text:
-                                            (
+                                            !gitService.repoIsLocal
+                                            ? "REMOTE ONLY // CLONE CREATES THE LOCAL BED"
+                                            : (
                                                 gitService.selectedLocalUpstream
                                                 || gitService.selectedLocalMatchingRemote
-                                            )
-                                            ? "TARGET TRACKING "
-                                              + (
-                                                  gitService.selectedLocalUpstream
-                                                  || gitService.selectedLocalMatchingRemote
-                                                )
-                                              + "  //  LIVE CHECKOUT "
-                                              + gitService.branch
-                                            : "TARGET HAS NO MATCHING REMOTE // LIVE CHECKOUT "
-                                              + gitService.branch
+                                              )
+                                              ? "TARGET TRACKING "
+                                                + (
+                                                    gitService.selectedLocalUpstream
+                                                    || gitService.selectedLocalMatchingRemote
+                                                  )
+                                                + "  //  LIVE CHECKOUT "
+                                                + gitService.branch
+                                              : "TARGET HAS NO MATCHING REMOTE // LIVE CHECKOUT "
+                                                + gitService.branch
                                         font.pixelSize: 8
                                         color:
-                                            (
+                                            !gitService.repoIsLocal
+                                            ? Colors.blue
+                                            : (
                                                 gitService.selectedLocalUpstream
                                                 || gitService.selectedLocalMatchingRemote
-                                            )
-                                            ? Colors.cyan
-                                            : Colors.magenta
+                                              )
+                                              ? Colors.cyan
+                                              : Colors.magenta
                                         elide: Text.ElideRight
                                     }
                                 }
@@ -2376,7 +2396,9 @@ PanelWindow {
                                     anchors.verticalCenterOffset: 2
                                     label: "FETCH"
                                     keyboardRow: 0
-                                    enabledAction: !gitService.actionBusy
+                                    enabledAction:
+                                        gitService.repoIsLocal
+                                        && !gitService.actionBusy
                                     selectedAction: gitService.actionTitle === "FETCH"
                                     onTriggered: gitService.runSyncAction("fetch")
                                 }
@@ -2386,15 +2408,34 @@ PanelWindow {
                                     height: 36
                                     anchors.verticalCenter: parent.verticalCenter
                                     anchors.verticalCenterOffset: 2
-                                    label: "PULL"
+                                    label:
+                                        gitService.repoIsLocal
+                                        ? "PULL"
+                                        : "CLONE"
                                     keyboardRow: 0
                                     leftIcon: "◂"
                                     iconPixelSize: 29
+                                    primaryBlue: !gitService.repoIsLocal
                                     enabledAction:
                                         !gitService.actionBusy
-                                        && gitService.pullSourceTargetValid
-                                    selectedAction: gitService.actionTitle === "PULL"
-                                    onTriggered: gitService.runSyncAction("pull")
+                                        && (
+                                            gitService.repoIsLocal
+                                            ? gitService.pullSourceTargetValid
+                                            : !!gitService.repoRemoteSlug
+                                        )
+                                    selectedAction:
+                                        gitService.actionTitle
+                                        === (
+                                            gitService.repoIsLocal
+                                            ? "PULL"
+                                            : "CLONE"
+                                        )
+                                    onTriggered: {
+                                        if (gitService.repoIsLocal)
+                                            gitService.runSyncAction("pull");
+                                        else
+                                            gitService.runSyncAction("clone");
+                                    }
                                 }
 
                                 ActionButton {
@@ -2406,9 +2447,12 @@ PanelWindow {
                                     keyboardNavigable: false
                                     orangeAccent:
                                         gitService.pullSourceMode === "target"
-                                    enabledAction: !gitService.actionBusy
+                                    enabledAction:
+                                        gitService.repoIsLocal
+                                        && !gitService.actionBusy
                                     selectedAction:
-                                        gitService.pullSourceMode === "upstream"
+                                        gitService.repoIsLocal
+                                        && gitService.pullSourceMode === "upstream"
                                     onTriggered: gitService.cyclePullSource()
                                 }
 
@@ -2424,7 +2468,9 @@ PanelWindow {
                                         gitService.pullMode === "ff-only"
                                         ? Colors.magenta
                                         : Colors.orange
-                                    enabledAction: !gitService.actionBusy
+                                    enabledAction:
+                                        gitService.repoIsLocal
+                                        && !gitService.actionBusy
                                     onTriggered: gitService.cyclePullMode()
                                 }
 
@@ -2434,17 +2480,22 @@ PanelWindow {
                                     anchors.verticalCenter: parent.verticalCenter
                                     anchors.verticalCenterOffset: 2
                                     label:
-                                        gitService.selectedRemoteExists
+                                        !gitService.repoIsLocal
                                         ? "PUSH"
-                                        : "CREATE REMOTE"
+                                        : gitService.selectedRemoteExists
+                                          ? "PUSH"
+                                          : "CREATE REMOTE"
                                     keyboardRow: 0
                                     rightIcon:
-                                        gitService.selectedRemoteExists
+                                        gitService.repoIsLocal
+                                        && gitService.selectedRemoteExists
                                         ? "▸"
                                         : ""
                                     iconPixelSize: 29
+                                    primaryBlue: !gitService.repoIsLocal
                                     enabledAction:
-                                        !gitService.actionBusy
+                                        gitService.repoIsLocal
+                                        && !gitService.actionBusy
                                         && !!gitService.selectedRemoteBranch
                                     selectedAction: gitService.actionTitle === "PUSH"
                                     onTriggered: gitService.runSyncAction("push")

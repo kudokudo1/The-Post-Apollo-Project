@@ -1105,12 +1105,20 @@ Scope {
                 '  elif [ "$rc" -eq 0 ]; then',
                 '    printf "CLONE // %s -> %s\\n" "$remote_slug" "$dest"',
                 '    if command -v gh >/dev/null 2>&1; then',
-                '      gh repo clone "$remote_slug" "$dest" -- --quiet || rc=$?',
+                '      GH_PROMPT_DISABLED=1 gh repo clone "$remote_slug" "$dest" || rc=$?',
                 '    elif [ -n "$remote_url" ]; then',
-                '      git clone --quiet "$remote_url" "$dest" || rc=$?',
+                '      GIT_TERMINAL_PROMPT=0 git clone "$remote_url" "$dest" || rc=$?',
                 '    else',
                 '      printf "CLONE STOPPED // no GitHub CLI or clone URL available\\n"',
                 '      rc=1',
+                '    fi',
+                '    if [ "$rc" -eq 0 ]; then',
+                '      if git -C "$dest" rev-parse --is-inside-work-tree >/dev/null 2>&1; then',
+                '        printf "CLONE VERIFIED // %s\\n" "$(git -C "$dest" rev-parse --show-toplevel)"',
+                '      else',
+                '        printf "CLONE FAILED VERIFICATION // no working tree at %s\\n" "$dest"',
+                '        rc=1',
+                '      fi',
                 '    fi',
                 '  fi',
                 '  printf "__PA_RC__\\t%s\\n" "$rc"',
@@ -1248,6 +1256,10 @@ Scope {
                 if (actionExitCode === 0) {
                     preferredRepoQuery = query;
                     discoverRepos();
+                } else {
+                    actionOutput += (
+                        actionOutput.length > 0 ? "\n" : ""
+                    ) + "CLONE DID NOT CREATE A LOCAL BED";
                 }
 
                 return;

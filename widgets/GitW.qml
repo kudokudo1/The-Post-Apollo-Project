@@ -1448,10 +1448,7 @@ PanelWindow {
                                 height: parent.height
                                 color: Colors.dark
                                 border.width: 1
-                                border.color:
-                                    gitService.selectedRemoteExists
-                                    ? Colors.cyan
-                                    : Colors.magenta
+                                border.color: Colors.magenta
 
                                 Column {
                                     anchors {
@@ -1462,6 +1459,7 @@ PanelWindow {
 
                                     MetaLabel {
                                         text: "REMOTE TARGET"
+                                        color: Colors.magenta
                                     }
 
                                     Row {
@@ -1481,10 +1479,7 @@ PanelWindow {
                                             width: parent.width - 64
                                             valueText: gitService.selectedRemoteBranch
                                             placeholderText: "TYPE REMOTE BRANCH"
-                                            accentColor:
-                                                gitService.selectedRemoteExists
-                                                ? Colors.cyan
-                                                : Colors.magenta
+                                            accentColor: Colors.magenta
 
                                             onSubmitted: function(value) {
                                                 gitService.selectRemoteText(value);

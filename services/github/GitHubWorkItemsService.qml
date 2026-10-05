@@ -293,7 +293,15 @@ Scope {
         pullsProcess.exec([
             "bash",
             "-lc",
-            'exec gh pr list --repo "$1" --state all --limit 1000 --json number,title,state,url,isDraft,author,headRefName,baseRefName,updatedAt,reviewDecision,latestReviews,statusCheckRollup',
+            [
+                'repo="$1"',
+                'rows="$(gh pr list --repo "$repo" --state all --limit 1000 --json number,title,state,url,isDraft,author,headRefName,baseRefName,updatedAt)" || exit $?',
+                'printf "%s" "$rows" | jq -c ".[]" | while IFS= read -r row; do',
+                '  number="$(printf "%s" "$row" | jq -r ".number")"',
+                '  detail="$(gh pr view "$number" --repo "$repo" --json reviewDecision,latestReviews,statusCheckRollup 2>/dev/null || printf "{}")"',
+                '  jq -nc --argjson row "$row" --argjson detail "$detail" "\$row + \$detail"',
+                'done | jq -s "."'
+            ].join("\n"),
             "pa-github-pulls",
             cleanRepo
         ]);

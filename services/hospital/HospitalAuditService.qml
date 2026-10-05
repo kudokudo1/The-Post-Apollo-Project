@@ -53,9 +53,13 @@ Scope {
 
         const target = String(repository || "").trim();
 
-        resetResult();
+        // Preserve the last good room/audit snapshot while a background
+        // refresh is in flight. Floor changes call resetResult() explicitly,
+        // so stale data cannot leak between repositories.
+        lastError = "";
 
         if (!target) {
+            resetResult();
             lastError = "NO GITHUB REPOSITORY";
             return;
         }

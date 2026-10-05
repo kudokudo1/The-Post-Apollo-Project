@@ -249,11 +249,16 @@ PanelWindow {
             && !roomService.postOpRunning
 
         onRemoteSnapshotReady: function(changed) {
-            // The quiet probe found a different remote snapshot (or is
-            // establishing the initial snapshot for this Floor). Only now do
-            // we refresh visible Hospital state.
+            // Remote refs changed (or this is the first baseline for the
+            // Quickshell session). Refresh local topology only after fetch.
             root.remoteRefreshPending = true;
             patientService.refresh();
+        }
+
+        onRemoteCheckCompleted: function(refsChanged) {
+            // Every successful remote check also performs a quiet PX audit.
+            // The audit service only publishes if its result actually changed.
+            auditService.runAudit(true);
         }
     }
 
@@ -305,7 +310,6 @@ PanelWindow {
 
             root.remoteRefreshPending = false;
             githubService.refresh();
-            auditService.runAudit();
         }
     }
 
@@ -2205,7 +2209,7 @@ PanelWindow {
                     GohuText {
                         id: auditAction
 
-                        text: auditService.running
+                        text: auditService.visibleRunning
                               ? "AUDIT // RUNNING"
                               : auditService.available
                               ? "AUDIT // " + auditService.status
@@ -2218,7 +2222,7 @@ PanelWindow {
                                : auditService.lastError
                                ? Colors.red
                                : Colors.cyan
-                        opacity: auditService.running ? 0.60 : 1.0
+                        opacity: auditService.visibleRunning ? 0.60 : 1.0
 
                         layer.enabled: true
                         layer.effect: DropShadow {
@@ -2297,7 +2301,7 @@ PanelWindow {
                         bottomMargin: 5
                     }
 
-                    text: auditService.running
+                    text: auditService.visibleRunning
                           ? "PX AUDIT RUNNING // " + auditService.repository
                           : auditService.available
                           ? "AUDIT " + auditService.status

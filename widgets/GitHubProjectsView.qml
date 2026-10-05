@@ -386,7 +386,7 @@ Item {
                         margins: 10
                     }
 
-                    spacing: 8
+                    spacing: 6
 
                     Row {
                         width: parent.width
@@ -484,6 +484,7 @@ Item {
 
                         ActionButton {
                             width: 142
+                            height: parent.height
                             label: "LINK CURRENT REPO"
                             enabledAction:
                                 !root.projectService.busy
@@ -504,12 +505,14 @@ Item {
                         ProjectInput {
                             id: itemTitleInput
                             width: parent.width * 0.43
+                            height: parent.height
                             placeholderText: "NEW WORK ITEM"
                         }
 
                         ProjectInput {
                             id: itemBodyInput
                             width: parent.width * 0.39
+                            height: parent.height
                             placeholderText: "CONTEXT // optional"
                         }
 
@@ -519,6 +522,7 @@ Item {
                                 - itemTitleInput.width
                                 - itemBodyInput.width
                                 - 12
+                            height: parent.height
                             label: "ADD WORK"
                             primaryBlue: true
                             enabledAction:
@@ -531,7 +535,6 @@ Item {
                                     itemBodyInput.text
                                 )
                         }
-                    }
 
                     Rectangle {
                         width: parent.width
@@ -547,6 +550,7 @@ Item {
 
                         ActionButton {
                             width: (parent.width - 12) / 3
+                            height: parent.height
                             label: "BOARD"
                             selectedAction: root.projectCamera === "board"
                             onTriggered: root.projectCamera = "board"
@@ -554,6 +558,7 @@ Item {
 
                         ActionButton {
                             width: (parent.width - 12) / 3
+                            height: parent.height
                             label: "ROADMAP"
                             selectedAction: root.projectCamera === "roadmap"
                             onTriggered: root.projectCamera = "roadmap"
@@ -561,6 +566,7 @@ Item {
 
                         ActionButton {
                             width: (parent.width - 12) / 3
+                            height: parent.height
                             label: "TABLE"
                             selectedAction: root.projectCamera === "table"
                             onTriggered: root.projectCamera = "table"
@@ -573,7 +579,7 @@ Item {
                         width: parent.width
                         height:
                             root.projectCamera === "board"
-                            ? parent.height - 138
+                            ? parent.height - 135
                             : 0
                         visible: root.projectCamera === "board"
                         clip: true
@@ -790,7 +796,7 @@ Item {
                         width: parent.width
                         height:
                             root.projectCamera === "roadmap"
-                            ? parent.height - 138
+                            ? parent.height - 135
                             : 0
                         visible: root.projectCamera === "roadmap"
                         projectService: root.projectService
@@ -800,7 +806,7 @@ Item {
                         width: parent.width
                         height:
                             root.projectCamera === "table"
-                            ? parent.height - 138
+                            ? parent.height - 135
                             : 0
                         visible: root.projectCamera === "table"
                         projectService: root.projectService

@@ -2320,7 +2320,7 @@ PanelWindow {
                         text: githubService.refreshing
                               ? "GITHUB // READING"
                               : githubService.available
-                              ? "GITHUB // LIVE"
+                              ? "GITHUB // SYNCED"
                               : "GITHUB"
                         font.pixelSize: 10
                         color: githubMouse.containsMouse

@@ -1408,6 +1408,7 @@ PanelWindow {
                     Rectangle {
                         width: 86
                         height: 26
+                        anchors.verticalCenter: parent.verticalCenter
 
                         color: Colors.dark
                         border.width: 1
@@ -1456,8 +1457,9 @@ PanelWindow {
                     Rectangle {
                         id: hospitalCloseButton
 
-                        width: 104
-                        height: 32
+                        width: 40
+                        height: 34
+                        anchors.verticalCenter: parent.verticalCenter
 
                         color:
                             hospitalCloseMouse.pressed
@@ -1479,18 +1481,18 @@ PanelWindow {
                                 : 0.38
                             color:
                                 hospitalCloseMouse.pressed
-                                ? Colors.red
-                                : Colors.black
+                                ? Colors.black
+                                : Colors.red
                         }
 
                         GohuText {
                             anchors.centerIn: parent
                             text: "X"
-                            font.pixelSize: 16
+                            font.pixelSize: 18
                             color:
                                 hospitalCloseMouse.pressed
-                                ? Colors.black
-                                : Colors.red
+                                ? Colors.red
+                                : Colors.black
 
                             layer.enabled: true
                             layer.effect: DropShadow {

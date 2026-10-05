@@ -28,6 +28,7 @@ Scope {
 
     property string repoPath: ""
     property string repoLabel: "LIVE QUICKSHELL"
+    property string preferredRepoQuery: ""
     property string repoRoot: ""
     property string repository: "NOT CONNECTED"
     property string branch: "NOT CONNECTED"
@@ -190,8 +191,27 @@ Scope {
             discoveringRepos = false;
             if (repoRows.count > 0) {
                 let index = repoIndexOfPath(repoPath);
+
+                if (index < 0 && preferredRepoQuery) {
+                    const needle =
+                        String(preferredRepoQuery || "").trim().toLowerCase();
+
+                    for (let i = 0; i < repoRows.count; ++i) {
+                        const row = repoRows.get(i);
+                        const label = String(row.label || "").toLowerCase();
+                        const pathValue = String(row.path || "").toLowerCase();
+
+                        if (label === needle
+                                || pathValue.endsWith("/" + needle)) {
+                            index = i;
+                            break;
+                        }
+                    }
+                }
+
                 if (index < 0)
                     index = 0;
+
                 const row = repoRows.get(index);
                 repoPath = String(row.path || "");
                 repoLabel = String(row.label || "REPOSITORY");

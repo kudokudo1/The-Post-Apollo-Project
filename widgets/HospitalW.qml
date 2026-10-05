@@ -817,27 +817,30 @@ PanelWindow {
         target: auditService
 
         function onAudited() {
-            root.ensureFirstRoomSelected();
-
+            // Capture ownership before auto-selecting a Room. Otherwise the
+            // first Room can start its own audit inside this callback and the
+            // just-finished Floor audit would be mistaken for that Room audit.
             const candidate = String(root.roomAuditInFlightTeam || "");
 
-            if (!candidate)
-                return;
+            if (candidate) {
+                root.roomAuditInFlightTeam = "";
 
-            root.roomAuditInFlightTeam = "";
+                if (root.selectedRoomTeam === candidate) {
+                    root.auditedRoomTeam = candidate;
+                    root.pendingRoomAuditTeam = "";
+                    return;
+                }
 
-            if (root.selectedRoomTeam === candidate) {
-                root.auditedRoomTeam = candidate;
-                root.pendingRoomAuditTeam = "";
+                // The operator can move to another Room while this audit is
+                // finishing. Immediately hand the audit lane to the newest Room.
+                if (root.pendingRoomAuditTeam
+                        && root.pendingRoomAuditTeam === root.selectedRoomTeam)
+                    root.runPendingRoomAudit();
+
                 return;
             }
 
-            // The operator can move to another Room while this audit is
-            // finishing. Immediately hand the audit lane to the newest Room
-            // instead of waiting for another selection event.
-            if (root.pendingRoomAuditTeam
-                    && root.pendingRoomAuditTeam === root.selectedRoomTeam)
-                root.runPendingRoomAudit();
+            root.ensureFirstRoomSelected();
         }
 
         function onRunningChanged() {

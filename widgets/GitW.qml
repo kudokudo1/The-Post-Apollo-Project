@@ -17,6 +17,7 @@ PanelWindow {
 
     property string activePage: "git"
     property string githubView: "control"
+    property bool projectsExpanded: false
     property string factoryTemplate: "smoke"
     property string factoryTrigger: "manual"
     property int selectedWorkflowIndex: 0
@@ -2838,8 +2839,13 @@ PanelWindow {
                         // ===== REMOTE IDENTITY + PX TELEMETRY =========
 
                         Rectangle {
+                            visible:
+                                !(
+                                    root.githubView === "projects"
+                                    && root.projectsExpanded
+                                )
                             width: parent.width
-                            height: 100
+                            height: visible ? 100 : 0
 
                             color: Colors.dark
                             border.width: 1
@@ -2957,8 +2963,18 @@ PanelWindow {
                             id: githubCameraBody
 
                             width: parent.width
-                            height: parent.height - 178
-                            z: root.workflowMenuOpen ? 700 : 0
+                            height:
+                                root.githubView === "projects"
+                                && root.projectsExpanded
+                                ? parent.height - 68
+                                : parent.height - 178
+                            z:
+                                root.githubView === "projects"
+                                && root.projectsExpanded
+                                ? 850
+                                : root.workflowMenuOpen
+                                ? 700
+                                : 0
 
                             Item {
                                 id: githubControlCamera
@@ -3762,6 +3778,11 @@ PanelWindow {
                                 gitService: gitService
                                 projectService: githubProjectsService
                                 keyboardHost: root
+                                projectExpanded: root.projectsExpanded
+
+                                onProjectExpandedRequested: function(expanded) {
+                                    root.projectsExpanded = expanded;
+                                }
                             }
                         }
 

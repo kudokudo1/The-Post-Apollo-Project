@@ -12,6 +12,7 @@ PanelWindow {
 
     property bool menuOpen: false
     property bool keyboardActive: true
+    property bool keyboardLock: false
     signal keyboardOwnershipRequested()
 
     property string activePage: "git"
@@ -71,14 +72,16 @@ PanelWindow {
 
     exclusiveZone: 0
     WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.keyboardFocus:
+        !root.menuOpen || !root.keyboardActive
+        ? WlrKeyboardFocus.None
+        : root.keyboardLock
+        ? WlrKeyboardFocus.Exclusive
+        : WlrKeyboardFocus.OnDemand
 
     color: "transparent"
     surfaceFormat.opaque: false
     visible: true
-
-    // Both cameras contain typeable controls, so let Wayland grant focus
-    // while the Git machine is open.
-    focusable: root.menuOpen && root.keyboardActive
 
     mask: Region {
         x: 0

@@ -257,7 +257,7 @@ Item {
             spacing: 10
 
             Rectangle {
-                width: 218
+                width: 180
                 height: parent.height
                 color: Colors.black
                 border.width: 1
@@ -398,7 +398,7 @@ Item {
             }
 
             Rectangle {
-                width: parent.width - 228
+                width: parent.width - 190
                 height: parent.height
                 color: Colors.dark
                 border.width: 1

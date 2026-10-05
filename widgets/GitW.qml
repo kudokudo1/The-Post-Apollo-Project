@@ -435,6 +435,7 @@ PanelWindow {
         property string valueText: ""
         property string placeholderText: ""
         property color accentColor: Colors.cyan
+        property color textColor: accentColor
         property bool editable: true
 
         signal submitted(string value)
@@ -464,7 +465,7 @@ PanelWindow {
 
             font.family: GohuFont.family
             font.pixelSize: 10
-            color: selectorInput.accentColor
+            color: selectorInput.textColor
             selectionColor: Colors.orange
             selectedTextColor: Colors.black
             verticalAlignment: TextInput.AlignVCenter
@@ -474,7 +475,7 @@ PanelWindow {
                 radius: 7
                 samples: 9
                 opacity: input.activeFocus ? 0.64 : 0.52
-                color: selectorInput.accentColor
+                color: selectorInput.textColor
                 transparentBorder: true
             }
 
@@ -1368,7 +1369,7 @@ PanelWindow {
                                 height: parent.height
                                 color: Colors.dark
                                 border.width: 1
-                                border.color: Colors.orange
+                                border.color: Colors.blue
 
                                 Column {
                                     anchors {
@@ -1377,7 +1378,7 @@ PanelWindow {
                                     }
                                     spacing: 5
 
-                                    OrangeLabel {
+                                    BlueLabel {
                                         text: "LOCAL TARGET"
                                     }
 
@@ -1402,7 +1403,8 @@ PanelWindow {
                                             width: parent.width - 64
                                             valueText: gitService.selectedLocalBranch
                                             placeholderText: "TYPE LOCAL TARGET"
-                                            accentColor: Colors.cyan
+                                            accentColor: Colors.blue
+                                            textColor: Colors.orange
                                             editable:
                                                 !gitService.actionBusy
                                                 && !gitService.refreshing

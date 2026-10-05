@@ -694,7 +694,9 @@ Scope {
                 'printf "UPSTREAM\\t%s\\n" "$upstream"',
                 'printf "AHEAD\\t%s\\n" "$ahead"',
                 'printf "BEHIND\\t%s\\n" "$behind"',
-                'while IFS=
+                'while IFS="$(printf "\\t")" read -r ref ref_head ref_upstream; do',
+                '  [ -n "$ref" ] && printf "LOCALBRANCH\\t%s\\t%s\\t%s\\n" "$ref" "$ref_head" "$ref_upstream"',
+                'done < <(git -C "$root" for-each-ref --format="%(refname:short)%09%(objectname:short=10)%09%(upstream:short)" refs/heads 2>/dev/null)',
                 'while IFS= read -r ref; do',
                 '  [ -z "$ref" ] && continue',
                 '  [ "$ref" = "origin" ] && continue',

@@ -185,10 +185,8 @@ PanelWindow {
     }
 
     onMenuOpenChanged: {
-        if (root.menuOpen) {
+        if (root.menuOpen)
             floorService.discover();
-            patientService.refresh();
-        }
     }
 
     Component.onCompleted: {
@@ -903,7 +901,7 @@ PanelWindow {
                 }
             }
 
-            // ===== PATIENT ======================================
+            // ===== ROOM / BED ===================================
 
             Row {
                 id: patientRoomRow

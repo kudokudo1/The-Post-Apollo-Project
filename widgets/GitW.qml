@@ -250,6 +250,34 @@ PanelWindow {
         onActivated: root.invokeGitHotkey("LAZYGIT")
     }
 
+    Shortcut {
+        sequence: "Shift+F"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.invokeGitHotkey("FETCH")
+    }
+
+    Shortcut {
+        sequence: "Shift+P"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.invokeGitHotkey("PULL")
+    }
+
+    Shortcut {
+        sequence: "Shift+U"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.invokeGitHotkey("UP")
+    }
+
+    Shortcut {
+        sequence: "Alt+P"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.invokeGitHotkey("PUSH")
+    }
+
     function restoreGitKeyboardFocus(requestSurface) {
         if (!root.menuOpen)
             return;
@@ -597,6 +625,36 @@ PanelWindow {
 
         if (activePage !== "git")
             return;
+
+        if (action === "FETCH") {
+            if (!gitService.actionBusy)
+                gitService.runSyncAction("fetch");
+
+            return;
+        }
+
+        if (action === "PULL") {
+            if (!gitService.actionBusy
+                    && gitService.pullSourceTargetValid)
+                gitService.runSyncAction("pull");
+
+            return;
+        }
+
+        if (action === "UP") {
+            if (!gitService.actionBusy)
+                gitService.cyclePullSource();
+
+            return;
+        }
+
+        if (action === "PUSH") {
+            if (!gitService.actionBusy
+                    && !!gitService.selectedRemoteBranch)
+                gitService.runSyncAction("push");
+
+            return;
+        }
 
         if (action === "STATUS") {
             gitService.runReadAction("status");

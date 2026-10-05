@@ -275,14 +275,21 @@ Scope {
     function pullReviewSummary(row) {
         const state = pullReviewState(row);
         const approvals = pullApprovalCount(row);
-
-        return (
-            state
-            + " // "
-            + String(approvals)
+        const countText =
+            String(approvals)
             + " APPROVAL"
-            + (approvals === 1 ? "" : "S")
-        );
+            + (approvals === 1 ? "" : "S");
+
+        if (state === "ERROR")
+            return "ERROR";
+
+        if (state === "NO REVIEW")
+            return countText;
+
+        if (state === "REVIEW REQUIRED")
+            return "REQUIRED // " + countText;
+
+        return state + " // " + countText;
     }
 
     function refreshIssues(repo) {

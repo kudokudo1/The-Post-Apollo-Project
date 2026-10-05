@@ -355,6 +355,12 @@ PanelWindow {
         localRepoPath: patientService.repoRoot
     }
 
+    HospitalRoomPresenceService {
+        id: roomPresenceService
+        repoPath: floorService.bedPath
+        branchName: root.selectedRoomBranch
+    }
+
     GitEvidenceProvider {
         id: gitEvidenceProvider
         gitService: hospitalEvidenceGitService
@@ -370,6 +376,8 @@ PanelWindow {
         target: patientService
 
         function onRefreshed() {
+            roomPresenceService.refresh();
+
             if (!root.remoteRefreshPending)
                 return;
 
@@ -1511,6 +1519,55 @@ PanelWindow {
                                     return String(room.branch || "NO DATA");
                                 }
                                 elide: Text.ElideRight
+                            }
+                        }
+
+                        Row {
+                            spacing: 8
+
+                            MetaLabel {
+                                width: 66
+                                text: "LOCATION"
+                            }
+
+                            GohuText {
+                                width: roomPane.width - 98
+                                text: roomPresenceService.summary
+                                font.pixelSize: 10
+                                color:
+                                    roomPresenceService.running
+                                    && !roomPresenceService.available
+                                    ? Colors.orange
+                                    : roomPresenceService.location === "MISSING"
+                                    ? Colors.red
+                                    : roomPresenceService.location === "LOCAL"
+                                    ? Colors.blue
+                                    : roomPresenceService.location === "REMOTE"
+                                    ? Colors.magenta
+                                    : roomPresenceService.syncState === "DIVERGED"
+                                    ? Colors.magenta
+                                    : roomPresenceService.syncState === "LOCAL_AHEAD"
+                                    ? Colors.blue
+                                    : roomPresenceService.syncState === "REMOTE_AHEAD"
+                                    ? Colors.magenta
+                                    : roomPresenceService.syncState === "SYNCED"
+                                    ? Colors.orange
+                                    : Colors.cyan
+                                elide: Text.ElideRight
+
+                                layer.enabled: true
+                                layer.effect: DropShadow {
+                                    radius: 6
+                                    samples: 7
+                                    opacity: 0.26
+                                    color:
+                                        roomPresenceService.location === "MISSING"
+                                        ? Colors.red
+                                        : roomPresenceService.syncState === "SYNCED"
+                                        ? Colors.orange
+                                        : Colors.cyan
+                                    transparentBorder: true
+                                }
                             }
                         }
 

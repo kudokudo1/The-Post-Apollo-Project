@@ -403,6 +403,18 @@ Item {
                                 height: 24
                                 spacing: 5
 
+                                ActionButton {
+                                    width: 24
+                                    height: 24
+                                    label: root.projectExpanded ? "↙" : "↗"
+                                    enabledAction: true
+                                    selectedAction: root.projectExpanded
+                                    onTriggered:
+                                        root.projectExpandedRequested(
+                                            !root.projectExpanded
+                                        )
+                                }
+
                                 GohuText {
                                     width: parent.width - 29
                                     anchors.verticalCenter: parent.verticalCenter
@@ -418,18 +430,6 @@ Item {
                                     font.pixelSize: 13
                                     color: Colors.white
                                     elide: Text.ElideRight
-                                }
-
-                                ActionButton {
-                                    width: 24
-                                    height: 24
-                                    label: root.projectExpanded ? "↙" : "↗"
-                                    enabledAction: true
-                                    selectedAction: root.projectExpanded
-                                    onTriggered:
-                                        root.projectExpandedRequested(
-                                            !root.projectExpanded
-                                        )
                                 }
                             }
 

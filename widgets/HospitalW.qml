@@ -582,7 +582,15 @@ PanelWindow {
             if (root.selectedRoomTeam === candidate) {
                 root.auditedRoomTeam = candidate;
                 root.pendingRoomAuditTeam = "";
+                return;
             }
+
+            // The operator can move to another Room while this audit is
+            // finishing. Immediately hand the audit lane to the newest Room
+            // instead of waiting for another selection event.
+            if (root.pendingRoomAuditTeam
+                    && root.pendingRoomAuditTeam === root.selectedRoomTeam)
+                root.runPendingRoomAudit();
         }
 
         function onRunningChanged() {

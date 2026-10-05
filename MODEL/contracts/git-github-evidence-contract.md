@@ -186,18 +186,43 @@ The reusable evidence data comes from `GitHubService` and
 
 Hospital should not parse the drawer or duplicate its GitHub queries.
 
-## Current Doc 3 branches
+## Canonical implementation status
 
 Taskbars:
 
-`feature/doc3-git-evidence-provider`
+The Git/GitHub evidence provider and its service dependencies are integrated on
+the repository's canonical `main` line. Historical Doc 3 feature branches are
+not authoritative runtime baselines.
 
 PX:
 
-`feature/doc3-px-evidence-query`
+Canonical repository:
 
-The PX branch is based on the current PX main that already contains Meta Apollo
-Repository Grammar v1.
+`kudokudo1/The-Post-Apollo-Dev-Exp`
+
+The exact-SHA run contract is merged to PX `main`. PX now supports:
+
+`px runs <repo> [limit] [sha]`
+
+When `sha` is supplied, PX forwards it to GitHub Actions as an exact commit
+filter and includes `headSha` in returned run summaries.
+
+The exact-SHA restoration landed through PX merge commit:
+
+`00d8016159c1304c3a7b313bd7ecfd6355488a3f`
+
+Regression coverage for the run contract landed on PX `main` through:
+
+`5b0e7f26e6ecd63f049273b3a3c68847af5c0013`
+
+The PX smoke workflow now exercises the exact-SHA run contract on `main` and
+pull requests.
+
+Runtime note:
+
+Taskbars invokes PX through `$HOME/.local/bin/px`. A workstation must have an
+installed PX copy synchronized with canonical PX `main` for the exact-SHA
+runtime behavior described by this contract.
 
 ## Deliberately outside this contract
 

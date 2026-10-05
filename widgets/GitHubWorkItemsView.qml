@@ -337,9 +337,17 @@ Item {
                         root.workService.rowUrl(modelData)
                     readonly property bool alreadyAdded:
                         root.projectService.containsItemUrl(itemUrl)
+                    readonly property string checkState:
+                        root.isPulls
+                        ? root.workService.pullCheckState(modelData)
+                        : ""
+                    readonly property string reviewState:
+                        root.isPulls
+                        ? root.workService.pullReviewState(modelData)
+                        : ""
 
                     width: sourceList.width
-                    height: 68
+                    height: root.isPulls ? 86 : 68
                     color: Colors.dark
                     border.width: 1
                     border.color:
@@ -414,6 +422,61 @@ Item {
                                 ? Colors.cyan
                                 : Colors.orange
                             elide: Text.ElideRight
+                        }
+
+                        Row {
+                            width: parent.width
+                            height: root.isPulls ? 15 : 0
+                            visible: root.isPulls
+                            spacing: 10
+
+                            GohuText {
+                                width: (parent.width - 10) / 2
+                                anchors.verticalCenter: parent.verticalCenter
+                                text:
+                                    "CHECKS // "
+                                    + root.workService.pullCheckSummary(
+                                        sourceRow.modelData
+                                    )
+                                font.pixelSize: 8
+                                color:
+                                    sourceRow.checkState === "FAIL"
+                                    ? Colors.red
+                                    : sourceRow.checkState === "PENDING"
+                                    ? Colors.orange
+                                    : sourceRow.checkState === "PASS"
+                                    ? Colors.cyan
+                                    : Colors.white
+                                opacity:
+                                    sourceRow.checkState === "NONE"
+                                    ? 0.46
+                                    : 1.0
+                                elide: Text.ElideRight
+                            }
+
+                            GohuText {
+                                width: (parent.width - 10) / 2
+                                anchors.verticalCenter: parent.verticalCenter
+                                text:
+                                    "REVIEW // "
+                                    + root.workService.pullReviewSummary(
+                                        sourceRow.modelData
+                                    )
+                                font.pixelSize: 8
+                                color:
+                                    sourceRow.reviewState === "CHANGES REQUESTED"
+                                    ? Colors.red
+                                    : sourceRow.reviewState === "REVIEW REQUIRED"
+                                    ? Colors.orange
+                                    : sourceRow.reviewState === "APPROVED"
+                                    ? Colors.cyan
+                                    : Colors.white
+                                opacity:
+                                    sourceRow.reviewState === "NO REVIEW"
+                                    ? 0.46
+                                    : 1.0
+                                elide: Text.ElideRight
+                            }
                         }
 
                         GohuText {

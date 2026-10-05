@@ -513,9 +513,9 @@ PanelWindow {
                 left: parent.left
                 leftMargin: 18
                 top: parent.top
-                // Start directly under the header cyan rule and stop at
-                // the bottom edge of the action bay.
-                topMargin: 88
+                // Align the floor rail with the top edge of the
+                // FLOOR // REPOSITORY box and the bottom of the action bay.
+                topMargin: 100
                 bottom: parent.bottom
                 bottomMargin: 18
             }

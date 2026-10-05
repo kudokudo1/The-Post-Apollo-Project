@@ -27,15 +27,27 @@ PanelWindow {
         selectedRoomTeam = selectedRoomTeam === candidate ? "" : candidate;
     }
 
-    function changeFloor(delta) {
-        if (hospitalGitService.repoCount <= 1
-                || hospitalGitService.refreshing
-                || patientService.refreshing
-                || roomService.running
-                || roomService.rehearsing
-                || roomService.integrating
-                || roomService.postOpRunning
-                || roomService.armed)
+    readonly property bool floorSwitchEnabled:
+        hospitalGitService.repoCount > 1
+        && !hospitalGitService.refreshing
+        && !patientService.refreshing
+        && !roomService.running
+        && !roomService.rehearsing
+        && !roomService.integrating
+        && !roomService.postOpRunning
+        && !roomService.armed
+
+    function selectFloor(index) {
+        if (!floorSwitchEnabled)
+            return;
+
+        const requested = Number(index);
+        const current =
+            hospitalGitService.repoIndexOfPath(hospitalGitService.repoPath);
+
+        if (requested < 0
+                || requested >= hospitalGitService.repoCount
+                || requested === current)
             return;
 
         selectedCommitSha = "";
@@ -43,7 +55,7 @@ PanelWindow {
         roomService.clearResult();
         certificationCoordinator.bindRoom(roomService);
         auditService.resetResult();
-        hospitalGitService.cycleRepo(delta);
+        hospitalGitService.selectRepo(requested);
     }
 
     onSelectedRoomTeamChanged: {
@@ -51,7 +63,8 @@ PanelWindow {
         certificationCoordinator.bindRoom(roomService);
     }
 
-    property int panelWidth: 700
+    // 700px content chassis + 44px floor-selector lane.
+    property int panelWidth: 744
     property int panelHeight: 1320
     property int panelTopMargin: 0
     property int panelLeftMargin: 50
@@ -488,6 +501,36 @@ PanelWindow {
             }
         }
 
+        // Persistent floor selector. This reuses the same tactile slider
+        // component as the Git panel, but selects repositories instead of remotes.
+        SelectorSlider {
+            id: floorSlider
+
+            z: 300
+            anchors {
+                left: parent.left
+                leftMargin: 18
+                top: parent.top
+                topMargin: 110
+                bottom: parent.bottom
+                bottomMargin: 72
+            }
+
+            count: hospitalGitService.repoCount
+            currentIndex:
+                hospitalGitService.repoIndexOfPath(
+                    hospitalGitService.repoPath
+                )
+            accentColor: Colors.magenta
+            handleGlowColor: Colors.orange
+            sideLabel: "FLOOR"
+            enabledSlider: root.floorSwitchEnabled
+
+            onIndexRequested: function(index) {
+                root.selectFloor(index);
+            }
+        }
+
         // Fixed diagnostic/header zone. Nothing above OPERATING ROOMS scrolls.
         Column {
             id: fixedTop
@@ -497,7 +540,7 @@ PanelWindow {
                 left: parent.left
                 right: parent.right
                 topMargin: 18
-                leftMargin: 18
+                leftMargin: 62
                 rightMargin: 18
             }
 
@@ -620,25 +663,14 @@ PanelWindow {
                 border.width: 1
                 border.color: Colors.cyan
 
-                readonly property bool switchEnabled:
-                    hospitalGitService.repoCount > 1
-                    && !hospitalGitService.refreshing
-                    && !patientService.refreshing
-                    && !roomService.running
-                    && !roomService.rehearsing
-                    && !roomService.integrating
-                    && !roomService.postOpRunning
-                    && !roomService.armed
-
                 Row {
                     anchors {
                         fill: parent
                         margins: 8
                     }
-                    spacing: 8
 
                     Column {
-                        width: parent.width - 98
+                        width: parent.width
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: 3
 
@@ -659,74 +691,6 @@ PanelWindow {
                             font.pixelSize: 11
                             color: Colors.orange
                             elide: Text.ElideRight
-                        }
-                    }
-
-                    Rectangle {
-                        width: 38
-                        height: 32
-                        anchors.verticalCenter: parent.verticalCenter
-                        color: floorPrevMouse.pressed
-                               ? Colors.orange
-                               : Colors.black
-                        border.width: 1
-                        border.color: floorPrevMouse.containsMouse
-                                      ? Colors.orange
-                                      : Colors.cyan
-                        opacity: floorSelector.switchEnabled ? 1.0 : 0.42
-
-                        GohuText {
-                            anchors.centerIn: parent
-                            text: "<"
-                            font.pixelSize: 13
-                            color: floorPrevMouse.pressed
-                                   ? Colors.black
-                                   : Colors.cyan
-                        }
-
-                        MouseArea {
-                            id: floorPrevMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            enabled: floorSelector.switchEnabled
-                            cursorShape: enabled
-                                         ? Qt.PointingHandCursor
-                                         : Qt.ArrowCursor
-                            onClicked: root.changeFloor(-1)
-                        }
-                    }
-
-                    Rectangle {
-                        width: 38
-                        height: 32
-                        anchors.verticalCenter: parent.verticalCenter
-                        color: floorNextMouse.pressed
-                               ? Colors.orange
-                               : Colors.black
-                        border.width: 1
-                        border.color: floorNextMouse.containsMouse
-                                      ? Colors.orange
-                                      : Colors.cyan
-                        opacity: floorSelector.switchEnabled ? 1.0 : 0.42
-
-                        GohuText {
-                            anchors.centerIn: parent
-                            text: ">"
-                            font.pixelSize: 13
-                            color: floorNextMouse.pressed
-                                   ? Colors.black
-                                   : Colors.cyan
-                        }
-
-                        MouseArea {
-                            id: floorNextMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            enabled: floorSelector.switchEnabled
-                            cursorShape: enabled
-                                         ? Qt.PointingHandCursor
-                                         : Qt.ArrowCursor
-                            onClicked: root.changeFloor(1)
                         }
                     }
                 }
@@ -1610,7 +1574,7 @@ PanelWindow {
                 right: parent.right
                 topMargin: 8
                 bottomMargin: 10
-                leftMargin: 18
+                leftMargin: 62
                 rightMargin: 18
             }
 
@@ -1662,7 +1626,7 @@ PanelWindow {
                 left: parent.left
                 right: parent.right
                 bottom: bottomStop.top
-                leftMargin: 18
+                leftMargin: 62
                 rightMargin: 18
                 bottomMargin: 8
             }

@@ -55,6 +55,12 @@ Rectangle {
             .replace(/>/g, "&gt;");
     }
 
+    function refPieces(refValue) {
+        return String(refValue || "")
+            .split(" • ")
+            .filter(function(name) { return name.length > 0; });
+    }
+
     function graphMetadataMarkup(refValue, subjectValue, headRow) {
         const refs = String(refValue || "")
             .split(" • ")
@@ -94,46 +100,6 @@ Rectangle {
                     ? Colors.cyan
                     : Colors.blue
                 )
-                + "\">"
-                + escapeStyled(subject)
-                + "</font>";
-        }
-
-        return result;
-    }
-
-    function graphMetadataGlowMarkup(refValue, subjectValue, headRow) {
-        const refs = String(refValue || "")
-            .split(" • ")
-            .filter(function(name) { return name.length > 0; });
-        const pieces = [];
-
-        for (let i = 0; i < refs.length; ++i) {
-            const name = refs[i];
-
-            // White and cyan branch/ref text both glow cyan.
-            pieces.push(
-                "<font color=\"" + String(Colors.cyan) + "\">"
-                + escapeStyled(name)
-                + "</font>"
-            );
-        }
-
-        let result = pieces.join(
-            "<font color=\"" + String(Colors.cyan) + "\"> • </font>"
-        );
-
-        const subject = String(subjectValue || "");
-
-        if (subject) {
-            if (result)
-                result += "<font color=\"" + String(Colors.cyan) + "\">  //  </font>";
-            else
-                result += "<font color=\"" + String(Colors.cyan) + "\">//  </font>";
-
-            // Blue/cyan subject text glows cyan. Head/yellow emphasis glows orange.
-            result += "<font color=\""
-                + String(headRow ? Colors.orange : Colors.cyan)
                 + "\">"
                 + escapeStyled(subject)
                 + "</font>";
@@ -418,15 +384,17 @@ Rectangle {
 
                                 layer.enabled: true
                                 layer.effect: DropShadow {
-                                    radius: 5
-                                    samples: 7
-                                    opacity: 0.42
+                                    radius: 7
+                                    samples: 9
+                                    opacity: 0.30
                                     color: Colors.orange
                                     transparentBorder: true
                                 }
                             }
 
                             Item {
+                                id: metadataDetails
+
                                 width: Math.max(
                                     0,
                                     metadataRow.width
@@ -434,55 +402,91 @@ Rectangle {
                                     - metadataRow.spacing
                                 )
                                 height: parent.height
+                                clip: true
 
-                                // StyledText cannot assign a different DropShadow
-                                // color per inline span, so render a soft colored
-                                // halo underneath using the mapped glow markup.
-                                Repeater {
-                                    model: [
-                                        { dx: -1, dy: 0 },
-                                        { dx: 1, dy: 0 },
-                                        { dx: 0, dy: -1 },
-                                        { dx: 0, dy: 1 },
-                                        { dx: -1, dy: -1 },
-                                        { dx: 1, dy: -1 },
-                                        { dx: -1, dy: 1 },
-                                        { dx: 1, dy: 1 }
-                                    ]
+                                Row {
+                                    id: metadataTextRow
+
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    height: parent.height
+                                    spacing: 0
+
+                                    Repeater {
+                                        id: refsRepeater
+                                        model: branchMap.refPieces(refsText)
+
+                                        delegate: Row {
+                                            height: metadataTextRow.height
+                                            spacing: 0
+
+                                            GohuText {
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                text: modelData
+                                                font.pixelSize: 9
+                                                color:
+                                                    String(modelData).indexOf("origin/") === 0
+                                                    ? Colors.white
+                                                    : Colors.cyan
+
+                                                layer.enabled: true
+                                                layer.effect: DropShadow {
+                                                    radius: 7
+                                                    samples: 9
+                                                    opacity: 0.18
+                                                    color: Colors.cyan
+                                                    transparentBorder: true
+                                                }
+                                            }
+
+                                            GohuText {
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                visible: index < refsRepeater.count - 1
+                                                text: " • "
+                                                font.pixelSize: 9
+                                                color: Colors.white
+
+                                                layer.enabled: true
+                                                layer.effect: DropShadow {
+                                                    radius: 7
+                                                    samples: 9
+                                                    opacity: 0.16
+                                                    color: Colors.cyan
+                                                    transparentBorder: true
+                                                }
+                                            }
+                                        }
+                                    }
 
                                     GohuText {
-                                        x: modelData.dx
-                                        y: modelData.dy
-                                        width: parent.width
-                                        height: parent.height
-                                        text:
-                                            branchMap.graphMetadataGlowMarkup(
-                                                refsText,
-                                                subject,
-                                                isHead
-                                            )
-                                        textFormat: Text.StyledText
-                                        font.pixelSize: 9
-                                        color: Colors.cyan
-                                        opacity: 0.20
-                                        elide: Text.ElideRight
-                                        verticalAlignment: Text.AlignVCenter
-                                    }
-                                }
-
-                                GohuText {
-                                    anchors.fill: parent
-                                    text:
-                                        branchMap.graphMetadataMarkup(
-                                            refsText,
-                                            subject,
-                                            isHead
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: Math.max(
+                                            0,
+                                            metadataDetails.width - x
                                         )
-                                    textFormat: Text.StyledText
-                                    font.pixelSize: 9
-                                    color: Colors.white
-                                    elide: Text.ElideRight
-                                    verticalAlignment: Text.AlignVCenter
+                                        text:
+                                            (refsRepeater.count > 0 ? "  //  " : "//  ")
+                                            + String(subject || "")
+                                        font.pixelSize: 9
+                                        color:
+                                            isHead
+                                            ? Colors.yellow
+                                            : refsRepeater.count > 0
+                                            ? Colors.cyan
+                                            : Colors.blue
+                                        elide: Text.ElideRight
+
+                                        layer.enabled: true
+                                        layer.effect: DropShadow {
+                                            radius: 7
+                                            samples: 9
+                                            opacity: 0.18
+                                            color:
+                                                isHead
+                                                ? Colors.orange
+                                                : Colors.cyan
+                                            transparentBorder: true
+                                        }
+                                    }
                                 }
                             }
                         }

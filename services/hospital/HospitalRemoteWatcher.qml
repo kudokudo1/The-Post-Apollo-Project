@@ -136,6 +136,7 @@ Scope {
 
         // Fetch updates only remote-tracking refs. It never checks out a branch,
         // changes the Bed's working files, merges, or pulls.
+        fetchProcess.wasInitialized = wasInitialized;
         fetchProcess.exec([
             "bash",
             "-lc",
@@ -144,7 +145,6 @@ Scope {
             path
         ]);
 
-        fetchProcess.wasInitialized = wasInitialized;
         fetchWatchdog.restart();
     }
 

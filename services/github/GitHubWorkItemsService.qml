@@ -299,7 +299,7 @@ Scope {
                 'printf "%s" "$rows" | jq -c ".[]" | while IFS= read -r row; do',
                 '  number="$(printf "%s" "$row" | jq -r ".number")"',
                 '  detail="$(gh pr view "$number" --repo "$repo" --json reviewDecision,latestReviews,statusCheckRollup 2>/dev/null || printf "{}")"',
-                '  jq -nc --argjson row "$row" --argjson detail "$detail" "\$row + \$detail"',
+                "  jq -nc --argjson row \"$row\" --argjson detail \"$detail\" '$row + $detail'",
                 'done | jq -s "."'
             ].join("\n"),
             "pa-github-pulls",

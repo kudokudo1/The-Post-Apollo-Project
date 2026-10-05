@@ -682,6 +682,60 @@ Scope {
         );
     }
 
+    function itemId(item) {
+        return String((item || {}).id || "");
+    }
+
+    function archiveItem(item) {
+        const number = selectedNumber();
+        const id = itemId(item);
+
+        if (!number || !id) {
+            lastError = "ARCHIVE UNAVAILABLE // PROJECT ITEM ID MISSING";
+            stateText = lastError;
+            return false;
+        }
+
+        return startOperation(
+            "archive-item",
+            [
+                "bash",
+                "-lc",
+                'exec gh project item-archive "$1" --owner "$2" --id "$3" --format json',
+                "pa-project-item-archive",
+                String(number),
+                owner,
+                id
+            ],
+            "ARCHIVING WORK ITEM"
+        );
+    }
+
+    function removeItem(item) {
+        const number = selectedNumber();
+        const id = itemId(item);
+
+        if (!number || !id) {
+            lastError = "REMOVE UNAVAILABLE // PROJECT ITEM ID MISSING";
+            stateText = lastError;
+            return false;
+        }
+
+        return startOperation(
+            "remove-item",
+            [
+                "bash",
+                "-lc",
+                'exec gh project item-delete "$1" --owner "$2" --id "$3" --format json',
+                "pa-project-item-remove",
+                String(number),
+                owner,
+                id
+            ],
+            "REMOVING WORK ITEM"
+        );
+    }
+
     function linkRepository(repoSlug) {
         const number = selectedNumber();
         const cleanRepo = String(repoSlug || "").trim();

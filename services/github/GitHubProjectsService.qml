@@ -129,6 +129,325 @@ Scope {
         return String(content.url || row.url || "");
     }
 
+    function fieldName(field) {
+        return String((field || {}).name || "").trim();
+    }
+
+    function fieldDataType(field) {
+        return String(
+            (field || {}).dataType
+            || (field || {}).type
+            || ""
+        ).trim().toUpperCase();
+    }
+
+    function projectFieldNames() {
+        const out = [];
+
+        for (let i = 0; i < fields.length; ++i) {
+            const name = fieldName(fields[i]);
+
+            if (name)
+                out.push(name);
+        }
+
+        return out;
+    }
+
+    function itemFieldValue(item, fieldNameValue) {
+        const row = item || {};
+        const target = String(fieldNameValue || "").trim();
+
+        if (!target)
+            return "";
+
+        if (row[target] !== undefined && row[target] !== null)
+            return row[target];
+
+        const lower = target.toLowerCase();
+        const keys = Object.keys(row);
+
+        for (let i = 0; i < keys.length; ++i) {
+            if (String(keys[i]).toLowerCase() === lower)
+                return row[keys[i]];
+        }
+
+        const fieldMap = row.fields || {};
+
+        if (fieldMap[target] !== undefined && fieldMap[target] !== null)
+            return fieldMap[target];
+
+        const fieldKeys = Object.keys(fieldMap);
+
+        for (let i = 0; i < fieldKeys.length; ++i) {
+            if (String(fieldKeys[i]).toLowerCase() === lower)
+                return fieldMap[fieldKeys[i]];
+        }
+
+        const values =
+            Array.isArray(row.fieldValues)
+            ? row.fieldValues
+            : [];
+
+        for (let i = 0; i < values.length; ++i) {
+            const value = values[i] || {};
+            const name = String(
+                value.fieldName
+                || (value.field || {}).name
+                || value.name
+                || ""
+            ).trim();
+
+            if (name.toLowerCase() !== lower)
+                continue;
+
+            if (value.value !== undefined && value.value !== null)
+                return value.value;
+
+            if (value.name !== undefined && value.name !== null
+                    && String(value.name).trim() !== target)
+                return value.name;
+
+            if (value.title !== undefined && value.title !== null)
+                return value.title;
+        }
+
+        return "";
+    }
+
+    function displayFieldValue(item, fieldNameValue) {
+        const value = itemFieldValue(item, fieldNameValue);
+
+        if (value === undefined || value === null)
+            return "";
+
+        if (Array.isArray(value)) {
+            const parts = [];
+
+            for (let i = 0; i < value.length; ++i) {
+                const row = value[i];
+
+                if (row && typeof row === "object")
+                    parts.push(String(row.name || row.title || row.login || ""));
+                else
+                    parts.push(String(row || ""));
+            }
+
+            return parts.filter(function(part) {
+                return part.length > 0;
+            }).join(", ");
+        }
+
+        if (typeof value === "object") {
+            return String(
+                value.name
+                || value.title
+                || value.login
+                || value.value
+                || ""
+            );
+        }
+
+        return String(value || "");
+    }
+
+    function fieldNameMatching(patterns, typeHint) {
+        const wantedType = String(typeHint || "").toUpperCase();
+
+        for (let i = 0; i < fields.length; ++i) {
+            const field = fields[i] || {};
+            const name = fieldName(field);
+            const lower = name.toLowerCase();
+            const dataType = fieldDataType(field);
+
+            if (wantedType && dataType && dataType.indexOf(wantedType) < 0)
+                continue;
+
+            for (let j = 0; j < patterns.length; ++j) {
+                if (lower.indexOf(patterns[j]) >= 0)
+                    return name;
+            }
+        }
+
+        return "";
+    }
+
+    function startDateFieldName() {
+        return fieldNameMatching(
+            ["start date", "start", "begin"],
+            "DATE"
+        );
+    }
+
+    function targetDateFieldName() {
+        return fieldNameMatching(
+            ["target date", "target", "due", "end date", "finish"],
+            "DATE"
+        );
+    }
+
+    function iterationFieldName() {
+        return fieldNameMatching(
+            ["iteration", "sprint", "cycle"],
+            "ITERATION"
+        );
+    }
+
+    function priorityFieldName() {
+        return fieldNameMatching(
+            ["priority"],
+            ""
+        );
+    }
+
+    function itemStartDate(item) {
+        const name = startDateFieldName();
+        return name ? displayFieldValue(item, name) : "";
+    }
+
+    function itemTargetDate(item) {
+        const name = targetDateFieldName();
+        return name ? displayFieldValue(item, name) : "";
+    }
+
+    function itemIteration(item) {
+        const name = iterationFieldName();
+        return name ? displayFieldValue(item, name) : "";
+    }
+
+    function itemPriority(item) {
+        const name = priorityFieldName();
+        return name ? displayFieldValue(item, name) : "";
+    }
+
+    function dateMs(value) {
+        const text = String(value || "").trim();
+
+        if (!text)
+            return NaN;
+
+        const valueMs = Date.parse(text);
+        return isNaN(valueMs) ? NaN : valueMs;
+    }
+
+    function itemStartMs(item) {
+        const start = dateMs(itemStartDate(item));
+
+        if (!isNaN(start))
+            return start;
+
+        return dateMs(itemTargetDate(item));
+    }
+
+    function itemEndMs(item) {
+        const target = dateMs(itemTargetDate(item));
+
+        if (!isNaN(target))
+            return target;
+
+        return itemStartMs(item);
+    }
+
+    function scheduledItems() {
+        const out = [];
+
+        for (let i = 0; i < items.length; ++i) {
+            if (!isNaN(itemStartMs(items[i])))
+                out.push(items[i]);
+        }
+
+        return out;
+    }
+
+    function unscheduledItems() {
+        const out = [];
+
+        for (let i = 0; i < items.length; ++i) {
+            if (isNaN(itemStartMs(items[i])))
+                out.push(items[i]);
+        }
+
+        return out;
+    }
+
+    function roadmapStartMs() {
+        const scheduled = scheduledItems();
+
+        if (scheduled.length === 0)
+            return NaN;
+
+        let result = itemStartMs(scheduled[0]);
+
+        for (let i = 1; i < scheduled.length; ++i)
+            result = Math.min(result, itemStartMs(scheduled[i]));
+
+        return result;
+    }
+
+    function roadmapEndMs() {
+        const scheduled = scheduledItems();
+
+        if (scheduled.length === 0)
+            return NaN;
+
+        let result = itemEndMs(scheduled[0]);
+
+        for (let i = 1; i < scheduled.length; ++i)
+            result = Math.max(result, itemEndMs(scheduled[i]));
+
+        return result;
+    }
+
+    function roadmapSpanMs() {
+        const start = roadmapStartMs();
+        const end = roadmapEndMs();
+
+        if (isNaN(start) || isNaN(end))
+            return NaN;
+
+        const oneDay = 86400000;
+        return Math.max(end - start, oneDay);
+    }
+
+    function roadmapRatio(valueMs) {
+        const start = roadmapStartMs();
+        const span = roadmapSpanMs();
+
+        if (isNaN(valueMs) || isNaN(start) || isNaN(span))
+            return 0;
+
+        return Math.max(0, Math.min(1, (valueMs - start) / span));
+    }
+
+    function roadmapBarX(item, width) {
+        return roadmapRatio(itemStartMs(item)) * Number(width || 0);
+    }
+
+    function roadmapBarWidth(item, width) {
+        const start = itemStartMs(item);
+        const end = itemEndMs(item);
+        const totalWidth = Number(width || 0);
+
+        if (isNaN(start) || isNaN(end) || totalWidth <= 0)
+            return 0;
+
+        return Math.max(
+            6,
+            (roadmapRatio(end) - roadmapRatio(start)) * totalWidth
+        );
+    }
+
+    function roadmapDateAt(ratio) {
+        const start = roadmapStartMs();
+        const span = roadmapSpanMs();
+
+        if (isNaN(start) || isNaN(span))
+            return "";
+
+        const date = new Date(start + span * Number(ratio || 0));
+        return date.toISOString().slice(0, 10);
+    }
+
     function statusField() {
         for (let i = 0; i < fields.length; ++i) {
             const row = fields[i] || {};
@@ -303,7 +622,10 @@ Scope {
                     'owner="$2"',
                     'view="$(gh project view "$number" --owner "$owner" --format json)" || exit $?',
                     'fields="$(gh project field-list "$number" --owner "$owner" --limit 100 --format json)" || exit $?',
-                    'items="$(gh project item-list "$number" --owner "$owner" --limit 200 --format json)" || exit $?',
+                    'mapfile -t field_names < <(printf "%s" "$fields" | jq -r ".fields[]? | .name // empty")',
+                    'args=(gh project item-list "$number" --owner "$owner" --limit 200 --format json)',
+                    'for field in "${field_names[@]}"; do [ -n "$field" ] && args+=(--field "$field"); done',
+                    'items="$("${args[@]}")" || exit $?',
                     "jq -nc --argjson view \"$view\" --argjson fields \"$fields\" --argjson items \"$items\" '{view:$view,fields:$fields,items:$items}'"
                 ].join("\n"),
                 "pa-project-detail",

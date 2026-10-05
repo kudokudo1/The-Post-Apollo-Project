@@ -45,7 +45,7 @@ PanelWindow {
         selectedRun ? String(selectedRun.status || "").toLowerCase() : ""
 
     // One physical machine, two cameras. Page changes never resize the chassis.
-    property int panelWidth: 920
+    property int panelWidth: 1120
     property int panelHeight: 790
     property int panelTopMargin: 0
     property int panelLeftMargin: 600

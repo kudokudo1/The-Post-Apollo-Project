@@ -1,0 +1,595 @@
+import QtQuick
+import Quickshell
+import Quickshell.Io
+
+Scope {
+    id: root
+
+    property string owner: "@me"
+
+    property bool busy: false
+    property string operation: ""
+    property string stateText: "READY"
+    property string lastError: ""
+
+    property var projects: []
+    property int selectedProjectIndex: -1
+    readonly property var selectedProject:
+        selectedProjectIndex >= 0 && selectedProjectIndex < projects.length
+        ? projects[selectedProjectIndex]
+        : ({})
+
+    property var projectView: ({})
+    property var fields: []
+    property var items: []
+
+    property bool stdoutSeen: false
+    property bool stderrSeen: false
+    property bool exitSeen: false
+    property int exitCode: -1
+    property string stdoutText: ""
+    property string stderrText: ""
+
+    signal projectsRefreshed()
+    signal projectRefreshed()
+    signal mutationFinished(bool success, string operation)
+
+    function rowsFrom(value, key) {
+        if (Array.isArray(value))
+            return value;
+
+        if (value && key && Array.isArray(value[key]))
+            return value[key];
+
+        return [];
+    }
+
+    function projectNumber(project) {
+        const value = Number((project || {}).number || 0);
+        return isNaN(value) ? 0 : value;
+    }
+
+    function projectTitle(project) {
+        return String((project || {}).title || "UNTITLED PROJECT");
+    }
+
+    function selectedNumber() {
+        return projectNumber(selectedProject);
+    }
+
+    function selectedTitle() {
+        return projectTitle(selectedProject);
+    }
+
+    function selectedProjectId() {
+        return String(
+            projectView.id
+            || selectedProject.id
+            || ""
+        );
+    }
+
+    function itemStatus(item) {
+        const row = item || {};
+
+        if (row.status !== undefined && row.status !== null)
+            return String(row.status || "").trim();
+
+        if (row.Status !== undefined && row.Status !== null)
+            return String(row.Status || "").trim();
+
+        if (row.fields && row.fields.Status !== undefined)
+            return String(row.fields.Status || "").trim();
+
+        return "";
+    }
+
+    function itemTitle(item) {
+        const row = item || {};
+        const content = row.content || {};
+
+        return String(
+            row.title
+            || content.title
+            || "UNTITLED WORK ITEM"
+        );
+    }
+
+    function itemType(item) {
+        const row = item || {};
+        const content = row.content || {};
+
+        return String(
+            row.type
+            || content.type
+            || "ITEM"
+        ).toUpperCase();
+    }
+
+    function itemRepository(item) {
+        const row = item || {};
+        const content = row.content || {};
+        const repository = row.repository || content.repository || {};
+
+        if (typeof repository === "string")
+            return repository;
+
+        return String(
+            repository.nameWithOwner
+            || repository.fullName
+            || repository.name
+            || ""
+        );
+    }
+
+    function itemUrl(item) {
+        const row = item || {};
+        const content = row.content || {};
+
+        return String(content.url || row.url || "");
+    }
+
+    function statusField() {
+        for (let i = 0; i < fields.length; ++i) {
+            const row = fields[i] || {};
+
+            if (String(row.name || "").trim().toLowerCase() === "status")
+                return row;
+        }
+
+        return null;
+    }
+
+    function statusOptions() {
+        const field = statusField();
+        const source =
+            field && Array.isArray(field.options)
+            ? field.options
+            : [];
+        const out = [];
+
+        for (let i = 0; i < source.length; ++i) {
+            const row = source[i] || {};
+            const name = String(row.name || "").trim();
+
+            if (name)
+                out.push(name);
+        }
+
+        return out;
+    }
+
+    function laneNames() {
+        const lanes = statusOptions();
+        const seen = ({});
+
+        for (let i = 0; i < lanes.length; ++i)
+            seen[lanes[i]] = true;
+
+        for (let i = 0; i < items.length; ++i) {
+            const status = itemStatus(items[i]) || "NO STATUS";
+
+            if (!seen[status]) {
+                seen[status] = true;
+                lanes.push(status);
+            }
+        }
+
+        if (lanes.length === 0)
+            lanes.push("NO STATUS");
+
+        return lanes;
+    }
+
+    function itemsForStatus(status) {
+        const target = String(status || "");
+        const out = [];
+
+        for (let i = 0; i < items.length; ++i) {
+            const actual = itemStatus(items[i]) || "NO STATUS";
+
+            if (actual === target)
+                out.push(items[i]);
+        }
+
+        return out;
+    }
+
+    function statusOptionByName(name) {
+        const field = statusField();
+        const source =
+            field && Array.isArray(field.options)
+            ? field.options
+            : [];
+        const target = String(name || "").trim();
+
+        for (let i = 0; i < source.length; ++i) {
+            const row = source[i] || {};
+
+            if (String(row.name || "").trim() === target)
+                return row;
+        }
+
+        return null;
+    }
+
+    function clearProjectDetail() {
+        projectView = ({});
+        fields = [];
+        items = [];
+    }
+
+    function startOperation(name, args, label) {
+        if (busy)
+            return false;
+
+        busy = true;
+        operation = String(name || "");
+        stateText = String(label || "WORKING");
+        lastError = "";
+        stdoutSeen = false;
+        stderrSeen = false;
+        exitSeen = false;
+        exitCode = -1;
+        stdoutText = "";
+        stderrText = "";
+
+        commandProcess.exec(args);
+        watchdog.restart();
+        return true;
+    }
+
+    function refreshProjects() {
+        return startOperation(
+            "list",
+            [
+                "bash",
+                "-lc",
+                'exec gh project list --owner "$1" --limit 100 --format json',
+                "pa-project-list",
+                owner
+            ],
+            "DISCOVERING PROJECTS"
+        );
+    }
+
+    function selectProject(index) {
+        const next = Number(index);
+
+        if (isNaN(next) || next < 0 || next >= projects.length)
+            return false;
+
+        selectedProjectIndex = next;
+        clearProjectDetail();
+        return refreshSelectedProject();
+    }
+
+    function cycleProject(delta) {
+        if (projects.length === 0)
+            return false;
+
+        let index = selectedProjectIndex;
+
+        if (index < 0)
+            index = 0;
+
+        index =
+            (
+                index
+                + Number(delta || 0)
+                + projects.length
+            )
+            % projects.length;
+
+        return selectProject(index);
+    }
+
+    function refreshSelectedProject() {
+        const number = selectedNumber();
+
+        if (!number) {
+            clearProjectDetail();
+            stateText = "NO PROJECT SELECTED";
+            return false;
+        }
+
+        return startOperation(
+            "detail",
+            [
+                "bash",
+                "-lc",
+                [
+                    'number="$1"',
+                    'owner="$2"',
+                    'view="$(gh project view "$number" --owner "$owner" --format json)" || exit $?',
+                    'fields="$(gh project field-list "$number" --owner "$owner" --limit 100 --format json)" || exit $?',
+                    'items="$(gh project item-list "$number" --owner "$owner" --limit 200 --field Status --format json)" || exit $?',
+                    "jq -nc --argjson view \"$view\" --argjson fields \"$fields\" --argjson items \"$items\" '{view:$view,fields:$fields,items:$items}'"
+                ].join("\n"),
+                "pa-project-detail",
+                String(number),
+                owner
+            ],
+            "READING OPERATING MAP"
+        );
+    }
+
+    function createProject(title) {
+        const clean = String(title || "").trim();
+
+        if (!clean)
+            return false;
+
+        return startOperation(
+            "create-project",
+            [
+                "bash",
+                "-lc",
+                'exec gh project create --owner "$1" --title "$2" --format json',
+                "pa-project-create",
+                owner,
+                clean
+            ],
+            "CREATING PROJECT"
+        );
+    }
+
+    function createDraft(title, body) {
+        const number = selectedNumber();
+        const cleanTitle = String(title || "").trim();
+
+        if (!number || !cleanTitle)
+            return false;
+
+        return startOperation(
+            "create-draft",
+            [
+                "bash",
+                "-lc",
+                'exec gh project item-create "$1" --owner "$2" --title "$3" --body "$4" --format json',
+                "pa-project-item-create",
+                String(number),
+                owner,
+                cleanTitle,
+                String(body || "")
+            ],
+            "ADDING WORK ITEM"
+        );
+    }
+
+    function linkRepository(repoSlug) {
+        const number = selectedNumber();
+        const cleanRepo = String(repoSlug || "").trim();
+
+        if (!number || !cleanRepo)
+            return false;
+
+        return startOperation(
+            "link-repo",
+            [
+                "bash",
+                "-lc",
+                'exec gh project link "$1" --owner "$2" --repo "$3"',
+                "pa-project-link",
+                String(number),
+                owner,
+                cleanRepo
+            ],
+            "LINKING REPOSITORY"
+        );
+    }
+
+    function setItemStatus(item, status) {
+        const number = selectedNumber();
+        const cleanStatus = String(status || "").trim();
+        const row = item || {};
+        const url = itemUrl(row);
+
+        if (!number || !cleanStatus)
+            return false;
+
+        if (url) {
+            return startOperation(
+                "set-status",
+                [
+                    "bash",
+                    "-lc",
+                    'exec gh project item-edit "$1" --owner "$2" --url "$3" --field Status --value "$4" --format json',
+                    "pa-project-status",
+                    String(number),
+                    owner,
+                    url,
+                    cleanStatus
+                ],
+                "MOVING WORK ITEM"
+            );
+        }
+
+        const field = statusField();
+        const option = statusOptionByName(cleanStatus);
+        const itemId = String(row.id || "");
+        const projectId = selectedProjectId();
+        const fieldId = String((field || {}).id || "");
+        const optionId = String((option || {}).id || "");
+
+        if (!itemId || !projectId || !fieldId || !optionId) {
+            lastError =
+                "STATUS MOVE UNAVAILABLE // PROJECT FIELD IDENTITIES MISSING";
+            stateText = lastError;
+            return false;
+        }
+
+        return startOperation(
+            "set-status",
+            [
+                "bash",
+                "-lc",
+                'exec gh project item-edit --id "$1" --project-id "$2" --field-id "$3" --single-select-option-id "$4" --format json',
+                "pa-project-status-ids",
+                itemId,
+                projectId,
+                fieldId,
+                optionId
+            ],
+            "MOVING WORK ITEM"
+        );
+    }
+
+    function parseProjects(payload) {
+        const parsed = JSON.parse(String(payload || "{}"));
+        const rows = rowsFrom(parsed, "projects");
+        const previousNumber = selectedNumber();
+
+        projects = rows;
+
+        if (rows.length === 0) {
+            selectedProjectIndex = -1;
+            clearProjectDetail();
+            return;
+        }
+
+        let nextIndex = 0;
+
+        if (previousNumber) {
+            for (let i = 0; i < rows.length; ++i) {
+                if (projectNumber(rows[i]) === previousNumber) {
+                    nextIndex = i;
+                    break;
+                }
+            }
+        }
+
+        selectedProjectIndex = nextIndex;
+    }
+
+    function parseDetail(payload) {
+        const parsed = JSON.parse(String(payload || "{}"));
+
+        projectView = parsed.view || ({});
+        fields = rowsFrom(parsed.fields, "fields");
+        items = rowsFrom(parsed.items, "items");
+    }
+
+    function authHint(errorText) {
+        const lower = String(errorText || "").toLowerCase();
+
+        if (lower.indexOf("project") >= 0
+                && (
+                    lower.indexOf("scope") >= 0
+                    || lower.indexOf("oauth") >= 0
+                    || lower.indexOf("authorization") >= 0
+                )) {
+            return "AUTH // RUN: gh auth refresh -s project";
+        }
+
+        return "";
+    }
+
+    function maybeFinish() {
+        if (!busy || !stdoutSeen || !stderrSeen || !exitSeen)
+            return;
+
+        const finishedOperation = operation;
+        const output = String(stdoutText || "").trim();
+        const error = String(stderrText || "").trim();
+
+        busy = false;
+        watchdog.stop();
+
+        if (exitCode !== 0) {
+            lastError = error || output || "GITHUB PROJECT OPERATION FAILED";
+            const hint = authHint(lastError);
+            stateText =
+                "ERROR // "
+                + lastError
+                + (hint ? "\n" + hint : "");
+            mutationFinished(false, finishedOperation);
+            return;
+        }
+
+        try {
+            if (finishedOperation === "list") {
+                parseProjects(output || "{}");
+                stateText =
+                    projects.length > 0
+                    ? "PROJECTS READY // " + String(projects.length)
+                    : "NO PROJECTS";
+                projectsRefreshed();
+
+                if (projects.length > 0) {
+                    Qt.callLater(function() {
+                        root.refreshSelectedProject();
+                    });
+                }
+
+                return;
+            }
+
+            if (finishedOperation === "detail") {
+                parseDetail(output || "{}");
+                stateText =
+                    "OPERATING MAP READY // "
+                    + String(items.length)
+                    + " ITEM"
+                    + (items.length === 1 ? "" : "S");
+                projectRefreshed();
+                return;
+            }
+        } catch (parseError) {
+            lastError =
+                "PROJECT RESPONSE PARSE // "
+                + String(parseError);
+            stateText = "ERROR // " + lastError;
+            mutationFinished(false, finishedOperation);
+            return;
+        }
+
+        stateText = "COMPLETE // " + finishedOperation.toUpperCase();
+        mutationFinished(true, finishedOperation);
+
+        if (finishedOperation === "create-project")
+            Qt.callLater(root.refreshProjects);
+        else
+            Qt.callLater(root.refreshSelectedProject);
+    }
+
+    Process {
+        id: commandProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                root.stdoutText = this.text;
+                root.stdoutSeen = true;
+                root.maybeFinish();
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                root.stderrText = this.text;
+                root.stderrSeen = true;
+                root.maybeFinish();
+            }
+        }
+
+        onExited: function(code, status) {
+            root.exitCode = Number(code);
+            root.exitSeen = true;
+            root.maybeFinish();
+        }
+    }
+
+    Timer {
+        id: watchdog
+        interval: 120000
+        repeat: false
+
+        onTriggered: {
+            const finishedOperation = root.operation;
+            root.busy = false;
+            root.lastError = "GITHUB PROJECT OPERATION TIMEOUT";
+            root.stateText = "ERROR // " + root.lastError;
+            root.mutationFinished(false, finishedOperation);
+        }
+    }
+}

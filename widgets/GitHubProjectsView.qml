@@ -10,9 +10,21 @@ Item {
     required property var keyboardHost
 
     property string projectCamera: "board"
+    property string itemCreateMode: "work"
     property bool projectExpanded: false
 
     signal projectExpandedRequested(bool expanded)
+
+    function selectItemCreateMode(mode) {
+        const next = String(mode || "work");
+
+        if (itemCreateMode === next)
+            return;
+
+        itemCreateMode = next;
+        itemTitleInput.text = "";
+        itemBodyInput.text = "";
+    }
 
     function moveItem(item, delta) {
         const options = root.projectService.statusOptions();
@@ -182,7 +194,9 @@ Item {
             if (operation === "create-project")
                 projectTitleInput.text = "";
 
-            if (operation === "create-draft") {
+            if (operation === "create-draft"
+                    || operation === "create-issue"
+                    || operation === "add-pr") {
                 itemTitleInput.text = "";
                 itemBodyInput.text = "";
             }
@@ -519,40 +533,106 @@ Item {
                     Row {
                         width: parent.width
                         height: 26
-                        spacing: 6
+                        spacing: 5
+
+                        ActionButton {
+                            width: 46
+                            height: parent.height
+                            label: "WORK"
+                            selectedAction: root.itemCreateMode === "work"
+                            onTriggered: root.selectItemCreateMode("work")
+                        }
+
+                        ActionButton {
+                            width: 46
+                            height: parent.height
+                            label: "ISSUE"
+                            selectedAction: root.itemCreateMode === "issue"
+                            onTriggered: root.selectItemCreateMode("issue")
+                        }
+
+                        ActionButton {
+                            width: 46
+                            height: parent.height
+                            label: "PR"
+                            selectedAction: root.itemCreateMode === "pr"
+                            onTriggered: root.selectItemCreateMode("pr")
+                        }
 
                         ProjectInput {
                             id: itemTitleInput
-                            width: parent.width * 0.43
+                            width:
+                                root.itemCreateMode === "pr"
+                                ? parent.width - 268
+                                : parent.width * 0.28
                             height: parent.height
-                            placeholderText: "NEW WORK ITEM"
+                            placeholderText:
+                                root.itemCreateMode === "pr"
+                                ? "PULL REQUEST URL"
+                                : root.itemCreateMode === "issue"
+                                ? "NEW ISSUE TITLE"
+                                : "NEW WORK ITEM"
                         }
 
                         ProjectInput {
                             id: itemBodyInput
-                            width: parent.width * 0.39
+                            visible: root.itemCreateMode !== "pr"
+                            width:
+                                root.itemCreateMode === "pr"
+                                ? 0
+                                : parent.width * 0.27
                             height: parent.height
-                            placeholderText: "CONTEXT // optional"
+                            placeholderText:
+                                root.itemCreateMode === "issue"
+                                ? "ISSUE CONTEXT // optional"
+                                : "CONTEXT // optional"
                         }
 
                         ActionButton {
                             width:
                                 parent.width
+                                - 138
                                 - itemTitleInput.width
                                 - itemBodyInput.width
-                                - 12
+                                - (
+                                    root.itemCreateMode === "pr"
+                                    ? 20
+                                    : 25
+                                  )
                             height: parent.height
-                            label: "ADD WORK"
+                            label:
+                                root.itemCreateMode === "issue"
+                                ? "ADD ISSUE"
+                                : root.itemCreateMode === "pr"
+                                ? "ADD PR"
+                                : "ADD WORK"
                             primaryBlue: true
                             enabledAction:
                                 !root.projectService.busy
                                 && root.projectService.selectedNumber() > 0
                                 && itemTitleInput.text.trim().length > 0
-                            onTriggered:
-                                root.projectService.createDraft(
-                                    itemTitleInput.text,
-                                    itemBodyInput.text
-                                )
+                                && (
+                                    root.itemCreateMode !== "issue"
+                                    || !!root.gitService.repoRemoteSlug
+                                   )
+                            onTriggered: {
+                                if (root.itemCreateMode === "issue") {
+                                    root.projectService.createIssue(
+                                        root.gitService.repoRemoteSlug,
+                                        itemTitleInput.text,
+                                        itemBodyInput.text
+                                    );
+                                } else if (root.itemCreateMode === "pr") {
+                                    root.projectService.addPullRequest(
+                                        itemTitleInput.text
+                                    );
+                                } else {
+                                    root.projectService.createDraft(
+                                        itemTitleInput.text,
+                                        itemBodyInput.text
+                                    );
+                                }
+                            }
                         }
                     }
 

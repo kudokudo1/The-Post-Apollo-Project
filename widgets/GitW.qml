@@ -1274,10 +1274,12 @@ PanelWindow {
                                 : Colors.red
                         }
 
-                        GohuText {
-                            anchors.centerIn: parent
+                        NotoText {
+                            anchors.fill: parent
                             text: "×"
-                            font.pixelSize: 22
+                            font.pixelSize: 28
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
                             color: Colors.red
 
                             layer.enabled: true

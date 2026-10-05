@@ -392,14 +392,16 @@ PanelWindow {
             current.height / 2
         );
 
-        // LOCAL Git has two explicit action rows. Up/Down should always hand
-        // between SYNC and LOCAL TOOLS instead of jumping to a farther control.
-        if (Number(dy || 0) !== 0
-                && typeof current.keyboardRow !== "undefined"
-                && Number(current.keyboardRow) >= 0) {
+        // LOCAL Git has two explicit action rows. Vertical movement is the
+        // only way to cross between them; horizontal movement stays in-row.
+        const currentRow =
+            typeof current.keyboardRow !== "undefined"
+            ? Number(current.keyboardRow)
+            : -1;
+
+        if (Number(dy || 0) !== 0 && currentRow >= 0) {
             const targetRow =
-                Number(current.keyboardRow)
-                + (Number(dy) < 0 ? -1 : 1);
+                currentRow + (Number(dy) < 0 ? -1 : 1);
             let rowBest = null;
             let rowBestDistance = Number.MAX_VALUE;
 
@@ -423,10 +425,10 @@ PanelWindow {
                 }
             }
 
-            if (rowBest) {
+            if (rowBest)
                 gitKeyboardControl = rowBest;
-                return;
-            }
+
+            return;
         }
 
         const horizontal = Number(dx || 0) !== 0;
@@ -438,6 +440,13 @@ PanelWindow {
 
             if (candidate === current)
                 continue;
+
+            // Left/Right never crosses an explicit action-row boundary.
+            if (horizontal && currentRow >= 0) {
+                if (typeof candidate.keyboardRow === "undefined"
+                        || Number(candidate.keyboardRow) !== currentRow)
+                    continue;
+            }
 
             const point = candidate.mapToItem(
                 frame,

@@ -242,8 +242,10 @@ PanelWindow {
         openAuditPending = false;
 
         // First open after a Quickshell restart, or an open after the stale
-        // window, gets one visible audit. Ordinary reopenings do not.
+        // window, gets one shared freshness pass. Audit and GitHub use the
+        // same per-Floor timestamp, so they run together or not at all.
         auditService.runAudit(false);
+        githubService.refresh();
     }
 
     onMenuOpenChanged: {

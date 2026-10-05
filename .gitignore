@@ -28,3 +28,6 @@ archive/
 
 # Local workflow library state
 workflow-sets.json
+
+# Local repository profile manager state
+repository-profile-sets.json

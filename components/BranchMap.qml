@@ -321,14 +321,14 @@ Rectangle {
                             font.pixelSize: isHead ? 15 : 13
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
-                            color: Colors.orange
+                            color: Colors.white
 
                             layer.enabled: true
                             layer.effect: DropShadow {
-                                radius: 15
-                                samples: 25
-                                opacity: 1.0
-                                color: Colors.orange
+                                radius: 12
+                                samples: 17
+                                opacity: 0.72
+                                color: Colors.cyan
                                 transparentBorder: true
                             }
                         }
@@ -342,25 +342,22 @@ Rectangle {
                             anchors.verticalCenter: parent.verticalCenter
                             z: 3
 
-                            readonly property color starColor:
-                                isHead ? Colors.yellow : branchMap.laneColor(lane)
-
                             text: isHead || topologyRow.refLandmark ? "★" : "✧"
                             font.pixelSize: isHead ? 15 : 13
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
-                            color: starColor
+                            color: Colors.white
 
                             layer.enabled: true
                             layer.effect: DropShadow {
-                                radius: isHead ? 7 : 5
-                                samples: isHead ? 9 : 7
+                                radius: isHead ? 8 : 6
+                                samples: isHead ? 11 : 9
                                 opacity: isHead
-                                         ? 0.78
+                                         ? 0.58
                                          : topologyRow.refLandmark
-                                         ? 0.48
-                                         : 0.38
-                                color: topologyStar.starColor
+                                         ? 0.40
+                                         : 0.30
+                                color: Colors.cyan
                                 transparentBorder: true
                             }
                         }
@@ -479,7 +476,12 @@ Rectangle {
                                         layer.effect: DropShadow {
                                             radius: 7
                                             samples: 9
-                                            opacity: 0.18
+                                            opacity:
+                                                isHead
+                                                ? 0.16
+                                                : refsRepeater.count > 0
+                                                ? 0.16
+                                                : 0.08
                                             color:
                                                 isHead
                                                 ? Colors.orange

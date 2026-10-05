@@ -1369,7 +1369,7 @@ PanelWindow {
                                     spacing: 5
 
                                     OrangeLabel {
-                                        text: "LOCAL BRANCH"
+                                        text: "LOCAL TARGET"
                                     }
 
                                     Row {
@@ -1391,8 +1391,8 @@ PanelWindow {
 
                                         SelectorInput {
                                             width: parent.width - 64
-                                            valueText: gitService.branch
-                                            placeholderText: "TYPE LOCAL BRANCH"
+                                            valueText: gitService.selectedLocalBranch
+                                            placeholderText: "TYPE LOCAL TARGET"
                                             accentColor: Colors.cyan
                                             editable:
                                                 !gitService.actionBusy
@@ -1421,19 +1421,23 @@ PanelWindow {
                                         spacing: 8
 
                                         MetaLabel {
-                                            text: "HEAD"
+                                            text: "TARGET"
                                         }
 
                                         BlueValue {
                                             width: 82
-                                            text: gitService.head
+                                            text: gitService.selectedLocalHead
                                             font.pixelSize: 9
                                         }
 
                                         MetaValue {
                                             width: parent.width - 120
-                                            text: gitService.worktree
-                                            font.pixelSize: 9
+                                            text:
+                                                "LIVE "
+                                                + gitService.branch
+                                                + " // "
+                                                + gitService.worktree
+                                            font.pixelSize: 8
                                         }
                                     }
                                 }
@@ -1574,9 +1578,17 @@ PanelWindow {
                                                 : "NONE"
                                             )
                                             + " → "
-                                            + gitService.branch
+                                            + (
+                                                gitService.selectedLocalBranch
+                                                ? gitService.selectedLocalBranch
+                                                : "NONE"
+                                            )
                                             + " // PUSH "
-                                            + gitService.branch
+                                            + (
+                                                gitService.selectedLocalBranch
+                                                ? gitService.selectedLocalBranch
+                                                : "NONE"
+                                            )
                                             + " → "
                                             + (
                                                 gitService.selectedRemoteBranch
@@ -1591,17 +1603,25 @@ PanelWindow {
                                     GohuText {
                                         width: parent.width
                                         text:
-                                            gitService.upstream
-                                            ? "TRACKING "
-                                              + gitService.upstream
-                                              + "  //  LOCAL +"
-                                              + gitService.ahead
-                                              + "  //  REMOTE +"
-                                              + gitService.behind
-                                            : "NO TRACKING BRANCH // PICK A REMOTE TARGET ABOVE"
+                                            (
+                                                gitService.selectedLocalUpstream
+                                                || gitService.selectedLocalMatchingRemote
+                                            )
+                                            ? "TARGET TRACKING "
+                                              + (
+                                                  gitService.selectedLocalUpstream
+                                                  || gitService.selectedLocalMatchingRemote
+                                                )
+                                              + "  //  LIVE CHECKOUT "
+                                              + gitService.branch
+                                            : "TARGET HAS NO MATCHING REMOTE // LIVE CHECKOUT "
+                                              + gitService.branch
                                         font.pixelSize: 8
                                         color:
-                                            gitService.upstream
+                                            (
+                                                gitService.selectedLocalUpstream
+                                                || gitService.selectedLocalMatchingRemote
+                                            )
                                             ? Colors.cyan
                                             : Colors.magenta
                                         elide: Text.ElideRight

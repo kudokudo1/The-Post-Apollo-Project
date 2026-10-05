@@ -13,6 +13,7 @@ PanelWindow {
 
     property bool menuOpen: false
     property bool keyboardActive: true
+    property bool keyboardLock: false
     signal keyboardOwnershipRequested()
 
     property string selectedCommitSha: ""
@@ -608,7 +609,12 @@ PanelWindow {
 
     exclusiveZone: 0
     WlrLayershell.layer: WlrLayer.Overlay
-    focusable: root.menuOpen && root.keyboardActive
+    WlrLayershell.keyboardFocus:
+        !root.menuOpen || !root.keyboardActive
+        ? WlrKeyboardFocus.None
+        : root.keyboardLock
+        ? WlrKeyboardFocus.Exclusive
+        : WlrKeyboardFocus.OnDemand
 
     color: "transparent"
     surfaceFormat.opaque: false

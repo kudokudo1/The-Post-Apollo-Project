@@ -202,9 +202,17 @@ Scope {
     }
 
     function pullApprovalCount(row) {
-        const reviews = Array.isArray((row || {}).latestReviews)
-            ? row.latestReviews
+        const source = row || {};
+        const enriched = Array.isArray(source.reviews)
+            ? source.reviews
             : [];
+        const listed = Array.isArray(source.latestReviews)
+            ? source.latestReviews
+            : [];
+        const reviews =
+            enriched.length > 0
+            ? enriched
+            : listed;
         let count = 0;
 
         for (let i = 0; i < reviews.length; ++i) {
@@ -219,8 +227,22 @@ Scope {
     }
 
     function pullReviewState(row) {
+        const source = row || {};
+        const enriched = Array.isArray(source.reviews)
+            ? source.reviews
+            : [];
+
+        for (let i = 0; i < enriched.length; ++i) {
+            const state = String(
+                (enriched[i] || {}).state || ""
+            ).toUpperCase();
+
+            if (state === "CHANGES_REQUESTED")
+                return "CHANGES REQUESTED";
+        }
+
         const decision = String(
-            (row || {}).reviewDecision || ""
+            source.reviewDecision || ""
         ).toUpperCase();
 
         if (decision === "APPROVED")
@@ -319,13 +341,33 @@ Scope {
             "-lc",
             [
                 'repo="$1"',
-                'rows="$(gh pr list --repo "$repo" --state all --limit 1000 --json number,title,state,url,isDraft,author,headRefName,baseRefName,headRefOid,updatedAt,reviewDecision,latestReviews,reviewRequests)" || exit $?',
+                'rows="$(gh pr list --repo "$repo" --state all --limit 1000 --json number,title,state,url,isDraft,author,headRefName,baseRefName,headRefOid,updatedAt,reviewDecision)" || exit $?',
                 'tmpdir="$(mktemp -d)"',
                 "trap 'rm -rf \"$tmpdir\"' EXIT",
-                "while IFS=
+                'printf "%s" "$rows" | jq -c ".[]" > "$tmpdir/rows.ndjson"',
+                'while IFS= read -r row; do',
+                '  number="$(printf "%s" "$row" | jq -r ".number")"',
+                '  sha="$(printf "%s" "$row" | jq -r ".headRefOid")"',
+                '  (',
+                '    checks_payload="$(gh api -H "Accept: application/vnd.github+json" "repos/$repo/commits/$sha/check-runs?per_page=100" 2>/dev/null || printf "{}")"',
+                '    reviews_payload="$(gh api "repos/$repo/pulls/$number/reviews?per_page=100" 2>/dev/null || printf "[]")"',
+                '    requests_payload="$(gh api "repos/$repo/pulls/$number/requested_reviewers" 2>/dev/null || printf "{\\\"users\\\":[],\\\"teams\\\":[]}")"',
+                '    checks="$(printf "%s" "$checks_payload" | jq -c "[.check_runs[]? | {name:(.name // \\\"\\\"),status:(.status // \\\"\\\"),conclusion:(.conclusion // \\\"\\\")}]" 2>/dev/null || printf "[]")"',
+                '    reviews="$(printf "%s" "$reviews_payload" | jq -c "[.[]? | select(.user.login != null) | {user:.user.login,state:(.state // \\\"\\\"),submittedAt:(.submitted_at // \\\"\\\")}] | sort_by([.user,.submittedAt]) | group_by(.user) | map(last)" 2>/dev/null || printf "[]")"',
+                '    requests="$(printf "%s" "$requests_payload" | jq -c "[.users[]?.login, .teams[]?.slug] | map(select(. != null and . != \\\"\\\"))" 2>/dev/null || printf "[]")"',
+                "    jq -nc --argjson number \"$number\" --argjson checks \"$checks\" --argjson reviews \"$reviews\" --argjson requests \"$requests\" '{number:$number,checks:$checks,reviews:$reviews,reviewRequests:$requests}' > \"$tmpdir/detail-$number.json\"",
+                '  ) &',
+                '  while [ "$(jobs -rp | wc -l)" -ge 8 ]; do',
+                '    wait -n || true',
+                '  done',
+                'done < "$tmpdir/rows.ndjson"',
                 'wait || true',
-                "checks_json=\"$(jq -s '.' \"$tmpdir\"/*.json 2>/dev/null || printf '[]')\"",
-                "jq -nc --argjson rows \"$rows\" --argjson checks \"$checks_json\" '$rows | map(. as $row | (($checks | map(select(.number == $row.number)) | first) // {checks:[]}) as $detail | $row + {checks:$detail.checks})'"
+                'if ls "$tmpdir"/detail-*.json >/dev/null 2>&1; then',
+                '  details_json="$(jq -s "." "$tmpdir"/detail-*.json)"',
+                'else',
+                '  details_json="[]"',
+                'fi',
+                "jq -nc --argjson rows \"$rows\" --argjson details \"$details_json\" '$rows | map(. as $row | (($details | map(select(.number == $row.number)) | first) // {checks:[],reviews:[],reviewRequests:[]}) as $detail | $row + {checks:$detail.checks,reviews:$detail.reviews,reviewRequests:$detail.reviewRequests})'"
             ].join("\n"),
             "pa-github-pulls",
             cleanRepo

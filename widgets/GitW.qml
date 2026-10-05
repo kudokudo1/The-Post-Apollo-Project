@@ -84,6 +84,20 @@ PanelWindow {
         height: root.menuOpen ? root.height : 0
     }
 
+    // Stable keyboard home for Git. Editors/dials may temporarily take
+    // focus, but ordinary Git navigation always has somewhere to return.
+    Item {
+        id: gitKeyboardFocusAnchor
+
+        anchors.fill: parent
+        focus:
+            root.menuOpen
+            && !root.activeTextEditor
+            && !root.dialControlMode
+        enabled: root.menuOpen
+        z: -1000
+    }
+
     Shortcut {
         sequence: "Esc"
         context: Qt.ApplicationShortcut
@@ -234,6 +248,23 @@ PanelWindow {
         context: Qt.ApplicationShortcut
         enabled: root.menuOpen
         onActivated: root.invokeGitHotkey("LAZYGIT")
+    }
+
+    function restoreGitKeyboardFocus(requestSurface) {
+        if (!root.menuOpen)
+            return;
+
+        Qt.callLater(function() {
+            if (!root.menuOpen
+                    || root.activeTextEditor
+                    || root.dialControlMode)
+                return;
+
+            gitKeyboardFocusAnchor.forceActiveFocus();
+
+            if (requestSurface === true)
+                root.requestActivate();
+        });
     }
 
     function registerGitKeyboardControl(item) {
@@ -495,10 +526,12 @@ PanelWindow {
         if (gitControlIsDial(item)) {
             dialControlMode = !dialControlMode;
 
-            if (dialControlMode)
+            if (dialControlMode) {
                 item.forceActiveFocus();
-            else
+            } else {
                 item.focus = false;
+                root.restoreGitKeyboardFocus(false);
+            }
 
             return;
         }
@@ -522,6 +555,7 @@ PanelWindow {
             showGithubPage();
 
         Qt.callLater(ensureGitKeyboardControl);
+        root.restoreGitKeyboardFocus(false);
     }
 
     function selectBottomMode(direction) {
@@ -543,6 +577,7 @@ PanelWindow {
             showGithubLibrary();
 
         Qt.callLater(ensureGitKeyboardControl);
+        root.restoreGitKeyboardFocus(false);
     }
 
     function invokeGitHotkey(actionName) {
@@ -599,6 +634,7 @@ PanelWindow {
             focused.deselect();
             focused.focus = false;
             root.activeTextEditor = null;
+            root.restoreGitKeyboardFocus(false);
         }
     }
 
@@ -761,6 +797,7 @@ PanelWindow {
             githubService.refresh();
 
         Qt.callLater(root.ensureGitKeyboardControl);
+        root.restoreGitKeyboardFocus(true);
     }
 
     GitService {
@@ -994,11 +1031,15 @@ PanelWindow {
                     selectorInput.submitted(candidate);
 
                 focus = false;
+                root.activeTextEditor = null;
+                root.restoreGitKeyboardFocus(false);
             }
 
             Keys.onEscapePressed: function(event) {
                 text = selectorInput.valueText;
                 focus = false;
+                root.activeTextEditor = null;
+                root.restoreGitKeyboardFocus(false);
                 event.accepted = true;
             }
 
@@ -2945,6 +2986,19 @@ PanelWindow {
                                                                             selectedTextColor: Colors.black
 
                                                                             onTextChanged: githubService.clearFactoryResult()
+
+                                                                            onAccepted: {
+                                                                                focus = false;
+                                                                                root.activeTextEditor = null;
+                                                                                root.restoreGitKeyboardFocus(false);
+                                                                            }
+
+                                                                            Keys.onEscapePressed: function(event) {
+                                                                                focus = false;
+                                                                                root.activeTextEditor = null;
+                                                                                root.restoreGitKeyboardFocus(false);
+                                                                                event.accepted = true;
+                                                                            }
 
                                                                             onActiveFocusChanged: {
                                                                                 if (activeFocus)

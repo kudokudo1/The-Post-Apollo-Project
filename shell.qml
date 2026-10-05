@@ -18,6 +18,12 @@ import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 
 PanelWindow {
+    id: shellRoot
+
+    // Hospital and Git may be open together, but exactly one owns the
+    // shared keyboard vocabulary at a time.
+    property string controlKeyboardOwner: ""
+
     screen: Quickshell.screens.find(s => s.name === "DP-5")
 
     anchors {
@@ -187,6 +193,19 @@ PanelWindow {
                 id: hospitalWindow
 
                 screen: Quickshell.screens.find(s => s.name === "DP-5")
+                keyboardActive:
+                    shellRoot.controlKeyboardOwner === "hospital"
+
+                onKeyboardOwnershipRequested:
+                    shellRoot.controlKeyboardOwner = "hospital"
+
+                onMenuOpenChanged: {
+                    if (!menuOpen
+                            && shellRoot.controlKeyboardOwner === "hospital") {
+                        shellRoot.controlKeyboardOwner =
+                            gitWindow.menuOpen ? "git" : "";
+                    }
+                }
             }
         }
 
@@ -212,6 +231,19 @@ PanelWindow {
                 id: gitWindow
 
                 screen: Quickshell.screens.find(s => s.name === "DP-5")
+                keyboardActive:
+                    shellRoot.controlKeyboardOwner === "git"
+
+                onKeyboardOwnershipRequested:
+                    shellRoot.controlKeyboardOwner = "git"
+
+                onMenuOpenChanged: {
+                    if (!menuOpen
+                            && shellRoot.controlKeyboardOwner === "git") {
+                        shellRoot.controlKeyboardOwner =
+                            hospitalWindow.menuOpen ? "hospital" : "";
+                    }
+                }
             }
         }
     }

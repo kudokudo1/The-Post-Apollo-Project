@@ -294,8 +294,6 @@ PanelWindow {
                 return;
 
             gitKeyboardFocusAnchor.forceActiveFocus();
-
-            if (requestSurface === true)
         });
     }
 

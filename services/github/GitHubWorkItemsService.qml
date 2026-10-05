@@ -91,40 +91,58 @@ Scope {
         return !!((row || {}).isDraft);
     }
 
+    function pullStatusCheckRollup(row) {
+        const commits = (((row || {}).commits || {}).nodes || []);
+
+        if (!Array.isArray(commits) || commits.length === 0)
+            return null;
+
+        const commit = (commits[0] || {}).commit || {};
+        return commit.statusCheckRollup || null;
+    }
+
+    function pullCheckContexts(row) {
+        const rollup = pullStatusCheckRollup(row);
+
+        if (!rollup)
+            return [];
+
+        const contexts = (rollup.contexts || {}).nodes || [];
+        return Array.isArray(contexts) ? contexts : [];
+    }
+
+    function pullCheckRollupState(row) {
+        const rollup = pullStatusCheckRollup(row);
+        return String((rollup || {}).state || "").toUpperCase();
+    }
+
     function pullCheckCounts(row) {
-        const source = row || {};
-        const directChecks = Array.isArray(source.checks)
-            ? source.checks
-            : [];
-        const listedChecks = Array.isArray(source.statusCheckRollup)
-            ? source.statusCheckRollup
-            : [];
-        const checks =
-            directChecks.length > 0
-            ? directChecks
-            : listedChecks;
+        const checks = pullCheckContexts(row);
         let passed = 0;
         let failed = 0;
+        let cancelled = 0;
         let pending = 0;
 
         for (let i = 0; i < checks.length; ++i) {
             const check = checks[i] || {};
+            const type = String(check.__typename || "");
             const status = String(check.status || "").toUpperCase();
             const conclusion = String(
-                check.conclusion
-                || check.state
-                || ""
+                type === "StatusContext"
+                ? check.state
+                : check.conclusion
             ).toUpperCase();
 
-            if ([
-                    "FAILURE",
-                    "ERROR",
-                    "CANCELLED",
-                    "TIMED_OUT",
-                    "ACTION_REQUIRED",
-                    "STARTUP_FAILURE",
-                    "STALE"
-                ].indexOf(conclusion) >= 0) {
+            if (conclusion === "CANCELLED") {
+                cancelled += 1;
+            } else if ([
+                           "FAILURE",
+                           "ERROR",
+                           "TIMED_OUT",
+                           "ACTION_REQUIRED",
+                           "STARTUP_FAILURE",
+                           "STALE"
+                       ].indexOf(conclusion) >= 0) {
                 failed += 1;
             } else if ([
                            "SUCCESS",
@@ -137,12 +155,14 @@ Scope {
                            "IN_PROGRESS",
                            "WAITING",
                            "REQUESTED",
-                           "PENDING"
-                       ].indexOf(status) >= 0) {
+                           "PENDING",
+                           "EXPECTED"
+                       ].indexOf(status) >= 0
+                       || [
+                              "PENDING",
+                              "EXPECTED"
+                          ].indexOf(conclusion) >= 0) {
                 pending += 1;
-            } else if (status === "COMPLETED"
-                       && !conclusion) {
-                passed += 1;
             } else {
                 pending += 1;
             }
@@ -152,20 +172,29 @@ Scope {
             total: checks.length,
             passed: passed,
             failed: failed,
+            cancelled: cancelled,
             pending: pending
         };
     }
 
     function pullCheckState(row) {
-        if (String((row || {}).checksError || "").trim())
-            return "ERROR";
+        const state = pullCheckRollupState(row);
+
+        if (state === "SUCCESS")
+            return "PASS";
+
+        if (state === "FAILURE" || state === "ERROR")
+            return "FAIL";
+
+        if (state === "PENDING" || state === "EXPECTED")
+            return "PENDING";
 
         const counts = pullCheckCounts(row);
 
         if (counts.total === 0)
             return "NONE";
 
-        if (counts.failed > 0)
+        if (counts.failed > 0 || counts.cancelled > 0)
             return "FAIL";
 
         if (counts.pending > 0)
@@ -175,53 +204,69 @@ Scope {
     }
 
     function pullCheckSummary(row) {
+        const rollupState = pullCheckRollupState(row);
         const counts = pullCheckCounts(row);
-        const state = pullCheckState(row);
 
-        if (state === "ERROR")
-            return "ERROR";
-
-        if (state === "NONE")
+        if (!rollupState && counts.total === 0)
             return "NONE";
 
-        if (state === "FAIL")
-            return "FAIL // " + String(counts.failed) + " FAILED";
+        const parts = [];
 
-        if (state === "PENDING")
-            return (
-                "PENDING // "
-                + String(counts.passed)
-                + "/"
-                + String(counts.total)
-            );
+        if (counts.passed > 0)
+            parts.push(String(counts.passed) + " PASS");
+
+        if (counts.failed > 0)
+            parts.push(String(counts.failed) + " FAIL");
+
+        if (counts.cancelled > 0)
+            parts.push(String(counts.cancelled) + " CANCELLED");
+
+        if (counts.pending > 0)
+            parts.push(String(counts.pending) + " PENDING");
+
+        const stateText =
+            rollupState
+            || (
+                counts.failed > 0 || counts.cancelled > 0
+                ? "FAILURE"
+                : counts.pending > 0
+                ? "PENDING"
+                : "SUCCESS"
+               );
 
         return (
-            "PASS // "
-            + String(counts.passed)
-            + "/"
-            + String(counts.total)
+            stateText
+            + (parts.length > 0 ? " // " + parts.join(" · ") : "")
         );
     }
 
+    function pullReviewNodes(row) {
+        const nodes = (((row || {}).reviews || {}).nodes || []);
+        return Array.isArray(nodes) ? nodes : [];
+    }
+
     function pullApprovalCount(row) {
-        const source = row || {};
-        const directReviews = Array.isArray(source.reviews)
-            ? source.reviews
-            : [];
-        const listedReviews = Array.isArray(source.latestReviews)
-            ? source.latestReviews
-            : [];
-        const reviews =
-            directReviews.length > 0
-            ? directReviews
-            : listedReviews;
-        let count = 0;
+        const reviews = pullReviewNodes(row);
+        const latestByAuthor = ({});
 
         for (let i = 0; i < reviews.length; ++i) {
             const review = reviews[i] || {};
-            const state = String(review.state || "").toUpperCase();
+            const author = (review.author || {}).login;
+            const key = String(author || "");
 
-            if (state === "APPROVED")
+            if (!key)
+                continue;
+
+            latestByAuthor[key] = String(
+                review.state || ""
+            ).toUpperCase();
+        }
+
+        let count = 0;
+        const authors = Object.keys(latestByAuthor);
+
+        for (let i = 0; i < authors.length; ++i) {
+            if (latestByAuthor[authors[i]] === "APPROVED")
                 count += 1;
         }
 
@@ -230,46 +275,23 @@ Scope {
 
     function pullReviewState(row) {
         const source = row || {};
-
-        if (String(source.reviewError || "").trim())
-            return "ERROR";
-
-        const directReviews = Array.isArray(source.reviews)
-            ? source.reviews
-            : [];
-
-        for (let i = 0; i < directReviews.length; ++i) {
-            const state = String(
-                (directReviews[i] || {}).state || ""
-            ).toUpperCase();
-
-            if (state === "CHANGES_REQUESTED")
-                return "CHANGES REQUESTED";
-        }
-
         const decision = String(
             source.reviewDecision || ""
         ).toUpperCase();
 
-        if (decision === "APPROVED")
+        if (decision)
+            return decision;
+
+        if (pullApprovalCount(source) > 0)
             return "APPROVED";
 
-        if (decision === "CHANGES_REQUESTED")
-            return "CHANGES REQUESTED";
+        const requestCount = Number(
+            ((source.reviewRequests || {}).totalCount) || 0
+        );
 
-        if (decision === "REVIEW_REQUIRED")
-            return "REVIEW REQUIRED";
-
-        if (pullApprovalCount(row) > 0)
-            return "APPROVED";
-
-        const requests = Array.isArray(source.reviewRequests)
-            ? source.reviewRequests
-            : [];
-
-        return requests.length > 0
-            ? "REVIEW REQUIRED"
-            : "NO REVIEW";
+        return requestCount > 0
+            ? "REVIEW_REQUIRED"
+            : "NONE";
     }
 
     function pullReviewSummary(row) {
@@ -280,16 +302,32 @@ Scope {
             + " APPROVAL"
             + (approvals === 1 ? "" : "S");
 
-        if (state === "ERROR")
-            return "ERROR";
-
-        if (state === "NO REVIEW")
-            return countText;
-
-        if (state === "REVIEW REQUIRED")
+        if (state === "REVIEW_REQUIRED")
             return "REQUIRED // " + countText;
 
         return state + " // " + countText;
+    }
+
+    function pullMergeState(row) {
+        return String(
+            (row || {}).mergeStateStatus || "UNKNOWN"
+        ).toUpperCase();
+    }
+
+    function pullMergeSummary(row) {
+        const state = pullMergeState(row);
+        const mergeable = String(
+            (row || {}).mergeable || ""
+        ).toUpperCase();
+
+        return (
+            state
+            + (
+                mergeable
+                ? " · " + mergeable
+                : ""
+              )
+        );
     }
 
     function refreshIssues(repo) {
@@ -354,33 +392,12 @@ Scope {
             "-lc",
             [
                 'repo="$1"',
-                'rows="$(gh pr list --repo "$repo" --state all --limit 1000 --json number,title,state,url,isDraft,author,headRefName,baseRefName,headRefOid,updatedAt,reviewDecision)" || exit $?',
-                'tmpdir="$(mktemp -d)"',
-                'printf "%s" "$rows" | jq -c ".[]" > "$tmpdir/rows.ndjson"',
-                'while IFS= read -r row; do',
-                '  number="$(printf "%s" "$row" | jq -r ".number")"',
-                '  sha="$(printf "%s" "$row" | jq -r ".headRefOid")"',
-                '  (',
-                '    checks_error=""',
-                '    review_error=""',
-                '    checks="$(gh api -H "Accept: application/vnd.github+json" "repos/$repo/commits/$sha/check-runs?per_page=100" --jq "[.check_runs[]? | {name:(.name // \\\"\\\"),status:(.status // \\\"\\\"),conclusion:(.conclusion // \\\"\\\")}]" 2>"$tmpdir/checks-$number.err")" || { checks="[]"; checks_error="$(tr "\\n" " " < "$tmpdir/checks-$number.err")"; }',
-                '    reviews="$(gh api "repos/$repo/pulls/$number/reviews?per_page=100" --jq "[.[]? | select(.user.login != null) | {user:.user.login,state:(.state // \\\"\\\"),submittedAt:(.submitted_at // \\\"\\\")}] | sort_by([.user,.submittedAt]) | group_by(.user) | map(last)" 2>"$tmpdir/reviews-$number.err")" || { reviews="[]"; review_error="$(tr "\\n" " " < "$tmpdir/reviews-$number.err")"; }',
-                '    requests="$(gh api "repos/$repo/pulls/$number/requested_reviewers" --jq "[.users[]?.login, .teams[]?.slug] | map(select(. != null and . != \\\"\\\"))" 2>/dev/null || printf "[]")"',
-                "    jq -nc --argjson number \"$number\" --argjson checks \"$checks\" --argjson reviews \"$reviews\" --argjson requests \"$requests\" --arg checksError \"$checks_error\" --arg reviewError \"$review_error\" '{number:$number,checks:$checks,reviews:$reviews,reviewRequests:$requests,checksError:$checksError,reviewError:$reviewError}' > \"$tmpdir/detail-$number.json\"",
-                '  ) &',
-                '  while [ "$(jobs -rp | wc -l)" -ge 8 ]; do',
-                '    wait -n || true',
-                '  done',
-                'done < "$tmpdir/rows.ndjson"',
-                'wait || true',
-                'details_json="[]"',
-                'if ls "$tmpdir"/detail-*.json >/dev/null 2>&1; then',
-                '  details_json="$(jq -s "." "$tmpdir"/detail-*.json)"',
-                'fi',
-                "jq -nc --argjson rows \"$rows\" --argjson details \"$details_json\" '$rows | map(. as $row | (($details | map(select(.number == $row.number)) | first) // {checks:[],reviews:[],reviewRequests:[],checksError:\"\",reviewError:\"\"}) as $detail | $row + {checks:$detail.checks,reviews:$detail.reviews,reviewRequests:$detail.reviewRequests,checksError:$detail.checksError,reviewError:$detail.reviewError})'",
-                'rm -rf "$tmpdir"'
+                'owner="${repo%%/*}"',
+                'name="${repo#*/}"',
+                "query='query($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(first:100,orderBy:{field:UPDATED_AT,direction:DESC}){nodes{number title state url isDraft updatedAt author{login} headRefName baseRefName headRefOid reviewDecision mergeStateStatus mergeable reviewRequests(first:20){totalCount} reviews(first:100){nodes{state author{login}}} commits(last:1){nodes{commit{statusCheckRollup{state contexts(first:100){nodes{__typename ... on CheckRun{name status conclusion} ... on StatusContext{context state}}}}}}}}}}}}}'",
+                'exec gh api graphql -F owner="$owner" -F name="$name" -f query="$query" --jq ".data.repository.pullRequests.nodes"'
             ].join("\n"),
-            "pa-github-pulls",
+            "pa-github-pulls-graphql",
             cleanRepo
         ]);
         pullsWatchdog.restart();

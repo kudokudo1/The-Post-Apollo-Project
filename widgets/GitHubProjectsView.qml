@@ -689,7 +689,7 @@ Item {
                                                 required property var modelData
 
                                                 width: laneBody.width
-                                                height: 66
+                                                height: 70
                                                 color: Colors.dark
                                                 border.width: 1
                                                 border.color:
@@ -705,15 +705,52 @@ Item {
 
                                                     spacing: 3
 
-                                                    GohuText {
+                                                    Row {
                                                         width: parent.width
-                                                        text:
-                                                            root.projectService.itemTitle(
-                                                                itemCard.modelData
-                                                            )
-                                                        font.pixelSize: 9
-                                                        color: Colors.white
-                                                        elide: Text.ElideRight
+                                                        height: 20
+                                                        spacing: 5
+
+                                                        GohuText {
+                                                            width: parent.width - 91
+                                                            anchors.verticalCenter: parent.verticalCenter
+                                                            text:
+                                                                root.projectService.itemTitle(
+                                                                    itemCard.modelData
+                                                                )
+                                                            font.pixelSize: 9
+                                                            color: Colors.white
+                                                            elide: Text.ElideRight
+                                                        }
+
+                                                        ActionButton {
+                                                            width: 57
+                                                            height: 20
+                                                            label: "ARCHIVE"
+                                                            enabledAction:
+                                                                !root.projectService.busy
+                                                                && !!root.projectService.itemId(
+                                                                    itemCard.modelData
+                                                                )
+                                                            onTriggered:
+                                                                root.projectService.archiveItem(
+                                                                    itemCard.modelData
+                                                                )
+                                                        }
+
+                                                        ActionButton {
+                                                            width: 24
+                                                            height: 20
+                                                            label: "X"
+                                                            enabledAction:
+                                                                !root.projectService.busy
+                                                                && !!root.projectService.itemId(
+                                                                    itemCard.modelData
+                                                                )
+                                                            onTriggered:
+                                                                root.projectService.removeItem(
+                                                                    itemCard.modelData
+                                                                )
+                                                        }
                                                     }
 
                                                     Row {

@@ -1253,12 +1253,9 @@ PanelWindow {
                         color:
                             gitCloseMouse.pressed
                             ? Colors.black
-                            : Colors.red
+                            : Colors.dark
                         border.width: 1
-                        border.color:
-                            gitCloseMouse.pressed
-                            ? Colors.black
-                            : Colors.red
+                        border.color: Colors.black
 
                         RectangularShadow {
                             anchors.fill: parent
@@ -1278,10 +1275,7 @@ PanelWindow {
                             anchors.centerIn: parent
                             text: "X"
                             font.pixelSize: 18
-                            color:
-                                gitCloseMouse.pressed
-                                ? Colors.red
-                                : Colors.black
+                            color: Colors.red
 
                             layer.enabled: true
                             layer.effect: DropShadow {

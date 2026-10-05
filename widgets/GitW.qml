@@ -1250,10 +1250,13 @@ PanelWindow {
 
                         color:
                             gitCloseMouse.pressed
-                            ? Colors.red
-                            : Colors.dark
+                            ? Colors.black
+                            : Colors.red
                         border.width: 1
-                        border.color: Colors.black
+                        border.color:
+                            gitCloseMouse.pressed
+                            ? Colors.black
+                            : Colors.red
 
                         RectangularShadow {
                             anchors.fill: parent
@@ -1261,9 +1264,12 @@ PanelWindow {
                             z: -1
                             opacity:
                                 gitCloseMouse.containsMouse
-                                ? 0.52
-                                : 0.30
-                            color: Colors.black
+                                ? 0.58
+                                : 0.38
+                            color:
+                                gitCloseMouse.pressed
+                                ? Colors.red
+                                : Colors.black
                         }
 
                         GohuText {

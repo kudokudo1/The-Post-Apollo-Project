@@ -203,57 +203,33 @@ Item {
 
         Row {
             width: parent.width
-            height: 42
-            spacing: 10
+            height: 26
+            spacing: 8
 
-            Column {
-                width: parent.width - 250
+            GohuText {
+                width: parent.width * 0.46
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 2
-
-                GohuText {
-                    width: parent.width
-                    text: "PROJECTS // OPERATING MAP"
-                    font.pixelSize: 13
-                    color: Colors.magenta
-                    elide: Text.ElideRight
-                }
-
-                GohuText {
-                    width: parent.width
-                    text:
-                        "WORK ACROSS REPOSITORIES // ONE MAP, MULTIPLE BEDS"
-                    font.pixelSize: 8
-                    color: Colors.cyan
-                    opacity: 0.72
-                    elide: Text.ElideRight
-                }
+                text: "PROJECTS // OPERATING MAP"
+                font.pixelSize: 10
+                color: Colors.magenta
+                elide: Text.ElideRight
             }
 
             GohuText {
-                width: 240
+                width: parent.width * 0.54 - 8
                 anchors.verticalCenter: parent.verticalCenter
                 horizontalAlignment: Text.AlignRight
-                text:
-                    root.projectService.busy
-                    ? root.projectService.stateText
-                    : root.projectService.lastError
-                    ? "ERROR"
-                    : root.projectService.stateText
-                font.pixelSize: 8
-                color:
-                    root.projectService.lastError
-                    ? Colors.red
-                    : root.projectService.busy
-                    ? Colors.orange
-                    : Colors.white
+                text: "WORK ACROSS REPOSITORIES // ONE MAP, MULTIPLE BEDS"
+                font.pixelSize: 7
+                color: Colors.cyan
+                opacity: 0.62
                 elide: Text.ElideRight
             }
         }
 
         Row {
             width: parent.width
-            height: parent.height - 50
+            height: parent.height - 34
             spacing: 10
 
             Rectangle {
@@ -414,7 +390,7 @@ Item {
 
                     Row {
                         width: parent.width
-                        height: 38
+                        height: 30
                         spacing: 8
 
                         Column {
@@ -433,7 +409,7 @@ Item {
                                         + root.projectService.selectedTitle()
                                       )
                                     : "NO PROJECT SELECTED"
-                                font.pixelSize: 12
+                                font.pixelSize: 10
                                 color: Colors.white
                                 elide: Text.ElideRight
                             }
@@ -446,9 +422,9 @@ Item {
                                         || root.projectService.projectView.description
                                         || "SELECT A PROJECT TO OPEN ITS OPERATING MAP"
                                     )
-                                font.pixelSize: 8
+                                font.pixelSize: 7
                                 color: Colors.cyan
-                                opacity: 0.68
+                                opacity: 0.58
                                 elide: Text.ElideRight
                             }
                         }
@@ -487,7 +463,7 @@ Item {
 
                     Row {
                         width: parent.width
-                        height: 30
+                        height: 24
                         spacing: 8
 
                         GohuText {
@@ -522,7 +498,7 @@ Item {
 
                     Row {
                         width: parent.width
-                        height: 30
+                        height: 26
                         spacing: 6
 
                         ProjectInput {
@@ -566,7 +542,7 @@ Item {
 
                     Row {
                         width: parent.width
-                        height: 28
+                        height: 24
                         spacing: 6
 
                         ActionButton {
@@ -597,7 +573,7 @@ Item {
                         width: parent.width
                         height:
                             root.projectCamera === "board"
-                            ? parent.height - 164
+                            ? parent.height - 138
                             : 0
                         visible: root.projectCamera === "board"
                         clip: true
@@ -814,7 +790,7 @@ Item {
                         width: parent.width
                         height:
                             root.projectCamera === "roadmap"
-                            ? parent.height - 164
+                            ? parent.height - 138
                             : 0
                         visible: root.projectCamera === "roadmap"
                         projectService: root.projectService
@@ -824,7 +800,7 @@ Item {
                         width: parent.width
                         height:
                             root.projectCamera === "table"
-                            ? parent.height - 164
+                            ? parent.height - 138
                             : 0
                         visible: root.projectCamera === "table"
                         projectService: root.projectService

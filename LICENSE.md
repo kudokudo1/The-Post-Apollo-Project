@@ -1,95 +1,120 @@
-# POST-APOLLO // COMMUNITY LICENSE & COMMERCIAL TERMS
+# LICENSE // META APOLLO // POST-APOLLO FAMILY
 
 > **STATUS //** source-available / community noncommercial
 >
 > **SCOPE //** original material in this repository only
 
-## 1. Scope and precedence
+The Meta Apollo // Post-Apollo Family is built to be used, explored, changed, learned from, and shared by people.
 
-These terms apply only to material for which the repository owner or identified Post-Apollo author has the right to grant a license.
+For ordinary community use, we want that relationship to be **easy and low friction**.
 
-Third-party, inherited, vendored, generated, archived, or otherwise separately licensed material remains governed by its own license and notices. If a file or directory carries a different license notice, that notice controls for that material.
+If you are using original Post-Apollo software personally, educationally, experimentally, academically, artistically, as a hobby, or as part of another genuinely noncommercial activity, you are generally welcome to use it, study it, modify it, and share your changes under the terms of the applicable community license.
 
-## 2. Original software and code
+## COMMUNITY LICENSES
 
 Unless a file says otherwise, original software and code covered by this notice are offered under the **PolyForm Noncommercial License 1.0.0**:
 
 https://polyformproject.org/licenses/noncommercial/1.0.0/
 
-The PolyForm terms are the operative software license. In practical terms, they are intended to make personal, educational, research, hobbyist, community, and other noncommercial use broadly available while reserving commercial exploitation.
+The PolyForm terms are the operative software license.
 
-## 3. Original writing, documentation, diagrams, and non-brand artwork
-
-Unless a file says otherwise, original writing, documentation, diagrams, and non-brand artistic material are offered under **Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)**:
+Unless a file says otherwise, original writing, documentation, diagrams, and non-brand artwork are offered under the **Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License (CC BY-NC-SA 4.0)**:
 
 https://creativecommons.org/licenses/by-nc-sa/4.0/
 
-Brand Assets described below are excluded from this grant unless expressly marked otherwise.
+Brand assets described below are excluded from that grant unless expressly marked otherwise.
 
-## 4. Commercial use is reserved
+Third-party, inherited, vendored, generated, archived, or separately licensed material keeps its own license and notices. Nothing here removes rights already granted by another applicable license or by law.
 
-No automatic commercial license is granted beyond rights you may independently have under applicable law or a separate file-specific license.
+## COMMUNITY
 
-If you want to use covered Post-Apollo material commercially, contact the copyright holder and obtain **express written permission** before doing so.
+Meta Apollo is interested in relationships between people, tools, machines, ideas, environments, and the things we build together.
 
-A commercial agreement may include, among other things:
+Community use is part of that relationship.
 
-- licensing fees or revenue terms;
-- provenance and attribution requirements;
-- disclosure of modifications;
-- source-availability or source-sharing requirements;
-- downstream user-freedom requirements;
-- limits on sublicensing, bundling, or white-labeling;
-- compatibility or interoperability obligations;
-- reporting or audit obligations;
-- separate permission for names, logos, or other Brand Assets.
+You are encouraged to experiment, learn, modify, fork, repair, reinterpret, and build on the work for noncommercial purposes.
 
-Silence, public availability, a fork, an issue, a contribution, or completion of an application step does **not** grant commercial permission.
+If you make something interesting with it, wonderful.
 
-### CEREMONY // HUMANS STILL EXIST
+If you change it beyond recognition, that can be interesting too.
 
-Commercial applicants may be asked to complete harmless and lawful ceremonial requirements as part of the application process.
+What matters is that existing attribution, provenance, and applicable license notices remain intact so that the **history and spirit of the work do not disappear simply because the work changed**.
 
-For example, an authorized representative may someday be asked to provide photographic evidence involving **three lemons** and a sincere request to become Kudo's best friend.
+## COMMERCIAL USE
 
-Completing a ceremony is only part of an application. It never creates a license by itself.
+Commercial use is different.
 
-The joke is optional.
+Public availability does not mean that Post-Apollo exists as free product development for a company.
 
-The written permission is not.
+No automatic commercial permission is granted for original Post-Apollo material beyond rights you may independently have under another applicable license or under law.
 
-## 5. Meta Apollo / Post-Apollo identity is reserved
+If you want to incorporate original Post-Apollo material into a commercial product, paid service, revenue-producing operation, commercial distribution, or another use primarily intended to produce commercial advantage, you need **express written permission** from the copyright holder.
 
-The community grants above do not grant a right to use project identity as though it were your own.
+That begins a different relationship.
 
-This includes, where applicable:
+Commercial terms may include licensing fees, attribution requirements, disclosure of modifications, source-sharing requirements, downstream user protections, restrictions on sublicensing or white-labeling, reporting obligations, or other conditions appropriate to the use.
 
-- **Meta Apollo Logos**
-- **Post-Apollo**
-- the **Kudo Star**
-- project logos and banners
-- distinctive branded artwork
-- names, marks, and presentation that reasonably identify an official Meta Apollo / Post-Apollo project
+Those terms are negotiated separately.
 
-You may make truthful factual references such as saying that your work is based on, compatible with, or forked from a Post-Apollo project, provided you do not imply sponsorship, endorsement, ownership, or official status.
+Being able to see the code does not grant commercial permission.
 
-Commercial branding use requires separate written permission.
+Forking the repository does not grant commercial permission.
 
-## 6. Community intent
+Submitting an issue does not grant commercial permission.
 
-The intended relationship is simple:
+Contributing to the project does not grant commercial permission.
 
-**People should be able to study, use, modify, experiment with, and share the work noncommercially.**
+Silence does not grant commercial permission.
 
-**Commercial actors do not receive the project as free product development.**
+And completing an application requirement does not, by itself, grant commercial permission.
 
-If commercial use would help your company, product, service, or revenue-producing activity, establish a relationship with the project first.
+Only an explicit written commercial license does that.
 
-## 7. Contact
+## CEREMONY // HUMANS STILL EXIST
 
-For commercial licensing or permissions, contact the repository owner through the GitHub account that owns this repository.
+Commercial licensing does not have to pretend that corporations are disembodied legal machines communicating exclusively through seventeen-page PDF attachments.
 
-If a dedicated licensing contact is published later, use that contact instead.
+A commercial applicant may occasionally be asked to complete harmless and lawful ceremonial requirements as part of beginning that relationship.
+
+For example, an authorized representative may someday be asked to provide photographic evidence of themselves **sniffing three lemons and sincerely asking Kudo to be their best friend.**
+
+This does not automatically grant them a license.
+
+It means they successfully sniffed three lemons.
+
+Commercial permission still requires a written agreement.
+
+## IDENTITY // META APOLLO
+
+Permission to use the work is not the same thing as permission to assume its identity.
+
+The community licenses do not grant ownership of, or unrestricted commercial rights to, the **Meta Apollo Logos**, **Post-Apollo** identity, **Kudo Star**, project logos, banners, distinctive branded artwork, or other marks that identify an official project within the family.
+
+You may truthfully say that your work is based on, compatible with, derived from, or inspired by a Post-Apollo project.
+
+You may preserve attribution and explain where something came from.
+
+You may not present an unofficial derivative as though it were an official Meta Apollo // Post-Apollo project, imply endorsement that does not exist, or use the project's identity to create confusion about the relationship between your work and ours.
+
+Commercial branding use requires separate permission.
+
+## THE INTENT
+
+The intent is not to make things difficult for people.
+
+It is almost the opposite.
+
+People should be able to develop meaningful relationships with the work: use it, understand it, change it, learn from it, and carry something forward.
+
+But a company seeking to turn that work into commercial power enters a different relationship with the project.
+
+That relationship requires consent.
+
+**Community use is welcomed!**
+
+**Commercial extraction is negotiated.**
+
+**Continuity, provenance, spirit, and identity are preserved.**
 
 ---
 

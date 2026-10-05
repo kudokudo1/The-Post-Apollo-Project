@@ -157,6 +157,9 @@ Scope {
     }
 
     function pullCheckState(row) {
+        if (String((row || {}).checksError || "").trim())
+            return "ERROR";
+
         const counts = pullCheckCounts(row);
 
         if (counts.total === 0)
@@ -174,6 +177,9 @@ Scope {
     function pullCheckSummary(row) {
         const counts = pullCheckCounts(row);
         const state = pullCheckState(row);
+
+        if (state === "ERROR")
+            return "ERROR";
 
         if (state === "NONE")
             return "NONE";
@@ -224,6 +230,10 @@ Scope {
 
     function pullReviewState(row) {
         const source = row || {};
+
+        if (String(source.reviewError || "").trim())
+            return "ERROR";
+
         const directReviews = Array.isArray(source.reviews)
             ? source.reviews
             : [];
@@ -344,10 +354,12 @@ Scope {
                 '  number="$(printf "%s" "$row" | jq -r ".number")"',
                 '  sha="$(printf "%s" "$row" | jq -r ".headRefOid")"',
                 '  (',
-                '    checks="$(gh api -H "Accept: application/vnd.github+json" "repos/$repo/commits/$sha/check-runs?per_page=100" --jq "[.check_runs[]? | {name:(.name // \\\"\\\"),status:(.status // \\\"\\\"),conclusion:(.conclusion // \\\"\\\")}]" 2>/dev/null || printf "[]")"',
-                '    reviews="$(gh api "repos/$repo/pulls/$number/reviews?per_page=100" --jq "[.[]? | select(.user.login != null) | {user:.user.login,state:(.state // \\\"\\\"),submittedAt:(.submitted_at // \\\"\\\")}] | sort_by([.user,.submittedAt]) | group_by(.user) | map(last)" 2>/dev/null || printf "[]")"',
+                '    checks_error=""',
+                '    review_error=""',
+                '    checks="$(gh api -H "Accept: application/vnd.github+json" "repos/$repo/commits/$sha/check-runs?per_page=100" --jq "[.check_runs[]? | {name:(.name // \\\"\\\"),status:(.status // \\\"\\\"),conclusion:(.conclusion // \\\"\\\")}]" 2>"$tmpdir/checks-$number.err")" || { checks="[]"; checks_error="$(tr "\\n" " " < "$tmpdir/checks-$number.err")"; }',
+                '    reviews="$(gh api "repos/$repo/pulls/$number/reviews?per_page=100" --jq "[.[]? | select(.user.login != null) | {user:.user.login,state:(.state // \\\"\\\"),submittedAt:(.submitted_at // \\\"\\\")}] | sort_by([.user,.submittedAt]) | group_by(.user) | map(last)" 2>"$tmpdir/reviews-$number.err")" || { reviews="[]"; review_error="$(tr "\\n" " " < "$tmpdir/reviews-$number.err")"; }',
                 '    requests="$(gh api "repos/$repo/pulls/$number/requested_reviewers" --jq "[.users[]?.login, .teams[]?.slug] | map(select(. != null and . != \\\"\\\"))" 2>/dev/null || printf "[]")"',
-                "    jq -nc --argjson number \"$number\" --argjson checks \"$checks\" --argjson reviews \"$reviews\" --argjson requests \"$requests\" '{number:$number,checks:$checks,reviews:$reviews,reviewRequests:$requests}' > \"$tmpdir/detail-$number.json\"",
+                "    jq -nc --argjson number \"$number\" --argjson checks \"$checks\" --argjson reviews \"$reviews\" --argjson requests \"$requests\" --arg checksError \"$checks_error\" --arg reviewError \"$review_error\" '{number:$number,checks:$checks,reviews:$reviews,reviewRequests:$requests,checksError:$checksError,reviewError:$reviewError}' > \"$tmpdir/detail-$number.json\"",
                 '  ) &',
                 '  while [ "$(jobs -rp | wc -l)" -ge 8 ]; do',
                 '    wait -n || true',
@@ -358,7 +370,7 @@ Scope {
                 'if ls "$tmpdir"/detail-*.json >/dev/null 2>&1; then',
                 '  details_json="$(jq -s "." "$tmpdir"/detail-*.json)"',
                 'fi',
-                "jq -nc --argjson rows \"$rows\" --argjson details \"$details_json\" '$rows | map(. as $row | (($details | map(select(.number == $row.number)) | first) // {checks:[],reviews:[],reviewRequests:[]}) as $detail | $row + {checks:$detail.checks,reviews:$detail.reviews,reviewRequests:$detail.reviewRequests})'",
+                "jq -nc --argjson rows \"$rows\" --argjson details \"$details_json\" '$rows | map(. as $row | (($details | map(select(.number == $row.number)) | first) // {checks:[],reviews:[],reviewRequests:[],checksError:\"\",reviewError:\"\"}) as $detail | $row + {checks:$detail.checks,reviews:$detail.reviews,reviewRequests:$detail.reviewRequests,checksError:$detail.checksError,reviewError:$detail.reviewError})'",
                 'rm -rf "$tmpdir"'
             ].join("\n"),
             "pa-github-pulls",

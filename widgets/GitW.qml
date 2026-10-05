@@ -623,7 +623,7 @@ PanelWindow {
             if (activePage === "github")
                 githubService.refresh();
             else
-                gitService.refresh();
+                gitService.discoverRepos();
 
             return;
         }

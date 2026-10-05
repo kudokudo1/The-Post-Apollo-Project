@@ -1464,10 +1464,7 @@ PanelWindow {
                             ? Colors.red
                             : Colors.dark
                         border.width: 1
-                        border.color:
-                            hospitalCloseMouse.containsMouse
-                            ? Colors.white
-                            : Colors.red
+                        border.color: Colors.black
 
                         RectangularShadow {
                             anchors.fill: parent
@@ -1477,7 +1474,7 @@ PanelWindow {
                                 hospitalCloseMouse.containsMouse
                                 ? 0.52
                                 : 0.30
-                            color: Colors.red
+                            color: Colors.black
                         }
 
                         GohuText {

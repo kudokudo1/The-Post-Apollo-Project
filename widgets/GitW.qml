@@ -1189,6 +1189,7 @@ PanelWindow {
                     Rectangle {
                         width: 94
                         height: 26
+                        anchors.verticalCenter: parent.verticalCenter
 
                         color: Colors.dark
                         border.width: 1
@@ -1245,8 +1246,9 @@ PanelWindow {
                     Rectangle {
                         id: gitCloseButton
 
-                        width: 104
-                        height: 32
+                        width: 40
+                        height: 34
+                        anchors.verticalCenter: parent.verticalCenter
 
                         color:
                             gitCloseMouse.pressed
@@ -1268,18 +1270,18 @@ PanelWindow {
                                 : 0.38
                             color:
                                 gitCloseMouse.pressed
-                                ? Colors.red
-                                : Colors.black
+                                ? Colors.black
+                                : Colors.red
                         }
 
                         GohuText {
                             anchors.centerIn: parent
                             text: "X"
-                            font.pixelSize: 16
+                            font.pixelSize: 18
                             color:
                                 gitCloseMouse.pressed
-                                ? Colors.black
-                                : Colors.red
+                                ? Colors.red
+                                : Colors.black
 
                             layer.enabled: true
                             layer.effect: DropShadow {

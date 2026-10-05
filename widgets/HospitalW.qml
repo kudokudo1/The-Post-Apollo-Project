@@ -629,11 +629,6 @@ PanelWindow {
         z: -1000
     }
 
-    onActiveChanged: {
-        if (root.menuOpen && root.active)
-            keyboardFocusAnchor.forceActiveFocus();
-    }
-
     Shortcut {
         sequence: "Esc"
         context: Qt.ApplicationShortcut

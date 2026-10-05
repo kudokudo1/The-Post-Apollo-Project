@@ -8,6 +8,7 @@ Item {
     required property var githubService
     required property var libraryStore
 
+    property var keyboardHost: null
     property string setNameDraft: ""
 
     signal workflowSelected(int index)
@@ -18,8 +19,24 @@ Item {
         property string label: ""
         property bool enabledAction: true
         property bool selectedAction: false
+        property bool keyboardNavigable:
+            label !== "↑"
+            && label !== "↓"
+        readonly property bool keyboardSelected:
+            !!root.keyboardHost
+            && root.keyboardHost.gitKeyboardControl === button
 
         signal triggered()
+
+        Component.onCompleted: {
+            if (root.keyboardHost)
+                root.keyboardHost.registerGitKeyboardControl(button);
+        }
+
+        Component.onDestruction: {
+            if (root.keyboardHost)
+                root.keyboardHost.unregisterGitKeyboardControl(button);
+        }
 
         height: 28
 
@@ -30,9 +47,11 @@ Item {
             ? Colors.yellow
             : Colors.black
 
-        border.width: 1
+        border.width: keyboardSelected ? 2 : 1
         border.color:
-            !enabledAction
+            keyboardSelected
+            ? Colors.orange
+            : !enabledAction
             ? Colors.cyan
             : selectedAction
             ? Colors.magenta
@@ -301,6 +320,16 @@ Item {
                                 text: root.setNameDraft
 
                                 onTextChanged: root.setNameDraft = text
+
+                                onActiveFocusChanged: {
+                                    if (!root.keyboardHost)
+                                        return;
+
+                                    if (activeFocus)
+                                        root.keyboardHost.activeTextEditor = setNameInput;
+                                    else if (root.keyboardHost.activeTextEditor === setNameInput)
+                                        root.keyboardHost.activeTextEditor = null;
+                                }
                             }
                         }
 

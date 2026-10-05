@@ -275,7 +275,10 @@ PanelWindow {
 
     GitHubService {
         id: githubService
-        originUrl: patientService.origin
+        // Floor discovery already knows the remote identity before the async
+        // patient refresh finishes. Using it here removes the first-open race
+        // where the watcher could request an audit before repoSlug existed.
+        originUrl: floorService.floorOrigin
     }
 
     HospitalAuditService {

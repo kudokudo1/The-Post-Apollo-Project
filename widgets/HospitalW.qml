@@ -14,6 +14,7 @@ PanelWindow {
     property bool menuOpen: false
     property string selectedCommitSha: ""
     property string selectedRoomTeam: ""
+    property bool remoteRefreshPending: false
     readonly property var selectedRoomData:
         auditService.roomFor(selectedRoomTeam)
     readonly property string selectedRoomBranch: {
@@ -235,6 +236,27 @@ PanelWindow {
         }
     }
 
+    HospitalRemoteWatcher {
+        id: remoteWatcher
+        repoPath: floorService.bedPath
+        floorKey: floorService.floorId
+        active:
+            root.menuOpen
+            && floorService.bedPath.length > 0
+            && !floorService.moveRunning
+            && !floorService.liveMoveArmed
+            && !roomService.integrating
+            && !roomService.postOpRunning
+
+        onRemoteSnapshotReady: function(changed) {
+            // The quiet probe found a different remote snapshot (or is
+            // establishing the initial snapshot for this Floor). Only now do
+            // we refresh visible Hospital state.
+            root.remoteRefreshPending = true;
+            patientService.refresh();
+        }
+    }
+
     GitService {
         id: hospitalEvidenceGitService
         repoPath: patientService.repoRoot
@@ -272,6 +294,19 @@ PanelWindow {
     HospitalCertificationCoordinator {
         id: certificationCoordinator
         evidenceProvider: gitEvidenceProvider
+    }
+
+    Connections {
+        target: patientService
+
+        function onRefreshed() {
+            if (!root.remoteRefreshPending)
+                return;
+
+            root.remoteRefreshPending = false;
+            githubService.refresh();
+            auditService.runAudit();
+        }
     }
 
     Connections {

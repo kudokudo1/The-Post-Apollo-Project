@@ -23,6 +23,7 @@ PanelWindow {
     property string roomAuditInFlightTeam: ""
     property bool roomControlMode: false
     property string roomControlAction: ""
+    property bool bedControlMode: false
     readonly property var selectedRoomData:
         auditService.roomFor(selectedRoomTeam)
     readonly property string selectedRoomBranch: {
@@ -193,6 +194,7 @@ PanelWindow {
         if (!selectedRoomTeam)
             return;
 
+        bedControlMode = false;
         roomControlMode = true;
 
         if (!roomControlEnabled(roomControlAction))
@@ -204,7 +206,35 @@ PanelWindow {
         roomControlAction = "";
     }
 
+    function enterBedControls() {
+        if (!selectedRoomTeam)
+            return;
+
+        roomControlMode = false;
+        roomControlAction = "";
+        bedControlMode = true;
+    }
+
+    function leaveBedControls() {
+        bedControlMode = false;
+    }
+
+    function invokeMoveBed() {
+        if (!menuOpen || !moveBedButton.enabledAction)
+            return;
+
+        floorService.moveBedToRoom(root.selectedRoomBranch);
+    }
+
     function moveRoomControl(dx, dy) {
+        if (bedControlMode) {
+            // The Bed box has one keyboard-selectable action: MOVE BED.
+            // Left returns to the Room action grid; other arrows stay put.
+            if (Number(dx || 0) < 0)
+                enterRoomControls();
+            return;
+        }
+
         if (!roomControlMode) {
             if (Number(dy || 0) < 0)
                 cycleRoom(-1);
@@ -270,8 +300,13 @@ PanelWindow {
             }
         }
 
-        if (bestName)
+        if (bestName) {
             roomControlAction = bestName;
+            return;
+        }
+
+        if (Number(dx || 0) > 0)
+            enterBedControls();
     }
 
     function performRoomControl(actionName) {
@@ -349,6 +384,11 @@ PanelWindow {
     function handleRoomEnter() {
         if (!selectedRoomTeam) {
             selectRoomIndex(0);
+            return;
+        }
+
+        if (bedControlMode) {
+            invokeMoveBed();
             return;
         }
 
@@ -510,6 +550,7 @@ PanelWindow {
 
     onSelectedRoomTeamChanged: {
         root.leaveRoomControls();
+        root.leaveBedControls();
         roomService.clearResult();
         certificationCoordinator.bindRoom(roomService);
         root.scheduleRoomEntryAudit(root.selectedRoomTeam);
@@ -691,6 +732,13 @@ PanelWindow {
         onActivated: root.invokeRoomShortcut("INTEGRATE")
     }
 
+    Shortcut {
+        sequence: "Shift+B"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.invokeMoveBed()
+    }
+
     function open() {
         root.menuOpen = true;
     }
@@ -744,6 +792,7 @@ PanelWindow {
     onMenuOpenChanged: {
         if (!root.menuOpen) {
             root.leaveRoomControls();
+            root.leaveBedControls();
             return;
         }
 
@@ -1606,22 +1655,30 @@ PanelWindow {
                     height: parent.height
 
                     color: Colors.dark
-                    border.width: 1
-                    border.color: roomAccent
+                    border.width: root.bedControlMode ? 2 : 1
+                    border.color:
+                        root.bedControlMode
+                        ? Colors.orange
+                        : roomAccent
 
                     RectangularShadow {
                         anchors.fill: parent
                         spread: 4
                         z: -1
                         opacity:
-                            roomIsDetached
+                            root.bedControlMode
+                            ? 0.40
+                            : roomIsDetached
                             ? 0.24
                             : roomIsFeature
                             ? 0.22
                             : roomIsMain
                             ? 0.30
                             : 0.20
-                        color: roomGlow
+                        color:
+                            root.bedControlMode
+                            ? Colors.orange
+                            : roomGlow
                     }
 
                     Column {
@@ -1859,6 +1916,8 @@ PanelWindow {
 
                             readonly property bool enabledAction:
                                 root.bedMoveEnabled
+                            readonly property bool keyboardSelected:
+                                root.bedControlMode
                             readonly property bool liveConfirm:
                                 floorService.bedIsLive
                                 && floorService.liveMoveArmed
@@ -1876,9 +1935,13 @@ PanelWindow {
                                 : liveConfirm
                                 ? Colors.red
                                 : Colors.black
-                            border.width: liveConfirm ? 2 : 1
+                            border.width:
+                                keyboardSelected || liveConfirm
+                                ? 2 : 1
                             border.color:
-                                liveConfirm
+                                keyboardSelected
+                                ? Colors.orange
+                                : liveConfirm
                                 ? Colors.red
                                 : root.bedAlreadyInSelectedRoom
                                 ? Colors.orange
@@ -1954,10 +2017,7 @@ PanelWindow {
                                     ? Qt.PointingHandCursor
                                     : Qt.ArrowCursor
 
-                                onClicked:
-                                    floorService.moveBedToRoom(
-                                        root.selectedRoomBranch
-                                    )
+                                onClicked: root.invokeMoveBed()
                             }
                         }
 

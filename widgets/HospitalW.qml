@@ -3021,6 +3021,20 @@ PanelWindow {
                 text: "OPERATING ROOMS"
             }
 
+            Rectangle {
+                width: parent.width
+                height: 2
+                color: Colors.magenta
+
+                RectangularShadow {
+                    anchors.fill: parent
+                    spread: 3
+                    z: -1
+                    opacity: 0.34
+                    color: Colors.magenta
+                }
+            }
+
 
         }
 

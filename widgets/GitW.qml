@@ -1366,16 +1366,54 @@ PanelWindow {
                                         fill: parent
                                         margins: 8
                                     }
-                                    spacing: 6
+                                    spacing: 5
 
                                     OrangeLabel {
-                                        text: "CURRENT LOCAL"
+                                        text: "LOCAL BRANCH"
                                     }
 
-                                    CyanValue {
+                                    Row {
                                         width: parent.width
-                                        text: gitService.branch
-                                        font.pixelSize: 12
+                                        height: 28
+                                        spacing: 4
+
+                                        ActionButton {
+                                            width: 28
+                                            height: 28
+                                            label: "<"
+                                            enabledAction:
+                                                gitService.localBranchCount > 1
+                                                && !gitService.actionBusy
+                                                && !gitService.refreshing
+                                            onTriggered:
+                                                gitService.cycleLocal(-1)
+                                        }
+
+                                        SelectorInput {
+                                            width: parent.width - 64
+                                            valueText: gitService.branch
+                                            placeholderText: "TYPE LOCAL BRANCH"
+                                            accentColor: Colors.cyan
+                                            editable:
+                                                !gitService.actionBusy
+                                                && !gitService.refreshing
+
+                                            onSubmitted: function(value) {
+                                                gitService.selectLocalText(value);
+                                            }
+                                        }
+
+                                        ActionButton {
+                                            width: 28
+                                            height: 28
+                                            label: ">"
+                                            enabledAction:
+                                                gitService.localBranchCount > 1
+                                                && !gitService.actionBusy
+                                                && !gitService.refreshing
+                                            onTriggered:
+                                                gitService.cycleLocal(1)
+                                        }
                                     }
 
                                     Row {

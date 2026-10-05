@@ -605,10 +605,7 @@ PanelWindow {
 
     exclusiveZone: 0
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus:
-        root.menuOpen
-        ? WlrKeyboardFocus.OnDemand
-        : WlrKeyboardFocus.None
+    focusable: root.menuOpen
 
     color: "transparent"
     surfaceFormat.opaque: false
@@ -621,6 +618,20 @@ PanelWindow {
         y: 0
         width: root.menuOpen ? root.width : 0
         height: root.menuOpen ? root.height : 0
+    }
+
+    Item {
+        id: keyboardFocusAnchor
+
+        anchors.fill: parent
+        focus: root.menuOpen
+        enabled: root.menuOpen
+        z: -1000
+    }
+
+    onActiveChanged: {
+        if (root.menuOpen && root.active)
+            keyboardFocusAnchor.forceActiveFocus();
     }
 
     Shortcut {
@@ -812,6 +823,11 @@ PanelWindow {
             root.leaveBedControls();
             return;
         }
+
+        Qt.callLater(function() {
+            keyboardFocusAnchor.forceActiveFocus();
+            root.requestActivate();
+        });
 
         root.ensureFirstRoomSelected();
         root.requestOpenAudit();

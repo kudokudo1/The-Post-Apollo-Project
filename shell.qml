@@ -24,6 +24,16 @@ PanelWindow {
     // shared keyboard vocabulary at a time.
     property string controlKeyboardOwner: ""
 
+    function swapControlKeyboardOwner() {
+        if (!hospitalWindow.menuOpen || !gitWindow.menuOpen)
+            return;
+
+        controlKeyboardOwner =
+            controlKeyboardOwner === "hospital"
+            ? "git"
+            : "hospital";
+    }
+
     screen: Quickshell.screens.find(s => s.name === "DP-5")
 
     anchors {
@@ -46,6 +56,13 @@ PanelWindow {
     implicitHeight: 70
 
     color: "transparent"
+
+    Shortcut {
+        sequence: "Ctrl+Tab"
+        context: Qt.ApplicationShortcut
+        enabled: hospitalWindow.menuOpen && gitWindow.menuOpen
+        onActivated: shellRoot.swapControlKeyboardOwner()
+    }
 
     // ===== SERVICES =============================================
 

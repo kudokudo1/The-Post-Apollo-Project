@@ -1380,6 +1380,14 @@ PanelWindow {
 
                                     BlueLabel {
                                         text: "LOCAL TARGET"
+
+                                        layer.effect: DropShadow {
+                                            radius: 6
+                                            samples: 7
+                                            opacity: 0.52
+                                            color: Colors.blue
+                                            transparentBorder: true
+                                        }
                                     }
 
                                     Row {
@@ -1404,7 +1412,7 @@ PanelWindow {
                                             valueText: gitService.selectedLocalBranch
                                             placeholderText: "TYPE LOCAL TARGET"
                                             accentColor: Colors.blue
-                                            textColor: Colors.orange
+                                            textColor: Colors.blue
                                             editable:
                                                 !gitService.actionBusy
                                                 && !gitService.refreshing
@@ -1435,7 +1443,7 @@ PanelWindow {
                                             text: "TARGET"
                                         }
 
-                                        BlueValue {
+                                        OrangeValue {
                                             width: 82
                                             text: gitService.selectedLocalHead
                                             font.pixelSize: 9

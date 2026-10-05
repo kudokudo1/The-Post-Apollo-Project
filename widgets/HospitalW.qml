@@ -1487,7 +1487,7 @@ PanelWindow {
 
                         GohuText {
                             anchors.centerIn: parent
-                            text: "X"
+                            text: "×"
                             font.pixelSize: 22
                             color: Colors.red
 

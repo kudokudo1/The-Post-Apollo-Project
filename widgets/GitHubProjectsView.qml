@@ -274,12 +274,16 @@ Item {
                         height: 28
                         spacing: 6
 
-                        SectionLabel {
+                        GohuText {
                             width: parent.width - 66
                             anchors.verticalCenter: parent.verticalCenter
                             text:
                                 "PROJECT INDEX // "
                                 + String(root.projectService.projects.length)
+                            font.pixelSize: 8
+                            color: Colors.cyan
+                            opacity: 0.72
+                            elide: Text.ElideRight
                         }
 
                         ActionButton {

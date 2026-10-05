@@ -12,6 +12,37 @@ Item {
     readonly property var unscheduled:
         root.projectService.unscheduledItems()
 
+    component RoadAction: Rectangle {
+        id: roadAction
+
+        property string label: ""
+        property bool enabledAction: true
+        property bool destructive: false
+
+        signal triggered()
+
+        height: 24
+        opacity: enabledAction ? 1.0 : 0.34
+        color: Colors.black
+        border.width: 1
+        border.color: destructive ? Colors.red : Colors.cyan
+
+        GohuText {
+            anchors.centerIn: parent
+            text: roadAction.label
+            font.pixelSize: 7
+            color: roadAction.destructive ? Colors.red : Colors.cyan
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            enabled: roadAction.enabledAction
+            hoverEnabled: true
+            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+            onClicked: roadAction.triggered()
+        }
+    }
+
     Column {
         anchors.fill: parent
         spacing: 8
@@ -181,7 +212,7 @@ Item {
                                 spacing: 8
 
                                 Column {
-                                    width: 182
+                                    width: 170
                                     anchors.verticalCenter: parent.verticalCenter
                                     spacing: 2
 
@@ -224,7 +255,7 @@ Item {
                                 Item {
                                     id: timeline
 
-                                    width: parent.width - 190
+                                    width: parent.width - 270
                                     height: parent.height
 
                                     Repeater {
@@ -298,6 +329,43 @@ Item {
                                         }
                                     }
                                 }
+
+                                Row {
+                                    width: 84
+                                    height: parent.height
+                                    spacing: 5
+
+                                    RoadAction {
+                                        width: 55
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        label: "ARCHIVE"
+                                        enabledAction:
+                                            !root.projectService.busy
+                                            && !!root.projectService.itemId(
+                                                roadRow.modelData
+                                            )
+                                        onTriggered:
+                                            root.projectService.archiveItem(
+                                                roadRow.modelData
+                                            )
+                                    }
+
+                                    RoadAction {
+                                        width: 24
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        label: "X"
+                                        destructive: true
+                                        enabledAction:
+                                            !root.projectService.busy
+                                            && !!root.projectService.itemId(
+                                                roadRow.modelData
+                                            )
+                                        onTriggered:
+                                            root.projectService.removeItem(
+                                                roadRow.modelData
+                                            )
+                                    }
+                                }
                             }
                         }
                     }
@@ -346,7 +414,7 @@ Item {
                                 }
 
                                 GohuText {
-                                    width: parent.width - 120
+                                    width: parent.width - 204
                                     anchors.verticalCenter: parent.verticalCenter
                                     text:
                                         root.projectService.itemTitle(
@@ -358,12 +426,49 @@ Item {
                                 }
 
                                 GohuText {
-                                    width: 120
+                                    width: 100
                                     anchors.verticalCenter: parent.verticalCenter
                                     horizontalAlignment: Text.AlignRight
                                     text: "NO DATE"
                                     font.pixelSize: 7
                                     color: Colors.orange
+                                }
+
+                                Row {
+                                    width: 104
+                                    height: parent.height
+                                    spacing: 4
+
+                                    RoadAction {
+                                        width: 72
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        label: "ARCHIVE"
+                                        enabledAction:
+                                            !root.projectService.busy
+                                            && !!root.projectService.itemId(
+                                                unscheduledRow.modelData
+                                            )
+                                        onTriggered:
+                                            root.projectService.archiveItem(
+                                                unscheduledRow.modelData
+                                            )
+                                    }
+
+                                    RoadAction {
+                                        width: 26
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        label: "X"
+                                        destructive: true
+                                        enabledAction:
+                                            !root.projectService.busy
+                                            && !!root.projectService.itemId(
+                                                unscheduledRow.modelData
+                                            )
+                                        onTriggered:
+                                            root.projectService.removeItem(
+                                                unscheduledRow.modelData
+                                            )
+                                    }
                                 }
                             }
                         }

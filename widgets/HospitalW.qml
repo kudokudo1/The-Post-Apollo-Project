@@ -12,6 +12,9 @@ PanelWindow {
     id: root
 
     property bool menuOpen: false
+    property bool keyboardActive: true
+    signal keyboardOwnershipRequested()
+
     property string selectedCommitSha: ""
     property string selectedRoomTeam: ""
     property bool remoteRefreshPending: false
@@ -605,7 +608,7 @@ PanelWindow {
 
     exclusiveZone: 0
     WlrLayershell.layer: WlrLayer.Overlay
-    focusable: root.menuOpen
+    focusable: root.menuOpen && root.keyboardActive
 
     color: "transparent"
     surfaceFormat.opaque: false
@@ -624,7 +627,7 @@ PanelWindow {
         id: keyboardFocusAnchor
 
         anchors.fill: parent
-        focus: root.menuOpen
+        focus: root.menuOpen && root.keyboardActive
         enabled: root.menuOpen
         z: -1000
     }
@@ -632,137 +635,138 @@ PanelWindow {
     Shortcut {
         sequence: "Esc"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.close()
     }
 
     Shortcut {
         sequence: "Up"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.moveRoomControl(0, -1)
     }
 
     Shortcut {
         sequence: "Down"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.moveRoomControl(0, 1)
     }
 
     Shortcut {
         sequence: "Left"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.moveRoomControl(-1, 0)
     }
 
     Shortcut {
         sequence: "Right"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.moveRoomControl(1, 0)
     }
 
     Shortcut {
         sequence: "Return"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.handleRoomEnter()
     }
 
     Shortcut {
         sequence: "Enter"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.handleRoomEnter()
     }
 
     Shortcut {
         sequence: "Shift+Left"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.cycleBed(-1)
     }
 
     Shortcut {
         sequence: "Shift+Right"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.cycleBed(1)
     }
 
     Shortcut {
         sequence: "Shift+S"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.invokeRoomShortcut("STATUS")
     }
 
     Shortcut {
         sequence: "Shift+D"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.invokeRoomShortcut("DIFF")
     }
 
     Shortcut {
         sequence: "Shift+L"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.invokeRoomShortcut("LOG")
     }
 
     Shortcut {
         sequence: "Shift+R"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.invokeRoomShortcut("REFRESH")
     }
 
     Shortcut {
         sequence: "Shift+G"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.invokeRoomShortcut("LAZYGIT")
     }
 
     Shortcut {
         sequence: "Shift+P"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.invokeRoomShortcut("PREPARE")
     }
 
     Shortcut {
         sequence: "Shift+M"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.invokeRoomShortcut("REHEARSE")
     }
 
     Shortcut {
         sequence: "Shift+A"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.invokeRoomShortcut("ARM")
     }
 
     Shortcut {
         sequence: "Shift+I"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.invokeRoomShortcut("INTEGRATE")
     }
 
     Shortcut {
         sequence: "Shift+B"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen
+        enabled: root.menuOpen && root.keyboardActive
         onActivated: root.invokeMoveBed()
     }
 
     function open() {
+        root.keyboardOwnershipRequested();
         root.menuOpen = true;
     }
 
@@ -771,7 +775,10 @@ PanelWindow {
     }
 
     function toggle() {
-        root.menuOpen = !root.menuOpen;
+        if (root.menuOpen)
+            root.close();
+        else
+            root.open();
     }
 
     function requestOpenAudit() {
@@ -820,6 +827,9 @@ PanelWindow {
         }
 
         Qt.callLater(function() {
+            if (!root.menuOpen || !root.keyboardActive)
+                return;
+
             keyboardFocusAnchor.forceActiveFocus();
             root.requestActivate();
         });
@@ -827,6 +837,19 @@ PanelWindow {
         root.ensureFirstRoomSelected();
         root.requestOpenAudit();
         floorService.discover();
+    }
+
+    onKeyboardActiveChanged: {
+        if (!root.menuOpen || !root.keyboardActive)
+            return;
+
+        Qt.callLater(function() {
+            if (!root.menuOpen || !root.keyboardActive)
+                return;
+
+            keyboardFocusAnchor.forceActiveFocus();
+            root.requestActivate();
+        });
     }
 
     Component.onCompleted: {
@@ -1267,6 +1290,15 @@ PanelWindow {
 
         border.width: 1
         border.color: Colors.magenta
+
+        HoverHandler {
+            enabled: root.menuOpen
+
+            onHoveredChanged: {
+                if (hovered && !root.keyboardActive)
+                    root.keyboardOwnershipRequested();
+            }
+        }
 
         Rectangle {
             id: innerFrame

@@ -27,6 +27,25 @@ PanelWindow {
         selectedRoomTeam = selectedRoomTeam === candidate ? "" : candidate;
     }
 
+    function changeFloor(delta) {
+        if (hospitalGitService.repoCount <= 1
+                || hospitalGitService.refreshing
+                || patientService.refreshing
+                || roomService.running
+                || roomService.rehearsing
+                || roomService.integrating
+                || roomService.postOpRunning
+                || roomService.armed)
+            return;
+
+        selectedCommitSha = "";
+        selectedRoomTeam = "";
+        roomService.clearResult();
+        certificationCoordinator.bindRoom(roomService);
+        auditService.resetResult();
+        hospitalGitService.cycleRepo(delta);
+    }
+
     onSelectedRoomTeamChanged: {
         roomService.clearResult();
         certificationCoordinator.bindRoom(roomService);
@@ -89,19 +108,18 @@ PanelWindow {
 
     onMenuOpenChanged: {
         if (root.menuOpen) {
-            hospitalGitService.refresh();
+            hospitalGitService.discoverRepos();
             patientService.refresh();
         }
     }
 
     Component.onCompleted: {
         certificationCoordinator.bindRoom(roomService);
-        hospitalGitService.refresh();
-        patientService.refresh();
     }
 
     GitService {
         id: hospitalGitService
+        preferredRepoQuery: "taskbars-post-apollo"
     }
 
     GitService {
@@ -112,6 +130,16 @@ PanelWindow {
 
     HospitalService {
         id: patientService
+        repoPath: hospitalGitService.repoPath
+
+        onRepoPathChanged: {
+            root.selectedCommitSha = "";
+            root.selectedRoomTeam = "";
+            roomService.clearResult();
+            certificationCoordinator.bindRoom(roomService);
+            auditService.resetResult();
+            refresh();
+        }
     }
 
     GitHubService {
@@ -580,6 +608,130 @@ PanelWindow {
                 }
             }
 
+            // ===== FLOOR / REPOSITORY ==========================
+
+            Rectangle {
+                id: floorSelector
+
+                width: parent.width
+                height: 54
+
+                color: Colors.dark
+                border.width: 1
+                border.color: Colors.cyan
+
+                readonly property bool switchEnabled:
+                    hospitalGitService.repoCount > 1
+                    && !hospitalGitService.refreshing
+                    && !patientService.refreshing
+                    && !roomService.running
+                    && !roomService.rehearsing
+                    && !roomService.integrating
+                    && !roomService.postOpRunning
+                    && !roomService.armed
+
+                Row {
+                    anchors {
+                        fill: parent
+                        margins: 8
+                    }
+                    spacing: 8
+
+                    Column {
+                        width: parent.width - 98
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 3
+
+                        SectionLabel {
+                            text: "FLOOR // REPOSITORY"
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text:
+                                hospitalGitService.repoLabel
+                                + (
+                                    auditService.defaultBranch
+                                    ? "  //  DEFAULT "
+                                      + auditService.defaultBranch
+                                    : ""
+                                  )
+                            font.pixelSize: 11
+                            color: Colors.orange
+                            elide: Text.ElideRight
+                        }
+                    }
+
+                    Rectangle {
+                        width: 38
+                        height: 32
+                        anchors.verticalCenter: parent.verticalCenter
+                        color: floorPrevMouse.pressed
+                               ? Colors.orange
+                               : Colors.black
+                        border.width: 1
+                        border.color: floorPrevMouse.containsMouse
+                                      ? Colors.orange
+                                      : Colors.cyan
+                        opacity: floorSelector.switchEnabled ? 1.0 : 0.42
+
+                        GohuText {
+                            anchors.centerIn: parent
+                            text: "<"
+                            font.pixelSize: 13
+                            color: floorPrevMouse.pressed
+                                   ? Colors.black
+                                   : Colors.cyan
+                        }
+
+                        MouseArea {
+                            id: floorPrevMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            enabled: floorSelector.switchEnabled
+                            cursorShape: enabled
+                                         ? Qt.PointingHandCursor
+                                         : Qt.ArrowCursor
+                            onClicked: root.changeFloor(-1)
+                        }
+                    }
+
+                    Rectangle {
+                        width: 38
+                        height: 32
+                        anchors.verticalCenter: parent.verticalCenter
+                        color: floorNextMouse.pressed
+                               ? Colors.orange
+                               : Colors.black
+                        border.width: 1
+                        border.color: floorNextMouse.containsMouse
+                                      ? Colors.orange
+                                      : Colors.cyan
+                        opacity: floorSelector.switchEnabled ? 1.0 : 0.42
+
+                        GohuText {
+                            anchors.centerIn: parent
+                            text: ">"
+                            font.pixelSize: 13
+                            color: floorNextMouse.pressed
+                                   ? Colors.black
+                                   : Colors.cyan
+                        }
+
+                        MouseArea {
+                            id: floorNextMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            enabled: floorSelector.switchEnabled
+                            cursorShape: enabled
+                                         ? Qt.PointingHandCursor
+                                         : Qt.ArrowCursor
+                            onClicked: root.changeFloor(1)
+                        }
+                    }
+                }
+            }
+
             // ===== PATIENT TOPOLOGY =============================
 
             BranchMap {
@@ -589,7 +741,9 @@ PanelWindow {
                 height: 190
 
                 topologyService: patientService
-                titleText: "PATIENT TOPOLOGY"
+                titleText:
+                    "FLOOR TOPOLOGY // "
+                    + patientService.repository
                 selectedSha: root.selectedCommitSha
 
                 onCommitSelected: function(sha) {
@@ -647,14 +801,14 @@ PanelWindow {
                             MetaValue {
                                 width: patientPane.width - 108
                                 text: patientService.repository
-                                color: Colors.blue
+                                color: Colors.orange
                                 elide: Text.ElideRight
 
                                 layer.effect: DropShadow {
                                     radius: 5
                                     samples: 7
                                     opacity: 0.28
-                                    color: Colors.blue
+                                    color: Colors.orange
                                     transparentBorder: true
                                 }
                             }

@@ -394,7 +394,7 @@ Item {
                         spacing: 8
 
                         Column {
-                            width: parent.width - 256
+                            width: parent.width - 264
                             anchors.verticalCenter: parent.verticalCenter
                             spacing: 2
 

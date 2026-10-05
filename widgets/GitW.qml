@@ -269,7 +269,7 @@ PanelWindow {
     }
 
     Shortcut {
-        sequence: "Shift+P"
+        sequence: "Shift+X"
         context: Qt.ApplicationShortcut
         enabled: root.menuOpen && root.keyboardActive
         onActivated: root.invokeGitHotkey("PULL")
@@ -283,7 +283,7 @@ PanelWindow {
     }
 
     Shortcut {
-        sequence: "Alt+P"
+        sequence: "Shift+P"
         context: Qt.ApplicationShortcut
         enabled: root.menuOpen && root.keyboardActive
         onActivated: root.invokeGitHotkey("PUSH")

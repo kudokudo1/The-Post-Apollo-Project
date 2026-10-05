@@ -92,15 +92,24 @@ Scope {
     }
 
     function pullCheckCounts(row) {
-        const checks = Array.isArray((row || {}).statusCheckRollup)
-            ? row.statusCheckRollup
+        const source = row || {};
+        const directChecks = Array.isArray(source.checks)
+            ? source.checks
             : [];
+        const rollupChecks = Array.isArray(source.statusCheckRollup)
+            ? source.statusCheckRollup
+            : [];
+        const checks =
+            directChecks.length > 0
+            ? directChecks
+            : rollupChecks;
         let passed = 0;
         let failed = 0;
         let pending = 0;
 
         for (let i = 0; i < checks.length; ++i) {
             const check = checks[i] || {};
+            const bucket = String(check.bucket || "").toLowerCase();
             const status = String(check.status || "").toUpperCase();
             const conclusion = String(
                 check.conclusion
@@ -108,22 +117,28 @@ Scope {
                 || ""
             ).toUpperCase();
 
-            if ([
-                    "FAILURE",
-                    "ERROR",
-                    "CANCELLED",
-                    "TIMED_OUT",
-                    "ACTION_REQUIRED",
-                    "STARTUP_FAILURE",
-                    "STALE"
-                ].indexOf(conclusion) >= 0) {
-                failed += 1;
-            } else if ([
-                           "SUCCESS",
-                           "NEUTRAL",
-                           "SKIPPED"
+            if (bucket === "fail"
+                    || bucket === "cancel"
+                    || [
+                           "FAILURE",
+                           "ERROR",
+                           "CANCELLED",
+                           "TIMED_OUT",
+                           "ACTION_REQUIRED",
+                           "STARTUP_FAILURE",
+                           "STALE"
                        ].indexOf(conclusion) >= 0) {
+                failed += 1;
+            } else if (bucket === "pass"
+                       || bucket === "skipping"
+                       || [
+                              "SUCCESS",
+                              "NEUTRAL",
+                              "SKIPPED"
+                          ].indexOf(conclusion) >= 0) {
                 passed += 1;
+            } else if (bucket === "pending") {
+                pending += 1;
             } else if (status === "COMPLETED"
                        && !conclusion) {
                 passed += 1;
@@ -212,8 +227,15 @@ Scope {
         if (decision === "REVIEW_REQUIRED")
             return "REVIEW REQUIRED";
 
-        return pullApprovalCount(row) > 0
-            ? "APPROVED"
+        if (pullApprovalCount(row) > 0)
+            return "APPROVED";
+
+        const requests = Array.isArray((row || {}).reviewRequests)
+            ? row.reviewRequests
+            : [];
+
+        return requests.length > 0
+            ? "REVIEW REQUIRED"
             : "NO REVIEW";
     }
 
@@ -295,12 +317,25 @@ Scope {
             "-lc",
             [
                 'repo="$1"',
-                'rows="$(gh pr list --repo "$repo" --state all --limit 1000 --json number,title,state,url,isDraft,author,headRefName,baseRefName,updatedAt)" || exit $?',
-                'printf "%s" "$rows" | jq -c ".[]" | while IFS= read -r row; do',
-                '  number="$(printf "%s" "$row" | jq -r ".number")"',
-                '  detail="$(gh pr view "$number" --repo "$repo" --json reviewDecision,latestReviews,statusCheckRollup 2>/dev/null || printf "{}")"',
-                "  jq -nc --argjson row \"$row\" --argjson detail \"$detail\" '$row + $detail'",
-                'done | jq -s "."'
+                'rows="$(gh pr list --repo "$repo" --state all --limit 1000 --json number,title,state,url,isDraft,author,headRefName,baseRefName,updatedAt,reviewDecision,latestReviews,reviewRequests)" || exit $?',
+                'checks="$(',
+                '  printf "%s" "$rows" | jq -r ".[].number" | xargs -r -P 8 -I{} bash -c '\''',
+                '    number="$1"',
+                '    repo="$2"',
+                '    payload="$(gh pr checks "$number" --repo "$repo" --json bucket,state,name,workflow 2>/dev/null || true)"',
+                '    [ -n "$payload" ] || payload="[]"',
+                '    jq -nc --argjson number "$number" --argjson checks "$payload" "{number:\\$number,checks:\\$checks}"',
+                '  '\'' _ {} "$repo"',
+                ')"',
+                'checks_json="$(printf "%s\\n" "$checks" | jq -s ".")"',
+                'jq -nc --argjson rows "$rows" --argjson checks "$checks_json" '\''',
+                '  $rows',
+                '  | map(',
+                '      . as $row',
+                '      | (($checks | map(select(.number == $row.number)) | first) // {checks:[]}) as $detail',
+                '      | $row + {checks:$detail.checks}',
+                '    )',
+                '\'''
             ].join("\n"),
             "pa-github-pulls",
             cleanRepo

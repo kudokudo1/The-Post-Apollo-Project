@@ -319,7 +319,7 @@ Scope {
                 'repo="$1"',
                 'rows="$(gh pr list --repo "$repo" --state all --limit 1000 --json number,title,state,url,isDraft,author,headRefName,baseRefName,updatedAt,reviewDecision,latestReviews,reviewRequests)" || exit $?',
                 'tmpdir="$(mktemp -d)"',
-                'trap '\''rm -rf "$tmpdir"'\'' EXIT',
+                "trap 'rm -rf \"$tmpdir\"' EXIT",
                 "while IFS= read -r number; do",
                 '  (',
                 '    payload="$(gh pr checks "$number" --repo "$repo" --json bucket,state,name,workflow 2>/dev/null || true)"',

@@ -9,6 +9,8 @@ Item {
     required property var projectService
     required property var keyboardHost
 
+    property string projectCamera: "board"
+
     function moveItem(item, delta) {
         const options = root.projectService.statusOptions();
 
@@ -562,11 +564,42 @@ Item {
                         opacity: 0.44
                     }
 
+                    Row {
+                        width: parent.width
+                        height: 28
+                        spacing: 6
+
+                        ActionButton {
+                            width: (parent.width - 12) / 3
+                            label: "BOARD"
+                            selectedAction: root.projectCamera === "board"
+                            onTriggered: root.projectCamera = "board"
+                        }
+
+                        ActionButton {
+                            width: (parent.width - 12) / 3
+                            label: "ROADMAP"
+                            selectedAction: root.projectCamera === "roadmap"
+                            onTriggered: root.projectCamera = "roadmap"
+                        }
+
+                        ActionButton {
+                            width: (parent.width - 12) / 3
+                            label: "TABLE"
+                            selectedAction: root.projectCamera === "table"
+                            onTriggered: root.projectCamera = "table"
+                        }
+                    }
+
                     Flickable {
                         id: mapScroll
 
                         width: parent.width
-                        height: parent.height - 126
+                        height:
+                            root.projectCamera === "board"
+                            ? parent.height - 164
+                            : 0
+                        visible: root.projectCamera === "board"
                         clip: true
                         contentWidth: width
                         contentHeight: laneColumn.height
@@ -775,6 +808,26 @@ Item {
                                 }
                             }
                         }
+                    }
+
+                    GitHubProjectsRoadmapView {
+                        width: parent.width
+                        height:
+                            root.projectCamera === "roadmap"
+                            ? parent.height - 164
+                            : 0
+                        visible: root.projectCamera === "roadmap"
+                        projectService: root.projectService
+                    }
+
+                    GitHubProjectsTableView {
+                        width: parent.width
+                        height:
+                            root.projectCamera === "table"
+                            ? parent.height - 164
+                            : 0
+                        visible: root.projectCamera === "table"
+                        projectService: root.projectService
                     }
                 }
             }

@@ -23,6 +23,16 @@ Scope {
     property string bedWorktree: ""
     property bool bedIsLive: false
 
+    property bool moveRunning: false
+    property string moveStatus: ""
+    property string moveError: ""
+    property bool liveMoveArmed: false
+    property string armedBedPath: ""
+    property string armedRoomBranch: ""
+    property int moveExitCode: -1
+    property string moveStdoutText: ""
+    property string moveStderrText: ""
+
     property var pendingBeds: []
     property var allBeds: []
     property var rememberedBedByFloor: ({})
@@ -36,6 +46,7 @@ Scope {
     signal floorsChanged()
     signal floorChanged()
     signal bedChanged()
+    signal bedMoveFinished(bool success, string detail)
 
     ListModel { id: floorRows }
     ListModel { id: bedRows }
@@ -262,6 +273,7 @@ Scope {
     }
 
     function applyFloor(index, preferredBedPath) {
+        clearLiveMoveArm();
         const floor = floorAt(index);
 
         if (!floor)
@@ -356,6 +368,7 @@ Scope {
     }
 
     function applyBed(index) {
+        clearLiveMoveArm();
         const bed = bedAt(index);
 
         if (!bed)
@@ -400,6 +413,217 @@ Scope {
             index = (index + Number(delta || 0) + bedRows.count) % bedRows.count;
 
         selectBed(index);
+    }
+
+    function clearLiveMoveArm() {
+        liveMoveArmed = false;
+        armedBedPath = "";
+        armedRoomBranch = "";
+        liveMoveArmTimer.stop();
+    }
+
+    function moveBedToRoom(targetBranch) {
+        if (moveRunning)
+            return false;
+
+        const bed = String(bedPath || "").trim();
+        const target = String(targetBranch || "").trim();
+        const current = String(bedBranch || "").trim();
+
+        moveError = "";
+
+        if (!bed) {
+            moveStatus = "MOVE REFUSED // NO BED SELECTED";
+            moveError = moveStatus;
+            return false;
+        }
+
+        if (!target) {
+            moveStatus = "MOVE REFUSED // NO ROOM SELECTED";
+            moveError = moveStatus;
+            return false;
+        }
+
+        if (target === current) {
+            clearLiveMoveArm();
+            moveStatus = "BED ALREADY IN ROOM // " + target;
+            return false;
+        }
+
+        if (bedIsLive
+                && (!liveMoveArmed
+                    || armedBedPath !== bed
+                    || armedRoomBranch !== target)) {
+            liveMoveArmed = true;
+            armedBedPath = bed;
+            armedRoomBranch = target;
+            moveStatus = "LIVE BED ARMED // PRESS AGAIN TO MOVE";
+            liveMoveArmTimer.restart();
+            return false;
+        }
+
+        clearLiveMoveArm();
+        moveRunning = true;
+        moveStatus = "MOVING BED // " + target;
+        moveError = "";
+        moveExitCode = -1;
+        moveStdoutText = "";
+        moveStderrText = "";
+        moveWatchdog.restart();
+
+        moveProcess.exec([
+            "bash",
+            "-lc",
+            [
+                'bed="$1"',
+                'target="$2"',
+                'if ! git -C "$bed" rev-parse --is-inside-work-tree >/dev/null 2>&1; then',
+                '  printf "REFUSED\\tBED CHECKOUT NOT FOUND\\n"',
+                '  exit 21',
+                'fi',
+                'dirty="$(git -C "$bed" status --porcelain=v1 2>/dev/null)"',
+                'if [ -n "$dirty" ]; then',
+                '  printf "REFUSED\\tBED DIRTY // COMMIT OR STASH FIRST\\n"',
+                '  exit 22',
+                'fi',
+                'current="$(git -C "$bed" branch --show-current 2>/dev/null || true)"',
+                'if [ "$current" = "$target" ]; then',
+                '  head="$(git -C "$bed" rev-parse --short=10 HEAD 2>/dev/null || true)"',
+                '  printf "OK\\t%s\\t%s\\n" "$target" "$head"',
+                '  exit 0',
+                'fi',
+                'if git -C "$bed" worktree list --porcelain 2>/dev/null | grep -Fqx "branch refs/heads/$target"; then',
+                '  printf "REFUSED\\tROOM ALREADY OCCUPIED BY ANOTHER BED\\n"',
+                '  exit 23',
+                'fi',
+                'if git -C "$bed" show-ref --verify --quiet "refs/heads/$target"; then',
+                '  if ! git -C "$bed" switch "$target" >/dev/null 2>&1; then',
+                '    printf "REFUSED\\tLOCAL ROOM SWITCH FAILED\\n"',
+                '    exit 24',
+                '  fi',
+                'else',
+                '  if ! git -C "$bed" remote get-url origin >/dev/null 2>&1; then',
+                '    printf "REFUSED\\tROOM NOT LOCAL // NO ORIGIN\\n"',
+                '    exit 25',
+                '  fi',
+                '  if ! git -C "$bed" fetch origin "refs/heads/$target:refs/remotes/origin/$target" >/dev/null 2>&1; then',
+                '    printf "REFUSED\\tREMOTE ROOM NOT FOUND\\n"',
+                '    exit 26',
+                '  fi',
+                '  if ! git -C "$bed" switch -c "$target" --track "origin/$target" >/dev/null 2>&1; then',
+                '    printf "REFUSED\\tTRACKING ROOM CREATE FAILED\\n"',
+                '    exit 27',
+                '  fi',
+                'fi',
+                'head="$(git -C "$bed" rev-parse --short=10 HEAD 2>/dev/null || true)"',
+                'printf "OK\\t%s\\t%s\\n" "$target" "$head"'
+            ].join("\n"),
+            "hospital-bed-move",
+            bed,
+            target
+        ]);
+
+        return true;
+    }
+
+    function finishMove() {
+        if (!moveRunning)
+            return;
+
+        moveRunning = false;
+        moveWatchdog.stop();
+
+        const out = String(moveStdoutText || "").trim();
+        const err = String(moveStderrText || "").trim();
+        const line = out.split("\n")[0] || "";
+        const parts = line.split("\t");
+        const kind = parts.length > 0 ? parts[0] : "";
+
+        if (moveExitCode === 0 && kind === "OK") {
+            const target = parts.length > 1 ? parts[1] : "";
+            const head = parts.length > 2 ? parts[2] : "";
+            moveStatus =
+                "BED MOVED // " + target
+                + (head ? " // " + head : "");
+            moveError = "";
+            bedMoveFinished(true, moveStatus);
+            discover();
+            return;
+        }
+
+        const detail =
+            kind === "REFUSED" && parts.length > 1
+            ? parts.slice(1).join("\t")
+            : String(err || out || ("MOVE EXIT " + moveExitCode)).trim();
+
+        moveError = detail || "BED MOVE FAILED";
+        moveStatus = "MOVE REFUSED // " + moveError;
+        bedMoveFinished(false, moveStatus);
+    }
+
+    Process {
+        id: moveProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                floorService.moveStdoutText = this.text;
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                floorService.moveStderrText = this.text;
+            }
+        }
+
+        onExited: function(code, exitStatus) {
+            floorService.moveExitCode = Number(code);
+            moveFinishTimer.restart();
+        }
+    }
+
+    Timer {
+        id: moveFinishTimer
+        interval: 30
+        repeat: false
+        onTriggered: floorService.finishMove()
+    }
+
+    Timer {
+        id: liveMoveArmTimer
+        interval: 7000
+        repeat: false
+
+        onTriggered: {
+            if (!floorService.liveMoveArmed)
+                return;
+
+            floorService.clearLiveMoveArm();
+            floorService.moveStatus = "LIVE BED MOVE ARM EXPIRED";
+        }
+    }
+
+    Timer {
+        id: moveWatchdog
+        interval: 15000
+        repeat: false
+
+        onTriggered: {
+            if (!floorService.moveRunning)
+                return;
+
+            floorService.moveRunning = false;
+            floorService.moveError = "BED MOVE TIMEOUT";
+            floorService.moveStatus = "MOVE REFUSED // BED MOVE TIMEOUT";
+
+            if (moveProcess.running)
+                moveProcess.running = false;
+
+            floorService.bedMoveFinished(
+                false,
+                floorService.moveStatus
+            );
+        }
     }
 
     Process {

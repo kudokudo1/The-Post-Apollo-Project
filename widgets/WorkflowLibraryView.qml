@@ -25,6 +25,12 @@ Item {
         readonly property bool keyboardSelected:
             !!root.keyboardHost
             && root.keyboardHost.gitKeyboardControl === button
+        readonly property bool keyboardSelector:
+            keyboardSelected
+            && root.keyboardHost.gitSelectorSource === "keyboard"
+        readonly property bool mouseSelector:
+            keyboardSelected
+            && root.keyboardHost.gitSelectorSource === "mouse"
 
         signal triggered()
 
@@ -43,13 +49,15 @@ Item {
         color:
             !enabledAction
             ? Colors.black
-            : selectedAction || mouse.containsMouse
+            : keyboardSelector || selectedAction
             ? Colors.yellow
             : Colors.black
 
-        border.width: keyboardSelected ? 2 : 1
+        border.width:
+            keyboardSelector || mouseSelector
+            ? 2 : 1
         border.color:
-            keyboardSelected
+            keyboardSelector || mouseSelector
             ? Colors.orange
             : !enabledAction
             ? Colors.cyan
@@ -68,10 +76,8 @@ Item {
             color:
                 !button.enabledAction
                 ? Colors.cyan
-                : button.selectedAction
+                : button.keyboardSelector || button.selectedAction
                 ? Colors.magenta
-                : mouse.containsMouse
-                ? Colors.orange
                 : Colors.cyan
 
             opacity: button.enabledAction ? 1.0 : 0.34
@@ -85,7 +91,22 @@ Item {
             hoverEnabled: true
             cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
 
-            onClicked: button.triggered()
+            onEntered: {
+                if (root.keyboardHost)
+                    root.keyboardHost.selectGitControlFromMouse(button);
+            }
+
+            onPositionChanged: {
+                if (root.keyboardHost)
+                    root.keyboardHost.selectGitControlFromMouse(button);
+            }
+
+            onClicked: {
+                if (root.keyboardHost)
+                    root.keyboardHost.selectGitControlFromMouse(button);
+
+                button.triggered();
+            }
         }
     }
 

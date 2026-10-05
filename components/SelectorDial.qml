@@ -10,6 +10,7 @@ Item {
     property int currentIndex: 0
     property string readoutText: selectedValue ? selectedValue.toUpperCase() : ""
     property bool interactive: options && options.length > 1
+    property bool keyboardSelected: false
 
     property color accentColor: Colors.cyan
     property color markerColor: Colors.orange
@@ -578,16 +579,24 @@ Item {
             }
         }
 
-        // Focus ring is intentionally subtle; it only appears for keyboard use.
+        // Keyboard ring appears both while the dial is selected by the
+        // Git spatial navigator and while it owns direct dial focus.
         Rectangle {
             anchors.centerIn: parent
             width: 110
             height: 110
             radius: 55
             color: "transparent"
-            border.width: dialRoot.activeFocus ? 1 : 0
-            border.color: Colors.magenta
-            opacity: dialRoot.activeFocus ? 0.72 : 0.0
+            border.width:
+                dialRoot.activeFocus || dialRoot.keyboardSelected
+                ? 2 : 0
+            border.color:
+                dialRoot.activeFocus
+                ? Colors.magenta
+                : Colors.orange
+            opacity:
+                dialRoot.activeFocus || dialRoot.keyboardSelected
+                ? 0.82 : 0.0
         }
     }
 

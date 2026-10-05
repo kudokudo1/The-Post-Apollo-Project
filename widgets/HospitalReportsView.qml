@@ -73,6 +73,7 @@ Item {
     }
 
     signal eventActivated(var event)
+    signal closeRequested()
 
     function shortSha(value) {
         const sha = String(value || "");
@@ -248,7 +249,7 @@ Item {
                 spacing: 8
 
                 GohuText {
-                    width: parent.width - 238
+                    width: parent.width - 304
                     anchors.verticalCenter: parent.verticalCenter
                     text:
                         "REPORTS // "
@@ -289,6 +290,12 @@ Item {
                         root.selectedIndex =
                             root.filteredEvents.length > 0 ? 0 : -1;
                     }
+                }
+
+                ReportButton {
+                    width: 58
+                    label: "CLOSE"
+                    onTriggered: root.closeRequested()
                 }
             }
 

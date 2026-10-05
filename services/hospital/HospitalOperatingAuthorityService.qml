@@ -132,16 +132,24 @@ Scope {
 
     function acquireSlot(team, branch, head, reason) {
         const requester = String(team || "").trim();
+        const requestedBranch = String(branch || "").trim();
+        const requestedHead = String(head || "").trim();
 
         if (!requester) {
             lastError = "AUTHORITY REFUSED // TEAM MISSING";
             return false;
         }
 
+        if (!requestedBranch || !requestedHead) {
+            lastError =
+                "AUTHORITY REFUSED // EXACT BRANCH AND HEAD REQUIRED";
+            return false;
+        }
+
         if (available) {
             ownerTeam = requester;
-            ownerBranch = String(branch || "");
-            ownerHead = String(head || "");
+            ownerBranch = requestedBranch;
+            ownerHead = requestedHead;
             ownerLeaseId = nowIso() + "::" + requester;
             acquiredAt = nowIso();
             lastError = "";
@@ -161,23 +169,24 @@ Scope {
         }
 
         if (ownerTeam === requester) {
-            const requestedBranch = String(branch || "");
-            const requestedHead = String(head || "");
-
+            const snapshotIncomplete =
+                !ownerLeaseId
+                || !ownerBranch
+                || !ownerHead
+                || !requestedBranch
+                || !requestedHead;
             const branchMismatch =
-                requestedBranch.length > 0
-                && ownerBranch.length > 0
-                && requestedBranch !== ownerBranch;
+                requestedBranch !== ownerBranch;
             const headMismatch =
-                requestedHead.length > 0
-                && ownerHead.length > 0
-                && requestedHead !== ownerHead;
+                requestedHead !== ownerHead;
 
-            if (branchMismatch || headMismatch) {
+            if (snapshotIncomplete
+                    || branchMismatch
+                    || headMismatch) {
                 lastError =
                     "AUTHORITY COLLISION // "
                     + requester
-                    + " ALREADY OWNS DIFFERENT SNAPSHOT";
+                    + " ALREADY OWNS DIFFERENT OR INCOMPLETE SNAPSHOT";
 
                 appendEvent(
                     "OWNERSHIP_CHANGE_REFUSED",
@@ -185,8 +194,10 @@ Scope {
                     {
                         currentBranch: ownerBranch,
                         currentHead: ownerHead,
+                        currentLeaseId: ownerLeaseId,
                         requestedBranch: requestedBranch,
-                        requestedHead: requestedHead
+                        requestedHead: requestedHead,
+                        snapshotIncomplete: snapshotIncomplete
                     }
                 );
 
@@ -202,8 +213,8 @@ Scope {
             const nextQueue = queue.slice();
             nextQueue.push({
                 team: requester,
-                branch: String(branch || ""),
-                head: String(head || ""),
+                branch: requestedBranch,
+                head: requestedHead,
                 requestedAt: nowIso(),
                 reason: String(reason || "")
             });
@@ -241,17 +252,19 @@ Scope {
         const requestedBranch = String(branch || "");
         const requestedHead = String(head || "");
 
-        if (!hydrated || ownerTeam !== requester)
+        if (!hydrated
+                || ownerTeam !== requester
+                || !ownerLeaseId
+                || !ownerBranch
+                || !ownerHead
+                || !requestedBranch
+                || !requestedHead)
             return "";
 
-        if (requestedBranch.length > 0
-                && ownerBranch.length > 0
-                && requestedBranch !== ownerBranch)
+        if (requestedBranch !== ownerBranch)
             return "";
 
-        if (requestedHead.length > 0
-                && ownerHead.length > 0
-                && requestedHead !== ownerHead)
+        if (requestedHead !== ownerHead)
             return "";
 
         return ownerLeaseId;

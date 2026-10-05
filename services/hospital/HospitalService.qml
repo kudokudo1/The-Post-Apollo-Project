@@ -5,8 +5,8 @@ import Quickshell.Io
 Scope {
     id: hospitalService
 
-    // Hospital operates on the development patient, not the live Quickshell copy.
-    readonly property string repoLabel: "~/Projects/taskbars-post-apollo"
+    // The selected Hospital floor supplies the repository path.
+    property string repoPath: ""
 
     property bool available: false
     property bool refreshing: false
@@ -152,7 +152,8 @@ Scope {
             "bash",
             "-lc",
             [
-                'repo="$HOME/Projects/taskbars-post-apollo"',
+                'repo="$1"',
+                'if [ -z "$repo" ]; then repo="$HOME/Projects/taskbars-post-apollo"; fi',
                 'if ! git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1; then',
                 '  printf "ERROR\\tPATIENT REPOSITORY NOT FOUND\\n"',
                 '  printf "DONE\\t\\n"',
@@ -177,7 +178,9 @@ Scope {
                 'printf "BRANCHCOUNT\\t%s\\n" "$branches"',
                 'git -C "$repo" log --all --topo-order --date-order -n 36 --pretty=format:"COMMIT%x09%H%x09%P%x09%D%x09%s"',
                 'printf "\\nDONE\\t\\n"'
-            ].join("\n")
+            ].join("\n"),
+            "hospital-patient-refresh",
+            repoPath
         ]);
     }
 

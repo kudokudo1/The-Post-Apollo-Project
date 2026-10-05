@@ -12,6 +12,11 @@ Scope {
     // This is intentionally a quiet probe interval. The Hospital UI does not
     // refresh on the timer; it refreshes only if the remote fingerprint changes.
     property int remoteProbeInterval: 120000
+    // Reopening Hospital does not probe every time. If Quickshell has stayed
+    // alive, an open only triggers an immediate probe after this much quiet time.
+    // A Quickshell restart resets this state, so the first open always probes.
+    property int openProbeStaleInterval: 600000
+    property double lastProbeAtMs: 0
 
     property bool probing: false
     property bool fetching: false
@@ -40,7 +45,15 @@ Scope {
         initialized = false;
         fingerprint = "";
         pendingFingerprint = "";
+        lastProbeAtMs = 0;
         lastError = "";
+    }
+
+    function shouldProbeOnOpen() {
+        if (!initialized || lastProbeAtMs <= 0)
+            return true;
+
+        return Date.now() - lastProbeAtMs >= openProbeStaleInterval;
     }
 
     function probeNow() {
@@ -109,6 +122,10 @@ Scope {
 
         if (!next)
             return;
+
+        // A successful comparison counts as fresh even when nothing changed.
+        // This is what prevents close/open/close/open from probing repeatedly.
+        lastProbeAtMs = Date.now();
 
         if (initialized && next === fingerprint)
             return;
@@ -188,7 +205,7 @@ Scope {
     }
 
     onActiveChanged: {
-        if (active)
+        if (active && shouldProbeOnOpen())
             immediateProbe.restart();
     }
 

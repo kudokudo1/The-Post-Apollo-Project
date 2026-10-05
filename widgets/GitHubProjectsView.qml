@@ -197,44 +197,26 @@ Item {
         }
     }
 
-    Column {
+    Item {
         anchors.fill: parent
-        spacing: 8
 
-        Row {
-            width: parent.width
+        GohuText {
+            x: 0
+            y: 0
+            width: 180
             height: 26
-            spacing: 8
-
-            GohuText {
-                width: parent.width * 0.46
-                anchors.verticalCenter: parent.verticalCenter
-                text: "PROJECTS // OPERATING MAP"
-                font.pixelSize: 10
-                color: Colors.magenta
-                elide: Text.ElideRight
-            }
-
-            GohuText {
-                width: parent.width * 0.54 - 8
-                anchors.verticalCenter: parent.verticalCenter
-                horizontalAlignment: Text.AlignRight
-                text: "WORK ACROSS REPOSITORIES // ONE MAP, MULTIPLE BEDS"
-                font.pixelSize: 7
-                color: Colors.cyan
-                opacity: 0.62
-                elide: Text.ElideRight
-            }
+            verticalAlignment: Text.AlignVCenter
+            text: "PROJECTS // OPERATING MAP"
+            font.pixelSize: 8
+            color: Colors.magenta
+            elide: Text.ElideRight
         }
 
-        Row {
-            width: parent.width
-            height: parent.height - 34
-            spacing: 10
-
-            Rectangle {
+        Rectangle {
+                x: 0
+                y: 34
                 width: 180
-                height: parent.height
+                height: parent.height - 34
                 color: Colors.black
                 border.width: 1
                 border.color: Colors.cyan
@@ -373,7 +355,9 @@ Item {
                 }
             }
 
-            Rectangle {
+        Rectangle {
+                x: 190
+                y: 0
                 width: parent.width - 190
                 height: parent.height
                 color: Colors.dark
@@ -814,6 +798,5 @@ Item {
                     }
                 }
             }
-        }
     }
 }

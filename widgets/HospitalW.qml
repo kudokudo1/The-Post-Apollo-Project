@@ -513,11 +513,11 @@ PanelWindow {
                 left: parent.left
                 leftMargin: 18
                 top: parent.top
-                // Start directly under the header cyan rule and run down
-                // to the chassis bottom rule.
+                // Start directly under the header cyan rule and stop at
+                // the bottom edge of the action bay.
                 topMargin: 88
                 bottom: parent.bottom
-                bottomMargin: 8
+                bottomMargin: 18
             }
 
             count: hospitalGitService.repoCount
@@ -553,7 +553,9 @@ PanelWindow {
             // ===== HEADER =======================================
 
             Item {
-                width: parent.width
+                // Header spans back across the floor-selector lane.
+                x: -44
+                width: parent.width + 44
                 height: 56
 
                 GohuText {
@@ -642,7 +644,10 @@ PanelWindow {
             }
 
             Rectangle {
-                width: parent.width
+                // Header rule spans the full Hospital chassis, including
+                // the floor-selector lane.
+                x: -44
+                width: parent.width + 44
                 height: 2
                 color: Colors.cyan
 

@@ -12,6 +12,8 @@ Item {
     property string projectCamera: "board"
     property bool projectExpanded: false
 
+    signal projectExpandedRequested(bool expanded)
+
     function moveItem(item, delta) {
         const options = root.projectService.statusOptions();
 
@@ -66,9 +68,7 @@ Item {
             text: button.label
             font.pixelSize: 8
             color:
-                !button.enabledAction
-                ? Colors.cyan
-                : button.selectedAction
+                button.selectedAction
                 ? Colors.magenta
                 : button.primaryBlue
                 ? Colors.blue
@@ -223,14 +223,6 @@ Item {
                 border.width: 1
                 border.color: Colors.cyan
 
-                Behavior on x {
-                    NumberAnimation { duration: 120; easing.type: Easing.OutQuad }
-                }
-
-                Behavior on width {
-                    NumberAnimation { duration: 120; easing.type: Easing.OutQuad }
-                }
-
                 Column {
                     anchors {
                         fill: parent
@@ -374,6 +366,20 @@ Item {
                 border.width: 1
                 border.color: Colors.cyan
 
+                Behavior on x {
+                    NumberAnimation {
+                        duration: 120
+                        easing.type: Easing.OutQuad
+                    }
+                }
+
+                Behavior on width {
+                    NumberAnimation {
+                        duration: 120
+                        easing.type: Easing.OutQuad
+                    }
+                }
+
                 Column {
                     anchors {
                         fill: parent
@@ -421,7 +427,9 @@ Item {
                                     enabledAction: true
                                     selectedAction: root.projectExpanded
                                     onTriggered:
-                                        root.projectExpanded = !root.projectExpanded
+                                        root.projectExpandedRequested(
+                                            !root.projectExpanded
+                                        )
                                 }
                             }
 

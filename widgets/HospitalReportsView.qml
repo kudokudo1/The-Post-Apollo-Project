@@ -236,6 +236,16 @@ Item {
         border.width: 1
         border.color: Colors.magenta
 
+        MouseArea {
+            anchors.fill: parent
+            hoverEnabled: true
+            acceptedButtons: Qt.AllButtons
+
+            onWheel: function(wheel) {
+                wheel.accepted = true;
+            }
+        }
+
         Column {
             anchors {
                 fill: parent

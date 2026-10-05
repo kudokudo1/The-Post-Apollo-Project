@@ -56,25 +56,79 @@ PanelWindow {
         selectedRoomTeam = selectedRoomTeam === candidate ? "" : candidate;
     }
 
-    function roomTeamAtScrollPosition() {
+    function roomIndexOfTeam(team) {
+        const wanted = String(team || "");
+        const rows = auditService.rooms || [];
+
+        if (!wanted || !Array.isArray(rows))
+            return -1;
+
+        for (let i = 0; i < rows.length; ++i) {
+            const row = rows[i] || {};
+            const candidate = String(row.team || row.branch || "");
+
+            if (candidate === wanted)
+                return i;
+        }
+
+        return -1;
+    }
+
+    function ensureRoomVisible(index) {
+        const count = (auditService.rooms || []).length;
+
+        if (index < 0 || index >= count)
+            return;
+
+        const stride = 61;
+        const rowTop = index * stride;
+        const rowBottom = rowTop + 54;
+        const viewTop = hospitalScroll.contentY;
+        const viewBottom = viewTop + hospitalScroll.height;
+
+        if (rowTop < viewTop)
+            hospitalScroll.contentY = rowTop;
+        else if (rowBottom > viewBottom)
+            hospitalScroll.contentY = Math.min(
+                scrollRail.maxContentY,
+                Math.max(0, rowBottom - hospitalScroll.height)
+            );
+    }
+
+    function selectRoomIndex(index) {
         const rows = auditService.rooms || [];
 
         if (!Array.isArray(rows) || rows.length === 0)
-            return "";
+            return;
 
-        // RoomRow is 54px high with 7px spacing. The settled Room is the
-        // row nearest the top edge of the operating-room viewport.
-        const stride = 61;
-        const index = Math.max(
+        const clamped = Math.max(0, Math.min(rows.length - 1, Number(index)));
+        const row = rows[clamped] || {};
+        const team = String(row.team || row.branch || "");
+
+        if (!team)
+            return;
+
+        selectedRoomTeam = team;
+        ensureRoomVisible(clamped);
+    }
+
+    function cycleRoom(delta) {
+        const rows = auditService.rooms || [];
+
+        if (!Array.isArray(rows) || rows.length === 0)
+            return;
+
+        let index = roomIndexOfTeam(selectedRoomTeam);
+
+        if (index < 0)
+            index = Number(delta || 0) < 0 ? rows.length : -1;
+
+        index = Math.max(
             0,
-            Math.min(
-                rows.length - 1,
-                Math.round(Number(hospitalScroll.contentY || 0) / stride)
-            )
+            Math.min(rows.length - 1, index + Number(delta || 0))
         );
-        const row = rows[index] || {};
 
-        return String(row.team || row.branch || "");
+        selectRoomIndex(index);
     }
 
     function scheduleRoomEntryAudit(team) {
@@ -105,21 +159,6 @@ PanelWindow {
 
         roomAuditInFlightTeam = candidate;
         auditService.runAudit(false);
-    }
-
-    function settleRoomFromScroll() {
-        if (!menuOpen)
-            return;
-
-        const team = roomTeamAtScrollPosition();
-
-        if (!team)
-            return;
-
-        if (selectedRoomTeam !== team)
-            selectedRoomTeam = team;
-        else
-            scheduleRoomEntryAudit(team);
     }
 
     function runAuditForCurrentRoom() {
@@ -268,6 +307,10 @@ PanelWindow {
 
     exclusiveZone: 0
     WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.keyboardFocus:
+        root.menuOpen
+        ? WlrKeyboardFocus.Exclusive
+        : WlrKeyboardFocus.None
 
     color: "transparent"
     surfaceFormat.opaque: false
@@ -280,6 +323,55 @@ PanelWindow {
         y: 0
         width: root.menuOpen ? root.width : 0
         height: root.menuOpen ? root.height : 0
+    }
+
+    Shortcut {
+        sequence: "Esc"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.close()
+    }
+
+    Shortcut {
+        sequence: "Up"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.cycleRoom(-1)
+    }
+
+    Shortcut {
+        sequence: "Down"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.cycleRoom(1)
+    }
+
+    Shortcut {
+        sequence: "Left"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.cycleFloor(-1)
+    }
+
+    Shortcut {
+        sequence: "Right"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.cycleFloor(1)
+    }
+
+    Shortcut {
+        sequence: "Shift+Left"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.cycleBed(-1)
+    }
+
+    Shortcut {
+        sequence: "Shift+Right"
+        context: Qt.ApplicationShortcut
+        enabled: root.menuOpen
+        onActivated: root.cycleBed(1)
     }
 
     function open() {
@@ -349,13 +441,6 @@ PanelWindow {
         interval: 75
         repeat: false
         onTriggered: root.maybeRunOpenAudit()
-    }
-
-    Timer {
-        id: roomScrollSettleTimer
-        interval: 420
-        repeat: false
-        onTriggered: root.settleRoomFromScroll()
     }
 
     Timer {
@@ -2341,8 +2426,90 @@ PanelWindow {
 
             // ===== OPERATING ROOMS ==============================
 
-            SectionLabel {
-                text: "OPERATING ROOMS"
+            Row {
+                width: parent.width
+                height: 28
+                spacing: 8
+
+                SectionLabel {
+                    width: parent.width - 72
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "OPERATING ROOMS"
+                }
+
+                Rectangle {
+                    width: 28
+                    height: 24
+                    anchors.verticalCenter: parent.verticalCenter
+                    color: roomUpMouse.pressed ? Colors.orange : Colors.black
+                    border.width: 1
+                    border.color:
+                        roomUpMouse.containsMouse
+                        ? Colors.orange
+                        : Colors.cyan
+                    opacity:
+                        auditService.rooms.length > 0
+                        ? 1.0 : 0.42
+
+                    GohuText {
+                        anchors.centerIn: parent
+                        text: "↑"
+                        font.pixelSize: 12
+                        color:
+                            roomUpMouse.pressed
+                            ? Colors.black
+                            : Colors.cyan
+                    }
+
+                    MouseArea {
+                        id: roomUpMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        enabled: auditService.rooms.length > 0
+                        cursorShape:
+                            enabled
+                            ? Qt.PointingHandCursor
+                            : Qt.ArrowCursor
+                        onClicked: root.cycleRoom(-1)
+                    }
+                }
+
+                Rectangle {
+                    width: 28
+                    height: 24
+                    anchors.verticalCenter: parent.verticalCenter
+                    color: roomDownMouse.pressed ? Colors.orange : Colors.black
+                    border.width: 1
+                    border.color:
+                        roomDownMouse.containsMouse
+                        ? Colors.orange
+                        : Colors.cyan
+                    opacity:
+                        auditService.rooms.length > 0
+                        ? 1.0 : 0.42
+
+                    GohuText {
+                        anchors.centerIn: parent
+                        text: "↓"
+                        font.pixelSize: 12
+                        color:
+                            roomDownMouse.pressed
+                            ? Colors.black
+                            : Colors.cyan
+                    }
+
+                    MouseArea {
+                        id: roomDownMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        enabled: auditService.rooms.length > 0
+                        cursorShape:
+                            enabled
+                            ? Qt.PointingHandCursor
+                            : Qt.ArrowCursor
+                        onClicked: root.cycleRoom(1)
+                    }
+                }
             }
 
 
@@ -2368,14 +2535,6 @@ PanelWindow {
             contentHeight: scrollContent.height
             boundsBehavior: Flickable.StopAtBounds
             flickDeceleration: 1800
-
-            onContentYChanged: {
-                root.auditedRoomTeam = "";
-                root.pendingRoomAuditTeam = "";
-                roomEntryAuditTimer.stop();
-                roomEntryAuditRetry.stop();
-                roomScrollSettleTimer.restart();
-            }
 
             Column {
                 id: scrollContent

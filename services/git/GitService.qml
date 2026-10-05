@@ -21,8 +21,16 @@ Scope {
     property string pullSourceMode: "upstream"
     readonly property string pullSourceLabel:
         pullSourceMode === "upstream" ? "UP" : "TGT"
+    readonly property string selectedLocalMatchingRemote:
+        selectedLocalBranch
+        && remoteIndexOf("origin/" + selectedLocalBranch) >= 0
+        ? "origin/" + selectedLocalBranch
+        : ""
+
     readonly property string pullSourceTarget:
-        pullSourceMode === "upstream" ? upstream : selectedRemoteBranch
+        pullSourceMode === "upstream"
+        ? (selectedLocalUpstream || selectedLocalMatchingRemote)
+        : selectedRemoteBranch
     readonly property bool pullSourceTargetValid:
         isRemoteBranchTarget(pullSourceTarget)
 
@@ -39,6 +47,13 @@ Scope {
     property string upstream: ""
     property int ahead: 0
     property int behind: 0
+
+    // Selecting a local branch here is a target selection, not a checkout.
+    // This keeps the self-hosted LIVE QUICKSHELL UI from replacing itself.
+    property string selectedLocalBranch: ""
+    property string selectedLocalHead: ""
+    property string selectedLocalUpstream: ""
+    property int selectedLocalIndex: -1
 
     property string selectedRemoteBranch: ""
     property bool selectedRemoteExists: false
@@ -237,6 +252,10 @@ Scope {
 
         repoPath = String(row.path || "");
         repoLabel = String(row.label || "REPOSITORY");
+        selectedLocalBranch = "";
+        selectedLocalHead = "";
+        selectedLocalUpstream = "";
+        selectedLocalIndex = -1;
 
         if (refreshing) {
             refreshPending = true;
@@ -300,23 +319,61 @@ Scope {
         return false;
     }
 
-    function selectLocal(index) {
+    function setLocalSelection(index) {
         const row = localBranchAt(index);
         if (!row)
             return false;
 
-        const target = String(row.name || "");
-        if (!target || target === branch)
-            return true;
+        selectedLocalIndex = index;
+        selectedLocalBranch = String(row.name || "");
+        selectedLocalHead = String(row.head || "");
+        selectedLocalUpstream = String(row.upstream || "");
+        return true;
+    }
 
-        return switchLocalBranch(target);
+    function ensureLocalSelection() {
+        let index = localIndexOf(selectedLocalBranch);
+
+        if (index < 0)
+            index = localIndexOf(branch);
+
+        if (index < 0 && localBranchRows.count > 0)
+            index = 0;
+
+        if (index >= 0)
+            setLocalSelection(index);
+        else {
+            selectedLocalIndex = -1;
+            selectedLocalBranch = "";
+            selectedLocalHead = "";
+            selectedLocalUpstream = "";
+        }
+    }
+
+    function selectLocal(index) {
+        if (actionBusy || refreshing)
+            return false;
+
+        if (!setLocalSelection(index))
+            return false;
+
+        actionTitle = "LOCAL TARGET";
+        actionExitCode = 0;
+        actionOutput =
+            "SELECTED LOCAL TARGET // " + selectedLocalBranch
+            + "\nNo checkout occurred. Working files were not changed.";
+        return true;
     }
 
     function cycleLocal(delta) {
         if (localBranchRows.count <= 0 || actionBusy || refreshing)
             return;
 
-        let index = localIndexOf(branch);
+        let index = selectedLocalIndex;
+
+        if (index < 0)
+            index = localIndexOf(branch);
+
         if (index < 0)
             index = 0;
         else
@@ -349,65 +406,11 @@ Scope {
         if (partialIndex >= 0)
             return selectLocal(partialIndex);
 
-        actionTitle = "SWITCH";
+        actionTitle = "LOCAL TARGET";
         actionExitCode = 1;
         actionOutput = "NO LOCAL BRANCH MATCH // " + String(query || "")
                      + "\nChoose an existing local branch.";
         return false;
-    }
-
-    function switchLocalBranch(targetBranch) {
-        if (actionBusy || refreshing)
-            return false;
-
-        const target = String(targetBranch || "").trim();
-
-        if (!target || localIndexOf(target) < 0) {
-            actionTitle = "SWITCH";
-            actionExitCode = 1;
-            actionOutput = "SWITCH REFUSED // LOCAL BRANCH NOT FOUND // "
-                         + target;
-            return false;
-        }
-
-        if (target === branch) {
-            actionTitle = "SWITCH";
-            actionExitCode = 0;
-            actionOutput = "ALREADY ON LOCAL BRANCH // " + target;
-            return true;
-        }
-
-        actionBusy = true;
-        actionTitle = "SWITCH";
-        actionOutput = "SWITCHING // " + branch + " → " + target;
-        actionExitCode = 0;
-        actionWatchdog.restart();
-
-        actionProcess.exec([
-            "bash",
-            "-lc",
-            [
-                'repo="$1"',
-                'target="$2"',
-                'if [ -z "$repo" ]; then repo="$HOME/.config/quickshell"; fi',
-                'if ! git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1; then',
-                '  printf "NOT A GIT REPOSITORY\\n"',
-                '  printf "__PA_RC__\\t1\\n"',
-                '  printf "__PA_DONE__\\n"',
-                '  exit 0',
-                'fi',
-                'printf "SWITCH // %s -> %s\\n" "$(git -C "$repo" branch --show-current)" "$target"',
-                'git -C "$repo" switch "$target"',
-                'rc=$?',
-                'printf "__PA_RC__\\t%s\\n" "$rc"',
-                'printf "__PA_DONE__\\n"'
-            ].join("\n"),
-            "pa-git-switch",
-            repoPath,
-            target
-        ]);
-
-        return true;
     }
 
     function selectRemote(index) {
@@ -484,8 +487,14 @@ Scope {
         remoteBranchRows.clear();
         topologyRows.clear();
 
-        for (let i = 0; i < pendingLocalBranches.length; ++i)
-            localBranchRows.append({ name: pendingLocalBranches[i] });
+        for (let i = 0; i < pendingLocalBranches.length; ++i) {
+            const localRow = pendingLocalBranches[i] || {};
+            localBranchRows.append({
+                name: String(localRow.name || ""),
+                head: String(localRow.head || ""),
+                upstream: String(localRow.upstream || "")
+            });
+        }
 
         for (let i = 0; i < pendingRemoteBranches.length; ++i) {
             const remoteName = String(pendingRemoteBranches[i] || "");
@@ -685,9 +694,433 @@ Scope {
                 'printf "UPSTREAM\\t%s\\n" "$upstream"',
                 'printf "AHEAD\\t%s\\n" "$ahead"',
                 'printf "BEHIND\\t%s\\n" "$behind"',
+                'while IFS=
                 'while IFS= read -r ref; do',
-                '  [ -n "$ref" ] && printf "LOCALBRANCH\\t%s\\n" "$ref"',
-                'done < <(git -C "$root" for-each-ref --format="%(refname:short)" refs/heads 2>/dev/null)',
+                '  [ -z "$ref" ] && continue',
+                '  [ "$ref" = "origin" ] && continue',
+                '  [ "$ref" = "origin/HEAD" ] && continue',
+                '  case "$ref" in */*) ;; *) continue ;; esac',
+                '  printf "REMOTEBRANCH\\t%s\\n" "$ref"',
+                'done < <(git -C "$root" for-each-ref --format="%(refname:short)" refs/remotes/origin 2>/dev/null)',
+                'git -C "$root" log --all --topo-order --date-order -n 48 --pretty=format:"COMMIT%x09%H%x09%P%x09%D%x09%s"',
+                'printf "\\nDONE\\t\\n"'
+            ].join("\n"),
+            "pa-git-refresh",
+            refreshRepoPath
+        ]);
+    }
+
+    function consumeRefreshLine(line) {
+        const raw = String(line || "");
+        const parts = raw.split("\t");
+        const key = parts.length > 0 ? parts[0] : "";
+
+        if (key === "COMMIT") {
+            appendCommit(
+                parts.length > 1 ? parts[1] : "",
+                parts.length > 2 ? parts[2] : "",
+                parts.length > 3 ? parts[3] : "",
+                parts.length > 4 ? parts.slice(4).join("\t") : ""
+            );
+            return;
+        }
+
+        const value = parts.length > 1 ? parts.slice(1).join("\t") : "";
+
+        if (key === "ROOT")
+            pendingRepoRoot = value;
+        else if (key === "REPO")
+            pendingRepository = value;
+        else if (key === "BRANCH")
+            pendingBranch = value;
+        else if (key === "HEAD")
+            pendingHead = value;
+        else if (key === "HEADFULL")
+            pendingHeadFull = value;
+        else if (key === "WORKTREE")
+            pendingWorktree = value;
+        else if (key === "ORIGIN")
+            pendingOrigin = value;
+        else if (key === "UPSTREAM")
+            pendingUpstream = value;
+        else if (key === "AHEAD")
+            pendingAhead = Number(value || 0);
+        else if (key === "BEHIND")
+            pendingBehind = Number(value || 0);
+        else if (key === "LOCALBRANCH")
+            pendingLocalBranches.push({
+                name: parts.length > 1 ? parts[1] : "",
+                head: parts.length > 2 ? parts[2] : "",
+                upstream: parts.length > 3 ? parts[3] : ""
+            });
+        else if (key === "REMOTEBRANCH")
+            pendingRemoteBranches.push(value);
+        else if (key === "ERROR") {
+            available = false;
+            lastError = value;
+        } else if (key === "DONE") {
+            const staleRead = refreshRepoPath !== repoPath;
+
+            refreshing = false;
+            refreshWatchdog.stop();
+
+            if (!staleRead && !lastError) {
+                publishPendingModels();
+                ensureLocalSelection();
+                ensureRemoteSelection();
+                topologyRevision += 1;
+                available = true;
+                refreshed();
+            }
+
+            if (refreshPending || staleRead) {
+                refreshPending = false;
+                Qt.callLater(function() {
+                    refresh();
+                });
+            }
+        }
+    }
+
+    function describePullMode() {
+        actionTitle = "PULL MODE";
+        actionExitCode = 0;
+
+        if (pullMode === "ff-only") {
+            actionOutput =
+                "PULL MODE // FF ONLY"
+                + "\nFast-forward the selected LOCAL TARGET when history is clean."
+                + "\nThis does not checkout that branch or replace the working files."
+                + "\nIf Git would need a merge, Pull stops instead.";
+        } else {
+            actionOutput =
+                "PULL MODE // MERGE"
+                + "\nPull the selected remote branch and merge divergent history."
+                + "\nThis mode can create a merge commit or leave conflicts to resolve."
+                + "\nNothing was changed yet.";
+        }
+    }
+
+    function cyclePullMode() {
+        pullMode = pullMode === "ff-only" ? "merge" : "ff-only";
+        describePullMode();
+    }
+
+    function cyclePullSource() {
+        pullSourceMode =
+            pullSourceMode === "upstream"
+            ? "target"
+            : "upstream";
+
+        actionTitle = "PULL SOURCE";
+        actionExitCode = 0;
+
+        if (pullSourceMode === "upstream") {
+            actionOutput =
+                pullSourceTargetValid
+                ? "PULL SOURCE // UPSTREAM\n" + pullSourceTarget
+                : "PULL SOURCE // UPSTREAM\nNO MATCHING REMOTE FOR SELECTED LOCAL TARGET";
+        } else {
+            actionOutput =
+                pullSourceTargetValid
+                ? "PULL SOURCE // TARGET\n" + pullSourceTarget
+                : "PULL SOURCE // TARGET\nCHOOSE A REMOTE TARGET ABOVE";
+        }
+    }
+
+    function runReadAction(kind) {
+        runAction(String(kind || "").toLowerCase());
+    }
+
+    function runSyncAction(kind) {
+        runAction(String(kind || "").toLowerCase());
+    }
+
+    function runAction(kind) {
+        if (actionBusy)
+            return;
+
+        const action = String(kind || "").toLowerCase();
+        const allowed = ["status", "diff", "log", "fetch", "pull", "push"];
+        const localTarget = selectedLocalBranch || branch;
+        const syncTarget =
+            action === "pull"
+            ? pullSourceTarget
+            : selectedRemoteBranch;
+
+        if (allowed.indexOf(action) < 0)
+            return;
+
+        if (action === "pull" && !isRemoteBranchTarget(syncTarget)) {
+            actionTitle = "PULL";
+            actionOutput =
+                pullSourceMode === "upstream"
+                ? "PULL SOURCE // UPSTREAM\nNo matching remote is configured for the selected local target."
+                : "PULL SOURCE // TARGET\nChoose a remote branch target first.";
+            actionExitCode = 1;
+            return;
+        }
+
+        if (action === "push" && !isRemoteBranchTarget(selectedRemoteBranch)) {
+            actionTitle = "PUSH";
+            actionOutput =
+                "Choose a remote branch target first."
+                + "\nExample // origin/" + String(localTarget || "main")
+                + "\nA remote name by itself is not a branch.";
+            actionExitCode = 1;
+            return;
+        }
+
+        actionBusy = true;
+        actionTitle = action.toUpperCase();
+        actionOutput = "";
+        actionExitCode = 0;
+        actionWatchdog.restart();
+
+        actionProcess.exec([
+            "bash",
+            "-lc",
+            [
+                'repo="$1"',
+                'kind="$2"',
+                'target="$3"',
+                'pull_mode="$4"',
+                'local_target="$5"',
+                'if [ -z "$repo" ]; then repo="$HOME/.config/quickshell"; fi',
+                'if ! git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1; then',
+                '  printf "NOT A GIT REPOSITORY\\n"',
+                '  printf "__PA_RC__\\t1\\n"',
+                '  printf "__PA_DONE__\\n"',
+                '  exit 0',
+                'fi',
+                'rc=0',
+                'case "$kind" in',
+                '  status)',
+                '    git -C "$repo" status --short --branch || rc=$?',
+                '    ;;',
+                '  diff)',
+                '    output="$(git -C "$repo" diff --stat; git -C "$repo" diff --name-status)"',
+                '    if [ -n "$output" ]; then printf "%s\\n" "$output"; else printf "NO UNSTAGED DIFF\\n"; fi',
+                '    ;;',
+                '  log)',
+                '    git -C "$repo" log --oneline --decorate -n 20 || rc=$?',
+                '    ;;',
+                '  fetch)',
+                '    printf "FETCH // updating remote branch map from origin\\n"',
+                '    git -C "$repo" fetch --prune origin || rc=$?',
+                '    ;;',
+                '  pull)',
+                '    remote="${target%%/*}"',
+                '    remote_branch="${target#*/}"',
+                '    current_branch="$(git -C "$repo" branch --show-current)"',
+                '    git -C "$repo" fetch --prune "$remote" || rc=$?',
+                '    if [ "$rc" -eq 0 ]; then',
+                '      if [ "$local_target" = "$current_branch" ]; then',
+                '        case "$pull_mode" in',
+                '          ff-only)',
+                '            printf "PULL // FF ONLY // %s -> checked-out %s\\n" "$target" "$local_target"',
+                '            git -C "$repo" pull --ff-only "$remote" "$remote_branch" || rc=$?',
+                '            ;;',
+                '          merge)',
+                '            printf "PULL // MERGE // %s -> checked-out %s\\n" "$target" "$local_target"',
+                '            git -C "$repo" pull --no-rebase "$remote" "$remote_branch" || rc=$?',
+                '            ;;',
+                '        esac',
+                '      elif [ "$pull_mode" = "ff-only" ]; then',
+                '        printf "SYNC LOCAL TARGET // %s -> %s // NO CHECKOUT\\n" "$target" "$local_target"',
+                '        if git -C "$repo" merge-base --is-ancestor "$local_target" "$target"; then',
+                '          git -C "$repo" branch -f "$local_target" "$target" || rc=$?',
+                '        else',
+                '          printf "PULL STOPPED // %s cannot fast-forward to %s\\n" "$local_target" "$target"',
+                '          rc=1',
+                '        fi',
+                '      else',
+                '        printf "BACKGROUND MERGE REFUSED // %s is not checked out\\n" "$local_target"',
+                '        printf "Use FF mode, or explicitly checkout the branch before a merge-mode pull.\\n"',
+                '        rc=1',
+                '      fi',
+                '    fi',
+                '    ;;',
+                '  push)',
+                '    remote="${target%%/*}"',
+                '    remote_branch="${target#*/}"',
+                '    if git -C "$repo" show-ref --verify --quiet "refs/remotes/$target"; then',
+                '      printf "PUSH // %s -> %s\\n" "$local_target" "$target"',
+                '    else',
+                '      printf "CREATE REMOTE BRANCH // %s -> %s\\n" "$local_target" "$target"',
+                '    fi',
+                '    git -C "$repo" push -u "$remote" "$local_target:$remote_branch" || rc=$?',
+                '    ;;',
+                'esac',
+                'printf "__PA_RC__\\t%s\\n" "$rc"',
+                'printf "__PA_DONE__\\n"'
+            ].join("\n"),
+            "pa-git-action",
+            repoPath,
+            action,
+            syncTarget,
+            pullMode,
+            localTarget
+        ]);
+    }
+
+    function friendlyActionError(message) {
+        const raw = String(message || "").trim();
+        const lower = raw.toLowerCase();
+
+        if (
+            actionTitle === "PULL"
+            && (
+                lower.indexOf("not possible to fast-forward") >= 0
+                || lower.indexOf("not possible to fast forward") >= 0
+                || lower.indexOf("divergent") >= 0
+                || lower.indexOf("non-fast-forward") >= 0
+            )
+        ) {
+            return "PULL STOPPED // branches have diverged"
+                 + "\nFAST-FORWARD ONLY // no merge was created"
+                 + "\nOpen Lazygit or choose a deliberate merge/rebase operation.";
+        }
+
+        if (
+            actionTitle === "PULL"
+            && (
+                lower.indexOf("couldn't find remote ref") >= 0
+                || lower.indexOf("could not find remote ref") >= 0
+            )
+        ) {
+            return "PULL STOPPED // remote branch was not found"
+                 + "\nChoose an existing remote target and try again.";
+        }
+
+        return "ERR: " + raw;
+    }
+
+    function consumeActionLine(line) {
+        const raw = String(line || "");
+
+        if (raw.indexOf("__PA_RC__\t") === 0) {
+            actionExitCode = Number(raw.slice("__PA_RC__\t".length) || 0);
+            return;
+        }
+
+        if (raw === "__PA_DONE__") {
+            actionBusy = false;
+            actionWatchdog.stop();
+            refresh();
+            return;
+        }
+
+        if (actionOutput.length > 12000)
+            return;
+
+        actionOutput += (actionOutput.length > 0 ? "\n" : "") + raw;
+    }
+
+    function launchLazygit() {
+        Quickshell.execDetached([
+            "bash",
+            "-lc",
+            [
+                'repo="$1"',
+                'if [ -z "$repo" ]; then repo="$HOME/.config/quickshell"; fi',
+                'cd "$repo" || exit 1',
+                'exec kitty --directory "$PWD" toolbox run -c fedora-toolbox-44 lazygit'
+            ].join("\n"),
+            "pa-lazygit",
+            repoPath
+        ]);
+    }
+
+    Process {
+        id: repoScanProcess
+
+        stdout: SplitParser {
+            onRead: function(line) {
+                gitService.consumeRepoLine(line);
+            }
+        }
+
+        stderr: SplitParser {
+            onRead: function(line) {
+                const message = String(line || "").trim();
+                if (message)
+                    gitService.lastError = message;
+            }
+        }
+    }
+
+    Process {
+        id: refreshProcess
+
+        stdout: SplitParser {
+            onRead: function(line) {
+                gitService.consumeRefreshLine(line);
+            }
+        }
+
+        stderr: SplitParser {
+            onRead: function(line) {
+                const message = String(line || "").trim();
+                if (message.length > 0)
+                    gitService.lastError = message;
+            }
+        }
+    }
+
+    Process {
+        id: actionProcess
+
+        stdout: SplitParser {
+            onRead: function(line) {
+                gitService.consumeActionLine(line);
+            }
+        }
+
+        stderr: SplitParser {
+            onRead: function(line) {
+                const message = String(line || "").trim();
+
+                if (message.length > 0)
+                    gitService.actionOutput += (
+                        gitService.actionOutput.length > 0 ? "\n" : ""
+                    ) + gitService.friendlyActionError(message);
+            }
+        }
+    }
+
+    Timer {
+        id: refreshWatchdog
+        interval: 6000
+        repeat: false
+
+        onTriggered: {
+            gitService.refreshing = false;
+            gitService.available = false;
+            gitService.lastError = "GIT READ TIMEOUT";
+            gitService.topologyRevision += 1;
+        }
+    }
+
+    Timer {
+        id: actionWatchdog
+        interval: 15000
+        repeat: false
+
+        onTriggered: {
+            gitService.actionBusy = false;
+            gitService.actionExitCode = 1;
+            gitService.actionOutput += (
+                gitService.actionOutput.length > 0 ? "\n" : ""
+            ) + "ACTION TIMEOUT";
+        }
+    }
+
+    Component.onCompleted: discoverRepos()
+}
+\''\\t'\'' read -r ref ref_head ref_upstream; do',
+                '  [ -n "$ref" ] && printf "LOCALBRANCH\\t%s\\t%s\\t%s\\n" "$ref" "$ref_head" "$ref_upstream"',
+                'done < <(git -C "$root" for-each-ref --format="%(refname:short)%09%(objectname:short=10)%09%(upstream:short)" refs/heads 2>/dev/null)',
                 'while IFS= read -r ref; do',
                 '  [ -z "$ref" ] && continue',
                 '  [ "$ref" = "origin" ] && continue',

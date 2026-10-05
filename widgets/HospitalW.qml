@@ -647,14 +647,14 @@ PanelWindow {
                             MetaValue {
                                 width: patientPane.width - 108
                                 text: patientService.repository
-                                color: Colors.orange
+                                color: Colors.blue
                                 elide: Text.ElideRight
 
                                 layer.effect: DropShadow {
                                     radius: 5
                                     samples: 7
                                     opacity: 0.28
-                                    color: Colors.orange
+                                    color: Colors.blue
                                     transparentBorder: true
                                 }
                             }

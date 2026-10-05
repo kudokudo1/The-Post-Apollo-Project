@@ -8,6 +8,8 @@ Scope {
     property string repository: ""
 
     property bool running: false
+    property bool quietRun: false
+    readonly property bool visibleRunning: running && !quietRun
     property bool available: false
 
     property string status: "NOT RUN"
@@ -29,6 +31,7 @@ Scope {
     property int exitCode: -1
     property string stdoutText: ""
     property string stderrText: ""
+    property string lastAuditPayload: ""
 
     signal audited()
 
@@ -44,12 +47,15 @@ Scope {
         latestRunConclusion = "";
         latestRunBranch = "";
         rooms = [];
+        lastAuditPayload = "";
         lastError = "";
     }
 
-    function runAudit() {
+    function runAudit(quiet) {
         if (running)
             return;
+
+        quietRun = Boolean(quiet);
 
         const target = String(repository || "").trim();
 
@@ -60,6 +66,7 @@ Scope {
 
         if (!target) {
             resetResult();
+            quietRun = false;
             lastError = "NO GITHUB REPOSITORY";
             return;
         }
@@ -133,7 +140,7 @@ Scope {
     }
 
     function roomLabel(team) {
-        if (running)
+        if (visibleRunning)
             return "READING";
 
         const room = roomFor(team);
@@ -173,7 +180,11 @@ Scope {
         if (!running || !exitSeen || !stdoutSeen || !stderrSeen)
             return;
 
+        const wasQuiet = quietRun;
+        const payload = String(stdoutText || "").trim();
+
         running = false;
+        quietRun = false;
         watchdog.stop();
 
         if (exitCode !== 0) {
@@ -182,8 +193,19 @@ Scope {
             return;
         }
 
+        // Background audits are observation-only until the result actually
+        // differs from the last published audit snapshot.
+        if (wasQuiet
+                && available
+                && payload.length > 0
+                && payload === lastAuditPayload) {
+            lastError = "";
+            return;
+        }
+
         try {
-            parseAudit(stdoutText);
+            parseAudit(payload);
+            lastAuditPayload = payload;
             available = true;
             lastError = "";
             audited();
@@ -229,6 +251,7 @@ Scope {
                 return;
 
             auditService.running = false;
+            auditService.quietRun = false;
             auditService.available = false;
             auditService.lastError = "PX AUDIT TIMEOUT";
 

@@ -64,6 +64,20 @@ PanelWindow {
         onActivated: shellRoot.swapControlKeyboardOwner()
     }
 
+    // Sway owns the global Mod4 keystrokes; these IPC functions route them
+    // into the exact same toggle functions used by the taskbar buttons.
+    IpcHandler {
+        target: "controlMenus"
+
+        function git(): void {
+            gitWindow.toggle();
+        }
+
+        function hospital(): void {
+            hospitalWindow.toggle();
+        }
+    }
+
     // ===== SERVICES =============================================
 
     WeatherService {

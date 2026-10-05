@@ -28,6 +28,12 @@ Scope {
 
     property var activeLanes: []
 
+    // Refresh into a staging snapshot so the visible topology never blanks
+    // while local Git is being reread.
+    property var pendingTopologyRows: []
+    property var pendingActiveLanes: []
+    property int pendingMaxLane: 0
+
     signal refreshed()
 
     ListModel {
@@ -38,6 +44,12 @@ Scope {
         topologyRows.clear();
         activeLanes = [];
         maxLane = 0;
+    }
+
+    function resetPendingTopology() {
+        pendingTopologyRows = [];
+        pendingActiveLanes = [];
+        pendingMaxLane = 0;
     }
 
     function cleanRefs(rawRefs) {
@@ -63,7 +75,7 @@ Scope {
     }
 
     function allocateLane(sha, parents) {
-        let lanes = activeLanes.slice();
+        let lanes = pendingActiveLanes.slice();
         let lane = lanes.indexOf(sha);
 
         if (lane < 0) {
@@ -97,8 +109,8 @@ Scope {
             }
         }
 
-        activeLanes = lanes;
-        maxLane = Math.max(maxLane, lane);
+        pendingActiveLanes = lanes;
+        pendingMaxLane = Math.max(pendingMaxLane, lane);
 
         return lane;
     }
@@ -109,7 +121,9 @@ Scope {
         const lane = allocateLane(sha, parents);
         const decorated = String(refs || "");
 
-        topologyRows.append({
+        const rows = pendingTopologyRows.slice();
+
+        rows.push({
             sha: sha,
             shortSha: String(sha).slice(0, 8),
             parents: parents.join(" "),
@@ -118,6 +132,8 @@ Scope {
             lane: lane,
             isHead: decorated.indexOf("HEAD ->") >= 0
         });
+
+        pendingTopologyRows = rows;
     }
 
     function commitAt(index) {
@@ -143,9 +159,8 @@ Scope {
             return;
 
         refreshing = true;
-        available = false;
         lastError = "";
-        resetTopology();
+        resetPendingTopology();
         watchdog.restart();
 
         refreshProcess.exec([
@@ -225,12 +240,21 @@ Scope {
         } else if (key === "DONE") {
             refreshing = false;
             watchdog.stop();
-            topologyRevision += 1;
 
             if (!lastError) {
+                topologyRows.clear();
+
+                for (let i = 0; i < pendingTopologyRows.length; ++i)
+                    topologyRows.append(pendingTopologyRows[i]);
+
+                activeLanes = pendingActiveLanes.slice();
+                maxLane = pendingMaxLane;
+                topologyRevision += 1;
                 available = true;
                 refreshed();
             }
+
+            resetPendingTopology();
         }
     }
 
@@ -260,9 +284,8 @@ Scope {
 
         onTriggered: {
             hospitalService.refreshing = false;
-            hospitalService.available = false;
             hospitalService.lastError = "PATIENT GIT READ TIMEOUT";
-            hospitalService.topologyRevision += 1;
+            hospitalService.resetPendingTopology();
         }
     }
 }

@@ -130,6 +130,15 @@ Scope {
         return -1;
     }
 
+    function localIndexOf(name) {
+        const needle = String(name || "");
+        for (let i = 0; i < localBranchRows.count; ++i) {
+            if (String(localBranchRows.get(i).name) === needle)
+                return i;
+        }
+        return -1;
+    }
+
     function remoteIndexOf(name) {
         const needle = String(name || "");
         for (let i = 0; i < remoteBranchRows.count; ++i) {
@@ -289,6 +298,116 @@ Scope {
         actionOutput = "NO MATCH // " + String(query || "")
                      + "\nType part of a repo name already registered on this machine.";
         return false;
+    }
+
+    function selectLocal(index) {
+        const row = localBranchAt(index);
+        if (!row)
+            return false;
+
+        const target = String(row.name || "");
+        if (!target || target === branch)
+            return true;
+
+        return switchLocalBranch(target);
+    }
+
+    function cycleLocal(delta) {
+        if (localBranchRows.count <= 0 || actionBusy || refreshing)
+            return;
+
+        let index = localIndexOf(branch);
+        if (index < 0)
+            index = 0;
+        else
+            index = (index + Number(delta || 0) + localBranchRows.count)
+                    % localBranchRows.count;
+
+        selectLocal(index);
+    }
+
+    function selectLocalText(query) {
+        const needle = String(query || "").trim().toLowerCase();
+
+        if (!needle)
+            return false;
+
+        let partialIndex = -1;
+
+        for (let i = 0; i < localBranchRows.count; ++i) {
+            const row = localBranchRows.get(i);
+            const name = String(row.name || "");
+            const lowerName = name.toLowerCase();
+
+            if (lowerName === needle)
+                return selectLocal(i);
+
+            if (partialIndex < 0 && lowerName.indexOf(needle) >= 0)
+                partialIndex = i;
+        }
+
+        if (partialIndex >= 0)
+            return selectLocal(partialIndex);
+
+        actionTitle = "SWITCH";
+        actionExitCode = 1;
+        actionOutput = "NO LOCAL BRANCH MATCH // " + String(query || "")
+                     + "\nChoose an existing local branch.";
+        return false;
+    }
+
+    function switchLocalBranch(targetBranch) {
+        if (actionBusy || refreshing)
+            return false;
+
+        const target = String(targetBranch || "").trim();
+
+        if (!target || localIndexOf(target) < 0) {
+            actionTitle = "SWITCH";
+            actionExitCode = 1;
+            actionOutput = "SWITCH REFUSED // LOCAL BRANCH NOT FOUND // "
+                         + target;
+            return false;
+        }
+
+        if (target === branch) {
+            actionTitle = "SWITCH";
+            actionExitCode = 0;
+            actionOutput = "ALREADY ON LOCAL BRANCH // " + target;
+            return true;
+        }
+
+        actionBusy = true;
+        actionTitle = "SWITCH";
+        actionOutput = "SWITCHING // " + branch + " → " + target;
+        actionExitCode = 0;
+        actionWatchdog.restart();
+
+        actionProcess.exec([
+            "bash",
+            "-lc",
+            [
+                'repo="$1"',
+                'target="$2"',
+                'if [ -z "$repo" ]; then repo="$HOME/.config/quickshell"; fi',
+                'if ! git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1; then',
+                '  printf "NOT A GIT REPOSITORY\\n"',
+                '  printf "__PA_RC__\\t1\\n"',
+                '  printf "__PA_DONE__\\n"',
+                '  exit 0',
+                'fi',
+                'printf "SWITCH // %s -> %s\\n" "$(git -C "$repo" branch --show-current)" "$target"',
+                'git -C "$repo" switch "$target"',
+                'rc=$?',
+                'printf "__PA_RC__\\t%s\\n" "$rc"',
+                'printf "__PA_DONE__\\n"'
+            ].join("\n"),
+            "pa-git-switch",
+            repoPath,
+            target
+        ]);
+
+        return true;
     }
 
     function selectRemote(index) {
@@ -849,6 +968,19 @@ Scope {
         ) {
             return "PULL STOPPED // remote branch was not found"
                  + "\nChoose an existing remote target and try again.";
+        }
+
+        if (
+            actionTitle === "SWITCH"
+            && (
+                lower.indexOf("would be overwritten by checkout") >= 0
+                || lower.indexOf("would be overwritten by switch") >= 0
+                || lower.indexOf("please commit your changes") >= 0
+                || lower.indexOf("please stash them") >= 0
+            )
+        ) {
+            return "SWITCH STOPPED // LOCAL CHANGES WOULD BE AFFECTED"
+                 + "\nCommit, stash, or discard those changes first.";
         }
 
         return "ERR: " + raw;

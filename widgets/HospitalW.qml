@@ -15,6 +15,9 @@ PanelWindow {
     property string selectedCommitSha: ""
     property string selectedRoomTeam: ""
     property bool remoteRefreshPending: false
+    property int openAuditStaleInterval: 600000
+    property bool openAuditPending: false
+    property var lastOpenAuditByFloor: ({})
     readonly property var selectedRoomData:
         auditService.roomFor(selectedRoomTeam)
     readonly property string selectedRoomBranch: {
@@ -207,13 +210,59 @@ PanelWindow {
         root.menuOpen = !root.menuOpen;
     }
 
+    function requestOpenAudit() {
+        openAuditPending = true;
+        maybeRunOpenAudit();
+    }
+
+    function maybeRunOpenAudit() {
+        if (!openAuditPending
+                || !menuOpen
+                || floorService.discovering
+                || auditService.running)
+            return;
+
+        const key = String(floorService.floorId || "");
+        const repo = String(auditService.repository || "");
+
+        if (!key || !repo)
+            return;
+
+        const stamps = lastOpenAuditByFloor;
+        const last = Number(stamps[key] || 0);
+        const now = Date.now();
+
+        if (last > 0 && now - last < openAuditStaleInterval) {
+            openAuditPending = false;
+            return;
+        }
+
+        stamps[key] = now;
+        lastOpenAuditByFloor = stamps;
+        openAuditPending = false;
+
+        // First open after a Quickshell restart, or an open after the stale
+        // window, gets one visible audit. Ordinary reopenings do not.
+        auditService.runAudit(false);
+    }
+
     onMenuOpenChanged: {
-        if (root.menuOpen)
-            floorService.discover();
+        if (!root.menuOpen)
+            return;
+
+        root.requestOpenAudit();
+        floorService.discover();
     }
 
     Component.onCompleted: {
         certificationCoordinator.bindRoom(roomService);
+    }
+
+    Timer {
+        id: openAuditKick
+        interval: 75
+        repeat: false
+        onTriggered: root.maybeRunOpenAudit()
     }
 
     HospitalFloorService {
@@ -226,6 +275,16 @@ PanelWindow {
             roomService.clearResult();
             certificationCoordinator.bindRoom(roomService);
             auditService.resetResult();
+
+            if (root.menuOpen) {
+                root.openAuditPending = true;
+                openAuditKick.restart();
+            }
+        }
+
+        onFloorsChanged: {
+            if (root.menuOpen)
+                openAuditKick.restart();
         }
 
         onBedChanged: {
@@ -256,8 +315,9 @@ PanelWindow {
         }
 
         onRemoteCheckCompleted: function(refsChanged) {
-            // Every successful remote check also performs a quiet PX audit.
-            // The audit service only publishes if its result actually changed.
+            // Every later freshness check also performs a quiet PX audit.
+            // If the visible first-open audit is still running, runAudit()
+            // simply refuses the duplicate request.
             auditService.runAudit(true);
         }
     }

@@ -102,6 +102,46 @@ Rectangle {
         return result;
     }
 
+    function graphMetadataGlowMarkup(refValue, subjectValue, headRow) {
+        const refs = String(refValue || "")
+            .split(" • ")
+            .filter(function(name) { return name.length > 0; });
+        const pieces = [];
+
+        for (let i = 0; i < refs.length; ++i) {
+            const name = refs[i];
+
+            // White and cyan branch/ref text both glow cyan.
+            pieces.push(
+                "<font color=\"" + String(Colors.cyan) + "\">"
+                + escapeStyled(name)
+                + "</font>"
+            );
+        }
+
+        let result = pieces.join(
+            "<font color=\"" + String(Colors.cyan) + "\"> • </font>"
+        );
+
+        const subject = String(subjectValue || "");
+
+        if (subject) {
+            if (result)
+                result += "<font color=\"" + String(Colors.cyan) + "\">  //  </font>";
+            else
+                result += "<font color=\"" + String(Colors.cyan) + "\">//  </font>";
+
+            // Blue/cyan subject text glows cyan. Head/yellow emphasis glows orange.
+            result += "<font color=\""
+                + String(headRow ? Colors.orange : Colors.cyan)
+                + "\">"
+                + escapeStyled(subject)
+                + "</font>";
+        }
+
+        return result;
+    }
+
     Item {
         anchors {
             fill: parent
@@ -360,24 +400,90 @@ Rectangle {
                         }
 
                         Row {
+                            id: metadataRow
+
                             x: topologyBody.laneAreaWidth
                             width: parent.width - x - 6
+                            height: parent.height
                             anchors.verticalCenter: parent.verticalCenter
                             spacing: 4
 
                             GohuText {
+                                id: shaText
+
+                                anchors.verticalCenter: parent.verticalCenter
                                 text: shortSha
                                 font.pixelSize: 9
                                 color: Colors.orange
+
+                                layer.enabled: true
+                                layer.effect: DropShadow {
+                                    radius: 5
+                                    samples: 7
+                                    opacity: 0.42
+                                    color: Colors.orange
+                                    transparentBorder: true
+                                }
                             }
 
-                            GohuText {
-                                width: parent.width - implicitWidth - 4
-                                text: branchMap.graphMetadataMarkup(refsText, subject, isHead)
-                                textFormat: Text.StyledText
-                                font.pixelSize: 9
-                                color: Colors.white
-                                elide: Text.ElideRight
+                            Item {
+                                width: Math.max(
+                                    0,
+                                    metadataRow.width
+                                    - shaText.implicitWidth
+                                    - metadataRow.spacing
+                                )
+                                height: parent.height
+
+                                // StyledText cannot assign a different DropShadow
+                                // color per inline span, so render a soft colored
+                                // halo underneath using the mapped glow markup.
+                                Repeater {
+                                    model: [
+                                        { dx: -1, dy: 0 },
+                                        { dx: 1, dy: 0 },
+                                        { dx: 0, dy: -1 },
+                                        { dx: 0, dy: 1 },
+                                        { dx: -1, dy: -1 },
+                                        { dx: 1, dy: -1 },
+                                        { dx: -1, dy: 1 },
+                                        { dx: 1, dy: 1 }
+                                    ]
+
+                                    GohuText {
+                                        x: modelData.dx
+                                        y: modelData.dy
+                                        width: parent.width
+                                        height: parent.height
+                                        text:
+                                            branchMap.graphMetadataGlowMarkup(
+                                                refsText,
+                                                subject,
+                                                isHead
+                                            )
+                                        textFormat: Text.StyledText
+                                        font.pixelSize: 9
+                                        color: Colors.cyan
+                                        opacity: 0.20
+                                        elide: Text.ElideRight
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
+                                }
+
+                                GohuText {
+                                    anchors.fill: parent
+                                    text:
+                                        branchMap.graphMetadataMarkup(
+                                            refsText,
+                                            subject,
+                                            isHead
+                                        )
+                                    textFormat: Text.StyledText
+                                    font.pixelSize: 9
+                                    color: Colors.white
+                                    elide: Text.ElideRight
+                                    verticalAlignment: Text.AlignVCenter
+                                }
                             }
                         }
 

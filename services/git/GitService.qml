@@ -249,7 +249,7 @@ Scope {
                 '  fi',
                 'done',
                 'if command -v gh >/dev/null 2>&1; then',
-                '  gh repo list --limit 200 --json name,nameWithOwner,url --jq '"'"'.[] | ["REMOTE", .name, .nameWithOwner, .url] | @tsv'"'"' 2>/dev/null || true',
+                "  gh repo list --limit 200 --json name,nameWithOwner,url --jq '.[] | [\\\"REMOTE\\\", .name, .nameWithOwner, .url] | @tsv' 2>/dev/null || true",
                 'fi',
                 'printf "DONE\\t\\n"'
             ].join("\n")

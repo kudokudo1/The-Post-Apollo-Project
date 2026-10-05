@@ -251,7 +251,7 @@ Scope {
                 'if command -v gh >/dev/null 2>&1; then',
                 '  while IFS="$(printf "\\t")" read -r name slug url; do',
                 '    [ -n "$slug" ] && printf "REMOTE\\t%s\\t%s\\t%s\\n" "$name" "$slug" "$url"',
-                '  done < <(gh repo list --limit 200 --json name,nameWithOwner,url --jq '"'"'.[] | [.name, .nameWithOwner, .url] | @tsv'"'"' 2>/dev/null)',
+                "  done < <(gh repo list --limit 200 --json name,nameWithOwner,url --jq '.[] | [.name, .nameWithOwner, .url] | @tsv' 2>/dev/null)",
                 'fi',
                 'printf "DONE\\t\\n"'
             ].join("\n")

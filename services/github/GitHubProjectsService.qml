@@ -682,6 +682,75 @@ Scope {
         );
     }
 
+    function createIssue(repoSlug, title, body) {
+        const number = selectedNumber();
+        const cleanRepo = String(repoSlug || "").trim();
+        const cleanTitle = String(title || "").trim();
+
+        if (!number || !cleanRepo || !cleanTitle) {
+            lastError =
+                !cleanRepo
+                ? "ISSUE CREATE UNAVAILABLE // ACTIVE REPOSITORY MISSING"
+                : "ISSUE CREATE UNAVAILABLE // TITLE MISSING";
+            stateText = lastError;
+            return false;
+        }
+
+        return startOperation(
+            "create-issue",
+            [
+                "bash",
+                "-lc",
+                [
+                    'issue_url="$(gh issue create --repo "$3" --title "$4" --body "$5")" || exit $?',
+                    'issue_url="$(printf "%s\\n" "$issue_url" | tail -n 1)"',
+                    '[ -n "$issue_url" ] || { printf "ISSUE CREATE RETURNED NO URL\\n" >&2; exit 1; }',
+                    'exec gh project item-add "$1" --owner "$2" --url "$issue_url" --format json'
+                ].join("\n"),
+                "pa-project-issue-create",
+                String(number),
+                owner,
+                cleanRepo,
+                cleanTitle,
+                String(body || "")
+            ],
+            "CREATING ISSUE"
+        );
+    }
+
+    function addPullRequest(url) {
+        const number = selectedNumber();
+        const cleanUrl = String(url || "").trim();
+        const lower = cleanUrl.toLowerCase();
+
+        if (!number || !cleanUrl) {
+            lastError = "PULL REQUEST ADD UNAVAILABLE // URL MISSING";
+            stateText = lastError;
+            return false;
+        }
+
+        if (lower.indexOf("github.com/") < 0
+                || lower.indexOf("/pull/") < 0) {
+            lastError = "PULL REQUEST ADD UNAVAILABLE // EXPECTED GITHUB PR URL";
+            stateText = lastError;
+            return false;
+        }
+
+        return startOperation(
+            "add-pr",
+            [
+                "bash",
+                "-lc",
+                'exec gh project item-add "$1" --owner "$2" --url "$3" --format json',
+                "pa-project-pr-add",
+                String(number),
+                owner,
+                cleanUrl
+            ],
+            "ADDING PULL REQUEST"
+        );
+    }
+
     function itemId(item) {
         return String((item || {}).id || "");
     }

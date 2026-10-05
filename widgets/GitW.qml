@@ -3306,6 +3306,7 @@ PanelWindow {
 
                                 githubService: githubService
                                 libraryStore: workflowLibraryStore
+                                keyboardHost: root
 
                                 onWorkflowSelected: function(index) {
                                     root.selectedWorkflowIndex = index;

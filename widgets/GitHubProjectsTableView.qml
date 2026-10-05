@@ -14,6 +14,7 @@ Item {
     readonly property int priorityWidth: 90
     readonly property int iterationWidth: 110
     readonly property int dateWidth: 92
+    readonly property int actionWidth: 104
     readonly property int totalWidth:
         titleWidth
         + typeWidth
@@ -22,6 +23,7 @@ Item {
         + priorityWidth
         + iterationWidth
         + dateWidth * 2
+        + actionWidth
 
     component Cell: Rectangle {
         id: cell
@@ -48,6 +50,37 @@ Item {
             color: cell.header ? cell.accent : Colors.white
             opacity: cell.value ? 1.0 : 0.34
             elide: Text.ElideRight
+        }
+    }
+
+    component ItemAction: Rectangle {
+        id: itemAction
+
+        property string label: ""
+        property bool enabledAction: true
+        property bool destructive: false
+
+        signal triggered()
+
+        height: 26
+        opacity: enabledAction ? 1.0 : 0.34
+        color: Colors.black
+        border.width: 1
+        border.color: destructive ? Colors.red : Colors.cyan
+
+        GohuText {
+            anchors.centerIn: parent
+            text: itemAction.label
+            font.pixelSize: 8
+            color: itemAction.destructive ? Colors.red : Colors.cyan
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            enabled: itemAction.enabledAction
+            hoverEnabled: true
+            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+            onClicked: itemAction.triggered()
         }
     }
 
@@ -162,6 +195,13 @@ Item {
                             value: "TARGET"
                             header: true
                         }
+
+                        Cell {
+                            width: root.actionWidth
+                            value: "ACTIONS"
+                            header: true
+                            accent: Colors.orange
+                        }
                     }
 
                     Repeater {
@@ -237,6 +277,48 @@ Item {
                                     root.projectService.itemTargetDate(
                                         tableRow.modelData
                                     )
+                            }
+
+                            Rectangle {
+                                width: root.actionWidth
+                                height: 38
+                                color: Colors.dark
+                                border.width: 1
+                                border.color: Colors.orange
+
+                                Row {
+                                    anchors.centerIn: parent
+                                    spacing: 4
+
+                                    ItemAction {
+                                        width: 66
+                                        label: "ARCHIVE"
+                                        enabledAction:
+                                            !root.projectService.busy
+                                            && !!root.projectService.itemId(
+                                                tableRow.modelData
+                                            )
+                                        onTriggered:
+                                            root.projectService.archiveItem(
+                                                tableRow.modelData
+                                            )
+                                    }
+
+                                    ItemAction {
+                                        width: 26
+                                        label: "X"
+                                        destructive: true
+                                        enabledAction:
+                                            !root.projectService.busy
+                                            && !!root.projectService.itemId(
+                                                tableRow.modelData
+                                            )
+                                        onTriggered:
+                                            root.projectService.removeItem(
+                                                tableRow.modelData
+                                            )
+                                    }
+                                }
                             }
                         }
                     }

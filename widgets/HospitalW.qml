@@ -293,28 +293,6 @@ PanelWindow {
         }
     }
 
-    Timer {
-        // Passive telemetry only. Keep this slow enough that the operator can
-        // actually work with the controls without the surface constantly
-        // repainting underneath them.
-        interval: 15000
-        repeat: true
-        running: root.menuOpen
-
-        onTriggered: {
-            if (floorService.liveMoveArmed
-                    || floorService.moveRunning
-                    || roomService.running
-                    || roomService.rehearsing
-                    || roomService.integrating
-                    || roomService.postOpRunning
-                    || roomService.armed)
-                return;
-
-            patientService.refresh();
-        }
-    }
-
     component SectionLabel: GohuText {
         font.pixelSize: 12
         color: Colors.magenta
@@ -723,19 +701,28 @@ PanelWindow {
                         id: hospitalLocalStatusText
 
                         anchors.centerIn: parent
-                        text: hospitalGitService.refreshing
-                              ? "READING"
-                              : hospitalGitService.available
-                              ? "LOCAL LIVE"
-                              : "OFFLINE"
+                        text:
+                            floorService.bedIsLive
+                            ? "LOCAL LIVE"
+                            : floorService.bedPath.length > 0
+                            ? "LOCAL BED"
+                            : "OFFLINE"
                         font.pixelSize: 9
-                        color: hospitalGitService.available ? Colors.magenta : Colors.red
+                        color:
+                            floorService.bedIsLive
+                            ? Colors.magenta
+                            : floorService.bedPath.length > 0
+                            ? Colors.cyan
+                            : Colors.red
 
                         layer.enabled: true
                         layer.effect: DropShadow {
                             radius: 10
                             samples: 11
-                            opacity: hospitalGitService.available ? 0.82 : 0.44
+                            opacity:
+                                floorService.bedPath.length > 0
+                                ? 0.82
+                                : 0.44
                             color: hospitalLocalStatusText.color
                             transparentBorder: true
                         }
@@ -2187,10 +2174,7 @@ PanelWindow {
                             enabled: !patientService.refreshing
                             cursorShape: Qt.PointingHandCursor
 
-                            onClicked: {
-                                hospitalGitService.refresh();
-                                patientService.refresh();
-                            }
+                            onClicked: floorService.discover()
                         }
                     }
 
@@ -2298,15 +2282,31 @@ PanelWindow {
                             + " // " + String(auditService.rooms.length) + " ROOMS"
                           : auditService.lastError
                           ? "AUDIT ERROR // " + auditService.lastError
-                          : !hospitalGitService.available
-                          ? "LOCAL PATIENT OFFLINE"
+                          : floorService.bedPath.length === 0
+                          ? "LOCAL BED OFFLINE"
                           : githubService.refreshing
-                          ? "LOCAL LIVE // PX → GITHUB READING"
+                          ? (
+                              floorService.bedIsLive
+                              ? "LOCAL LIVE // PX → GITHUB READING"
+                              : "LOCAL BED // PX → GITHUB READING"
+                            )
                           : githubService.available
-                          ? "LOCAL + PX/GITHUB LIVE // WRITE ACTUATORS OFFLINE"
+                          ? (
+                              floorService.bedIsLive
+                              ? "LOCAL LIVE + PX/GITHUB LIVE // WRITE ACTUATORS OFFLINE"
+                              : "LOCAL BED + PX/GITHUB LIVE // WRITE ACTUATORS OFFLINE"
+                            )
                           : githubService.lastError
-                          ? "LOCAL LIVE // PX/GITHUB OFFLINE"
-                          : "LOCAL LIVE // PX/GITHUB NOT REQUESTED"
+                          ? (
+                              floorService.bedIsLive
+                              ? "LOCAL LIVE // PX/GITHUB OFFLINE"
+                              : "LOCAL BED // PX/GITHUB OFFLINE"
+                            )
+                          : (
+                              floorService.bedIsLive
+                              ? "LOCAL LIVE // PX/GITHUB NOT REQUESTED"
+                              : "LOCAL BED // PX/GITHUB NOT REQUESTED"
+                            )
                     font.pixelSize: 8
                     color: Colors.magenta
 

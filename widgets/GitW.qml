@@ -1181,6 +1181,7 @@ PanelWindow {
             keyboardSelected
             && root.gitSelectorSource === "mouse"
         property bool primaryBlue: false
+        property bool blueAccent: false
         property bool orangeAccent: false
         property bool orangeTextOnly: false
         property bool redAccent: false
@@ -1214,6 +1215,8 @@ PanelWindow {
             ? Colors.magenta
             : primaryBlue
             ? Colors.white
+            : blueAccent
+            ? Colors.blue
             : redAccent
             ? Colors.red
             : orangeAccent || orangeTextOnly
@@ -1263,6 +1266,8 @@ PanelWindow {
             ? (redAccent ? Colors.red : Colors.magenta)
             : primaryBlue
             ? (hovered ? Colors.cyan : Colors.blue)
+            : blueAccent
+            ? Colors.blue
             : redAccent
             ? Colors.red
             : orangeAccent
@@ -2415,7 +2420,7 @@ PanelWindow {
                                     keyboardRow: 0
                                     leftIcon: "◂"
                                     iconPixelSize: 29
-                                    primaryBlue: !gitService.repoIsLocal
+                                    blueAccent: !gitService.repoIsLocal
                                     enabledAction:
                                         !gitService.actionBusy
                                         && (
@@ -2492,7 +2497,7 @@ PanelWindow {
                                         ? "▸"
                                         : ""
                                     iconPixelSize: 29
-                                    primaryBlue: !gitService.repoIsLocal
+                                    blueAccent: !gitService.repoIsLocal
                                     enabledAction:
                                         gitService.repoIsLocal
                                         && !gitService.actionBusy

@@ -16,6 +16,28 @@ PanelWindow {
     property string selectedRoomTeam: ""
     readonly property var selectedRoomData:
         auditService.roomFor(selectedRoomTeam)
+    readonly property string selectedRoomBranch: {
+        const room = selectedRoomData || {};
+        return String(room.branch || "");
+    }
+    readonly property bool bedIsClean:
+        String(floorService.bedWorktree || "")
+            .trim()
+            .toUpperCase() === "CLEAN"
+    readonly property bool bedAlreadyInSelectedRoom:
+        selectedRoomBranch.length > 0
+        && String(floorService.bedBranch || "") === selectedRoomBranch
+    readonly property bool bedMoveEnabled:
+        selectedRoomBranch.length > 0
+        && floorService.bedPath.length > 0
+        && !bedAlreadyInSelectedRoom
+        && bedIsClean
+        && !floorService.moveRunning
+        && !roomService.running
+        && !roomService.rehearsing
+        && !roomService.integrating
+        && !roomService.postOpRunning
+        && !roomService.armed
 
     function toggleCommitSelection(sha) {
         const candidate = String(sha || "");
@@ -1185,6 +1207,139 @@ PanelWindow {
                                       )
                                     : "NONE"
                             }
+                        }
+
+                        Rectangle {
+                            id: moveBedButton
+
+                            readonly property bool enabledAction:
+                                root.bedMoveEnabled
+                            readonly property bool liveConfirm:
+                                floorService.bedIsLive
+                                && floorService.liveMoveArmed
+                                && floorService.armedBedPath
+                                   === floorService.bedPath
+                                && floorService.armedRoomBranch
+                                   === root.selectedRoomBranch
+
+                            width: parent.width
+                            height: 28
+
+                            color:
+                                moveBedMouse.pressed
+                                ? Colors.orange
+                                : liveConfirm
+                                ? Colors.red
+                                : Colors.black
+                            border.width: liveConfirm ? 2 : 1
+                            border.color:
+                                liveConfirm
+                                ? Colors.red
+                                : root.bedAlreadyInSelectedRoom
+                                ? Colors.orange
+                                : moveBedMouse.containsMouse
+                                ? Colors.orange
+                                : Colors.cyan
+                            opacity:
+                                enabledAction
+                                || root.bedAlreadyInSelectedRoom
+                                || liveConfirm
+                                ? 1.0
+                                : 0.44
+
+                            RectangularShadow {
+                                anchors.fill: parent
+                                spread: liveConfirm ? 5 : 3
+                                z: -1
+                                opacity: liveConfirm ? 0.46 : 0.20
+                                color:
+                                    liveConfirm
+                                    ? Colors.red
+                                    : root.bedAlreadyInSelectedRoom
+                                    ? Colors.orange
+                                    : Colors.cyan
+                            }
+
+                            GohuText {
+                                anchors.centerIn: parent
+                                text:
+                                    floorService.moveRunning
+                                    ? "MOVING BED"
+                                    : moveBedButton.liveConfirm
+                                    ? "CONFIRM LIVE BED MOVE"
+                                    : root.bedAlreadyInSelectedRoom
+                                    ? "BED IS IN THIS ROOM"
+                                    : root.selectedRoomBranch.length === 0
+                                    ? "SELECT A ROOM"
+                                    : !root.bedIsClean
+                                    ? "BED DIRTY // COMMIT OR STASH"
+                                    : "MOVE BED TO ROOM"
+                                font.pixelSize: 9
+                                color:
+                                    moveBedMouse.pressed
+                                    ? Colors.black
+                                    : moveBedButton.liveConfirm
+                                    ? Colors.white
+                                    : root.bedAlreadyInSelectedRoom
+                                    ? Colors.orange
+                                    : Colors.cyan
+
+                                layer.enabled: true
+                                layer.effect: DropShadow {
+                                    radius: moveBedButton.liveConfirm ? 9 : 5
+                                    samples: moveBedButton.liveConfirm ? 13 : 7
+                                    opacity: moveBedButton.liveConfirm ? 0.58 : 0.24
+                                    color:
+                                        moveBedButton.liveConfirm
+                                        ? Colors.red
+                                        : root.bedAlreadyInSelectedRoom
+                                        ? Colors.orange
+                                        : Colors.cyan
+                                    transparentBorder: true
+                                }
+                            }
+
+                            MouseArea {
+                                id: moveBedMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                enabled: moveBedButton.enabledAction
+                                cursorShape:
+                                    enabled
+                                    ? Qt.PointingHandCursor
+                                    : Qt.ArrowCursor
+
+                                onClicked:
+                                    floorService.moveBedToRoom(
+                                        root.selectedRoomBranch
+                                    )
+                            }
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text:
+                                floorService.moveStatus.length > 0
+                                ? floorService.moveStatus
+                                : (
+                                    root.selectedRoomBranch.length > 0
+                                    && !root.bedAlreadyInSelectedRoom
+                                    ? (
+                                        floorService.bedBranch
+                                        + "  →  "
+                                        + root.selectedRoomBranch
+                                      )
+                                    : ""
+                                  )
+                            font.pixelSize: 8
+                            color:
+                                floorService.moveError.length > 0
+                                ? Colors.red
+                                : floorService.liveMoveArmed
+                                ? Colors.red
+                                : Colors.cyan
+                            elide: Text.ElideRight
+                            visible: text.length > 0
                         }
                     }
                 }

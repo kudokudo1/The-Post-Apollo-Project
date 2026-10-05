@@ -2711,6 +2711,7 @@ PanelWindow {
 
                                                                                 keyboardSelected:
                                                                                     root.gitKeyboardControl === ignitionDial
+                                                                                keyboardHost: root
                                                                                 Component.onCompleted:
                                                                                     root.registerGitKeyboardControl(ignitionDial)
                                                                                 Component.onDestruction:
@@ -2756,6 +2757,7 @@ PanelWindow {
 
                                                                                 keyboardSelected:
                                                                                     root.gitKeyboardControl === operationDial
+                                                                                keyboardHost: root
                                                                                 Component.onCompleted:
                                                                                     root.registerGitKeyboardControl(operationDial)
                                                                                 Component.onDestruction:
@@ -2797,6 +2799,7 @@ PanelWindow {
 
                                                                                 keyboardSelected:
                                                                                     root.gitKeyboardControl === targetDial
+                                                                                keyboardHost: root
                                                                                 Component.onCompleted:
                                                                                     root.registerGitKeyboardControl(targetDial)
                                                                                 Component.onDestruction:

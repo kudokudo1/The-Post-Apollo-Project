@@ -837,7 +837,6 @@ PanelWindow {
                 return;
 
             keyboardFocusAnchor.forceActiveFocus();
-            root.requestActivate();
         });
 
         root.ensureFirstRoomSelected();
@@ -854,7 +853,6 @@ PanelWindow {
                 return;
 
             keyboardFocusAnchor.forceActiveFocus();
-            root.requestActivate();
         });
     }
 
@@ -1798,17 +1796,17 @@ PanelWindow {
                         opacity:
                             root.bedControlMode
                             ? 0.40
-                            : roomIsDetached
+                            : bedPane.roomIsDetached
                             ? 0.24
-                            : roomIsFeature
+                            : bedPane.roomIsFeature
                             ? 0.22
-                            : roomIsMain
+                            : bedPane.roomIsMain
                             ? 0.30
                             : 0.20
                         color:
                             root.bedControlMode
                             ? Colors.orange
-                            : roomGlow
+                            : bedPane.roomGlow
                     }
 
                     Column {
@@ -2087,11 +2085,11 @@ PanelWindow {
 
                             RectangularShadow {
                                 anchors.fill: parent
-                                spread: liveConfirm ? 5 : 3
+                                spread: moveBedButton.liveConfirm ? 5 : 3
                                 z: -1
-                                opacity: liveConfirm ? 0.46 : 0.20
+                                opacity: moveBedButton.liveConfirm ? 0.46 : 0.20
                                 color:
-                                    liveConfirm
+                                    moveBedButton.liveConfirm
                                     ? Colors.red
                                     : root.bedAlreadyInSelectedRoom
                                     ? Colors.orange

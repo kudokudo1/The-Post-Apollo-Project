@@ -303,7 +303,7 @@ Scope {
                     'owner="$2"',
                     'view="$(gh project view "$number" --owner "$owner" --format json)" || exit $?',
                     'fields="$(gh project field-list "$number" --owner "$owner" --limit 100 --format json)" || exit $?',
-                    'items="$(gh project item-list "$number" --owner "$owner" --limit 200 --field Status --format json)" || exit $?',
+                    'items="$(gh project item-list "$number" --owner "$owner" --limit 200 --format json)" || exit $?',
                     "jq -nc --argjson view \"$view\" --argjson fields \"$fields\" --argjson items \"$items\" '{view:$view,fields:$fields,items:$items}'"
                 ].join("\n"),
                 "pa-project-detail",
@@ -547,10 +547,15 @@ Scope {
         stateText = "COMPLETE // " + finishedOperation.toUpperCase();
         mutationFinished(true, finishedOperation);
 
-        if (finishedOperation === "create-project")
-            Qt.callLater(root.refreshProjects);
-        else
-            Qt.callLater(root.refreshSelectedProject);
+        if (finishedOperation === "create-project") {
+            Qt.callLater(function() {
+                root.refreshProjects();
+            });
+        } else {
+            Qt.callLater(function() {
+                root.refreshSelectedProject();
+            });
+        }
     }
 
     Process {

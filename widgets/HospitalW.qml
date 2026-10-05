@@ -28,8 +28,8 @@ PanelWindow {
     }
 
     readonly property bool floorSwitchEnabled:
-        hospitalGitService.repoCount > 1
-        && !hospitalGitService.refreshing
+        floorService.floorCount > 1
+        && !floorService.discovering
         && !patientService.refreshing
         && !roomService.running
         && !roomService.rehearsing
@@ -42,11 +42,10 @@ PanelWindow {
             return;
 
         const requested = Number(index);
-        const current =
-            hospitalGitService.repoIndexOfPath(hospitalGitService.repoPath);
+        const current = floorService.selectedFloorIndex;
 
         if (requested < 0
-                || requested >= hospitalGitService.repoCount
+                || requested >= floorService.floorCount
                 || requested === current)
             return;
 
@@ -55,16 +54,15 @@ PanelWindow {
         roomService.clearResult();
         certificationCoordinator.bindRoom(roomService);
         auditService.resetResult();
-        hospitalGitService.selectRepo(requested);
+        floorService.selectFloor(requested);
     }
 
     function cycleFloor(delta) {
         if (!floorSwitchEnabled)
             return;
 
-        const count = hospitalGitService.repoCount;
-        let current =
-            hospitalGitService.repoIndexOfPath(hospitalGitService.repoPath);
+        const count = floorService.floorCount;
+        let current = floorService.selectedFloorIndex;
 
         if (count <= 0)
             return;
@@ -76,6 +74,51 @@ PanelWindow {
             (current + Number(delta || 0) + count) % count;
 
         selectFloor(requested);
+    }
+
+    readonly property bool bedSwitchEnabled:
+        floorService.bedCount > 1
+        && !floorService.discovering
+        && !patientService.refreshing
+        && !roomService.running
+        && !roomService.rehearsing
+        && !roomService.integrating
+        && !roomService.postOpRunning
+        && !roomService.armed
+
+    function selectBed(index) {
+        if (!bedSwitchEnabled)
+            return;
+
+        const requested = Number(index);
+
+        if (requested < 0
+                || requested >= floorService.bedCount
+                || requested === floorService.selectedBedIndex)
+            return;
+
+        selectedCommitSha = "";
+        roomService.clearResult();
+        certificationCoordinator.bindRoom(roomService);
+        floorService.selectBed(requested);
+    }
+
+    function cycleBed(delta) {
+        if (!bedSwitchEnabled)
+            return;
+
+        const count = floorService.bedCount;
+        let current = floorService.selectedBedIndex;
+
+        if (count <= 0)
+            return;
+
+        if (current < 0)
+            current = 0;
+
+        selectBed(
+            (current + Number(delta || 0) + count) % count
+        );
     }
 
     onSelectedRoomTeamChanged: {
@@ -143,7 +186,7 @@ PanelWindow {
 
     onMenuOpenChanged: {
         if (root.menuOpen) {
-            hospitalGitService.discoverRepos();
+            floorService.discover();
             patientService.refresh();
         }
     }
@@ -152,9 +195,24 @@ PanelWindow {
         certificationCoordinator.bindRoom(roomService);
     }
 
-    GitService {
-        id: hospitalGitService
-        preferredRepoQuery: "taskbars-post-apollo"
+    HospitalFloorService {
+        id: floorService
+        preferredFloorQuery: "taskbars-post-apollo"
+
+        onFloorChanged: {
+            root.selectedCommitSha = "";
+            root.selectedRoomTeam = "";
+            roomService.clearResult();
+            certificationCoordinator.bindRoom(roomService);
+            auditService.resetResult();
+        }
+
+        onBedChanged: {
+            root.selectedCommitSha = "";
+            roomService.clearResult();
+            certificationCoordinator.bindRoom(roomService);
+            patientService.refresh();
+        }
     }
 
     GitService {
@@ -165,16 +223,7 @@ PanelWindow {
 
     HospitalService {
         id: patientService
-        repoPath: hospitalGitService.repoPath
-
-        onRepoPathChanged: {
-            root.selectedCommitSha = "";
-            root.selectedRoomTeam = "";
-            roomService.clearResult();
-            certificationCoordinator.bindRoom(roomService);
-            auditService.resetResult();
-            refresh();
-        }
+        repoPath: floorService.bedPath
     }
 
     GitHubService {
@@ -229,7 +278,7 @@ PanelWindow {
         repeat: true
         running: root.menuOpen
 
-        onTriggered: hospitalGitService.refresh()
+        onTriggered: patientService.refresh()
     }
 
     component SectionLabel: GohuText {
@@ -540,11 +589,8 @@ PanelWindow {
                 bottomMargin: 18
             }
 
-            count: hospitalGitService.repoCount
-            currentIndex:
-                hospitalGitService.repoIndexOfPath(
-                    hospitalGitService.repoPath
-                )
+            count: floorService.floorCount
+            currentIndex: floorService.selectedFloorIndex
             accentColor: Colors.cyan
             handleGlowColor: Colors.magenta
             sideLabel: "FLOOR"
@@ -711,7 +757,7 @@ PanelWindow {
                         GohuText {
                             width: parent.width
                             text:
-                                hospitalGitService.repoLabel
+                                floorService.floorLabel
                                 + (
                                     auditService.defaultBranch
                                     ? "  //  DEFAULT "
@@ -865,23 +911,24 @@ PanelWindow {
                 width: parent.width
                 height: 328
                 spacing: 10
+                layoutDirection: Qt.RightToLeft
 
                 Rectangle {
-                    id: patientPane
+                    id: bedPane
 
                     width: (parent.width - parent.spacing) / 2
                     height: parent.height
 
                     color: Colors.dark
                     border.width: 1
-                    border.color: Colors.magenta
+                    border.color: floorService.bedIsLive ? Colors.orange : Colors.cyan
 
                     RectangularShadow {
                         anchors.fill: parent
                         spread: 4
                         z: -1
-                        opacity: 0.22
-                        color: Colors.magenta
+                        opacity: floorService.bedIsLive ? 0.30 : 0.20
+                        color: floorService.bedIsLive ? Colors.orange : Colors.cyan
                     }
 
                     Column {
@@ -892,8 +939,109 @@ PanelWindow {
 
                         spacing: 8
 
-                        SectionLabel {
-                            text: "PATIENT"
+                        Row {
+                            width: parent.width
+                            height: 32
+                            spacing: 6
+
+                            Column {
+                                width: parent.width - 76
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 2
+
+                                SectionLabel {
+                                    width: parent.width
+                                    text: "BED // LOCAL CHECKOUT"
+                                    elide: Text.ElideRight
+                                }
+
+                                GohuText {
+                                    width: parent.width
+                                    text:
+                                        floorService.bedLabel
+                                        + (
+                                            floorService.bedIsLive
+                                            ? "  //  LIVE"
+                                            : ""
+                                          )
+                                    font.pixelSize: 10
+                                    color:
+                                        floorService.bedIsLive
+                                        ? Colors.orange
+                                        : Colors.cyan
+                                    elide: Text.ElideRight
+                                }
+                            }
+
+                            Rectangle {
+                                width: 32
+                                height: 28
+                                anchors.verticalCenter: parent.verticalCenter
+                                color: bedPrevMouse.pressed ? Colors.orange : Colors.black
+                                border.width: 1
+                                border.color:
+                                    bedPrevMouse.containsMouse
+                                    ? Colors.orange
+                                    : Colors.cyan
+                                opacity: root.bedSwitchEnabled ? 1.0 : 0.42
+
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    text: "<"
+                                    font.pixelSize: 12
+                                    color:
+                                        bedPrevMouse.pressed
+                                        ? Colors.black
+                                        : Colors.cyan
+                                }
+
+                                MouseArea {
+                                    id: bedPrevMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    enabled: root.bedSwitchEnabled
+                                    cursorShape:
+                                        enabled
+                                        ? Qt.PointingHandCursor
+                                        : Qt.ArrowCursor
+                                    onClicked: root.cycleBed(-1)
+                                }
+                            }
+
+                            Rectangle {
+                                width: 32
+                                height: 28
+                                anchors.verticalCenter: parent.verticalCenter
+                                color: bedNextMouse.pressed ? Colors.orange : Colors.black
+                                border.width: 1
+                                border.color:
+                                    bedNextMouse.containsMouse
+                                    ? Colors.orange
+                                    : Colors.cyan
+                                opacity: root.bedSwitchEnabled ? 1.0 : 0.42
+
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    text: ">"
+                                    font.pixelSize: 12
+                                    color:
+                                        bedNextMouse.pressed
+                                        ? Colors.black
+                                        : Colors.cyan
+                                }
+
+                                MouseArea {
+                                    id: bedNextMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    enabled: root.bedSwitchEnabled
+                                    cursorShape:
+                                        enabled
+                                        ? Qt.PointingHandCursor
+                                        : Qt.ArrowCursor
+                                    onClicked: root.cycleBed(1)
+                                }
+                            }
                         }
 
                         Row {
@@ -901,22 +1049,13 @@ PanelWindow {
 
                             MetaLabel {
                                 width: 76
-                                text: "REPOSITORY"
+                                text: "PATH"
                             }
 
                             MetaValue {
-                                width: patientPane.width - 108
-                                text: patientService.repository
-                                color: Colors.orange
-                                elide: Text.ElideRight
-
-                                layer.effect: DropShadow {
-                                    radius: 5
-                                    samples: 7
-                                    opacity: 0.28
-                                    color: Colors.orange
-                                    transparentBorder: true
-                                }
+                                width: bedPane.width - 108
+                                text: floorService.bedPath || "NO LOCAL CHECKOUT"
+                                elide: Text.ElideMiddle
                             }
                         }
 
@@ -925,11 +1064,11 @@ PanelWindow {
 
                             OrangeLabel {
                                 width: 76
-                                text: "BRANCH"
+                                text: "ROOM"
                             }
 
                             CyanValue {
-                                width: patientPane.width - 108
+                                width: bedPane.width - 108
                                 text: patientService.branch
                                 elide: Text.ElideRight
                             }
@@ -940,11 +1079,11 @@ PanelWindow {
 
                             MetaLabel {
                                 width: 76
-                                text: "HEAD"
+                                text: "PATIENT"
                             }
 
                             BlueValue {
-                                width: patientPane.width - 108
+                                width: bedPane.width - 108
                                 text: patientService.head
                                 elide: Text.ElideRight
                             }
@@ -966,7 +1105,7 @@ PanelWindow {
                                         .trim()
                                         .toUpperCase() === "CLEAN"
 
-                                width: patientPane.width - 108
+                                width: bedPane.width - 108
                                 text: patientService.worktree
                                 font.pixelSize: 10
                                 elide: Text.ElideRight
@@ -980,6 +1119,27 @@ PanelWindow {
                                     color: worktreeValue.cleanState ? Colors.orange : Colors.cyan
                                     transparentBorder: true
                                 }
+                            }
+                        }
+
+                        Row {
+                            spacing: 8
+
+                            MetaLabel {
+                                width: 76
+                                text: "BEDS"
+                            }
+
+                            MetaValue {
+                                width: bedPane.width - 108
+                                text:
+                                    floorService.bedCount > 0
+                                    ? (
+                                        String(floorService.selectedBedIndex + 1)
+                                        + " / "
+                                        + String(floorService.bedCount)
+                                      )
+                                    : "NONE"
                             }
                         }
                     }

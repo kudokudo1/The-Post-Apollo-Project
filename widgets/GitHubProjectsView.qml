@@ -10,6 +10,7 @@ Item {
     required property var keyboardHost
 
     property string projectCamera: "board"
+    property bool projectExpanded: false
 
     function moveItem(item, delta) {
         const options = root.projectService.statusOptions();
@@ -45,15 +46,14 @@ Item {
         signal triggered()
 
         height: 28
+        opacity: enabledAction ? 1.0 : 0.34
         color:
             selectedAction
             ? Colors.yellow
             : Colors.black
         border.width: 1
         border.color:
-            !enabledAction
-            ? Colors.dark
-            : selectedAction
+            selectedAction
             ? Colors.orange
             : mouse.containsMouse
             ? Colors.orange
@@ -73,7 +73,7 @@ Item {
                 : button.primaryBlue
                 ? Colors.blue
                 : Colors.cyan
-            opacity: button.enabledAction ? 1.0 : 0.34
+            opacity: 1.0
         }
 
         MouseArea {
@@ -201,6 +201,7 @@ Item {
         anchors.fill: parent
 
         GohuText {
+            visible: !root.projectExpanded
             x: 0
             y: 0
             width: 180
@@ -213,6 +214,7 @@ Item {
         }
 
         Rectangle {
+                visible: !root.projectExpanded
                 x: 0
                 y: 34
                 width: 180
@@ -220,6 +222,14 @@ Item {
                 color: Colors.black
                 border.width: 1
                 border.color: Colors.cyan
+
+                Behavior on x {
+                    NumberAnimation { duration: 120; easing.type: Easing.OutQuad }
+                }
+
+                Behavior on width {
+                    NumberAnimation { duration: 120; easing.type: Easing.OutQuad }
+                }
 
                 Column {
                     anchors {
@@ -240,9 +250,9 @@ Item {
                             text:
                                 "PROJECT INDEX // "
                                 + String(root.projectService.projects.length)
-                            font.pixelSize: 8
+                            font.pixelSize: 10
                             color: Colors.cyan
-                            opacity: 0.72
+                            opacity: 0.82
                             elide: Text.ElideRight
                         }
 
@@ -273,7 +283,7 @@ Item {
                                 root.projectService.selectedProjectIndex === index
 
                             width: projectList.width
-                            height: 58
+                            height: 64
                             color:
                                 selected
                                 ? Colors.yellow
@@ -301,7 +311,7 @@ Item {
                                         + String(root.projectService.projectNumber(projectCard.modelData))
                                         + " // "
                                         + root.projectService.projectTitle(projectCard.modelData)
-                                    font.pixelSize: 9
+                                    font.pixelSize: 11
                                     color:
                                         projectCard.selected
                                         ? Colors.magenta
@@ -317,9 +327,9 @@ Item {
                                             || projectCard.modelData.description
                                             || "OPERATING MAP"
                                         )
-                                    font.pixelSize: 7
+                                    font.pixelSize: 8
                                     color: Colors.cyan
-                                    opacity: 0.62
+                                    opacity: 0.72
                                     elide: Text.ElideRight
                                 }
                             }
@@ -356,9 +366,9 @@ Item {
             }
 
         Rectangle {
-                x: 190
+                x: root.projectExpanded ? 0 : 190
                 y: 0
-                width: parent.width - 190
+                width: root.projectExpanded ? parent.width : parent.width - 190
                 height: parent.height
                 color: Colors.dark
                 border.width: 1
@@ -382,20 +392,37 @@ Item {
                             anchors.verticalCenter: parent.verticalCenter
                             spacing: 2
 
-                            GohuText {
+                            Row {
                                 width: parent.width
-                                text:
-                                    root.projectService.selectedNumber() > 0
-                                    ? (
-                                        "#"
-                                        + String(root.projectService.selectedNumber())
-                                        + " // "
-                                        + root.projectService.selectedTitle()
-                                      )
-                                    : "NO PROJECT SELECTED"
-                                font.pixelSize: 10
-                                color: Colors.white
-                                elide: Text.ElideRight
+                                height: 24
+                                spacing: 5
+
+                                GohuText {
+                                    width: parent.width - 29
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text:
+                                        root.projectService.selectedNumber() > 0
+                                        ? (
+                                            "#"
+                                            + String(root.projectService.selectedNumber())
+                                            + " // "
+                                            + root.projectService.selectedTitle()
+                                          )
+                                        : "NO PROJECT SELECTED"
+                                    font.pixelSize: 13
+                                    color: Colors.white
+                                    elide: Text.ElideRight
+                                }
+
+                                ActionButton {
+                                    width: 24
+                                    height: 24
+                                    label: root.projectExpanded ? "↙" : "↗"
+                                    enabledAction: true
+                                    selectedAction: root.projectExpanded
+                                    onTriggered:
+                                        root.projectExpanded = !root.projectExpanded
+                                }
                             }
 
                             GohuText {

@@ -592,7 +592,7 @@ PanelWindow {
         if (activePage !== "github")
             return;
 
-        const modes = ["control", "library", "profile"];
+        const modes = ["control", "library", "profile", "projects"];
         let index = modes.indexOf(githubView);
 
         if (index < 0)
@@ -614,8 +614,10 @@ PanelWindow {
             showGithubControl();
         else if (target === "library")
             showGithubLibrary();
-        else
+        else if (target === "profile")
             showGithubProfile();
+        else
+            showGithubProjects();
 
         Qt.callLater(ensureGitKeyboardControl);
         root.restoreGitKeyboardFocus(false);
@@ -631,6 +633,8 @@ PanelWindow {
             if (activePage === "github") {
                 if (githubView === "profile")
                     gitService.discoverRepos();
+                else if (githubView === "projects")
+                    githubProjectsService.refreshProjects();
                 else
                     githubService.refresh();
             } else {
@@ -767,7 +771,20 @@ PanelWindow {
         gitService.discoverRepos();
     }
 
+    function showGithubProjects() {
+        root.workflowMenuOpen = false;
+        root.runInspectorOpen = false;
+        root.githubView = "projects";
+
+        if (!githubProjectsService.busy
+                && githubProjectsService.projects.length === 0)
+            githubProjectsService.refreshProjects();
+    }
+
     function githubStateText() {
+        if (root.githubView === "projects")
+            return githubProjectsService.stateText;
+
         if (root.githubView === "profile") {
             if (repositoryProfileService.busy)
                 return repositoryProfileService.resultText;
@@ -811,6 +828,15 @@ PanelWindow {
     }
 
     function githubStateColor() {
+        if (root.githubView === "projects") {
+            if (githubProjectsService.lastError)
+                return Colors.red;
+
+            return githubProjectsService.busy
+                   ? Colors.orange
+                   : Colors.white;
+        }
+
         if (root.githubView === "profile") {
             if (repositoryProfileService.lastError)
                 return Colors.red;
@@ -940,6 +966,10 @@ PanelWindow {
 
     RepositoryProfileStore {
         id: repositoryProfileStore
+    }
+
+    GitHubProjectsService {
+        id: githubProjectsService
     }
 
     Connections {
@@ -3651,6 +3681,15 @@ PanelWindow {
                                 profileStore: repositoryProfileStore
                                 keyboardHost: root
                             }
+
+                            GitHubProjectsView {
+                                anchors.fill: parent
+                                visible: root.githubView === "projects"
+
+                                gitService: gitService
+                                projectService: githubProjectsService
+                                keyboardHost: root
+                            }
                         }
 
                         // ===== APPCONTROL-STYLE GITHUB MODE RAIL ======
@@ -3678,6 +3717,11 @@ PanelWindow {
                                         name: "PROFILE",
                                         key: "profile",
                                         symbol: "◇"
+                                    },
+                                    {
+                                        name: "PROJECTS",
+                                        key: "projects",
+                                        symbol: "⌗"
                                     }
                                 ]
 
@@ -3708,9 +3752,9 @@ PanelWindow {
                                     width:
                                         (
                                             githubModeButtonRow.width
-                                            - githubModeButtonRow.spacing * 2
+                                            - githubModeButtonRow.spacing * 3
                                         )
-                                        / 3
+                                        / 4
 
                                     height: parent.height
 
@@ -3777,6 +3821,8 @@ PanelWindow {
                                                 root.showGithubLibrary();
                                             else if (modelData.key === "profile")
                                                 root.showGithubProfile();
+                                            else if (modelData.key === "projects")
+                                                root.showGithubProjects();
                                             else
                                                 root.showGithubControl();
                                         }

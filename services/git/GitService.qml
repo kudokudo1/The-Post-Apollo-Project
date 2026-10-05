@@ -11,6 +11,7 @@ Scope {
     property string refreshRepoPath: ""
     property bool discoveringRepos: false
     property bool actionBusy: false
+    property string clonePendingQuery: ""
 
     property string pullMode: "ff-only"
     readonly property string pullModeLabel:
@@ -997,25 +998,54 @@ Scope {
         if (actionBusy)
             return;
 
-        if (!repoIsLocal || String(repoPath || "").indexOf("remote://") === 0) {
+        const action = String(kind || "").toLowerCase();
+        const remoteOnly =
+            !repoIsLocal
+            || String(repoPath || "").indexOf("remote://") === 0;
+        const allowed = [
+            "status",
+            "diff",
+            "log",
+            "fetch",
+            "pull",
+            "push",
+            "clone"
+        ];
+
+        if (allowed.indexOf(action) < 0)
+            return;
+
+        if (remoteOnly && action !== "clone") {
             actionTitle = String(kind || "GIT").toUpperCase();
             actionExitCode = 1;
             actionOutput =
                 "LOCAL CHECKOUT REQUIRED // " + (repoRemoteSlug || repoLabel)
-                + "\nThis repository exists on GitHub but has no local working tree here.";
+                + "\nClone this repository first.";
             return;
         }
 
-        const action = String(kind || "").toLowerCase();
-        const allowed = ["status", "diff", "log", "fetch", "pull", "push"];
+        if (action === "clone" && !remoteOnly) {
+            actionTitle = "CLONE";
+            actionExitCode = 0;
+            actionOutput =
+                "ALREADY LOCAL // " + repoRoot
+                + "\nThis repository already has a local working tree.";
+            return;
+        }
+
+        if (action === "clone" && !repoRemoteSlug) {
+            actionTitle = "CLONE";
+            actionExitCode = 1;
+            actionOutput =
+                "CLONE STOPPED // GitHub repository identity is unavailable.";
+            return;
+        }
+
         const localTarget = selectedLocalBranch || branch;
         const syncTarget =
             action === "pull"
             ? pullSourceTarget
             : selectedRemoteBranch;
-
-        if (allowed.indexOf(action) < 0)
-            return;
 
         if (action === "pull" && !isRemoteBranchTarget(syncTarget)) {
             actionTitle = "PULL";
@@ -1041,6 +1071,11 @@ Scope {
         actionTitle = action.toUpperCase();
         actionOutput = "";
         actionExitCode = 0;
+
+        if (action === "clone")
+            clonePendingQuery = repoRemoteSlug || repoLabel;
+
+        actionWatchdog.interval = action === "clone" ? 120000 : 15000;
         actionWatchdog.restart();
 
         actionProcess.exec([
@@ -1052,6 +1087,36 @@ Scope {
                 'target="$3"',
                 'pull_mode="$4"',
                 'local_target="$5"',
+                'remote_slug="$6"',
+                'repo_label="$7"',
+                'remote_url="$8"',
+                'rc=0',
+                'if [ "$kind" = "clone" ]; then',
+                '  projects="$HOME/Projects"',
+                '  dest="$projects/$repo_label"',
+                '  mkdir -p "$projects" || rc=$?',
+                '  if [ "$rc" -eq 0 ] && [ -e "$dest" ]; then',
+                '    if git -C "$dest" rev-parse --is-inside-work-tree >/dev/null 2>&1; then',
+                '      printf "ALREADY LOCAL // %s\\n" "$dest"',
+                '    else',
+                '      printf "CLONE STOPPED // destination already exists // %s\\n" "$dest"',
+                '      rc=1',
+                '    fi',
+                '  elif [ "$rc" -eq 0 ]; then',
+                '    printf "CLONE // %s -> %s\\n" "$remote_slug" "$dest"',
+                '    if command -v gh >/dev/null 2>&1; then',
+                '      gh repo clone "$remote_slug" "$dest" -- --quiet || rc=$?',
+                '    elif [ -n "$remote_url" ]; then',
+                '      git clone --quiet "$remote_url" "$dest" || rc=$?',
+                '    else',
+                '      printf "CLONE STOPPED // no GitHub CLI or clone URL available\\n"',
+                '      rc=1',
+                '    fi',
+                '  fi',
+                '  printf "__PA_RC__\\t%s\\n" "$rc"',
+                '  printf "__PA_DONE__\\n"',
+                '  exit 0',
+                'fi',
                 'if [ -z "$repo" ]; then repo="$HOME/.config/quickshell"; fi',
                 'if ! git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1; then',
                 '  printf "NOT A GIT REPOSITORY\\n"',
@@ -1059,7 +1124,6 @@ Scope {
                 '  printf "__PA_DONE__\\n"',
                 '  exit 0',
                 'fi',
-                'rc=0',
                 'case "$kind" in',
                 '  status)',
                 '    git -C "$repo" status --short --branch || rc=$?',
@@ -1126,7 +1190,10 @@ Scope {
             action,
             syncTarget,
             pullMode,
-            localTarget
+            localTarget,
+            repoRemoteSlug,
+            repoLabel,
+            repoRemoteUrl
         ]);
     }
 
@@ -1173,6 +1240,19 @@ Scope {
         if (raw === "__PA_DONE__") {
             actionBusy = false;
             actionWatchdog.stop();
+
+            if (actionTitle === "CLONE") {
+                const query = clonePendingQuery;
+                clonePendingQuery = "";
+
+                if (actionExitCode === 0) {
+                    preferredRepoQuery = query;
+                    discoverRepos();
+                }
+
+                return;
+            }
+
             refresh();
             return;
         }

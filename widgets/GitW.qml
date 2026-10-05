@@ -595,19 +595,30 @@ PanelWindow {
         if (activePage !== "github")
             return;
 
-        const target = Number(direction || 0) < 0
-            ? "control"
-            : "library";
+        const modes = ["control", "library", "profile"];
+        let index = modes.indexOf(githubView);
 
-        if (target === githubView)
-            return;
+        if (index < 0)
+            index = 0;
+
+        index =
+            (
+                index
+                + (Number(direction || 0) < 0 ? -1 : 1)
+                + modes.length
+            )
+            % modes.length;
+
+        const target = modes[index];
 
         clearGitKeyboardControl();
 
         if (target === "control")
             showGithubControl();
-        else
+        else if (target === "library")
             showGithubLibrary();
+        else
+            showGithubProfile();
 
         Qt.callLater(ensureGitKeyboardControl);
         root.restoreGitKeyboardFocus(false);
@@ -746,6 +757,13 @@ PanelWindow {
         root.workflowMenuOpen = false;
         root.runInspectorOpen = false;
         root.githubView = "library";
+    }
+
+    function showGithubProfile() {
+        root.workflowMenuOpen = false;
+        root.runInspectorOpen = false;
+        root.githubView = "profile";
+        gitService.discoverRepos();
     }
 
     function githubStateText() {
@@ -891,6 +909,14 @@ PanelWindow {
     WorkflowLibraryStore {
         id: workflowLibraryStore
         githubService: githubService
+    }
+
+    RepositoryProfileService {
+        id: repositoryProfileService
+    }
+
+    RepositoryProfileStore {
+        id: repositoryProfileStore
     }
 
     Connections {
@@ -3592,6 +3618,16 @@ PanelWindow {
                                     root.showGithubControl();
                                 }
                             }
+
+                            RepositoryProfileView {
+                                anchors.fill: parent
+                                visible: root.githubView === "profile"
+
+                                gitService: gitService
+                                profileService: repositoryProfileService
+                                profileStore: repositoryProfileStore
+                                keyboardHost: root
+                            }
                         }
 
                         // ===== APPCONTROL-STYLE GITHUB MODE RAIL ======
@@ -3614,6 +3650,11 @@ PanelWindow {
                                         name: "LIBRARY",
                                         key: "library",
                                         symbol: "▤"
+                                    },
+                                    {
+                                        name: "PROFILE",
+                                        key: "profile",
+                                        symbol: "◇"
                                     }
                                 ]
 
@@ -3644,9 +3685,9 @@ PanelWindow {
                                     width:
                                         (
                                             githubModeButtonRow.width
-                                            - githubModeButtonRow.spacing
+                                            - githubModeButtonRow.spacing * 2
                                         )
-                                        / 2
+                                        / 3
 
                                     height: parent.height
 
@@ -3711,6 +3752,8 @@ PanelWindow {
                                         onClicked: {
                                             if (modelData.key === "library")
                                                 root.showGithubLibrary();
+                                            else if (modelData.key === "profile")
+                                                root.showGithubProfile();
                                             else
                                                 root.showGithubControl();
                                         }

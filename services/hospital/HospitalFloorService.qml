@@ -29,6 +29,9 @@ Scope {
     property bool liveMoveArmed: false
     property string armedBedPath: ""
     property string armedRoomBranch: ""
+    property bool moveExitSeen: false
+    property bool moveStdoutSeen: false
+    property bool moveStderrSeen: false
     property int moveExitCode: -1
     property string moveStdoutText: ""
     property string moveStderrText: ""
@@ -466,6 +469,9 @@ Scope {
         moveRunning = true;
         moveStatus = "MOVING BED // " + target;
         moveError = "";
+        moveExitSeen = false;
+        moveStdoutSeen = false;
+        moveStderrSeen = false;
         moveExitCode = -1;
         moveStdoutText = "";
         moveStderrText = "";
@@ -526,6 +532,16 @@ Scope {
         return true;
     }
 
+    function maybeFinishMove() {
+        if (!moveRunning
+                || !moveExitSeen
+                || !moveStdoutSeen
+                || !moveStderrSeen)
+            return;
+
+        finishMove();
+    }
+
     function finishMove() {
         if (!moveRunning)
             return;
@@ -567,26 +583,24 @@ Scope {
         stdout: StdioCollector {
             onStreamFinished: {
                 floorService.moveStdoutText = this.text;
+                floorService.moveStdoutSeen = true;
+                floorService.maybeFinishMove();
             }
         }
 
         stderr: StdioCollector {
             onStreamFinished: {
                 floorService.moveStderrText = this.text;
+                floorService.moveStderrSeen = true;
+                floorService.maybeFinishMove();
             }
         }
 
         onExited: function(code, exitStatus) {
             floorService.moveExitCode = Number(code);
-            moveFinishTimer.restart();
+            floorService.moveExitSeen = true;
+            floorService.maybeFinishMove();
         }
-    }
-
-    Timer {
-        id: moveFinishTimer
-        interval: 30
-        repeat: false
-        onTriggered: floorService.finishMove()
     }
 
     Timer {

@@ -253,6 +253,7 @@ Scope {
 
     function fieldNameMatching(patterns, typeHint) {
         const wantedType = String(typeHint || "").toUpperCase();
+        let fallback = "";
 
         for (let i = 0; i < fields.length; ++i) {
             const field = fields[i] || {};
@@ -260,16 +261,21 @@ Scope {
             const lower = name.toLowerCase();
             const dataType = fieldDataType(field);
 
-            if (wantedType && dataType && dataType.indexOf(wantedType) < 0)
-                continue;
-
             for (let j = 0; j < patterns.length; ++j) {
-                if (lower.indexOf(patterns[j]) >= 0)
+                if (lower.indexOf(patterns[j]) < 0)
+                    continue;
+
+                if (!fallback)
+                    fallback = name;
+
+                if (!wantedType
+                        || !dataType
+                        || dataType.indexOf(wantedType) >= 0)
                     return name;
             }
         }
 
-        return "";
+        return fallback;
     }
 
     function startDateFieldName() {

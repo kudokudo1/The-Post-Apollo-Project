@@ -67,7 +67,9 @@ PanelWindow {
     property int panelWidth: 744
     property int panelHeight: 1320
     property int panelTopMargin: 0
-    property int panelLeftMargin: 50
+    // Extend the new floor-selector lane to the screen edge while keeping
+    // the original Hospital content at the same desktop position.
+    property int panelLeftMargin: 6
     property int frameInset: 8
     property int glowGutter: 14
     property int topGlowGutter: 12
@@ -511,9 +513,11 @@ PanelWindow {
                 left: parent.left
                 leftMargin: 18
                 top: parent.top
-                topMargin: 110
+                // Start directly under the header cyan rule and run down
+                // to the chassis bottom rule.
+                topMargin: 88
                 bottom: parent.bottom
-                bottomMargin: 72
+                bottomMargin: 8
             }
 
             count: hospitalGitService.repoCount

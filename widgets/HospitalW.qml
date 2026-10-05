@@ -914,19 +914,47 @@ PanelWindow {
                 Rectangle {
                     id: bedPane
 
+                    readonly property string roomName:
+                        String(patientService.branch || "")
+                    readonly property bool roomIsMain:
+                        roomName === "main"
+                    readonly property bool roomIsFeature:
+                        roomName.indexOf("feature/") === 0
+                    readonly property bool roomIsDetached:
+                        roomName.toUpperCase() === "DETACHED"
+                    readonly property color roomAccent:
+                        roomIsMain
+                        ? Colors.orange
+                        : roomIsFeature
+                        ? Colors.blue
+                        : roomIsDetached
+                        ? Colors.white
+                        : Colors.cyan
+                    readonly property color roomGlow:
+                        roomIsMain
+                        ? Colors.orange
+                        : Colors.cyan
+
                     width: (parent.width - parent.spacing) / 2
                     height: parent.height
 
                     color: Colors.dark
                     border.width: 1
-                    border.color: floorService.bedIsLive ? Colors.orange : Colors.cyan
+                    border.color: roomAccent
 
                     RectangularShadow {
                         anchors.fill: parent
                         spread: 4
                         z: -1
-                        opacity: floorService.bedIsLive ? 0.30 : 0.20
-                        color: floorService.bedIsLive ? Colors.orange : Colors.cyan
+                        opacity:
+                            roomIsDetached
+                            ? 0.24
+                            : roomIsFeature
+                            ? 0.22
+                            : roomIsMain
+                            ? 0.30
+                            : 0.20
+                        color: roomGlow
                     }
 
                     Column {
@@ -1065,10 +1093,28 @@ PanelWindow {
                                 text: "ROOM"
                             }
 
-                            CyanValue {
+                            GohuText {
                                 width: bedPane.width - 108
                                 text: patientService.branch
+                                font.pixelSize: 11
+                                color: bedPane.roomAccent
                                 elide: Text.ElideRight
+
+                                layer.enabled: true
+                                layer.effect: DropShadow {
+                                    radius: 7
+                                    samples: 9
+                                    opacity:
+                                        bedPane.roomIsDetached
+                                        ? 0.34
+                                        : bedPane.roomIsFeature
+                                        ? 0.20
+                                        : bedPane.roomIsMain
+                                        ? 0.44
+                                        : 0.30
+                                    color: bedPane.roomGlow
+                                    transparentBorder: true
+                                }
                             }
                         }
 

@@ -1456,8 +1456,8 @@ PanelWindow {
                     Rectangle {
                         id: hospitalCloseButton
 
-                        width: 32
-                        height: 28
+                        width: 104
+                        height: 32
 
                         color:
                             hospitalCloseMouse.pressed
@@ -1480,7 +1480,7 @@ PanelWindow {
                         GohuText {
                             anchors.centerIn: parent
                             text: "X"
-                            font.pixelSize: 12
+                            font.pixelSize: 16
                             color:
                                 hospitalCloseMouse.pressed
                                 ? Colors.black

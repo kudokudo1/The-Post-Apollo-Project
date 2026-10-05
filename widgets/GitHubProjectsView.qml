@@ -535,6 +535,7 @@ Item {
                                     itemBodyInput.text
                                 )
                         }
+                    }
 
                     Rectangle {
                         width: parent.width

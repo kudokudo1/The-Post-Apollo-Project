@@ -459,7 +459,7 @@ Item {
                                 width: (parent.width - 10) / 2
                                 anchors.verticalCenter: parent.verticalCenter
                                 text:
-                                    "REVIEW // "
+                                    "APPROVAL // "
                                     + root.workService.pullReviewSummary(
                                         sourceRow.modelData
                                     )

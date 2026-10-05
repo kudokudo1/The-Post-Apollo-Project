@@ -104,7 +104,6 @@ Scope {
             return false;
         }
 
-        repoSlug = cleanRepo;
         issuesBusy = true;
         issuesError = "";
         issuesStateText = "READING ISSUES";
@@ -118,7 +117,7 @@ Scope {
         issuesProcess.exec([
             "bash",
             "-lc",
-            'exec gh issue list --repo "$1" --state all --limit 200 --json number,title,state,url,labels,author,updatedAt',
+            'exec gh issue list --repo "$1" --state all --limit 1000 --json number,title,state,url,labels,author,updatedAt',
             "pa-github-issues",
             cleanRepo
         ]);
@@ -139,7 +138,6 @@ Scope {
             return false;
         }
 
-        repoSlug = cleanRepo;
         pullsBusy = true;
         pullsError = "";
         pullsStateText = "READING PULL REQUESTS";
@@ -153,7 +151,7 @@ Scope {
         pullsProcess.exec([
             "bash",
             "-lc",
-            'exec gh pr list --repo "$1" --state all --limit 200 --json number,title,state,url,isDraft,author,headRefName,baseRefName,updatedAt',
+            'exec gh pr list --repo "$1" --state all --limit 1000 --json number,title,state,url,isDraft,author,headRefName,baseRefName,updatedAt',
             "pa-github-pulls",
             cleanRepo
         ]);

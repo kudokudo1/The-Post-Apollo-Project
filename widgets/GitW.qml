@@ -2091,7 +2091,7 @@ PanelWindow {
                 top: parent.top
                 topMargin: 148
                 bottom: parent.bottom
-                bottomMargin: 26
+                bottomMargin: 18
             }
 
             count: gitService.repoCount

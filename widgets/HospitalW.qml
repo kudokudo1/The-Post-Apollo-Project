@@ -1793,7 +1793,7 @@ PanelWindow {
                             ? Colors.magenta
                             : intercomMouse.containsMouse
                             ? Colors.orange
-                            : Colors.omnitrix
+                            : Colors.cyan
 
                         RectangularShadow {
                             anchors.fill: parent
@@ -1810,18 +1810,13 @@ PanelWindow {
                                 ? Colors.magenta
                                 : intercomMouse.containsMouse
                                 ? Colors.orange
-                                : Colors.omnitrix
+                                : Colors.cyan
                         }
 
                         GohuText {
                             anchors.centerIn: parent
-                            anchors.verticalCenterOffset: 2
-                            width: parent.width
-                            height: parent.height
-                            text: "🎙︎"
-                            font.pixelSize: 23
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
+                            text: "IC"
+                            font.pixelSize: 11
                             color:
                                 intercomMouse.pressed
                                 ? Colors.black
@@ -1829,7 +1824,7 @@ PanelWindow {
                                 ? Colors.magenta
                                 : intercomMouse.containsMouse
                                 ? Colors.orange
-                                : Colors.omnitrix
+                                : Colors.cyan
 
                             layer.enabled: !intercomMouse.pressed
                             layer.effect: DropShadow {
@@ -1841,7 +1836,7 @@ PanelWindow {
                                     ? Colors.magenta
                                     : intercomMouse.containsMouse
                                     ? Colors.orange
-                                    : Colors.omnitrix
+                                    : Colors.cyan
                                 transparentBorder: true
                             }
                         }
@@ -1896,14 +1891,11 @@ PanelWindow {
                                 : Colors.green
                         }
 
-                        GohuText {
+                        NotoText {
                             anchors.centerIn: parent
-                            width: parent.width
-                            height: parent.height
-                            text: "☎︎"
-                            font.pixelSize: 28
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
+                            anchors.verticalCenterOffset: 1
+                            text: "☎"
+                            font.pixelSize: 21
                             color:
                                 phoneMouse.pressed
                                 ? Colors.black

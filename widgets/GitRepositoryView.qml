@@ -30,6 +30,22 @@ Item {
         remoteUrlInput.text = String((row || {}).url || "");
     }
 
+
+    component SectionLabel: GohuText {
+        font.pixelSize: 12
+        color: Colors.magenta
+    }
+
+    component MetaLabel: GohuText {
+        font.pixelSize: 10
+        color: Colors.cyan
+    }
+
+    component GreenLabel: GohuText {
+        font.pixelSize: 10
+        color: Colors.green
+    }
+
     component MiniButton: Rectangle {
         id: button
 

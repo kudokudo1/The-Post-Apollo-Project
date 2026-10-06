@@ -73,6 +73,8 @@ Scope {
         id: hospitalHistory
     }
 
+    readonly property var historyService: hospitalHistory
+
     FileView {
         id: historyFile
 

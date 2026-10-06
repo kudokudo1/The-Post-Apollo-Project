@@ -81,6 +81,8 @@ Scope {
 
     readonly property var evidencePacket:
         certification.evidencePacket
+    readonly property var historyService:
+        certification.historyService
 
     signal certificationChanged(
         string previousState,

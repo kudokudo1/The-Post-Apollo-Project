@@ -28,6 +28,7 @@ PanelWindow {
     property bool roomControlMode: false
     property string roomControlAction: ""
     property bool bedControlMode: false
+    property bool reportsOpen: false
     readonly property var selectedRoomData:
         auditService.roomFor(selectedRoomTeam)
     readonly property string selectedRoomBranch: {
@@ -151,7 +152,8 @@ PanelWindow {
     ]
 
     readonly property bool roomBaseActionsEnabled:
-        root.selectedRoomTeam.length > 0
+        !root.reportsOpen
+        && root.selectedRoomTeam.length > 0
         && !roomService.running
         && !roomService.rehearsing
         && !roomService.integrating
@@ -195,7 +197,7 @@ PanelWindow {
     }
 
     function enterRoomControls() {
-        if (!selectedRoomTeam)
+        if (root.reportsOpen || !selectedRoomTeam)
             return;
 
         bedControlMode = false;
@@ -211,7 +213,7 @@ PanelWindow {
     }
 
     function enterBedControls() {
-        if (!selectedRoomTeam)
+        if (root.reportsOpen || !selectedRoomTeam)
             return;
 
         roomControlMode = false;
@@ -224,13 +226,18 @@ PanelWindow {
     }
 
     function invokeMoveBed() {
-        if (!menuOpen || !moveBedButton.enabledAction)
+        if (root.reportsOpen
+                || !menuOpen
+                || !moveBedButton.enabledAction)
             return;
 
         floorService.moveBedToRoom(root.selectedRoomBranch);
     }
 
     function moveRoomControl(dx, dy) {
+        if (root.reportsOpen)
+            return;
+
         if (bedControlMode) {
             // The Bed box has one keyboard-selectable action: MOVE BED.
             // Left returns to the Room action grid. Down exits back to the
@@ -396,13 +403,18 @@ PanelWindow {
     }
 
     function invokeRoomShortcut(actionName) {
-        if (!menuOpen || !selectedRoomTeam)
+        if (root.reportsOpen
+                || !menuOpen
+                || !selectedRoomTeam)
             return;
 
         performRoomControl(actionName);
     }
 
     function handleRoomEnter() {
+        if (root.reportsOpen)
+            return;
+
         if (!selectedRoomTeam) {
             selectRoomIndex(0);
             return;
@@ -476,7 +488,8 @@ PanelWindow {
     }
 
     readonly property bool floorSwitchEnabled:
-        floorService.floorCount > 1
+        !root.reportsOpen
+        && floorService.floorCount > 1
         && !floorService.discovering
         && !patientService.refreshing
         && !roomService.running
@@ -525,7 +538,8 @@ PanelWindow {
     }
 
     readonly property bool bedSwitchEnabled:
-        floorService.bedCount > 1
+        !root.reportsOpen
+        && floorService.bedCount > 1
         && !floorService.discovering
         && !patientService.refreshing
         && !roomService.running
@@ -642,7 +656,10 @@ PanelWindow {
         sequence: "Esc"
         context: Qt.ApplicationShortcut
         enabled: root.menuOpen && root.keyboardActive
-        onActivated: root.close()
+        onActivated:
+            root.reportsOpen
+            ? root.closeReports()
+            : root.close()
     }
 
     Shortcut {
@@ -771,12 +788,25 @@ PanelWindow {
         onActivated: root.invokeMoveBed()
     }
 
+    function openReports() {
+        root.leaveRoomControls();
+        root.leaveBedControls();
+        reportsView.teamFilter = root.selectedRoomTeam;
+        reportsView.stateFilter = "";
+        root.reportsOpen = true;
+    }
+
+    function closeReports() {
+        root.reportsOpen = false;
+    }
+
     function open() {
         root.keyboardOwnershipRequested();
         root.menuOpen = true;
     }
 
     function close() {
+        root.reportsOpen = false;
         root.menuOpen = false;
     }
 
@@ -3127,6 +3157,27 @@ PanelWindow {
             }
         }
 
+        HospitalReportsView {
+            id: reportsView
+
+            z: 700
+            visible: root.reportsOpen
+            historyService: certificationCoordinator.historyService
+
+            anchors {
+                left: parent.left
+                right: parent.right
+                top: fixedTop.bottom
+                bottom: actionBay.top
+                leftMargin: 62
+                rightMargin: 18
+                topMargin: 10
+                bottomMargin: 10
+            }
+
+            onCloseRequested: root.closeReports()
+        }
+
         Rectangle {
             id: actionBay
 
@@ -3271,6 +3322,59 @@ PanelWindow {
                             cursorShape: Qt.PointingHandCursor
 
                             onClicked: githubService.refresh()
+                        }
+                    }
+
+                    GohuText {
+                        id: reportsAction
+
+                        text:
+                            root.reportsOpen
+                            ? "REPORTS // OPEN"
+                            : "REPORTS // "
+                              + String(
+                                  certificationCoordinator.historyService
+                                  && Array.isArray(
+                                      certificationCoordinator
+                                          .historyService.events
+                                  )
+                                  ? certificationCoordinator
+                                      .historyService.events.length
+                                  : 0
+                              )
+                        font.pixelSize: 10
+                        color:
+                            reportsMouse.containsMouse
+                            ? Colors.orange
+                            : root.reportsOpen
+                            ? Colors.magenta
+                            : Colors.cyan
+
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 7
+                            opacity:
+                                reportsMouse.containsMouse
+                                ? 0.52
+                                : root.reportsOpen
+                                ? 0.42
+                                : 0.28
+                            color: reportsAction.color
+                            transparentBorder: true
+                        }
+
+                        MouseArea {
+                            id: reportsMouse
+                            anchors.fill: parent
+                            anchors.margins: -8
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+
+                            onClicked:
+                                root.reportsOpen
+                                ? root.closeReports()
+                                : root.openReports()
                         }
                     }
                 }

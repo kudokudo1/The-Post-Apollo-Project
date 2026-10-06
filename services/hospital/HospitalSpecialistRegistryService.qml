@@ -63,6 +63,14 @@ Scope {
             assignment: String(row.assignment || "UNASSIGNED").trim(),
             callable: !!row.callable,
             capabilities: capabilities,
+            intercomArgs:
+                Array.isArray(row.intercomArgs)
+                ? row.intercomArgs.map(function(value) {
+                      return String(value || "").trim();
+                  }).filter(function(value) {
+                      return value.length > 0;
+                  })
+                : [],
             presence: "UNKNOWN",
             endpoint: "",
             lastSeen: ""
@@ -85,6 +93,10 @@ Scope {
             capabilities:
                 Array.isArray(row.capabilities)
                 ? row.capabilities.slice()
+                : [],
+            intercomArgs:
+                Array.isArray(row.intercomArgs)
+                ? row.intercomArgs.slice()
                 : []
         };
     }

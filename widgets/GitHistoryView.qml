@@ -856,12 +856,6 @@ Item {
                         }
 
                         NeonScrollBar {
-                            anchors {
-                                top: historyScroll1.top
-                                right: historyScroll1.right
-                                bottom: historyScroll1.bottom
-                                rightMargin: 2
-                            }
                             flickable: historyScroll1
                         }
 }
@@ -973,12 +967,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                anchors {
-                                    top: historyScroll2.top
-                                    right: historyScroll2.right
-                                    bottom: historyScroll2.bottom
-                                    rightMargin: 2
-                                }
                                 flickable: historyScroll2
                             }
 }
@@ -1087,12 +1075,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                anchors {
-                                    top: historyScroll3.top
-                                    right: historyScroll3.right
-                                    bottom: historyScroll3.bottom
-                                    rightMargin: 2
-                                }
                                 flickable: historyScroll3
                             }
 }
@@ -1249,12 +1231,6 @@ Item {
                         }
                     
                         NeonScrollBar {
-                            anchors {
-                                top: historyScroll4.top
-                                right: historyScroll4.right
-                                bottom: historyScroll4.bottom
-                                rightMargin: 2
-                            }
                             flickable: historyScroll4
                         }
 }
@@ -1549,12 +1525,6 @@ Item {
                         }
                     
                         NeonScrollBar {
-                            anchors {
-                                top: historyScroll5.top
-                                right: historyScroll5.right
-                                bottom: historyScroll5.bottom
-                                rightMargin: 2
-                            }
                             flickable: historyScroll5
                         }
 }

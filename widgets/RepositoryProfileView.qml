@@ -13,6 +13,8 @@ Item {
 
     property string profileMode: "repositories"
     property bool accountDirty: false
+    property string accountIdentityMode: "login"
+    property string accountEmailMode: "primary"
     property string visibilityMode: "keep"
     property string topicMode: "add"
     property string descriptionMode: "keep"
@@ -1180,64 +1182,123 @@ Item {
             }
         }
 
-        Rectangle {
+        Item {
             width: parent.width
-            height: parent.height - 52
-            color: Colors.dark
-            border.width: 1
-            border.color:
-                root.accountService.lastError
-                ? Colors.red
-                : root.accountDirty
-                ? Colors.orange
-                : Colors.cyan
+            height: parent.height - 46
 
             Column {
                 anchors {
                     fill: parent
-                    margins: 12
+                    topMargin: 2
                 }
 
-                spacing: 9
-
-                GohuText {
-                    width: parent.width
-                    text: "ACCOUNT IDENTITY"
-                    font.pixelSize: 10
-                    color: Colors.magenta
-                }
+                spacing: 6
 
                 Rectangle {
                     width: parent.width
                     height: 38
                     color: Colors.black
                     border.width: 1
-                    border.color: Colors.blue
+                    border.color:
+                        root.accountIdentityMode === "display"
+                        && root.accountDirty
+                        ? Colors.orange
+                        : Colors.blue
 
                     Row {
                         anchors {
                             fill: parent
-                            margins: 8
+                            margins: 6
                         }
 
+                        spacing: 7
+
                         GohuText {
-                            width: 128
+                            width: 114
                             anchors.verticalCenter: parent.verticalCenter
-                            text: "GITHUB LOGIN"
+                            text:
+                                root.accountIdentityMode === "login"
+                                ? "GITHUB LOGIN"
+                                : "DISPLAY NAME"
                             font.pixelSize: 8
                             color: Colors.cyan
                         }
 
-                        GohuText {
-                            width: parent.width - 128
+                        Item {
+                            width: parent.width - 196
+                            height: parent.height
+
+                            GohuText {
+                                anchors.fill: parent
+                                visible: root.accountIdentityMode === "login"
+                                verticalAlignment: Text.AlignVCenter
+                                text:
+                                    root.accountService.login
+                                    ? "@" + root.accountService.login
+                                    : "NOT LOADED"
+                                font.pixelSize: 10
+                                color: Colors.white
+                                elide: Text.ElideRight
+                            }
+
+                            TextInput {
+                                id: accountNameInput
+
+                                anchors.fill: parent
+                                visible: root.accountIdentityMode === "display"
+                                enabled:
+                                    visible
+                                    && !root.accountService.busy
+                                verticalAlignment: TextInput.AlignVCenter
+                                selectByMouse: true
+                                clip: true
+                                font.family: "GohuFont 11 Nerd Font Mono"
+                                font.pixelSize: 9
+                                color: Colors.white
+                                selectionColor: Colors.magenta
+                                selectedTextColor: Colors.black
+
+                                onTextChanged: {
+                                    if (visible)
+                                        root.accountDirty = true;
+                                }
+
+                                Keys.onEscapePressed: function(event) {
+                                    focus = false;
+
+                                    if (root.keyboardHost) {
+                                        root.keyboardHost.activeTextEditor = null;
+                                        root.keyboardHost.restoreGitKeyboardFocus(false);
+                                    }
+
+                                    event.accepted = true;
+                                }
+
+                                onActiveFocusChanged: {
+                                    if (!root.keyboardHost)
+                                        return;
+
+                                    if (activeFocus)
+                                        root.keyboardHost.activeTextEditor = accountNameInput;
+                                    else if (root.keyboardHost.activeTextEditor === accountNameInput)
+                                        root.keyboardHost.activeTextEditor = null;
+                                }
+                            }
+                        }
+
+                        ManagerButton {
+                            width: 68
+                            height: 26
                             anchors.verticalCenter: parent.verticalCenter
-                            text:
-                                root.accountService.login
-                                ? "@" + root.accountService.login
-                                : "NOT LOADED"
-                            font.pixelSize: 10
-                            color: Colors.white
-                            elide: Text.ElideRight
+                            label:
+                                root.accountIdentityMode === "login"
+                                ? "DISPLAY"
+                                : "LOGIN"
+                            onTriggered:
+                                root.accountIdentityMode =
+                                    root.accountIdentityMode === "login"
+                                    ? "display"
+                                    : "login"
                         }
                     }
                 }
@@ -1248,9 +1309,15 @@ Item {
                     color: Colors.black
                     border.width: 1
                     border.color:
-                        root.accountService.primaryEmailAvailable
-                        ? Colors.blue
-                        : Colors.orange
+                        root.accountEmailMode === "primary"
+                        ? (
+                            root.accountService.primaryEmailAvailable
+                            ? Colors.blue
+                            : Colors.orange
+                          )
+                        : root.accountDirty
+                        ? Colors.orange
+                        : Colors.blue
 
                     Row {
                         anchors {
@@ -1258,40 +1325,116 @@ Item {
                             margins: 6
                         }
 
-                        spacing: 8
+                        spacing: 7
 
                         GohuText {
-                            width: 150
+                            width: 114
                             anchors.verticalCenter: parent.verticalCenter
-                            text: "PRIMARY ACCOUNT EMAIL"
+                            text:
+                                root.accountEmailMode === "primary"
+                                ? "PRIMARY EMAIL"
+                                : "PUBLIC EMAIL"
                             font.pixelSize: 8
                             color: Colors.cyan
                         }
 
-                        GohuText {
-                            width: parent.width - 270
-                            anchors.verticalCenter: parent.verticalCenter
-                            text:
-                                root.accountService.primaryEmailAvailable
-                                ? root.accountService.primaryEmail
-                                : root.accountService.primaryEmailMessage
-                            font.pixelSize: 9
-                            color:
-                                root.accountService.primaryEmailAvailable
-                                ? Colors.white
-                                : Colors.orange
-                            elide: Text.ElideRight
+                        Item {
+                            width:
+                                parent.width
+                                - 196
+                                - (
+                                    root.accountEmailMode === "primary"
+                                    ? 72
+                                    : 0
+                                  )
+                            height: parent.height
+
+                            GohuText {
+                                anchors.fill: parent
+                                visible: root.accountEmailMode === "primary"
+                                verticalAlignment: Text.AlignVCenter
+                                text:
+                                    root.accountService.primaryEmailAvailable
+                                    ? root.accountService.primaryEmail
+                                    : root.accountService.primaryEmailMessage
+                                font.pixelSize: 9
+                                color:
+                                    root.accountService.primaryEmailAvailable
+                                    ? Colors.white
+                                    : Colors.orange
+                                elide: Text.ElideRight
+                            }
+
+                            TextInput {
+                                id: accountEmailInput
+
+                                anchors.fill: parent
+                                visible: root.accountEmailMode === "public"
+                                enabled:
+                                    visible
+                                    && !root.accountService.busy
+                                verticalAlignment: TextInput.AlignVCenter
+                                selectByMouse: true
+                                clip: true
+                                font.family: "GohuFont 11 Nerd Font Mono"
+                                font.pixelSize: 9
+                                color: Colors.white
+                                selectionColor: Colors.magenta
+                                selectedTextColor: Colors.black
+
+                                onTextChanged: {
+                                    if (visible)
+                                        root.accountDirty = true;
+                                }
+
+                                Keys.onEscapePressed: function(event) {
+                                    focus = false;
+
+                                    if (root.keyboardHost) {
+                                        root.keyboardHost.activeTextEditor = null;
+                                        root.keyboardHost.restoreGitKeyboardFocus(false);
+                                    }
+
+                                    event.accepted = true;
+                                }
+
+                                onActiveFocusChanged: {
+                                    if (!root.keyboardHost)
+                                        return;
+
+                                    if (activeFocus)
+                                        root.keyboardHost.activeTextEditor = accountEmailInput;
+                                    else if (root.keyboardHost.activeTextEditor === accountEmailInput)
+                                        root.keyboardHost.activeTextEditor = null;
+                                }
+                            }
                         }
 
                         ManagerButton {
-                            width: 104
+                            visible: root.accountEmailMode === "primary"
+                            width: visible ? 72 : 0
                             height: 26
                             anchors.verticalCenter: parent.verticalCenter
-                            label: "EMAIL SETTINGS"
+                            label: "SETTINGS"
                             onTriggered:
                                 Qt.openUrlExternally(
                                     "https://github.com/settings/emails"
                                 )
+                        }
+
+                        ManagerButton {
+                            width: 68
+                            height: 26
+                            anchors.verticalCenter: parent.verticalCenter
+                            label:
+                                root.accountEmailMode === "primary"
+                                ? "PUBLIC"
+                                : "PRIMARY"
+                            onTriggered:
+                                root.accountEmailMode =
+                                    root.accountEmailMode === "primary"
+                                    ? "public"
+                                    : "primary"
                         }
                     }
                 }
@@ -1299,69 +1442,21 @@ Item {
                 GohuText {
                     width: parent.width
                     text:
-                        "LOGIN HANDLE AND PRIMARY ACCOUNT EMAIL ARE IDENTITY FIELDS. "
-                        + "DISPLAY NAME, BIO, AND PUBLIC EMAIL CAN BE UPDATED BELOW."
-                    wrapMode: Text.Wrap
+                        "LOGIN + PRIMARY EMAIL ARE ACCOUNT IDENTITY. "
+                        + "DISPLAY NAME + PUBLIC EMAIL ARE EDITABLE."
                     font.pixelSize: 7
                     color: Colors.orange
-                }
-
-                GohuText {
-                    width: parent.width
-                    text: "DISPLAY NAME"
-                    font.pixelSize: 8
-                    color: Colors.cyan
-                }
-
-                ManagerInput {
-                    id: accountNameInput
-
-                    width: parent.width
-                    placeholderText: "DISPLAY NAME"
-                    enabledInput: !root.accountService.busy
-                    onEdited: root.accountDirty = true
-                }
-
-                GohuText {
-                    width: parent.width
-                    text: "BIO"
-                    font.pixelSize: 8
-                    color: Colors.cyan
+                    elide: Text.ElideRight
                 }
 
                 ManagerTextArea {
                     id: accountBioInput
 
                     width: parent.width
+                    height: 72
                     placeholderText: "BIO"
                     enabledInput: !root.accountService.busy
                     onEdited: root.accountDirty = true
-                }
-
-                GohuText {
-                    width: parent.width
-                    text: "PUBLIC EMAIL"
-                    font.pixelSize: 8
-                    color: Colors.cyan
-                }
-
-                ManagerInput {
-                    id: accountEmailInput
-
-                    width: parent.width
-                    placeholderText: "PUBLIC EMAIL"
-                    enabledInput: !root.accountService.busy
-                    onEdited: root.accountDirty = true
-                }
-
-                GohuText {
-                    width: parent.width
-                    text:
-                        "THIS IS THE EMAIL GITHUB MAY SHOW PUBLICLY ON YOUR PROFILE. "
-                        + "LEAVE IT EMPTY TO CLEAR THE PUBLIC EMAIL FIELD."
-                    wrapMode: Text.Wrap
-                    font.pixelSize: 7
-                    color: Colors.orange
                 }
 
                 Row {
@@ -1417,7 +1512,7 @@ Item {
 
                 Rectangle {
                     width: parent.width
-                    height: Math.max(54, parent.height - 428)
+                    height: Math.max(38, parent.height - 208)
                     color: Colors.black
                     border.width: 1
                     border.color:
@@ -1428,7 +1523,7 @@ Item {
                     GohuText {
                         anchors {
                             fill: parent
-                            margins: 8
+                            margins: 7
                         }
 
                         text:

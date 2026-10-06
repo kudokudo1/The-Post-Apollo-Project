@@ -797,6 +797,10 @@ PanelWindow {
         root.operationsSurface = "";
     }
 
+    function showSurgery() {
+        root.closeOperationsSurface();
+    }
+
     function openReports() {
         root.leaveRoomControls();
         root.leaveBedControls();
@@ -1137,6 +1141,74 @@ PanelWindow {
                     && root.pendingRoomAuditTeam
                     && root.pendingRoomAuditTeam === root.selectedRoomTeam)
                 root.runPendingRoomAudit();
+        }
+    }
+
+    component HospitalModeTab: Rectangle {
+        id: modeTab
+
+        property string label: ""
+        property bool selected: false
+
+        signal triggered()
+
+        readonly property bool hovered: modeTabMouse.containsMouse
+        readonly property bool pressed: modeTabMouse.pressed
+
+        height: 36
+        color:
+            pressed
+            ? Colors.magenta
+            : hovered || selected
+            ? Colors.yellow
+            : Colors.black
+        border.width: 1
+        border.color:
+            pressed
+            ? Colors.magenta
+            : hovered || selected
+            ? Colors.orange
+            : Colors.cyan
+
+        GohuText {
+            anchors.centerIn: parent
+            text: modeTab.label
+            font.pixelSize: 11
+            color:
+                modeTab.pressed
+                ? Colors.black
+                : modeTab.selected
+                ? Colors.magenta
+                : modeTab.hovered
+                ? Colors.orange
+                : Colors.cyan
+
+            layer.enabled: !modeTab.pressed
+            layer.effect: DropShadow {
+                radius: 10
+                samples: 11
+                opacity:
+                    modeTab.hovered
+                    ? 0.64
+                    : modeTab.selected
+                    ? 0.60
+                    : 0.34
+                color:
+                    modeTab.selected
+                    ? Colors.magenta
+                    : modeTab.hovered
+                    ? Colors.orange
+                    : Colors.cyan
+                transparentBorder: true
+            }
+        }
+
+        MouseArea {
+            id: modeTabMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: modeTab.triggered()
         }
     }
 
@@ -1704,6 +1776,35 @@ PanelWindow {
                 }
             }
 
+
+            Row {
+                id: hospitalModeTabs
+
+                width: parent.width
+                height: 36
+                spacing: 10
+
+                HospitalModeTab {
+                    width: (parent.width - 20) / 3
+                    label: "SURGERY"
+                    selected: !root.operationsOpen
+                    onTriggered: root.showSurgery()
+                }
+
+                HospitalModeTab {
+                    width: (parent.width - 20) / 3
+                    label: "REPORTS"
+                    selected: root.operationsSurface === "reports"
+                    onTriggered: root.openReports()
+                }
+
+                HospitalModeTab {
+                    width: (parent.width - 20) / 3
+                    label: "ROUNDS"
+                    selected: root.operationsSurface === "rounds"
+                    onTriggered: root.openRounds()
+                }
+            }
 
             Rectangle {
                 id: departmentContextStrip
@@ -3391,7 +3492,6 @@ PanelWindow {
                 bottomMargin: 10
             }
 
-            onCloseRequested: root.closeOperationsSurface()
         }
 
         HospitalRoundsView {
@@ -3412,7 +3512,6 @@ PanelWindow {
                 bottomMargin: 10
             }
 
-            onCloseRequested: root.closeOperationsSurface()
             onRoomActivated: function(room) {
                 root.openRoomFromRounds(room);
             }
@@ -3445,7 +3544,7 @@ PanelWindow {
 
                 Row {
                     anchors.centerIn: parent
-                    spacing: 16
+                    spacing: 22
 
                     GohuText {
                         id: refreshAction
@@ -3566,110 +3665,6 @@ PanelWindow {
                     }
 
 
-                    GohuText {
-                        id: reportsAction
-
-                        text:
-                            root.operationsSurface === "reports"
-                            ? "REPORTS // OPEN"
-                            : "REPORTS // "
-                              + String(
-                                  certificationCoordinator.historyService
-                                  && Array.isArray(
-                                      certificationCoordinator
-                                          .historyService.events
-                                  )
-                                  ? certificationCoordinator
-                                      .historyService.events.length
-                                  : 0
-                              )
-                        font.pixelSize: 10
-                        color:
-                            reportsMouse.containsMouse
-                            ? Colors.orange
-                            : root.operationsSurface === "reports"
-                            ? Colors.magenta
-                            : Colors.cyan
-
-                        layer.enabled: true
-                        layer.effect: DropShadow {
-                            radius: 5
-                            samples: 7
-                            opacity:
-                                reportsMouse.containsMouse
-                                ? 0.52
-                                : root.operationsSurface === "reports"
-                                ? 0.42
-                                : 0.28
-                            color: reportsAction.color
-                            transparentBorder: true
-                        }
-
-                        MouseArea {
-                            id: reportsMouse
-                            anchors.fill: parent
-                            anchors.margins: -8
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-
-                            onClicked:
-                                root.operationsSurface === "reports"
-                                ? root.closeOperationsSurface()
-                                : root.openReports()
-                        }
-                    }
-
-                    GohuText {
-                        id: roundsAction
-
-                        text:
-                            roundsService.running
-                            ? "ROUNDS // WALKING"
-                            : root.operationsSurface === "rounds"
-                            ? "ROUNDS // OPEN"
-                            : roundsService.available
-                            ? "ROUNDS // "
-                              + String(roundsService.attentionCount)
-                            : "ROUNDS"
-                        font.pixelSize: 10
-                        color:
-                            roundsMouse.containsMouse
-                            ? Colors.orange
-                            : root.operationsSurface === "rounds"
-                            ? Colors.magenta
-                            : roundsService.attentionCount > 0
-                            ? Colors.orange
-                            : Colors.cyan
-
-                        layer.enabled: true
-                        layer.effect: DropShadow {
-                            radius: 5
-                            samples: 7
-                            opacity:
-                                roundsMouse.containsMouse
-                                ? 0.52
-                                : root.operationsSurface === "rounds"
-                                ? 0.42
-                                : roundsService.attentionCount > 0
-                                ? 0.38
-                                : 0.28
-                            color: roundsAction.color
-                            transparentBorder: true
-                        }
-
-                        MouseArea {
-                            id: roundsMouse
-                            anchors.fill: parent
-                            anchors.margins: -8
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-
-                            onClicked:
-                                root.operationsSurface === "rounds"
-                                ? root.closeOperationsSurface()
-                                : root.openRounds()
-                        }
-                    }
                 }
 
                 GohuText {

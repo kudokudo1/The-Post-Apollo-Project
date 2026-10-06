@@ -34,7 +34,6 @@ Item {
     }
 
     signal roomActivated(var room)
-    signal closeRequested()
 
     function shortSha(value) {
         const sha = String(value || "");
@@ -197,7 +196,7 @@ Item {
                 spacing: 8
 
                 GohuText {
-                    width: parent.width - 312
+                    width: parent.width - 214
                     anchors.verticalCenter: parent.verticalCenter
                     text:
                         root.roundsService.running
@@ -238,12 +237,6 @@ Item {
                         : "REFRESH"
                     enabledAction: !root.roundsService.running
                     onTriggered: root.roundsService.refresh()
-                }
-
-                RoundsButton {
-                    width: 58
-                    label: "CLOSE"
-                    onTriggered: root.closeRequested()
                 }
             }
 

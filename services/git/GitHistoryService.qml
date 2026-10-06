@@ -34,6 +34,19 @@ Scope {
     property string actionStatus: "READY"
     property string lastError: ""
 
+    property bool queryBusy: false
+    property var queryRows: []
+    property string queryStatus: "READY"
+    property string queryPath: ""
+    property string queryAuthor: ""
+    property string querySince: ""
+    property string queryUntil: ""
+    property string queryRange: ""
+
+    property bool reflogBusy: false
+    property var reflogRows: []
+    property string reflogStatus: "READY"
+
     property var activeLanes: []
 
     property bool inspectExitSeen: false
@@ -64,6 +77,20 @@ Scope {
     property int actionExitCode: -1
     property string actionStdoutText: ""
     property string actionStderrText: ""
+
+    property bool queryExitSeen: false
+    property bool queryStdoutSeen: false
+    property bool queryStderrSeen: false
+    property int queryExitCode: -1
+    property string queryStdoutText: ""
+    property string queryStderrText: ""
+
+    property bool reflogExitSeen: false
+    property bool reflogStdoutSeen: false
+    property bool reflogStderrSeen: false
+    property int reflogExitCode: -1
+    property string reflogStdoutText: ""
+    property string reflogStderrText: ""
 
     signal refreshed()
     signal actionFinished(string action, bool success, string detail)
@@ -287,6 +314,241 @@ Scope {
             lastError = "";
 
         refreshed();
+    }
+
+    function runQuery(path, author, sinceText, untilText, rangeText) {
+        const repo = String(repositoryPath || "").trim();
+
+        if (!repo || queryBusy)
+            return false;
+
+        queryPath = String(path || "").trim();
+        queryAuthor = String(author || "").trim();
+        querySince = String(sinceText || "").trim();
+        queryUntil = String(untilText || "").trim();
+        queryRange = String(rangeText || "").trim();
+
+        queryBusy = true;
+        queryRows = [];
+        queryStatus = "QUERY // RUNNING";
+        lastError = "";
+
+        queryExitSeen = false;
+        queryStdoutSeen = false;
+        queryStderrSeen = false;
+        queryExitCode = -1;
+        queryStdoutText = "";
+        queryStderrText = "";
+
+        queryProcess.exec([
+            "bash",
+            "-lc",
+            [
+                'repo="$1"',
+                'path="$2"',
+                'author="$3"',
+                'since_text="$4"',
+                'until_text="$5"',
+                'range_text="$6"',
+                'python3 - "$repo" "$path" "$author" "$since_text" "$until_text" "$range_text" <<\'PY\'',
+                'import subprocess, sys',
+                'repo, path, author, since_text, until_text, range_text = sys.argv[1:7]',
+                'cmd = [',
+                '    "git", "-C", repo, "log",',
+                '    "--date-order", "-n", "200",',
+                '    "--pretty=format:QROW%x09%H%x09%P%x09%D%x09%ct%x09%an%x09%ae%x09%s"',
+                ']',
+                'if range_text:',
+                '    cmd.append(range_text)',
+                'else:',
+                '    cmd.append("--all")',
+                'if author:',
+                '    cmd.append("--author=" + author)',
+                'if since_text:',
+                '    cmd.append("--since=" + since_text)',
+                'if until_text:',
+                '    cmd.append("--until=" + until_text)',
+                'if path:',
+                '    cmd += ["--", path]',
+                'proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)',
+                'sys.stdout.buffer.write(proc.stdout)',
+                'sys.stderr.buffer.write(proc.stderr)',
+                'sys.exit(proc.returncode)',
+                'PY'
+            ].join("\n"),
+            "git-history-query",
+            repo,
+            queryPath,
+            queryAuthor,
+            querySince,
+            queryUntil,
+            queryRange
+        ]);
+
+        return true;
+    }
+
+    function parseQuery(text) {
+        const out = [];
+        const lines = String(text || "").split("\n");
+
+        for (let i = 0; i < lines.length; ++i) {
+            const line = String(lines[i] || "");
+            if (!line || line.indexOf("QROW\t") !== 0)
+                continue;
+
+            const p = line.split("\t");
+            const refs = p.length > 3 ? p[3] : "";
+
+            out.push({
+                sha: p.length > 1 ? p[1] : "",
+                shortSha:
+                    p.length > 1
+                    ? p[1].slice(0, 8)
+                    : "",
+                parents:
+                    p.length > 2 && p[2].trim()
+                    ? p[2].trim().split(/\s+/)
+                    : [],
+                refsText: cleanRefs(refs),
+                epoch:
+                    p.length > 4
+                    ? Number(p[4] || 0)
+                    : 0,
+                author: p.length > 5 ? p[5] : "",
+                email: p.length > 6 ? p[6] : "",
+                subject:
+                    p.length > 7
+                    ? p.slice(7).join("\t")
+                    : ""
+            });
+        }
+
+        queryRows = out;
+    }
+
+    function maybeFinishQuery() {
+        if (!queryBusy
+                || !queryExitSeen
+                || !queryStdoutSeen
+                || !queryStderrSeen)
+            return;
+
+        queryBusy = false;
+
+        if (queryExitCode !== 0) {
+            lastError = String(
+                queryStderrText
+                || queryStdoutText
+                || ("QUERY EXIT " + queryExitCode)
+            ).trim();
+            queryStatus = "QUERY // REFUSED";
+            queryRows = [];
+            return;
+        }
+
+        parseQuery(queryStdoutText);
+        lastError = "";
+        queryStatus =
+            "QUERY // "
+            + String(queryRows.length)
+            + " MATCHES";
+    }
+
+    function clearQuery() {
+        queryPath = "";
+        queryAuthor = "";
+        querySince = "";
+        queryUntil = "";
+        queryRange = "";
+        queryRows = [];
+        queryStatus = "READY";
+    }
+
+    function loadReflog() {
+        const repo = String(repositoryPath || "").trim();
+
+        if (!repo || reflogBusy)
+            return false;
+
+        reflogBusy = true;
+        reflogRows = [];
+        reflogStatus = "REFLOG // READING";
+        lastError = "";
+
+        reflogExitSeen = false;
+        reflogStdoutSeen = false;
+        reflogStderrSeen = false;
+        reflogExitCode = -1;
+        reflogStdoutText = "";
+        reflogStderrText = "";
+
+        reflogProcess.exec([
+            "bash",
+            "-lc",
+            [
+                'repo="$1"',
+                'git -C "$repo" reflog --all -n 200 --date=iso --format="RROW%x09%H%x09%gD%x09%gs"'
+            ].join("\n"),
+            "git-history-reflog",
+            repo
+        ]);
+
+        return true;
+    }
+
+    function parseReflog(text) {
+        const out = [];
+        const lines = String(text || "").split("\n");
+
+        for (let i = 0; i < lines.length; ++i) {
+            const line = String(lines[i] || "");
+            if (!line || line.indexOf("RROW\t") !== 0)
+                continue;
+
+            const p = line.split("\t");
+            const sha = p.length > 1 ? p[1] : "";
+
+            out.push({
+                sha: sha,
+                shortSha: sha.slice(0, 8),
+                selector: p.length > 2 ? p[2] : "",
+                subject:
+                    p.length > 3
+                    ? p.slice(3).join("\t")
+                    : ""
+            });
+        }
+
+        reflogRows = out;
+    }
+
+    function maybeFinishReflog() {
+        if (!reflogBusy
+                || !reflogExitSeen
+                || !reflogStdoutSeen
+                || !reflogStderrSeen)
+            return;
+
+        reflogBusy = false;
+
+        if (reflogExitCode !== 0) {
+            lastError = String(
+                reflogStderrText
+                || reflogStdoutText
+                || ("REFLOG EXIT " + reflogExitCode)
+            ).trim();
+            reflogStatus = "REFLOG // REFUSED";
+            reflogRows = [];
+            return;
+        }
+
+        parseReflog(reflogStdoutText);
+        lastError = "";
+        reflogStatus =
+            "REFLOG // "
+            + String(reflogRows.length)
+            + " ENTRIES";
     }
 
     function showCommit(sha) {
@@ -695,6 +957,58 @@ Scope {
         lastError = detail || (actionName + " FAILED");
         actionStatus = actionName + " // REFUSED";
         actionFinished(actionName, false, lastError);
+    }
+
+    Process {
+        id: queryProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                root.queryStdoutText = this.text;
+                root.queryStdoutSeen = true;
+                root.maybeFinishQuery();
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                root.queryStderrText = this.text;
+                root.queryStderrSeen = true;
+                root.maybeFinishQuery();
+            }
+        }
+
+        onExited: function(code, exitStatus) {
+            root.queryExitCode = Number(code);
+            root.queryExitSeen = true;
+            root.maybeFinishQuery();
+        }
+    }
+
+    Process {
+        id: reflogProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                root.reflogStdoutText = this.text;
+                root.reflogStdoutSeen = true;
+                root.maybeFinishReflog();
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                root.reflogStderrText = this.text;
+                root.reflogStderrSeen = true;
+                root.maybeFinishReflog();
+            }
+        }
+
+        onExited: function(code, exitStatus) {
+            root.reflogExitCode = Number(code);
+            root.reflogExitSeen = true;
+            root.maybeFinishReflog();
+        }
     }
 
     Process {

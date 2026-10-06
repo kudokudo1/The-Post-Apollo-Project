@@ -840,6 +840,9 @@ PanelWindow {
             return githubProjectsService.stateText;
 
         if (root.githubView === "profile") {
+            if (repositoryProfileView.profileMode === "account")
+                return githubAccountProfileService.stateText;
+
             if (repositoryProfileService.busy)
                 return repositoryProfileService.resultText;
 
@@ -910,6 +913,15 @@ PanelWindow {
         }
 
         if (root.githubView === "profile") {
+            if (repositoryProfileView.profileMode === "account") {
+                if (githubAccountProfileService.lastError)
+                    return Colors.red;
+
+                return githubAccountProfileService.busy
+                       ? Colors.blue
+                       : Colors.white;
+            }
+
             if (repositoryProfileService.lastError)
                 return Colors.red;
 
@@ -1034,6 +1046,10 @@ PanelWindow {
 
     RepositoryProfileService {
         id: repositoryProfileService
+    }
+
+    GitHubAccountProfileService {
+        id: githubAccountProfileService
     }
 
     RepositoryProfileStore {
@@ -3838,12 +3854,15 @@ PanelWindow {
                             }
 
                             RepositoryProfileView {
+                                id: repositoryProfileView
+
                                 anchors.fill: parent
                                 visible: root.githubView === "profile"
 
                                 gitService: gitService
                                 profileService: repositoryProfileService
                                 profileStore: repositoryProfileStore
+                                accountService: githubAccountProfileService
                                 keyboardHost: root
                             }
 

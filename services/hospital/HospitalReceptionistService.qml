@@ -219,7 +219,7 @@ Scope {
         }
 
         if (unreadCount <= 0)
-            return "NO NEW ACTIVITY SINCE LAST VISIT.";
+            return "";
 
         const counts = unreadSourceCounts();
         const order = [
@@ -260,7 +260,12 @@ Scope {
         visitActive = true;
         visitStartedAt = nowIso();
         rebuildReadMetrics();
-        append("RECEPTION", briefingBody());
+
+        const briefing = briefingBody();
+
+        if (briefing)
+            append("RECEPTION", briefing);
+
         return true;
     }
 

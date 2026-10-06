@@ -30,6 +30,8 @@ PanelWindow {
     property bool bedControlMode: false
     property string operationsSurface: ""
     property bool phoneMenuOpen: false
+    property bool intercomMenuOpen: false
+    property bool intercomTyping: false
     property string pendingRoundsRoomTeam: ""
     property int pendingRoundsFloorIndex: -1
 
@@ -663,6 +665,13 @@ PanelWindow {
         context: Qt.ApplicationShortcut
         enabled: root.menuOpen && root.keyboardActive
         onActivated: {
+            if (root.intercomMenuOpen) {
+                root.intercomMenuOpen = false;
+                root.intercomTyping = false;
+                keyboardFocusAnchor.forceActiveFocus();
+                return;
+            }
+
             if (root.phoneMenuOpen) {
                 root.phoneMenuOpen = false;
                 return;
@@ -680,126 +689,126 @@ PanelWindow {
     Shortcut {
         sequence: "Up"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping
         onActivated: root.moveRoomControl(0, -1)
     }
 
     Shortcut {
         sequence: "Down"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping
         onActivated: root.moveRoomControl(0, 1)
     }
 
     Shortcut {
         sequence: "Left"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping
         onActivated: root.moveRoomControl(-1, 0)
     }
 
     Shortcut {
         sequence: "Right"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping
         onActivated: root.moveRoomControl(1, 0)
     }
 
     Shortcut {
         sequence: "Return"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping
         onActivated: root.handleRoomEnter()
     }
 
     Shortcut {
         sequence: "Enter"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping
         onActivated: root.handleRoomEnter()
     }
 
     Shortcut {
         sequence: "Shift+Left"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping
         onActivated: root.cycleBed(-1)
     }
 
     Shortcut {
         sequence: "Shift+Right"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping
         onActivated: root.cycleBed(1)
     }
 
     Shortcut {
         sequence: "Shift+S"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping
         onActivated: root.invokeRoomShortcut("STATUS")
     }
 
     Shortcut {
         sequence: "Shift+D"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping
         onActivated: root.invokeRoomShortcut("DIFF")
     }
 
     Shortcut {
         sequence: "Shift+F"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping
         onActivated: root.invokeRoomShortcut("LOG")
     }
 
     Shortcut {
         sequence: "Shift+R"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping
         onActivated: root.invokeRoomShortcut("REFRESH")
     }
 
     Shortcut {
         sequence: "Shift+G"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping
         onActivated: root.invokeRoomShortcut("LAZYGIT")
     }
 
     Shortcut {
         sequence: "Shift+P"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping
         onActivated: root.invokeRoomShortcut("PREPARE")
     }
 
     Shortcut {
         sequence: "Shift+M"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping
         onActivated: root.invokeRoomShortcut("REHEARSE")
     }
 
     Shortcut {
         sequence: "Shift+A"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping
         onActivated: root.invokeRoomShortcut("ARM")
     }
 
     Shortcut {
         sequence: "Shift+I"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping
         onActivated: root.invokeRoomShortcut("INTEGRATE")
     }
 
     Shortcut {
         sequence: "Shift+B"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping
         onActivated: root.invokeMoveBed()
     }
 
@@ -814,7 +823,26 @@ PanelWindow {
     function togglePhoneMenu() {
         root.phoneMenuOpen = !root.phoneMenuOpen;
 
+        if (root.phoneMenuOpen) {
+            root.intercomMenuOpen = false;
+            root.intercomTyping = false;
+        }
+
         if (root.phoneMenuOpen
+                && specialistRegistryService.loaded
+                && !specialistRegistryService.probing)
+            specialistRegistryService.refreshPresence();
+    }
+
+    function toggleIntercomMenu() {
+        root.intercomMenuOpen = !root.intercomMenuOpen;
+
+        if (root.intercomMenuOpen)
+            root.phoneMenuOpen = false;
+        else
+            root.intercomTyping = false;
+
+        if (root.intercomMenuOpen
                 && specialistRegistryService.loaded
                 && !specialistRegistryService.probing)
             specialistRegistryService.refreshPresence();
@@ -903,6 +931,8 @@ PanelWindow {
 
     function close() {
         root.phoneMenuOpen = false;
+        root.intercomMenuOpen = false;
+        root.intercomTyping = false;
         root.operationsSurface = "";
         root.menuOpen = false;
     }
@@ -1035,6 +1065,11 @@ PanelWindow {
 
     HospitalPhoneService {
         id: phoneService
+        registryService: specialistRegistryService
+    }
+
+    HospitalIntercomService {
+        id: intercomService
         registryService: specialistRegistryService
     }
 
@@ -1680,6 +1715,84 @@ PanelWindow {
                     }
 
                     spacing: 8
+
+                    Rectangle {
+                        id: intercomButton
+
+                        width: 40
+                        height: 34
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        color:
+                            intercomMouse.pressed
+                            ? Colors.black
+                            : root.intercomMenuOpen
+                            ? Colors.yellow
+                            : Colors.dark
+                        border.width: 1
+                        border.color:
+                            root.intercomMenuOpen
+                            ? Colors.magenta
+                            : intercomMouse.containsMouse
+                            ? Colors.orange
+                            : Colors.cyan
+
+                        RectangularShadow {
+                            anchors.fill: parent
+                            spread: 4
+                            z: -1
+                            opacity:
+                                root.intercomMenuOpen
+                                ? 0.54
+                                : intercomMouse.containsMouse
+                                ? 0.46
+                                : 0.28
+                            color:
+                                root.intercomMenuOpen
+                                ? Colors.magenta
+                                : intercomMouse.containsMouse
+                                ? Colors.orange
+                                : Colors.cyan
+                        }
+
+                        GohuText {
+                            anchors.centerIn: parent
+                            text: "IC"
+                            font.pixelSize: 11
+                            color:
+                                intercomMouse.pressed
+                                ? Colors.black
+                                : root.intercomMenuOpen
+                                ? Colors.magenta
+                                : intercomMouse.containsMouse
+                                ? Colors.orange
+                                : Colors.cyan
+
+                            layer.enabled: !intercomMouse.pressed
+                            layer.effect: DropShadow {
+                                radius: 7
+                                samples: 9
+                                opacity: 0.52
+                                color:
+                                    root.intercomMenuOpen
+                                    ? Colors.magenta
+                                    : intercomMouse.containsMouse
+                                    ? Colors.orange
+                                    : Colors.cyan
+                                transparentBorder: true
+                            }
+                        }
+
+                        MouseArea {
+                            id: intercomMouse
+
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+
+                            onClicked: root.toggleIntercomMenu()
+                        }
+                    }
 
                     Rectangle {
                         id: phoneButton
@@ -3693,16 +3806,62 @@ PanelWindow {
                 + 4
             width: parent.width
             height: Math.max(0, parent.height - y)
-            visible: root.phoneMenuOpen
+            visible:
+                root.phoneMenuOpen
+                || root.intercomMenuOpen
             z: 1180
             acceptedButtons: Qt.AllButtons
             hoverEnabled: true
 
-            onClicked:
-                root.phoneMenuOpen = false
+            onClicked: {
+                root.phoneMenuOpen = false;
+                root.intercomMenuOpen = false;
+                root.intercomTyping = false;
+                keyboardFocusAnchor.forceActiveFocus();
+            }
 
             onWheel: function(wheel) {
                 wheel.accepted = true;
+            }
+        }
+
+        HospitalIntercomMenu {
+            id: intercomDropdown
+
+            visible: root.intercomMenuOpen
+            z: 1200
+
+            registryService: specialistRegistryService
+            intercomService: intercomService
+            workingDirectory: floorService.bedPath
+            floorLabel: floorService.floorLabel
+            roomLabel:
+                root.selectedRoomTeam
+                ? root.selectedRoomTeam
+                : "NO ROOM"
+
+            x:
+                fixedTop.x
+                + hospitalHeader.x
+                + hospitalHeaderActions.x
+                + intercomButton.x
+                + intercomButton.width
+                - width
+            y:
+                fixedTop.y
+                + hospitalHeader.y
+                + hospitalHeaderActions.y
+                + intercomButton.y
+                + intercomButton.height
+                + 6
+
+            onTypingChanged: function(active) {
+                root.intercomTyping = active;
+
+                if (!active
+                        && root.menuOpen
+                        && root.keyboardActive)
+                    keyboardFocusAnchor.forceActiveFocus();
             }
         }
 

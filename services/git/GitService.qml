@@ -330,7 +330,7 @@ Scope {
                 name: String(row.name || ""),
                 head: String(row.head || ""),
                 upstream: String(row.upstream || ""),
-                activityEpoch: Number(row.activityEpoch || 0),
+                unpulledCount: Number(row.unpulledCount || 0),
                 score: score
             });
         }
@@ -360,7 +360,8 @@ Scope {
             matches.push({
                 originalIndex: i,
                 name: String(row.name || ""),
-                activityEpoch: Number(row.activityEpoch || 0),
+                unpulledCount: Number(row.unpulledCount || 0),
+                remoteOnly: Boolean(row.remoteOnly),
                 score: score
             });
         }
@@ -802,7 +803,7 @@ Scope {
                 name: String(localRow.name || ""),
                 head: String(localRow.head || ""),
                 upstream: String(localRow.upstream || ""),
-                activityEpoch: Number(localRow.activityEpoch || 0)
+                unpulledCount: Number(localRow.unpulledCount || 0)
             });
         }
 
@@ -815,7 +816,8 @@ Scope {
 
             remoteBranchRows.append({
                 name: remoteName,
-                activityEpoch: Number(remoteRow.activityEpoch || 0)
+                unpulledCount: Number(remoteRow.unpulledCount || 0),
+                remoteOnly: Boolean(remoteRow.remoteOnly)
             });
         }
 
@@ -1051,16 +1053,30 @@ Scope {
                 'printf "UPSTREAM\\t%s\\n" "$upstream"',
                 'printf "AHEAD\\t%s\\n" "$ahead"',
                 'printf "BEHIND\\t%s\\n" "$behind"',
-                'while IFS="$(printf "\\t")" read -r ref ref_head ref_upstream ref_epoch; do',
-                '  [ -n "$ref" ] && printf "LOCALBRANCH\\t%s\\t%s\\t%s\\t%s\\n" "$ref" "$ref_head" "$ref_upstream" "$ref_epoch"',
-                'done < <(git -C "$root" for-each-ref --format="%(refname:short)%09%(objectname:short=10)%09%(upstream:short)%09%(committerdate:unix)" refs/heads 2>/dev/null)',
-                'while IFS="$(printf "\\t")" read -r ref ref_epoch; do',
+                'while IFS="$(printf "\\t")" read -r ref ref_head ref_upstream; do',
+                '  [ -z "$ref" ] && continue',
+                '  compare="$ref_upstream"',
+                '  if [ -z "$compare" ] && git -C "$root" show-ref --verify --quiet "refs/remotes/origin/$ref"; then compare="origin/$ref"; fi',
+                '  unpulled=0',
+                '  if [ -n "$compare" ]; then unpulled="$(git -C "$root" rev-list --count "$ref..$compare" 2>/dev/null || printf "0")"; fi',
+                '  printf "LOCALBRANCH\\t%s\\t%s\\t%s\\t%s\\n" "$ref" "$ref_head" "$ref_upstream" "$unpulled"',
+                'done < <(git -C "$root" for-each-ref --format="%(refname:short)%09%(objectname:short=10)%09%(upstream:short)" refs/heads 2>/dev/null)',
+                'while IFS= read -r ref; do',
                 '  [ -z "$ref" ] && continue',
                 '  [ "$ref" = "origin" ] && continue',
                 '  [ "$ref" = "origin/HEAD" ] && continue',
                 '  case "$ref" in */*) ;; *) continue ;; esac',
-                '  printf "REMOTEBRANCH\\t%s\\t%s\\n" "$ref" "$ref_epoch"',
-                'done < <(git -C "$root" for-each-ref --format="%(refname:short)%09%(committerdate:unix)" refs/remotes/origin 2>/dev/null)',
+                '  local_branch="${ref#origin/}"',
+                '  unpulled=0',
+                '  remote_only=0',
+                '  if git -C "$root" show-ref --verify --quiet "refs/heads/$local_branch"; then',
+                '    unpulled="$(git -C "$root" rev-list --count "$local_branch..$ref" 2>/dev/null || printf "0")"',
+                '  else',
+                '    remote_only=1',
+                '    unpulled=1',
+                '  fi',
+                '  printf "REMOTEBRANCH\\t%s\\t%s\\t%s\\n" "$ref" "$unpulled" "$remote_only"',
+                'done < <(git -C "$root" for-each-ref --format="%(refname:short)" refs/remotes/origin 2>/dev/null)',
                 'git -C "$root" log --all --topo-order --date-order -n 48 --pretty=format:"COMMIT%x09%H%x09%P%x09%D%x09%s"',
                 'printf "\\nDONE\\t\\n"'
             ].join("\n"),
@@ -1111,12 +1127,13 @@ Scope {
                 name: parts.length > 1 ? parts[1] : "",
                 head: parts.length > 2 ? parts[2] : "",
                 upstream: parts.length > 3 ? parts[3] : "",
-                activityEpoch: parts.length > 4 ? Number(parts[4] || 0) : 0
+                unpulledCount: parts.length > 4 ? Number(parts[4] || 0) : 0
             });
         else if (key === "REMOTEBRANCH")
             pendingRemoteBranches.push({
                 name: parts.length > 1 ? parts[1] : "",
-                activityEpoch: parts.length > 2 ? Number(parts[2] || 0) : 0
+                unpulledCount: parts.length > 2 ? Number(parts[2] || 0) : 0,
+                remoteOnly: parts.length > 3 ? Number(parts[3] || 0) === 1 : false
             });
         else if (key === "ERROR") {
             available = false;

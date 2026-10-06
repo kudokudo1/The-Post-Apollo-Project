@@ -29,6 +29,7 @@ PanelWindow {
     property string roomControlAction: ""
     property bool bedControlMode: false
     property string operationsSurface: ""
+    property bool phoneMenuOpen: false
     property string pendingRoundsRoomTeam: ""
     property int pendingRoundsFloorIndex: -1
 
@@ -661,10 +662,19 @@ PanelWindow {
         sequence: "Esc"
         context: Qt.ApplicationShortcut
         enabled: root.menuOpen && root.keyboardActive
-        onActivated:
-            root.operationsOpen
-            ? root.closeOperationsSurface()
-            : root.close()
+        onActivated: {
+            if (root.phoneMenuOpen) {
+                root.phoneMenuOpen = false;
+                return;
+            }
+
+            if (root.operationsOpen) {
+                root.closeOperationsSurface();
+                return;
+            }
+
+            root.close();
+        }
     }
 
     Shortcut {
@@ -801,6 +811,15 @@ PanelWindow {
         root.closeOperationsSurface();
     }
 
+    function togglePhoneMenu() {
+        root.phoneMenuOpen = !root.phoneMenuOpen;
+
+        if (root.phoneMenuOpen
+                && specialistRegistryService.loaded
+                && !specialistRegistryService.probing)
+            specialistRegistryService.refreshPresence();
+    }
+
     function openReports() {
         root.leaveRoomControls();
         root.leaveBedControls();
@@ -883,6 +902,7 @@ PanelWindow {
     }
 
     function close() {
+        root.phoneMenuOpen = false;
         root.operationsSurface = "";
         root.menuOpen = false;
     }
@@ -1013,6 +1033,11 @@ PanelWindow {
         id: specialistRegistryService
     }
 
+    HospitalPhoneService {
+        id: phoneService
+        registryService: specialistRegistryService
+    }
+
     HospitalRemoteWatcher {
         id: remoteWatcher
         repoPath: floorService.bedPath
@@ -1092,7 +1117,8 @@ PanelWindow {
         target: specialistRegistryService
 
         function onRegistryLoaded() {
-            if (root.operationsSurface === "staff"
+            if ((root.operationsSurface === "staff"
+                    || root.phoneMenuOpen)
                     && !specialistRegistryService.probing)
                 specialistRegistryService.refreshPresence();
         }
@@ -1584,6 +1610,8 @@ PanelWindow {
             // ===== HEADER =======================================
 
             Item {
+                id: hospitalHeader
+
                 // Header spans back across the floor-selector lane.
                 x: -44
                 width: parent.width + 44
@@ -1644,6 +1672,8 @@ PanelWindow {
                 }
 
                 Row {
+                    id: hospitalHeaderActions
+
                     anchors {
                         right: parent.right
                         verticalCenter: parent.verticalCenter
@@ -1748,6 +1778,85 @@ PanelWindow {
                                 color: hospitalLocalStatusText.color
                                 transparentBorder: true
                             }
+                        }
+                    }
+
+                    Rectangle {
+                        id: phoneButton
+
+                        width: 40
+                        height: 34
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        color:
+                            phoneMouse.pressed
+                            ? Colors.black
+                            : root.phoneMenuOpen
+                            ? Colors.yellow
+                            : Colors.dark
+                        border.width: 1
+                        border.color:
+                            root.phoneMenuOpen
+                            ? Colors.magenta
+                            : phoneMouse.containsMouse
+                            ? Colors.orange
+                            : Colors.cyan
+
+                        RectangularShadow {
+                            anchors.fill: parent
+                            spread: 4
+                            z: -1
+                            opacity:
+                                root.phoneMenuOpen
+                                ? 0.54
+                                : phoneMouse.containsMouse
+                                ? 0.46
+                                : 0.28
+                            color:
+                                root.phoneMenuOpen
+                                ? Colors.magenta
+                                : phoneMouse.containsMouse
+                                ? Colors.orange
+                                : Colors.cyan
+                        }
+
+                        NotoText {
+                            anchors.centerIn: parent
+                            anchors.verticalCenterOffset: 1
+                            text: "☎"
+                            font.pixelSize: 21
+                            color:
+                                phoneMouse.pressed
+                                ? Colors.black
+                                : root.phoneMenuOpen
+                                ? Colors.magenta
+                                : phoneMouse.containsMouse
+                                ? Colors.orange
+                                : Colors.cyan
+
+                            layer.enabled: !phoneMouse.pressed
+                            layer.effect: DropShadow {
+                                radius: 7
+                                samples: 9
+                                opacity: 0.52
+                                color:
+                                    root.phoneMenuOpen
+                                    ? Colors.magenta
+                                    : phoneMouse.containsMouse
+                                    ? Colors.orange
+                                    : Colors.cyan
+                                transparentBorder: true
+                            }
+                        }
+
+                        MouseArea {
+                            id: phoneMouse
+
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+
+                            onClicked: root.togglePhoneMenu()
                         }
                     }
 
@@ -3571,6 +3680,59 @@ PanelWindow {
 
 
             }
+        }
+
+        MouseArea {
+            id: phoneMenuShield
+
+            x: 0
+            y:
+                fixedTop.y
+                + hospitalHeader.y
+                + hospitalHeader.height
+                + 4
+            width: parent.width
+            height: Math.max(0, parent.height - y)
+            visible: root.phoneMenuOpen
+            z: 1180
+            acceptedButtons: Qt.AllButtons
+            hoverEnabled: true
+
+            onClicked:
+                root.phoneMenuOpen = false
+
+            onWheel: function(wheel) {
+                wheel.accepted = true;
+            }
+        }
+
+        HospitalPhoneMenu {
+            id: phoneDropdown
+
+            visible: root.phoneMenuOpen
+            z: 1200
+
+            registryService: specialistRegistryService
+            phoneService: phoneService
+            workingDirectory: floorService.bedPath
+
+            x:
+                fixedTop.x
+                + hospitalHeader.x
+                + hospitalHeaderActions.x
+                + phoneButton.x
+                + phoneButton.width
+                - width
+            y:
+                fixedTop.y
+                + hospitalHeader.y
+                + hospitalHeaderActions.y
+                + phoneButton.y
+                + phoneButton.height
+                + 6
+
+            onCallLaunched:
+                root.phoneMenuOpen = false
         }
 
         HospitalReportsView {

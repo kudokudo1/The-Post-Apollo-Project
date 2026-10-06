@@ -809,6 +809,14 @@ PanelWindow {
         gitService.refresh();
     }
 
+    function showGitRepository() {
+        root.localTargetMenuOpen = false;
+        root.remoteTargetMenuOpen = false;
+        root.gitView = "repository";
+        repositoryService.refresh();
+        branchWorkspaceService.refresh();
+    }
+
     function localTargetResults() {
         const count = gitService.localBranchCount;
         const revision = gitService.topologyRevision;
@@ -1337,6 +1345,14 @@ PanelWindow {
         id: gitService
     }
 
+    GitRepositoryService {
+        id: repositoryService
+        repositoryPath:
+            gitService.repoIsLocal
+            ? gitService.repoRoot
+            : ""
+    }
+
     GitHistoryService {
         id: historyService
         repositoryPath:
@@ -1429,6 +1445,17 @@ PanelWindow {
             else if (root.activePage === "git"
                     && root.gitView === "changes")
                 changesService.refresh();
+        }
+    }
+
+    Connections {
+        target: repositoryService
+
+        function onActionFinished(action, success, detail) {
+            if (success) {
+                gitService.refresh();
+                branchWorkspaceService.refresh();
+            }
         }
     }
 
@@ -4138,6 +4165,25 @@ PanelWindow {
                         }
                     }
 
+                    GitRepositoryView {
+                        id: gitRepositoryView
+
+                        anchors {
+                            top: parent.top
+                            left: parent.left
+                            right: parent.right
+                            bottom: gitModeButtonRow.top
+                            bottomMargin: 8
+                        }
+
+                        visible: root.gitView === "repository"
+
+                        repositoryService: repositoryService
+                        gitService: gitService
+                        branchWorkspaceService: branchWorkspaceService
+                        keyboardHost: root
+                    }
+
                     GitHistoryView {
                         id: gitHistoryView
 
@@ -4235,7 +4281,7 @@ PanelWindow {
                                     name: "REPOSITORY",
                                     key: "repository",
                                     symbol: "◇",
-                                    available: false
+                                    available: true
                                 }
                             ]
 
@@ -4340,6 +4386,11 @@ PanelWindow {
                                             === "history"
                                         )
                                             root.showGitHistory();
+                                        else if (
+                                            gitModeButton.modelData.key
+                                            === "repository"
+                                        )
+                                            root.showGitRepository();
                                     }
                                 }
                             }

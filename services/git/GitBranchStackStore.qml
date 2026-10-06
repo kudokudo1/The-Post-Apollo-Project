@@ -14,7 +14,6 @@ Scope {
     property string trunkBranch: "main"
     property var relations: []
 
-    signal relationsChanged()
     signal relationRejected(string reason)
 
     readonly property var repositoryRelations:
@@ -146,8 +145,7 @@ Scope {
 
             relations = next;
             persist();
-            relationsChanged();
-            return true;
+                return true;
         }
 
         const record = {
@@ -163,7 +161,6 @@ Scope {
 
         relations = next;
         persist();
-        relationsChanged();
         return true;
     }
 
@@ -207,7 +204,6 @@ Scope {
         });
 
         persist();
-        relationsChanged();
         return true;
     }
 

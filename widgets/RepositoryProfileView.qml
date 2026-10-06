@@ -592,7 +592,7 @@ Item {
                                                   - catalogScroll.height
                                               )
                                             )
-                                    color: Colors.cyan
+                                    color: Colors.magenta
                                     opacity:
                                         catalogScroll.contentHeight
                                         > catalogScroll.height

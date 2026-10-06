@@ -2524,7 +2524,7 @@ PanelWindow {
                                         ActionButton {
                                             id: localTargetSwitchButton
 
-                                            width: 62
+                                            width: 56
                                             height: 28
                                             label:
                                                 branchWorkspaceService.actionBusy
@@ -2567,7 +2567,7 @@ PanelWindow {
                                         SelectorInput {
                                             id: localTargetInput
 
-                                            width: parent.width - 98
+                                            width: parent.width - 92
                                             valueText:
                                                 gitService.localTargetDisplay
                                             placeholderText: "TYPE LOCAL TARGET"

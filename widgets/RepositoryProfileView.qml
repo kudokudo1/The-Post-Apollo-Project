@@ -8,8 +8,11 @@ Item {
     required property var gitService
     required property var profileService
     required property var profileStore
+    required property var accountService
     required property var keyboardHost
 
+    property string profileMode: "repositories"
+    property bool accountDirty: false
     property string visibilityMode: "keep"
     property string topicMode: "add"
     property string descriptionMode: "keep"
@@ -28,6 +31,24 @@ Item {
 
     function markDirty() {
         root.profileService.invalidateReview();
+    }
+
+    function loadAccountDraft() {
+        accountNameInput.text = root.accountService.displayName;
+        accountBioInput.text = root.accountService.bio;
+        accountEmailInput.text = root.accountService.email;
+        root.accountDirty = false;
+    }
+
+    function showAccountProfile() {
+        root.profileMode = "account";
+
+        if (!root.accountService.busy)
+            root.accountService.refreshProfile();
+    }
+
+    function showRepositoryProfiles() {
+        root.profileMode = "repositories";
     }
 
     component ManagerButton: Rectangle {
@@ -220,6 +241,97 @@ Item {
         }
     }
 
+    component ManagerTextArea: Rectangle {
+        id: field
+
+        property string placeholderText: ""
+        property bool enabledInput: true
+        property alias text: editor.text
+
+        signal edited()
+
+        height: 96
+        color: Colors.black
+        border.width: 1
+        border.color:
+            editor.activeFocus
+            ? Colors.magenta
+            : field.enabledInput
+            ? Colors.cyan
+            : Colors.dark
+
+        GohuText {
+            anchors {
+                left: parent.left
+                top: parent.top
+                leftMargin: 7
+                topMargin: 7
+            }
+
+            visible: editor.text.length === 0 && !editor.activeFocus
+            text: field.placeholderText
+            font.pixelSize: 8
+            color: Colors.white
+            opacity: field.enabledInput ? 0.42 : 0.22
+        }
+
+        TextEdit {
+            id: editor
+
+            anchors {
+                fill: parent
+                margins: 7
+            }
+
+            enabled: field.enabledInput
+            activeFocusOnPress: true
+            selectByMouse: true
+            wrapMode: TextEdit.Wrap
+            clip: true
+            font.family: "GohuFont 11 Nerd Font Mono"
+            font.pixelSize: 9
+            color: field.enabledInput ? Colors.white : Colors.cyan
+            selectionColor: Colors.magenta
+            selectedTextColor: Colors.black
+
+            onTextChanged: field.edited()
+
+            Keys.onEscapePressed: function(event) {
+                focus = false;
+
+                if (root.keyboardHost) {
+                    root.keyboardHost.activeTextEditor = null;
+                    root.keyboardHost.restoreGitKeyboardFocus(false);
+                }
+
+                event.accepted = true;
+            }
+
+            onActiveFocusChanged: {
+                if (!root.keyboardHost)
+                    return;
+
+                if (activeFocus)
+                    root.keyboardHost.activeTextEditor = editor;
+                else if (root.keyboardHost.activeTextEditor === editor)
+                    root.keyboardHost.activeTextEditor = null;
+            }
+        }
+    }
+
+    Connections {
+        target: root.accountService
+
+        function onProfileLoaded() {
+            root.loadAccountDraft();
+        }
+
+        function onProfileSaved(success) {
+            if (success)
+                root.loadAccountDraft();
+        }
+    }
+
     Connections {
         target: root.profileStore
 
@@ -246,7 +358,10 @@ Item {
     }
 
     Column {
+        id: repositoryManager
+
         anchors.fill: parent
+        visible: root.profileMode === "repositories"
         spacing: 10
 
         Rectangle {
@@ -265,11 +380,20 @@ Item {
                 spacing: 8
 
                 GohuText {
-                    width: parent.width - 180
+                    width: parent.width - 278
                     anchors.verticalCenter: parent.verticalCenter
                     text: "REPOSITORY PROFILE MANAGER // BATCH CONTROL"
                     font.pixelSize: 11
                     color: Colors.blue
+                }
+
+                ManagerButton {
+                    width: 90
+                    height: 26
+                    anchors.verticalCenter: parent.verticalCenter
+                    label: "ACCOUNT"
+                    primaryBlue: true
+                    onTriggered: root.showAccountProfile()
                 }
 
                 GohuText {
@@ -1006,4 +1130,270 @@ Item {
             }
         }
     }
+
+    Column {
+        id: accountManager
+
+        anchors.fill: parent
+        visible: root.profileMode === "account"
+        spacing: 10
+
+        Rectangle {
+            width: parent.width
+            height: 42
+            color: Colors.dark
+            border.width: 1
+            border.color: Colors.blue
+
+            Row {
+                anchors {
+                    fill: parent
+                    margins: 8
+                }
+
+                spacing: 8
+
+                GohuText {
+                    width: parent.width - 206
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "GITHUB ACCOUNT PROFILE"
+                    font.pixelSize: 11
+                    color: Colors.blue
+                }
+
+                ManagerButton {
+                    width: 106
+                    height: 26
+                    anchors.verticalCenter: parent.verticalCenter
+                    label: "REPOSITORIES"
+                    onTriggered: root.showRepositoryProfiles()
+                }
+
+                ManagerButton {
+                    width: 84
+                    height: 26
+                    anchors.verticalCenter: parent.verticalCenter
+                    label:
+                        root.accountService.loading
+                        ? "READING"
+                        : "REFRESH"
+                    enabledAction: !root.accountService.busy
+                    onTriggered: root.accountService.refreshProfile()
+                }
+            }
+        }
+
+        Rectangle {
+            width: parent.width
+            height: parent.height - 52
+            color: Colors.dark
+            border.width: 1
+            border.color:
+                root.accountService.lastError
+                ? Colors.red
+                : root.accountDirty
+                ? Colors.orange
+                : Colors.cyan
+
+            Column {
+                anchors {
+                    fill: parent
+                    margins: 12
+                }
+
+                spacing: 9
+
+                GohuText {
+                    width: parent.width
+                    text: "ACCOUNT IDENTITY"
+                    font.pixelSize: 10
+                    color: Colors.magenta
+                }
+
+                Rectangle {
+                    width: parent.width
+                    height: 38
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.blue
+
+                    Row {
+                        anchors {
+                            fill: parent
+                            margins: 8
+                        }
+
+                        GohuText {
+                            width: 128
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "GITHUB LOGIN"
+                            font.pixelSize: 8
+                            color: Colors.cyan
+                        }
+
+                        GohuText {
+                            width: parent.width - 128
+                            anchors.verticalCenter: parent.verticalCenter
+                            text:
+                                root.accountService.login
+                                ? "@" + root.accountService.login
+                                : "NOT LOADED"
+                            font.pixelSize: 10
+                            color: Colors.white
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
+
+                GohuText {
+                    width: parent.width
+                    text:
+                        "LOGIN HANDLE IS READ-ONLY HERE. "
+                        + "DISPLAY NAME, BIO, AND PUBLIC EMAIL CAN BE UPDATED BELOW."
+                    wrapMode: Text.Wrap
+                    font.pixelSize: 7
+                    color: Colors.orange
+                }
+
+                GohuText {
+                    width: parent.width
+                    text: "DISPLAY NAME"
+                    font.pixelSize: 8
+                    color: Colors.cyan
+                }
+
+                ManagerInput {
+                    id: accountNameInput
+
+                    width: parent.width
+                    placeholderText: "DISPLAY NAME"
+                    enabledInput: !root.accountService.busy
+                    onEdited: root.accountDirty = true
+                }
+
+                GohuText {
+                    width: parent.width
+                    text: "BIO"
+                    font.pixelSize: 8
+                    color: Colors.cyan
+                }
+
+                ManagerTextArea {
+                    id: accountBioInput
+
+                    width: parent.width
+                    placeholderText: "BIO"
+                    enabledInput: !root.accountService.busy
+                    onEdited: root.accountDirty = true
+                }
+
+                GohuText {
+                    width: parent.width
+                    text: "PUBLIC EMAIL"
+                    font.pixelSize: 8
+                    color: Colors.cyan
+                }
+
+                ManagerInput {
+                    id: accountEmailInput
+
+                    width: parent.width
+                    placeholderText: "PUBLIC EMAIL"
+                    enabledInput: !root.accountService.busy
+                    onEdited: root.accountDirty = true
+                }
+
+                GohuText {
+                    width: parent.width
+                    text:
+                        "THIS IS THE EMAIL GITHUB MAY SHOW PUBLICLY ON YOUR PROFILE. "
+                        + "LEAVE IT EMPTY TO CLEAR THE PUBLIC EMAIL FIELD."
+                    wrapMode: Text.Wrap
+                    font.pixelSize: 7
+                    color: Colors.orange
+                }
+
+                Row {
+                    width: parent.width
+                    height: 30
+                    spacing: 8
+
+                    ManagerButton {
+                        width: 108
+                        height: 30
+                        label: "RESET"
+                        enabledAction:
+                            !root.accountService.busy
+                            && root.accountDirty
+                        onTriggered: root.loadAccountDraft()
+                    }
+
+                    ManagerButton {
+                        width: 132
+                        height: 30
+                        label:
+                            root.accountService.saving
+                            ? "SAVING"
+                            : "SAVE PROFILE"
+                        primaryBlue: true
+                        enabledAction:
+                            !root.accountService.busy
+                            && root.accountDirty
+
+                        onTriggered:
+                            root.accountService.saveProfile(
+                                accountNameInput.text,
+                                accountBioInput.text,
+                                accountEmailInput.text
+                            )
+                    }
+
+                    GohuText {
+                        width: parent.width - 256
+                        anchors.verticalCenter: parent.verticalCenter
+                        horizontalAlignment: Text.AlignRight
+                        text:
+                            root.accountDirty
+                            ? "UNSAVED CHANGES"
+                            : "SYNCED"
+                        font.pixelSize: 8
+                        color:
+                            root.accountDirty
+                            ? Colors.orange
+                            : Colors.cyan
+                    }
+                }
+
+                Rectangle {
+                    width: parent.width
+                    height: Math.max(54, parent.height - 382)
+                    color: Colors.black
+                    border.width: 1
+                    border.color:
+                        root.accountService.lastError
+                        ? Colors.red
+                        : Colors.cyan
+
+                    GohuText {
+                        anchors {
+                            fill: parent
+                            margins: 8
+                        }
+
+                        text:
+                            root.accountService.lastError
+                            ? "ERROR // " + root.accountService.lastError
+                            : root.accountService.stateText
+                        wrapMode: Text.WrapAnywhere
+                        font.pixelSize: 8
+                        color:
+                            root.accountService.lastError
+                            ? Colors.red
+                            : Colors.white
+                    }
+                }
+            }
+        }
+    }
+
 }

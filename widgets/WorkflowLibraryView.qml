@@ -628,7 +628,7 @@ Item {
                                         spacing: 6
 
                                         Column {
-                                            width: parent.width - 142
+                                            width: parent.width - 182
                                             anchors.verticalCenter: parent.verticalCenter
                                             spacing: 2
 
@@ -662,6 +662,17 @@ Item {
                                             label: "+ QUEUE"
 
                                             onTriggered: root.libraryStore.addWorkflow(modelData)
+                                        }
+
+                                        LibraryButton {
+                                            width: 34
+                                            label: "×"
+                                            enabledAction: !root.githubService.actionBusy
+
+                                            onTriggered:
+                                                root.githubService.deleteWorkflow(
+                                                    String(modelData.path || "")
+                                                )
                                         }
                                     }
                                 }

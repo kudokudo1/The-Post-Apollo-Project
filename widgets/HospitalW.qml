@@ -1682,6 +1682,85 @@ PanelWindow {
                     spacing: 8
 
                     Rectangle {
+                        id: phoneButton
+
+                        width: 40
+                        height: 34
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        color:
+                            phoneMouse.pressed
+                            ? Colors.black
+                            : root.phoneMenuOpen
+                            ? Colors.yellow
+                            : Colors.dark
+                        border.width: 1
+                        border.color:
+                            root.phoneMenuOpen
+                            ? Colors.magenta
+                            : phoneMouse.containsMouse
+                            ? Colors.orange
+                            : Colors.green
+
+                        RectangularShadow {
+                            anchors.fill: parent
+                            spread: 4
+                            z: -1
+                            opacity:
+                                root.phoneMenuOpen
+                                ? 0.54
+                                : phoneMouse.containsMouse
+                                ? 0.46
+                                : 0.28
+                            color:
+                                root.phoneMenuOpen
+                                ? Colors.magenta
+                                : phoneMouse.containsMouse
+                                ? Colors.orange
+                                : Colors.green
+                        }
+
+                        NotoText {
+                            anchors.centerIn: parent
+                            anchors.verticalCenterOffset: 1
+                            text: "☎"
+                            font.pixelSize: 21
+                            color:
+                                phoneMouse.pressed
+                                ? Colors.black
+                                : root.phoneMenuOpen
+                                ? Colors.magenta
+                                : phoneMouse.containsMouse
+                                ? Colors.orange
+                                : Colors.green
+
+                            layer.enabled: !phoneMouse.pressed
+                            layer.effect: DropShadow {
+                                radius: 7
+                                samples: 9
+                                opacity: 0.52
+                                color:
+                                    root.phoneMenuOpen
+                                    ? Colors.magenta
+                                    : phoneMouse.containsMouse
+                                    ? Colors.orange
+                                    : Colors.green
+                                transparentBorder: true
+                            }
+                        }
+
+                        MouseArea {
+                            id: phoneMouse
+
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+
+                            onClicked: root.togglePhoneMenu()
+                        }
+                    }
+
+                    Rectangle {
                         width: 86
                         height: 26
                         anchors.verticalCenter: parent.verticalCenter
@@ -1778,85 +1857,6 @@ PanelWindow {
                                 color: hospitalLocalStatusText.color
                                 transparentBorder: true
                             }
-                        }
-                    }
-
-                    Rectangle {
-                        id: phoneButton
-
-                        width: 40
-                        height: 34
-                        anchors.verticalCenter: parent.verticalCenter
-
-                        color:
-                            phoneMouse.pressed
-                            ? Colors.black
-                            : root.phoneMenuOpen
-                            ? Colors.yellow
-                            : Colors.dark
-                        border.width: 1
-                        border.color:
-                            root.phoneMenuOpen
-                            ? Colors.magenta
-                            : phoneMouse.containsMouse
-                            ? Colors.orange
-                            : Colors.cyan
-
-                        RectangularShadow {
-                            anchors.fill: parent
-                            spread: 4
-                            z: -1
-                            opacity:
-                                root.phoneMenuOpen
-                                ? 0.54
-                                : phoneMouse.containsMouse
-                                ? 0.46
-                                : 0.28
-                            color:
-                                root.phoneMenuOpen
-                                ? Colors.magenta
-                                : phoneMouse.containsMouse
-                                ? Colors.orange
-                                : Colors.cyan
-                        }
-
-                        NotoText {
-                            anchors.centerIn: parent
-                            anchors.verticalCenterOffset: 1
-                            text: "☎"
-                            font.pixelSize: 21
-                            color:
-                                phoneMouse.pressed
-                                ? Colors.black
-                                : root.phoneMenuOpen
-                                ? Colors.magenta
-                                : phoneMouse.containsMouse
-                                ? Colors.orange
-                                : Colors.cyan
-
-                            layer.enabled: !phoneMouse.pressed
-                            layer.effect: DropShadow {
-                                radius: 7
-                                samples: 9
-                                opacity: 0.52
-                                color:
-                                    root.phoneMenuOpen
-                                    ? Colors.magenta
-                                    : phoneMouse.containsMouse
-                                    ? Colors.orange
-                                    : Colors.cyan
-                                transparentBorder: true
-                            }
-                        }
-
-                        MouseArea {
-                            id: phoneMouse
-
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-
-                            onClicked: root.togglePhoneMenu()
                         }
                     }
 

@@ -111,7 +111,7 @@ Item {
         GohuText {
             anchors.centerIn: parent
             text: button.label
-            font.pixelSize: 16
+            font.pixelSize: 11
             color:
                 button.selectedAction
                 ? Colors.magenta
@@ -202,7 +202,7 @@ Item {
                         root.roundsService.running
                         ? "ROUNDS // WALKING FLOORS"
                         : "ROUNDS // HOSPITAL BOARD"
-                    font.pixelSize: 16
+                    font.pixelSize: 13
                     color: Colors.magenta
                     elide: Text.ElideRight
                 }
@@ -313,7 +313,7 @@ Item {
                         ? "LAST ROUND // "
                           + root.roundsService.lastRefreshedAt
                         : "ROUNDS NOT RUN"
-                    font.pixelSize: 12
+                    font.pixelSize: 10
                     color:
                         root.roundsService.lastError
                         ? Colors.red
@@ -396,7 +396,7 @@ Item {
                                                         modelData.team
                                                         || "ROOM"
                                                     )
-                                                font.pixelSize: 16
+                                                font.pixelSize: 11
                                                 color:
                                                     root.selectedIndex === index
                                                     ? Colors.magenta
@@ -416,7 +416,7 @@ Item {
                                                         modelData.state
                                                         || "UNKNOWN"
                                                     )
-                                                font.pixelSize: 16
+                                                font.pixelSize: 11
                                                 color:
                                                     root.stateColor(
                                                         modelData.state
@@ -434,7 +434,7 @@ Item {
                                                     modelData.responsibility
                                                     || "NO RESPONSIBILITY"
                                                 )
-                                            font.pixelSize: 12
+                                            font.pixelSize: 10
                                             color: Colors.white
                                             opacity: 0.86
                                             elide: Text.ElideRight
@@ -463,7 +463,7 @@ Item {
                                                       )
                                                     : ""
                                                 )
-                                            font.pixelSize: 12
+                                            font.pixelSize: 10
                                             color: Colors.orange
                                             elide: Text.ElideRight
                                         }
@@ -509,7 +509,7 @@ Item {
                                     root.filterMode === "ATTENTION"
                                     ? "NO ROOMS REQUIRE ATTENTION"
                                     : "NO ROOMS AVAILABLE"
-                                font.pixelSize: 16
+                                font.pixelSize: 11
                                 color: Colors.cyan
                                 opacity: 0.62
                                 horizontalAlignment: Text.AlignHCenter
@@ -559,7 +559,7 @@ Item {
                             text:
                                 "FLOOR // "
                                 + String(parent.room.floorLabel || "—")
-                            font.pixelSize: 12
+                            font.pixelSize: 10
                             color: Colors.cyan
                             elide: Text.ElideRight
                         }
@@ -569,7 +569,7 @@ Item {
                             text:
                                 "REPO // "
                                 + String(parent.room.repository || "—")
-                            font.pixelSize: 12
+                            font.pixelSize: 10
                             color: Colors.white
                             elide: Text.ElideRight
                         }
@@ -579,7 +579,7 @@ Item {
                             text:
                                 "STATE // "
                                 + String(parent.room.state || "—")
-                            font.pixelSize: 16
+                            font.pixelSize: 11
                             color:
                                 root.stateColor(parent.room.state)
                             elide: Text.ElideRight
@@ -592,7 +592,7 @@ Item {
                                 + String(parent.room.ahead || 0)
                                 + " / -"
                                 + String(parent.room.behind || 0)
-                            font.pixelSize: 12
+                            font.pixelSize: 10
                             color: Colors.orange
                         }
 
@@ -604,7 +604,7 @@ Item {
                                     root.shortSha(parent.room.head)
                                     || "—"
                                 )
-                            font.pixelSize: 12
+                            font.pixelSize: 10
                             color: Colors.blue
                             elide: Text.ElideRight
                         }
@@ -616,7 +616,7 @@ Item {
                                     parent.room.responsibility
                                     || "NO RESPONSIBILITY RECORDED"
                                 )
-                            font.pixelSize: 16
+                            font.pixelSize: 11
                             color: Colors.white
                             wrapMode: Text.Wrap
                         }

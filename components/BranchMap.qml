@@ -422,7 +422,7 @@ Rectangle {
                                             GohuText {
                                                 anchors.verticalCenter: parent.verticalCenter
                                                 text: modelData
-                                                font.pixelSize: 9
+                                                font.pixelSize: 11
                                                 color:
                                                     String(modelData).indexOf("origin/") === 0
                                                     ? Colors.white
@@ -442,7 +442,7 @@ Rectangle {
                                                 anchors.verticalCenter: parent.verticalCenter
                                                 visible: index < refsRepeater.count - 1
                                                 text: " • "
-                                                font.pixelSize: 9
+                                                font.pixelSize: 11
                                                 color: Colors.white
 
                                                 layer.enabled: true

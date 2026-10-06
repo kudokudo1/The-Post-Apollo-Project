@@ -42,6 +42,31 @@ Scope {
     property bool contextFavoritesOnly: false
     property bool contextProblemsOnly: false
 
+    readonly property bool contextActive:
+        contextEventKey.length > 0
+        || contextTarget.length > 0
+    readonly property var contextItem: contextEvent()
+    readonly property bool contextHasEvent:
+        contextItem !== null
+    readonly property bool contextIsFavorite:
+        contextHasEvent
+        && isPinned(contextItem)
+    readonly property bool contextCanBefore:
+        contextNeighbor(-1) !== null
+    readonly property bool contextCanNewer:
+        contextNeighbor(1) !== null
+    readonly property string contextLabel: {
+        if (contextTarget)
+            return contextTarget;
+
+        const item = contextItem || {};
+        return String(
+            item.title
+            || item.source
+            || "ACTIVITY"
+        );
+    }
+
     FileView {
         id: activityFile
 
@@ -1072,6 +1097,173 @@ Scope {
         return -1;
     }
 
+    function contextNeighbor(directionValue) {
+        const current = contextEvent();
+
+        if (!current)
+            return null;
+
+        const matches = contextMatches();
+        const index = contextIndex(matches);
+
+        if (index < 0)
+            return null;
+
+        const direction = Number(directionValue || 0);
+        const nextIndex =
+            direction < 0
+            ? index + 1
+            : direction > 0
+            ? index - 1
+            : index;
+
+        if (nextIndex < 0 || nextIndex >= matches.length)
+            return null;
+
+        return matches[nextIndex] || null;
+    }
+
+    function openCurrentContext() {
+        if (contextTarget) {
+            teamNavigationRequested(contextTarget);
+            return true;
+        }
+
+        const current = contextEvent();
+
+        if (!current)
+            return false;
+
+        activityActionRequested(current);
+        return true;
+    }
+
+    function setCurrentContextFavorite(pinnedValue) {
+        const current = contextEvent();
+
+        if (!current)
+            return false;
+
+        return setPinned(current, Boolean(pinnedValue));
+    }
+
+    function moveContextBefore() {
+        const older = contextNeighbor(-1);
+
+        if (!older)
+            return false;
+
+        rememberActivityContext(
+            older,
+            contextSource,
+            contextTarget,
+            contextUnreadOnly,
+            contextFavoritesOnly,
+            contextProblemsOnly
+        );
+        return true;
+    }
+
+    function moveContextNewer() {
+        const newer = contextNeighbor(1);
+
+        if (!newer)
+            return false;
+
+        rememberActivityContext(
+            newer,
+            contextSource,
+            contextTarget,
+            contextUnreadOnly,
+            contextFavoritesOnly,
+            contextProblemsOnly
+        );
+        return true;
+    }
+
+    function contextAction(actionValue) {
+        const action =
+            String(actionValue || "").trim().toLowerCase();
+
+        if (action === "open") {
+            if (!openCurrentContext())
+                return false;
+
+            const current = contextEvent();
+
+            append(
+                "RECEPTION",
+                contextTarget
+                ? "OPENING ROOM // " + contextTarget
+                : current
+                ? "OPENING // " + activityLine(current)
+                : "OPENING CONTEXT"
+            );
+            return true;
+        }
+
+        if (action === "favorite") {
+            const current = contextEvent();
+
+            if (!current)
+                return false;
+
+            const desired = !isPinned(current);
+
+            setCurrentContextFavorite(desired);
+            append(
+                "RECEPTION",
+                (
+                    desired
+                    ? "FAVORITED // "
+                    : "UNFAVORITED // "
+                )
+                + activityLine(current)
+            );
+            return true;
+        }
+
+        if (action === "before") {
+            if (!moveContextBefore()) {
+                append(
+                    "RECEPTION",
+                    "NOTHING OLDER IN THIS CONTEXT"
+                );
+                return false;
+            }
+
+            append(
+                "RECEPTION",
+                activityListResponse(
+                    "BEFORE",
+                    [contextEvent()]
+                )
+            );
+            return true;
+        }
+
+        if (action === "newer") {
+            if (!moveContextNewer()) {
+                append(
+                    "RECEPTION",
+                    "NOTHING NEWER IN THIS CONTEXT"
+                );
+                return false;
+            }
+
+            append(
+                "RECEPTION",
+                activityListResponse(
+                    "NEWER",
+                    [contextEvent()]
+                )
+            );
+            return true;
+        }
+
+        return false;
+    }
+
     function answerContextFollowUp(textValue) {
         const raw = String(textValue || "").trim();
 
@@ -1131,14 +1323,8 @@ Scope {
 
         append("OPERATOR", raw);
 
-        if (goThere && contextTarget) {
-            append(
-                "RECEPTION",
-                "OPENING ROOM // " + contextTarget
-            );
-            teamNavigationRequested(contextTarget);
-            return true;
-        }
+        if (goThere && contextTarget)
+            return contextAction("open");
 
         const current = contextEvent();
 
@@ -1151,28 +1337,13 @@ Scope {
             return true;
         }
 
-        if (goThere) {
-            append(
-                "RECEPTION",
-                "OPENING // " + activityLine(current)
-            );
-            activityActionRequested(current);
-            return true;
-        }
-
-        if (openThat) {
-            append(
-                "RECEPTION",
-                "OPENING // " + activityLine(current)
-            );
-            activityActionRequested(current);
-            return true;
-        }
+        if (goThere || openThat)
+            return contextAction("open");
 
         if (favoriteThat || unfavoriteThat) {
             const desired = favoriteThat && !unfavoriteThat;
 
-            setPinned(current, desired);
+            setCurrentContextFavorite(desired);
             append(
                 "RECEPTION",
                 (
@@ -1198,57 +1369,12 @@ Scope {
         }
 
         if (beforeThat) {
-            const olderIndex = index + 1;
-
-            if (olderIndex >= matches.length) {
-                append(
-                    "RECEPTION",
-                    "NOTHING OLDER IN THIS CONTEXT"
-                );
-                return true;
-            }
-
-            const older = matches[olderIndex] || {};
-
-            rememberActivityContext(
-                older,
-                contextSource,
-                contextTarget,
-                contextUnreadOnly,
-                contextFavoritesOnly,
-                contextProblemsOnly
-            );
-            append(
-                "RECEPTION",
-                activityListResponse("BEFORE", [older])
-            );
+            contextAction("before");
             return true;
         }
 
         if (newerThanThat) {
-            if (index <= 0) {
-                append(
-                    "RECEPTION",
-                    "NOTHING NEWER IN THIS CONTEXT"
-                );
-                return true;
-            }
-
-            const newer = matches.slice(0, index);
-            const newest = newer[0] || {};
-
-            rememberActivityContext(
-                newest,
-                contextSource,
-                contextTarget,
-                contextUnreadOnly,
-                contextFavoritesOnly,
-                contextProblemsOnly
-            );
-            append(
-                "RECEPTION",
-                activityListResponse("NEWER", newer)
-            );
+            contextAction("newer");
             return true;
         }
 

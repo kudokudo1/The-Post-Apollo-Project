@@ -24,6 +24,9 @@ PanelWindow {
     property int selectedWorkflowIndex: 0
     property bool workflowMenuOpen: false
     property bool localTargetMenuOpen: false
+    property bool remoteTargetMenuOpen: false
+    property string localTargetQuery: ""
+    property string remoteTargetQuery: ""
     property string targetMatchSource: "local"
     property int selectedRunIndex: 0
     property bool runInspectorOpen: false
@@ -755,6 +758,7 @@ PanelWindow {
 
     function close() {
         root.localTargetMenuOpen = false;
+        root.remoteTargetMenuOpen = false;
         root.menuOpen = false;
     }
 
@@ -778,13 +782,131 @@ PanelWindow {
 
     function showGitControl() {
         root.localTargetMenuOpen = false;
+        root.remoteTargetMenuOpen = false;
         root.gitView = "control";
     }
 
     function showGitBranches() {
         root.localTargetMenuOpen = false;
+        root.remoteTargetMenuOpen = false;
         root.gitView = "branches";
         branchWorkspaceService.refresh();
+    }
+
+    function localTargetResults() {
+        const count = gitService.localBranchCount;
+        const revision = gitService.topologyRevision;
+        return gitService.fuzzyLocalMatches(
+            root.localTargetQuery,
+            Math.max(1, count)
+        );
+    }
+
+    function remoteTargetResults(limit) {
+        const count = gitService.remoteBranchCount;
+        const revision = gitService.topologyRevision;
+        return gitService.fuzzyRemoteMatches(
+            root.remoteTargetQuery,
+            Math.max(1, Number(limit || count))
+        );
+    }
+
+    function showTrackChoice() {
+        const query = String(root.localTargetQuery || "")
+            .trim()
+            .toLowerCase();
+
+        return !query
+            || "track".indexOf(query) === 0
+            || query.indexOf("track") === 0
+            || query.indexOf("checkout") === 0;
+    }
+
+    function branchActivityIntensity(epoch) {
+        const stamp = Number(epoch || 0);
+
+        if (stamp <= 0)
+            return 0;
+
+        const age = Math.max(0, Date.now() / 1000 - stamp);
+        const day = 86400;
+
+        if (age <= day)
+            return 1.0;
+        if (age <= day * 3)
+            return 0.78;
+        if (age <= day * 7)
+            return 0.54;
+        if (age <= day * 14)
+            return 0.30;
+
+        return 0;
+    }
+
+    function remoteActivityPoints() {
+        const points = [];
+        const count = gitService.remoteBranchCount;
+        const revision = gitService.topologyRevision;
+
+        for (let i = 0; i < count; ++i) {
+            const row = gitService.remoteBranchAt(i);
+            if (!row)
+                continue;
+
+            const intensity = root.branchActivityIntensity(
+                row.activityEpoch
+            );
+
+            if (intensity <= 0)
+                continue;
+
+            points.push({
+                index: i,
+                intensity: intensity,
+                label: String(row.name || "")
+            });
+        }
+
+        return points;
+    }
+
+    function localActivityPoints() {
+        const rows = root.localTargetResults();
+        const points = [];
+
+        for (let i = 0; i < rows.length; ++i) {
+            const intensity = root.branchActivityIntensity(
+                rows[i].activityEpoch
+            );
+
+            if (intensity <= 0)
+                continue;
+
+            points.push({
+                rowIndex: i,
+                intensity: intensity,
+                name: String(rows[i].name || "")
+            });
+        }
+
+        return points;
+    }
+
+    function scrollLocalResultIntoView(rowIndex) {
+        const trackOffset = root.showTrackChoice() ? 1 : 0;
+        const rowY = (Number(rowIndex || 0) + trackOffset) * 30;
+        const targetY =
+            rowY
+            - Math.max(0, localTargetFlick.height - 30) / 2;
+
+        localTargetFlick.contentY =
+            Math.max(
+                0,
+                Math.min(
+                    localTargetScrollRail.maxContentY,
+                    targetY
+                )
+            );
     }
 
     function remoteBranchLeaf(remoteBranch) {
@@ -901,6 +1023,7 @@ PanelWindow {
 
     function showGithubPage() {
         root.localTargetMenuOpen = false;
+        root.remoteTargetMenuOpen = false;
         root.activePage = "github";
         gitService.refresh();
         githubService.refresh();
@@ -1508,6 +1631,7 @@ PanelWindow {
         property bool userEditing: false
 
         signal submitted(string value)
+        signal edited(string value)
 
         function syncDisplay(value) {
             selectorInput.userEditing = false;
@@ -1558,8 +1682,10 @@ PanelWindow {
 
             Component.onCompleted: text = selectorInput.valueText
 
-            onTextEdited:
-                selectorInput.userEditing = true
+            onTextEdited: {
+                selectorInput.userEditing = true;
+                selectorInput.edited(String(text || ""));
+            }
 
             onAccepted: {
                 const candidate = String(text || "").trim();
@@ -2259,6 +2385,8 @@ PanelWindow {
             currentIndex: gitService.selectedRemoteIndex
             accentColor: Colors.orange
             handleGlowColor: Colors.cyan
+            activityGlowColor: Colors.magenta
+            activityPoints: root.remoteActivityPoints()
             sideLabel: "REMOTE"
 
             onIndexRequested: function(index) {
@@ -2691,11 +2819,20 @@ PanelWindow {
                                                 !gitService.actionBusy
                                                 && !gitService.refreshing
 
+                                            onEdited: function(value) {
+                                                root.localTargetQuery = value;
+                                                root.remoteTargetMenuOpen = false;
+                                                root.localTargetMenuOpen = true;
+                                                localTargetFlick.contentY = 0;
+                                            }
+
                                             onSubmitted: function(value) {
                                                 root.localTargetMenuOpen = false;
 
                                                 if (gitService.selectLocalText(value))
                                                     root.targetMatchSource = "local";
+
+                                                root.localTargetQuery = "";
                                             }
                                         }
 
@@ -2712,9 +2849,12 @@ PanelWindow {
                                             selectedAction:
                                                 root.localTargetMenuOpen
 
-                                            onTriggered:
+                                            onTriggered: {
+                                                root.localTargetQuery = "";
+                                                root.remoteTargetMenuOpen = false;
                                                 root.localTargetMenuOpen =
-                                                    !root.localTargetMenuOpen
+                                                    !root.localTargetMenuOpen;
+                                            }
                                         }
                                     }
 
@@ -2820,7 +2960,8 @@ PanelWindow {
                                     width: localTargetCard.width - 16
                                     height:
                                         Math.min(
-                                            gitService.localBranchCount + 1,
+                                            root.localTargetResults().length
+                                            + (root.showTrackChoice() ? 1 : 0),
                                             7
                                         ) * 30 + 8
                                     color: Colors.black
@@ -2866,7 +3007,8 @@ PanelWindow {
 
                                             Rectangle {
                                                 width: parent.width
-                                                height: 30
+                                                height: visible ? 30 : 0
+                                                visible: root.showTrackChoice()
                                                 color:
                                                     gitService.localTrackCheckoutMode
                                                     ? Colors.yellow
@@ -2922,7 +3064,7 @@ PanelWindow {
                                             }
 
                                             Repeater {
-                                                model: gitService.localBranchModel
+                                                model: root.localTargetResults()
 
                                                 Rectangle {
                                                     required property int index
@@ -3017,6 +3159,7 @@ PanelWindow {
                                                                     )
                                                             ) {
                                                                 root.targetMatchSource = "local";
+                                                                root.localTargetQuery = "";
                                                                 localTargetInput
                                                                     .syncDisplay(
                                                                         branchName
@@ -3057,6 +3200,84 @@ PanelWindow {
                                                 localTargetFlick.contentHeight
                                                 - localTargetFlick.height
                                             )
+
+                                        Repeater {
+                                            model: root.localActivityPoints()
+
+                                            Item {
+                                                required property int index
+                                                required property var modelData
+
+                                                width: 17
+                                                height: 10
+                                                x: (parent.width - width) / 2
+                                                z: 6
+
+                                                y:
+                                                    root.localTargetResults().length <= 1
+                                                    ? (
+                                                        localTargetScrollRail.height
+                                                        - height
+                                                      ) / 2
+                                                    : (
+                                                        localTargetScrollRail.height
+                                                        - height
+                                                      )
+                                                      * Number(
+                                                          modelData.rowIndex || 0
+                                                        )
+                                                      / Math.max(
+                                                          1,
+                                                          root.localTargetResults().length
+                                                          - 1
+                                                        )
+
+                                                RectangularShadow {
+                                                    anchors.centerIn: activityTick
+                                                    width: activityTick.width
+                                                    height: activityTick.height
+                                                    spread: 3
+                                                    z: -1
+                                                    opacity:
+                                                        0.68
+                                                        * Number(
+                                                            parent.modelData
+                                                                .intensity || 0
+                                                          )
+                                                    color: Colors.magenta
+                                                }
+
+                                                Rectangle {
+                                                    id: activityTick
+                                                    anchors.centerIn: parent
+                                                    width: 15
+                                                    height: 2
+                                                    radius: 1
+                                                    color: Colors.magenta
+                                                    opacity:
+                                                        0.44
+                                                        + 0.56
+                                                          * Number(
+                                                              parent.modelData
+                                                                  .intensity || 0
+                                                            )
+                                                }
+
+                                                MouseArea {
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+
+                                                    onClicked:
+                                                        root.scrollLocalResultIntoView(
+                                                            Number(
+                                                                parent.modelData
+                                                                    .rowIndex || 0
+                                                            )
+                                                        )
+                                                }
+                                            }
+                                        }
 
                                         Rectangle {
                                             id: localTargetScrollHandle
@@ -3156,8 +3377,11 @@ PanelWindow {
                             }
 
                             Rectangle {
+                                id: remoteTargetCard
+
                                 width: (parent.width - 20) / 3
                                 height: parent.height
+                                z: root.remoteTargetMenuOpen ? 800 : 0
                                 color: Colors.dark
                                 border.width: 1
                                 border.color: Colors.magenta
@@ -3193,20 +3417,35 @@ PanelWindow {
                                             label: "<"
                                             enabledAction: gitService.remoteBranchCount > 0
                                             onTriggered: {
+                                                root.remoteTargetMenuOpen = false;
+                                                root.remoteTargetQuery = "";
                                                 gitService.cycleRemote(-1);
                                                 root.targetMatchSource = "remote";
                                             }
                                         }
 
                                         SelectorInput {
+                                            id: remoteTargetInput
+
                                             width: parent.width - 64
                                             valueText: gitService.selectedRemoteBranch
                                             placeholderText: "TYPE REMOTE BRANCH"
                                             accentColor: Colors.magenta
 
+                                            onEdited: function(value) {
+                                                root.remoteTargetQuery = value;
+                                                root.localTargetMenuOpen = false;
+                                                root.remoteTargetMenuOpen =
+                                                    String(value || "").trim().length > 0;
+                                            }
+
                                             onSubmitted: function(value) {
+                                                root.remoteTargetMenuOpen = false;
+
                                                 if (gitService.selectRemoteText(value))
                                                     root.targetMatchSource = "remote";
+
+                                                root.remoteTargetQuery = "";
                                             }
                                         }
 
@@ -3216,6 +3455,8 @@ PanelWindow {
                                             label: ">"
                                             enabledAction: gitService.remoteBranchCount > 0
                                             onTriggered: {
+                                                root.remoteTargetMenuOpen = false;
+                                                root.remoteTargetQuery = "";
                                                 gitService.cycleRemote(1);
                                                 root.targetMatchSource = "remote";
                                             }
@@ -3236,6 +3477,124 @@ PanelWindow {
                                             ? Colors.white
                                             : Colors.magenta
                                         elide: Text.ElideRight
+                                    }
+                                }
+
+                                Rectangle {
+                                    id: remoteTargetDropdown
+
+                                    parent: gitLocalPage
+                                    visible:
+                                        root.remoteTargetMenuOpen
+                                        && root.remoteTargetResults(7).length > 0
+                                    z: 1600
+                                    x:
+                                        branchControlStrip.x
+                                        + remoteTargetCard.x
+                                        + 8
+                                    y:
+                                        branchControlStrip.y
+                                        + remoteTargetCard.y
+                                        + 63
+                                    width: remoteTargetCard.width - 16
+                                    height:
+                                        root.remoteTargetResults(7).length
+                                        * 30 + 8
+                                    color: Colors.black
+                                    border.width: 1
+                                    border.color: Colors.magenta
+                                    clip: true
+
+                                    RectangularShadow {
+                                        anchors.fill: parent
+                                        spread: 4
+                                        z: -1
+                                        opacity: 0.34
+                                        color: Colors.magenta
+                                    }
+
+                                    Column {
+                                        anchors {
+                                            fill: parent
+                                            margins: 4
+                                        }
+
+                                        Repeater {
+                                            model: root.remoteTargetResults(7)
+
+                                            Rectangle {
+                                                required property int index
+                                                required property var modelData
+
+                                                width: parent.width
+                                                height: 30
+
+                                                readonly property string branchName:
+                                                    String(modelData.name || "")
+
+                                                color:
+                                                    remoteChoiceMouse.containsMouse
+                                                    ? Colors.dark
+                                                    : Colors.black
+
+                                                Rectangle {
+                                                    width: 3
+                                                    anchors {
+                                                        left: parent.left
+                                                        top: parent.top
+                                                        bottom: parent.bottom
+                                                    }
+                                                    color: Colors.magenta
+                                                    opacity:
+                                                        0.22
+                                                        + 0.58
+                                                          * root.branchActivityIntensity(
+                                                              modelData.activityEpoch
+                                                          )
+                                                }
+
+                                                GohuText {
+                                                    anchors {
+                                                        left: parent.left
+                                                        right: parent.right
+                                                        verticalCenter: parent.verticalCenter
+                                                        leftMargin: 9
+                                                        rightMargin: 8
+                                                    }
+                                                    text: parent.branchName
+                                                    font.pixelSize: 10
+                                                    color:
+                                                        root.branchActivityIntensity(
+                                                            modelData.activityEpoch
+                                                        ) > 0
+                                                        ? Colors.white
+                                                        : Colors.magenta
+                                                    elide: Text.ElideRight
+                                                }
+
+                                                MouseArea {
+                                                    id: remoteChoiceMouse
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+
+                                                    onClicked: {
+                                                        gitService.selectRemote(
+                                                            Number(
+                                                                parent.modelData
+                                                                    .originalIndex
+                                                            )
+                                                        );
+                                                        root.targetMatchSource = "remote";
+                                                        root.remoteTargetQuery = "";
+                                                        root.remoteTargetMenuOpen = false;
+                                                        remoteTargetInput.syncDisplay(
+                                                            gitService.selectedRemoteBranch
+                                                        );
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }

@@ -818,6 +818,16 @@ PanelWindow {
             roundsService.refresh();
     }
 
+    function openStaff() {
+        root.leaveRoomControls();
+        root.leaveBedControls();
+        root.operationsSurface = "staff";
+
+        if (specialistRegistryService.loaded
+                && !specialistRegistryService.probing)
+            specialistRegistryService.refreshPresence();
+    }
+
     function resolvePendingRoundsRoom() {
         const team = String(root.pendingRoundsRoomTeam || "");
 
@@ -999,6 +1009,10 @@ PanelWindow {
         floorService: floorService
     }
 
+    HospitalSpecialistRegistryService {
+        id: specialistRegistryService
+    }
+
     HospitalRemoteWatcher {
         id: remoteWatcher
         repoPath: floorService.bedPath
@@ -1072,6 +1086,16 @@ PanelWindow {
     HospitalCertificationCoordinator {
         id: certificationCoordinator
         evidenceProvider: gitEvidenceProvider
+    }
+
+    Connections {
+        target: specialistRegistryService
+
+        function onRegistryLoaded() {
+            if (root.operationsSurface === "staff"
+                    && !specialistRegistryService.probing)
+                specialistRegistryService.refreshPresence();
+        }
     }
 
     Connections {
@@ -1576,6 +1600,8 @@ PanelWindow {
                         ? "HOSPITAL // REPORTS"
                         : root.operationsSurface === "rounds"
                         ? "HOSPITAL // ROUNDS"
+                        : root.operationsSurface === "staff"
+                        ? "HOSPITAL // STAFF"
                         : "HOSPITAL // SURGERY ROOM"
                     font.pixelSize: 20
                     color: Colors.magenta
@@ -1601,6 +1627,8 @@ PanelWindow {
                         ? "SURGICAL HISTORY // EVIDENCE"
                         : root.operationsSurface === "rounds"
                         ? "HOSPITAL-WIDE // ATTENTION"
+                        : root.operationsSurface === "staff"
+                        ? "SPECIALISTS // PRESENCE"
                         : "CONTROL SURFACE // LOCAL PATIENT"
                     font.pixelSize: 10
                     color: Colors.cyan
@@ -1663,6 +1691,21 @@ PanelWindow {
                                       )
                                     : "CLEAR"
                                   )
+                                : root.operationsSurface === "staff"
+                                ? (
+                                    specialistRegistryService.probing
+                                    ? "CHECKING"
+                                    : "READY "
+                                      + String(
+                                          specialistRegistryService
+                                              .readyCount
+                                      )
+                                      + "/"
+                                      + String(
+                                          specialistRegistryService
+                                              .specialistCount
+                                      )
+                                  )
                                 : floorService.bedIsLive
                                 ? "LOCAL LIVE"
                                 : floorService.bedPath.length > 0
@@ -1678,6 +1721,14 @@ PanelWindow {
                                     ? Colors.orange
                                     : Colors.cyan
                                   )
+                                : root.operationsSurface === "staff"
+                                ? (
+                                    specialistRegistryService.lastError
+                                    ? Colors.red
+                                    : specialistRegistryService.readyCount > 0
+                                    ? Colors.green
+                                    : Colors.orange
+                                  )
                                 : floorService.bedIsLive
                                 ? Colors.magenta
                                 : floorService.bedPath.length > 0
@@ -1689,7 +1740,9 @@ PanelWindow {
                                 radius: 10
                                 samples: 11
                                 opacity:
-                                    floorService.bedPath.length > 0
+                                    root.operationsOpen
+                                    ? 0.82
+                                    : floorService.bedPath.length > 0
                                     ? 0.82
                                     : 0.44
                                 color: hospitalLocalStatusText.color
@@ -1785,24 +1838,31 @@ PanelWindow {
                 spacing: 10
 
                 HospitalModeTab {
-                    width: (parent.width - 20) / 3
+                    width: (parent.width - 30) / 4
                     label: "SURGERY"
                     selected: !root.operationsOpen
                     onTriggered: root.showSurgery()
                 }
 
                 HospitalModeTab {
-                    width: (parent.width - 20) / 3
+                    width: (parent.width - 30) / 4
                     label: "REPORTS"
                     selected: root.operationsSurface === "reports"
                     onTriggered: root.openReports()
                 }
 
                 HospitalModeTab {
-                    width: (parent.width - 20) / 3
+                    width: (parent.width - 30) / 4
                     label: "ROUNDS"
                     selected: root.operationsSurface === "rounds"
                     onTriggered: root.openRounds()
+                }
+
+                HospitalModeTab {
+                    width: (parent.width - 30) / 4
+                    label: "STAFF"
+                    selected: root.operationsSurface === "staff"
+                    onTriggered: root.openStaff()
                 }
             }
 
@@ -1817,6 +1877,8 @@ PanelWindow {
                 border.color:
                     root.operationsSurface === "reports"
                     ? Colors.magenta
+                    : root.operationsSurface === "staff"
+                    ? Colors.orange
                     : Colors.cyan
 
                 RectangularShadow {
@@ -1827,6 +1889,8 @@ PanelWindow {
                     color:
                         root.operationsSurface === "reports"
                         ? Colors.magenta
+                        : root.operationsSurface === "staff"
+                        ? Colors.orange
                         : Colors.cyan
                 }
 
@@ -1843,11 +1907,15 @@ PanelWindow {
                         text:
                             root.operationsSurface === "reports"
                             ? "REPORTS // CONTEXT"
+                            : root.operationsSurface === "staff"
+                            ? "STAFF // PRESENCE"
                             : "ROUNDS // HOSPITAL-WIDE"
                         font.pixelSize: 12
                         color:
                             root.operationsSurface === "reports"
                             ? Colors.magenta
+                            : root.operationsSurface === "staff"
+                            ? Colors.orange
                             : Colors.cyan
                         elide: Text.ElideRight
                     }
@@ -1884,6 +1952,26 @@ PanelWindow {
                                     : 0
                                   )
                               )
+                            : root.operationsSurface === "staff"
+                            ? (
+                                "SPECIALISTS "
+                                + String(
+                                    specialistRegistryService
+                                        .specialistCount
+                                  )
+                                + "  //  READY "
+                                + String(
+                                    specialistRegistryService.readyCount
+                                  )
+                                + "  //  OFFLINE "
+                                + String(
+                                    specialistRegistryService.offlineCount
+                                  )
+                                + "  //  CALLABLE "
+                                + String(
+                                    specialistRegistryService.callableCount
+                                  )
+                              )
                             : (
                                 "FLOORS "
                                 + String(roundsService.floorCount)
@@ -1900,6 +1988,17 @@ PanelWindow {
                         color:
                             root.operationsSurface === "reports"
                             ? Colors.white
+                            : root.operationsSurface === "staff"
+                            ? (
+                                specialistRegistryService.lastError
+                                ? Colors.red
+                                : specialistRegistryService.probing
+                                ? Colors.orange
+                                : specialistRegistryService
+                                    .callableCount > 0
+                                ? Colors.green
+                                : Colors.white
+                              )
                             : roundsService.attentionCount > 0
                             ? Colors.orange
                             : Colors.white
@@ -3514,6 +3613,25 @@ PanelWindow {
 
             onRoomActivated: function(room) {
                 root.openRoomFromRounds(room);
+            }
+        }
+
+        HospitalSpecialistsView {
+            id: specialistsView
+
+            z: 700
+            visible: root.operationsSurface === "staff"
+            registryService: specialistRegistryService
+
+            anchors {
+                left: parent.left
+                right: parent.right
+                top: fixedTop.bottom
+                bottom: actionBay.top
+                leftMargin: 62
+                rightMargin: 18
+                topMargin: 8
+                bottomMargin: 10
             }
         }
 

@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "specialists": [
+    {
+      "id": "codex",
+      "name": "CODEX",
+      "provider": "OPENAI",
+      "role": "CODE / REVIEW SPECIALIST",
+      "kind": "AGENT",
+      "transport": "CLI",
+      "command": "codex",
+      "assignment": "UNASSIGNED",
+      "callable": true,
+      "capabilities": [
+        "CODE",
+        "REVIEW",
+        "RESEARCH"
+      ]
+    },
+    {
+      "id": "hermes",
+      "name": "HERMES",
+      "provider": "HERMES",
+      "role": "GENERAL / RESEARCH SPECIALIST",
+      "kind": "AGENT",
+      "transport": "CLI",
+      "command": "hermes",
+      "assignment": "UNASSIGNED",
+      "callable": true,
+      "capabilities": [
+        "RESEARCH",
+        "PLANNING",
+        "OPERATIONS"
+      ]
+    }
+  ]
+}

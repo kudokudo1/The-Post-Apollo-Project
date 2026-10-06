@@ -752,6 +752,176 @@ Scope {
             : next;
     }
 
+    function activityQuerySource(queryValue) {
+        const query = String(queryValue || "").toLowerCase();
+
+        if (query.indexOf("report") >= 0
+                || query.indexOf("history") >= 0
+                || query.indexOf("evidence") >= 0)
+            return "reports";
+
+        if (query.indexOf("round") >= 0
+                || query.indexOf("attention") >= 0)
+            return "rounds";
+
+        if (query.indexOf("intercom") >= 0
+                || query.indexOf("message") >= 0)
+            return "intercom";
+
+        if (query.indexOf("phone") >= 0
+                || query.indexOf("call") >= 0)
+            return "phone";
+
+        if (query.indexOf("staff") >= 0
+                || query.indexOf("specialist") >= 0)
+            return "staff";
+
+        return "";
+    }
+
+    function matchingActivity(sourceValue, unreadOnly, favoritesOnly) {
+        const source = String(sourceValue || "").toLowerCase();
+        const matches = [];
+
+        for (let i = 0; i < activityEvents.length; ++i) {
+            const event = activityEvents[i] || {};
+
+            if (source
+                    && String(event.source || "").toLowerCase()
+                       !== source)
+                continue;
+
+            if (unreadOnly && !isUnread(event))
+                continue;
+
+            if (favoritesOnly && !isPinned(event))
+                continue;
+
+            matches.push(event);
+        }
+
+        matches.sort(function(a, b) {
+            return root.eventEpoch(b) - root.eventEpoch(a);
+        });
+
+        return matches;
+    }
+
+    function activityLine(eventValue) {
+        const event = eventValue || {};
+        const time = String(event.timeLabel || "");
+        const source =
+            String(event.source || "activity").toUpperCase();
+        const title = String(event.title || "HOSPITAL ACTIVITY");
+        const detail = String(event.detail || "");
+
+        return [
+            time,
+            source,
+            title,
+            detail
+        ].filter(function(value) {
+            return String(value || "").length > 0;
+        }).join(" // ");
+    }
+
+    function activityListResponse(labelValue, eventsValue) {
+        const label = String(labelValue || "RECENT");
+        const events =
+            Array.isArray(eventsValue)
+            ? eventsValue.slice(0, 5)
+            : [];
+
+        if (events.length === 0)
+            return label + " // NONE RECORDED";
+
+        const lines = [label + " // " + String(events.length)];
+
+        for (let i = 0; i < events.length; ++i)
+            lines.push("- " + activityLine(events[i] || {}));
+
+        return lines.join("\n");
+    }
+
+    function answerActivityQuestion(textValue) {
+        const raw = String(textValue || "").trim();
+
+        if (!raw)
+            return false;
+
+        const query = raw.toLowerCase();
+        const asksNew =
+            query.indexOf("what's new") >= 0
+            || query.indexOf("whats new") >= 0
+            || query.indexOf("what is new") >= 0
+            || query.indexOf("anything new") >= 0
+            || query.indexOf("what did i miss") >= 0
+            || query.indexOf("did i miss") >= 0
+            || query.indexOf("since last") >= 0
+            || query.indexOf("while i was gone") >= 0;
+        const asksFavorites =
+            query.indexOf("favorite") >= 0
+            || query.indexOf("favourite") >= 0
+            || query.indexOf("pinned") >= 0
+            || query.indexOf("kept") >= 0;
+        const asksRecent =
+            query.indexOf("recent") >= 0
+            || query.indexOf("latest") >= 0
+            || query.indexOf("what happened") >= 0
+            || query.indexOf("activity") >= 0
+            || query.indexOf("last call") >= 0
+            || query.indexOf("last report") >= 0
+            || query.indexOf("last round") >= 0
+            || query.indexOf("last intercom") >= 0
+            || query.indexOf("last message") >= 0
+            || query.indexOf("last staff") >= 0;
+        const asksHelp =
+            query.indexOf("what do you know") >= 0
+            || query.indexOf("what can you tell me") >= 0
+            || query.indexOf("what can i ask") >= 0;
+
+        if (!asksNew
+                && !asksFavorites
+                && !asksRecent
+                && !asksHelp)
+            return false;
+
+        append("OPERATOR", raw);
+
+        if (asksHelp) {
+            append(
+                "RECEPTION",
+                "I can report what is new, what you missed, recent activity, recent Reports, Rounds, Phone, Intercom, Staff changes, and your favorites."
+            );
+            return true;
+        }
+
+        const source = activityQuerySource(query);
+        const matches =
+            matchingActivity(
+                source,
+                asksNew,
+                asksFavorites
+            );
+        let label = "";
+
+        if (asksFavorites)
+            label = "FAVORITES";
+        else if (asksNew)
+            label = "NEW SINCE LAST VISIT";
+        else
+            label = "RECENT";
+
+        if (source)
+            label += " // " + source.toUpperCase();
+
+        append(
+            "RECEPTION",
+            activityListResponse(label, matches)
+        );
+        return true;
+    }
+
     function request(route, operatorText) {
         const target = String(route || "").toLowerCase();
 
@@ -792,6 +962,9 @@ Scope {
             return false;
 
         const query = raw.toLowerCase();
+
+        if (answerActivityQuestion(raw))
+            return true;
 
         if (query.indexOf("intercom") >= 0
                 || query.indexOf("message") >= 0

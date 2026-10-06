@@ -88,7 +88,7 @@ Scope {
                 '  primary_available=true',
                 '  primary_message="PRIMARY EMAIL // READY"',
                 'fi',
-                'jq -nc --argjson profile "$profile" --arg primaryEmail "$primary_email" --argjson primaryEmailAvailable "$primary_available" --arg primaryEmailMessage "$primary_message" "$profile + {primaryEmail:$primaryEmail,primaryEmailAvailable:$primaryEmailAvailable,primaryEmailMessage:$primaryEmailMessage}"'
+                "jq -nc --argjson profile \"$profile\" --arg primaryEmail \"$primary_email\" --argjson primaryEmailAvailable \"$primary_available\" --arg primaryEmailMessage \"$primary_message\" '$profile + {primaryEmail:$primaryEmail,primaryEmailAvailable:$primaryEmailAvailable,primaryEmailMessage:$primaryEmailMessage}'"
             ].join("\n")
         ]);
         watchdog.restart();

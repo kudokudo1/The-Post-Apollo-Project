@@ -1813,8 +1813,11 @@ PanelWindow {
                                 : Colors.omnitrix
                         }
 
-                        NotoText {
-                            anchors.fill: parent
+                        GohuText {
+                            anchors.centerIn: parent
+                            anchors.verticalCenterOffset: 2
+                            width: parent.width
+                            height: parent.height
                             text: "🎙︎"
                             font.pixelSize: 19
                             horizontalAlignment: Text.AlignHCenter

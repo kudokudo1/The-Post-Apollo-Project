@@ -650,7 +650,7 @@ Item {
                                 - sourceList.height
                             )
                           )
-                    color: Colors.cyan
+                    color: Colors.magenta
                 }
             }
         }

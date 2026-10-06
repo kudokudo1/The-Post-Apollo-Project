@@ -189,8 +189,8 @@ Rectangle {
                             )
                         )
 
-                    width: 30
-                    height: 10
+                    width: 14
+                    height: 7
                     anchors.horizontalCenter: parent.horizontalCenter
                     z: 5
                     visible: intensity > 0
@@ -208,9 +208,9 @@ Rectangle {
                         anchors.centerIn: activityTick
                         width: activityTick.width
                         height: activityTick.height
-                        spread: 3
+                        spread: 1
                         z: -1
-                        opacity: 0.68 * parent.intensity
+                        opacity: 0.30 * parent.intensity
                         color: slider.activityGlowColor
                     }
 
@@ -218,11 +218,11 @@ Rectangle {
                         id: activityTick
 
                         anchors.centerIn: parent
-                        width: 22
-                        height: 2
+                        width: 7
+                        height: 1
                         radius: 1
                         color: slider.activityGlowColor
-                        opacity: 0.46 + 0.54 * parent.intensity
+                        opacity: 0.72 + 0.28 * parent.intensity
                     }
 
                     MouseArea {

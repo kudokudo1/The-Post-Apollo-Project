@@ -753,7 +753,7 @@ Item {
                                   * workflowScrollTrack.thumbTravel
                                 : 0
 
-                            color: Colors.orange
+                            color: Colors.magenta
                             opacity:
                                 workflowFlick.contentHeight > workflowFlick.height
                                 ? 0.92

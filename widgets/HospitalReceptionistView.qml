@@ -12,6 +12,8 @@ Rectangle {
     property int readyCount: 0
     property int specialistCount: 0
     property int attentionCount: 0
+    property int newCount: 0
+    property int recentCount: 0
     property var inbox: []
 
     signal routeRequested(string route)
@@ -292,6 +294,10 @@ Rectangle {
                     + String(root.specialistCount)
                     + "    //    ATTENTION "
                     + String(root.attentionCount)
+                    + "    //    NEW "
+                    + String(root.newCount)
+                    + "    //    RECENT "
+                    + String(root.recentCount)
                     + "    //    AUTHORITY: ROUTE + EXPLAIN + INITIATE"
                 font.pixelSize: 10
                 color: Colors.green
@@ -332,7 +338,15 @@ Rectangle {
                         id: inboxCount
 
                         anchors.verticalCenter: parent.verticalCenter
-                        text: String(Math.min(5, root.inbox.length))
+                        text:
+                            root.newCount > 0
+                            ? (
+                                "NEW "
+                                + String(root.newCount)
+                                + " // "
+                                + String(root.recentCount)
+                              )
+                            : String(root.recentCount)
                         font.pixelSize: 10
                         color: Colors.yellow
                     }
@@ -357,6 +371,9 @@ Rectangle {
                                 : null
                             readonly property bool occupied:
                                 itemData !== null
+                            readonly property bool unread:
+                                occupied
+                                && root.receptionistService.isUnread(itemData)
                             readonly property color attentionAccent:
                                 root.attentionColor(itemData)
 
@@ -367,10 +384,18 @@ Rectangle {
                                 && inboxMouse.pressed
                                 ? Colors.black
                                 : Colors.black
-                            opacity: occupied ? 1.0 : 0.18
+                            opacity:
+                                !occupied
+                                ? 0.18
+                                : unread
+                                ? 1.0
+                                : 0.62
                             border.width:
                                 occupied
-                                && inboxMouse.containsMouse
+                                && (
+                                    unread
+                                    || inboxMouse.containsMouse
+                                )
                                 ? 2 : 1
                             border.color:
                                 !occupied
@@ -412,13 +437,18 @@ Rectangle {
                                         const detail =
                                             String(item.detail || "");
 
-                                        return time
+                                        const body =
+                                            time
                                             ? (
                                                 detail
                                                 ? time + " // " + detail
                                                 : time
                                               )
                                             : detail;
+
+                                        return parent.parent.unread
+                                            ? "NEW // " + body
+                                            : body;
                                     }
                                     font.pixelSize: 7
                                     color: Colors.white

@@ -27,6 +27,9 @@ Scope {
     property bool pendingVisitStart: false
     property int unreadCount: 0
     property int recentCount: 0
+    property var pinnedKeys: []
+    property int pinnedCount: 0
+    property int maxPinnedEvents: 5
 
     FileView {
         id: activityFile
@@ -41,6 +44,7 @@ Scope {
             property var events: []
             property var subjects: ({})
             property string lastReadAt: ""
+            property var pinnedKeys: []
         }
 
         onAdapterUpdated: writeAdapter()
@@ -223,20 +227,156 @@ Scope {
         return true;
     }
 
+    function eventKey(event) {
+        return String((event || {}).key || "");
+    }
+
+    function isPinned(event) {
+        const key = eventKey(event);
+
+        return !!key && pinnedKeys.indexOf(key) >= 0;
+    }
+
+    function trimActivityEvents(eventsValue) {
+        const source =
+            Array.isArray(eventsValue)
+            ? eventsValue.slice()
+            : [];
+
+        source.sort(function(a, b) {
+            return root.eventEpoch(a) - root.eventEpoch(b);
+        });
+
+        const pinned = [];
+        const unpinned = [];
+
+        for (let i = 0; i < source.length; ++i) {
+            if (isPinned(source[i] || {}))
+                pinned.push(source[i]);
+            else
+                unpinned.push(source[i]);
+        }
+
+        const unpinnedBudget =
+            Math.max(0, maxActivityEvents - pinned.length);
+        const kept =
+            pinned.concat(
+                unpinned.slice(
+                    Math.max(0, unpinned.length - unpinnedBudget)
+                )
+            );
+
+        kept.sort(function(a, b) {
+            return root.eventEpoch(a) - root.eventEpoch(b);
+        });
+
+        return kept;
+    }
+
+    function cleanPinnedKeys() {
+        const existing = {};
+
+        for (let i = 0; i < activityEvents.length; ++i) {
+            const key = eventKey(activityEvents[i] || {});
+
+            if (key)
+                existing[key] = true;
+        }
+
+        const next = [];
+
+        for (let i = 0; i < pinnedKeys.length; ++i) {
+            const key = String(pinnedKeys[i] || "");
+
+            if (key && existing[key] && next.indexOf(key) < 0)
+                next.push(key);
+        }
+
+        pinnedKeys = next.slice(0, maxPinnedEvents);
+        pinnedCount = pinnedKeys.length;
+        activityAdapter.pinnedKeys = pinnedKeys.slice();
+    }
+
+    function togglePinned(event) {
+        if (!activityHydrated)
+            return false;
+
+        const key = eventKey(event);
+
+        if (!key)
+            return false;
+
+        const existing = pinnedKeys.indexOf(key);
+        let next = pinnedKeys.slice();
+
+        if (existing >= 0) {
+            next.splice(existing, 1);
+        } else {
+            next = [key].concat(
+                next.filter(function(value) {
+                    return String(value || "") !== key;
+                })
+            ).slice(0, maxPinnedEvents);
+        }
+
+        pinnedKeys = next;
+        pinnedCount = pinnedKeys.length;
+        activityEvents = trimActivityEvents(activityEvents);
+        activityAdapter.events = activityEvents.slice();
+        activityAdapter.pinnedKeys = pinnedKeys.slice();
+        refreshVisibleInbox();
+        return true;
+    }
+
     function refreshVisibleInbox() {
         const ordered = activityEvents.slice().sort(function(a, b) {
             return root.eventEpoch(b) - root.eventEpoch(a);
         });
+        const byKey = {};
 
-        inbox = ordered.slice(0, 5);
+        for (let i = 0; i < activityEvents.length; ++i) {
+            const event = activityEvents[i] || {};
+            const key = eventKey(event);
+
+            if (key)
+                byKey[key] = event;
+        }
+
+        const visible = [];
+
+        for (let i = 0;
+                i < pinnedKeys.length && visible.length < 5;
+                ++i) {
+            const pinned = byKey[String(pinnedKeys[i] || "")];
+
+            if (pinned)
+                visible.push(pinned);
+        }
+
+        for (let i = 0;
+                i < ordered.length && visible.length < 5;
+                ++i) {
+            const event = ordered[i] || {};
+
+            if (!isPinned(event))
+                visible.push(event);
+        }
+
+        inbox = visible;
+        pinnedCount = Math.min(maxPinnedEvents, pinnedKeys.length);
         rebuildReadMetrics();
     }
 
     function hydrateActivity() {
-        activityEvents =
-            Array.isArray(activityAdapter.events)
-            ? activityAdapter.events.slice(-maxActivityEvents)
+        pinnedKeys =
+            Array.isArray(activityAdapter.pinnedKeys)
+            ? activityAdapter.pinnedKeys.slice(0, maxPinnedEvents)
             : [];
+        activityEvents = trimActivityEvents(
+            Array.isArray(activityAdapter.events)
+            ? activityAdapter.events
+            : []
+        );
         subjectStates =
             activityAdapter.subjects
             && typeof activityAdapter.subjects === "object"
@@ -244,6 +384,7 @@ Scope {
             : ({});
         lastReadAt = String(activityAdapter.lastReadAt || "");
         activityHydrated = true;
+        cleanPinnedKeys();
         refreshVisibleInbox();
 
         if (pendingActivities.length > 0) {
@@ -328,7 +469,7 @@ Scope {
             return root.eventEpoch(a) - root.eventEpoch(b);
         });
 
-        next = next.slice(-maxActivityEvents);
+        next = trimActivityEvents(next);
         activityEvents = next;
         activityAdapter.events = next.slice();
         refreshVisibleInbox();

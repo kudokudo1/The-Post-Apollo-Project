@@ -16,6 +16,8 @@ Item {
     property string resetMode: "mixed"
     property string armedAction: ""
 
+    readonly property var displayedRows: root.filteredRows()
+
     function pad2(value) {
         const text = String(Number(value || 0));
         return text.length < 2 ? "0" + text : text;
@@ -534,70 +536,187 @@ Item {
                         }
                         clip: true
                         contentWidth: width
-                        contentHeight: historyColumn.implicitHeight
+                        contentHeight: historyColumn.height
                         boundsBehavior: Flickable.StopAtBounds
 
-                        Column {
+                        Item {
                             id: historyColumn
+
                             width: parent.width
-                            spacing: 3
+                            height:
+                                Math.max(
+                                    1,
+                                    root.displayedRows.length * 50
+                                )
+
+                            Canvas {
+                                id: topologyCanvas
+
+                                anchors.fill: parent
+                                z: 0
+                                antialiasing: true
+
+                                property var rowsSnapshot:
+                                    root.displayedRows
+
+                                onRowsSnapshotChanged: requestPaint()
+                                onWidthChanged: requestPaint()
+                                onHeightChanged: requestPaint()
+
+                                onPaint: {
+                                    const ctx = getContext("2d");
+                                    ctx.reset();
+                                    ctx.clearRect(
+                                        0,
+                                        0,
+                                        width,
+                                        height
+                                    );
+
+                                    const rows =
+                                        root.displayedRows || [];
+                                    const bySha = {};
+
+                                    for (
+                                        let i = 0;
+                                        i < rows.length;
+                                        ++i
+                                    ) {
+                                        bySha[
+                                            String(
+                                                rows[i].sha || ""
+                                            )
+                                        ] = i;
+                                    }
+
+                                    ctx.strokeStyle =
+                                        Colors.cyan.toString();
+                                    ctx.lineWidth = 1;
+                                    ctx.globalAlpha = 0.46;
+
+                                    for (
+                                        let i = 0;
+                                        i < rows.length;
+                                        ++i
+                                    ) {
+                                        const row = rows[i] || {};
+                                        const parents =
+                                            row.parents || [];
+                                        const x1 =
+                                            12
+                                            + Math.min(
+                                                6,
+                                                Number(
+                                                    row.lane || 0
+                                                )
+                                              ) * 7;
+                                        const y1 =
+                                            i * 50 + 25;
+
+                                        for (
+                                            let p = 0;
+                                            p < parents.length;
+                                            ++p
+                                        ) {
+                                            const parentSha =
+                                                String(
+                                                    parents[p] || ""
+                                                );
+                                            const parentIndex =
+                                                bySha[parentSha];
+
+                                            if (
+                                                parentIndex === undefined
+                                                || parentIndex <= i
+                                            )
+                                                continue;
+
+                                            const parentRow =
+                                                rows[parentIndex]
+                                                || {};
+                                            const x2 =
+                                                12
+                                                + Math.min(
+                                                    6,
+                                                    Number(
+                                                        parentRow.lane
+                                                        || 0
+                                                    )
+                                                  ) * 7;
+                                            const y2 =
+                                                parentIndex * 50
+                                                + 25;
+
+                                            ctx.beginPath();
+                                            ctx.moveTo(x1, y1);
+
+                                            if (x1 === x2) {
+                                                ctx.lineTo(
+                                                    x2,
+                                                    y2
+                                                );
+                                            } else {
+                                                const bendY =
+                                                    y1
+                                                    + (
+                                                        y2 - y1
+                                                      ) * 0.55;
+
+                                                ctx.lineTo(
+                                                    x1,
+                                                    bendY
+                                                );
+                                                ctx.lineTo(
+                                                    x2,
+                                                    bendY
+                                                );
+                                                ctx.lineTo(
+                                                    x2,
+                                                    y2
+                                                );
+                                            }
+
+                                            ctx.stroke();
+                                        }
+                                    }
+
+                                    ctx.globalAlpha = 1.0;
+                                }
+                            }
 
                             Repeater {
-                                model: root.filteredRows()
+                                model: root.displayedRows
 
                                 Rectangle {
                                     id: commitRow
+
                                     required property int index
                                     required property var modelData
 
+                                    x: 0
+                                    y: index * 50
+                                    z: 1
                                     width: historyColumn.width
                                     height: 50
+
                                     color:
                                         commitMouse.containsMouse
                                         || (
                                             root.historyService
                                             && root.historyService.selectedSha
-                                               === String(modelData.sha || "")
+                                               === String(
+                                                   modelData.sha || ""
+                                               )
                                         )
                                         ? Colors.black
                                         : "transparent"
-                                    border.width:
-                                        modelData.isHead
-                                        || (
-                                            root.historyService
-                                            && root.historyService.selectedSha
-                                               === String(modelData.sha || "")
-                                        )
-                                        ? 1 : 0
-                                    border.color:
-                                        modelData.isHead
-                                        ? Colors.magenta
-                                        : Colors.orange
 
                                     Item {
                                         id: graphLane
+
                                         width: 64
                                         height: parent.height
                                         anchors.left: parent.left
-
-                                        Rectangle {
-                                            width: 1
-                                            anchors {
-                                                top: parent.top
-                                                bottom: parent.bottom
-                                            }
-                                            x:
-                                                12
-                                                + Math.min(
-                                                    6,
-                                                    Number(
-                                                        commitRow.modelData.lane
-                                                        || 0
-                                                    )
-                                                  ) * 7
-                                            color: Colors.cyan
-                                            opacity: 0.40
-                                        }
 
                                         Rectangle {
                                             width:
@@ -612,7 +731,9 @@ Item {
                                                 + Math.min(
                                                     6,
                                                     Number(
-                                                        commitRow.modelData.lane
+                                                        commitRow
+                                                            .modelData
+                                                            .lane
                                                         || 0
                                                     )
                                                   ) * 7
@@ -648,26 +769,34 @@ Item {
                                                 width: 66
                                                 text:
                                                     String(
-                                                        commitRow.modelData.shortSha
+                                                        commitRow
+                                                            .modelData
+                                                            .shortSha
                                                         || ""
                                                     )
                                                 font.pixelSize: 10
                                                 color:
-                                                    commitRow.modelData.isHead
+                                                    commitRow
+                                                        .modelData
+                                                        .isHead
                                                     ? Colors.magenta
                                                     : Colors.orange
                                             }
 
                                             GohuText {
-                                                width: parent.width - 73
+                                                width:
+                                                    parent.width - 73
                                                 text:
                                                     String(
-                                                        commitRow.modelData.refsText
+                                                        commitRow
+                                                            .modelData
+                                                            .refsText
                                                         || ""
                                                     )
                                                 font.pixelSize: 9
                                                 color: Colors.cyan
-                                                elide: Text.ElideRight
+                                                elide:
+                                                    Text.ElideRight
                                             }
                                         }
 
@@ -675,7 +804,9 @@ Item {
                                             width: parent.width
                                             text:
                                                 String(
-                                                    commitRow.modelData.subject
+                                                    commitRow
+                                                        .modelData
+                                                        .subject
                                                     || ""
                                                 )
                                             font.pixelSize: 11
@@ -687,12 +818,16 @@ Item {
                                             width: parent.width
                                             text:
                                                 String(
-                                                    commitRow.modelData.author
+                                                    commitRow
+                                                        .modelData
+                                                        .author
                                                     || ""
                                                 )
                                                 + " // "
                                                 + root.dateLabel(
-                                                    commitRow.modelData.epoch
+                                                    commitRow
+                                                        .modelData
+                                                        .epoch
                                                   )
                                             font.pixelSize: 9
                                             color: Colors.white
@@ -703,18 +838,23 @@ Item {
 
                                     MouseArea {
                                         id: commitMouse
+
                                         anchors.fill: parent
                                         hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
+                                        cursorShape:
+                                            Qt.PointingHandCursor
+
                                         onClicked:
                                             root.selectCommit(
-                                                commitRow.modelData.sha
+                                                commitRow
+                                                    .modelData
+                                                    .sha
                                             )
                                     }
                                 }
                             }
                         }
-                    
+
                         NeonScrollBar {
                             anchors {
                                 top: historyScroll1.top

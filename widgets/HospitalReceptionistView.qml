@@ -162,7 +162,7 @@ Rectangle {
                     Repeater {
                         model: [
                             { label: "☎︎", route: "phone", color: Colors.green },
-                            { label: "🎙︎", route: "intercom", color: Colors.omnitrix },
+                            { label: "", route: "intercom", color: Colors.omnitrix },
                             { label: "🗒︎", route: "reports", color: Colors.magenta },
                             { label: "⚠︎", route: "rounds", color: Colors.orange }
                         ]
@@ -186,7 +186,9 @@ Rectangle {
 
                             GohuText {
                                 anchors.centerIn: parent
-                                anchors.verticalCenterOffset: 0
+                                anchors.verticalCenterOffset:
+                                    parent.modelData.route === "intercom"
+                                    ? 2 : 0
                                 width: parent.width
                                 height: parent.height
                                 visible:
@@ -195,7 +197,7 @@ Rectangle {
                                 text: parent.modelData.label
                                 font.pixelSize:
                                     parent.modelData.route === "phone"
-                                    ? 25 : 20
+                                    ? 30 : 21
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                                 color:
@@ -208,7 +210,7 @@ Rectangle {
                                 anchors.centerIn: parent
                                 anchors.verticalCenterOffset:
                                     parent.modelData.route === "reports"
-                                    ? 2
+                                    ? 4
                                     : parent.modelData.route === "rounds"
                                     ? 2 : 0
                                 width: parent.width

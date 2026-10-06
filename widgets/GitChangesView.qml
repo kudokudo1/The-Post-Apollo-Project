@@ -88,12 +88,12 @@ Item {
     }
 
     component LabelText: GohuText {
-        font.pixelSize: 10
+        font.pixelSize: 12
         color: Colors.cyan
     }
 
     component SectionLabel: GohuText {
-        font.pixelSize: 12
+        font.pixelSize: 14
         color: Colors.magenta
     }
 
@@ -122,7 +122,7 @@ Item {
         GohuText {
             anchors.centerIn: parent
             text: button.label
-            font.pixelSize: 8
+            font.pixelSize: 10
             color:
                 mouse.pressed
                 ? Colors.black
@@ -175,7 +175,7 @@ Item {
             selectionColor: Colors.magenta
             selectedTextColor: Colors.black
             font.family: "GohuFont 11 Nerd Font Mono"
-            font.pixelSize: 9
+            font.pixelSize: 11
             clip: true
 
             onActiveFocusChanged: {
@@ -199,7 +199,7 @@ Item {
             }
             visible: editor.text.length === 0
             text: editorBox.placeholder
-            font.pixelSize: 8
+            font.pixelSize: 10
             color: Colors.white
             opacity: 0.30
         }
@@ -242,7 +242,7 @@ Item {
                                 + String(root.gitService.repoRoot || "")
                               )
                             : "NO REPOSITORY"
-                        font.pixelSize: 8
+                        font.pixelSize: 10
                         color: Colors.white
                         elide: Text.ElideMiddle
                     }
@@ -404,7 +404,7 @@ Item {
                                             ? root.changesService.untrackedCount
                                             : 0
                                           )
-                                    font.pixelSize: 8
+                                    font.pixelSize: 10
                                     color: Colors.cyan
                                 }
                             }
@@ -431,7 +431,7 @@ Item {
                                     topPadding: 24
                                     horizontalAlignment: Text.AlignHCenter
                                     text: "WORKTREE CLEAN"
-                                    font.pixelSize: 11
+                                    font.pixelSize: 13
                                     color: Colors.green
                                 }
 
@@ -496,7 +496,7 @@ Item {
                                             GohuText {
                                                 width: parent.width
                                                 text: String(fileRow.modelData.path || "")
-                                                font.pixelSize: 9
+                                                font.pixelSize: 11
                                                 color: Colors.white
                                                 elide: Text.ElideMiddle
                                             }
@@ -516,7 +516,7 @@ Item {
                                                             )
                                                         : ""
                                                       )
-                                                font.pixelSize: 7
+                                                font.pixelSize: 9
                                                 color:
                                                     fileRow.modelData.conflict
                                                     ? Colors.red
@@ -661,7 +661,7 @@ Item {
                                     root.changesService
                                     ? root.changesService.previewText
                                     : "NO CHANGE SERVICE"
-                                font.pixelSize: 9
+                                font.pixelSize: 11
                                 color:
                                     root.changesService
                                     && root.changesService.lastError
@@ -757,7 +757,7 @@ Item {
                                     text:
                                         "UNTRACKED FILE // STAGE WHOLE FILE FIRST"
                                     horizontalAlignment: Text.AlignHCenter
-                                    font.pixelSize: 9
+                                    font.pixelSize: 11
                                     color: Colors.magenta
                                 }
 
@@ -775,7 +775,7 @@ Item {
                                     topPadding: 20
                                     text: "NO HUNKS IN THIS SIDE"
                                     horizontalAlignment: Text.AlignHCenter
-                                    font.pixelSize: 9
+                                    font.pixelSize: 11
                                     color: Colors.cyan
                                 }
 
@@ -812,7 +812,7 @@ Item {
                                             GohuText {
                                                 width: parent.width
                                                 text: String(hunkRow.modelData.header || "")
-                                                font.pixelSize: 8
+                                                font.pixelSize: 10
                                                 color: Colors.orange
                                                 elide: Text.ElideRight
                                             }
@@ -828,7 +828,7 @@ Item {
                                                     + String(
                                                         hunkRow.modelData.removed || 0
                                                       )
-                                                font.pixelSize: 8
+                                                font.pixelSize: 10
                                                 color: Colors.cyan
                                             }
                                         }
@@ -971,7 +971,7 @@ Item {
                                         ? String(row.text || "")
                                         : "SELECT A HUNK";
                                 }
-                                font.pixelSize: 9
+                                font.pixelSize: 11
                                 color: Colors.white
                                 wrapMode: Text.WrapAnywhere
                             }
@@ -1016,7 +1016,7 @@ Item {
                                 topPadding: 24
                                 text: "NO STASHES"
                                 horizontalAlignment: Text.AlignHCenter
-                                font.pixelSize: 10
+                                font.pixelSize: 12
                                 color: Colors.cyan
                             }
 
@@ -1059,7 +1059,7 @@ Item {
                                                 + String(
                                                     stashRow.modelData.sha || ""
                                                   ).slice(0, 8)
-                                            font.pixelSize: 8
+                                            font.pixelSize: 10
                                             color: Colors.magenta
                                         }
 
@@ -1069,7 +1069,7 @@ Item {
                                                 String(
                                                     stashRow.modelData.message || ""
                                                 )
-                                            font.pixelSize: 9
+                                            font.pixelSize: 11
                                             color: Colors.white
                                             elide: Text.ElideRight
                                         }
@@ -1193,7 +1193,7 @@ Item {
                                     root.changesService
                                     ? root.changesService.previewText
                                     : "NO CHANGE SERVICE"
-                                font.pixelSize: 9
+                                font.pixelSize: 11
                                 color: Colors.white
                                 wrapMode: Text.WrapAnywhere
                             }
@@ -1236,7 +1236,7 @@ Item {
                                         ? root.changesService.operationState
                                         : "NONE"
                                       )
-                                font.pixelSize: 10
+                                font.pixelSize: 12
                                 color:
                                     root.changesService
                                     && root.changesService.operationState !== "NONE"
@@ -1255,7 +1255,7 @@ Item {
                                         : 0
                                     )
                                     + " CONFLICTS"
-                                font.pixelSize: 9
+                                font.pixelSize: 11
                                 color: Colors.red
                             }
                         }
@@ -1281,7 +1281,7 @@ Item {
                                     topPadding: 24
                                     text: "NO UNRESOLVED CONFLICTS"
                                     horizontalAlignment: Text.AlignHCenter
-                                    font.pixelSize: 10
+                                    font.pixelSize: 12
                                     color: Colors.green
                                 }
 
@@ -1322,7 +1322,7 @@ Item {
                                                     String(
                                                         conflictRow.modelData.path || ""
                                                     )
-                                                font.pixelSize: 9
+                                                font.pixelSize: 11
                                                 color: Colors.white
                                                 elide: Text.ElideMiddle
                                             }
@@ -1339,7 +1339,7 @@ Item {
                                                         conflictRow.modelData.worktreeStatus
                                                         || " "
                                                     )
-                                                font.pixelSize: 7
+                                                font.pixelSize: 9
                                                 color: Colors.red
                                             }
                                         }
@@ -1506,7 +1506,7 @@ Item {
                                     root.changesService
                                     ? root.changesService.previewText
                                     : "NO CHANGE SERVICE"
-                                font.pixelSize: 9
+                                font.pixelSize: 11
                                 color: Colors.white
                                 wrapMode: Text.WrapAnywhere
                             }
@@ -1654,7 +1654,7 @@ Item {
                             : root.changesService.actionStatus
                           )
                         : "NO CHANGE SERVICE"
-                    font.pixelSize: 8
+                    font.pixelSize: 10
                     color:
                         root.armedAction
                         ? Colors.orange

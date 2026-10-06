@@ -3586,8 +3586,8 @@ PanelWindow {
                                                     text: parent.branchName
                                                     font.pixelSize: 10
                                                     color:
-                                                        root.branchActivityIntensity(
-                                                            modelData.activityEpoch
+                                                        Number(
+                                                            modelData.unpulledCount || 0
                                                         ) > 0
                                                         ? Colors.white
                                                         : Colors.magenta

@@ -21,6 +21,13 @@ Scope {
     property var pendingActivities: []
     property int maxActivityEvents: 100
 
+    property string lastReadAt: ""
+    property bool visitActive: false
+    property string visitStartedAt: ""
+    property bool pendingVisitStart: false
+    property int unreadCount: 0
+    property int recentCount: 0
+
     FileView {
         id: activityFile
 
@@ -33,6 +40,7 @@ Scope {
             property int schemaVersion: 1
             property var events: []
             property var subjects: ({})
+            property string lastReadAt: ""
         }
 
         onAdapterUpdated: writeAdapter()
@@ -63,12 +71,165 @@ Scope {
         return Number.isFinite(parsed) ? parsed : 0;
     }
 
+    function timestampEpoch(value) {
+        const parsed = Date.parse(String(value || ""));
+        return Number.isFinite(parsed) ? parsed : 0;
+    }
+
+    function readBaselineAt() {
+        if (lastReadAt)
+            return lastReadAt;
+
+        if (visitActive && visitStartedAt)
+            return visitStartedAt;
+
+        return "";
+    }
+
+    function isUnread(event) {
+        const baseline = readBaselineAt();
+
+        if (!baseline)
+            return false;
+
+        return eventEpoch(event) > timestampEpoch(baseline);
+    }
+
+    function rebuildReadMetrics() {
+        recentCount = Math.min(5, activityEvents.length);
+
+        const baseline = readBaselineAt();
+
+        if (!baseline) {
+            unreadCount = 0;
+            return;
+        }
+
+        let count = 0;
+
+        for (let i = 0; i < activityEvents.length; ++i) {
+            if (eventEpoch(activityEvents[i] || {})
+                    > timestampEpoch(baseline))
+                count += 1;
+        }
+
+        unreadCount = count;
+    }
+
+    function unreadSourceCounts() {
+        const result = {
+            rounds: 0,
+            reports: 0,
+            intercom: 0,
+            phone: 0,
+            staff: 0,
+            other: 0
+        };
+        const baseline = readBaselineAt();
+
+        if (!baseline)
+            return result;
+
+        const cutoff = timestampEpoch(baseline);
+
+        for (let i = 0; i < activityEvents.length; ++i) {
+            const event = activityEvents[i] || {};
+
+            if (eventEpoch(event) <= cutoff)
+                continue;
+
+            const source =
+                String(event.source || "").toLowerCase();
+
+            if (Object.prototype.hasOwnProperty.call(result, source))
+                result[source] += 1;
+            else
+                result.other += 1;
+        }
+
+        return result;
+    }
+
+    function briefingBody() {
+        if (!lastReadAt) {
+            return recentCount > 0
+                ? (
+                    "FIRST DESK VISIT // "
+                    + String(recentCount)
+                    + " RECENT ITEM"
+                    + (recentCount === 1 ? "" : "S")
+                    + " AVAILABLE"
+                  )
+                : "FIRST DESK VISIT // NO RECENT ACTIVITY";
+        }
+
+        if (unreadCount <= 0)
+            return "NO NEW ACTIVITY SINCE LAST VISIT.";
+
+        const counts = unreadSourceCounts();
+        const order = [
+            ["rounds", "ROUNDS"],
+            ["reports", "REPORTS"],
+            ["intercom", "INTERCOM"],
+            ["phone", "PHONE"],
+            ["staff", "STAFF"],
+            ["other", "OTHER"]
+        ];
+        const parts = [
+            String(unreadCount)
+            + " NEW SINCE LAST VISIT"
+        ];
+
+        for (let i = 0; i < order.length; ++i) {
+            const key = order[i][0];
+            const label = order[i][1];
+            const count = Number(counts[key] || 0);
+
+            if (count > 0)
+                parts.push(label + " " + String(count));
+        }
+
+        return parts.join(" // ");
+    }
+
+    function beginVisit() {
+        if (!activityHydrated) {
+            pendingVisitStart = true;
+            return false;
+        }
+
+        if (visitActive)
+            return false;
+
+        pendingVisitStart = false;
+        visitActive = true;
+        visitStartedAt = nowIso();
+        rebuildReadMetrics();
+        append("RECEPTION", briefingBody());
+        return true;
+    }
+
+    function endVisit() {
+        pendingVisitStart = false;
+
+        if (!activityHydrated || !visitActive)
+            return false;
+
+        visitActive = false;
+        visitStartedAt = "";
+        lastReadAt = nowIso();
+        activityAdapter.lastReadAt = lastReadAt;
+        rebuildReadMetrics();
+        return true;
+    }
+
     function refreshVisibleInbox() {
         const ordered = activityEvents.slice().sort(function(a, b) {
             return root.eventEpoch(b) - root.eventEpoch(a);
         });
 
         inbox = ordered.slice(0, 5);
+        rebuildReadMetrics();
     }
 
     function hydrateActivity() {
@@ -81,6 +242,7 @@ Scope {
             && typeof activityAdapter.subjects === "object"
             ? Object.assign({}, activityAdapter.subjects)
             : ({});
+        lastReadAt = String(activityAdapter.lastReadAt || "");
         activityHydrated = true;
         refreshVisibleInbox();
 
@@ -91,6 +253,9 @@ Scope {
             for (let i = 0; i < pending.length; ++i)
                 recordActivity(pending[i] || {});
         }
+
+        if (pendingVisitStart)
+            beginVisit();
     }
 
     function activityKeyExists(keyValue) {

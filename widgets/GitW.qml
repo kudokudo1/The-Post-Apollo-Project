@@ -2409,7 +2409,7 @@ PanelWindow {
             currentIndex: gitService.selectedRemoteIndex
             accentColor: Colors.orange
             handleGlowColor: Colors.cyan
-            activityGlowColor: Colors.magenta
+            activityGlowColor: Colors.orange
             activityPoints: root.remoteActivityPoints()
             sideLabel: "REMOTE"
 
@@ -3263,12 +3263,12 @@ PanelWindow {
                                                     radius: 1
                                                     spread: 2
                                                     opacity:
-                                                        0.16
+                                                        0.30
                                                         * Number(
                                                             parent.modelData
                                                                 .intensity || 0
                                                           )
-                                                    color: Colors.magenta
+                                                    color: Colors.orange
                                                 }
 
                                                 RectangularShadow {
@@ -3278,12 +3278,12 @@ PanelWindow {
                                                     radius: 1
                                                     spread: 1
                                                     opacity:
-                                                        0.68
+                                                        0.90
                                                         * Number(
                                                             parent.modelData
                                                                 .intensity || 0
                                                           )
-                                                    color: Colors.magenta
+                                                    color: Colors.orange
                                                 }
 
                                                 MouseArea {
@@ -3581,14 +3581,14 @@ PanelWindow {
                                                         radius: 1
                                                         spread: 2
                                                         opacity:
-                                                            0.16
+                                                            0.30
                                                             * root.recentGlowIntensity(
                                                                 root.remoteRecentRank(
                                                                     parent.parent
                                                                         .branchName
                                                                 )
                                                             )
-                                                        color: Colors.magenta
+                                                        color: Colors.orange
                                                     }
 
                                                     RectangularShadow {
@@ -3598,14 +3598,14 @@ PanelWindow {
                                                         radius: 1
                                                         spread: 1
                                                         opacity:
-                                                            0.66
+                                                            0.90
                                                             * root.recentGlowIntensity(
                                                                 root.remoteRecentRank(
                                                                     parent.parent
                                                                         .branchName
                                                                 )
                                                             )
-                                                        color: Colors.magenta
+                                                        color: Colors.orange
                                                     }
                                                 }
 

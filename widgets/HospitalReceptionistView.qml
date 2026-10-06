@@ -164,7 +164,7 @@ Rectangle {
                             { label: "☎︎", route: "phone", color: Colors.green },
                             { label: "", route: "intercom", color: Colors.omnitrix },
                             { label: "🗒︎", route: "reports", color: Colors.magenta },
-                            { label: "⚠︎", route: "rounds", color: Colors.orange }
+                            { label: "⚠︎", route: "rounds", color: Colors.yellow }
                         ]
 
                         Rectangle {

@@ -404,11 +404,22 @@ Rectangle {
                                 GohuText {
                                     width: parent.width
                                     visible: parent.parent.occupied
-                                    text:
-                                        String(
-                                            (parent.parent.itemData || {}).detail
-                                            || ""
-                                        )
+                                    text: {
+                                        const item =
+                                            parent.parent.itemData || {};
+                                        const time =
+                                            String(item.timeLabel || "");
+                                        const detail =
+                                            String(item.detail || "");
+
+                                        return time
+                                            ? (
+                                                detail
+                                                ? time + " // " + detail
+                                                : time
+                                              )
+                                            : detail;
+                                    }
                                     font.pixelSize: 7
                                     color: Colors.white
                                     opacity: 0.72

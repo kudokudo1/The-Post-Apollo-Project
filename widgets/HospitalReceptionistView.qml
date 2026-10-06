@@ -164,7 +164,7 @@ Rectangle {
                             { label: "☎", route: "phone", color: Colors.green },
                             { label: "🎙︎", route: "intercom", color: Colors.omnitrix },
                             { label: "🗒︎", route: "reports", color: Colors.magenta },
-                            { label: "!", route: "rounds", color: Colors.orange }
+                            { label: "⚠︎", route: "rounds", color: Colors.orange }
                         ]
 
                         Rectangle {
@@ -186,7 +186,7 @@ Rectangle {
 
                             GohuText {
                                 anchors.centerIn: parent
-                                anchors.verticalCenterOffset: 2
+                                anchors.verticalCenterOffset: 0
                                 width: parent.width
                                 height: parent.height
                                 visible:
@@ -216,6 +216,8 @@ Rectangle {
                                     ? 23
                                     : parent.modelData.route === "reports"
                                     ? 20
+                                    : parent.modelData.route === "rounds"
+                                    ? 21
                                     : 11
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter

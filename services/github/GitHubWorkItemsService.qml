@@ -177,6 +177,68 @@ Scope {
         };
     }
 
+    function pullCheckSuites(row) {
+        const suites = (row || {}).checkSuites || [];
+        return Array.isArray(suites) ? suites : [];
+    }
+
+    function pullCheckSuiteCounts(row) {
+        const suites = pullCheckSuites(row);
+        let passed = 0;
+        let failed = 0;
+        let startupFailed = 0;
+        let cancelled = 0;
+        let pending = 0;
+
+        for (let i = 0; i < suites.length; ++i) {
+            const suite = suites[i] || {};
+            const status = String(suite.status || "").toUpperCase();
+            const conclusion = String(
+                suite.conclusion || ""
+            ).toUpperCase();
+
+            if (conclusion === "STARTUP_FAILURE") {
+                startupFailed += 1;
+            } else if (conclusion === "CANCELLED") {
+                cancelled += 1;
+            } else if ([
+                           "FAILURE",
+                           "ERROR",
+                           "TIMED_OUT",
+                           "ACTION_REQUIRED",
+                           "STALE"
+                       ].indexOf(conclusion) >= 0) {
+                failed += 1;
+            } else if ([
+                           "SUCCESS",
+                           "NEUTRAL",
+                           "SKIPPED"
+                       ].indexOf(conclusion) >= 0) {
+                passed += 1;
+            } else if ([
+                           "QUEUED",
+                           "IN_PROGRESS",
+                           "WAITING",
+                           "REQUESTED",
+                           "PENDING"
+                       ].indexOf(status) >= 0
+                       || !conclusion) {
+                pending += 1;
+            } else {
+                pending += 1;
+            }
+        }
+
+        return {
+            total: suites.length,
+            passed: passed,
+            failed: failed,
+            startupFailed: startupFailed,
+            cancelled: cancelled,
+            pending: pending
+        };
+    }
+
     function pullCheckState(row) {
         const state = pullCheckRollupState(row);
 
@@ -191,13 +253,30 @@ Scope {
 
         const counts = pullCheckCounts(row);
 
-        if (counts.total === 0)
+        if (counts.total > 0) {
+            if (counts.failed > 0 || counts.cancelled > 0)
+                return "FAIL";
+
+            if (counts.pending > 0)
+                return "PENDING";
+
+            return "PASS";
+        }
+
+        if (String((row || {}).suiteError || "").trim())
+            return "ERROR";
+
+        const suiteCounts = pullCheckSuiteCounts(row);
+
+        if (suiteCounts.total === 0)
             return "NONE";
 
-        if (counts.failed > 0 || counts.cancelled > 0)
+        if (suiteCounts.failed > 0
+                || suiteCounts.startupFailed > 0
+                || suiteCounts.cancelled > 0)
             return "FAIL";
 
-        if (counts.pending > 0)
+        if (suiteCounts.pending > 0)
             return "PENDING";
 
         return "PASS";
@@ -207,36 +286,90 @@ Scope {
         const rollupState = pullCheckRollupState(row);
         const counts = pullCheckCounts(row);
 
-        if (!rollupState && counts.total === 0)
+        if (rollupState || counts.total > 0) {
+            const parts = [];
+
+            if (counts.passed > 0)
+                parts.push(String(counts.passed) + " PASS");
+
+            if (counts.failed > 0)
+                parts.push(String(counts.failed) + " FAIL");
+
+            if (counts.cancelled > 0)
+                parts.push(String(counts.cancelled) + " CANCELLED");
+
+            if (counts.pending > 0)
+                parts.push(String(counts.pending) + " PENDING");
+
+            const stateText =
+                rollupState
+                || (
+                    counts.failed > 0 || counts.cancelled > 0
+                    ? "FAILURE"
+                    : counts.pending > 0
+                    ? "PENDING"
+                    : "SUCCESS"
+                   );
+
+            return (
+                stateText
+                + (parts.length > 0 ? " // " + parts.join(" · ") : "")
+            );
+        }
+
+        if (String((row || {}).suiteError || "").trim())
+            return "ERROR";
+
+        const suiteCounts = pullCheckSuiteCounts(row);
+
+        if (suiteCounts.total === 0)
             return "NONE";
 
-        const parts = [];
+        if (suiteCounts.startupFailed > 0
+                && suiteCounts.startupFailed === suiteCounts.total) {
+            return (
+                "STARTUP FAILURE // "
+                + String(suiteCounts.total)
+                + " SUITE"
+                + (suiteCounts.total === 1 ? "" : "S")
+            );
+        }
 
-        if (counts.passed > 0)
-            parts.push(String(counts.passed) + " PASS");
+        const suiteParts = [];
 
-        if (counts.failed > 0)
-            parts.push(String(counts.failed) + " FAIL");
+        if (suiteCounts.passed > 0)
+            suiteParts.push(String(suiteCounts.passed) + " PASS");
 
-        if (counts.cancelled > 0)
-            parts.push(String(counts.cancelled) + " CANCELLED");
+        if (suiteCounts.failed > 0)
+            suiteParts.push(String(suiteCounts.failed) + " FAIL");
 
-        if (counts.pending > 0)
-            parts.push(String(counts.pending) + " PENDING");
+        if (suiteCounts.startupFailed > 0)
+            suiteParts.push(
+                String(suiteCounts.startupFailed) + " STARTUP FAILURE"
+            );
 
-        const stateText =
-            rollupState
-            || (
-                counts.failed > 0 || counts.cancelled > 0
-                ? "FAILURE"
-                : counts.pending > 0
-                ? "PENDING"
-                : "SUCCESS"
-               );
+        if (suiteCounts.cancelled > 0)
+            suiteParts.push(String(suiteCounts.cancelled) + " CANCELLED");
+
+        if (suiteCounts.pending > 0)
+            suiteParts.push(String(suiteCounts.pending) + " PENDING");
+
+        const suiteState =
+            suiteCounts.failed > 0
+            || suiteCounts.startupFailed > 0
+            || suiteCounts.cancelled > 0
+            ? "FAILURE"
+            : suiteCounts.pending > 0
+            ? "PENDING"
+            : "SUCCESS";
 
         return (
-            stateText
-            + (parts.length > 0 ? " // " + parts.join(" · ") : "")
+            suiteState
+            + (
+                suiteParts.length > 0
+                ? " // " + suiteParts.join(" · ")
+                : ""
+              )
         );
     }
 
@@ -394,8 +527,29 @@ Scope {
                 'repo="$1"',
                 'owner="${repo%%/*}"',
                 'name="${repo#*/}"',
-                "query='query($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(first:100,orderBy:{field:UPDATED_AT,direction:DESC}){nodes{number title state url isDraft updatedAt author{login} headRefName baseRefName headRefOid reviewDecision mergeStateStatus mergeable reviewRequests(first:20){totalCount} reviews(first:100){nodes{state author{login}}} commits(last:1){nodes{commit{statusCheckRollup{state contexts(first:100){nodes{__typename ... on CheckRun{name status conclusion} ... on StatusContext{context state}}}}}}}}}}}}}'",
-                'exec gh api graphql -F owner="$owner" -F name="$name" -f query="$query" --jq ".data.repository.pullRequests.nodes"'
+                "query='query($owner:String!,$name:String!){ repository(owner:$owner,name:$name){ pullRequests(first:100,orderBy:{field:UPDATED_AT,direction:DESC}){ nodes{ number title state url isDraft updatedAt author{login} headRefName baseRefName headRefOid reviewDecision mergeStateStatus mergeable reviewRequests(first:20){totalCount} reviews(first:100){nodes{state author{login}}} commits(last:1){ nodes{ commit{ statusCheckRollup{ state contexts(first:100){ nodes{ __typename ... on CheckRun{name status conclusion} ... on StatusContext{context state} } } } } } } } } } }'",
+                'rows="$(gh api graphql -F owner="$owner" -F name="$name" -f query="$query" --jq ".data.repository.pullRequests.nodes")" || exit $?',
+                'tmpdir="$(mktemp -d)"',
+                'printf "%s" "$rows" | jq -c ".[] | select(.commits.nodes[0].commit.statusCheckRollup == null)" > "$tmpdir/fallback.ndjson"',
+                'while IFS= read -r row; do',
+                '  number="$(printf "%s" "$row" | jq -r ".number")"',
+                '  sha="$(printf "%s" "$row" | jq -r ".headRefOid")"',
+                '  (',
+                '    suite_error=""',
+                '    suites="$(gh api -H "Accept: application/vnd.github+json" "repos/$repo/commits/$sha/check-suites?per_page=100" --jq "[.check_suites[]? | {status:(.status // \\\"\\\"),conclusion:(.conclusion // \\\"\\\")}]" 2>"$tmpdir/suites-$number.err")" || { suites="[]"; suite_error="$(tr "\\n" " " < "$tmpdir/suites-$number.err")"; }',
+                "    jq -nc --argjson number \"$number\" --argjson suites \"$suites\" --arg suiteError \"$suite_error\" '{number:$number,checkSuites:$suites,suiteError:$suiteError}' > \"$tmpdir/detail-$number.json\"",
+                '  ) &',
+                '  while [ "$(jobs -rp | wc -l)" -ge 8 ]; do',
+                '    wait -n || true',
+                '  done',
+                'done < "$tmpdir/fallback.ndjson"',
+                'wait || true',
+                'details_json="[]"',
+                'if ls "$tmpdir"/detail-*.json >/dev/null 2>&1; then',
+                '  details_json="$(jq -s "." "$tmpdir"/detail-*.json)"',
+                'fi',
+                "jq -nc --argjson rows \"$rows\" --argjson details \"$details_json\" '$rows | map(. as $row | (($details | map(select(.number == $row.number)) | first) // {checkSuites:[],suiteError:\"\"}) as $detail | $row + {checkSuites:$detail.checkSuites,suiteError:$detail.suiteError})'",
+                'rm -rf "$tmpdir"'
             ].join("\n"),
             "pa-github-pulls-graphql",
             cleanRepo

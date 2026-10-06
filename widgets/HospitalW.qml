@@ -1289,6 +1289,12 @@ PanelWindow {
         target: certificationCoordinator.historyService
         ignoreUnknownSignals: true
 
+        function onEventsChanged() {
+            receptionistService.syncReports(
+                certificationCoordinator.historyService.events
+            );
+        }
+
         function onEventRecorded(event) {
             receptionistService.recordReportEvent(event);
         }

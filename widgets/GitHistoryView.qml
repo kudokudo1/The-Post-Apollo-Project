@@ -589,10 +589,18 @@ Item {
                                         ] = i;
                                     }
 
+                                    // Continuous visual history spine.
+                                    // Real parent/merge edges are drawn over this.
                                     ctx.strokeStyle =
                                         Colors.cyan.toString();
                                     ctx.lineWidth = 1;
-                                    ctx.globalAlpha = 0.46;
+                                    ctx.globalAlpha = 0.20;
+                                    ctx.beginPath();
+                                    ctx.moveTo(12, 0);
+                                    ctx.lineTo(12, height);
+                                    ctx.stroke();
+
+                                    ctx.globalAlpha = 0.54;
 
                                     for (
                                         let i = 0;
@@ -857,6 +865,7 @@ Item {
 
                         NeonScrollBar {
                             flickable: historyScroll1
+                            starHandle: true
                         }
 }
                 }

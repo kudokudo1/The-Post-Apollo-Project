@@ -17,6 +17,7 @@ Scope {
     property var tagRefs: []
 
     property string selectedRef: "ALL"
+    property string selectedMode: "all"
     property string selectedSha: ""
     property string detailText: "SELECT A COMMIT"
     property var selectedParents: []
@@ -132,14 +133,23 @@ Scope {
         return out.slice(0, 6).join(" • ");
     }
 
-    function refresh(refName) {
+    function refresh(refName, modeName) {
         const repo = String(repositoryPath || "").trim();
         const ref = String(refName || selectedRef || "ALL").trim();
+        const requestedMode = String(
+            modeName || selectedMode || "all"
+        ).trim();
 
         if (!repo || refreshing || actionBusy)
             return false;
 
         selectedRef = ref || "ALL";
+        selectedMode =
+            requestedMode === "first-parent"
+            || requestedMode === "merges"
+            || requestedMode === "no-merges"
+            ? requestedMode
+            : "all";
         refreshing = true;
         lastError = "";
 
@@ -156,6 +166,13 @@ Scope {
             [
                 'repo="$1"',
                 'scope="$2"',
+                'mode="$3"',
+                'case "$mode" in',
+                '  first-parent) mode_args="--first-parent" ;;',
+                '  merges) mode_args="--merges" ;;',
+                '  no-merges) mode_args="--no-merges" ;;',
+                '  *) mode_args="" ;;',
+                'esac',
                 'if ! git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1; then',
                 '  printf "ERROR\\tNOT A GIT WORKTREE\\n"',
                 '  exit 21',
@@ -163,19 +180,20 @@ Scope {
                 'git -C "$repo" for-each-ref --sort=-committerdate --format="BRANCH%x09%(refname:short)" refs/heads 2>/dev/null',
                 'git -C "$repo" for-each-ref --sort=-creatordate --format="TAG%x09%(refname:short)" refs/tags 2>/dev/null',
                 'if [ -z "$scope" ] || [ "$scope" = "ALL" ]; then',
-                '  git -C "$repo" log --all --topo-order --date-order -n 150 --pretty=format:"ROW%x09%H%x09%P%x09%D%x09%ct%x09%an%x09%s"',
+                '  git -C "$repo" log --all --topo-order --date-order $mode_args -n 150 --pretty=format:"ROW%x09%H%x09%P%x09%D%x09%ct%x09%an%x09%s"',
                 'else',
                 '  if ! git -C "$repo" rev-parse --verify "$scope^{commit}" >/dev/null 2>&1; then',
                 '    printf "\\nERROR\\tREF NOT FOUND // %s\\n" "$scope"',
                 '    exit 22',
                 '  fi',
-                '  git -C "$repo" log "$scope" --topo-order --date-order -n 150 --pretty=format:"ROW%x09%H%x09%P%x09%D%x09%ct%x09%an%x09%s"',
+                '  git -C "$repo" log "$scope" --topo-order --date-order $mode_args -n 150 --pretty=format:"ROW%x09%H%x09%P%x09%D%x09%ct%x09%an%x09%s"',
                 'fi',
                 'printf "\\nDONE\\n"'
             ].join("\n"),
             "git-history-scan",
             repo,
-            selectedRef
+            selectedRef,
+            selectedMode
         ]);
 
         return true;
@@ -670,7 +688,7 @@ Scope {
             actionStatus = detail || (actionName + " // OK");
             lastError = "";
             actionFinished(actionName, true, detail || "OK");
-            refresh(selectedRef);
+            refresh(selectedRef, selectedMode);
             return;
         }
 

@@ -20,6 +20,10 @@ Item {
     property bool commitAmend: false
     property bool commitSign: false
     property bool commitAllowEmpty: false
+    property bool commitNoVerify: false
+
+    property string stashMode: "all"
+    property bool stashRestoreIndex: false
 
     property string armedAction: ""
 
@@ -87,13 +91,22 @@ Item {
         root.armedAction = "";
     }
 
+    function cycleStashMode() {
+        if (root.stashMode === "all")
+            root.stashMode = "keep-index";
+        else if (root.stashMode === "keep-index")
+            root.stashMode = "staged";
+        else
+            root.stashMode = "all";
+    }
+
     component LabelText: GohuText {
-        font.pixelSize: 10
+        font.pixelSize: 12
         color: Colors.cyan
     }
 
     component SectionLabel: GohuText {
-        font.pixelSize: 12
+        font.pixelSize: 14
         color: Colors.magenta
     }
 
@@ -122,7 +135,7 @@ Item {
         GohuText {
             anchors.centerIn: parent
             text: button.label
-            font.pixelSize: 8
+            font.pixelSize: 10
             color:
                 mouse.pressed
                 ? Colors.black
@@ -175,7 +188,7 @@ Item {
             selectionColor: Colors.magenta
             selectedTextColor: Colors.black
             font.family: "GohuFont 11 Nerd Font Mono"
-            font.pixelSize: 9
+            font.pixelSize: 11
             clip: true
 
             onActiveFocusChanged: {
@@ -199,7 +212,7 @@ Item {
             }
             visible: editor.text.length === 0
             text: editorBox.placeholder
-            font.pixelSize: 8
+            font.pixelSize: 10
             color: Colors.white
             opacity: 0.30
         }
@@ -242,7 +255,7 @@ Item {
                                 + String(root.gitService.repoRoot || "")
                               )
                             : "NO REPOSITORY"
-                        font.pixelSize: 8
+                        font.pixelSize: 10
                         color: Colors.white
                         elide: Text.ElideMiddle
                     }
@@ -404,13 +417,14 @@ Item {
                                             ? root.changesService.untrackedCount
                                             : 0
                                           )
-                                    font.pixelSize: 8
+                                    font.pixelSize: 10
                                     color: Colors.cyan
                                 }
                             }
                         }
 
                         Flickable {
+                            id: changesScroll1
                             width: parent.width
                             height: parent.height - 34
                             clip: true
@@ -431,7 +445,7 @@ Item {
                                     topPadding: 24
                                     horizontalAlignment: Text.AlignHCenter
                                     text: "WORKTREE CLEAN"
-                                    font.pixelSize: 11
+                                    font.pixelSize: 13
                                     color: Colors.green
                                 }
 
@@ -496,7 +510,7 @@ Item {
                                             GohuText {
                                                 width: parent.width
                                                 text: String(fileRow.modelData.path || "")
-                                                font.pixelSize: 9
+                                                font.pixelSize: 11
                                                 color: Colors.white
                                                 elide: Text.ElideMiddle
                                             }
@@ -516,7 +530,7 @@ Item {
                                                             )
                                                         : ""
                                                       )
-                                                font.pixelSize: 7
+                                                font.pixelSize: 9
                                                 color:
                                                     fileRow.modelData.conflict
                                                     ? Colors.red
@@ -542,7 +556,18 @@ Item {
                                     }
                                 }
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: changesScroll1
+                                anchors {
+                                    top: changesScroll1.top
+                                    right: changesScroll1.right
+                                    bottom: changesScroll1.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: changesScroll1
+                            }
+}
                     }
                 }
 
@@ -647,6 +672,7 @@ Item {
                         }
 
                         Flickable {
+                            id: changesScroll2
                             width: parent.width
                             height: parent.height - 34
                             clip: true
@@ -661,7 +687,7 @@ Item {
                                     root.changesService
                                     ? root.changesService.previewText
                                     : "NO CHANGE SERVICE"
-                                font.pixelSize: 9
+                                font.pixelSize: 11
                                 color:
                                     root.changesService
                                     && root.changesService.lastError
@@ -669,7 +695,18 @@ Item {
                                     : Colors.white
                                 wrapMode: Text.WrapAnywhere
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: changesScroll2
+                                anchors {
+                                    top: changesScroll2.top
+                                    right: changesScroll2.right
+                                    bottom: changesScroll2.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: changesScroll2
+                            }
+}
                     }
                 }
             }
@@ -736,6 +773,7 @@ Item {
                         }
 
                         Flickable {
+                            id: changesScroll3
                             width: parent.width
                             height: parent.height - 34
                             clip: true
@@ -757,7 +795,7 @@ Item {
                                     text:
                                         "UNTRACKED FILE // STAGE WHOLE FILE FIRST"
                                     horizontalAlignment: Text.AlignHCenter
-                                    font.pixelSize: 9
+                                    font.pixelSize: 11
                                     color: Colors.magenta
                                 }
 
@@ -775,7 +813,7 @@ Item {
                                     topPadding: 20
                                     text: "NO HUNKS IN THIS SIDE"
                                     horizontalAlignment: Text.AlignHCenter
-                                    font.pixelSize: 9
+                                    font.pixelSize: 11
                                     color: Colors.cyan
                                 }
 
@@ -812,7 +850,7 @@ Item {
                                             GohuText {
                                                 width: parent.width
                                                 text: String(hunkRow.modelData.header || "")
-                                                font.pixelSize: 8
+                                                font.pixelSize: 10
                                                 color: Colors.orange
                                                 elide: Text.ElideRight
                                             }
@@ -828,7 +866,7 @@ Item {
                                                     + String(
                                                         hunkRow.modelData.removed || 0
                                                       )
-                                                font.pixelSize: 8
+                                                font.pixelSize: 10
                                                 color: Colors.cyan
                                             }
                                         }
@@ -845,7 +883,18 @@ Item {
                                     }
                                 }
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: changesScroll3
+                                anchors {
+                                    top: changesScroll3.top
+                                    right: changesScroll3.right
+                                    bottom: changesScroll3.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: changesScroll3
+                            }
+}
                     }
                 }
 
@@ -948,6 +997,7 @@ Item {
                         }
 
                         Flickable {
+                            id: changesScroll4
                             width: parent.width
                             height: parent.height - 34
                             clip: true
@@ -971,11 +1021,22 @@ Item {
                                         ? String(row.text || "")
                                         : "SELECT A HUNK";
                                 }
-                                font.pixelSize: 9
+                                font.pixelSize: 11
                                 color: Colors.white
                                 wrapMode: Text.WrapAnywhere
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: changesScroll4
+                                anchors {
+                                    top: changesScroll4.top
+                                    right: changesScroll4.right
+                                    bottom: changesScroll4.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: changesScroll4
+                            }
+}
                     }
                 }
             }
@@ -994,6 +1055,7 @@ Item {
                     border.color: Colors.magenta
 
                     Flickable {
+                        id: changesScroll5
                         anchors {
                             fill: parent
                             margins: 7
@@ -1016,7 +1078,7 @@ Item {
                                 topPadding: 24
                                 text: "NO STASHES"
                                 horizontalAlignment: Text.AlignHCenter
-                                font.pixelSize: 10
+                                font.pixelSize: 12
                                 color: Colors.cyan
                             }
 
@@ -1059,7 +1121,7 @@ Item {
                                                 + String(
                                                     stashRow.modelData.sha || ""
                                                   ).slice(0, 8)
-                                            font.pixelSize: 8
+                                            font.pixelSize: 10
                                             color: Colors.magenta
                                         }
 
@@ -1069,7 +1131,7 @@ Item {
                                                 String(
                                                     stashRow.modelData.message || ""
                                                 )
-                                            font.pixelSize: 9
+                                            font.pixelSize: 11
                                             color: Colors.white
                                             elide: Text.ElideRight
                                         }
@@ -1094,7 +1156,18 @@ Item {
                                 }
                             }
                         }
-                    }
+                    
+                        NeonScrollBar {
+                            parent: changesScroll5
+                            anchors {
+                                top: changesScroll5.top
+                                right: changesScroll5.right
+                                bottom: changesScroll5.bottom
+                                rightMargin: 2
+                            }
+                            flickable: changesScroll5
+                        }
+}
                 }
 
                 Rectangle {
@@ -1117,12 +1190,22 @@ Item {
                             spacing: 5
 
                             LabelText {
-                                width: parent.width - 286
+                                width: parent.width - 378
                                 anchors.verticalCenter: parent.verticalCenter
                                 text:
                                     root.selectedStashRef
                                     ? "STASH // " + root.selectedStashRef
                                     : "SELECT A STASH"
+                            }
+
+                            MiniButton {
+                                width: 86
+                                label: "INDEX"
+                                accent: Colors.cyan
+                                selected: root.stashRestoreIndex
+                                onTriggered:
+                                    root.stashRestoreIndex =
+                                        !root.stashRestoreIndex
                             }
 
                             MiniButton {
@@ -1135,7 +1218,8 @@ Item {
                                     && !root.changesService.actionBusy
                                 onTriggered:
                                     root.changesService.applyStash(
-                                        root.selectedStashRef
+                                        root.selectedStashRef,
+                                        root.stashRestoreIndex
                                     )
                             }
 
@@ -1149,7 +1233,8 @@ Item {
                                     && !root.changesService.actionBusy
                                 onTriggered:
                                     root.changesService.popStash(
-                                        root.selectedStashRef
+                                        root.selectedStashRef,
+                                        root.stashRestoreIndex
                                     )
                             }
 
@@ -1179,6 +1264,7 @@ Item {
                         }
 
                         Flickable {
+                            id: changesScroll6
                             width: parent.width
                             height: parent.height - 34
                             clip: true
@@ -1193,11 +1279,22 @@ Item {
                                     root.changesService
                                     ? root.changesService.previewText
                                     : "NO CHANGE SERVICE"
-                                font.pixelSize: 9
+                                font.pixelSize: 11
                                 color: Colors.white
                                 wrapMode: Text.WrapAnywhere
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: changesScroll6
+                                anchors {
+                                    top: changesScroll6.top
+                                    right: changesScroll6.right
+                                    bottom: changesScroll6.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: changesScroll6
+                            }
+}
                     }
                 }
             }
@@ -1236,7 +1333,7 @@ Item {
                                         ? root.changesService.operationState
                                         : "NONE"
                                       )
-                                font.pixelSize: 10
+                                font.pixelSize: 12
                                 color:
                                     root.changesService
                                     && root.changesService.operationState !== "NONE"
@@ -1255,12 +1352,13 @@ Item {
                                         : 0
                                     )
                                     + " CONFLICTS"
-                                font.pixelSize: 9
+                                font.pixelSize: 11
                                 color: Colors.red
                             }
                         }
 
                         Flickable {
+                            id: changesScroll7
                             width: parent.width
                             height: parent.height - 34
                             clip: true
@@ -1281,7 +1379,7 @@ Item {
                                     topPadding: 24
                                     text: "NO UNRESOLVED CONFLICTS"
                                     horizontalAlignment: Text.AlignHCenter
-                                    font.pixelSize: 10
+                                    font.pixelSize: 12
                                     color: Colors.green
                                 }
 
@@ -1322,7 +1420,7 @@ Item {
                                                     String(
                                                         conflictRow.modelData.path || ""
                                                     )
-                                                font.pixelSize: 9
+                                                font.pixelSize: 11
                                                 color: Colors.white
                                                 elide: Text.ElideMiddle
                                             }
@@ -1339,7 +1437,7 @@ Item {
                                                         conflictRow.modelData.worktreeStatus
                                                         || " "
                                                     )
-                                                font.pixelSize: 7
+                                                font.pixelSize: 9
                                                 color: Colors.red
                                             }
                                         }
@@ -1357,7 +1455,18 @@ Item {
                                     }
                                 }
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: changesScroll7
+                                anchors {
+                                    top: changesScroll7.top
+                                    right: changesScroll7.right
+                                    bottom: changesScroll7.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: changesScroll7
+                            }
+}
                     }
                 }
 
@@ -1448,7 +1557,7 @@ Item {
                             spacing: 8
 
                             MiniButton {
-                                width: (parent.width - 8) / 2
+                                width: (parent.width - 16) / 3
                                 height: 34
                                 label:
                                     "CONTINUE "
@@ -1468,7 +1577,24 @@ Item {
                             }
 
                             MiniButton {
-                                width: (parent.width - 8) / 2
+                                width: (parent.width - 16) / 3
+                                height: 34
+                                label: "SKIP STEP"
+                                accent: Colors.orange
+                                enabledAction:
+                                    root.changesService
+                                    && (
+                                        root.changesService.operationState === "REBASE"
+                                        || root.changesService.operationState === "CHERRY_PICK"
+                                        || root.changesService.operationState === "REVERT"
+                                      )
+                                    && !root.changesService.actionBusy
+                                onTriggered:
+                                    root.changesService.skipOperation()
+                            }
+
+                            MiniButton {
+                                width: (parent.width - 16) / 3
                                 height: 34
                                 label:
                                     root.armedAction === "abort-operation"
@@ -1492,6 +1618,7 @@ Item {
                         }
 
                         Flickable {
+                            id: changesScroll8
                             width: parent.width
                             height: parent.height - 118
                             clip: true
@@ -1506,11 +1633,22 @@ Item {
                                     root.changesService
                                     ? root.changesService.previewText
                                     : "NO CHANGE SERVICE"
-                                font.pixelSize: 9
+                                font.pixelSize: 11
                                 color: Colors.white
                                 wrapMode: Text.WrapAnywhere
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: changesScroll8
+                                anchors {
+                                    top: changesScroll8.top
+                                    right: changesScroll8.right
+                                    bottom: changesScroll8.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: changesScroll8
+                            }
+}
                     }
                 }
             }
@@ -1541,7 +1679,7 @@ Item {
 
                     EditorBox {
                         id: commitInput
-                        width: parent.width - 522
+                        width: parent.width - 532
                         placeholder:
                             root.commitAmend
                             ? "NEW MESSAGE // EMPTY KEEPS CURRENT MESSAGE"
@@ -1568,6 +1706,16 @@ Item {
                         selected: root.commitSign
                         onTriggered:
                             root.commitSign = !root.commitSign
+                    }
+
+                    MiniButton {
+                        width: 92
+                        height: 30
+                        label: "NO VERIFY"
+                        accent: Colors.red
+                        selected: root.commitNoVerify
+                        onTriggered:
+                            root.commitNoVerify = !root.commitNoVerify
                     }
 
                     MiniButton {
@@ -1606,14 +1754,41 @@ Item {
                                 commitInput.text,
                                 root.commitAmend,
                                 root.commitSign,
-                                root.commitAllowEmpty
+                                root.commitAllowEmpty,
+                                root.commitNoVerify
                             )
                     }
 
                     MiniButton {
-                        width: 96
+                        width: 84
                         height: 30
-                        label: "STASH ALL"
+                        label: "CLEAR"
+                        accent: Colors.cyan
+                        enabledAction:
+                            root.armedAction.length > 0
+                        onTriggered: root.clearArm()
+                    }
+                }
+
+                Row {
+                    width: parent.width
+                    height: 30
+                    spacing: 6
+
+                    MiniButton {
+                        width: 150
+                        height: 30
+                        label:
+                            "STASH "
+                            + root.stashMode.toUpperCase()
+                        accent: Colors.magenta
+                        onTriggered: root.cycleStashMode()
+                    }
+
+                    MiniButton {
+                        width: 118
+                        height: 30
+                        label: "STASH NOW"
                         accent: Colors.magenta
                         enabledAction:
                             root.changesService
@@ -1623,18 +1798,23 @@ Item {
                             root.changesService.stash(
                                 commitInput.text.trim().length > 0
                                 ? commitInput.text
-                                : "Post-Apollo stash"
+                                : "Post-Apollo stash",
+                                root.stashMode
                             )
                     }
 
-                    MiniButton {
-                        width: 70
-                        height: 30
-                        label: "CLEAR"
-                        accent: Colors.cyan
-                        enabledAction:
-                            root.armedAction.length > 0
-                        onTriggered: root.clearArm()
+                    GohuText {
+                        width: parent.width - 280
+                        anchors.verticalCenter: parent.verticalCenter
+                        text:
+                            root.stashMode === "staged"
+                            ? "STAGED ONLY"
+                            : root.stashMode === "keep-index"
+                            ? "STASH WORKTREE + UNTRACKED, KEEP INDEX"
+                            : "STASH TRACKED + UNTRACKED"
+                        font.pixelSize: 10
+                        color: Colors.cyan
+                        elide: Text.ElideRight
                     }
                 }
 
@@ -1654,7 +1834,7 @@ Item {
                             : root.changesService.actionStatus
                           )
                         : "NO CHANGE SERVICE"
-                    font.pixelSize: 8
+                    font.pixelSize: 10
                     color:
                         root.armedAction
                         ? Colors.orange
@@ -1681,6 +1861,7 @@ Item {
                 commitInput.text = "";
                 root.commitAmend = false;
                 root.commitAllowEmpty = false;
+                root.commitNoVerify = false;
             }
 
             if (root.selectedPath)

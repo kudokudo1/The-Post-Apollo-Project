@@ -588,49 +588,64 @@ Scope {
                 '    printf "OK\\tUNSTAGED ALL CHANGES\\n"',
                 '    ;;',
                 '  commit)',
-                '    message="$a"; amend="$b"; sign="$c"; allow_empty="$d"',
+                '    message="$a"; amend="$b"; commit_opts="$c"; allow_empty="$d"',
                 '    sign_arg=""',
-                '    [ "$sign" = "1" ] && sign_arg="-S"',
+                '    verify_arg=""',
+                '    case ":$commit_opts:" in *:sign:*) sign_arg="-S" ;; esac',
+                '    case ":$commit_opts:" in *:no-verify:*) verify_arg="--no-verify" ;; esac',
                 '    if [ "$amend" = "1" ]; then',
                 '      if [ -n "$message" ]; then',
-                '        git -C "$repo" commit --amend $sign_arg -m "$message" || exit $?',
+                '        git -C "$repo" commit --amend $sign_arg $verify_arg -m "$message" || exit $?',
                 '      else',
-                '        git -C "$repo" commit --amend $sign_arg --no-edit || exit $?',
+                '        git -C "$repo" commit --amend $sign_arg $verify_arg --no-edit || exit $?',
                 '      fi',
                 '      printf "OK\\tAMENDED HEAD\\n"',
                 '    else',
                 '      [ -n "$message" ] || { printf "REFUSED\\tCOMMIT MESSAGE REQUIRED\\n"; exit 24; }',
                 '      if [ "$allow_empty" = "1" ]; then',
-                '        git -C "$repo" commit $sign_arg --allow-empty -m "$message" || exit $?',
+                '        git -C "$repo" commit $sign_arg $verify_arg --allow-empty -m "$message" || exit $?',
                 '      else',
                 '        if git -C "$repo" diff --cached --quiet --exit-code; then',
                 '          printf "REFUSED\\tNO STAGED CHANGES\\n"',
                 '          exit 25',
                 '        fi',
-                '        git -C "$repo" commit $sign_arg -m "$message" || exit $?',
+                '        git -C "$repo" commit $sign_arg $verify_arg -m "$message" || exit $?',
                 '      fi',
                 '      printf "OK\\tCOMMITTED // %s\\n" "$message"',
                 '    fi',
                 '    ;;',
                 '  stash)',
-                '    message="$a"',
+                '    message="$a"; mode="$b"',
                 '    if [ -z "$(git -C "$repo" status --porcelain=v1 2>/dev/null)" ]; then',
                 '      printf "REFUSED\\tWORKTREE CLEAN\\n"',
                 '      exit 26',
                 '    fi',
                 '    [ -n "$message" ] || message="Post-Apollo stash"',
-                '    git -C "$repo" stash push -u -m "$message" || exit $?',
-                '    printf "OK\\tSTASHED // %s\\n" "$message"',
+                '    case "$mode" in',
+                '      staged) git -C "$repo" stash push --staged -m "$message" || exit $? ;;',
+                '      keep-index) git -C "$repo" stash push -u --keep-index -m "$message" || exit $? ;;',
+                '      all|"") git -C "$repo" stash push -u -m "$message" || exit $? ;;',
+                '      *) printf "REFUSED\\tUNKNOWN STASH MODE // %s\\n" "$mode"; exit 26 ;;',
+                '    esac',
+                '    printf "OK\\tSTASHED %s // %s\\n" "${mode:-all}" "$message"',
                 '    ;;',
                 '  stash-apply)',
                 '    [ -n "$a" ] || { printf "REFUSED\\tSTASH REF REQUIRED\\n"; exit 27; }',
-                '    git -C "$repo" stash apply "$a" || exit $?',
+                '    if [ "$b" = "index" ]; then',
+                '      git -C "$repo" stash apply --index "$a" || exit $?',
+                '    else',
+                '      git -C "$repo" stash apply "$a" || exit $?',
+                '    fi',
                 '    printf "OK\\tAPPLIED // %s\\n" "$a"',
                 '    ;;',
                 '  stash-pop)',
                 '    ref="$a"; [ -n "$ref" ] || ref="stash@{0}"',
                 '    git -C "$repo" rev-parse --verify "$ref" >/dev/null 2>&1 || { printf "REFUSED\\tSTASH NOT FOUND // %s\\n" "$ref"; exit 28; }',
-                '    git -C "$repo" stash pop "$ref" || exit $?',
+                '    if [ "$b" = "index" ]; then',
+                '      git -C "$repo" stash pop --index "$ref" || exit $?',
+                '    else',
+                '      git -C "$repo" stash pop "$ref" || exit $?',
+                '    fi',
                 '    printf "OK\\tPOPPED // %s\\n" "$ref"',
                 '    ;;',
                 '  stash-drop)',
@@ -685,6 +700,16 @@ Scope {
                 '      *) printf "REFUSED\\tNO ABORTABLE OPERATION\\n"; exit 35 ;;',
                 '    esac',
                 '    printf "OK\\tABORTED // %s\\n" "$state"',
+                '    ;;',
+                '  skip-operation)',
+                '    state="$a"',
+                '    case "$state" in',
+                '      REBASE) GIT_EDITOR=true git -C "$repo" rebase --skip || exit $? ;;',
+                '      CHERRY_PICK) GIT_EDITOR=true git -C "$repo" cherry-pick --skip || exit $? ;;',
+                '      REVERT) GIT_EDITOR=true git -C "$repo" revert --skip || exit $? ;;',
+                '      *) printf "REFUSED\\tNO SKIPPABLE OPERATION\\n"; exit 35 ;;',
+                '    esac',
+                '    printf "OK\\tSKIPPED CURRENT STEP // %s\\n" "$state"',
                 '    ;;',
                 '  stage-hunk|unstage-hunk|discard-hunk)',
                 '    [ -n "$a" ] || { printf "REFUSED\\tFILE REQUIRED\\n"; exit 36; }',
@@ -766,26 +791,50 @@ Scope {
         return runAction("unstage-all", "", "", "", "");
     }
 
-    function commit(message, amend, sign, allowEmpty) {
+    function commit(message, amend, sign, allowEmpty, noVerify) {
+        const options = [];
+        if (sign)
+            options.push("sign");
+        if (noVerify)
+            options.push("no-verify");
+
         return runAction(
             "commit",
             String(message || "").trim(),
             amend ? "1" : "0",
-            sign ? "1" : "0",
+            options.join(":"),
             allowEmpty ? "1" : "0"
         );
     }
 
-    function stash(message) {
-        return runAction("stash", String(message || "").trim(), "", "", "");
+    function stash(message, mode) {
+        return runAction(
+            "stash",
+            String(message || "").trim(),
+            String(mode || "all"),
+            "",
+            ""
+        );
     }
 
-    function applyStash(ref) {
-        return runAction("stash-apply", ref, "", "", "");
+    function applyStash(ref, restoreIndex) {
+        return runAction(
+            "stash-apply",
+            ref,
+            restoreIndex ? "index" : "",
+            "",
+            ""
+        );
     }
 
-    function popStash(ref) {
-        return runAction("stash-pop", ref || "stash@{0}", "", "", "");
+    function popStash(ref, restoreIndex) {
+        return runAction(
+            "stash-pop",
+            ref || "stash@{0}",
+            restoreIndex ? "index" : "",
+            "",
+            ""
+        );
     }
 
     function dropStash(ref, confirmed) {
@@ -835,6 +884,16 @@ Scope {
             "abort-operation",
             operationState,
             confirmed ? "CONFIRM" : "",
+            "",
+            ""
+        );
+    }
+
+    function skipOperation() {
+        return runAction(
+            "skip-operation",
+            operationState,
+            "",
             "",
             ""
         );

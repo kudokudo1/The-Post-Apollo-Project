@@ -16,6 +16,7 @@ Item {
     property string selectedRemoteName: ""
     property string selectedRemoteBranch: ""
     property string selectedTag: ""
+    property string tagMode: "lightweight"
     property string selectedWorktreePath: ""
     property bool selectedWorktreeLocked: false
     property string projectFileKind: "ignore"
@@ -74,8 +75,25 @@ Item {
             : root.repositoryService.ignoreLines;
     }
 
+    function cycleTagMode() {
+        if (root.tagMode === "lightweight")
+            root.tagMode = "annotated";
+        else if (root.tagMode === "annotated")
+            root.tagMode = "signed";
+        else
+            root.tagMode = "lightweight";
+    }
+
+    function tagModeLabel() {
+        if (root.tagMode === "annotated")
+            return "ANNOTATED";
+        if (root.tagMode === "signed")
+            return "SIGNED";
+        return "LIGHTWEIGHT";
+    }
+
     component SectionLabel: GohuText {
-        font.pixelSize: 12
+        font.pixelSize: 14
         color: Colors.magenta
     }
 
@@ -104,7 +122,7 @@ Item {
         GohuText {
             anchors.centerIn: parent
             text: button.label
-            font.pixelSize: 8
+            font.pixelSize: 10
             color:
                 mouse.pressed
                 ? Colors.black
@@ -156,7 +174,7 @@ Item {
             selectionColor: Colors.magenta
             selectedTextColor: Colors.black
             font.family: "GohuFont 11 Nerd Font Mono"
-            font.pixelSize: 9
+            font.pixelSize: 11
             clip: true
 
             onActiveFocusChanged: {
@@ -180,7 +198,7 @@ Item {
             }
             visible: editor.text.length === 0
             text: editorBox.placeholder
-            font.pixelSize: 8
+            font.pixelSize: 10
             color: Colors.white
             opacity: 0.30
         }
@@ -219,7 +237,7 @@ Item {
                             root.gitService
                             ? String(root.gitService.repoRoot || "NO LOCAL REPOSITORY")
                             : "NO LOCAL REPOSITORY"
-                        font.pixelSize: 8
+                        font.pixelSize: 10
                         color: Colors.cyan
                         elide: Text.ElideMiddle
                     }
@@ -326,11 +344,12 @@ Item {
                                     ? root.repositoryService.remotes.length
                                     : 0
                                   )
-                            font.pixelSize: 10
+                            font.pixelSize: 12
                             color: Colors.magenta
                         }
 
                         Flickable {
+                            id: repositoryScroll1
                             width: parent.width
                             height: parent.height - 24
                             clip: true
@@ -380,7 +399,7 @@ Item {
                                                         remoteRow.modelData.name
                                                         || ""
                                                     )
-                                                font.pixelSize: 9
+                                                font.pixelSize: 11
                                                 color: Colors.magenta
                                             }
 
@@ -392,7 +411,7 @@ Item {
                                                         remoteRow.modelData.url
                                                         || ""
                                                       )
-                                                font.pixelSize: 7
+                                                font.pixelSize: 9
                                                 color: Colors.white
                                                 elide: Text.ElideMiddle
                                             }
@@ -405,7 +424,7 @@ Item {
                                                         remoteRow.modelData.pushUrl
                                                         || ""
                                                       )
-                                                font.pixelSize: 7
+                                                font.pixelSize: 9
                                                 color: Colors.cyan
                                                 elide: Text.ElideMiddle
                                             }
@@ -425,7 +444,18 @@ Item {
                                     }
                                 }
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: repositoryScroll1
+                                anchors {
+                                    top: repositoryScroll1.top
+                                    right: repositoryScroll1.right
+                                    bottom: repositoryScroll1.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: repositoryScroll1
+                            }
+}
                     }
                 }
 
@@ -487,6 +517,21 @@ Item {
                             }
 
                             MiniButton {
+                                width: 88
+                                height: 30
+                                label: "SYNC HEAD"
+                                accent: Colors.cyan
+                                enabledAction:
+                                    root.selectedRemoteName
+                                    && root.repositoryService
+                                    && !root.repositoryService.actionBusy
+                                onTriggered:
+                                    root.repositoryService.syncRemoteHead(
+                                        root.selectedRemoteName
+                                    )
+                            }
+
+                            MiniButton {
                                 width: 94
                                 height: 30
                                 label:
@@ -513,7 +558,14 @@ Item {
                             }
 
                             MiniButton {
-                                width: parent.width - 160 - 76 - 76 - 94 - 20
+                                width:
+                                    parent.width
+                                    - 160
+                                    - 76
+                                    - 76
+                                    - 88
+                                    - 94
+                                    - 25
                                 height: 30
                                 label: "ADD / RENAME"
                                 accent: Colors.cyan
@@ -658,11 +710,12 @@ Item {
                             text:
                                 "REMOTE BRANCHES // "
                                 + String(root.remoteBranchRows().length)
-                            font.pixelSize: 9
+                            font.pixelSize: 11
                             color: Colors.cyan
                         }
 
                         Flickable {
+                            id: repositoryScroll2
                             width: parent.width
                             height: parent.height - 190
                             clip: true
@@ -713,7 +766,7 @@ Item {
                                                     remoteBranchRow.modelData.shortSha
                                                     || ""
                                                 )
-                                            font.pixelSize: 8
+                                            font.pixelSize: 10
                                             color: Colors.white
                                             elide: Text.ElideMiddle
                                         }
@@ -784,7 +837,18 @@ Item {
                                     }
                                 }
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: repositoryScroll2
+                                anchors {
+                                    top: repositoryScroll2.top
+                                    right: repositoryScroll2.right
+                                    bottom: repositoryScroll2.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: repositoryScroll2
+                            }
+}
                     }
                 }
             }
@@ -803,6 +867,7 @@ Item {
                     border.color: Colors.orange
 
                     Flickable {
+                        id: repositoryScroll3
                         anchors {
                             fill: parent
                             margins: 7
@@ -856,7 +921,7 @@ Item {
                                                 + String(
                                                     tagRow.modelData.shortSha || ""
                                                   )
-                                            font.pixelSize: 9
+                                            font.pixelSize: 11
                                             color: Colors.orange
                                         }
 
@@ -866,7 +931,7 @@ Item {
                                                 String(
                                                     tagRow.modelData.subject || ""
                                                 )
-                                            font.pixelSize: 7
+                                            font.pixelSize: 9
                                             color: Colors.white
                                             elide: Text.ElideRight
                                         }
@@ -889,7 +954,18 @@ Item {
                                 }
                             }
                         }
-                    }
+                    
+                        NeonScrollBar {
+                            parent: repositoryScroll3
+                            anchors {
+                                top: repositoryScroll3.top
+                                right: repositoryScroll3.right
+                                bottom: repositoryScroll3.bottom
+                                rightMargin: 2
+                            }
+                            flickable: repositoryScroll3
+                        }
+}
                 }
 
                 Rectangle {
@@ -927,9 +1003,44 @@ Item {
                             text: "HEAD"
                         }
 
+                        Row {
+                            width: parent.width
+                            height: 30
+                            spacing: 6
+
+                            MiniButton {
+                                width: 136
+                                height: 30
+                                label:
+                                    "MODE "
+                                    + root.tagModeLabel()
+                                accent:
+                                    root.tagMode === "signed"
+                                    ? Colors.magenta
+                                    : root.tagMode === "annotated"
+                                    ? Colors.orange
+                                    : Colors.cyan
+                                onTriggered: root.cycleTagMode()
+                            }
+
+                            EditorBox {
+                                id: tagMessageInput
+                                width: parent.width - 142
+                                placeholder:
+                                    root.tagMode === "lightweight"
+                                    ? "MESSAGE // UNUSED FOR LIGHTWEIGHT"
+                                    : "TAG MESSAGE"
+                                accent: Colors.green
+                                keyboardOwner: root.keyboardHost
+                            }
+                        }
+
                         MiniButton {
                             width: parent.width
-                            label: "CREATE LOCAL TAG"
+                            label:
+                                "CREATE "
+                                + root.tagModeLabel()
+                                + " TAG"
                             accent: Colors.green
                             enabledAction:
                                 root.repositoryService
@@ -937,7 +1048,9 @@ Item {
                             onTriggered:
                                 root.repositoryService.createTag(
                                     tagNameInput.text.trim(),
-                                    tagTargetInput.text.trim()
+                                    tagTargetInput.text.trim(),
+                                    root.tagMode,
+                                    tagMessageInput.text
                                 )
                         }
 
@@ -986,27 +1099,60 @@ Item {
                             }
                         }
 
-                        MiniButton {
+                        Row {
                             width: parent.width
-                            label:
-                                root.armedAction === "delete-tag"
-                                ? "CONFIRM DELETE LOCAL TAG"
-                                : "DELETE SELECTED LOCAL TAG"
-                            accent: Colors.red
-                            enabledAction:
-                                root.selectedTag
-                                && root.repositoryService
-                            onTriggered:
-                                root.armOrRun(
-                                    "delete-tag",
-                                    function() {
-                                        root.repositoryService.deleteTag(
-                                            root.selectedTag,
-                                            true
-                                        );
-                                        root.selectedTag = "";
-                                    }
-                                )
+                            height: 30
+                            spacing: 6
+
+                            MiniButton {
+                                width: (parent.width - 6) / 2
+                                height: 30
+                                label:
+                                    root.armedAction === "delete-tag"
+                                    ? "CONFIRM LOCAL"
+                                    : "DELETE LOCAL TAG"
+                                accent: Colors.red
+                                enabledAction:
+                                    root.selectedTag
+                                    && root.repositoryService
+                                onTriggered:
+                                    root.armOrRun(
+                                        "delete-tag",
+                                        function() {
+                                            root.repositoryService.deleteTag(
+                                                root.selectedTag,
+                                                true
+                                            );
+                                            root.selectedTag = "";
+                                        }
+                                    )
+                            }
+
+                            MiniButton {
+                                width: (parent.width - 6) / 2
+                                height: 30
+                                label:
+                                    root.armedAction === "delete-remote-tag"
+                                    ? "CONFIRM REMOTE"
+                                    : "DELETE REMOTE TAG"
+                                accent: Colors.red
+                                enabledAction:
+                                    root.selectedTag
+                                    && tagRemoteInput.text.trim()
+                                    && root.repositoryService
+                                onTriggered:
+                                    root.armOrRun(
+                                        "delete-remote-tag",
+                                        function() {
+                                            root.repositoryService
+                                                .deleteRemoteTag(
+                                                    tagRemoteInput.text.trim(),
+                                                    root.selectedTag,
+                                                    true
+                                                );
+                                        }
+                                    )
+                            }
                         }
                     }
                 }
@@ -1046,7 +1192,7 @@ Item {
                                         ? root.branchWorkspaceService.worktrees.length
                                         : 0
                                       )
-                                font.pixelSize: 10
+                                font.pixelSize: 12
                                 color: Colors.cyan
                             }
 
@@ -1063,6 +1209,7 @@ Item {
                         }
 
                         Flickable {
+                            id: repositoryScroll4
                             width: parent.width
                             height: parent.height - 34
                             clip: true
@@ -1125,7 +1272,7 @@ Item {
                                                         worktreeRow.modelData.head
                                                         || ""
                                                       ).slice(0, 10)
-                                                font.pixelSize: 9
+                                                font.pixelSize: 11
                                                 color: Colors.white
                                                 elide: Text.ElideRight
                                             }
@@ -1137,7 +1284,7 @@ Item {
                                                         worktreeRow.modelData.path
                                                         || ""
                                                     )
-                                                font.pixelSize: 7
+                                                font.pixelSize: 9
                                                 color: Colors.cyan
                                                 elide: Text.ElideMiddle
                                             }
@@ -1153,7 +1300,7 @@ Item {
                                                         worktreeRow.modelData.dirtyCount
                                                       ) + " CHANGES"
                                                     : "CLEAN"
-                                                font.pixelSize: 7
+                                                font.pixelSize: 9
                                                 color:
                                                     Number(
                                                         worktreeRow.modelData.dirtyCount
@@ -1225,7 +1372,18 @@ Item {
                                     }
                                 }
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: repositoryScroll4
+                                anchors {
+                                    top: repositoryScroll4.top
+                                    right: repositoryScroll4.right
+                                    bottom: repositoryScroll4.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: repositoryScroll4
+                            }
+}
                     }
                 }
 
@@ -1257,7 +1415,7 @@ Item {
                                         ? root.repositoryService.submodules.length
                                         : 0
                                       )
-                                font.pixelSize: 10
+                                font.pixelSize: 12
                                 color: Colors.magenta
                             }
 
@@ -1285,6 +1443,7 @@ Item {
                         }
 
                         Flickable {
+                            id: repositoryScroll5
                             width: parent.width
                             height: parent.height - 34
                             clip: true
@@ -1305,7 +1464,7 @@ Item {
                                     topPadding: 24
                                     text: "NO SUBMODULES"
                                     horizontalAlignment: Text.AlignHCenter
-                                    font.pixelSize: 10
+                                    font.pixelSize: 12
                                     color: Colors.cyan
                                 }
 
@@ -1344,7 +1503,7 @@ Item {
                                                         submoduleRow.modelData.path
                                                         || ""
                                                     )
-                                                font.pixelSize: 9
+                                                font.pixelSize: 11
                                                 color: Colors.white
                                                 elide: Text.ElideMiddle
                                             }
@@ -1361,14 +1520,25 @@ Item {
                                                         submoduleRow.modelData.sha
                                                         || ""
                                                       ).slice(0, 10)
-                                                font.pixelSize: 7
+                                                font.pixelSize: 9
                                                 color: Colors.cyan
                                             }
                                         }
                                     }
                                 }
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: repositoryScroll5
+                                anchors {
+                                    top: repositoryScroll5.top
+                                    right: repositoryScroll5.right
+                                    bottom: repositoryScroll5.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: repositoryScroll5
+                            }
+}
                     }
                 }
             }
@@ -1387,6 +1557,7 @@ Item {
                     border.color: Colors.green
 
                     Flickable {
+                        id: repositoryScroll6
                         anchors {
                             fill: parent
                             margins: 7
@@ -1427,7 +1598,7 @@ Item {
                                         width: 205
                                         text:
                                             String(configRow.modelData.key || "")
-                                        font.pixelSize: 8
+                                        font.pixelSize: 10
                                         color: Colors.green
                                         elide: Text.ElideRight
                                     }
@@ -1444,7 +1615,7 @@ Item {
                                             String(
                                                 configRow.modelData.value || ""
                                             )
-                                        font.pixelSize: 8
+                                        font.pixelSize: 10
                                         color: Colors.white
                                         elide: Text.ElideRight
                                     }
@@ -1468,7 +1639,18 @@ Item {
                                 }
                             }
                         }
-                    }
+                    
+                        NeonScrollBar {
+                            parent: repositoryScroll6
+                            anchors {
+                                top: repositoryScroll6.top
+                                right: repositoryScroll6.right
+                                bottom: repositoryScroll6.bottom
+                                rightMargin: 2
+                            }
+                            flickable: repositoryScroll6
+                        }
+}
                 }
 
                 Rectangle {
@@ -1546,7 +1728,7 @@ Item {
                             text:
                                 "This editor is deliberately repo-local. "
                                 + "Global identity/credentials remain outside this surface."
-                            font.pixelSize: 8
+                            font.pixelSize: 10
                             color: Colors.white
                             opacity: 0.50
                             wrapMode: Text.WordWrap
@@ -1608,6 +1790,7 @@ Item {
                         }
 
                         Flickable {
+                            id: repositoryScroll7
                             width: parent.width
                             height: parent.height - 34
                             clip: true
@@ -1653,7 +1836,7 @@ Item {
                                                     projectLineRow.modelData.line
                                                     || 0
                                                 )
-                                            font.pixelSize: 7
+                                            font.pixelSize: 9
                                             color: Colors.cyan
                                         }
 
@@ -1670,7 +1853,7 @@ Item {
                                                     projectLineRow.modelData.text
                                                     || ""
                                                 )
-                                            font.pixelSize: 8
+                                            font.pixelSize: 10
                                             color: Colors.white
                                             elide: Text.ElideRight
                                         }
@@ -1690,7 +1873,18 @@ Item {
                                     }
                                 }
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: repositoryScroll7
+                                anchors {
+                                    top: repositoryScroll7.top
+                                    right: repositoryScroll7.right
+                                    bottom: repositoryScroll7.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: repositoryScroll7
+                            }
+}
                     }
                 }
 
@@ -1785,6 +1979,7 @@ Item {
                     border.color: Colors.blue
 
                     Flickable {
+                        id: repositoryScroll8
                         anchors {
                             fill: parent
                             margins: 7
@@ -1807,7 +2002,7 @@ Item {
                                 topPadding: 24
                                 text: "NO ACTIVE HOOK FILES"
                                 horizontalAlignment: Text.AlignHCenter
-                                font.pixelSize: 10
+                                font.pixelSize: 12
                                 color: Colors.cyan
                             }
 
@@ -1840,7 +2035,7 @@ Item {
                                         width: parent.width - 112
                                         text:
                                             String(hookRow.modelData.name || "")
-                                        font.pixelSize: 9
+                                        font.pixelSize: 11
                                         color: Colors.white
                                         elide: Text.ElideRight
                                     }
@@ -1877,7 +2072,18 @@ Item {
                                 }
                             }
                         }
-                    }
+                    
+                        NeonScrollBar {
+                            parent: repositoryScroll8
+                            anchors {
+                                top: repositoryScroll8.top
+                                right: repositoryScroll8.right
+                                bottom: repositoryScroll8.bottom
+                                rightMargin: 2
+                            }
+                            flickable: repositoryScroll8
+                        }
+}
                 }
 
                 Rectangle {
@@ -1904,7 +2110,7 @@ Item {
                                 "This surface only enables/disables existing "
                                 + "repository hook files by executable bit. "
                                 + "It does not generate hook scripts or rewrite hook contents."
-                            font.pixelSize: 9
+                            font.pixelSize: 11
                             color: Colors.white
                             wrapMode: Text.WordWrap
                         }
@@ -1937,6 +2143,7 @@ Item {
                         }
 
                         Flickable {
+                            id: repositoryScroll9
                             width: parent.width
                             height: 170
                             clip: true
@@ -1950,11 +2157,22 @@ Item {
                                     root.repositoryService
                                     ? root.repositoryService.objectInfo
                                     : ""
-                                font.pixelSize: 9
+                                font.pixelSize: 11
                                 color: Colors.white
                                 wrapMode: Text.WrapAnywhere
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: repositoryScroll9
+                                anchors {
+                                    top: repositoryScroll9.top
+                                    right: repositoryScroll9.right
+                                    bottom: repositoryScroll9.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: repositoryScroll9
+                            }
+}
 
                         MiniButton {
                             width: parent.width
@@ -1999,6 +2217,7 @@ Item {
                     border.color: Colors.cyan
 
                     Flickable {
+                        id: repositoryScroll10
                         anchors {
                             fill: parent
                             margins: 8
@@ -2014,7 +2233,7 @@ Item {
                                 root.repositoryService
                                 ? root.repositoryService.healthOutput
                                 : "NO REPOSITORY SERVICE"
-                            font.pixelSize: 9
+                            font.pixelSize: 11
                             color:
                                 root.repositoryService
                                 && root.repositoryService.lastError
@@ -2022,7 +2241,18 @@ Item {
                                 : Colors.white
                             wrapMode: Text.WrapAnywhere
                         }
-                    }
+                    
+                        NeonScrollBar {
+                            parent: repositoryScroll10
+                            anchors {
+                                top: repositoryScroll10.top
+                                right: repositoryScroll10.right
+                                bottom: repositoryScroll10.bottom
+                                rightMargin: 2
+                            }
+                            flickable: repositoryScroll10
+                        }
+}
                 }
             }
         }
@@ -2059,7 +2289,7 @@ Item {
                         : root.repositoryService.actionStatus
                       )
                     : "NO REPOSITORY SERVICE"
-                font.pixelSize: 8
+                font.pixelSize: 10
                 color:
                     root.armedAction
                     ? Colors.orange

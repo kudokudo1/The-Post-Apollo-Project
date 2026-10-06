@@ -87,8 +87,49 @@ Item {
 
         if (root.historyService)
             root.historyService.refresh(
-                root.currentScope().ref
+                root.currentScope().ref,
+                root.historyService.selectedMode
             );
+    }
+
+    function cycleHistoryMode() {
+        if (!root.historyService)
+            return;
+
+        const current = String(
+            root.historyService.selectedMode || "all"
+        );
+
+        if (current === "all")
+            root.historyService.selectedMode = "first-parent";
+        else if (current === "first-parent")
+            root.historyService.selectedMode = "merges";
+        else if (current === "merges")
+            root.historyService.selectedMode = "no-merges";
+        else
+            root.historyService.selectedMode = "all";
+
+        root.historyService.refresh(
+            root.currentScope().ref,
+            root.historyService.selectedMode
+        );
+    }
+
+    function historyModeLabel() {
+        if (!root.historyService)
+            return "ALL";
+
+        const mode = String(
+            root.historyService.selectedMode || "all"
+        );
+
+        if (mode === "first-parent")
+            return "FIRST PARENT";
+        if (mode === "merges")
+            return "MERGES";
+        if (mode === "no-merges")
+            return "NO MERGES";
+        return "ALL";
     }
 
     function filteredRows() {
@@ -178,7 +219,7 @@ Item {
     }
 
     component SectionLabel: GohuText {
-        font.pixelSize: 12
+        font.pixelSize: 14
         color: Colors.magenta
     }
 
@@ -207,7 +248,7 @@ Item {
         GohuText {
             anchors.centerIn: parent
             text: button.label
-            font.pixelSize: 8
+            font.pixelSize: 10
             color:
                 mouse.pressed
                 ? Colors.black
@@ -259,7 +300,7 @@ Item {
             selectionColor: Colors.magenta
             selectedTextColor: Colors.black
             font.family: "GohuFont 11 Nerd Font Mono"
-            font.pixelSize: 9
+            font.pixelSize: 11
             clip: true
 
             onActiveFocusChanged: {
@@ -283,7 +324,7 @@ Item {
             }
             visible: editor.text.length === 0
             text: editorBox.placeholder
-            font.pixelSize: 8
+            font.pixelSize: 10
             color: Colors.white
             opacity: 0.30
         }
@@ -323,7 +364,7 @@ Item {
                             ? String(root.historyService.rows.length)
                               + " LOADED"
                             : "NO HISTORY"
-                        font.pixelSize: 8
+                        font.pixelSize: 10
                         color: Colors.cyan
                     }
                 }
@@ -352,7 +393,7 @@ Item {
                         }
                         verticalAlignment: Text.AlignVCenter
                         text: root.currentScope().label
-                        font.pixelSize: 8
+                        font.pixelSize: 10
                         color: Colors.white
                         elide: Text.ElideMiddle
                     }
@@ -366,9 +407,27 @@ Item {
                     onTriggered: root.cycleScope(1)
                 }
 
+                MiniButton {
+                    width: 118
+                    anchors.verticalCenter: parent.verticalCenter
+                    label:
+                        "MODE "
+                        + root.historyModeLabel()
+                    accent: Colors.magenta
+                    onTriggered: root.cycleHistoryMode()
+                }
+
                 EditorBox {
                     id: searchInput
-                    width: parent.width - 210 - 34 - 220 - 34 - 116 - 42
+                    width:
+                        parent.width
+                        - 210
+                        - 34
+                        - 220
+                        - 34
+                        - 118
+                        - 110
+                        - 56
                     anchors.verticalCenter: parent.verticalCenter
                     placeholder: "SEARCH SHA / AUTHOR / SUBJECT / REF"
                     accent: Colors.orange
@@ -392,7 +451,8 @@ Item {
                         && !root.historyService.actionBusy
                     onTriggered:
                         root.historyService.refresh(
-                            root.currentScope().ref
+                            root.currentScope().ref,
+                            root.historyService.selectedMode
                         )
                 }
             }
@@ -459,6 +519,7 @@ Item {
                     border.color: Colors.cyan
 
                     Flickable {
+                        id: historyScroll1
                         anchors {
                             fill: parent
                             margins: 7
@@ -582,7 +643,7 @@ Item {
                                                         commitRow.modelData.shortSha
                                                         || ""
                                                     )
-                                                font.pixelSize: 8
+                                                font.pixelSize: 10
                                                 color:
                                                     commitRow.modelData.isHead
                                                     ? Colors.magenta
@@ -596,7 +657,7 @@ Item {
                                                         commitRow.modelData.refsText
                                                         || ""
                                                     )
-                                                font.pixelSize: 7
+                                                font.pixelSize: 9
                                                 color: Colors.cyan
                                                 elide: Text.ElideRight
                                             }
@@ -609,7 +670,7 @@ Item {
                                                     commitRow.modelData.subject
                                                     || ""
                                                 )
-                                            font.pixelSize: 9
+                                            font.pixelSize: 11
                                             color: Colors.white
                                             elide: Text.ElideRight
                                         }
@@ -625,7 +686,7 @@ Item {
                                                 + root.dateLabel(
                                                     commitRow.modelData.epoch
                                                   )
-                                            font.pixelSize: 7
+                                            font.pixelSize: 9
                                             color: Colors.white
                                             opacity: 0.50
                                             elide: Text.ElideRight
@@ -645,7 +706,18 @@ Item {
                                 }
                             }
                         }
-                    }
+                    
+                        NeonScrollBar {
+                            parent: historyScroll1
+                            anchors {
+                                top: historyScroll1.top
+                                right: historyScroll1.right
+                                bottom: historyScroll1.bottom
+                                rightMargin: 2
+                            }
+                            flickable: historyScroll1
+                        }
+}
                 }
 
                 Rectangle {
@@ -727,6 +799,7 @@ Item {
                         }
 
                         Flickable {
+                            id: historyScroll2
                             width: parent.width
                             height: parent.height - 154
                             clip: true
@@ -743,7 +816,7 @@ Item {
                                     : root.inspectorMode === "file"
                                     ? root.historyService.fileDiffText
                                     : root.historyService.detailText
-                                font.pixelSize: 9
+                                font.pixelSize: 11
                                 color:
                                     root.historyService
                                     && root.historyService.lastError
@@ -751,7 +824,18 @@ Item {
                                     : Colors.white
                                 wrapMode: Text.WrapAnywhere
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: historyScroll2
+                                anchors {
+                                    top: historyScroll2.top
+                                    right: historyScroll2.right
+                                    bottom: historyScroll2.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: historyScroll2
+                            }
+}
 
                         Rectangle {
                             width: parent.width
@@ -770,11 +854,12 @@ Item {
                                     ? root.historyService.changedFiles.length
                                     : 0
                                   )
-                            font.pixelSize: 8
+                            font.pixelSize: 10
                             color: Colors.cyan
                         }
 
                         Flickable {
+                            id: historyScroll3
                             width: parent.width
                             height: 92
                             clip: true
@@ -816,7 +901,7 @@ Item {
                                                     changedFileRow.modelData.status
                                                     || ""
                                                 )
-                                            font.pixelSize: 8
+                                            font.pixelSize: 10
                                             color: Colors.orange
                                         }
 
@@ -833,7 +918,7 @@ Item {
                                                     changedFileRow.modelData.path
                                                     || ""
                                                 )
-                                            font.pixelSize: 8
+                                            font.pixelSize: 10
                                             color: Colors.white
                                             elide: Text.ElideMiddle
                                         }
@@ -854,7 +939,18 @@ Item {
                                     }
                                 }
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: historyScroll3
+                                anchors {
+                                    top: historyScroll3.top
+                                    right: historyScroll3.right
+                                    bottom: historyScroll3.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: historyScroll3
+                            }
+}
                     }
                 }
             }
@@ -899,7 +995,7 @@ Item {
 
                                 GohuText {
                                     text: "A // BASE"
-                                    font.pixelSize: 8
+                                    font.pixelSize: 10
                                     color: Colors.cyan
                                 }
 
@@ -910,7 +1006,7 @@ Item {
                                         && root.historyService.compareA
                                         ? root.historyService.compareA
                                         : "NOT SET"
-                                    font.pixelSize: 9
+                                    font.pixelSize: 11
                                     color: Colors.white
                                     elide: Text.ElideMiddle
                                 }
@@ -933,7 +1029,7 @@ Item {
 
                                 GohuText {
                                     text: "B // TARGET"
-                                    font.pixelSize: 8
+                                    font.pixelSize: 10
                                     color: Colors.orange
                                 }
 
@@ -944,7 +1040,7 @@ Item {
                                         && root.historyService.compareB
                                         ? root.historyService.compareB
                                         : "NOT SET"
-                                    font.pixelSize: 9
+                                    font.pixelSize: 11
                                     color: Colors.white
                                     elide: Text.ElideMiddle
                                 }
@@ -969,7 +1065,7 @@ Item {
                             text:
                                 "Select commits in LOG, press SET A / SET B, then compare. "
                                 + "A and B remain pinned while you browse."
-                            font.pixelSize: 8
+                            font.pixelSize: 10
                             color: Colors.white
                             opacity: 0.56
                             wrapMode: Text.WordWrap
@@ -985,6 +1081,7 @@ Item {
                     border.color: Colors.cyan
 
                     Flickable {
+                        id: historyScroll4
                         anchors {
                             fill: parent
                             margins: 8
@@ -1001,11 +1098,22 @@ Item {
                                 root.historyService
                                 ? root.historyService.compareText
                                 : "NO HISTORY SERVICE"
-                            font.pixelSize: 9
+                            font.pixelSize: 11
                             color: Colors.white
                             wrapMode: Text.WrapAnywhere
                         }
-                    }
+                    
+                        NeonScrollBar {
+                            parent: historyScroll4
+                            anchors {
+                                top: historyScroll4.top
+                                right: historyScroll4.right
+                                bottom: historyScroll4.bottom
+                                rightMargin: 2
+                            }
+                            flickable: historyScroll4
+                        }
+}
                 }
             }
 
@@ -1040,7 +1148,7 @@ Item {
                                 && root.historyService.selectedSha
                                 ? root.historyService.selectedSha
                                 : "SELECT A COMMIT IN LOG"
-                            font.pixelSize: 9
+                            font.pixelSize: 11
                             color: Colors.orange
                             elide: Text.ElideMiddle
                         }
@@ -1204,7 +1312,7 @@ Item {
 
                         GohuText {
                             text: "ANCESTRY NAVIGATION"
-                            font.pixelSize: 9
+                            font.pixelSize: 11
                             color: Colors.cyan
                         }
 
@@ -1262,6 +1370,7 @@ Item {
                     border.color: Colors.orange
 
                     Flickable {
+                        id: historyScroll5
                         anchors {
                             fill: parent
                             margins: 8
@@ -1287,14 +1396,25 @@ Item {
                                 : root.historyService
                                 ? root.historyService.detailText
                                 : "NO HISTORY SERVICE"
-                            font.pixelSize: 9
+                            font.pixelSize: 11
                             color:
                                 root.armedAction
                                 ? Colors.orange
                                 : Colors.white
                             wrapMode: Text.WrapAnywhere
                         }
-                    }
+                    
+                        NeonScrollBar {
+                            parent: historyScroll5
+                            anchors {
+                                top: historyScroll5.top
+                                right: historyScroll5.right
+                                bottom: historyScroll5.bottom
+                                rightMargin: 2
+                            }
+                            flickable: historyScroll5
+                        }
+}
                 }
             }
         }
@@ -1333,7 +1453,7 @@ Item {
                         : root.historyService.actionStatus
                       )
                     : "NO HISTORY SERVICE"
-                font.pixelSize: 8
+                font.pixelSize: 10
                 color:
                     root.armedAction
                     ? Colors.orange
@@ -1348,6 +1468,9 @@ Item {
 
     Component.onCompleted: {
         if (root.historyService)
-            root.historyService.refresh("ALL");
+            root.historyService.refresh(
+                "ALL",
+                root.historyService.selectedMode
+            );
     }
 }

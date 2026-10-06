@@ -424,7 +424,7 @@ Rectangle {
                                 anchors {
                                     fill: parent
                                     leftMargin: 5
-                                    rightMargin: 32
+                                    rightMargin: 25
                                     topMargin: 5
                                     bottomMargin: 5
                                 }
@@ -476,44 +476,35 @@ Rectangle {
                                 }
                             }
 
-                            Rectangle {
-                                id: pinControl
+                            Item {
+                                id: favoriteControl
 
                                 visible: inboxSlot.occupied
                                 z: 3
-                                width: 24
-                                height: 14
+                                width: 20
+                                height: 20
                                 anchors {
                                     top: parent.top
                                     right: parent.right
-                                    topMargin: 4
-                                    rightMargin: 4
+                                    topMargin: 1
+                                    rightMargin: 2
                                 }
-
-                                color:
-                                    inboxSlot.pinned
-                                    ? inboxSlot.attentionAccent
-                                    : Colors.black
-                                border.width: 1
-                                border.color:
-                                    pinMouse.containsMouse
-                                    ? Colors.orange
-                                    : inboxSlot.attentionAccent
 
                                 NotoText {
                                     anchors.centerIn: parent
-                                    text: "✦"
-                                    font.pixelSize: 11
+                                    text:
+                                        inboxSlot.pinned
+                                        ? "✦"
+                                        : "✧"
+                                    font.pixelSize: 15
                                     color:
-                                        pinMouse.containsMouse
+                                        favoriteMouse.containsMouse
                                         ? Colors.orange
-                                        : inboxSlot.pinned
-                                        ? Colors.black
                                         : inboxSlot.attentionAccent
                                 }
 
                                 MouseArea {
-                                    id: pinMouse
+                                    id: favoriteMouse
 
                                     anchors.fill: parent
                                     hoverEnabled: true

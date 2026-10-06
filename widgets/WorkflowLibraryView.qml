@@ -643,7 +643,7 @@ Item {
                                             GohuText {
                                                 width: parent.width
                                                 text: String(modelData.path || "")
-                                                font.pixelSize: 7
+                                                font.pixelSize: 9
                                                 color: Colors.orange
                                                 opacity: 0.78
                                                 elide: Text.ElideMiddle

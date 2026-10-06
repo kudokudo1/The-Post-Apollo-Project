@@ -102,17 +102,30 @@ Scope {
     }
 
     function pullCheckContexts(row) {
-        const rollup = pullStatusCheckRollup(row);
+        const source = row || {};
+        const direct = source.checkContexts || [];
+
+        if (direct && direct.length !== undefined)
+            return direct;
+
+        const rollup = pullStatusCheckRollup(source);
 
         if (!rollup)
             return [];
 
-        const contexts = (rollup.contexts || {}).nodes || [];
-        return Array.isArray(contexts) ? contexts : [];
+        return (rollup.contexts || {}).nodes || [];
     }
 
     function pullCheckRollupState(row) {
-        const rollup = pullStatusCheckRollup(row);
+        const source = row || {};
+        const direct = String(
+            source.checkState || ""
+        ).toUpperCase();
+
+        if (direct)
+            return direct;
+
+        const rollup = pullStatusCheckRollup(source);
         return String((rollup || {}).state || "").toUpperCase();
     }
 
@@ -179,7 +192,11 @@ Scope {
 
     function pullCheckSuites(row) {
         const suites = (row || {}).checkSuites || [];
-        return Array.isArray(suites) ? suites : [];
+
+        if (suites && suites.length !== undefined)
+            return suites;
+
+        return [];
     }
 
     function pullCheckSuiteCounts(row) {
@@ -529,6 +546,7 @@ Scope {
                 'name="${repo#*/}"',
                 "query='query($owner:String!,$name:String!){ repository(owner:$owner,name:$name){ pullRequests(first:100,orderBy:{field:UPDATED_AT,direction:DESC}){ nodes{ number title state url isDraft updatedAt author{login} headRefName baseRefName headRefOid reviewDecision mergeStateStatus mergeable reviewRequests(first:20){totalCount} reviews(first:100){nodes{state author{login}}} commits(last:1){ nodes{ commit{ statusCheckRollup{ state contexts(first:100){ nodes{ __typename ... on CheckRun{name status conclusion} ... on StatusContext{context state} } } } } } } } } } }'",
                 'rows="$(gh api graphql -F owner="$owner" -F name="$name" -f query="$query" --jq ".data.repository.pullRequests.nodes")" || exit $?',
+                "rows=\"$(printf \"%s\" \"$rows\" | jq -c '[.[] | . + {checkState:(.commits.nodes[0].commit.statusCheckRollup.state // \"\"),checkContexts:(.commits.nodes[0].commit.statusCheckRollup.contexts.nodes // [])}]')\"",
                 'tmpdir="$(mktemp -d)"',
                 'printf "%s" "$rows" | jq -c ".[] | select(.commits.nodes[0].commit.statusCheckRollup == null)" > "$tmpdir/fallback.ndjson"',
                 'while IFS= read -r row; do',

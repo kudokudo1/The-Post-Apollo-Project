@@ -2524,9 +2524,20 @@ PanelWindow {
                                     }
 
                                     Flickable {
+                                        id: localTargetFlick
+
                                         anchors {
-                                            fill: parent
-                                            margins: 4
+                                            left: parent.left
+                                            right: parent.right
+                                            top: parent.top
+                                            bottom: parent.bottom
+                                            leftMargin: 4
+                                            rightMargin:
+                                                localTargetScrollRail.visible
+                                                ? 15
+                                                : 4
+                                            topMargin: 4
+                                            bottomMargin: 4
                                         }
 
                                         clip: true
@@ -2701,6 +2712,129 @@ PanelWindow {
                                                         }
                                                     }
                                                 }
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        id: localTargetScrollRail
+
+                                        anchors {
+                                            top: parent.top
+                                            right: parent.right
+                                            bottom: parent.bottom
+                                            topMargin: 4
+                                            rightMargin: 4
+                                            bottomMargin: 4
+                                        }
+
+                                        width: 7
+                                        visible:
+                                            localTargetFlick.contentHeight
+                                            > localTargetFlick.height + 1
+                                        color: Colors.cyan
+                                        opacity: 0.72
+                                        border.width: 1
+                                        border.color: Colors.cyan
+
+                                        readonly property real maxContentY:
+                                            Math.max(
+                                                0,
+                                                localTargetFlick.contentHeight
+                                                - localTargetFlick.height
+                                            )
+
+                                        Rectangle {
+                                            id: localTargetScrollHandle
+
+                                            width: parent.width
+                                            height:
+                                                Math.max(
+                                                    20,
+                                                    parent.height
+                                                    * Math.min(
+                                                        1,
+                                                        localTargetFlick.height
+                                                        / Math.max(
+                                                            localTargetFlick.contentHeight,
+                                                            1
+                                                        )
+                                                    )
+                                                )
+                                            y:
+                                                parent.maxContentY > 0
+                                                ? (
+                                                    localTargetFlick.contentY
+                                                    / parent.maxContentY
+                                                  )
+                                                  * (
+                                                      parent.height
+                                                      - height
+                                                    )
+                                                : 0
+                                            color: Colors.magenta
+                                            border.width: 1
+                                            border.color: Colors.magenta
+                                        }
+
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+
+                                            function scrollTo(mouseY) {
+                                                const travel =
+                                                    localTargetScrollRail.height
+                                                    - localTargetScrollHandle.height;
+                                                const target =
+                                                    mouseY
+                                                    - localTargetScrollHandle.height
+                                                      / 2;
+                                                const ratio =
+                                                    travel > 0
+                                                    ? Math.max(
+                                                          0,
+                                                          Math.min(
+                                                              1,
+                                                              target
+                                                              / travel
+                                                          )
+                                                      )
+                                                    : 0;
+
+                                                localTargetFlick.contentY =
+                                                    ratio
+                                                    * localTargetScrollRail
+                                                        .maxContentY;
+                                            }
+
+                                            onPressed: function(mouse) {
+                                                scrollTo(mouse.y);
+                                            }
+
+                                            onPositionChanged: function(mouse) {
+                                                if (pressed)
+                                                    scrollTo(mouse.y);
+                                            }
+
+                                            onWheel: function(wheel) {
+                                                const step =
+                                                    wheel.angleDelta.y > 0
+                                                    ? -30
+                                                    : 30;
+
+                                                localTargetFlick.contentY =
+                                                    Math.max(
+                                                        0,
+                                                        Math.min(
+                                                            localTargetScrollRail
+                                                                .maxContentY,
+                                                            localTargetFlick
+                                                                .contentY
+                                                            + step
+                                                        )
+                                                    );
+                                                wheel.accepted = true;
                                             }
                                         }
                                     }

@@ -210,7 +210,7 @@ Rectangle {
                         height: 2
                         radius: 1
                         spread: 2
-                        opacity: 0.18 * parent.intensity
+                        opacity: 0.32 * parent.intensity
                         color: slider.activityGlowColor
                     }
 
@@ -220,7 +220,7 @@ Rectangle {
                         height: 1
                         radius: 1
                         spread: 1
-                        opacity: 0.70 * parent.intensity
+                        opacity: 0.92 * parent.intensity
                         color: slider.activityGlowColor
                     }
 

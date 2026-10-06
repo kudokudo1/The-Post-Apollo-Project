@@ -12,8 +12,10 @@ Rectangle {
     property int readyCount: 0
     property int specialistCount: 0
     property int attentionCount: 0
+    property var inbox: []
 
     signal routeRequested(string route)
+    signal attentionActivated(var item)
     signal typingChanged(bool active)
 
     color: Colors.black
@@ -283,6 +285,155 @@ Rectangle {
         }
 
         Rectangle {
+            id: inboxFrame
+
+            width: parent.width
+            height: 132
+            color: Colors.dark
+            border.width: 1
+            border.color: Colors.yellow
+            clip: true
+
+            Column {
+                anchors {
+                    fill: parent
+                    margins: 7
+                }
+
+                spacing: 5
+
+                Row {
+                    width: parent.width
+                    height: 20
+
+                    GohuText {
+                        width: parent.width - inboxCount.width
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "FRONT DESK // ATTENTION INBOX"
+                        font.pixelSize: 10
+                        color: Colors.yellow
+                    }
+
+                    GohuText {
+                        id: inboxCount
+
+                        anchors.verticalCenter: parent.verticalCenter
+                        text:
+                            String(
+                                root.inbox.filter(function(item) {
+                                    return String((item || {}).kind || "")
+                                           !== "clear";
+                                }).length
+                            )
+                        font.pixelSize: 11
+                        color: Colors.yellow
+                    }
+                }
+
+                Flickable {
+                    id: inboxScroll
+
+                    width: parent.width
+                    height: parent.height - 25
+                    contentWidth: width
+                    contentHeight: inboxColumn.height
+                    boundsBehavior: Flickable.StopAtBounds
+                    clip: true
+
+                    Column {
+                        id: inboxColumn
+
+                        width: inboxScroll.width
+                        spacing: 4
+
+                        Repeater {
+                            model: root.inbox
+
+                            Rectangle {
+                                required property var modelData
+
+                                width: inboxColumn.width
+                                height: 34
+                                color:
+                                    inboxMouse.pressed
+                                    ? Colors.black
+                                    : Colors.black
+                                border.width:
+                                    inboxMouse.containsMouse
+                                    && String(modelData.route || "")
+                                    ? 2 : 1
+                                border.color:
+                                    String(modelData.kind || "") === "room"
+                                    ? (
+                                        inboxMouse.containsMouse
+                                        ? Colors.orange
+                                        : Colors.yellow
+                                      )
+                                    : String(modelData.kind || "") === "staff"
+                                    ? (
+                                        inboxMouse.containsMouse
+                                        ? Colors.orange
+                                        : Colors.magenta
+                                      )
+                                    : Colors.green
+
+                                Column {
+                                    anchors {
+                                        left: parent.left
+                                        right: parent.right
+                                        verticalCenter: parent.verticalCenter
+                                        leftMargin: 8
+                                        rightMargin: 8
+                                    }
+
+                                    spacing: 1
+
+                                    GohuText {
+                                        width: parent.width
+                                        text: String(parent.parent.modelData.title || "")
+                                        font.pixelSize: 9
+                                        color:
+                                            String(parent.parent.modelData.kind || "") === "room"
+                                            ? Colors.yellow
+                                            : String(parent.parent.modelData.kind || "") === "staff"
+                                            ? Colors.magenta
+                                            : Colors.green
+                                        elide: Text.ElideRight
+                                    }
+
+                                    GohuText {
+                                        width: parent.width
+                                        text: String(parent.parent.modelData.detail || "")
+                                        font.pixelSize: 8
+                                        color: Colors.white
+                                        opacity: 0.78
+                                        elide: Text.ElideRight
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: inboxMouse
+
+                                    anchors.fill: parent
+                                    enabled:
+                                        String(parent.modelData.route || "").length > 0
+                                    hoverEnabled: true
+                                    cursorShape:
+                                        enabled
+                                        ? Qt.PointingHandCursor
+                                        : Qt.ArrowCursor
+
+                                    onClicked:
+                                        root.attentionActivated(parent.modelData)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Rectangle {
             id: transcriptFrame
 
             width: parent.width
@@ -292,8 +443,9 @@ Rectangle {
                     root.height
                     - receptionStage.height
                     - statusStrip.height
+                    - inboxFrame.height
                     - composer.height
-                    - 52
+                    - 61
                 )
             color: Colors.dark
             border.width: 1

@@ -16,6 +16,7 @@ PanelWindow {
     signal keyboardOwnershipRequested()
 
     property string activePage: "git"
+    property string gitView: "control"
     property string githubView: "control"
     property bool projectsExpanded: false
     property string factoryTemplate: "smoke"
@@ -769,6 +770,20 @@ PanelWindow {
         root.runInspectorOpen = false;
         root.activePage = "git";
         gitService.refresh();
+
+        if (root.gitView === "branches")
+            branchWorkspaceService.refresh();
+    }
+
+    function showGitControl() {
+        root.localTargetMenuOpen = false;
+        root.gitView = "control";
+    }
+
+    function showGitBranches() {
+        root.localTargetMenuOpen = false;
+        root.gitView = "branches";
+        branchWorkspaceService.refresh();
     }
 
     function showGithubPage() {
@@ -1028,6 +1043,10 @@ PanelWindow {
 
         gitService.refresh();
 
+        if (root.activePage === "git"
+                && root.gitView === "branches")
+            branchWorkspaceService.refresh();
+
         if (root.activePage === "github")
             githubService.refresh();
 
@@ -1037,6 +1056,41 @@ PanelWindow {
 
     GitService {
         id: gitService
+    }
+
+    GitBranchWorkspaceService {
+        id: branchWorkspaceService
+        repositoryPath:
+            gitService.repoIsLocal
+            ? gitService.repoRoot
+            : ""
+    }
+
+    GitBranchStackStore {
+        id: branchStackStore
+        repositoryKey:
+            gitService.repoRemoteSlug
+            || gitService.repoRoot
+    }
+
+    GitStackPlanner {
+        id: stackPlanner
+        branchStackStore: branchStackStore
+        branchWorkspaceService: branchWorkspaceService
+        repositoryPath:
+            gitService.repoIsLocal
+            ? gitService.repoRoot
+            : ""
+    }
+
+    GitStackExecutor {
+        id: stackExecutor
+        stackPlanner: stackPlanner
+        branchWorkspaceService: branchWorkspaceService
+        repositoryPath:
+            gitService.repoIsLocal
+            ? gitService.repoRoot
+            : ""
     }
 
     GitHubService {
@@ -1068,6 +1122,16 @@ PanelWindow {
     GitHubWorkItemsService {
         id: githubWorkItemsService
         repoSlug: gitService.repoRemoteSlug
+    }
+
+    Connections {
+        target: gitService
+
+        function onRefreshed() {
+            if (root.activePage === "git"
+                    && root.gitView === "branches")
+                branchWorkspaceService.refresh();
+        }
     }
 
     Connections {
@@ -2044,7 +2108,9 @@ PanelWindow {
         SelectorSlider {
             id: remoteSlider
 
-            visible: root.activePage === "git"
+            visible:
+                root.activePage === "git"
+                && root.gitView === "control"
             z: 100
             anchors {
                 right: parent.right
@@ -2087,9 +2153,12 @@ PanelWindow {
                         top: parent.top
                     }
 
-                    text: root.activePage === "git"
-                          ? "GIT // LOCAL REPOSITORY"
-                          : "GITHUB // REMOTE AUTOMATION"
+                    text:
+                        root.activePage === "git"
+                        ? root.gitView === "branches"
+                          ? "GIT // BRANCHES"
+                          : "GIT // LOCAL REPOSITORY"
+                        : "GITHUB // REMOTE AUTOMATION"
                     font.pixelSize: 20
                     color: Colors.magenta
 
@@ -2109,9 +2178,12 @@ PanelWindow {
                         bottom: parent.bottom
                     }
 
-                    text: root.activePage === "git"
-                          ? "CONTROL SURFACE // LOCAL GIT"
-                          : "PX CONTROL SURFACE // GITHUB ACTIONS"
+                    text:
+                        root.activePage === "git"
+                        ? root.gitView === "branches"
+                          ? "OPERATING MAP // BRANCHES + WORKSPACES + STACKS"
+                          : "CONTROL SURFACE // LOCAL GIT"
+                        : "PX CONTROL SURFACE // GITHUB ACTIONS"
                     font.pixelSize: 10
                     color: Colors.cyan
                 }
@@ -2291,7 +2363,9 @@ PanelWindow {
                         id: localTargetMenuShield
 
                         anchors.fill: parent
-                        visible: root.localTargetMenuOpen
+                        visible:
+                            root.gitView === "control"
+                            && root.localTargetMenuOpen
                         z: 1500
                         hoverEnabled: true
                         acceptedButtons: Qt.AllButtons
@@ -2305,8 +2379,14 @@ PanelWindow {
                     }
 
                     Column {
-                        anchors.fill: parent
+                        id: gitControlCamera
+
+                        anchors {
+                            fill: parent
+                            bottomMargin: 66
+                        }
                         spacing: 10
+                        visible: root.gitView === "control"
 
                         // ===== REPOSITORY / BRANCH CONTROL STRIP =====
 
@@ -2923,7 +3003,7 @@ PanelWindow {
 
                         BranchMap {
                             width: parent.width
-                            height: 250
+                            height: 220
 
                             topologyService: gitService
                             titleText: "REPOSITORY BRANCH MAP"
@@ -3341,6 +3421,170 @@ PanelWindow {
                             }
                         }
                     }
+
+                    GitBranchesView {
+                        id: gitBranchesView
+
+                        anchors {
+                            top: parent.top
+                            left: parent.left
+                            right: parent.right
+                            bottom: gitModeButtonRow.top
+                            bottomMargin: 8
+                        }
+
+                        visible: root.gitView === "branches"
+
+                        gitService: gitService
+                        branchWorkspaceService: branchWorkspaceService
+                        branchStackStore: branchStackStore
+                        stackPlanner: stackPlanner
+                        stackExecutor: stackExecutor
+                    }
+
+                    Row {
+                        id: gitModeButtonRow
+
+                        anchors {
+                            left: parent.left
+                            right: parent.right
+                            bottom: parent.bottom
+                        }
+
+                        height: 56
+                        spacing: 8
+
+                        Repeater {
+                            model: [
+                                {
+                                    name: "CONTROL",
+                                    key: "control",
+                                    symbol: "◎",
+                                    available: true
+                                },
+                                {
+                                    name: "BRANCHES",
+                                    key: "branches",
+                                    symbol: "⇶",
+                                    available: true
+                                },
+                                {
+                                    name: "CHANGES",
+                                    key: "changes",
+                                    symbol: "Δ",
+                                    available: false
+                                },
+                                {
+                                    name: "HISTORY",
+                                    key: "history",
+                                    symbol: "◴",
+                                    available: false
+                                },
+                                {
+                                    name: "REPOSITORY",
+                                    key: "repository",
+                                    symbol: "◇",
+                                    available: false
+                                }
+                            ]
+
+                            Rectangle {
+                                id: gitModeButton
+
+                                required property int index
+                                required property var modelData
+
+                                readonly property bool isSelected:
+                                    root.gitView === modelData.key
+                                readonly property bool isHovered:
+                                    gitModeMouse.containsMouse
+                                readonly property bool isPressed:
+                                    gitModeMouse.pressed
+                                readonly property bool enabledMode:
+                                    Boolean(modelData.available)
+
+                                width:
+                                    (
+                                        gitModeButtonRow.width
+                                        - gitModeButtonRow.spacing * 4
+                                    )
+                                    / 5
+                                height: parent.height
+
+                                color:
+                                    isPressed
+                                    ? Colors.magenta
+                                    : isHovered || isSelected
+                                    ? Colors.yellow
+                                    : Colors.black
+                                border.width: 1
+                                border.color:
+                                    isHovered || isPressed || isSelected
+                                    ? Colors.orange
+                                    : Colors.cyan
+                                opacity: enabledMode ? 1.0 : 0.30
+
+                                Column {
+                                    anchors.centerIn: parent
+                                    spacing: 2
+
+                                    NotoText {
+                                        anchors.horizontalCenter:
+                                            parent.horizontalCenter
+                                        text: gitModeButton.modelData.symbol
+                                        font.pixelSize: 16
+                                        color:
+                                            gitModeButton.isPressed
+                                            ? Colors.black
+                                            : gitModeButton.isSelected
+                                            ? Colors.magenta
+                                            : gitModeButton.isHovered
+                                            ? Colors.orange
+                                            : Colors.cyan
+                                    }
+
+                                    GohuText {
+                                        anchors.horizontalCenter:
+                                            parent.horizontalCenter
+                                        text: gitModeButton.modelData.name
+                                        font.pixelSize: 8
+                                        color:
+                                            gitModeButton.isPressed
+                                            ? Colors.black
+                                            : gitModeButton.isSelected
+                                            ? Colors.magenta
+                                            : gitModeButton.isHovered
+                                            ? Colors.orange
+                                            : Colors.cyan
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: gitModeMouse
+
+                                    anchors.fill: parent
+                                    enabled: gitModeButton.enabledMode
+                                    hoverEnabled: true
+                                    cursorShape:
+                                        enabled
+                                        ? Qt.PointingHandCursor
+                                        : Qt.ArrowCursor
+
+                                    onClicked: {
+                                        if (gitModeButton.modelData.key
+                                                === "control")
+                                            root.showGitControl();
+                                        else if (
+                                            gitModeButton.modelData.key
+                                            === "branches"
+                                        )
+                                            root.showGitBranches();
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                 }
 
                 Item {

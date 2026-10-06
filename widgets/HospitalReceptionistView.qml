@@ -162,7 +162,7 @@ Rectangle {
                     Repeater {
                         model: [
                             { label: "☎︎", route: "phone", color: Colors.green },
-                            { label: "", route: "intercom", color: Colors.omnitrix },
+                            { label: "🎙︎", route: "intercom", color: Colors.omnitrix },
                             { label: "🗒︎", route: "reports", color: Colors.magenta },
                             { label: "⚠︎", route: "rounds", color: Colors.yellow }
                         ]

@@ -197,7 +197,7 @@ Rectangle {
                                 text: parent.modelData.label
                                 font.pixelSize:
                                     parent.modelData.route === "phone"
-                                    ? 28 : 23
+                                    ? 25 : 23
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                                 color:
@@ -252,60 +252,6 @@ Rectangle {
             }
         }
 
-        Row {
-            id: routeButtons
-
-            width: parent.width
-            height: 38
-            spacing: 7
-
-            Repeater {
-                model: ["SURGERY", "REPORTS", "ROUNDS", "STAFF"]
-
-                Rectangle {
-                    required property string modelData
-
-                    width: (routeButtons.width - 21) / 4
-                    height: 38
-                    color:
-                        routeMouse.pressed
-                        ? Colors.black
-                        : Colors.dark
-                    border.width:
-                        routeMouse.containsMouse
-                        ? 2 : 1
-                    border.color:
-                        routeMouse.containsMouse
-                        ? Colors.orange
-                        : Colors.cyan
-
-                    GohuText {
-                        anchors.centerIn: parent
-                        text: parent.modelData
-                        font.pixelSize: 11
-                        color:
-                            routeMouse.containsMouse
-                            ? Colors.orange
-                            : Colors.cyan
-                    }
-
-                    MouseArea {
-                        id: routeMouse
-
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-
-                        onClicked:
-                            root.receptionistService.request(
-                                parent.modelData.toLowerCase(),
-                                ""
-                            )
-                    }
-                }
-            }
-        }
-
         Rectangle {
             id: statusStrip
 
@@ -345,10 +291,9 @@ Rectangle {
                     90,
                     root.height
                     - receptionStage.height
-                    - routeButtons.height
                     - statusStrip.height
                     - composer.height
-                    - 45
+                    - 52
                 )
             color: Colors.dark
             border.width: 1

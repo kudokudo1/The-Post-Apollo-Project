@@ -205,24 +205,23 @@ Rectangle {
                           / Math.max(1, slider.count - 1)
 
                     RectangularShadow {
-                        anchors.centerIn: activityTick
-                        width: activityTick.width
-                        height: activityTick.height
-                        spread: 1
-                        z: -1
-                        opacity: 0.30 * parent.intensity
+                        anchors.centerIn: parent
+                        width: 2
+                        height: 2
+                        radius: 1
+                        spread: 2
+                        opacity: 0.18 * parent.intensity
                         color: slider.activityGlowColor
                     }
 
-                    Rectangle {
-                        id: activityTick
-
+                    RectangularShadow {
                         anchors.centerIn: parent
-                        width: 7
+                        width: 1
                         height: 1
                         radius: 1
+                        spread: 1
+                        opacity: 0.70 * parent.intensity
                         color: slider.activityGlowColor
-                        opacity: 0.72 + 0.28 * parent.intensity
                     }
 
                     MouseArea {

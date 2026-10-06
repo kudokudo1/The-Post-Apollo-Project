@@ -47,6 +47,7 @@ Scope {
                 || status === "MISSING_PARENT"
                 || status === "NO_MERGE_BASE"
                 || status === "NON_LINEAR"
+                || status === "PARENT_INVALID"
                 || status === "ERROR";
         }).length
 
@@ -143,17 +144,21 @@ Scope {
                 '  printf "ERROR\\tNOT A GIT WORKTREE\\n"',
                 '  exit 21',
                 'fi',
+                'declare -A moves',
+                'declare -A invalid',
                 'while [ "$#" -ge 3 ]; do',
                 '  child="$1"',
                 '  parent="$2"',
                 '  depth="$3"',
                 '  shift 3',
                 '  if ! git -C "$repo" show-ref --verify --quiet "refs/heads/$child"; then',
-                '    printf "STEP\\t%s\\t%s\\t%s\\t\\t\\t\\tMISSING_BRANCH\\n" "$child" "$parent" "$depth"',
+                '    invalid["$child"]=1',
+                '    printf "STEP\\t%s\\t%s\\t%s\\t\\t\\t\\t0\\t0\\tMISSING_BRANCH\\n" "$child" "$parent" "$depth"',
                 '    continue',
                 '  fi',
                 '  if ! git -C "$repo" show-ref --verify --quiet "refs/heads/$parent"; then',
-                '    printf "STEP\\t%s\\t%s\\t%s\\t\\t\\t\\tMISSING_PARENT\\n" "$child" "$parent" "$depth"',
+                '    invalid["$child"]=1',
+                '    printf "STEP\\t%s\\t%s\\t%s\\t\\t\\t\\t0\\t0\\tMISSING_PARENT\\n" "$child" "$parent" "$depth"',
                 '    continue',
                 '  fi',
                 '  child_head="$(git -C "$repo" rev-parse "$child" 2>/dev/null || true)"',
@@ -161,19 +166,25 @@ Scope {
                 '  base="$(git -C "$repo" merge-base "$parent" "$child" 2>/dev/null || true)"',
                 '  unique_count=0',
                 '  merge_count=0',
-                '  if [ -z "$base" ]; then',
+                '  if [ -n "${invalid[$parent]:-}" ]; then',
+                '    status="PARENT_INVALID"',
+                '  elif [ -z "$base" ]; then',
                 '    status="NO_MERGE_BASE"',
                 '  else',
                 '    unique_count="$(git -C "$repo" rev-list --count "$base..$child" 2>/dev/null || printf "0")"',
                 '    merge_count="$(git -C "$repo" rev-list --count --merges "$base..$child" 2>/dev/null || printf "0")"',
                 '    if [ "$merge_count" -gt 0 ]; then',
                 '      status="NON_LINEAR"',
+                '    elif [ -n "${moves[$parent]:-}" ]; then',
+                '      status="RESTACK_REQUIRED"',
                 '    elif git -C "$repo" merge-base --is-ancestor "$parent" "$child" >/dev/null 2>&1; then',
                 '      status="UP_TO_DATE"',
                 '    else',
                 '      status="RESTACK_REQUIRED"',
                 '    fi',
                 '  fi',
+                '  if [ "$status" = "RESTACK_REQUIRED" ]; then moves["$child"]=1; fi',
+                '  case "$status" in MISSING_BRANCH|MISSING_PARENT|NO_MERGE_BASE|NON_LINEAR|PARENT_INVALID|ERROR) invalid["$child"]=1 ;; esac',
                 '  printf "STEP\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$child" "$parent" "$depth" "$child_head" "$parent_head" "$base" "$unique_count" "$merge_count" "$status"',
                 'done'
             ].join("\n"),

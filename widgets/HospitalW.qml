@@ -1813,33 +1813,13 @@ PanelWindow {
                                 : Colors.omnitrix
                         }
 
-                        NotoText {
-                            anchors.centerIn: parent
-                            anchors.verticalCenterOffset: 1
+                        Text {
+                            anchors.fill: parent
                             text: "🎙"
-                            font.pixelSize: 18
-                            color:
-                                intercomMouse.pressed
-                                ? Colors.black
-                                : root.intercomMenuOpen
-                                ? Colors.magenta
-                                : intercomMouse.containsMouse
-                                ? Colors.orange
-                                : Colors.omnitrix
-
-                            layer.enabled: !intercomMouse.pressed
-                            layer.effect: DropShadow {
-                                radius: 7
-                                samples: 9
-                                opacity: 0.52
-                                color:
-                                    root.intercomMenuOpen
-                                    ? Colors.magenta
-                                    : intercomMouse.containsMouse
-                                    ? Colors.orange
-                                    : Colors.omnitrix
-                                transparentBorder: true
-                            }
+                            font.family: "Noto Color Emoji"
+                            font.pixelSize: 19
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
                         }
 
                         MouseArea {

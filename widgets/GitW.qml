@@ -699,6 +699,7 @@ PanelWindow {
         if (action === "PUSH") {
             if (!gitService.actionBusy
                     && gitService.repoIsLocal
+                    && !gitService.localTrackCheckoutMode
                     && !!gitService.selectedRemoteBranch)
                 gitService.runSyncAction("push");
 
@@ -2273,8 +2274,11 @@ PanelWindow {
                         // ===== REPOSITORY / BRANCH CONTROL STRIP =====
 
                         Row {
+                            id: branchControlStrip
+
                             width: parent.width
                             height: 82
+                            z: root.localTargetMenuOpen ? 900 : 0
                             spacing: 10
 
                             Rectangle {
@@ -2932,6 +2936,7 @@ PanelWindow {
                                     enabledAction:
                                         gitService.repoIsLocal
                                         && !gitService.actionBusy
+                                        && !gitService.localTrackCheckoutMode
                                     onTriggered: gitService.cyclePullMode()
                                 }
 
@@ -2957,6 +2962,7 @@ PanelWindow {
                                     enabledAction:
                                         gitService.repoIsLocal
                                         && !gitService.actionBusy
+                                        && !gitService.localTrackCheckoutMode
                                         && !!gitService.selectedRemoteBranch
                                     selectedAction: gitService.actionTitle === "PUSH"
                                     onTriggered: gitService.runSyncAction("push")

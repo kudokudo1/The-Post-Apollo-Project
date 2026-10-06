@@ -22,6 +22,7 @@ PanelWindow {
     property string factoryTrigger: "manual"
     property int selectedWorkflowIndex: 0
     property bool workflowMenuOpen: false
+    property bool localTargetMenuOpen: false
     property int selectedRunIndex: 0
     property bool runInspectorOpen: false
     property int runInspectorHeight: 400
@@ -698,6 +699,7 @@ PanelWindow {
         if (action === "PUSH") {
             if (!gitService.actionBusy
                     && gitService.repoIsLocal
+                    && !gitService.localTrackCheckoutMode
                     && !!gitService.selectedRemoteBranch)
                 gitService.runSyncAction("push");
 
@@ -750,6 +752,7 @@ PanelWindow {
     }
 
     function close() {
+        root.localTargetMenuOpen = false;
         root.menuOpen = false;
     }
 
@@ -762,12 +765,14 @@ PanelWindow {
 
     function showGitPage() {
         root.workflowMenuOpen = false;
+        root.localTargetMenuOpen = false;
         root.runInspectorOpen = false;
         root.activePage = "git";
         gitService.refresh();
     }
 
     function showGithubPage() {
+        root.localTargetMenuOpen = false;
         root.activePage = "github";
         gitService.refresh();
         githubService.refresh();
@@ -2269,8 +2274,11 @@ PanelWindow {
                         // ===== REPOSITORY / BRANCH CONTROL STRIP =====
 
                         Row {
+                            id: branchControlStrip
+
                             width: parent.width
                             height: 82
+                            z: root.localTargetMenuOpen ? 900 : 0
                             spacing: 10
 
                             Rectangle {
@@ -2342,8 +2350,11 @@ PanelWindow {
                             }
 
                             Rectangle {
+                                id: localTargetCard
+
                                 width: (parent.width - 20) / 3
                                 height: parent.height
+                                z: root.localTargetMenuOpen ? 800 : 0
                                 color: Colors.dark
                                 border.width: 1
                                 border.color: Colors.blue
@@ -2372,21 +2383,10 @@ PanelWindow {
                                         height: 28
                                         spacing: 4
 
-                                        ActionButton {
-                                            width: 28
-                                            height: 28
-                                            label: "<"
-                                            enabledAction:
-                                                gitService.localBranchCount > 1
-                                                && !gitService.actionBusy
-                                                && !gitService.refreshing
-                                            onTriggered:
-                                                gitService.cycleLocal(-1)
-                                        }
-
                                         SelectorInput {
-                                            width: parent.width - 64
-                                            valueText: gitService.selectedLocalBranch
+                                            width: parent.width - 32
+                                            valueText:
+                                                gitService.localTargetDisplay
                                             placeholderText: "TYPE LOCAL TARGET"
                                             accentColor: Colors.blue
                                             textColor: Colors.blue
@@ -2395,6 +2395,7 @@ PanelWindow {
                                                 && !gitService.refreshing
 
                                             onSubmitted: function(value) {
+                                                root.localTargetMenuOpen = false;
                                                 gitService.selectLocalText(value);
                                             }
                                         }
@@ -2402,13 +2403,19 @@ PanelWindow {
                                         ActionButton {
                                             width: 28
                                             height: 28
-                                            label: ">"
+                                            label:
+                                                root.localTargetMenuOpen
+                                                ? "▲"
+                                                : "▼"
                                             enabledAction:
-                                                gitService.localBranchCount > 1
-                                                && !gitService.actionBusy
+                                                !gitService.actionBusy
                                                 && !gitService.refreshing
+                                            selectedAction:
+                                                root.localTargetMenuOpen
+
                                             onTriggered:
-                                                gitService.cycleLocal(1)
+                                                root.localTargetMenuOpen =
+                                                    !root.localTargetMenuOpen
                                         }
                                     }
 
@@ -2417,12 +2424,18 @@ PanelWindow {
                                         spacing: 8
 
                                         MetaLabel {
-                                            text: "TARGET"
+                                            text:
+                                                gitService.localTrackCheckoutMode
+                                                ? "MODE"
+                                                : "TARGET"
                                         }
 
                                         OrangeValue {
                                             width: 82
-                                            text: gitService.selectedLocalHead
+                                            text:
+                                                gitService.localTrackCheckoutMode
+                                                ? "NEW"
+                                                : gitService.selectedLocalHead
                                             font.pixelSize: 9
                                         }
 
@@ -2434,6 +2447,188 @@ PanelWindow {
                                                 + " // "
                                                 + gitService.worktree
                                             font.pixelSize: 8
+                                        }
+                                    }
+                                }
+
+                                Rectangle {
+                                    id: localTargetDropdown
+
+                                    visible: root.localTargetMenuOpen
+                                    z: 1600
+                                    x: 8
+                                    y: 63
+                                    width: parent.width - 16
+                                    height:
+                                        Math.min(
+                                            gitService.localBranchCount + 1,
+                                            7
+                                        ) * 30 + 8
+                                    color: Colors.black
+                                    border.width: 1
+                                    border.color: Colors.blue
+                                    clip: true
+
+                                    RectangularShadow {
+                                        anchors.fill: parent
+                                        spread: 4
+                                        z: -1
+                                        opacity: 0.32
+                                        color: Colors.blue
+                                    }
+
+                                    Flickable {
+                                        anchors {
+                                            fill: parent
+                                            margins: 4
+                                        }
+
+                                        clip: true
+                                        contentWidth: width
+                                        contentHeight: localTargetMenuColumn.height
+                                        boundsBehavior: Flickable.StopAtBounds
+
+                                        Column {
+                                            id: localTargetMenuColumn
+
+                                            width: parent.width
+                                            spacing: 0
+
+                                            Rectangle {
+                                                width: parent.width
+                                                height: 30
+                                                color:
+                                                    gitService.localTrackCheckoutMode
+                                                    ? Colors.yellow
+                                                    : trackChoiceMouse.containsMouse
+                                                    ? Colors.dark
+                                                    : Colors.black
+
+                                                GohuText {
+                                                    anchors {
+                                                        left: parent.left
+                                                        right: parent.right
+                                                        verticalCenter: parent.verticalCenter
+                                                        leftMargin: 8
+                                                        rightMargin: 8
+                                                    }
+
+                                                    text:
+                                                        "TRACK // CHECKOUT REMOTE"
+                                                    font.pixelSize: 8
+                                                    color:
+                                                        gitService.localTrackCheckoutMode
+                                                        ? Colors.magenta
+                                                        : Colors.blue
+                                                    elide: Text.ElideRight
+                                                }
+
+                                                Rectangle {
+                                                    anchors {
+                                                        left: parent.left
+                                                        right: parent.right
+                                                        bottom: parent.bottom
+                                                    }
+                                                    height: 1
+                                                    color: Colors.blue
+                                                    opacity: 0.30
+                                                }
+
+                                                MouseArea {
+                                                    id: trackChoiceMouse
+
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+
+                                                    onClicked: {
+                                                        gitService
+                                                            .selectTrackCheckoutRemote();
+                                                        root.localTargetMenuOpen = false;
+                                                    }
+                                                }
+                                            }
+
+                                            Repeater {
+                                                model: gitService.localBranchModel
+
+                                                Rectangle {
+                                                    required property int index
+                                                    required property var modelData
+
+                                                    width:
+                                                        localTargetMenuColumn.width
+                                                    height: 30
+
+                                                    readonly property bool selected:
+                                                        !gitService.localTrackCheckoutMode
+                                                        && String(modelData.name || "")
+                                                           === gitService.selectedLocalBranch
+                                                    readonly property bool live:
+                                                        String(modelData.name || "")
+                                                        === gitService.branch
+
+                                                    color:
+                                                        selected
+                                                        ? Colors.yellow
+                                                        : localChoiceMouse.containsMouse
+                                                        ? Colors.dark
+                                                        : Colors.black
+
+                                                    GohuText {
+                                                        anchors {
+                                                            left: parent.left
+                                                            right: parent.right
+                                                            verticalCenter: parent.verticalCenter
+                                                            leftMargin: 8
+                                                            rightMargin: 8
+                                                        }
+
+                                                        text:
+                                                            (parent.live
+                                                             ? "LIVE // "
+                                                             : "")
+                                                            + String(
+                                                                modelData.name
+                                                                || "UNKNOWN"
+                                                            )
+                                                        font.pixelSize: 8
+                                                        color:
+                                                            parent.selected
+                                                            ? Colors.magenta
+                                                            : parent.live
+                                                            ? Colors.orange
+                                                            : Colors.blue
+                                                        elide: Text.ElideRight
+                                                    }
+
+                                                    Rectangle {
+                                                        anchors {
+                                                            left: parent.left
+                                                            right: parent.right
+                                                            bottom: parent.bottom
+                                                        }
+                                                        height: 1
+                                                        color: Colors.blue
+                                                        opacity: 0.20
+                                                    }
+
+                                                    MouseArea {
+                                                        id: localChoiceMouse
+
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        cursorShape:
+                                                            Qt.PointingHandCursor
+
+                                                        onClicked: {
+                                                            gitService
+                                                                .selectLocal(index);
+                                                            root.localTargetMenuOpen = false;
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -2574,35 +2769,43 @@ PanelWindow {
                                               + " → ~/Projects/"
                                               + gitService.repoLabel
                                               + " // PUSH UNLOCKS AFTER CLONE"
-                                            : "PULL "
-                                              + (
-                                                  gitService.pullSourceMode === "upstream"
-                                                  ? "UPSTREAM "
-                                                  : "TARGET "
-                                                )
-                                              + (
-                                                  gitService.pullSourceTarget
-                                                  ? gitService.pullSourceTarget
-                                                  : "NONE"
-                                                )
-                                              + " → "
-                                              + (
-                                                  gitService.selectedLocalBranch
-                                                  ? gitService.selectedLocalBranch
-                                                  : "NONE"
-                                                )
-                                              + " // PUSH "
-                                              + (
-                                                  gitService.selectedLocalBranch
-                                                  ? gitService.selectedLocalBranch
-                                                  : "NONE"
-                                                )
-                                              + " → "
-                                              + (
-                                                  gitService.selectedRemoteBranch
-                                                  ? gitService.selectedRemoteBranch
-                                                  : "REMOTE"
-                                                )
+                                            : gitService.localTrackCheckoutMode
+                                              ? "PULL // TRACK "
+                                                + (
+                                                    gitService.selectedRemoteBranch
+                                                    ? gitService.selectedRemoteBranch
+                                                    : "NO REMOTE"
+                                                  )
+                                                + " → NEW LOCAL + LIVE CHECKOUT"
+                                              : "PULL "
+                                                + (
+                                                    gitService.pullSourceMode === "upstream"
+                                                    ? "UPSTREAM "
+                                                    : "TARGET "
+                                                  )
+                                                + (
+                                                    gitService.pullSourceTarget
+                                                    ? gitService.pullSourceTarget
+                                                    : "NONE"
+                                                  )
+                                                + " → "
+                                                + (
+                                                    gitService.selectedLocalBranch
+                                                    ? gitService.selectedLocalBranch
+                                                    : "NONE"
+                                                  )
+                                                + " // PUSH "
+                                                + (
+                                                    gitService.selectedLocalBranch
+                                                    ? gitService.selectedLocalBranch
+                                                    : "NONE"
+                                                  )
+                                                + " → "
+                                                + (
+                                                    gitService.selectedRemoteBranch
+                                                    ? gitService.selectedRemoteBranch
+                                                    : "REMOTE"
+                                                  )
                                         font.pixelSize: 8
                                         color: Colors.white
                                         elide: Text.ElideRight
@@ -2613,10 +2816,12 @@ PanelWindow {
                                         text:
                                             !gitService.repoIsLocal
                                             ? "REMOTE ONLY // CLONE CREATES THE LOCAL BED"
-                                            : (
-                                                gitService.selectedLocalUpstream
-                                                || gitService.selectedLocalMatchingRemote
-                                              )
+                                            : gitService.localTrackCheckoutMode
+                                              ? "TRACK MODE // PULL WILL CREATE + SWITCH LIVE CHECKOUT"
+                                              : (
+                                                  gitService.selectedLocalUpstream
+                                                  || gitService.selectedLocalMatchingRemote
+                                                )
                                               ? "TARGET TRACKING "
                                                 + (
                                                     gitService.selectedLocalUpstream
@@ -2678,7 +2883,11 @@ PanelWindow {
                                         gitService.actionTitle
                                         === (
                                             gitService.repoIsLocal
-                                            ? "PULL"
+                                            ? (
+                                                gitService.localTrackCheckoutMode
+                                                ? "TRACK // CHECKOUT"
+                                                : "PULL"
+                                              )
                                             : "CLONE"
                                         )
                                     onTriggered: {
@@ -2697,13 +2906,18 @@ PanelWindow {
                                     label: gitService.pullSourceLabel
                                     keyboardNavigable: false
                                     orangeAccent:
-                                        gitService.pullSourceMode === "target"
+                                        gitService.localTrackCheckoutMode
+                                        || gitService.pullSourceMode === "target"
                                     enabledAction:
                                         gitService.repoIsLocal
                                         && !gitService.actionBusy
+                                        && !gitService.localTrackCheckoutMode
                                     selectedAction:
                                         gitService.repoIsLocal
-                                        && gitService.pullSourceMode === "upstream"
+                                        && (
+                                            gitService.localTrackCheckoutMode
+                                            || gitService.pullSourceMode === "upstream"
+                                        )
                                     onTriggered: gitService.cyclePullSource()
                                 }
 
@@ -2722,6 +2936,7 @@ PanelWindow {
                                     enabledAction:
                                         gitService.repoIsLocal
                                         && !gitService.actionBusy
+                                        && !gitService.localTrackCheckoutMode
                                     onTriggered: gitService.cyclePullMode()
                                 }
 
@@ -2747,6 +2962,7 @@ PanelWindow {
                                     enabledAction:
                                         gitService.repoIsLocal
                                         && !gitService.actionBusy
+                                        && !gitService.localTrackCheckoutMode
                                         && !!gitService.selectedRemoteBranch
                                     selectedAction: gitService.actionTitle === "PUSH"
                                     onTriggered: gitService.runSyncAction("push")

@@ -364,12 +364,9 @@ Item {
         visible: root.profileMode === "repositories"
         spacing: 10
 
-        Rectangle {
+        Item {
             width: parent.width
             height: 42
-            color: Colors.dark
-            border.width: 1
-            border.color: Colors.blue
 
             Row {
                 anchors {
@@ -387,15 +384,6 @@ Item {
                     color: Colors.blue
                 }
 
-                ManagerButton {
-                    width: 90
-                    height: 26
-                    anchors.verticalCenter: parent.verticalCenter
-                    label: "ACCOUNT"
-                    primaryBlue: true
-                    onTriggered: root.showAccountProfile()
-                }
-
                 GohuText {
                     width: 172
                     anchors.verticalCenter: parent.verticalCenter
@@ -406,6 +394,15 @@ Item {
                         + (root.profileStore.queueCount === 1 ? "" : "S")
                     font.pixelSize: 9
                     color: Colors.cyan
+                }
+
+                ManagerButton {
+                    width: 90
+                    height: 26
+                    anchors.verticalCenter: parent.verticalCenter
+                    label: "ACCOUNT"
+                    primaryBlue: true
+                    onTriggered: root.showAccountProfile()
                 }
             }
         }
@@ -1245,10 +1242,64 @@ Item {
                     }
                 }
 
+                Rectangle {
+                    width: parent.width
+                    height: 38
+                    color: Colors.black
+                    border.width: 1
+                    border.color:
+                        root.accountService.primaryEmailAvailable
+                        ? Colors.blue
+                        : Colors.orange
+
+                    Row {
+                        anchors {
+                            fill: parent
+                            margins: 6
+                        }
+
+                        spacing: 8
+
+                        GohuText {
+                            width: 150
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "PRIMARY ACCOUNT EMAIL"
+                            font.pixelSize: 8
+                            color: Colors.cyan
+                        }
+
+                        GohuText {
+                            width: parent.width - 270
+                            anchors.verticalCenter: parent.verticalCenter
+                            text:
+                                root.accountService.primaryEmailAvailable
+                                ? root.accountService.primaryEmail
+                                : root.accountService.primaryEmailMessage
+                            font.pixelSize: 9
+                            color:
+                                root.accountService.primaryEmailAvailable
+                                ? Colors.white
+                                : Colors.orange
+                            elide: Text.ElideRight
+                        }
+
+                        ManagerButton {
+                            width: 104
+                            height: 26
+                            anchors.verticalCenter: parent.verticalCenter
+                            label: "EMAIL SETTINGS"
+                            onTriggered:
+                                Qt.openUrlExternally(
+                                    "https://github.com/settings/emails"
+                                )
+                        }
+                    }
+                }
+
                 GohuText {
                     width: parent.width
                     text:
-                        "LOGIN HANDLE IS READ-ONLY HERE. "
+                        "LOGIN HANDLE AND PRIMARY ACCOUNT EMAIL ARE IDENTITY FIELDS. "
                         + "DISPLAY NAME, BIO, AND PUBLIC EMAIL CAN BE UPDATED BELOW."
                     wrapMode: Text.Wrap
                     font.pixelSize: 7
@@ -1366,7 +1417,7 @@ Item {
 
                 Rectangle {
                     width: parent.width
-                    height: Math.max(54, parent.height - 382)
+                    height: Math.max(54, parent.height - 428)
                     color: Colors.black
                     border.width: 1
                     border.color:

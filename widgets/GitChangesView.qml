@@ -558,12 +558,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                anchors {
-                                    top: changesScroll1.top
-                                    right: changesScroll1.right
-                                    bottom: changesScroll1.bottom
-                                    rightMargin: 2
-                                }
                                 flickable: changesScroll1
                             }
 }
@@ -696,12 +690,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                anchors {
-                                    top: changesScroll2.top
-                                    right: changesScroll2.right
-                                    bottom: changesScroll2.bottom
-                                    rightMargin: 2
-                                }
                                 flickable: changesScroll2
                             }
 }
@@ -883,12 +871,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                anchors {
-                                    top: changesScroll3.top
-                                    right: changesScroll3.right
-                                    bottom: changesScroll3.bottom
-                                    rightMargin: 2
-                                }
                                 flickable: changesScroll3
                             }
 }
@@ -1024,12 +1006,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                anchors {
-                                    top: changesScroll4.top
-                                    right: changesScroll4.right
-                                    bottom: changesScroll4.bottom
-                                    rightMargin: 2
-                                }
                                 flickable: changesScroll4
                             }
 }
@@ -1154,12 +1130,6 @@ Item {
                         }
                     
                         NeonScrollBar {
-                            anchors {
-                                top: changesScroll5.top
-                                right: changesScroll5.right
-                                bottom: changesScroll5.bottom
-                                rightMargin: 2
-                            }
                             flickable: changesScroll5
                         }
 }
@@ -1280,12 +1250,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                anchors {
-                                    top: changesScroll6.top
-                                    right: changesScroll6.right
-                                    bottom: changesScroll6.bottom
-                                    rightMargin: 2
-                                }
                                 flickable: changesScroll6
                             }
 }
@@ -1451,12 +1415,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                anchors {
-                                    top: changesScroll7.top
-                                    right: changesScroll7.right
-                                    bottom: changesScroll7.bottom
-                                    rightMargin: 2
-                                }
                                 flickable: changesScroll7
                             }
 }
@@ -1632,12 +1590,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                anchors {
-                                    top: changesScroll8.top
-                                    right: changesScroll8.right
-                                    bottom: changesScroll8.bottom
-                                    rightMargin: 2
-                                }
                                 flickable: changesScroll8
                             }
 }

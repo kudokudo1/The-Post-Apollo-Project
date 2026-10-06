@@ -10,6 +10,7 @@ Item {
     required property var branchWorkspaceService
     required property var branchStackStore
     required property var stackPlanner
+    required property var stackExecutor
 
     property string selectedBranch: ""
     property string selectedSha: ""
@@ -67,6 +68,9 @@ Item {
     onSelectedBranchChanged: {
         if (stackPlanner)
             stackPlanner.clear();
+
+        if (stackExecutor)
+            stackExecutor.disarm("BRANCH SELECTION CHANGED");
     }
 
     Connections {
@@ -77,6 +81,9 @@ Item {
         function onRelationsChanged() {
             if (root.stackPlanner)
                 root.stackPlanner.clear();
+
+            if (root.stackExecutor)
+                root.stackExecutor.disarm("STACK RELATIONSHIPS CHANGED");
         }
     }
 
@@ -88,6 +95,9 @@ Item {
         function onRefreshed() {
             if (root.stackPlanner)
                 root.stackPlanner.clear();
+
+            if (root.stackExecutor)
+                root.stackExecutor.disarm("BRANCH STATE CHANGED");
         }
     }
 
@@ -770,27 +780,54 @@ Item {
                                     root.selectedStackParent.length > 0
                                     || root.selectedStackDescendants.length > 0
                                 )
-                            onTriggered:
+                            onTriggered: {
+                                if (stackExecutor)
+                                    stackExecutor.disarm("NEW PREVIEW");
+
                                 stackPlanner.buildPlan(
                                     root.selectedBranch,
                                     true
-                                )
+                                );
+                            }
                         }
 
                         BranchButton {
                             width: (inspector.width - 26) / 2
-                            label: "RESTACK"
+                            label:
+                                stackExecutor && stackExecutor.armed
+                                ? "ARMED"
+                                : "ARM"
+                            selectedAction:
+                                stackExecutor && stackExecutor.armed
                             enabledAction:
-                                stackPlanner
-                                && stackPlanner.startBranch === root.selectedBranch
+                                stackExecutor
+                                && !stackExecutor.running
+                                && !stackExecutor.armed
+                                && stackPlanner
+                                && stackPlanner.startBranch
+                                   === root.selectedBranch
                                 && stackPlanner.executable
                                 && stackPlanner.requiredCount > 0
                             onTriggered:
-                                root.restackRequested(root.selectedBranch)
+                                stackExecutor.armFromPlanner()
                         }
 
                         BranchButton {
-                            width: inspector.width - 20
+                            width: (inspector.width - 26) / 2
+                            label:
+                                stackExecutor && stackExecutor.running
+                                ? "RESTACKING"
+                                : "RESTACK"
+                            enabledAction:
+                                stackExecutor
+                                && stackExecutor.armed
+                                && !stackExecutor.running
+                            onTriggered:
+                                stackExecutor.executeArmed()
+                        }
+
+                        BranchButton {
+                            width: (inspector.width - 26) / 2
                             label: "SUBMIT STACK"
                             enabledAction:
                                 root.selectedBranch.length > 0
@@ -833,7 +870,13 @@ Item {
                             GohuText {
                                 width: parent.width
                                 text:
-                                    stackPlanner
+                                    stackExecutor && stackExecutor.running
+                                    ? stackExecutor.stateText
+                                    : stackExecutor && stackExecutor.armed
+                                    ? stackExecutor.armStatus
+                                    : stackExecutor && stackExecutor.lastError
+                                    ? stackExecutor.lastError
+                                    : stackPlanner
                                     ? stackPlanner.stateText
                                     : "RESTACK PREVIEW // NOT CONNECTED"
                                 font.pixelSize: 7

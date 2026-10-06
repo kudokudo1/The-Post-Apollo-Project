@@ -13,6 +13,7 @@ Scope {
     ]
 
     signal routeRequested(string route)
+    signal activityActionRequested(var item)
 
     property var inbox: []
     property var activityEvents: []
@@ -942,6 +943,143 @@ Scope {
         return parts.join(" // ");
     }
 
+    function isProblemActivity(eventValue) {
+        const event = eventValue || {};
+        const source =
+            String(event.source || "").toLowerCase();
+        const context = event.context || {};
+        const room = context.room || {};
+        const title =
+            String(event.title || "").toUpperCase();
+        const state =
+            String(context.state || "").toUpperCase();
+
+        if (source === "rounds")
+            return Number(room.attentionRank || 0) > 0
+                || title.indexOf("CLEAR //") !== 0;
+
+        if (source === "staff")
+            return title.indexOf("OFFLINE //") === 0;
+
+        if (source === "reports")
+            return state === "BLOCKED"
+                || state === "REOPENED";
+
+        return false;
+    }
+
+    function actionableMatches(
+            sourceValue,
+            favoritesOnly,
+            targetValue,
+            problemsOnly) {
+        let matches =
+            matchingActivity(
+                sourceValue,
+                false,
+                favoritesOnly,
+                targetValue
+            );
+
+        if (problemsOnly) {
+            matches = matches.filter(function(event) {
+                return root.isProblemActivity(event || {});
+            });
+        }
+
+        return matches;
+    }
+
+    function answerActivityAction(textValue) {
+        const raw = String(textValue || "").trim();
+
+        if (!raw)
+            return false;
+
+        const query = raw.toLowerCase();
+        const asksAction =
+            query.indexOf("show me") >= 0
+            || query.indexOf("take me to") >= 0
+            || query.indexOf("go to") >= 0
+            || query.indexOf("jump to") >= 0
+            || query.indexOf("open the latest") >= 0
+            || query.indexOf("open latest") >= 0
+            || query.indexOf("open the newest") >= 0
+            || query.indexOf("open newest") >= 0
+            || query.indexOf("open the recent") >= 0
+            || query.indexOf("open recent") >= 0;
+
+        if (!asksAction)
+            return false;
+
+        const target = activityTargetFromQuery(raw);
+        let source = activityQuerySource(query);
+        const favoritesOnly =
+            query.indexOf("favorite") >= 0
+            || query.indexOf("favourite") >= 0
+            || query.indexOf("pinned") >= 0;
+        const problemsOnly =
+            query.indexOf("problem") >= 0
+            || query.indexOf("issue") >= 0
+            || query.indexOf("attention") >= 0;
+
+        // Bare team navigation means "take me to the Room" first.
+        if (target && !source && !favoritesOnly)
+            source = "rounds";
+
+        let matches =
+            actionableMatches(
+                source,
+                favoritesOnly,
+                target,
+                problemsOnly
+            );
+
+        // A team may not have a retained Rounds event. Fall back to any
+        // retained event for that team rather than pretending it does.
+        if (matches.length === 0
+                && target
+                && source === "rounds"
+                && !problemsOnly) {
+            matches =
+                actionableMatches(
+                    "",
+                    favoritesOnly,
+                    target,
+                    false
+                );
+        }
+
+        append("OPERATOR", raw);
+
+        if (matches.length === 0) {
+            const label = [
+                target,
+                source ? source.toUpperCase() : "",
+                favoritesOnly ? "FAVORITE" : "",
+                problemsOnly ? "PROBLEM" : ""
+            ].filter(function(value) {
+                return String(value || "").length > 0;
+            }).join(" // ");
+
+            append(
+                "RECEPTION",
+                (label || "ACTIVITY")
+                + " // NOTHING RECORDED TO OPEN"
+            );
+            return true;
+        }
+
+        const selected = matches[0] || {};
+
+        append(
+            "RECEPTION",
+            "OPENING // " + activityLine(selected)
+        );
+        activityActionRequested(selected);
+        return true;
+    }
+
     function answerActivityQuestion(textValue) {
         const raw = String(textValue || "").trim();
 
@@ -1003,7 +1141,7 @@ Scope {
         if (asksHelp) {
             append(
                 "RECEPTION",
-                "I can report what is new, what you missed, recent activity, favorites, activity for a Room or team, when its last activity happened, and how many events I have recorded."
+                "I can report what is new, what you missed, recent activity, favorites, Room or team history, counts, and last activity. I can also show a team, open the latest matching event, or take you to a recorded problem."
             );
             return true;
         }
@@ -1107,6 +1245,9 @@ Scope {
             return false;
 
         const query = raw.toLowerCase();
+
+        if (answerActivityAction(raw))
+            return true;
 
         if (answerActivityQuestion(raw))
             return true;

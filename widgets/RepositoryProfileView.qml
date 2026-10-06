@@ -291,7 +291,7 @@ Item {
             wrapMode: TextEdit.Wrap
             clip: true
             font.family: "GohuFont 11 Nerd Font Mono"
-            font.pixelSize: 9
+            font.pixelSize: 11
             color: field.enabledInput ? Colors.white : Colors.cyan
             selectionColor: Colors.magenta
             selectedTextColor: Colors.black
@@ -1236,7 +1236,7 @@ Item {
                                     root.accountService.login
                                     ? "@" + root.accountService.login
                                     : "NOT LOADED"
-                                font.pixelSize: 10
+                                font.pixelSize: 11
                                 color: Colors.white
                                 elide: Text.ElideRight
                             }
@@ -1253,7 +1253,7 @@ Item {
                                 selectByMouse: true
                                 clip: true
                                 font.family: "GohuFont 11 Nerd Font Mono"
-                                font.pixelSize: 9
+                                font.pixelSize: 11
                                 color: Colors.white
                                 selectionColor: Colors.magenta
                                 selectedTextColor: Colors.black
@@ -1357,7 +1357,7 @@ Item {
                                     root.accountService.primaryEmailAvailable
                                     ? root.accountService.primaryEmail
                                     : root.accountService.primaryEmailMessage
-                                font.pixelSize: 9
+                                font.pixelSize: 11
                                 color:
                                     root.accountService.primaryEmailAvailable
                                     ? Colors.white
@@ -1377,7 +1377,7 @@ Item {
                                 selectByMouse: true
                                 clip: true
                                 font.family: "GohuFont 11 Nerd Font Mono"
-                                font.pixelSize: 9
+                                font.pixelSize: 11
                                 color: Colors.white
                                 selectionColor: Colors.magenta
                                 selectedTextColor: Colors.black

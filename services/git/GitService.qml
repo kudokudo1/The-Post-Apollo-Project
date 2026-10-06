@@ -331,6 +331,7 @@ Scope {
                 head: String(row.head || ""),
                 upstream: String(row.upstream || ""),
                 unpulledCount: Number(row.unpulledCount || 0),
+                lastChangedEpoch: Number(row.lastChangedEpoch || 0),
                 score: score
             });
         }
@@ -362,6 +363,7 @@ Scope {
                 name: String(row.name || ""),
                 unpulledCount: Number(row.unpulledCount || 0),
                 remoteOnly: Boolean(row.remoteOnly),
+                lastChangedEpoch: Number(row.lastChangedEpoch || 0),
                 score: score
             });
         }
@@ -803,7 +805,8 @@ Scope {
                 name: String(localRow.name || ""),
                 head: String(localRow.head || ""),
                 upstream: String(localRow.upstream || ""),
-                unpulledCount: Number(localRow.unpulledCount || 0)
+                unpulledCount: Number(localRow.unpulledCount || 0),
+                lastChangedEpoch: Number(localRow.lastChangedEpoch || 0)
             });
         }
 
@@ -817,7 +820,8 @@ Scope {
             remoteBranchRows.append({
                 name: remoteName,
                 unpulledCount: Number(remoteRow.unpulledCount || 0),
-                remoteOnly: Boolean(remoteRow.remoteOnly)
+                remoteOnly: Boolean(remoteRow.remoteOnly),
+                lastChangedEpoch: Number(remoteRow.lastChangedEpoch || 0)
             });
         }
 
@@ -1058,10 +1062,14 @@ Scope {
                 '  compare="$ref_upstream"',
                 '  if [ -z "$compare" ] && git -C "$root" show-ref --verify --quiet "refs/remotes/origin/$ref"; then compare="origin/$ref"; fi',
                 '  unpulled=0',
-                '  if [ -n "$compare" ]; then unpulled="$(git -C "$root" cherry HEAD "$compare" 2>/dev/null | grep -c "^+" || true)"; fi',
-                '  printf "LOCALBRANCH\\t%s\\t%s\\t%s\\t%s\\n" "$ref" "$ref_head" "$ref_upstream" "$unpulled"',
+                '  changed=0',
+                '  if [ -n "$compare" ]; then',
+                '    unpulled="$(git -C "$root" cherry HEAD "$compare" 2>/dev/null | grep -c "^+" || true)"',
+                '    changed="$(git -C "$root" show -s --format=%ct "$compare" 2>/dev/null || printf "0")"',
+                '  fi',
+                '  printf "LOCALBRANCH\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$ref" "$ref_head" "$ref_upstream" "$unpulled" "$changed"',
                 'done < <(git -C "$root" for-each-ref --format="%(refname:short)%09%(objectname:short=10)%09%(upstream:short)" refs/heads 2>/dev/null)',
-                'while IFS= read -r ref; do',
+                'while IFS="$(printf "\\t")" read -r ref changed; do',
                 '  [ -z "$ref" ] && continue',
                 '  [ "$ref" = "origin" ] && continue',
                 '  [ "$ref" = "origin/HEAD" ] && continue',
@@ -1070,8 +1078,8 @@ Scope {
                 '  remote_only=0',
                 '  if ! git -C "$root" show-ref --verify --quiet "refs/heads/$local_branch"; then remote_only=1; fi',
                 '  unpulled="$(git -C "$root" cherry HEAD "$ref" 2>/dev/null | grep -c "^+" || true)"',
-                '  printf "REMOTEBRANCH\\t%s\\t%s\\t%s\\n" "$ref" "$unpulled" "$remote_only"',
-                'done < <(git -C "$root" for-each-ref --format="%(refname:short)" refs/remotes/origin 2>/dev/null)',
+                '  printf "REMOTEBRANCH\\t%s\\t%s\\t%s\\t%s\\n" "$ref" "$unpulled" "$remote_only" "$changed"',
+                'done < <(git -C "$root" for-each-ref --format="%(refname:short)%09%(committerdate:unix)" refs/remotes/origin 2>/dev/null)',
                 'git -C "$root" log --all --topo-order --date-order -n 48 --pretty=format:"COMMIT%x09%H%x09%P%x09%D%x09%s"',
                 'printf "\\nDONE\\t\\n"'
             ].join("\n"),
@@ -1122,13 +1130,15 @@ Scope {
                 name: parts.length > 1 ? parts[1] : "",
                 head: parts.length > 2 ? parts[2] : "",
                 upstream: parts.length > 3 ? parts[3] : "",
-                unpulledCount: parts.length > 4 ? Number(parts[4] || 0) : 0
+                unpulledCount: parts.length > 4 ? Number(parts[4] || 0) : 0,
+                lastChangedEpoch: parts.length > 5 ? Number(parts[5] || 0) : 0
             });
         else if (key === "REMOTEBRANCH")
             pendingRemoteBranches.push({
                 name: parts.length > 1 ? parts[1] : "",
                 unpulledCount: parts.length > 2 ? Number(parts[2] || 0) : 0,
-                remoteOnly: parts.length > 3 ? Number(parts[3] || 0) === 1 : false
+                remoteOnly: parts.length > 3 ? Number(parts[3] || 0) === 1 : false,
+                lastChangedEpoch: parts.length > 4 ? Number(parts[4] || 0) : 0
             });
         else if (key === "ERROR") {
             available = false;

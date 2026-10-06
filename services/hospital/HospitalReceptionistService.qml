@@ -47,6 +47,7 @@ QtObject {
 
             next.push({
                 kind: "room",
+                source: "rounds",
                 title:
                     String(room.attentionLabel || "ATTENTION")
                     + " // "
@@ -67,6 +68,7 @@ QtObject {
 
             next.push({
                 kind: "staff",
+                source: "staff",
                 title:
                     "OFFLINE // "
                     + String(specialist.name || specialist.id || "SPECIALIST"),

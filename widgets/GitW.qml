@@ -2287,6 +2287,23 @@ PanelWindow {
                     }
                     visible: root.activePage === "git"
 
+                    MouseArea {
+                        id: localTargetMenuShield
+
+                        anchors.fill: parent
+                        visible: root.localTargetMenuOpen
+                        z: 1500
+                        hoverEnabled: true
+                        acceptedButtons: Qt.AllButtons
+
+                        onClicked:
+                            root.localTargetMenuOpen = false
+
+                        onWheel: function(wheel) {
+                            wheel.accepted = true;
+                        }
+                    }
+
                     Column {
                         anchors.fill: parent
                         spacing: 10
@@ -2591,12 +2608,17 @@ PanelWindow {
                                                         localTargetMenuColumn.width
                                                     height: 30
 
+                                                    readonly property string branchName:
+                                                        String(
+                                                            modelData.name
+                                                            || ""
+                                                        )
                                                     readonly property bool selected:
                                                         !gitService.localTrackCheckoutMode
-                                                        && String(modelData.name || "")
+                                                        && branchName
                                                            === gitService.selectedLocalBranch
                                                     readonly property bool live:
-                                                        String(modelData.name || "")
+                                                        branchName
                                                         === gitService.branch
 
                                                     color:
@@ -2653,13 +2675,27 @@ PanelWindow {
                                                             Qt.PointingHandCursor
 
                                                         onClicked: {
-                                                            gitService
-                                                                .selectLocal(index);
-                                                            root.localTargetMenuOpen = false;
-                                                            localTargetInput
-                                                                .syncDisplay(
-                                                                    gitService.localTargetDisplay
+                                                            const branchName =
+                                                                String(
+                                                                    parent.branchName
+                                                                    || ""
                                                                 );
+
+                                                            if (!branchName)
+                                                                return;
+
+                                                            if (
+                                                                gitService
+                                                                    .selectLocalText(
+                                                                        branchName
+                                                                    )
+                                                            ) {
+                                                                localTargetInput
+                                                                    .syncDisplay(
+                                                                        branchName
+                                                                    );
+                                                                root.localTargetMenuOpen = false;
+                                                            }
                                                         }
                                                     }
                                                 }

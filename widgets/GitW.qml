@@ -822,25 +822,19 @@ PanelWindow {
             || query.indexOf("checkout") === 0;
     }
 
-    function branchActivityIntensity(epoch) {
-        const stamp = Number(epoch || 0);
+    function branchActivityIntensity(unpulledCount) {
+        const count = Number(unpulledCount || 0);
 
-        if (stamp <= 0)
+        if (count <= 0)
             return 0;
+        if (count === 1)
+            return 0.56;
+        if (count <= 3)
+            return 0.68;
+        if (count <= 8)
+            return 0.80;
 
-        const age = Math.max(0, Date.now() / 1000 - stamp);
-        const day = 86400;
-
-        if (age <= day)
-            return 1.0;
-        if (age <= day * 3)
-            return 0.78;
-        if (age <= day * 7)
-            return 0.54;
-        if (age <= day * 14)
-            return 0.30;
-
-        return 0;
+        return 0.92;
     }
 
     function remoteActivityPoints() {
@@ -853,16 +847,16 @@ PanelWindow {
             if (!row)
                 continue;
 
-            const intensity = root.branchActivityIntensity(
-                row.activityEpoch
-            );
+            const unpulled = Number(row.unpulledCount || 0);
+            const intensity = root.branchActivityIntensity(unpulled);
 
-            if (intensity <= 0)
+            if (unpulled <= 0)
                 continue;
 
             points.push({
                 index: i,
                 intensity: intensity,
+                unpulledCount: unpulled,
                 label: String(row.name || "")
             });
         }
@@ -875,16 +869,16 @@ PanelWindow {
         const points = [];
 
         for (let i = 0; i < rows.length; ++i) {
-            const intensity = root.branchActivityIntensity(
-                rows[i].activityEpoch
-            );
+            const unpulled = Number(rows[i].unpulledCount || 0);
+            const intensity = root.branchActivityIntensity(unpulled);
 
-            if (intensity <= 0)
+            if (unpulled <= 0)
                 continue;
 
             points.push({
                 rowIndex: i,
                 intensity: intensity,
+                unpulledCount: unpulled,
                 name: String(rows[i].name || "")
             });
         }
@@ -3208,8 +3202,8 @@ PanelWindow {
                                                 required property int index
                                                 required property var modelData
 
-                                                width: 17
-                                                height: 10
+                                                width: 11
+                                                height: 7
                                                 x: (parent.width - width) / 2
                                                 z: 6
 
@@ -3236,10 +3230,10 @@ PanelWindow {
                                                     anchors.centerIn: activityTick
                                                     width: activityTick.width
                                                     height: activityTick.height
-                                                    spread: 3
+                                                    spread: 1
                                                     z: -1
                                                     opacity:
-                                                        0.68
+                                                        0.28
                                                         * Number(
                                                             parent.modelData
                                                                 .intensity || 0
@@ -3250,13 +3244,13 @@ PanelWindow {
                                                 Rectangle {
                                                     id: activityTick
                                                     anchors.centerIn: parent
-                                                    width: 15
-                                                    height: 2
+                                                    width: 6
+                                                    height: 1
                                                     radius: 1
                                                     color: Colors.magenta
                                                     opacity:
-                                                        0.44
-                                                        + 0.56
+                                                        0.72
+                                                        + 0.28
                                                           * Number(
                                                               parent.modelData
                                                                   .intensity || 0
@@ -3537,20 +3531,48 @@ PanelWindow {
                                                     ? Colors.dark
                                                     : Colors.black
 
-                                                Rectangle {
-                                                    width: 3
+                                                Item {
+                                                    width: 10
+                                                    height: 8
                                                     anchors {
                                                         left: parent.left
-                                                        top: parent.top
-                                                        bottom: parent.bottom
+                                                        leftMargin: 2
+                                                        verticalCenter:
+                                                            parent.verticalCenter
                                                     }
-                                                    color: Colors.magenta
-                                                    opacity:
-                                                        0.22
-                                                        + 0.58
-                                                          * root.branchActivityIntensity(
-                                                              modelData.activityEpoch
-                                                          )
+                                                    visible:
+                                                        Number(
+                                                            parent.modelData
+                                                                .unpulledCount || 0
+                                                        ) > 0
+
+                                                    RectangularShadow {
+                                                        anchors.centerIn:
+                                                            remoteUnpulledTick
+                                                        width:
+                                                            remoteUnpulledTick.width
+                                                        height:
+                                                            remoteUnpulledTick.height
+                                                        spread: 1
+                                                        z: -1
+                                                        opacity:
+                                                            0.28
+                                                            * root.branchActivityIntensity(
+                                                                parent.parent
+                                                                    .modelData
+                                                                    .unpulledCount
+                                                            )
+                                                        color: Colors.magenta
+                                                    }
+
+                                                    Rectangle {
+                                                        id: remoteUnpulledTick
+                                                        anchors.centerIn: parent
+                                                        width: 6
+                                                        height: 1
+                                                        color: Colors.magenta
+                                                        opacity: 0.88
+                                                    }
                                                 }
 
                                                 GohuText {

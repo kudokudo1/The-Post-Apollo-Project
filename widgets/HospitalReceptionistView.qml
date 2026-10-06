@@ -161,10 +161,10 @@ Rectangle {
 
                     Repeater {
                         model: [
-                            { label: "☎", route: "phone", color: Colors.green },
-                            { label: "IC", route: "intercom", color: Colors.cyan },
-                            { label: "▤", route: "reports", color: Colors.magenta },
-                            { label: "!", route: "rounds", color: Colors.orange }
+                            { label: "☎︎", route: "phone", color: Colors.green },
+                            { label: "🎙︎", route: "intercom", color: Colors.omnitrix },
+                            { label: "🗒︎", route: "reports", color: Colors.magenta },
+                            { label: "⚠︎", route: "rounds", color: Colors.yellow }
                         ]
 
                         Rectangle {
@@ -186,10 +186,47 @@ Rectangle {
 
                             GohuText {
                                 anchors.centerIn: parent
+                                anchors.verticalCenterOffset:
+                                    parent.modelData.route === "intercom"
+                                    ? 2 : 0
+                                width: parent.width
+                                height: parent.height
+                                visible:
+                                    parent.modelData.route === "intercom"
+                                    || parent.modelData.route === "phone"
                                 text: parent.modelData.label
                                 font.pixelSize:
-                                    parent.modelData.label === "☎"
-                                    ? 18 : 11
+                                    parent.modelData.route === "phone"
+                                    ? 28 : 23
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                color:
+                                    deskControlMouse.containsMouse
+                                    ? Colors.orange
+                                    : parent.modelData.color
+                            }
+
+                            NotoText {
+                                anchors.centerIn: parent
+                                anchors.verticalCenterOffset:
+                                    parent.modelData.route === "reports"
+                                    ? 4
+                                    : parent.modelData.route === "rounds"
+                                    ? 2 : 0
+                                width: parent.width
+                                height: parent.height
+                                visible:
+                                    parent.modelData.route !== "intercom"
+                                    && parent.modelData.route !== "phone"
+                                text: parent.modelData.label
+                                font.pixelSize:
+                                    parent.modelData.route === "reports"
+                                    ? 22
+                                    : parent.modelData.route === "rounds"
+                                    ? 27
+                                    : 11
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
                                 color:
                                     deskControlMouse.containsMouse
                                     ? Colors.orange

@@ -64,6 +64,33 @@ Item {
     signal submitStackRequested(string branch)
     signal compareRequested(string branch)
 
+    onSelectedBranchChanged: {
+        if (stackPlanner)
+            stackPlanner.clear();
+    }
+
+    Connections {
+        target: root.branchStackStore
+        enabled: root.branchStackStore !== null
+        ignoreUnknownSignals: true
+
+        function onRelationsChanged() {
+            if (root.stackPlanner)
+                root.stackPlanner.clear();
+        }
+    }
+
+    Connections {
+        target: root.branchWorkspaceService
+        enabled: root.branchWorkspaceService !== null
+        ignoreUnknownSignals: true
+
+        function onRefreshed() {
+            if (root.stackPlanner)
+                root.stackPlanner.clear();
+        }
+    }
+
     function branchForHead(sha) {
         const needle = String(sha || "");
 
@@ -755,6 +782,7 @@ Item {
                             label: "RESTACK"
                             enabledAction:
                                 stackPlanner
+                                && stackPlanner.startBranch === root.selectedBranch
                                 && stackPlanner.executable
                                 && stackPlanner.requiredCount > 0
                             onTriggered:

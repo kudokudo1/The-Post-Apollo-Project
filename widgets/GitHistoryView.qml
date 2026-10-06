@@ -22,6 +22,17 @@ Item {
         return year + "-" + month + "-" + day + "  " + hour + ":" + minute;
     }
 
+
+    component SectionLabel: GohuText {
+        font.pixelSize: 12
+        color: Colors.magenta
+    }
+
+    component OrangeLabel: GohuText {
+        font.pixelSize: 10
+        color: Colors.orange
+    }
+
     component MiniButton: Rectangle {
         id: button
 

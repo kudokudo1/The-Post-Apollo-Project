@@ -1819,7 +1819,7 @@ PanelWindow {
                             width: parent.width
                             height: parent.height
                             text: "🎙︎"
-                            font.pixelSize: 21
+                            font.pixelSize: 23
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                             color:
@@ -1901,7 +1901,7 @@ PanelWindow {
                             width: parent.width
                             height: parent.height
                             text: "☎︎"
-                            font.pixelSize: 30
+                            font.pixelSize: 28
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                             color:

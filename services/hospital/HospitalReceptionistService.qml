@@ -48,6 +48,16 @@ Scope {
         return new Date().toLocaleTimeString();
     }
 
+    function timeLabelFor(recordedAtValue) {
+        const raw = String(recordedAtValue || "");
+        const date = raw ? new Date(raw) : new Date();
+
+        if (Number.isNaN(date.getTime()))
+            return nowLabel();
+
+        return date.toLocaleTimeString();
+    }
+
     function eventEpoch(event) {
         const parsed = Date.parse(String((event || {}).recordedAt || ""));
         return Number.isFinite(parsed) ? parsed : 0;
@@ -134,7 +144,11 @@ Scope {
             schemaVersion: 1,
             key: key,
             recordedAt: recordedAt,
-            timeLabel: String(item.timeLabel || nowLabel()),
+            timeLabel:
+                String(
+                    item.timeLabel
+                    || timeLabelFor(recordedAt)
+                ),
             source: source,
             kind: kind,
             title: title,

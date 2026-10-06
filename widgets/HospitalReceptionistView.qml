@@ -184,14 +184,37 @@ Rectangle {
                                 ? Colors.orange
                                 : modelData.color
 
+                            GohuText {
+                                anchors.centerIn: parent
+                                anchors.verticalCenterOffset: 2
+                                width: parent.width
+                                height: parent.height
+                                visible:
+                                    parent.modelData.route === "intercom"
+                                text: parent.modelData.label
+                                font.pixelSize: 20
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                color:
+                                    deskControlMouse.containsMouse
+                                    ? Colors.orange
+                                    : parent.modelData.color
+                            }
+
                             NotoText {
-                                anchors.fill: parent
+                                anchors.centerIn: parent
+                                anchors.verticalCenterOffset:
+                                    parent.modelData.route === "reports"
+                                    ? 2 : 0
+                                width: parent.width
+                                height: parent.height
+                                visible:
+                                    parent.modelData.route !== "intercom"
                                 text: parent.modelData.label
                                 font.pixelSize:
                                     parent.modelData.label === "☎"
                                     ? 23
-                                    : parent.modelData.route === "intercom"
-                                    || parent.modelData.route === "reports"
+                                    : parent.modelData.route === "reports"
                                     ? 20
                                     : 11
                                 horizontalAlignment: Text.AlignHCenter

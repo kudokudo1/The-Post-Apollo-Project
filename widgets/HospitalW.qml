@@ -1687,9 +1687,9 @@ PanelWindow {
                 left: parent.left
                 right: parent.right
                 topMargin: 18
-                leftMargin: 62
-                rightMargin:
-                    root.operationsOpen ? 8 : 18
+                leftMargin:
+                    root.operationsOpen ? 18 : 62
+                rightMargin: 18
             }
 
             spacing: 12
@@ -1700,8 +1700,10 @@ PanelWindow {
                 id: hospitalHeader
 
                 // Header spans back across the floor-selector lane.
-                x: -44
-                width: parent.width + 44
+                x: root.operationsOpen ? 0 : -44
+                width:
+                    parent.width
+                    + (root.operationsOpen ? 0 : 44)
                 height: 56
 
                 GohuText {
@@ -2097,8 +2099,10 @@ PanelWindow {
             Rectangle {
                 // Header rule spans the full Hospital chassis, including
                 // the floor-selector lane.
-                x: -44
-                width: parent.width + 44
+                x: root.operationsOpen ? 0 : -44
+                width:
+                    parent.width
+                    + (root.operationsOpen ? 0 : 44)
                 height: 2
                 color: Colors.cyan
 
@@ -4002,8 +4006,8 @@ PanelWindow {
                 right: parent.right
                 top: fixedTop.bottom
                 bottom: actionBay.top
-                leftMargin: 62
-                rightMargin: 8
+                leftMargin: 18
+                rightMargin: 18
                 topMargin: 8
                 bottomMargin: 10
             }
@@ -4034,8 +4038,8 @@ PanelWindow {
                 right: parent.right
                 top: fixedTop.bottom
                 bottom: actionBay.top
-                leftMargin: 62
-                rightMargin: 8
+                leftMargin: 18
+                rightMargin: 18
                 topMargin: 8
                 bottomMargin: 10
             }
@@ -4054,8 +4058,8 @@ PanelWindow {
                 right: parent.right
                 top: fixedTop.bottom
                 bottom: actionBay.top
-                leftMargin: 62
-                rightMargin: 8
+                leftMargin: 18
+                rightMargin: 18
                 topMargin: 8
                 bottomMargin: 10
             }
@@ -4077,8 +4081,8 @@ PanelWindow {
                 right: parent.right
                 top: fixedTop.bottom
                 bottom: actionBay.top
-                leftMargin: 62
-                rightMargin: 8
+                leftMargin: 18
+                rightMargin: 18
                 topMargin: 8
                 bottomMargin: 10
             }
@@ -4092,9 +4096,9 @@ PanelWindow {
                 left: parent.left
                 right: parent.right
                 bottom: bottomStop.top
-                leftMargin: 62
-                rightMargin:
-                    root.operationsOpen ? 8 : 18
+                leftMargin:
+                    root.operationsOpen ? 18 : 62
+                rightMargin: 18
                 bottomMargin: 8
             }
 
@@ -4313,7 +4317,7 @@ PanelWindow {
                 > hospitalScroll.height
 
             opacity: 1.0
-            visible: !root.operationsOpen
+            visible: true
             z: 300
 
             property real maxContentY:

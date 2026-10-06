@@ -538,6 +538,269 @@ Rectangle {
         }
 
         Rectangle {
+            id: contextStrip
+
+            width: parent.width
+            height:
+                root.receptionistService.contextActive
+                ? 36 : 0
+            visible: root.receptionistService.contextActive
+            color: Colors.dark
+            border.width: 1
+            border.color: Colors.cyan
+
+            GohuText {
+                anchors {
+                    left: parent.left
+                    right: contextActions.left
+                    verticalCenter: parent.verticalCenter
+                    leftMargin: 8
+                    rightMargin: 8
+                }
+
+                text:
+                    "CONTEXT // "
+                    + String(
+                        root.receptionistService.contextLabel
+                        || "ACTIVITY"
+                    )
+                font.pixelSize: 9
+                color: Colors.cyan
+                elide: Text.ElideRight
+            }
+
+            Row {
+                id: contextActions
+
+                anchors {
+                    right: parent.right
+                    verticalCenter: parent.verticalCenter
+                    rightMargin: 6
+                }
+
+                spacing: 5
+
+                Rectangle {
+                    id: contextOpen
+
+                    width: 52
+                    height: 24
+                    color:
+                        contextOpenMouse.pressed
+                        ? Colors.magenta
+                        : Colors.black
+                    border.width:
+                        contextOpenMouse.containsMouse
+                        ? 2 : 1
+                    border.color:
+                        contextOpenMouse.containsMouse
+                        ? Colors.orange
+                        : Colors.cyan
+
+                    GohuText {
+                        anchors.centerIn: parent
+                        text: "OPEN"
+                        font.pixelSize: 8
+                        color:
+                            contextOpenMouse.pressed
+                            ? Colors.black
+                            : contextOpenMouse.containsMouse
+                            ? Colors.orange
+                            : Colors.cyan
+                    }
+
+                    MouseArea {
+                        id: contextOpenMouse
+
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+
+                        onClicked: {
+                            root.receptionistService.contextAction("open");
+                            Qt.callLater(function() {
+                                transcript.contentY = Math.max(
+                                    0,
+                                    transcript.contentHeight
+                                    - transcript.height
+                                );
+                            });
+                        }
+                    }
+                }
+
+                Item {
+                    id: contextFavorite
+
+                    width: 30
+                    height: 24
+                    opacity:
+                        root.receptionistService.contextHasEvent
+                        ? 1.0 : 0.28
+
+                    NotoText {
+                        anchors.centerIn: parent
+                        text:
+                            root.receptionistService.contextIsFavorite
+                            ? "✦"
+                            : "✧"
+                        font.pixelSize: 17
+                        color:
+                            contextFavoriteMouse.containsMouse
+                            && contextFavoriteMouse.enabled
+                            ? Colors.orange
+                            : root.attentionColor(
+                                root.receptionistService.contextItem
+                              )
+                    }
+
+                    MouseArea {
+                        id: contextFavoriteMouse
+
+                        anchors.fill: parent
+                        enabled:
+                            root.receptionistService.contextHasEvent
+                        hoverEnabled: true
+                        cursorShape:
+                            enabled
+                            ? Qt.PointingHandCursor
+                            : Qt.ArrowCursor
+
+                        onClicked: {
+                            root.receptionistService
+                                .contextAction("favorite");
+                            Qt.callLater(function() {
+                                transcript.contentY = Math.max(
+                                    0,
+                                    transcript.contentHeight
+                                    - transcript.height
+                                );
+                            });
+                        }
+                    }
+                }
+
+                Rectangle {
+                    id: contextBefore
+
+                    width: 56
+                    height: 24
+                    color:
+                        contextBeforeMouse.pressed
+                        && contextBeforeMouse.enabled
+                        ? Colors.magenta
+                        : Colors.black
+                    opacity:
+                        root.receptionistService.contextCanBefore
+                        ? 1.0 : 0.30
+                    border.width:
+                        contextBeforeMouse.containsMouse
+                        && contextBeforeMouse.enabled
+                        ? 2 : 1
+                    border.color: Colors.cyan
+
+                    GohuText {
+                        anchors.centerIn: parent
+                        text: "BEFORE"
+                        font.pixelSize: 7
+                        color:
+                            contextBeforeMouse.pressed
+                            && contextBeforeMouse.enabled
+                            ? Colors.black
+                            : contextBeforeMouse.containsMouse
+                              && contextBeforeMouse.enabled
+                            ? Colors.orange
+                            : Colors.cyan
+                    }
+
+                    MouseArea {
+                        id: contextBeforeMouse
+
+                        anchors.fill: parent
+                        enabled:
+                            root.receptionistService.contextCanBefore
+                        hoverEnabled: true
+                        cursorShape:
+                            enabled
+                            ? Qt.PointingHandCursor
+                            : Qt.ArrowCursor
+
+                        onClicked: {
+                            root.receptionistService
+                                .contextAction("before");
+                            Qt.callLater(function() {
+                                transcript.contentY = Math.max(
+                                    0,
+                                    transcript.contentHeight
+                                    - transcript.height
+                                );
+                            });
+                        }
+                    }
+                }
+
+                Rectangle {
+                    id: contextNewer
+
+                    width: 54
+                    height: 24
+                    color:
+                        contextNewerMouse.pressed
+                        && contextNewerMouse.enabled
+                        ? Colors.magenta
+                        : Colors.black
+                    opacity:
+                        root.receptionistService.contextCanNewer
+                        ? 1.0 : 0.30
+                    border.width:
+                        contextNewerMouse.containsMouse
+                        && contextNewerMouse.enabled
+                        ? 2 : 1
+                    border.color: Colors.cyan
+
+                    GohuText {
+                        anchors.centerIn: parent
+                        text: "NEWER"
+                        font.pixelSize: 7
+                        color:
+                            contextNewerMouse.pressed
+                            && contextNewerMouse.enabled
+                            ? Colors.black
+                            : contextNewerMouse.containsMouse
+                              && contextNewerMouse.enabled
+                            ? Colors.orange
+                            : Colors.cyan
+                    }
+
+                    MouseArea {
+                        id: contextNewerMouse
+
+                        anchors.fill: parent
+                        enabled:
+                            root.receptionistService.contextCanNewer
+                        hoverEnabled: true
+                        cursorShape:
+                            enabled
+                            ? Qt.PointingHandCursor
+                            : Qt.ArrowCursor
+
+                        onClicked: {
+                            root.receptionistService
+                                .contextAction("newer");
+                            Qt.callLater(function() {
+                                transcript.contentY = Math.max(
+                                    0,
+                                    transcript.contentHeight
+                                    - transcript.height
+                                );
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        Rectangle {
             id: transcriptFrame
 
             width: parent.width
@@ -548,8 +811,13 @@ Rectangle {
                     - receptionStage.height
                     - statusStrip.height
                     - inboxFrame.height
+                    - contextStrip.height
                     - composer.height
                     - 61
+                    - (
+                        contextStrip.visible
+                        ? 9 : 0
+                      )
                 )
             color: Colors.dark
             border.width: 1

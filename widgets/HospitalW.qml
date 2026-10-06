@@ -1819,7 +1819,7 @@ PanelWindow {
                             width: parent.width
                             height: parent.height
                             text: ""
-                            font.pixelSize: 20
+                            font.pixelSize: 21
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                             color:
@@ -1896,11 +1896,14 @@ PanelWindow {
                                 : Colors.green
                         }
 
-                        NotoText {
+                        GohuText {
                             anchors.centerIn: parent
-                            anchors.verticalCenterOffset: 1
-                            text: "☎"
-                            font.pixelSize: 21
+                            width: parent.width
+                            height: parent.height
+                            text: "☎︎"
+                            font.pixelSize: 30
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
                             color:
                                 phoneMouse.pressed
                                 ? Colors.black

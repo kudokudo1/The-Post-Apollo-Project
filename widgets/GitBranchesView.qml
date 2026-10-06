@@ -9,6 +9,7 @@ Item {
     required property var gitService
     required property var branchWorkspaceService
     required property var branchStackStore
+    required property var stackPlanner
 
     property string selectedBranch: ""
     property string selectedSha: ""
@@ -730,13 +731,32 @@ Item {
 
                         BranchButton {
                             width: (inspector.width - 26) / 2
-                            label: "RESTACK"
+                            label:
+                                stackPlanner && stackPlanner.busy
+                                ? "READING"
+                                : "PREVIEW"
                             enabledAction:
                                 root.selectedBranch.length > 0
+                                && stackPlanner
+                                && !stackPlanner.busy
                                 && (
                                     root.selectedStackParent.length > 0
                                     || root.selectedStackDescendants.length > 0
                                 )
+                            onTriggered:
+                                stackPlanner.buildPlan(
+                                    root.selectedBranch,
+                                    true
+                                )
+                        }
+
+                        BranchButton {
+                            width: (inspector.width - 26) / 2
+                            label: "RESTACK"
+                            enabledAction:
+                                stackPlanner
+                                && stackPlanner.executable
+                                && stackPlanner.requiredCount > 0
                             onTriggered:
                                 root.restackRequested(root.selectedBranch)
                         }
@@ -752,6 +772,87 @@ Item {
                                 )
                             onTriggered:
                                 root.submitStackRequested(root.selectedBranch)
+                        }
+                    }
+
+                    Rectangle {
+                        width: parent.width
+                        height:
+                            stackPlanner
+                            && stackPlanner.plan.length > 0
+                            ? Math.min(
+                                112,
+                                28 + stackPlanColumn.implicitHeight
+                              )
+                            : 30
+                        color: Colors.black
+                        border.width: 1
+                        border.color:
+                            stackPlanner && stackPlanner.invalidCount > 0
+                            ? Colors.red
+                            : stackPlanner && stackPlanner.requiredCount > 0
+                            ? Colors.orange
+                            : Colors.cyan
+                        clip: true
+
+                        Column {
+                            anchors {
+                                fill: parent
+                                margins: 6
+                            }
+                            spacing: 3
+
+                            GohuText {
+                                width: parent.width
+                                text:
+                                    stackPlanner
+                                    ? stackPlanner.stateText
+                                    : "RESTACK PREVIEW // NOT CONNECTED"
+                                font.pixelSize: 7
+                                color:
+                                    stackPlanner && stackPlanner.invalidCount > 0
+                                    ? Colors.red
+                                    : stackPlanner && stackPlanner.requiredCount > 0
+                                    ? Colors.orange
+                                    : Colors.cyan
+                                elide: Text.ElideRight
+                            }
+
+                            Column {
+                                id: stackPlanColumn
+
+                                width: parent.width
+                                spacing: 1
+
+                                Repeater {
+                                    model:
+                                        stackPlanner
+                                        ? stackPlanner.plan.slice(0, 4)
+                                        : []
+
+                                    GohuText {
+                                        required property var modelData
+
+                                        width: stackPlanColumn.width
+                                        text:
+                                            String(modelData.branch || "")
+                                            + " → "
+                                            + String(modelData.parent || "")
+                                            + " // "
+                                            + String(modelData.status || "")
+                                        font.pixelSize: 7
+                                        color:
+                                            String(modelData.status || "")
+                                            === "RESTACK_REQUIRED"
+                                            ? Colors.orange
+                                            : String(modelData.status || "")
+                                              === "UP_TO_DATE"
+                                            ? Colors.cyan
+                                            : Colors.red
+                                        elide: Text.ElideMiddle
+                                    }
+                                }
+                            }
                         }
                     }
 

@@ -13,6 +13,9 @@ Scope {
     property string displayName: ""
     property string bio: ""
     property string email: ""
+    property string primaryEmail: ""
+    property bool primaryEmailAvailable: false
+    property string primaryEmailMessage: "PRIMARY EMAIL // NOT LOADED"
     property string profileUrl: ""
 
     property string stateText: "ACCOUNT PROFILE // READY"
@@ -43,6 +46,19 @@ Scope {
         bio = String(profile.bio || "");
         email = String(profile.email || "");
         profileUrl = String(profile.html_url || "");
+
+        if (profile.primaryEmail !== undefined) {
+            primaryEmail = String(profile.primaryEmail || "");
+            primaryEmailAvailable = !!profile.primaryEmailAvailable;
+            primaryEmailMessage = String(
+                profile.primaryEmailMessage
+                || (
+                    primaryEmailAvailable
+                    ? "PRIMARY EMAIL // READY"
+                    : "PRIMARY EMAIL // UNAVAILABLE"
+                  )
+            );
+        }
     }
 
     function refreshProfile() {
@@ -62,7 +78,18 @@ Scope {
         readProcess.exec([
             "bash",
             "-lc",
-            'exec gh api user --jq "{login,name,bio,email,html_url}"'
+            [
+                'profile="$(gh api user --jq "{login,name,bio,email,html_url}")" || exit $?',
+                'primary_email=""',
+                'primary_available=false',
+                'primary_message="PRIMARY EMAIL // user:email scope required"',
+                'if emails="$(gh api user/emails 2>/dev/null)"; then',
+                '  primary_email="$(printf "%s" "$emails" | jq -r "map(select(.primary == true))[0].email // empty")"',
+                '  primary_available=true',
+                '  primary_message="PRIMARY EMAIL // READY"',
+                'fi',
+                'jq -nc --argjson profile "$profile" --arg primaryEmail "$primary_email" --argjson primaryEmailAvailable "$primary_available" --arg primaryEmailMessage "$primary_message" "$profile + {primaryEmail:$primaryEmail,primaryEmailAvailable:$primaryEmailAvailable,primaryEmailMessage:$primaryEmailMessage}"'
+            ].join("\n")
         ]);
         watchdog.restart();
         return true;

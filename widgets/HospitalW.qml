@@ -1815,7 +1815,7 @@ PanelWindow {
 
                         GohuText {
                             anchors.centerIn: parent
-                            anchors.verticalCenterOffset: 2
+                            anchors.verticalCenterOffset: 0
                             width: parent.width
                             height: parent.height
                             text: "🎙︎"

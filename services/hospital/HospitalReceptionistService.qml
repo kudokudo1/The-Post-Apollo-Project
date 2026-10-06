@@ -1131,6 +1131,15 @@ Scope {
 
         append("OPERATOR", raw);
 
+        if (goThere && contextTarget) {
+            append(
+                "RECEPTION",
+                "OPENING ROOM // " + contextTarget
+            );
+            teamNavigationRequested(contextTarget);
+            return true;
+        }
+
         const current = contextEvent();
 
         if (!current) {
@@ -1143,15 +1152,6 @@ Scope {
         }
 
         if (goThere) {
-            if (contextTarget) {
-                append(
-                    "RECEPTION",
-                    "OPENING ROOM // " + contextTarget
-                );
-                teamNavigationRequested(contextTarget);
-                return true;
-            }
-
             append(
                 "RECEPTION",
                 "OPENING // " + activityLine(current)
@@ -1320,15 +1320,12 @@ Scope {
                 && !source
                 && !asksSpecificHistoricalEvent) {
             append("OPERATOR", raw);
-            rememberActivityContext(
-                contextEvent() || {},
-                "",
-                target,
-                false,
-                false,
-                false
-            );
+            contextEventKey = "";
+            contextSource = "";
             contextTarget = target;
+            contextUnreadOnly = false;
+            contextFavoritesOnly = false;
+            contextProblemsOnly = false;
             append(
                 "RECEPTION",
                 "OPENING ROOM // " + target

@@ -295,6 +295,11 @@ Scope {
                 '    git -C "$repo" remote prune "$a" || exit $?',
                 '    printf "OK\\tPRUNED REMOTE // %s\\n" "$a"',
                 '    ;;',
+                '  remote-head)',
+                '    [ -n "$a" ] || { printf "REFUSED\\tREMOTE REQUIRED\\n"; exit 23; }',
+                '    git -C "$repo" remote set-head "$a" -a || exit $?',
+                '    printf "OK\\tSYNCHRONIZED REMOTE HEAD // %s\\n" "$a"',
+                '    ;;',
                 '  add-remote)',
                 '    [ -n "$a" ] && [ -n "$b" ] || { printf "REFUSED\\tREMOTE NAME + URL REQUIRED\\n"; exit 24; }',
                 '    git -C "$repo" remote get-url "$a" >/dev/null 2>&1 && { printf "REFUSED\\tREMOTE ALREADY EXISTS // %s\\n" "$a"; exit 25; }',
@@ -334,10 +339,22 @@ Scope {
                 '    git -C "$repo" push "$remote" --delete "$branch" || exit $?',
                 '    printf "OK\\tDELETED REMOTE BRANCH // %s/%s\\n" "$remote" "$branch"',
                 '    ;;',
-                '  create-tag)',
-                '    name="$a"; target="$b"; [ -n "$target" ] || target="HEAD"',
+                '  create-tag-light|create-tag-annotated|create-tag-signed)',
+                '    name="$a"; target="$b"; message="$c"; [ -n "$target" ] || target="HEAD"',
                 '    git check-ref-format "refs/tags/$name" >/dev/null 2>&1 || { printf "REFUSED\\tINVALID TAG NAME\\n"; exit 30; }',
-                '    git -C "$repo" tag "$name" "$target" || exit $?',
+                '    case "$op" in',
+                '      create-tag-annotated)',
+                '        [ -n "$message" ] || message="$name"',
+                '        git -C "$repo" tag -a "$name" "$target" -m "$message" || exit $?',
+                '        ;;',
+                '      create-tag-signed)',
+                '        [ -n "$message" ] || message="$name"',
+                '        git -C "$repo" tag -s "$name" "$target" -m "$message" || exit $?',
+                '        ;;',
+                '      *)',
+                '        git -C "$repo" tag "$name" "$target" || exit $?',
+                '        ;;',
+                '    esac',
                 '    printf "OK\\tCREATED TAG // %s\\n" "$name"',
                 '    ;;',
                 '  delete-tag)',
@@ -353,6 +370,12 @@ Scope {
                 '  push-tags)',
                 '    git -C "$repo" push "$a" --tags || exit $?',
                 '    printf "OK\\tPUSHED ALL TAGS // %s\\n" "$a"',
+                '    ;;',
+                '  delete-remote-tag)',
+                '    [ "$c" = "CONFIRM" ] || { printf "REFUSED\\tREMOTE TAG DELETE REQUIRES CONFIRMATION\\n"; exit 32; }',
+                '    [ -n "$a" ] && [ -n "$b" ] || { printf "REFUSED\\tREMOTE + TAG REQUIRED\\n"; exit 32; }',
+                '    git -C "$repo" push "$a" ":refs/tags/$b" || exit $?',
+                '    printf "OK\\tDELETED REMOTE TAG // %s/%s\\n" "$a" "$b"',
                 '    ;;',
                 '  set-config)',
                 '    [ -n "$a" ] && [ -n "$b" ] || { printf "REFUSED\\tCONFIG KEY + VALUE REQUIRED\\n"; exit 32; }',
@@ -452,6 +475,10 @@ Scope {
         return runAction("prune-remote", name, "", "");
     }
 
+    function syncRemoteHead(name) {
+        return runAction("remote-head", name, "", "");
+    }
+
     function addRemote(name, url) {
         return runAction("add-remote", name, url, "");
     }
@@ -494,8 +521,21 @@ Scope {
         );
     }
 
-    function createTag(name, target) {
-        return runAction("create-tag", name, target || "HEAD", "");
+    function createTag(name, target, mode, message) {
+        const kind = String(mode || "lightweight");
+        const operation =
+            kind === "annotated"
+            ? "create-tag-annotated"
+            : kind === "signed"
+            ? "create-tag-signed"
+            : "create-tag-light";
+
+        return runAction(
+            operation,
+            name,
+            target || "HEAD",
+            String(message || "").trim()
+        );
     }
 
     function deleteTag(name, confirmed) {
@@ -513,6 +553,15 @@ Scope {
 
     function pushAllTags(remote) {
         return runAction("push-tags", remote, "", "");
+    }
+
+    function deleteRemoteTag(remote, tag, confirmed) {
+        return runAction(
+            "delete-remote-tag",
+            remote,
+            tag,
+            confirmed ? "CONFIRM" : ""
+        );
     }
 
     function setConfig(key, value) {

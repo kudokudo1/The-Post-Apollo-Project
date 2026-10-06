@@ -24,6 +24,7 @@ PanelWindow {
     property int selectedWorkflowIndex: 0
     property bool workflowMenuOpen: false
     property bool localTargetMenuOpen: false
+    property string targetMatchSource: "local"
     property int selectedRunIndex: 0
     property bool runInspectorOpen: false
     property int runInspectorHeight: 400
@@ -784,6 +785,104 @@ PanelWindow {
         root.localTargetMenuOpen = false;
         root.gitView = "branches";
         branchWorkspaceService.refresh();
+    }
+
+    function remoteBranchLeaf(remoteBranch) {
+        let value = String(remoteBranch || "").trim();
+        value = value.replace(/^refs\/remotes\//, "");
+
+        const slash = value.indexOf("/");
+        return slash >= 0 ? value.slice(slash + 1) : value;
+    }
+
+    function matchingRemoteForLocal() {
+        const localBranch = String(gitService.selectedLocalBranch || "");
+
+        if (!localBranch)
+            return "";
+
+        const upstream = String(gitService.selectedLocalUpstream || "");
+
+        if (upstream && root.remoteBranchLeaf(upstream) === localBranch)
+            return upstream;
+
+        return "origin/" + localBranch;
+    }
+
+    function targetsAreMatched() {
+        const remoteBranch = String(gitService.selectedRemoteBranch || "");
+
+        if (!remoteBranch)
+            return false;
+
+        if (gitService.localTrackCheckoutMode)
+            return root.targetMatchSource === "remote";
+
+        const localBranch = String(gitService.selectedLocalBranch || "");
+        return !!localBranch
+            && root.remoteBranchLeaf(remoteBranch) === localBranch;
+    }
+
+    function matchTargetSelectors() {
+        if (gitService.actionBusy || gitService.refreshing)
+            return;
+
+        if (root.targetMatchSource === "remote") {
+            const remoteBranch = String(
+                gitService.selectedRemoteBranch || ""
+            );
+            const localBranch = root.remoteBranchLeaf(remoteBranch);
+
+            if (!remoteBranch || !localBranch)
+                return;
+
+            if (gitService.localIndexOf(localBranch) >= 0) {
+                if (gitService.selectLocalText(localBranch))
+                    localTargetInput.syncDisplay(localBranch);
+
+                gitService.actionTitle = "TARGET MATCH";
+                gitService.actionExitCode = 0;
+                gitService.actionOutput =
+                    "MATCH REMOTE → LOCAL\n"
+                    + remoteBranch + " → " + localBranch
+                    + "\nSelectors only. LIVE checkout was not changed.";
+            } else {
+                gitService.selectTrackCheckoutRemote();
+                localTargetInput.syncDisplay(
+                    gitService.localTargetDisplay
+                );
+
+                gitService.actionTitle = "TARGET MATCH";
+                gitService.actionExitCode = 0;
+                gitService.actionOutput =
+                    "MATCH REMOTE → LOCAL\n"
+                    + remoteBranch
+                    + "\nNo matching local branch exists."
+                    + "\nLOCAL TARGET prepared as TRACK // CHECKOUT REMOTE."
+                    + "\nNothing was created or checked out.";
+            }
+
+            return;
+        }
+
+        if (gitService.localTrackCheckoutMode)
+            return;
+
+        const localBranch = String(
+            gitService.selectedLocalBranch || ""
+        );
+        const remoteBranch = root.matchingRemoteForLocal();
+
+        if (!localBranch || !remoteBranch)
+            return;
+
+        gitService.selectRemoteText(remoteBranch);
+        gitService.actionTitle = "TARGET MATCH";
+        gitService.actionExitCode = 0;
+        gitService.actionOutput =
+            "MATCH LOCAL → REMOTE\n"
+            + localBranch + " → " + remoteBranch
+            + "\nSelectors only. No Git operation occurred.";
     }
 
     function showGithubPage() {
@@ -2150,6 +2249,7 @@ PanelWindow {
 
             onIndexRequested: function(index) {
                 gitService.selectRemote(index);
+                root.targetMatchSource = "remote";
             }
         }
 
@@ -2579,7 +2679,9 @@ PanelWindow {
 
                                             onSubmitted: function(value) {
                                                 root.localTargetMenuOpen = false;
-                                                gitService.selectLocalText(value);
+
+                                                if (gitService.selectLocalText(value))
+                                                    root.targetMatchSource = "local";
                                             }
                                         }
 
@@ -2604,9 +2706,11 @@ PanelWindow {
 
                                     Row {
                                         width: parent.width
-                                        spacing: 8
+                                        height: 20
+                                        spacing: 6
 
                                         MetaLabel {
+                                            width: 38
                                             text:
                                                 gitService.localTrackCheckoutMode
                                                 ? "MODE"
@@ -2614,7 +2718,7 @@ PanelWindow {
                                         }
 
                                         OrangeValue {
-                                            width: 82
+                                            width: 64
                                             text:
                                                 gitService.localTrackCheckoutMode
                                                 ? "NEW"
@@ -2623,13 +2727,48 @@ PanelWindow {
                                         }
 
                                         MetaValue {
-                                            width: parent.width - 120
+                                            width:
+                                                parent.width
+                                                - 38
+                                                - 64
+                                                - 62
+                                                - 18
                                             text:
                                                 "LIVE "
                                                 + gitService.branch
                                                 + " // "
                                                 + gitService.worktree
                                             font.pixelSize: 8
+                                        }
+
+                                        ActionButton {
+                                            id: targetMatchButton
+
+                                            width: 62
+                                            height: 20
+                                            label:
+                                                root.targetsAreMatched()
+                                                ? "MATCHED"
+                                                : root.targetMatchSource === "remote"
+                                                ? "R→L"
+                                                : "L→R"
+                                            enabledAction:
+                                                !root.targetsAreMatched()
+                                                && !gitService.actionBusy
+                                                && !gitService.refreshing
+                                                && (
+                                                    root.targetMatchSource === "remote"
+                                                    ? !!gitService.selectedRemoteBranch
+                                                    : (
+                                                        !gitService.localTrackCheckoutMode
+                                                        && !!gitService.selectedLocalBranch
+                                                      )
+                                                   )
+                                            selectedAction:
+                                                root.targetsAreMatched()
+
+                                            onTriggered:
+                                                root.matchTargetSelectors()
                                         }
                                     }
                                 }
@@ -2742,6 +2881,7 @@ PanelWindow {
                                                     onClicked: {
                                                         gitService
                                                             .selectTrackCheckoutRemote();
+                                                        root.targetMatchSource = "remote";
                                                         root.localTargetMenuOpen = false;
                                                         localTargetInput
                                                             .syncDisplay(
@@ -2846,6 +2986,7 @@ PanelWindow {
                                                                         branchName
                                                                     )
                                                             ) {
+                                                                root.targetMatchSource = "local";
                                                                 localTargetInput
                                                                     .syncDisplay(
                                                                         branchName
@@ -3021,7 +3162,10 @@ PanelWindow {
                                             height: 28
                                             label: "<"
                                             enabledAction: gitService.remoteBranchCount > 0
-                                            onTriggered: gitService.cycleRemote(-1)
+                                            onTriggered: {
+                                                gitService.cycleRemote(-1);
+                                                root.targetMatchSource = "remote";
+                                            }
                                         }
 
                                         SelectorInput {
@@ -3031,7 +3175,8 @@ PanelWindow {
                                             accentColor: Colors.magenta
 
                                             onSubmitted: function(value) {
-                                                gitService.selectRemoteText(value);
+                                                if (gitService.selectRemoteText(value))
+                                                    root.targetMatchSource = "remote";
                                             }
                                         }
 
@@ -3040,7 +3185,10 @@ PanelWindow {
                                             height: 28
                                             label: ">"
                                             enabledAction: gitService.remoteBranchCount > 0
-                                            onTriggered: gitService.cycleRemote(1)
+                                            onTriggered: {
+                                                gitService.cycleRemote(1);
+                                                root.targetMatchSource = "remote";
+                                            }
                                         }
                                     }
 

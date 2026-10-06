@@ -1445,6 +1445,7 @@ PanelWindow {
         SelectorSlider {
             id: floorSlider
 
+            visible: !root.operationsOpen
             z: 300
             anchors {
                 left: parent.left
@@ -1498,7 +1499,12 @@ PanelWindow {
                         top: parent.top
                     }
 
-                    text: "HOSPITAL // SURGERY ROOM"
+                    text:
+                        root.operationsSurface === "reports"
+                        ? "HOSPITAL // REPORTS"
+                        : root.operationsSurface === "rounds"
+                        ? "HOSPITAL // ROUNDS"
+                        : "HOSPITAL // SURGERY ROOM"
                     font.pixelSize: 20
                     color: Colors.magenta
 
@@ -1518,7 +1524,12 @@ PanelWindow {
                         bottom: parent.bottom
                     }
 
-                    text: "CONTROL SURFACE // LOCAL PATIENT"
+                    text:
+                        root.operationsSurface === "reports"
+                        ? "SURGICAL HISTORY // EVIDENCE"
+                        : root.operationsSurface === "rounds"
+                        ? "HOSPITAL-WIDE // ATTENTION"
+                        : "CONTROL SURFACE // LOCAL PATIENT"
                     font.pixelSize: 10
                     color: Colors.cyan
 
@@ -1562,14 +1573,40 @@ PanelWindow {
 
                             anchors.centerIn: parent
                             text:
-                                floorService.bedIsLive
+                                root.operationsSurface === "reports"
+                                ? (
+                                    "REPORTS "
+                                    + String(
+                                        reportsView.filteredEvents.length
+                                    )
+                                  )
+                                : root.operationsSurface === "rounds"
+                                ? (
+                                    roundsService.running
+                                    ? "ROUNDING"
+                                    : roundsService.attentionCount > 0
+                                    ? "ATTN "
+                                      + String(
+                                          roundsService.attentionCount
+                                      )
+                                    : "CLEAR"
+                                  )
+                                : floorService.bedIsLive
                                 ? "LOCAL LIVE"
                                 : floorService.bedPath.length > 0
                                 ? "LOCAL BED"
                                 : "OFFLINE"
                             font.pixelSize: 9
                             color:
-                                floorService.bedIsLive
+                                root.operationsSurface === "reports"
+                                ? Colors.magenta
+                                : root.operationsSurface === "rounds"
+                                ? (
+                                    roundsService.attentionCount > 0
+                                    ? Colors.orange
+                                    : Colors.cyan
+                                  )
+                                : floorService.bedIsLive
                                 ? Colors.magenta
                                 : floorService.bedPath.length > 0
                                 ? Colors.cyan
@@ -1667,11 +1704,115 @@ PanelWindow {
                 }
             }
 
+
+            Rectangle {
+                id: departmentContextStrip
+
+                width: parent.width
+                height: 44
+                visible: root.operationsOpen
+                color: Colors.dark
+                border.width: 1
+                border.color:
+                    root.operationsSurface === "reports"
+                    ? Colors.magenta
+                    : Colors.cyan
+
+                RectangularShadow {
+                    anchors.fill: parent
+                    spread: 3
+                    z: -1
+                    opacity: 0.22
+                    color:
+                        root.operationsSurface === "reports"
+                        ? Colors.magenta
+                        : Colors.cyan
+                }
+
+                Row {
+                    anchors {
+                        fill: parent
+                        margins: 8
+                    }
+                    spacing: 12
+
+                    GohuText {
+                        width: 138
+                        anchors.verticalCenter: parent.verticalCenter
+                        text:
+                            root.operationsSurface === "reports"
+                            ? "REPORTS // CONTEXT"
+                            : "ROUNDS // HOSPITAL-WIDE"
+                        font.pixelSize: 10
+                        color:
+                            root.operationsSurface === "reports"
+                            ? Colors.magenta
+                            : Colors.cyan
+                        elide: Text.ElideRight
+                    }
+
+                    GohuText {
+                        width: parent.width - 150
+                        anchors.verticalCenter: parent.verticalCenter
+                        text:
+                            root.operationsSurface === "reports"
+                            ? (
+                                "FLOOR "
+                                + (
+                                    floorService.floorLabel
+                                    || "UNKNOWN"
+                                  )
+                                + "  //  ROOM "
+                                + (
+                                    reportsView.teamFilter
+                                    || "ALL"
+                                  )
+                                + "  //  VISIBLE "
+                                + String(
+                                    reportsView.filteredEvents.length
+                                  )
+                                + " / "
+                                + String(
+                                    certificationCoordinator.historyService
+                                    && Array.isArray(
+                                        certificationCoordinator
+                                            .historyService.events
+                                    )
+                                    ? certificationCoordinator
+                                        .historyService.events.length
+                                    : 0
+                                  )
+                              )
+                            : (
+                                "FLOORS "
+                                + String(roundsService.floorCount)
+                                + "  //  ROOMS "
+                                + String(roundsService.roomCount)
+                                + "  //  ATTENTION "
+                                + String(roundsService.attentionCount)
+                                + "  //  DIVERGED "
+                                + String(roundsService.divergedCount)
+                                + "  //  MISSING "
+                                + String(roundsService.missingCount)
+                              )
+                        font.pixelSize: 9
+                        color:
+                            root.operationsSurface === "reports"
+                            ? Colors.white
+                            : roundsService.attentionCount > 0
+                            ? Colors.orange
+                            : Colors.white
+                        elide: Text.ElideRight
+                    }
+                }
+            }
+
             // ===== FLOOR / REPOSITORY ==========================
 
             Rectangle {
                 id: floorSelector
 
+                visible: !root.operationsOpen
                 width: parent.width
                 height: 54
 
@@ -1830,6 +1971,7 @@ PanelWindow {
             BranchMap {
                 id: topologyFrame
 
+                visible: !root.operationsOpen
                 width: parent.width
                 height: 190
 
@@ -1849,6 +1991,7 @@ PanelWindow {
             Row {
                 id: patientRoomRow
 
+                visible: !root.operationsOpen
                 width: parent.width
                 height: 328
                 spacing: 10
@@ -3151,10 +3294,12 @@ PanelWindow {
             // ===== OPERATING ROOMS ==============================
 
             SectionLabel {
+                visible: !root.operationsOpen
                 text: "OPERATING ROOMS"
             }
 
             Rectangle {
+                visible: !root.operationsOpen
                 width: parent.width
                 height: 2
                 color: Colors.magenta

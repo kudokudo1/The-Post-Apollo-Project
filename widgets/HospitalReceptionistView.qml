@@ -18,6 +18,21 @@ Rectangle {
     signal attentionActivated(var item)
     signal typingChanged(bool active)
 
+    function attentionColor(item) {
+        const source = String((item || {}).source || "").toLowerCase();
+
+        if (source === "phone")
+            return Colors.green;
+        if (source === "intercom")
+            return Colors.omnitrix;
+        if (source === "reports")
+            return Colors.magenta;
+        if (source === "rounds")
+            return Colors.yellow;
+
+        return Colors.cyan;
+    }
+
     color: Colors.black
     border.width: 1
     border.color: Colors.magenta
@@ -342,6 +357,8 @@ Rectangle {
                                 : null
                             readonly property bool occupied:
                                 itemData !== null
+                            readonly property color attentionAccent:
+                                root.attentionColor(itemData)
 
                             width: (inboxSlots.width - 24) / 5
                             height: inboxSlots.height
@@ -358,17 +375,9 @@ Rectangle {
                             border.color:
                                 !occupied
                                 ? Colors.cyan
-                                : String(itemData.kind || "") === "room"
-                                ? (
-                                    inboxMouse.containsMouse
-                                    ? Colors.orange
-                                    : Colors.yellow
-                                  )
-                                : (
-                                    inboxMouse.containsMouse
-                                    ? Colors.orange
-                                    : Colors.magenta
-                                  )
+                                : inboxMouse.containsMouse
+                                ? Colors.orange
+                                : attentionAccent
 
                             Column {
                                 anchors {
@@ -388,12 +397,7 @@ Rectangle {
                                         )
                                     font.pixelSize: 8
                                     color:
-                                        String(
-                                            (parent.parent.itemData || {}).kind
-                                            || ""
-                                        ) === "room"
-                                        ? Colors.yellow
-                                        : Colors.magenta
+                                        parent.parent.attentionAccent
                                     elide: Text.ElideRight
                                 }
 

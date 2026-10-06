@@ -824,6 +824,62 @@ PanelWindow {
         branchWorkspaceService.refresh();
     }
 
+    function openHistoryForBranch(branchName) {
+        const branch = String(branchName || "").trim();
+
+        if (!branch)
+            return;
+
+        root.localTargetMenuOpen = false;
+        root.remoteTargetMenuOpen = false;
+        root.activePage = "git";
+        root.gitView = "history";
+        gitService.refresh();
+        gitHistoryView.openBranchScope(branch);
+    }
+
+    function openHistoryForPath(path) {
+        const target = String(path || "").trim();
+
+        if (!target)
+            return;
+
+        root.localTargetMenuOpen = false;
+        root.remoteTargetMenuOpen = false;
+        root.activePage = "git";
+        root.gitView = "history";
+        gitHistoryView.openPathQuery(target);
+    }
+
+    function openChangesForPath(path) {
+        const target = String(path || "").trim();
+
+        if (!target)
+            return;
+
+        root.localTargetMenuOpen = false;
+        root.remoteTargetMenuOpen = false;
+        root.activePage = "git";
+        root.gitView = "changes";
+        gitChangesView.focusPath(target);
+        changesService.refresh();
+    }
+
+    function openBranchesForContext(branchName, sha) {
+        const branch = String(branchName || "").trim();
+        const commit = String(sha || "").trim();
+
+        if (!branch && !commit)
+            return;
+
+        root.localTargetMenuOpen = false;
+        root.remoteTargetMenuOpen = false;
+        root.activePage = "git";
+        root.gitView = "branches";
+        gitBranchesView.focusContext(branch, commit);
+        branchWorkspaceService.refresh();
+    }
+
     function localTargetResults() {
         const count = gitService.localBranchCount;
         const revision = gitService.topologyRevision;
@@ -4252,6 +4308,17 @@ PanelWindow {
                         gitService: gitService
                         historyService: historyService
                         keyboardHost: root
+
+                        onChangesRequested: function(path) {
+                            root.openChangesForPath(path);
+                        }
+
+                        onBranchesRequested: function(branch, sha) {
+                            root.openBranchesForContext(
+                                branch,
+                                sha
+                            );
+                        }
                     }
 
                     GitChangesView {
@@ -4270,6 +4337,10 @@ PanelWindow {
                         changesService: changesService
                         gitService: gitService
                         keyboardHost: root
+
+                        onHistoryRequested: function(path) {
+                            root.openHistoryForPath(path);
+                        }
                     }
 
                     GitBranchesView {
@@ -4290,6 +4361,10 @@ PanelWindow {
                         branchStackStore: branchStackStore
                         stackPlanner: stackPlanner
                         stackExecutor: stackExecutor
+
+                        onHistoryRequested: function(branch) {
+                            root.openHistoryForBranch(branch);
+                        }
                     }
 
                     Row {

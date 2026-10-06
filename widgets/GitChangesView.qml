@@ -424,6 +424,7 @@ Item {
                         }
 
                         Flickable {
+                            id: changesScroll1
                             width: parent.width
                             height: parent.height - 34
                             clip: true
@@ -555,7 +556,18 @@ Item {
                                     }
                                 }
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: changesScroll1
+                                anchors {
+                                    top: changesScroll1.top
+                                    right: changesScroll1.right
+                                    bottom: changesScroll1.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: changesScroll1
+                            }
+}
                     }
                 }
 
@@ -660,6 +672,7 @@ Item {
                         }
 
                         Flickable {
+                            id: changesScroll2
                             width: parent.width
                             height: parent.height - 34
                             clip: true
@@ -682,7 +695,18 @@ Item {
                                     : Colors.white
                                 wrapMode: Text.WrapAnywhere
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: changesScroll2
+                                anchors {
+                                    top: changesScroll2.top
+                                    right: changesScroll2.right
+                                    bottom: changesScroll2.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: changesScroll2
+                            }
+}
                     }
                 }
             }
@@ -749,6 +773,7 @@ Item {
                         }
 
                         Flickable {
+                            id: changesScroll3
                             width: parent.width
                             height: parent.height - 34
                             clip: true
@@ -858,7 +883,18 @@ Item {
                                     }
                                 }
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: changesScroll3
+                                anchors {
+                                    top: changesScroll3.top
+                                    right: changesScroll3.right
+                                    bottom: changesScroll3.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: changesScroll3
+                            }
+}
                     }
                 }
 
@@ -961,6 +997,7 @@ Item {
                         }
 
                         Flickable {
+                            id: changesScroll4
                             width: parent.width
                             height: parent.height - 34
                             clip: true
@@ -988,7 +1025,18 @@ Item {
                                 color: Colors.white
                                 wrapMode: Text.WrapAnywhere
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: changesScroll4
+                                anchors {
+                                    top: changesScroll4.top
+                                    right: changesScroll4.right
+                                    bottom: changesScroll4.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: changesScroll4
+                            }
+}
                     }
                 }
             }
@@ -1007,6 +1055,7 @@ Item {
                     border.color: Colors.magenta
 
                     Flickable {
+                        id: changesScroll5
                         anchors {
                             fill: parent
                             margins: 7
@@ -1107,7 +1156,18 @@ Item {
                                 }
                             }
                         }
-                    }
+                    
+                        NeonScrollBar {
+                            parent: changesScroll5
+                            anchors {
+                                top: changesScroll5.top
+                                right: changesScroll5.right
+                                bottom: changesScroll5.bottom
+                                rightMargin: 2
+                            }
+                            flickable: changesScroll5
+                        }
+}
                 }
 
                 Rectangle {
@@ -1204,6 +1264,7 @@ Item {
                         }
 
                         Flickable {
+                            id: changesScroll6
                             width: parent.width
                             height: parent.height - 34
                             clip: true
@@ -1222,7 +1283,18 @@ Item {
                                 color: Colors.white
                                 wrapMode: Text.WrapAnywhere
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: changesScroll6
+                                anchors {
+                                    top: changesScroll6.top
+                                    right: changesScroll6.right
+                                    bottom: changesScroll6.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: changesScroll6
+                            }
+}
                     }
                 }
             }
@@ -1286,6 +1358,7 @@ Item {
                         }
 
                         Flickable {
+                            id: changesScroll7
                             width: parent.width
                             height: parent.height - 34
                             clip: true
@@ -1382,7 +1455,18 @@ Item {
                                     }
                                 }
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: changesScroll7
+                                anchors {
+                                    top: changesScroll7.top
+                                    right: changesScroll7.right
+                                    bottom: changesScroll7.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: changesScroll7
+                            }
+}
                     }
                 }
 
@@ -1534,6 +1618,7 @@ Item {
                         }
 
                         Flickable {
+                            id: changesScroll8
                             width: parent.width
                             height: parent.height - 118
                             clip: true
@@ -1552,7 +1637,18 @@ Item {
                                 color: Colors.white
                                 wrapMode: Text.WrapAnywhere
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: changesScroll8
+                                anchors {
+                                    top: changesScroll8.top
+                                    right: changesScroll8.right
+                                    bottom: changesScroll8.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: changesScroll8
+                            }
+}
                     }
                 }
             }

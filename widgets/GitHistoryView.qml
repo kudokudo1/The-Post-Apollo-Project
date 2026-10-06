@@ -8,18 +8,51 @@ Item {
     property var gitService: null
     property var historyService: null
 
+    function pad2(value) {
+        const text = String(Number(value || 0));
+        return text.length < 2 ? "0" + text : text;
+    }
+
     function dateLabel(epoch) {
         const value = Number(epoch || 0);
         if (value <= 0)
             return "";
 
         const d = new Date(value * 1000);
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, "0");
-        const day = String(d.getDate()).padStart(2, "0");
-        const hour = String(d.getHours()).padStart(2, "0");
-        const minute = String(d.getMinutes()).padStart(2, "0");
-        return year + "-" + month + "-" + day + "  " + hour + ":" + minute;
+        return d.getFullYear()
+            + "-" + root.pad2(d.getMonth() + 1)
+            + "-" + root.pad2(d.getDate())
+            + "  " + root.pad2(d.getHours())
+            + ":" + root.pad2(d.getMinutes());
+    }
+
+    function historyRows() {
+        const rows = [];
+        if (!root.gitService)
+            return rows;
+
+        const revision = root.gitService.topologyRevision;
+        const count = root.gitService.commitCount;
+
+        for (let i = 0; i < count; ++i) {
+            const row = root.gitService.commitAt(i);
+            if (!row)
+                continue;
+
+            rows.push({
+                sha: String(row.sha || ""),
+                shortSha: String(row.shortSha || ""),
+                parents: String(row.parents || ""),
+                refsText: String(row.refsText || ""),
+                epoch: Number(row.epoch || 0),
+                author: String(row.author || ""),
+                subject: String(row.subject || ""),
+                lane: Number(row.lane || 0),
+                isHead: Boolean(row.isHead)
+            });
+        }
+
+        return rows;
     }
 
 
@@ -187,16 +220,13 @@ Item {
                         spacing: 3
 
                         Repeater {
-                            model:
-                                root.gitService
-                                ? root.gitService.topologyModel
-                                : null
+                            model: root.historyRows()
 
                             Rectangle {
                                 id: commitRow
 
                                 required property int index
-                                required property var model
+                                required property var modelData
 
                                 width: historyColumn.width
                                 height: 48
@@ -238,14 +268,14 @@ Item {
                                             12
                                             + Math.min(
                                                 6,
-                                                Number(commitRow.model.lane || 0)
+                                                Number(commitRow.modelData.lane || 0)
                                               ) * 7
                                         color: Colors.cyan
                                         opacity: 0.46
                                     }
 
                                     Rectangle {
-                                        width: commitRow.model.isHead ? 9 : 7
+                                        width: commitRow.modelData.isHead ? 9 : 7
                                         height: width
                                         radius: width / 2
                                         anchors.verticalCenter: parent.verticalCenter
@@ -253,15 +283,15 @@ Item {
                                             8
                                             + Math.min(
                                                 6,
-                                                Number(commitRow.model.lane || 0)
+                                                Number(commitRow.modelData.lane || 0)
                                               ) * 7
                                         color:
-                                            commitRow.model.isHead
+                                            commitRow.modelData.isHead
                                             ? Colors.magenta
                                             : Colors.black
                                         border.width: 1
                                         border.color:
-                                            commitRow.model.isHead
+                                            commitRow.modelData.isHead
                                             ? Colors.magenta
                                             : Colors.cyan
 
@@ -270,10 +300,10 @@ Item {
                                             z: -1
                                             spread: 2
                                             opacity:
-                                                commitRow.model.isHead
+                                                commitRow.modelData.isHead
                                                 ? 0.54 : 0.24
                                             color:
-                                                commitRow.model.isHead
+                                                commitRow.modelData.isHead
                                                 ? Colors.magenta
                                                 : Colors.cyan
                                         }
@@ -299,11 +329,11 @@ Item {
                                             width: 70
                                             text:
                                                 String(
-                                                    commitRow.model.shortSha || ""
+                                                    commitRow.modelData.shortSha || ""
                                                 )
                                             font.pixelSize: 8
                                             color:
-                                                commitRow.model.isHead
+                                                commitRow.modelData.isHead
                                                 ? Colors.magenta
                                                 : Colors.orange
                                         }
@@ -312,7 +342,7 @@ Item {
                                             width: parent.width - 78
                                             text:
                                                 String(
-                                                    commitRow.model.refsText || ""
+                                                    commitRow.modelData.refsText || ""
                                                 )
                                             font.pixelSize: 7
                                             color: Colors.cyan
@@ -324,7 +354,7 @@ Item {
                                         width: parent.width
                                         text:
                                             String(
-                                                commitRow.model.subject || ""
+                                                commitRow.modelData.subject || ""
                                             )
                                         font.pixelSize: 9
                                         color: Colors.white
@@ -335,11 +365,11 @@ Item {
                                         width: parent.width
                                         text:
                                             String(
-                                                commitRow.model.author || ""
+                                                commitRow.modelData.author || ""
                                             )
                                             + "  //  "
                                             + root.dateLabel(
-                                                commitRow.model.epoch
+                                                commitRow.modelData.epoch
                                               )
                                         font.pixelSize: 7
                                         color: Colors.white
@@ -355,7 +385,7 @@ Item {
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked:
                                         root.historyService.showCommit(
-                                            commitRow.model.sha
+                                            commitRow.modelData.sha
                                         )
                                 }
                             }

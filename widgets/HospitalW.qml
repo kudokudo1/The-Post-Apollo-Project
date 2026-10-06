@@ -1818,7 +1818,7 @@ PanelWindow {
                             anchors.verticalCenterOffset: 2
                             width: parent.width
                             height: parent.height
-                            text: ""
+                            text: "🎙︎"
                             font.pixelSize: 21
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter

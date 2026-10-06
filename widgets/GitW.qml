@@ -809,14 +809,28 @@ PanelWindow {
         return "origin/" + localBranch;
     }
 
+    function trackRemoteLocalBranch() {
+        if (!gitService.localTrackCheckoutMode)
+            return "";
+
+        const remoteBranch = String(
+            gitService.selectedRemoteBranch || ""
+        );
+        const localBranch = root.remoteBranchLeaf(remoteBranch);
+
+        if (!remoteBranch || !localBranch)
+            return "";
+
+        return gitService.localIndexOf(localBranch) >= 0
+            ? localBranch
+            : "";
+    }
+
     function targetsAreMatched() {
         const remoteBranch = String(gitService.selectedRemoteBranch || "");
 
-        if (!remoteBranch)
+        if (!remoteBranch || gitService.localTrackCheckoutMode)
             return false;
-
-        if (gitService.localTrackCheckoutMode)
-            return root.targetMatchSource === "remote";
 
         const localBranch = String(gitService.selectedLocalBranch || "");
         return !!localBranch
@@ -2747,25 +2761,41 @@ PanelWindow {
                                             width: 62
                                             height: 20
                                             label:
-                                                root.targetsAreMatched()
+                                                gitService.localTrackCheckoutMode
+                                                ? (
+                                                    root.trackRemoteLocalBranch()
+                                                    ? "R→L"
+                                                    : gitService.selectedRemoteBranch
+                                                      ? "TRACK"
+                                                      : "R→L"
+                                                  )
+                                                : root.targetsAreMatched()
                                                 ? "MATCHED"
                                                 : root.targetMatchSource === "remote"
                                                 ? "R→L"
                                                 : "L→R"
                                             enabledAction:
-                                                !root.targetsAreMatched()
-                                                && !gitService.actionBusy
+                                                !gitService.actionBusy
                                                 && !gitService.refreshing
                                                 && (
-                                                    root.targetMatchSource === "remote"
-                                                    ? !!gitService.selectedRemoteBranch
+                                                    gitService.localTrackCheckoutMode
+                                                    ? !!root.trackRemoteLocalBranch()
                                                     : (
-                                                        !gitService.localTrackCheckoutMode
-                                                        && !!gitService.selectedLocalBranch
+                                                        !root.targetsAreMatched()
+                                                        && (
+                                                            root.targetMatchSource === "remote"
+                                                            ? !!gitService.selectedRemoteBranch
+                                                            : !!gitService.selectedLocalBranch
+                                                          )
                                                       )
                                                    )
                                             selectedAction:
-                                                root.targetsAreMatched()
+                                                gitService.localTrackCheckoutMode
+                                                ? (
+                                                    !!gitService.selectedRemoteBranch
+                                                    && !root.trackRemoteLocalBranch()
+                                                  )
+                                                : root.targetsAreMatched()
 
                                             onTriggered:
                                                 root.matchTargetSelectors()

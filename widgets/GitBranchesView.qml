@@ -14,6 +14,8 @@ Item {
 
     property string selectedBranch: ""
     property string selectedSha: ""
+    property string pendingFocusBranch: ""
+    property string pendingFocusSha: ""
     property string editMode: "NAME"
     property string newBranchMode: "ABOVE"
 
@@ -66,6 +68,7 @@ Item {
     signal restackRequested(string branch)
     signal submitStackRequested(string branch)
     signal compareRequested(string branch)
+    signal historyRequested(string branch)
 
     onSelectedBranchChanged: {
         if (stackPlanner)
@@ -100,6 +103,52 @@ Item {
 
             if (root.stackExecutor)
                 root.stackExecutor.disarm("BRANCH STATE CHANGED");
+
+            root.applyFocusContext();
+        }
+    }
+
+    function focusContext(branchName, sha) {
+        root.pendingFocusBranch = String(branchName || "");
+        root.pendingFocusSha = String(sha || "");
+        root.applyFocusContext();
+    }
+
+    function applyFocusContext() {
+        const branch = String(root.pendingFocusBranch || "");
+        const sha = String(root.pendingFocusSha || "");
+
+        if (!branch && !sha)
+            return;
+
+        if (branch && root.branchWorkspaceService) {
+            const row =
+                root.branchWorkspaceService.branchForName(branch);
+
+            if (row) {
+                root.selectBranch(branch);
+
+                if (sha)
+                    root.selectedSha = sha;
+
+                root.pendingFocusBranch = "";
+                root.pendingFocusSha = "";
+                return;
+            }
+        }
+
+        if (sha) {
+            root.selectedSha = sha;
+
+            const headBranch = root.branchForHead(sha);
+            if (headBranch)
+                root.selectedBranch = headBranch;
+
+            // A non-tip commit still remains selected as commit context.
+            root.pendingFocusSha = "";
+
+            if (!branch)
+                root.pendingFocusBranch = "";
         }
     }
 
@@ -998,10 +1047,13 @@ Item {
 
                         BranchButton {
                             width: (inspector.width - 26) / 2
-                            label: "COMPARE"
-                            enabledAction: false
+                            label: "HISTORY"
+                            enabledAction:
+                                root.selectedBranch.length > 0
                             onTriggered:
-                                root.compareRequested(root.selectedBranch)
+                                root.historyRequested(
+                                    root.selectedBranch
+                                )
                         }
 
                         CompoundButton {

@@ -30,6 +30,9 @@ PanelWindow {
     property bool bedControlMode: false
     property string operationsSurface: ""
     property bool phoneMenuOpen: false
+    property bool intercomMenuOpen: false
+    property bool intercomTyping: false
+    property bool receptionistTyping: false
     property string pendingRoundsRoomTeam: ""
     property int pendingRoundsFloorIndex: -1
 
@@ -663,6 +666,13 @@ PanelWindow {
         context: Qt.ApplicationShortcut
         enabled: root.menuOpen && root.keyboardActive
         onActivated: {
+            if (root.intercomMenuOpen) {
+                root.intercomMenuOpen = false;
+                root.intercomTyping = false;
+                keyboardFocusAnchor.forceActiveFocus();
+                return;
+            }
+
             if (root.phoneMenuOpen) {
                 root.phoneMenuOpen = false;
                 return;
@@ -680,126 +690,126 @@ PanelWindow {
     Shortcut {
         sequence: "Up"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping && !root.receptionistTyping
         onActivated: root.moveRoomControl(0, -1)
     }
 
     Shortcut {
         sequence: "Down"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping && !root.receptionistTyping
         onActivated: root.moveRoomControl(0, 1)
     }
 
     Shortcut {
         sequence: "Left"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping && !root.receptionistTyping
         onActivated: root.moveRoomControl(-1, 0)
     }
 
     Shortcut {
         sequence: "Right"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping && !root.receptionistTyping
         onActivated: root.moveRoomControl(1, 0)
     }
 
     Shortcut {
         sequence: "Return"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping && !root.receptionistTyping
         onActivated: root.handleRoomEnter()
     }
 
     Shortcut {
         sequence: "Enter"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping && !root.receptionistTyping
         onActivated: root.handleRoomEnter()
     }
 
     Shortcut {
         sequence: "Shift+Left"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping && !root.receptionistTyping
         onActivated: root.cycleBed(-1)
     }
 
     Shortcut {
         sequence: "Shift+Right"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping && !root.receptionistTyping
         onActivated: root.cycleBed(1)
     }
 
     Shortcut {
         sequence: "Shift+S"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping && !root.receptionistTyping
         onActivated: root.invokeRoomShortcut("STATUS")
     }
 
     Shortcut {
         sequence: "Shift+D"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping && !root.receptionistTyping
         onActivated: root.invokeRoomShortcut("DIFF")
     }
 
     Shortcut {
         sequence: "Shift+F"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping && !root.receptionistTyping
         onActivated: root.invokeRoomShortcut("LOG")
     }
 
     Shortcut {
         sequence: "Shift+R"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping && !root.receptionistTyping
         onActivated: root.invokeRoomShortcut("REFRESH")
     }
 
     Shortcut {
         sequence: "Shift+G"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping && !root.receptionistTyping
         onActivated: root.invokeRoomShortcut("LAZYGIT")
     }
 
     Shortcut {
         sequence: "Shift+P"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping && !root.receptionistTyping
         onActivated: root.invokeRoomShortcut("PREPARE")
     }
 
     Shortcut {
         sequence: "Shift+M"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping && !root.receptionistTyping
         onActivated: root.invokeRoomShortcut("REHEARSE")
     }
 
     Shortcut {
         sequence: "Shift+A"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping && !root.receptionistTyping
         onActivated: root.invokeRoomShortcut("ARM")
     }
 
     Shortcut {
         sequence: "Shift+I"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping && !root.receptionistTyping
         onActivated: root.invokeRoomShortcut("INTEGRATE")
     }
 
     Shortcut {
         sequence: "Shift+B"
         context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        enabled: root.menuOpen && root.keyboardActive && !root.intercomTyping && !root.receptionistTyping
         onActivated: root.invokeMoveBed()
     }
 
@@ -811,10 +821,73 @@ PanelWindow {
         root.closeOperationsSurface();
     }
 
+    function openReception() {
+        root.leaveRoomControls();
+        root.leaveBedControls();
+        root.phoneMenuOpen = false;
+        root.intercomMenuOpen = false;
+        root.intercomTyping = false;
+        root.operationsSurface = "reception";
+    }
+
+    function handleReceptionRoute(route) {
+        const target = String(route || "").toLowerCase();
+
+        if (target === "surgery") {
+            root.showSurgery();
+            return;
+        }
+
+        if (target === "reports") {
+            root.openReports();
+            return;
+        }
+
+        if (target === "rounds") {
+            root.openRounds();
+            return;
+        }
+
+        if (target === "staff") {
+            root.openStaff();
+            return;
+        }
+
+        if (target === "phone") {
+            if (!root.phoneMenuOpen)
+                root.togglePhoneMenu();
+            return;
+        }
+
+        if (target === "intercom") {
+            if (!root.intercomMenuOpen)
+                root.toggleIntercomMenu();
+        }
+    }
+
     function togglePhoneMenu() {
         root.phoneMenuOpen = !root.phoneMenuOpen;
 
+        if (root.phoneMenuOpen) {
+            root.intercomMenuOpen = false;
+            root.intercomTyping = false;
+        }
+
         if (root.phoneMenuOpen
+                && specialistRegistryService.loaded
+                && !specialistRegistryService.probing)
+            specialistRegistryService.refreshPresence();
+    }
+
+    function toggleIntercomMenu() {
+        root.intercomMenuOpen = !root.intercomMenuOpen;
+
+        if (root.intercomMenuOpen)
+            root.phoneMenuOpen = false;
+        else
+            root.intercomTyping = false;
+
+        if (root.intercomMenuOpen
                 && specialistRegistryService.loaded
                 && !specialistRegistryService.probing)
             specialistRegistryService.refreshPresence();
@@ -898,11 +971,15 @@ PanelWindow {
 
     function open() {
         root.keyboardOwnershipRequested();
+        root.operationsSurface = "reception";
         root.menuOpen = true;
     }
 
     function close() {
         root.phoneMenuOpen = false;
+        root.intercomMenuOpen = false;
+        root.intercomTyping = false;
+        root.receptionistTyping = false;
         root.operationsSurface = "";
         root.menuOpen = false;
     }
@@ -1036,6 +1113,15 @@ PanelWindow {
     HospitalPhoneService {
         id: phoneService
         registryService: specialistRegistryService
+    }
+
+    HospitalIntercomService {
+        id: intercomService
+        registryService: specialistRegistryService
+    }
+
+    HospitalReceptionistService {
+        id: receptionistService
     }
 
     HospitalRemoteWatcher {
@@ -1601,7 +1687,8 @@ PanelWindow {
                 left: parent.left
                 right: parent.right
                 topMargin: 18
-                leftMargin: 62
+                leftMargin:
+                    root.operationsOpen ? 18 : 62
                 rightMargin: 18
             }
 
@@ -1613,8 +1700,10 @@ PanelWindow {
                 id: hospitalHeader
 
                 // Header spans back across the floor-selector lane.
-                x: -44
-                width: parent.width + 44
+                x: root.operationsOpen ? 0 : -44
+                width:
+                    parent.width
+                    + (root.operationsOpen ? 0 : 44)
                 height: 56
 
                 GohuText {
@@ -1624,7 +1713,9 @@ PanelWindow {
                     }
 
                     text:
-                        root.operationsSurface === "reports"
+                        root.operationsSurface === "reception"
+                        ? "HOSPITAL // RECEPTION"
+                        : root.operationsSurface === "reports"
                         ? "HOSPITAL // REPORTS"
                         : root.operationsSurface === "rounds"
                         ? "HOSPITAL // ROUNDS"
@@ -1651,7 +1742,9 @@ PanelWindow {
                     }
 
                     text:
-                        root.operationsSurface === "reports"
+                        root.operationsSurface === "reception"
+                        ? "FRONT DESK // COORDINATION"
+                        : root.operationsSurface === "reports"
                         ? "SURGICAL HISTORY // EVIDENCE"
                         : root.operationsSurface === "rounds"
                         ? "HOSPITAL-WIDE // ATTENTION"
@@ -1680,6 +1773,84 @@ PanelWindow {
                     }
 
                     spacing: 8
+
+                    Rectangle {
+                        id: intercomButton
+
+                        width: 40
+                        height: 34
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        color:
+                            intercomMouse.pressed
+                            ? Colors.black
+                            : root.intercomMenuOpen
+                            ? Colors.yellow
+                            : Colors.dark
+                        border.width: 1
+                        border.color:
+                            root.intercomMenuOpen
+                            ? Colors.magenta
+                            : intercomMouse.containsMouse
+                            ? Colors.orange
+                            : Colors.cyan
+
+                        RectangularShadow {
+                            anchors.fill: parent
+                            spread: 4
+                            z: -1
+                            opacity:
+                                root.intercomMenuOpen
+                                ? 0.54
+                                : intercomMouse.containsMouse
+                                ? 0.46
+                                : 0.28
+                            color:
+                                root.intercomMenuOpen
+                                ? Colors.magenta
+                                : intercomMouse.containsMouse
+                                ? Colors.orange
+                                : Colors.cyan
+                        }
+
+                        GohuText {
+                            anchors.centerIn: parent
+                            text: "IC"
+                            font.pixelSize: 11
+                            color:
+                                intercomMouse.pressed
+                                ? Colors.black
+                                : root.intercomMenuOpen
+                                ? Colors.magenta
+                                : intercomMouse.containsMouse
+                                ? Colors.orange
+                                : Colors.cyan
+
+                            layer.enabled: !intercomMouse.pressed
+                            layer.effect: DropShadow {
+                                radius: 7
+                                samples: 9
+                                opacity: 0.52
+                                color:
+                                    root.intercomMenuOpen
+                                    ? Colors.magenta
+                                    : intercomMouse.containsMouse
+                                    ? Colors.orange
+                                    : Colors.cyan
+                                transparentBorder: true
+                            }
+                        }
+
+                        MouseArea {
+                            id: intercomMouse
+
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+
+                            onClicked: root.toggleIntercomMenu()
+                        }
+                    }
 
                     Rectangle {
                         id: phoneButton
@@ -1782,7 +1953,9 @@ PanelWindow {
 
                             anchors.centerIn: parent
                             text:
-                                root.operationsSurface === "reports"
+                                root.operationsSurface === "reception"
+                                ? "DESK OPEN"
+                                : root.operationsSurface === "reports"
                                 ? (
                                     "REPORTS "
                                     + String(
@@ -1822,7 +1995,9 @@ PanelWindow {
                                 : "OFFLINE"
                             font.pixelSize: 9
                             color:
-                                root.operationsSurface === "reports"
+                                root.operationsSurface === "reception"
+                                ? Colors.green
+                                : root.operationsSurface === "reports"
                                 ? Colors.magenta
                                 : root.operationsSurface === "rounds"
                                 ? (
@@ -1924,8 +2099,10 @@ PanelWindow {
             Rectangle {
                 // Header rule spans the full Hospital chassis, including
                 // the floor-selector lane.
-                x: -44
-                width: parent.width + 44
+                x: root.operationsOpen ? 0 : -44
+                width:
+                    parent.width
+                    + (root.operationsOpen ? 0 : 44)
                 height: 2
                 color: Colors.cyan
 
@@ -1947,28 +2124,35 @@ PanelWindow {
                 spacing: 10
 
                 HospitalModeTab {
-                    width: (parent.width - 30) / 4
+                    width: (parent.width - 40) / 5
+                    label: "RECEPTION"
+                    selected: root.operationsSurface === "reception"
+                    onTriggered: root.openReception()
+                }
+
+                HospitalModeTab {
+                    width: (parent.width - 40) / 5
                     label: "SURGERY"
                     selected: !root.operationsOpen
                     onTriggered: root.showSurgery()
                 }
 
                 HospitalModeTab {
-                    width: (parent.width - 30) / 4
+                    width: (parent.width - 40) / 5
                     label: "REPORTS"
                     selected: root.operationsSurface === "reports"
                     onTriggered: root.openReports()
                 }
 
                 HospitalModeTab {
-                    width: (parent.width - 30) / 4
+                    width: (parent.width - 40) / 5
                     label: "ROUNDS"
                     selected: root.operationsSurface === "rounds"
                     onTriggered: root.openRounds()
                 }
 
                 HospitalModeTab {
-                    width: (parent.width - 30) / 4
+                    width: (parent.width - 40) / 5
                     label: "STAFF"
                     selected: root.operationsSurface === "staff"
                     onTriggered: root.openStaff()
@@ -1984,7 +2168,9 @@ PanelWindow {
                 color: Colors.dark
                 border.width: 1
                 border.color:
-                    root.operationsSurface === "reports"
+                    root.operationsSurface === "reception"
+                    ? Colors.green
+                    : root.operationsSurface === "reports"
                     ? Colors.magenta
                     : root.operationsSurface === "staff"
                     ? Colors.orange
@@ -1996,7 +2182,9 @@ PanelWindow {
                     z: -1
                     opacity: 0.22
                     color:
-                        root.operationsSurface === "reports"
+                        root.operationsSurface === "reception"
+                        ? Colors.green
+                        : root.operationsSurface === "reports"
                         ? Colors.magenta
                         : root.operationsSurface === "staff"
                         ? Colors.orange
@@ -2014,14 +2202,18 @@ PanelWindow {
                         width: 138
                         anchors.verticalCenter: parent.verticalCenter
                         text:
-                            root.operationsSurface === "reports"
+                            root.operationsSurface === "reception"
+                            ? "RECEPTION // DESK"
+                            : root.operationsSurface === "reports"
                             ? "REPORTS // CONTEXT"
                             : root.operationsSurface === "staff"
                             ? "STAFF // PRESENCE"
                             : "ROUNDS // HOSPITAL-WIDE"
                         font.pixelSize: 12
                         color:
-                            root.operationsSurface === "reports"
+                            root.operationsSurface === "reception"
+                            ? Colors.green
+                            : root.operationsSurface === "reports"
                             ? Colors.magenta
                             : root.operationsSurface === "staff"
                             ? Colors.orange
@@ -2033,7 +2225,18 @@ PanelWindow {
                         width: parent.width - 150
                         anchors.verticalCenter: parent.verticalCenter
                         text:
-                            root.operationsSurface === "reports"
+                            root.operationsSurface === "reception"
+                            ? (
+                                "FLOOR "
+                                + (floorService.floorLabel || "UNKNOWN")
+                                + "  //  ROOM "
+                                + (root.selectedRoomTeam || "NONE")
+                                + "  //  STAFF READY "
+                                + String(specialistRegistryService.readyCount)
+                                + "/"
+                                + String(specialistRegistryService.specialistCount)
+                              )
+                            : root.operationsSurface === "reports"
                             ? (
                                 "FLOOR "
                                 + (
@@ -2095,7 +2298,9 @@ PanelWindow {
                               )
                         font.pixelSize: 11
                         color:
-                            root.operationsSurface === "reports"
+                            root.operationsSurface === "reception"
+                            ? Colors.white
+                            : root.operationsSurface === "reports"
                             ? Colors.white
                             : root.operationsSurface === "staff"
                             ? (
@@ -3693,16 +3898,62 @@ PanelWindow {
                 + 4
             width: parent.width
             height: Math.max(0, parent.height - y)
-            visible: root.phoneMenuOpen
+            visible:
+                root.phoneMenuOpen
+                || root.intercomMenuOpen
             z: 1180
             acceptedButtons: Qt.AllButtons
             hoverEnabled: true
 
-            onClicked:
-                root.phoneMenuOpen = false
+            onClicked: {
+                root.phoneMenuOpen = false;
+                root.intercomMenuOpen = false;
+                root.intercomTyping = false;
+                keyboardFocusAnchor.forceActiveFocus();
+            }
 
             onWheel: function(wheel) {
                 wheel.accepted = true;
+            }
+        }
+
+        HospitalIntercomMenu {
+            id: intercomDropdown
+
+            visible: root.intercomMenuOpen
+            z: 1200
+
+            registryService: specialistRegistryService
+            intercomService: intercomService
+            workingDirectory: floorService.bedPath
+            floorLabel: floorService.floorLabel
+            roomLabel:
+                root.selectedRoomTeam
+                ? root.selectedRoomTeam
+                : "NO ROOM"
+
+            x:
+                fixedTop.x
+                + hospitalHeader.x
+                + hospitalHeaderActions.x
+                + intercomButton.x
+                + intercomButton.width
+                - width
+            y:
+                fixedTop.y
+                + hospitalHeader.y
+                + hospitalHeaderActions.y
+                + intercomButton.y
+                + intercomButton.height
+                + 6
+
+            onTypingChanged: function(active) {
+                root.intercomTyping = active;
+
+                if (!active
+                        && root.menuOpen
+                        && root.keyboardActive)
+                    keyboardFocusAnchor.forceActiveFocus();
             }
         }
 
@@ -3735,6 +3986,46 @@ PanelWindow {
                 root.phoneMenuOpen = false
         }
 
+        HospitalReceptionistView {
+            id: receptionistView
+
+            z: 700
+            visible: root.operationsSurface === "reception"
+            receptionistService: receptionistService
+            floorLabel: floorService.floorLabel
+            roomLabel:
+                root.selectedRoomTeam
+                ? root.selectedRoomTeam
+                : "NO ROOM"
+            readyCount: specialistRegistryService.readyCount
+            specialistCount: specialistRegistryService.specialistCount
+            attentionCount: roundsService.attentionCount
+
+            anchors {
+                left: parent.left
+                right: parent.right
+                top: fixedTop.bottom
+                bottom: actionBay.top
+                leftMargin: 18
+                rightMargin: 18
+                topMargin: 8
+                bottomMargin: 10
+            }
+
+            onRouteRequested: function(route) {
+                root.handleReceptionRoute(route);
+            }
+
+            onTypingChanged: function(active) {
+                root.receptionistTyping = active;
+
+                if (!active
+                        && root.menuOpen
+                        && root.keyboardActive)
+                    keyboardFocusAnchor.forceActiveFocus();
+            }
+        }
+
         HospitalReportsView {
             id: reportsView
 
@@ -3747,7 +4038,7 @@ PanelWindow {
                 right: parent.right
                 top: fixedTop.bottom
                 bottom: actionBay.top
-                leftMargin: 62
+                leftMargin: 18
                 rightMargin: 18
                 topMargin: 8
                 bottomMargin: 10
@@ -3767,7 +4058,7 @@ PanelWindow {
                 right: parent.right
                 top: fixedTop.bottom
                 bottom: actionBay.top
-                leftMargin: 62
+                leftMargin: 18
                 rightMargin: 18
                 topMargin: 8
                 bottomMargin: 10
@@ -3790,7 +4081,7 @@ PanelWindow {
                 right: parent.right
                 top: fixedTop.bottom
                 bottom: actionBay.top
-                leftMargin: 62
+                leftMargin: 18
                 rightMargin: 18
                 topMargin: 8
                 bottomMargin: 10
@@ -3805,7 +4096,8 @@ PanelWindow {
                 left: parent.left
                 right: parent.right
                 bottom: bottomStop.top
-                leftMargin: 62
+                leftMargin:
+                    root.operationsOpen ? 18 : 62
                 rightMargin: 18
                 bottomMargin: 8
             }

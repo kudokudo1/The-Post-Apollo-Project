@@ -162,8 +162,8 @@ Rectangle {
                     Repeater {
                         model: [
                             { label: "☎", route: "phone", color: Colors.green },
-                            { label: "IC", route: "intercom", color: Colors.cyan },
-                            { label: "▤", route: "reports", color: Colors.magenta },
+                            { label: "🎙", route: "intercom", color: Colors.omnitrix },
+                            { label: "🗒", route: "reports", color: Colors.magenta },
                             { label: "!", route: "rounds", color: Colors.orange }
                         ]
 
@@ -184,12 +184,13 @@ Rectangle {
                                 ? Colors.orange
                                 : modelData.color
 
-                            GohuText {
+                            NotoText {
                                 anchors.centerIn: parent
+                                anchors.verticalCenterOffset: 1
                                 text: parent.modelData.label
                                 font.pixelSize:
-                                    parent.modelData.label === "☎"
-                                    ? 18 : 11
+                                    parent.modelData.label === "!"
+                                    ? 11 : 18
                                 color:
                                     deskControlMouse.containsMouse
                                     ? Colors.orange

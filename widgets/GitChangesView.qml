@@ -20,6 +20,10 @@ Item {
     property bool commitAmend: false
     property bool commitSign: false
     property bool commitAllowEmpty: false
+    property bool commitNoVerify: false
+
+    property string stashMode: "all"
+    property bool stashRestoreIndex: false
 
     property string armedAction: ""
 
@@ -85,6 +89,15 @@ Item {
 
     function clearArm() {
         root.armedAction = "";
+    }
+
+    function cycleStashMode() {
+        if (root.stashMode === "all")
+            root.stashMode = "keep-index";
+        else if (root.stashMode === "keep-index")
+            root.stashMode = "staged";
+        else
+            root.stashMode = "all";
     }
 
     component LabelText: GohuText {
@@ -1117,12 +1130,22 @@ Item {
                             spacing: 5
 
                             LabelText {
-                                width: parent.width - 286
+                                width: parent.width - 378
                                 anchors.verticalCenter: parent.verticalCenter
                                 text:
                                     root.selectedStashRef
                                     ? "STASH // " + root.selectedStashRef
                                     : "SELECT A STASH"
+                            }
+
+                            MiniButton {
+                                width: 86
+                                label: "INDEX"
+                                accent: Colors.cyan
+                                selected: root.stashRestoreIndex
+                                onTriggered:
+                                    root.stashRestoreIndex =
+                                        !root.stashRestoreIndex
                             }
 
                             MiniButton {
@@ -1135,7 +1158,8 @@ Item {
                                     && !root.changesService.actionBusy
                                 onTriggered:
                                     root.changesService.applyStash(
-                                        root.selectedStashRef
+                                        root.selectedStashRef,
+                                        root.stashRestoreIndex
                                     )
                             }
 
@@ -1149,7 +1173,8 @@ Item {
                                     && !root.changesService.actionBusy
                                 onTriggered:
                                     root.changesService.popStash(
-                                        root.selectedStashRef
+                                        root.selectedStashRef,
+                                        root.stashRestoreIndex
                                     )
                             }
 
@@ -1448,7 +1473,7 @@ Item {
                             spacing: 8
 
                             MiniButton {
-                                width: (parent.width - 8) / 2
+                                width: (parent.width - 16) / 3
                                 height: 34
                                 label:
                                     "CONTINUE "
@@ -1468,7 +1493,24 @@ Item {
                             }
 
                             MiniButton {
-                                width: (parent.width - 8) / 2
+                                width: (parent.width - 16) / 3
+                                height: 34
+                                label: "SKIP STEP"
+                                accent: Colors.orange
+                                enabledAction:
+                                    root.changesService
+                                    && (
+                                        root.changesService.operationState === "REBASE"
+                                        || root.changesService.operationState === "CHERRY_PICK"
+                                        || root.changesService.operationState === "REVERT"
+                                      )
+                                    && !root.changesService.actionBusy
+                                onTriggered:
+                                    root.changesService.skipOperation()
+                            }
+
+                            MiniButton {
+                                width: (parent.width - 16) / 3
                                 height: 34
                                 label:
                                     root.armedAction === "abort-operation"
@@ -1541,7 +1583,7 @@ Item {
 
                     EditorBox {
                         id: commitInput
-                        width: parent.width - 522
+                        width: parent.width - 532
                         placeholder:
                             root.commitAmend
                             ? "NEW MESSAGE // EMPTY KEEPS CURRENT MESSAGE"
@@ -1568,6 +1610,16 @@ Item {
                         selected: root.commitSign
                         onTriggered:
                             root.commitSign = !root.commitSign
+                    }
+
+                    MiniButton {
+                        width: 92
+                        height: 30
+                        label: "NO VERIFY"
+                        accent: Colors.red
+                        selected: root.commitNoVerify
+                        onTriggered:
+                            root.commitNoVerify = !root.commitNoVerify
                     }
 
                     MiniButton {
@@ -1606,14 +1658,41 @@ Item {
                                 commitInput.text,
                                 root.commitAmend,
                                 root.commitSign,
-                                root.commitAllowEmpty
+                                root.commitAllowEmpty,
+                                root.commitNoVerify
                             )
                     }
 
                     MiniButton {
-                        width: 96
+                        width: 84
                         height: 30
-                        label: "STASH ALL"
+                        label: "CLEAR"
+                        accent: Colors.cyan
+                        enabledAction:
+                            root.armedAction.length > 0
+                        onTriggered: root.clearArm()
+                    }
+                }
+
+                Row {
+                    width: parent.width
+                    height: 30
+                    spacing: 6
+
+                    MiniButton {
+                        width: 150
+                        height: 30
+                        label:
+                            "STASH "
+                            + root.stashMode.toUpperCase()
+                        accent: Colors.magenta
+                        onTriggered: root.cycleStashMode()
+                    }
+
+                    MiniButton {
+                        width: 118
+                        height: 30
+                        label: "STASH NOW"
                         accent: Colors.magenta
                         enabledAction:
                             root.changesService
@@ -1623,18 +1702,23 @@ Item {
                             root.changesService.stash(
                                 commitInput.text.trim().length > 0
                                 ? commitInput.text
-                                : "Post-Apollo stash"
+                                : "Post-Apollo stash",
+                                root.stashMode
                             )
                     }
 
-                    MiniButton {
-                        width: 70
-                        height: 30
-                        label: "CLEAR"
-                        accent: Colors.cyan
-                        enabledAction:
-                            root.armedAction.length > 0
-                        onTriggered: root.clearArm()
+                    GohuText {
+                        width: parent.width - 280
+                        anchors.verticalCenter: parent.verticalCenter
+                        text:
+                            root.stashMode === "staged"
+                            ? "STAGED ONLY"
+                            : root.stashMode === "keep-index"
+                            ? "STASH WORKTREE + UNTRACKED, KEEP INDEX"
+                            : "STASH TRACKED + UNTRACKED"
+                        font.pixelSize: 10
+                        color: Colors.cyan
+                        elide: Text.ElideRight
                     }
                 }
 
@@ -1681,6 +1765,7 @@ Item {
                 commitInput.text = "";
                 root.commitAmend = false;
                 root.commitAllowEmpty = false;
+                root.commitNoVerify = false;
             }
 
             if (root.selectedPath)

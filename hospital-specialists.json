@@ -15,7 +15,8 @@
         "CODE",
         "REVIEW",
         "RESEARCH"
-      ]
+      ],
+      "intercomArgs": []
     },
     {
       "id": "hermes",
@@ -31,6 +32,10 @@
         "RESEARCH",
         "PLANNING",
         "OPERATIONS"
+      ],
+      "intercomArgs": [
+        "chat",
+        "-q"
       ]
     }
   ]

@@ -197,7 +197,7 @@ Rectangle {
                                 text: parent.modelData.label
                                 font.pixelSize:
                                     parent.modelData.route === "phone"
-                                    ? 30 : 21
+                                    ? 30 : 22
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                                 color:
@@ -221,9 +221,9 @@ Rectangle {
                                 text: parent.modelData.label
                                 font.pixelSize:
                                     parent.modelData.route === "reports"
-                                    ? 20
+                                    ? 21
                                     : parent.modelData.route === "rounds"
-                                    ? 25
+                                    ? 26
                                     : 11
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter

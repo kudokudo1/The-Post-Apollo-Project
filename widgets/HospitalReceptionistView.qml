@@ -188,7 +188,7 @@ Rectangle {
                                 anchors.centerIn: parent
                                 anchors.verticalCenterOffset:
                                     parent.modelData.route === "intercom"
-                                    ? 2 : 0
+                                    ? 1 : 0
                                 width: parent.width
                                 height: parent.height
                                 visible:
@@ -223,7 +223,7 @@ Rectangle {
                                     parent.modelData.route === "reports"
                                     ? 22
                                     : parent.modelData.route === "rounds"
-                                    ? 27
+                                    ? 28
                                     : 11
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter

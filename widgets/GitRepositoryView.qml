@@ -313,7 +313,7 @@ Item {
 
         Item {
             width: parent.width
-            height: parent.height - 146
+            height: parent.height - 154
 
             // ===== REMOTES ===============================================
             Row {

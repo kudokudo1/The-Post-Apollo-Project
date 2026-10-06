@@ -16,7 +16,11 @@ Item {
     property string resetMode: "mixed"
     property string selectedQuerySha: ""
     property string selectedReflogSha: ""
+    property string selectedCommitRefs: ""
     property string armedAction: ""
+
+    signal changesRequested(string path)
+    signal branchesRequested(string branch, string sha)
 
     readonly property var displayedRows: root.filteredRows()
 
@@ -169,10 +173,84 @@ Item {
         return out;
     }
 
-    function selectCommit(sha) {
+    function selectedBranchContext() {
+        const raw = String(root.selectedCommitRefs || "");
+        if (!raw)
+            return "";
+
+        const refs = raw.split(" • ");
+
+        for (let i = 0; i < refs.length; ++i) {
+            const candidate = String(refs[i] || "").trim();
+
+            if (!candidate
+                    || candidate.indexOf("TAG ") === 0
+                    || candidate.indexOf("origin/") === 0)
+                continue;
+
+            return candidate;
+        }
+
+        return "";
+    }
+
+    function openBranchScope(branchName) {
+        const branch = String(branchName || "").trim();
+
+        if (!branch || !root.historyService)
+            return;
+
+        root.subMode = "log";
+        root.searchQuery = "";
+        searchInput.text = "";
+        root.selectedCommitRefs = "";
+
+        const target = "refs/heads/" + branch;
+        const entries = root.scopeEntries();
+
+        for (let i = 0; i < entries.length; ++i) {
+            if (String(entries[i].ref || "") !== target)
+                continue;
+
+            root.scopeIndex = i;
+            break;
+        }
+
+        root.historyService.refresh(
+            target,
+            root.historyService.selectedMode
+        );
+    }
+
+    function openPathQuery(path) {
+        const target = String(path || "").trim();
+
+        if (!target || !root.historyService)
+            return;
+
+        root.subMode = "query";
+        queryPathInput.text = target;
+        queryAuthorInput.text = "";
+        querySinceInput.text = "";
+        queryUntilInput.text = "";
+        queryRangeInput.text = "";
+        root.selectedQuerySha = "";
+
+        root.historyService.runQuery(
+            target,
+            "",
+            "",
+            "",
+            ""
+        );
+    }
+
+    function selectCommit(sha, refsText) {
         if (!root.historyService)
             return;
 
+        root.selectedCommitRefs =
+            String(refsText || "");
         root.inspectorMode = "detail";
         root.historyService.showCommit(sha);
         root.armedAction = "";
@@ -874,7 +952,10 @@ Item {
                                             root.selectCommit(
                                                 commitRow
                                                     .modelData
-                                                    .sha
+                                                    .sha,
+                                                commitRow
+                                                    .modelData
+                                                    .refsText
                                             )
                                     }
                                 }
@@ -908,7 +989,7 @@ Item {
                             spacing: 5
 
                             MiniButton {
-                                width: 76
+                                width: 62
                                 label: "DETAIL"
                                 accent: Colors.cyan
                                 selected: root.inspectorMode === "detail"
@@ -920,7 +1001,7 @@ Item {
                             }
 
                             MiniButton {
-                                width: 76
+                                width: 58
                                 label: "FILE"
                                 accent: Colors.orange
                                 selected: root.inspectorMode === "file"
@@ -932,7 +1013,7 @@ Item {
                             }
 
                             MiniButton {
-                                width: 72
+                                width: 54
                                 label: "SET A"
                                 accent: Colors.cyan
                                 enabledAction:
@@ -942,7 +1023,7 @@ Item {
                             }
 
                             MiniButton {
-                                width: 72
+                                width: 54
                                 label: "SET B"
                                 accent: Colors.orange
                                 enabledAction:
@@ -952,7 +1033,34 @@ Item {
                             }
 
                             MiniButton {
-                                width: 86
+                                width: 82
+                                label: "BRANCHES"
+                                accent: Colors.green
+                                enabledAction:
+                                    root.historyService
+                                    && root.historyService.selectedSha
+                                onTriggered:
+                                    root.branchesRequested(
+                                        root.selectedBranchContext(),
+                                        root.historyService.selectedSha
+                                    )
+                            }
+
+                            MiniButton {
+                                width: 82
+                                label: "CHANGES"
+                                accent: Colors.orange
+                                enabledAction:
+                                    root.historyService
+                                    && root.historyService.selectedFile
+                                onTriggered:
+                                    root.changesRequested(
+                                        root.historyService.selectedFile
+                                    )
+                            }
+
+                            MiniButton {
+                                width: 78
                                 label: "COPY SHA"
                                 accent: Colors.magenta
                                 enabledAction:
@@ -1453,8 +1561,9 @@ Item {
                                                         queryRow.modelData.sha
                                                         || ""
                                                     );
-                                                root.historyService.showCommit(
-                                                    root.selectedQuerySha
+                                                root.selectCommit(
+                                                    root.selectedQuerySha,
+                                                    queryRow.modelData.refsText
                                                 );
                                             }
                                         }
@@ -1613,6 +1722,7 @@ Item {
                                                         reflogRow.modelData.sha
                                                         || ""
                                                     );
+                                                root.selectedCommitRefs = "";
                                                 root.historyService.showCommit(
                                                     root.selectedReflogSha
                                                 );

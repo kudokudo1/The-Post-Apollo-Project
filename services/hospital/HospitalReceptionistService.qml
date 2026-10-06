@@ -779,8 +779,57 @@ Scope {
         return "";
     }
 
-    function matchingActivity(sourceValue, unreadOnly, favoritesOnly) {
+    function activityTargetFromQuery(queryValue) {
+        const query = String(queryValue || "");
+        const direct =
+            query.match(/\bT\d+(?:-[A-Z0-9]+)?\b/i);
+
+        if (direct && direct.length > 0)
+            return String(direct[0] || "").toUpperCase();
+
+        const teamNumber =
+            query.match(/\bteam\s+(\d+)\b/i);
+
+        if (teamNumber && teamNumber.length > 1)
+            return "T" + String(teamNumber[1] || "");
+
+        return "";
+    }
+
+    function eventMatchesTarget(eventValue, targetValue) {
+        const event = eventValue || {};
+        const target =
+            String(targetValue || "").trim().toUpperCase();
+
+        if (!target)
+            return true;
+
+        const context = event.context || {};
+        const room = context.room || {};
+        const values = [
+            String(context.team || ""),
+            String(room.team || ""),
+            String(event.title || ""),
+            String(event.detail || "")
+        ];
+
+        for (let i = 0; i < values.length; ++i) {
+            const value = values[i].toUpperCase();
+
+            if (value.indexOf(target) >= 0)
+                return true;
+        }
+
+        return false;
+    }
+
+    function matchingActivity(
+            sourceValue,
+            unreadOnly,
+            favoritesOnly,
+            targetValue) {
         const source = String(sourceValue || "").toLowerCase();
+        const target = String(targetValue || "");
         const matches = [];
 
         for (let i = 0; i < activityEvents.length; ++i) {
@@ -789,6 +838,9 @@ Scope {
             if (source
                     && String(event.source || "").toLowerCase()
                        !== source)
+                continue;
+
+            if (!eventMatchesTarget(event, target))
                 continue;
 
             if (unreadOnly && !isUnread(event))
@@ -843,6 +895,53 @@ Scope {
         return lines.join("\n");
     }
 
+    function activityCountResponse(labelValue, eventsValue) {
+        const label = String(labelValue || "ACTIVITY");
+        const events =
+            Array.isArray(eventsValue)
+            ? eventsValue
+            : [];
+        const counts = {
+            rounds: 0,
+            reports: 0,
+            intercom: 0,
+            phone: 0,
+            staff: 0,
+            other: 0
+        };
+
+        for (let i = 0; i < events.length; ++i) {
+            const source =
+                String((events[i] || {}).source || "").toLowerCase();
+
+            if (Object.prototype.hasOwnProperty.call(counts, source))
+                counts[source] += 1;
+            else
+                counts.other += 1;
+        }
+
+        const parts = [
+            label + " // " + String(events.length)
+        ];
+        const order = [
+            ["rounds", "ROUNDS"],
+            ["reports", "REPORTS"],
+            ["intercom", "INTERCOM"],
+            ["phone", "PHONE"],
+            ["staff", "STAFF"],
+            ["other", "OTHER"]
+        ];
+
+        for (let i = 0; i < order.length; ++i) {
+            const count = Number(counts[order[i][0]] || 0);
+
+            if (count > 0)
+                parts.push(order[i][1] + " " + String(count));
+        }
+
+        return parts.join(" // ");
+    }
+
     function answerActivityQuestion(textValue) {
         const raw = String(textValue || "").trim();
 
@@ -868,6 +967,8 @@ Scope {
             query.indexOf("recent") >= 0
             || query.indexOf("latest") >= 0
             || query.indexOf("what happened") >= 0
+            || query.indexOf("what's happened") >= 0
+            || query.indexOf("whats happened") >= 0
             || query.indexOf("activity") >= 0
             || query.indexOf("last call") >= 0
             || query.indexOf("last report") >= 0
@@ -875,6 +976,15 @@ Scope {
             || query.indexOf("last intercom") >= 0
             || query.indexOf("last message") >= 0
             || query.indexOf("last staff") >= 0;
+        const asksWhen =
+            query.indexOf("when was") >= 0
+            || query.indexOf("when did") >= 0
+            || query.indexOf("last activity") >= 0
+            || query.indexOf("last thing") >= 0;
+        const asksCount =
+            query.indexOf("how many") >= 0
+            || query.indexOf("count ") >= 0
+            || query.indexOf("count?") >= 0;
         const asksHelp =
             query.indexOf("what do you know") >= 0
             || query.indexOf("what can you tell me") >= 0
@@ -883,6 +993,8 @@ Scope {
         if (!asksNew
                 && !asksFavorites
                 && !asksRecent
+                && !asksWhen
+                && !asksCount
                 && !asksHelp)
             return false;
 
@@ -891,17 +1003,19 @@ Scope {
         if (asksHelp) {
             append(
                 "RECEPTION",
-                "I can report what is new, what you missed, recent activity, recent Reports, Rounds, Phone, Intercom, Staff changes, and your favorites."
+                "I can report what is new, what you missed, recent activity, favorites, activity for a Room or team, when its last activity happened, and how many events I have recorded."
             );
             return true;
         }
 
         const source = activityQuerySource(query);
+        const target = activityTargetFromQuery(raw);
         const matches =
             matchingActivity(
                 source,
                 asksNew,
-                asksFavorites
+                asksFavorites,
+                target
             );
         let label = "";
 
@@ -914,6 +1028,37 @@ Scope {
 
         if (source)
             label += " // " + source.toUpperCase();
+
+        if (target)
+            label += " // " + target;
+
+        if (asksCount) {
+            append(
+                "RECEPTION",
+                activityCountResponse(label, matches)
+            );
+            return true;
+        }
+
+        if (asksWhen) {
+            append(
+                "RECEPTION",
+                matches.length > 0
+                ? activityListResponse(
+                    "LAST // "
+                    + (
+                        target
+                        ? target
+                        : source
+                        ? source.toUpperCase()
+                        : "ACTIVITY"
+                      ),
+                    [matches[0]]
+                  )
+                : label + " // NONE RECORDED"
+            );
+            return true;
+        }
 
         append(
             "RECEPTION",

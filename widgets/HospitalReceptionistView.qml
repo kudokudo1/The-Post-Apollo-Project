@@ -161,7 +161,7 @@ Rectangle {
 
                     Repeater {
                         model: [
-                            { label: "☎", route: "phone", color: Colors.green },
+                            { label: "☎︎", route: "phone", color: Colors.green },
                             { label: "🎙︎", route: "intercom", color: Colors.omnitrix },
                             { label: "🗒︎", route: "reports", color: Colors.magenta },
                             { label: "⚠︎", route: "rounds", color: Colors.orange }
@@ -191,8 +191,11 @@ Rectangle {
                                 height: parent.height
                                 visible:
                                     parent.modelData.route === "intercom"
+                                    || parent.modelData.route === "phone"
                                 text: parent.modelData.label
-                                font.pixelSize: 20
+                                font.pixelSize:
+                                    parent.modelData.route === "phone"
+                                    ? 25 : 20
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                                 color:
@@ -205,19 +208,20 @@ Rectangle {
                                 anchors.centerIn: parent
                                 anchors.verticalCenterOffset:
                                     parent.modelData.route === "reports"
+                                    ? 2
+                                    : parent.modelData.route === "rounds"
                                     ? 2 : 0
                                 width: parent.width
                                 height: parent.height
                                 visible:
                                     parent.modelData.route !== "intercom"
+                                    && parent.modelData.route !== "phone"
                                 text: parent.modelData.label
                                 font.pixelSize:
-                                    parent.modelData.label === "☎"
-                                    ? 23
-                                    : parent.modelData.route === "reports"
+                                    parent.modelData.route === "reports"
                                     ? 20
                                     : parent.modelData.route === "rounds"
-                                    ? 21
+                                    ? 25
                                     : 11
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter

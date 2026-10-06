@@ -87,8 +87,49 @@ Item {
 
         if (root.historyService)
             root.historyService.refresh(
-                root.currentScope().ref
+                root.currentScope().ref,
+                root.historyService.selectedMode
             );
+    }
+
+    function cycleHistoryMode() {
+        if (!root.historyService)
+            return;
+
+        const current = String(
+            root.historyService.selectedMode || "all"
+        );
+
+        if (current === "all")
+            root.historyService.selectedMode = "first-parent";
+        else if (current === "first-parent")
+            root.historyService.selectedMode = "merges";
+        else if (current === "merges")
+            root.historyService.selectedMode = "no-merges";
+        else
+            root.historyService.selectedMode = "all";
+
+        root.historyService.refresh(
+            root.currentScope().ref,
+            root.historyService.selectedMode
+        );
+    }
+
+    function historyModeLabel() {
+        if (!root.historyService)
+            return "ALL";
+
+        const mode = String(
+            root.historyService.selectedMode || "all"
+        );
+
+        if (mode === "first-parent")
+            return "FIRST PARENT";
+        if (mode === "merges")
+            return "MERGES";
+        if (mode === "no-merges")
+            return "NO MERGES";
+        return "ALL";
     }
 
     function filteredRows() {
@@ -366,9 +407,27 @@ Item {
                     onTriggered: root.cycleScope(1)
                 }
 
+                MiniButton {
+                    width: 118
+                    anchors.verticalCenter: parent.verticalCenter
+                    label:
+                        "MODE "
+                        + root.historyModeLabel()
+                    accent: Colors.magenta
+                    onTriggered: root.cycleHistoryMode()
+                }
+
                 EditorBox {
                     id: searchInput
-                    width: parent.width - 210 - 34 - 220 - 34 - 116 - 42
+                    width:
+                        parent.width
+                        - 210
+                        - 34
+                        - 220
+                        - 34
+                        - 118
+                        - 110
+                        - 56
                     anchors.verticalCenter: parent.verticalCenter
                     placeholder: "SEARCH SHA / AUTHOR / SUBJECT / REF"
                     accent: Colors.orange
@@ -392,7 +451,8 @@ Item {
                         && !root.historyService.actionBusy
                     onTriggered:
                         root.historyService.refresh(
-                            root.currentScope().ref
+                            root.currentScope().ref,
+                            root.historyService.selectedMode
                         )
                 }
             }
@@ -1348,6 +1408,9 @@ Item {
 
     Component.onCompleted: {
         if (root.historyService)
-            root.historyService.refresh("ALL");
+            root.historyService.refresh(
+                "ALL",
+                root.historyService.selectedMode
+            );
     }
 }

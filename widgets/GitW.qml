@@ -822,23 +822,23 @@ PanelWindow {
             || query.indexOf("checkout") === 0;
     }
 
-    function branchActivityIntensity(unpulledCount) {
-        const count = Number(unpulledCount || 0);
+    function recentGlowIntensity(rank) {
+        const index = Number(rank || 0);
 
-        if (count <= 0)
-            return 0;
-        if (count === 1)
-            return 0.56;
-        if (count <= 3)
-            return 0.68;
-        if (count <= 8)
+        if (index <= 0)
+            return 0.92;
+        if (index === 1)
             return 0.80;
+        if (index === 2)
+            return 0.68;
+        if (index === 3)
+            return 0.58;
 
-        return 0.92;
+        return 0.50;
     }
 
     function remoteActivityPoints() {
-        const points = [];
+        const candidates = [];
         const count = gitService.remoteBranchCount;
         const revision = gitService.topologyRevision;
 
@@ -848,40 +848,70 @@ PanelWindow {
                 continue;
 
             const unpulled = Number(row.unpulledCount || 0);
-            const intensity = root.branchActivityIntensity(unpulled);
-
             if (unpulled <= 0)
                 continue;
 
-            points.push({
+            candidates.push({
                 index: i,
-                intensity: intensity,
                 unpulledCount: unpulled,
+                lastChangedEpoch: Number(row.lastChangedEpoch || 0),
                 label: String(row.name || "")
             });
         }
 
+        candidates.sort(function(a, b) {
+            if (a.lastChangedEpoch !== b.lastChangedEpoch)
+                return b.lastChangedEpoch - a.lastChangedEpoch;
+            return a.label.localeCompare(b.label);
+        });
+
+        const points = candidates.slice(0, 5);
+
+        for (let i = 0; i < points.length; ++i)
+            points[i].intensity = root.recentGlowIntensity(i);
+
         return points;
+    }
+
+    function remoteRecentRank(branchName) {
+        const needle = String(branchName || "");
+        const points = root.remoteActivityPoints();
+
+        for (let i = 0; i < points.length; ++i) {
+            if (String(points[i].label || "") === needle)
+                return i;
+        }
+
+        return -1;
     }
 
     function localActivityPoints() {
         const rows = root.localTargetResults();
-        const points = [];
+        const candidates = [];
 
         for (let i = 0; i < rows.length; ++i) {
             const unpulled = Number(rows[i].unpulledCount || 0);
-            const intensity = root.branchActivityIntensity(unpulled);
-
             if (unpulled <= 0)
                 continue;
 
-            points.push({
+            candidates.push({
                 rowIndex: i,
-                intensity: intensity,
                 unpulledCount: unpulled,
+                lastChangedEpoch: Number(rows[i].lastChangedEpoch || 0),
                 name: String(rows[i].name || "")
             });
         }
+
+        candidates.sort(function(a, b) {
+            if (a.lastChangedEpoch !== b.lastChangedEpoch)
+                return b.lastChangedEpoch - a.lastChangedEpoch;
+            return a.name.localeCompare(b.name);
+        });
+
+        const points = candidates.slice(0, 5);
+
+        for (let i = 0; i < points.length; ++i)
+            points[i].intensity = root.recentGlowIntensity(i);
 
         return points;
     }
@@ -3540,10 +3570,9 @@ PanelWindow {
                                                             parent.verticalCenter
                                                     }
                                                     visible:
-                                                        Number(
-                                                            parent.modelData
-                                                                .unpulledCount || 0
-                                                        ) > 0
+                                                        root.remoteRecentRank(
+                                                            parent.branchName
+                                                        ) >= 0
 
                                                     RectangularShadow {
                                                         anchors.centerIn: parent
@@ -3553,10 +3582,11 @@ PanelWindow {
                                                         spread: 2
                                                         opacity:
                                                             0.16
-                                                            * root.branchActivityIntensity(
-                                                                parent.parent
-                                                                    .modelData
-                                                                    .unpulledCount
+                                                            * root.recentGlowIntensity(
+                                                                root.remoteRecentRank(
+                                                                    parent.parent
+                                                                        .branchName
+                                                                )
                                                             )
                                                         color: Colors.magenta
                                                     }
@@ -3569,10 +3599,11 @@ PanelWindow {
                                                         spread: 1
                                                         opacity:
                                                             0.66
-                                                            * root.branchActivityIntensity(
-                                                                parent.parent
-                                                                    .modelData
-                                                                    .unpulledCount
+                                                            * root.recentGlowIntensity(
+                                                                root.remoteRecentRank(
+                                                                    parent.parent
+                                                                        .branchName
+                                                                )
                                                             )
                                                         color: Colors.magenta
                                                     }
@@ -3589,9 +3620,9 @@ PanelWindow {
                                                     text: parent.branchName
                                                     font.pixelSize: 10
                                                     color:
-                                                        Number(
-                                                            modelData.unpulledCount || 0
-                                                        ) > 0
+                                                        root.remoteRecentRank(
+                                                            parent.branchName
+                                                        ) >= 0
                                                         ? Colors.white
                                                         : Colors.magenta
                                                     elide: Text.ElideRight

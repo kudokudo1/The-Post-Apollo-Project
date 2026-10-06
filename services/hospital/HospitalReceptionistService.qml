@@ -12,6 +12,85 @@ QtObject {
 
     signal routeRequested(string route)
 
+    property var inbox: []
+
+    function rebuildInbox(roundsRooms, specialists) {
+        const next = [];
+        const rooms =
+            Array.isArray(roundsRooms)
+            ? roundsRooms
+            : [];
+        const staff =
+            Array.isArray(specialists)
+            ? specialists
+            : [];
+
+        for (let i = 0; i < rooms.length && next.length < 6; ++i) {
+            const room = rooms[i] || {};
+            const rank = Number(room.attentionRank || 0);
+
+            if (rank <= 0)
+                continue;
+
+            const state = String(room.state || "CHECK").toUpperCase();
+            const detailParts = [
+                String(room.floorLabel || "FLOOR"),
+                state
+            ];
+            const ahead = Number(room.ahead || 0);
+            const behind = Number(room.behind || 0);
+
+            if (ahead > 0)
+                detailParts.push("AHEAD " + String(ahead));
+            if (behind > 0)
+                detailParts.push("BEHIND " + String(behind));
+
+            next.push({
+                kind: "room",
+                title:
+                    String(room.attentionLabel || "ATTENTION")
+                    + " // "
+                    + String(room.team || room.branch || "ROOM"),
+                detail: detailParts.join(" // "),
+                route: "surgery",
+                room: room
+            });
+        }
+
+        for (let i = 0; i < staff.length && next.length < 6; ++i) {
+            const specialist = staff[i] || {};
+            const presence =
+                String(specialist.presence || "UNKNOWN").toUpperCase();
+
+            if (presence !== "OFFLINE")
+                continue;
+
+            next.push({
+                kind: "staff",
+                title:
+                    "OFFLINE // "
+                    + String(specialist.name || specialist.id || "SPECIALIST"),
+                detail:
+                    String(specialist.role || "SPECIALIST")
+                    + " // "
+                    + String(specialist.provider || "PROVIDER"),
+                route: "staff",
+                specialistId: String(specialist.id || "")
+            });
+        }
+
+        if (next.length === 0) {
+            next.push({
+                kind: "clear",
+                title: "NO ACTIVE ATTENTION",
+                detail: "Rounds and Staff have no active alerts.",
+                route: ""
+            });
+        }
+
+        inbox = next;
+    }
+
     function append(sender, body) {
         const next = transcript.concat([{
             sender: String(sender || ""),

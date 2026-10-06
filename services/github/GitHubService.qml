@@ -446,6 +446,10 @@ Scope {
         runRemoteAction("run", workflowPath);
     }
 
+    function deleteWorkflow(workflowPath) {
+        runRemoteAction("delete-workflow", workflowPath);
+    }
+
     function runWorkflowBatch(workflowPaths) {
         if (actionBusy || refreshing)
             return;
@@ -515,7 +519,10 @@ Scope {
             return;
         }
 
-        if (kind !== "run" && kind !== "rerun" && kind !== "cancel") {
+        if (kind !== "run"
+                && kind !== "rerun"
+                && kind !== "cancel"
+                && kind !== "delete-workflow") {
             actionResult = "ERROR // UNKNOWN ACTION";
             return;
         }
@@ -530,15 +537,32 @@ Scope {
         actionStdoutText = "";
         actionStderrText = "";
 
-        remoteActionProcess.exec([
-            "bash",
-            "-lc",
-            'exec "$HOME/.local/bin/px" "$1" "$2" "$3"',
-            "px-action",
-            kind,
-            repoSlug,
-            cleanTarget
-        ]);
+        if (kind === "delete-workflow") {
+            remoteActionProcess.exec([
+                "bash",
+                "-lc",
+                [
+                    'workflow_sha="$(gh api "repos/$1/contents/$2" --jq ".sha")" || exit $?',
+                    '[ -n "$workflow_sha" ] || { printf "WORKFLOW SHA MISSING\\n" >&2; exit 1; }',
+                    'exec gh api --method DELETE "repos/$1/contents/$2"',
+                    '  -f "message=Delete workflow $2"',
+                    '  -f "sha=$workflow_sha"'
+                ].join(" \\\n"),
+                "github-delete-workflow",
+                repoSlug,
+                cleanTarget
+            ]);
+        } else {
+            remoteActionProcess.exec([
+                "bash",
+                "-lc",
+                'exec "$HOME/.local/bin/px" "$1" "$2" "$3"',
+                "px-action",
+                kind,
+                repoSlug,
+                cleanTarget
+            ]);
+        }
 
         actionWatchdog.restart();
     }
@@ -557,6 +581,8 @@ Scope {
             actionResult =
                 actionKind === "batch"
                 ? "QUEUE // DISPATCHED"
+                : actionKind === "delete-workflow"
+                ? "WORKFLOW // DELETED"
                 : actionKind.toUpperCase() + " // OK";
             refresh();
             return;

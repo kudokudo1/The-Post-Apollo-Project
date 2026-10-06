@@ -46,6 +46,7 @@ Scope {
             return status === "MISSING_BRANCH"
                 || status === "MISSING_PARENT"
                 || status === "NO_MERGE_BASE"
+                || status === "NON_LINEAR"
                 || status === "ERROR";
         }).length
 
@@ -158,14 +159,22 @@ Scope {
                 '  child_head="$(git -C "$repo" rev-parse "$child" 2>/dev/null || true)"',
                 '  parent_head="$(git -C "$repo" rev-parse "$parent" 2>/dev/null || true)"',
                 '  base="$(git -C "$repo" merge-base "$parent" "$child" 2>/dev/null || true)"',
+                '  unique_count=0',
+                '  merge_count=0',
                 '  if [ -z "$base" ]; then',
                 '    status="NO_MERGE_BASE"',
-                '  elif git -C "$repo" merge-base --is-ancestor "$parent" "$child" >/dev/null 2>&1; then',
-                '    status="UP_TO_DATE"',
                 '  else',
-                '    status="RESTACK_REQUIRED"',
+                '    unique_count="$(git -C "$repo" rev-list --count "$base..$child" 2>/dev/null || printf "0")"',
+                '    merge_count="$(git -C "$repo" rev-list --count --merges "$base..$child" 2>/dev/null || printf "0")"',
+                '    if [ "$merge_count" -gt 0 ]; then',
+                '      status="NON_LINEAR"',
+                '    elif git -C "$repo" merge-base --is-ancestor "$parent" "$child" >/dev/null 2>&1; then',
+                '      status="UP_TO_DATE"',
+                '    else',
+                '      status="RESTACK_REQUIRED"',
+                '    fi',
                 '  fi',
-                '  printf "STEP\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$child" "$parent" "$depth" "$child_head" "$parent_head" "$base" "$status"',
+                '  printf "STEP\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$child" "$parent" "$depth" "$child_head" "$parent_head" "$base" "$unique_count" "$merge_count" "$status"',
                 'done'
             ].join("\n"),
             "git-restack-preview",
@@ -224,7 +233,9 @@ Scope {
                 head: parts.length > 4 ? parts[4] : "",
                 parentHead: parts.length > 5 ? parts[5] : "",
                 mergeBase: parts.length > 6 ? parts[6] : "",
-                status: parts.length > 7 ? parts[7] : "ERROR"
+                uniqueCommits: parts.length > 7 ? Number(parts[7] || 0) : 0,
+                mergeCommits: parts.length > 8 ? Number(parts[8] || 0) : 0,
+                status: parts.length > 9 ? parts[9] : "ERROR"
             });
         }
 

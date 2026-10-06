@@ -329,7 +329,7 @@ Rectangle {
                     GohuText {
                         width: parent.width - inboxCount.width
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "FRONT DESK // ATTENTION"
+                        text: "FRONT DESK // RECENT + PINNED"
                         font.pixelSize: 10
                         color: Colors.yellow
                     }
@@ -338,15 +338,25 @@ Rectangle {
                         id: inboxCount
 
                         anchors.verticalCenter: parent.verticalCenter
-                        text:
-                            root.newCount > 0
-                            ? (
-                                "NEW "
-                                + String(root.newCount)
-                                + " // "
-                                + String(root.recentCount)
-                              )
-                            : String(root.recentCount)
+                        text: {
+                            const pinned =
+                                Number(
+                                    root.receptionistService.pinnedCount
+                                    || 0
+                                );
+                            const parts = [];
+
+                            if (pinned > 0)
+                                parts.push("PIN " + String(pinned));
+
+                            if (root.newCount > 0)
+                                parts.push(
+                                    "NEW " + String(root.newCount)
+                                );
+
+                            parts.push(String(root.recentCount));
+                            return parts.join(" // ");
+                        }
                         font.pixelSize: 10
                         color: Colors.yellow
                     }
@@ -363,6 +373,8 @@ Rectangle {
                         model: 5
 
                         Rectangle {
+                            id: inboxSlot
+
                             required property int index
 
                             readonly property var itemData:
@@ -374,6 +386,9 @@ Rectangle {
                             readonly property bool unread:
                                 occupied
                                 && root.receptionistService.isUnread(itemData)
+                            readonly property bool pinned:
+                                occupied
+                                && root.receptionistService.isPinned(itemData)
                             readonly property color attentionAccent:
                                 root.attentionColor(itemData)
 
@@ -387,13 +402,14 @@ Rectangle {
                             opacity:
                                 !occupied
                                 ? 0.18
-                                : unread
+                                : unread || pinned
                                 ? 1.0
                                 : 0.62
                             border.width:
                                 occupied
                                 && (
                                     unread
+                                    || pinned
                                     || inboxMouse.containsMouse
                                 )
                                 ? 2 : 1
@@ -407,7 +423,10 @@ Rectangle {
                             Column {
                                 anchors {
                                     fill: parent
-                                    margins: 5
+                                    leftMargin: 5
+                                    rightMargin: 32
+                                    topMargin: 5
+                                    bottomMargin: 5
                                 }
 
                                 spacing: 2
@@ -454,6 +473,56 @@ Rectangle {
                                     color: Colors.white
                                     opacity: 0.72
                                     elide: Text.ElideRight
+                                }
+                            }
+
+                            Rectangle {
+                                id: pinControl
+
+                                visible: inboxSlot.occupied
+                                z: 3
+                                width: 24
+                                height: 14
+                                anchors {
+                                    top: parent.top
+                                    right: parent.right
+                                    topMargin: 4
+                                    rightMargin: 4
+                                }
+
+                                color:
+                                    inboxSlot.pinned
+                                    ? inboxSlot.attentionAccent
+                                    : Colors.black
+                                border.width: 1
+                                border.color:
+                                    pinMouse.containsMouse
+                                    ? Colors.orange
+                                    : inboxSlot.attentionAccent
+
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    text: "PIN"
+                                    font.pixelSize: 6
+                                    color:
+                                        pinMouse.containsMouse
+                                        ? Colors.orange
+                                        : inboxSlot.pinned
+                                        ? Colors.black
+                                        : inboxSlot.attentionAccent
+                                }
+
+                                MouseArea {
+                                    id: pinMouse
+
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+
+                                    onClicked:
+                                        root.receptionistService.togglePinned(
+                                            inboxSlot.itemData
+                                        )
                                 }
                             }
 

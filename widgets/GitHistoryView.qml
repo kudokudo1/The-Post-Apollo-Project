@@ -277,8 +277,11 @@ Item {
         property string placeholder: ""
         property color accent: Colors.cyan
         property var keyboardOwner: null
+        property int editorFontSize: 11
+        property int placeholderFontSize: 10
 
         height: 30
+        clip: true
         color: Colors.black
         border.width: 1
         border.color:
@@ -300,7 +303,7 @@ Item {
             selectionColor: Colors.magenta
             selectedTextColor: Colors.black
             font.family: "GohuFont 11 Nerd Font Mono"
-            font.pixelSize: 11
+            font.pixelSize: editorBox.editorFontSize
             clip: true
 
             onActiveFocusChanged: {
@@ -319,14 +322,17 @@ Item {
         GohuText {
             anchors {
                 left: parent.left
+                right: parent.right
                 verticalCenter: parent.verticalCenter
                 leftMargin: 8
+                rightMargin: 8
             }
             visible: editor.text.length === 0
             text: editorBox.placeholder
-            font.pixelSize: 10
+            font.pixelSize: editorBox.placeholderFontSize
             color: Colors.white
             opacity: 0.30
+            elide: Text.ElideRight
         }
     }
 
@@ -429,9 +435,11 @@ Item {
                         - 110
                         - 56
                     anchors.verticalCenter: parent.verticalCenter
-                    placeholder: "SEARCH SHA / AUTHOR / SUBJECT / REF"
+                    placeholder: "SEARCH SHA / AUTHOR / SUBJECT"
                     accent: Colors.orange
                     keyboardOwner: root.keyboardHost
+                    editorFontSize: 10
+                    placeholderFontSize: 9
                     onTextChanged:
                         root.searchQuery = text
                 }
@@ -503,7 +511,7 @@ Item {
 
         Item {
             width: parent.width
-            height: parent.height - 150
+            height: parent.height - 158
 
             // ===== LOG ===================================================
             Row {

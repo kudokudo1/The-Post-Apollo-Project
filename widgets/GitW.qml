@@ -1307,11 +1307,16 @@ PanelWindow {
         property color accentColor: Colors.cyan
         property color textColor: accentColor
         property bool editable: true
+        property bool userEditing: false
 
         signal submitted(string value)
 
-        function syncDisplay() {
-            input.text = selectorInput.valueText;
+        function syncDisplay(value) {
+            selectorInput.userEditing = false;
+            input.text =
+                value === undefined
+                ? selectorInput.valueText
+                : String(value || "");
         }
 
         height: 28
@@ -1320,7 +1325,7 @@ PanelWindow {
         border.color: input.activeFocus ? Colors.yellow : selectorInput.accentColor
 
         onValueTextChanged: {
-            if (!input.activeFocus)
+            if (!selectorInput.userEditing)
                 input.text = valueText;
         }
 
@@ -1355,18 +1360,25 @@ PanelWindow {
 
             Component.onCompleted: text = selectorInput.valueText
 
+            onTextEdited:
+                selectorInput.userEditing = true
+
             onAccepted: {
                 const candidate = String(text || "").trim();
+
+                selectorInput.userEditing = false;
 
                 if (candidate)
                     selectorInput.submitted(candidate);
 
+                text = selectorInput.valueText;
                 focus = false;
                 root.activeTextEditor = null;
                 root.restoreGitKeyboardFocus(false);
             }
 
             Keys.onEscapePressed: function(event) {
+                selectorInput.userEditing = false;
                 text = selectorInput.valueText;
                 focus = false;
                 root.activeTextEditor = null;
@@ -1377,9 +1389,11 @@ PanelWindow {
             onActiveFocusChanged: {
                 if (activeFocus) {
                     root.activeTextEditor = input;
+                    selectorInput.userEditing = false;
                     text = selectorInput.valueText;
                     selectAll();
                 } else {
+                    selectorInput.userEditing = false;
                     text = selectorInput.valueText;
 
                     if (root.activeTextEditor === input)
@@ -2551,10 +2565,10 @@ PanelWindow {
                                                         gitService
                                                             .selectTrackCheckoutRemote();
                                                         root.localTargetMenuOpen = false;
-                                                        Qt.callLater(function() {
-                                                            localTargetInput
-                                                                .syncDisplay();
-                                                        });
+                                                        localTargetInput
+                                                            .syncDisplay(
+                                                                gitService.localTargetDisplay
+                                                            );
                                                     }
                                                 }
                                             }
@@ -2635,10 +2649,10 @@ PanelWindow {
                                                             gitService
                                                                 .selectLocal(index);
                                                             root.localTargetMenuOpen = false;
-                                                            Qt.callLater(function() {
-                                                                localTargetInput
-                                                                    .syncDisplay();
-                                                            });
+                                                            localTargetInput
+                                                                .syncDisplay(
+                                                                    gitService.localTargetDisplay
+                                                                );
                                                         }
                                                     }
                                                 }
@@ -3087,7 +3101,7 @@ PanelWindow {
                                     gitService.actionBusy
                                     ? gitService.actionTitle + " // RUNNING"
                                     : gitService.actionTitle + " // OUTPUT"
-                                font.pixelSize: 9
+                                font.pixelSize: 10
                                 color:
                                     gitService.actionExitCode === 0
                                     ? Colors.orange
@@ -3127,7 +3141,7 @@ PanelWindow {
                                     id: localOutputText
                                     width: parent.width
                                     text: gitService.actionOutput
-                                    font.pixelSize: 9
+                                    font.pixelSize: 11
                                     color: Colors.white
                                     wrapMode: Text.WrapAnywhere
 

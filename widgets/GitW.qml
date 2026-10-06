@@ -2974,8 +2974,17 @@ PanelWindow {
                                             onSubmitted: function(value) {
                                                 root.localTargetMenuOpen = false;
 
-                                                if (gitService.selectLocalText(value))
+                                                if (gitService.selectLocalText(value)) {
                                                     root.targetMatchSource = "local";
+
+                                                    Qt.callLater(function() {
+                                                        localTargetInput
+                                                            .syncDisplay(
+                                                                gitService
+                                                                    .localTargetDisplay
+                                                            );
+                                                    });
+                                                }
 
                                                 root.localTargetQuery = "";
                                             }
@@ -3200,10 +3209,14 @@ PanelWindow {
                                                             .selectTrackCheckoutRemote();
                                                         root.targetMatchSource = "remote";
                                                         root.localTargetMenuOpen = false;
-                                                        localTargetInput
-                                                            .syncDisplay(
-                                                                gitService.localTargetDisplay
-                                                            );
+
+                                                        Qt.callLater(function() {
+                                                            localTargetInput
+                                                                .syncDisplay(
+                                                                    gitService
+                                                                        .localTargetDisplay
+                                                                );
+                                                        });
                                                     }
                                                 }
                                             }
@@ -3305,11 +3318,15 @@ PanelWindow {
                                                             ) {
                                                                 root.targetMatchSource = "local";
                                                                 root.localTargetQuery = "";
-                                                                localTargetInput
-                                                                    .syncDisplay(
-                                                                        branchName
-                                                                    );
                                                                 root.localTargetMenuOpen = false;
+
+                                                                Qt.callLater(function() {
+                                                                    localTargetInput
+                                                                        .syncDisplay(
+                                                                            gitService
+                                                                                .localTargetDisplay
+                                                                        );
+                                                                });
                                                             }
                                                         }
                                                     }

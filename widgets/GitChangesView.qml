@@ -14,6 +14,7 @@ Item {
     property var selectedFile: null
     property string selectedStashRef: ""
     property int selectedHunkIndex: -1
+    property int selectedLineIndex: -1
     property string diffMode: "combined"
     property string hunkMode: "worktree"
 
@@ -31,6 +32,9 @@ Item {
         const data = row || {};
         root.selectedFile = data;
         root.selectedPath = String(data.path || "");
+        root.selectedHunkIndex = -1;
+        root.selectedLineIndex = -1;
+        root.clearArm();
 
         if (!root.selectedPath || !root.changesService)
             return;
@@ -68,12 +72,42 @@ Item {
     function setHunkMode(mode) {
         root.hunkMode = String(mode || "worktree");
         root.selectedHunkIndex = -1;
+        root.selectedLineIndex = -1;
+        root.clearArm();
 
         if (root.selectedPath && root.changesService)
             root.changesService.loadHunks(
                 root.selectedPath,
                 root.hunkMode
             );
+    }
+
+    function selectedHunk() {
+        if (!root.changesService)
+            return null;
+
+        return root.changesService.hunkAt(
+            root.selectedHunkIndex
+        );
+    }
+
+    function selectedHunkLines() {
+        const hunk = root.selectedHunk();
+        return hunk && hunk.lines
+            ? hunk.lines
+            : [];
+    }
+
+    function selectedLine() {
+        const lines = root.selectedHunkLines();
+
+        if (
+            root.selectedLineIndex < 0
+            || root.selectedLineIndex >= lines.length
+        )
+            return null;
+
+        return lines[root.selectedLineIndex];
     }
 
     function armOrRun(key, callback) {
@@ -862,9 +896,12 @@ Item {
                                             anchors.fill: parent
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
-                                            onClicked:
+                                            onClicked: {
                                                 root.selectedHunkIndex =
-                                                    hunkRow.index
+                                                    hunkRow.index;
+                                                root.selectedLineIndex = -1;
+                                                root.clearArm();
+                                            }
                                         }
                                     }
                                 }
@@ -921,6 +958,8 @@ Item {
                                     && root.selectedHunkIndex >= 0
                                     && !root.changesService.actionBusy
                                 onTriggered: {
+                                    root.selectedLineIndex = -1;
+
                                     if (root.hunkMode === "staged")
                                         root.changesService.unstageHunk(
                                             root.selectedPath,
@@ -950,6 +989,7 @@ Item {
                                     root.armOrRun(
                                         "discard-hunk",
                                         function() {
+                                            root.selectedLineIndex = -1;
                                             root.changesService.discardHunk(
                                                 root.selectedPath,
                                                 root.selectedHunkIndex,
@@ -967,48 +1007,316 @@ Item {
                                     root.changesService
                                     && root.selectedPath
                                     && !root.changesService.hunkBusy
-                                onTriggered:
+                                onTriggered: {
+                                    root.selectedLineIndex = -1;
                                     root.changesService.loadHunks(
                                         root.selectedPath,
                                         root.hunkMode
+                                    );
+                                }
+                            }
+                        }
+
+                        Row {
+                            width: parent.width
+                            height: 28
+                            spacing: 5
+
+                            LabelText {
+                                width: parent.width - 230
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: {
+                                    const line = root.selectedLine();
+
+                                    if (!line)
+                                        return "SELECT A +/- LINE";
+
+                                    const number =
+                                        line.kind === "+"
+                                        ? line.newLine
+                                        : line.oldLine;
+
+                                    return "LINE "
+                                        + String(number || "?")
+                                        + " // "
+                                        + (
+                                            line.kind === "+"
+                                            ? "ADD"
+                                            : "REMOVE"
+                                          );
+                                }
+                                color:
+                                    root.selectedLine()
+                                    && root.selectedLine().kind === "+"
+                                    ? Colors.green
+                                    : root.selectedLine()
+                                      && root.selectedLine().kind === "-"
+                                    ? Colors.orange
+                                    : Colors.cyan
+                            }
+
+                            MiniButton {
+                                width: 108
+                                label:
+                                    root.hunkMode === "staged"
+                                    ? "UNSTAGE LINE"
+                                    : "STAGE LINE"
+                                accent:
+                                    root.hunkMode === "staged"
+                                    ? Colors.orange
+                                    : Colors.green
+                                enabledAction:
+                                    root.changesService
+                                    && root.selectedHunkIndex >= 0
+                                    && root.selectedLineIndex >= 0
+                                    && root.selectedLine()
+                                    && Boolean(
+                                        root.selectedLine().selectable
+                                    )
+                                    && !root.changesService.actionBusy
+                                onTriggered: {
+                                    if (root.hunkMode === "staged")
+                                        root.changesService.unstageLine(
+                                            root.selectedPath,
+                                            root.selectedHunkIndex,
+                                            root.selectedLineIndex
+                                        );
+                                    else
+                                        root.changesService.stageLine(
+                                            root.selectedPath,
+                                            root.selectedHunkIndex,
+                                            root.selectedLineIndex
+                                        );
+
+                                    root.selectedLineIndex = -1;
+                                    root.clearArm();
+                                }
+                            }
+
+                            MiniButton {
+                                width: 112
+                                label:
+                                    root.armedAction === "discard-line"
+                                    ? "CONFIRM LINE"
+                                    : "DISCARD LINE"
+                                accent: Colors.red
+                                enabledAction:
+                                    root.hunkMode === "worktree"
+                                    && root.changesService
+                                    && root.selectedHunkIndex >= 0
+                                    && root.selectedLineIndex >= 0
+                                    && root.selectedLine()
+                                    && Boolean(
+                                        root.selectedLine().selectable
+                                    )
+                                    && !root.changesService.actionBusy
+                                onTriggered:
+                                    root.armOrRun(
+                                        "discard-line",
+                                        function() {
+                                            root.changesService.discardLine(
+                                                root.selectedPath,
+                                                root.selectedHunkIndex,
+                                                root.selectedLineIndex,
+                                                true
+                                            );
+                                            root.selectedLineIndex = -1;
+                                        }
                                     )
                             }
                         }
 
                         Flickable {
                             id: changesScroll4
+
                             width: parent.width
-                            height: parent.height - 34
+                            height: parent.height - 66
                             clip: true
                             contentWidth: width
-                            contentHeight: hunkText.implicitHeight
+                            contentHeight: lineColumn.implicitHeight
                             boundsBehavior: Flickable.StopAtBounds
 
-                            GohuText {
-                                id: hunkText
+                            Column {
+                                id: lineColumn
+
                                 width: parent.width
-                                text: {
-                                    if (!root.changesService)
-                                        return "NO CHANGE SERVICE";
+                                spacing: 1
 
-                                    const row =
-                                        root.changesService.hunkAt(
-                                            root.selectedHunkIndex
-                                        );
-
-                                    return row
-                                        ? String(row.text || "")
-                                        : "SELECT A HUNK";
+                                GohuText {
+                                    visible:
+                                        root.selectedHunkIndex < 0
+                                    width: parent.width
+                                    topPadding: 24
+                                    text: "SELECT A HUNK"
+                                    horizontalAlignment:
+                                        Text.AlignHCenter
+                                    font.pixelSize: 11
+                                    color: Colors.cyan
                                 }
-                                font.pixelSize: 11
-                                color: Colors.white
-                                wrapMode: Text.WrapAnywhere
+
+                                Repeater {
+                                    model: root.selectedHunkLines()
+
+                                    Rectangle {
+                                        id: lineRow
+
+                                        required property int index
+                                        required property var modelData
+
+                                        width: lineColumn.width
+                                        height: 25
+
+                                        color:
+                                            root.selectedLineIndex
+                                            === index
+                                            ? Colors.dark
+                                            : lineMouse.containsMouse
+                                              && Boolean(
+                                                  modelData.selectable
+                                              )
+                                            ? Colors.black
+                                            : "transparent"
+
+                                        border.width:
+                                            root.selectedLineIndex
+                                            === index
+                                            ? 1
+                                            : 0
+
+                                        border.color:
+                                            modelData.kind === "+"
+                                            ? Colors.green
+                                            : modelData.kind === "-"
+                                            ? Colors.orange
+                                            : Colors.cyan
+
+                                        GohuText {
+                                            anchors {
+                                                left: parent.left
+                                                verticalCenter:
+                                                    parent.verticalCenter
+                                            }
+                                            width: 42
+                                            horizontalAlignment:
+                                                Text.AlignRight
+                                            text:
+                                                lineRow.modelData.oldLine
+                                                ? String(
+                                                    lineRow.modelData.oldLine
+                                                  )
+                                                : ""
+                                            font.pixelSize: 9
+                                            color: Colors.white
+                                            opacity: 0.44
+                                        }
+
+                                        GohuText {
+                                            anchors {
+                                                left: parent.left
+                                                verticalCenter:
+                                                    parent.verticalCenter
+                                                leftMargin: 48
+                                            }
+                                            width: 42
+                                            horizontalAlignment:
+                                                Text.AlignRight
+                                            text:
+                                                lineRow.modelData.newLine
+                                                ? String(
+                                                    lineRow.modelData.newLine
+                                                  )
+                                                : ""
+                                            font.pixelSize: 9
+                                            color: Colors.white
+                                            opacity: 0.44
+                                        }
+
+                                        GohuText {
+                                            anchors {
+                                                left: parent.left
+                                                verticalCenter:
+                                                    parent.verticalCenter
+                                                leftMargin: 98
+                                            }
+                                            width: 18
+                                            horizontalAlignment:
+                                                Text.AlignHCenter
+                                            text:
+                                                String(
+                                                    lineRow.modelData.kind
+                                                    || " "
+                                                )
+                                            font.pixelSize: 11
+                                            color:
+                                                lineRow.modelData.kind === "+"
+                                                ? Colors.green
+                                                : lineRow.modelData.kind === "-"
+                                                ? Colors.orange
+                                                : Colors.cyan
+                                        }
+
+                                        GohuText {
+                                            anchors {
+                                                left: parent.left
+                                                right: parent.right
+                                                verticalCenter:
+                                                    parent.verticalCenter
+                                                leftMargin: 122
+                                                rightMargin: 12
+                                            }
+                                            text:
+                                                String(
+                                                    lineRow.modelData.text
+                                                    || ""
+                                                )
+                                            font.pixelSize: 10
+                                            color:
+                                                lineRow.modelData.kind === "+"
+                                                ? Colors.green
+                                                : lineRow.modelData.kind === "-"
+                                                ? Colors.orange
+                                                : Colors.white
+                                            opacity:
+                                                Boolean(
+                                                    lineRow
+                                                        .modelData
+                                                        .selectable
+                                                )
+                                                ? 1.0
+                                                : 0.58
+                                            elide: Text.ElideRight
+                                        }
+
+                                        MouseArea {
+                                            id: lineMouse
+
+                                            anchors.fill: parent
+                                            enabled:
+                                                Boolean(
+                                                    lineRow
+                                                        .modelData
+                                                        .selectable
+                                                )
+                                            hoverEnabled: true
+                                            cursorShape:
+                                                enabled
+                                                ? Qt.PointingHandCursor
+                                                : Qt.ArrowCursor
+
+                                            onClicked: {
+                                                root.selectedLineIndex =
+                                                    lineRow.index;
+                                                root.clearArm();
+                                            }
+                                        }
+                                    }
+                                }
                             }
-                        
+
                             NeonScrollBar {
                                 flickable: changesScroll4
                             }
-}
+                        }
                     }
                 }
             }
@@ -1801,7 +2109,15 @@ Item {
 
             root.clearArm();
 
-            if (String(action || "") === "COMMIT") {
+            const actionText = String(action || "");
+
+            if (
+                actionText.indexOf("LINE") >= 0
+                || actionText.indexOf("HUNK") >= 0
+            )
+                root.selectedLineIndex = -1;
+
+            if (actionText === "COMMIT") {
                 commitInput.text = "";
                 root.commitAmend = false;
                 root.commitAllowEmpty = false;

@@ -778,6 +778,8 @@ PanelWindow {
 
         if (root.gitView === "branches")
             branchWorkspaceService.refresh();
+        else if (root.gitView === "changes")
+            changesService.refresh();
     }
 
     function showGitControl() {
@@ -791,6 +793,13 @@ PanelWindow {
         root.remoteTargetMenuOpen = false;
         root.gitView = "branches";
         branchWorkspaceService.refresh();
+    }
+
+    function showGitChanges() {
+        root.localTargetMenuOpen = false;
+        root.remoteTargetMenuOpen = false;
+        root.gitView = "changes";
+        changesService.refresh();
     }
 
     function localTargetResults() {
@@ -1306,6 +1315,9 @@ PanelWindow {
         if (root.activePage === "git"
                 && root.gitView === "branches")
             branchWorkspaceService.refresh();
+        else if (root.activePage === "git"
+                && root.gitView === "changes")
+            changesService.refresh();
 
         if (root.activePage === "github")
             githubService.refresh();
@@ -1316,6 +1328,14 @@ PanelWindow {
 
     GitService {
         id: gitService
+    }
+
+    GitChangesService {
+        id: changesService
+        repositoryPath:
+            gitService.repoIsLocal
+            ? gitService.repoRoot
+            : ""
     }
 
     GitBranchWorkspaceService {
@@ -1391,6 +1411,18 @@ PanelWindow {
             if (root.activePage === "git"
                     && root.gitView === "branches")
                 branchWorkspaceService.refresh();
+            else if (root.activePage === "git"
+                    && root.gitView === "changes")
+                changesService.refresh();
+        }
+    }
+
+    Connections {
+        target: changesService
+
+        function onActionFinished(action, success, detail) {
+            if (success)
+                gitService.refresh();
         }
     }
 
@@ -2444,6 +2476,12 @@ PanelWindow {
                         root.activePage === "git"
                         ? root.gitView === "branches"
                           ? "GIT // BRANCHES"
+                          : root.gitView === "changes"
+                          ? "GIT // CHANGES"
+                          : root.gitView === "history"
+                          ? "GIT // HISTORY"
+                          : root.gitView === "repository"
+                          ? "GIT // REPOSITORY"
                           : "GIT // LOCAL REPOSITORY"
                         : "GITHUB // REMOTE AUTOMATION"
                     font.pixelSize: 20
@@ -2469,6 +2507,12 @@ PanelWindow {
                         root.activePage === "git"
                         ? root.gitView === "branches"
                           ? "OPERATING MAP // BRANCHES + WORKSPACES + STACKS"
+                          : root.gitView === "changes"
+                          ? "WORKTREE // STAGE + COMMIT + STASH"
+                          : root.gitView === "history"
+                          ? "COMMIT GRAPH // LOCAL HISTORY"
+                          : root.gitView === "repository"
+                          ? "REMOTES // CONFIG + WORKTREES"
                           : "CONTROL SURFACE // LOCAL GIT"
                         : "PX CONTROL SURFACE // GITHUB ACTIONS"
                     font.pixelSize: 10
@@ -4079,6 +4123,24 @@ PanelWindow {
                         }
                     }
 
+                    GitChangesView {
+                        id: gitChangesView
+
+                        anchors {
+                            top: parent.top
+                            left: parent.left
+                            right: parent.right
+                            bottom: gitModeButtonRow.top
+                            bottomMargin: 8
+                        }
+
+                        visible: root.gitView === "changes"
+
+                        changesService: changesService
+                        gitService: gitService
+                        keyboardHost: root
+                    }
+
                     GitBranchesView {
                         id: gitBranchesView
 
@@ -4129,7 +4191,7 @@ PanelWindow {
                                     name: "CHANGES",
                                     key: "changes",
                                     symbol: "Δ",
-                                    available: false
+                                    available: true
                                 },
                                 {
                                     name: "HISTORY",
@@ -4236,6 +4298,11 @@ PanelWindow {
                                             === "branches"
                                         )
                                             root.showGitBranches();
+                                        else if (
+                                            gitModeButton.modelData.key
+                                            === "changes"
+                                        )
+                                            root.showGitChanges();
                                     }
                                 }
                             }

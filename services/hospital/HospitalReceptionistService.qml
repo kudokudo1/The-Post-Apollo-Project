@@ -32,6 +32,15 @@ Scope {
     property int pinnedCount: 0
     property int maxPinnedEvents: 5
 
+    // Session-local conversational reference. This is intentionally not
+    // persisted: Reception remembers "that" only inside the live session.
+    property string contextEventKey: ""
+    property string contextSource: ""
+    property string contextTarget: ""
+    property bool contextUnreadOnly: false
+    property bool contextFavoritesOnly: false
+    property bool contextProblemsOnly: false
+
     FileView {
         id: activityFile
 
@@ -298,7 +307,7 @@ Scope {
         activityAdapter.pinnedKeys = pinnedKeys.slice();
     }
 
-    function togglePinned(event) {
+    function setPinned(event, pinnedValue) {
         if (!activityHydrated)
             return false;
 
@@ -307,17 +316,25 @@ Scope {
         if (!key)
             return false;
 
+        const desired = Boolean(pinnedValue);
         const existing = pinnedKeys.indexOf(key);
+
+        if (desired && existing >= 0)
+            return true;
+
+        if (!desired && existing < 0)
+            return true;
+
         let next = pinnedKeys.slice();
 
-        if (existing >= 0) {
-            next.splice(existing, 1);
-        } else {
+        if (desired) {
             next = [key].concat(
                 next.filter(function(value) {
                     return String(value || "") !== key;
                 })
             ).slice(0, maxPinnedEvents);
+        } else {
+            next.splice(existing, 1);
         }
 
         pinnedKeys = next;
@@ -327,6 +344,10 @@ Scope {
         activityAdapter.pinnedKeys = pinnedKeys.slice();
         refreshVisibleInbox();
         return true;
+    }
+
+    function togglePinned(event) {
+        return setPinned(event, !isPinned(event));
     }
 
     function refreshVisibleInbox() {
@@ -968,6 +989,247 @@ Scope {
         return false;
     }
 
+    function clearActivityContext() {
+        contextEventKey = "";
+        contextSource = "";
+        contextTarget = "";
+        contextUnreadOnly = false;
+        contextFavoritesOnly = false;
+        contextProblemsOnly = false;
+    }
+
+    function rememberActivityContext(
+            eventValue,
+            sourceValue,
+            targetValue,
+            unreadOnlyValue,
+            favoritesOnlyValue,
+            problemsOnlyValue) {
+        const event = eventValue || {};
+        const key = eventKey(event);
+
+        if (!key) {
+            clearActivityContext();
+            return false;
+        }
+
+        contextEventKey = key;
+        contextSource = String(sourceValue || "").toLowerCase();
+        contextTarget = String(targetValue || "").toUpperCase();
+        contextUnreadOnly = Boolean(unreadOnlyValue);
+        contextFavoritesOnly = Boolean(favoritesOnlyValue);
+        contextProblemsOnly = Boolean(problemsOnlyValue);
+        return true;
+    }
+
+    function contextEvent() {
+        const key = String(contextEventKey || "");
+
+        if (!key)
+            return null;
+
+        for (let i = 0; i < activityEvents.length; ++i) {
+            const event = activityEvents[i] || {};
+
+            if (eventKey(event) === key)
+                return event;
+        }
+
+        return null;
+    }
+
+    function contextMatches() {
+        let matches =
+            matchingActivity(
+                contextSource,
+                contextUnreadOnly,
+                contextFavoritesOnly,
+                contextTarget
+            );
+
+        if (contextProblemsOnly) {
+            matches = matches.filter(function(event) {
+                return root.isProblemActivity(event || {});
+            });
+        }
+
+        return matches;
+    }
+
+    function contextIndex(matchesValue) {
+        const matches =
+            Array.isArray(matchesValue)
+            ? matchesValue
+            : [];
+        const key = String(contextEventKey || "");
+
+        for (let i = 0; i < matches.length; ++i) {
+            if (eventKey(matches[i] || {}) === key)
+                return i;
+        }
+
+        return -1;
+    }
+
+    function answerContextFollowUp(textValue) {
+        const raw = String(textValue || "").trim();
+
+        if (!raw)
+            return false;
+
+        const query = raw.toLowerCase();
+        const openThat =
+            (
+                query.indexOf("open that") >= 0
+                || query.indexOf("open it") >= 0
+                || query.indexOf("show me that") >= 0
+                || query.indexOf("show me it") >= 0
+                || query.indexOf("take me to that") >= 0
+                || query.indexOf("take me to it") >= 0
+                || query.indexOf("go to that") >= 0
+                || query.indexOf("go to it") >= 0
+            );
+        const favoriteThat =
+            query.indexOf("favorite that") >= 0
+            || query.indexOf("favorite it") >= 0
+            || query.indexOf("favourite that") >= 0
+            || query.indexOf("favourite it") >= 0
+            || query.indexOf("pin that") >= 0
+            || query.indexOf("pin it") >= 0;
+        const unfavoriteThat =
+            query.indexOf("unfavorite that") >= 0
+            || query.indexOf("unfavorite it") >= 0
+            || query.indexOf("unfavourite that") >= 0
+            || query.indexOf("unfavourite it") >= 0
+            || query.indexOf("unpin that") >= 0
+            || query.indexOf("unpin it") >= 0;
+        const beforeThat =
+            query.indexOf("before that") >= 0
+            || query.indexOf("before it") >= 0
+            || query.indexOf("previous one") >= 0
+            || query.indexOf("previous event") >= 0;
+        const newerThanThat =
+            query.indexOf("anything newer") >= 0
+            || query.indexOf("anything after that") >= 0
+            || query.indexOf("anything after it") >= 0
+            || query.indexOf("what happened after that") >= 0
+            || query.indexOf("what happened after it") >= 0;
+
+        if (!openThat
+                && !favoriteThat
+                && !unfavoriteThat
+                && !beforeThat
+                && !newerThanThat)
+            return false;
+
+        append("OPERATOR", raw);
+
+        const current = contextEvent();
+
+        if (!current) {
+            append(
+                "RECEPTION",
+                "NO ACTIVE CONTEXT // ASK ME ABOUT AN EVENT, ROOM, OR TEAM FIRST"
+            );
+            clearActivityContext();
+            return true;
+        }
+
+        if (openThat) {
+            append(
+                "RECEPTION",
+                "OPENING // " + activityLine(current)
+            );
+            activityActionRequested(current);
+            return true;
+        }
+
+        if (favoriteThat || unfavoriteThat) {
+            const desired = favoriteThat && !unfavoriteThat;
+
+            setPinned(current, desired);
+            append(
+                "RECEPTION",
+                (
+                    desired
+                    ? "FAVORITED // "
+                    : "UNFAVORITED // "
+                )
+                + activityLine(current)
+            );
+            return true;
+        }
+
+        const matches = contextMatches();
+        const index = contextIndex(matches);
+
+        if (index < 0) {
+            append(
+                "RECEPTION",
+                "CONTEXT EXPIRED // THAT EVENT IS NO LONGER IN RETAINED HISTORY"
+            );
+            clearActivityContext();
+            return true;
+        }
+
+        if (beforeThat) {
+            const olderIndex = index + 1;
+
+            if (olderIndex >= matches.length) {
+                append(
+                    "RECEPTION",
+                    "NOTHING OLDER IN THIS CONTEXT"
+                );
+                return true;
+            }
+
+            const older = matches[olderIndex] || {};
+
+            rememberActivityContext(
+                older,
+                contextSource,
+                contextTarget,
+                contextUnreadOnly,
+                contextFavoritesOnly,
+                contextProblemsOnly
+            );
+            append(
+                "RECEPTION",
+                activityListResponse("BEFORE", [older])
+            );
+            return true;
+        }
+
+        if (newerThanThat) {
+            if (index <= 0) {
+                append(
+                    "RECEPTION",
+                    "NOTHING NEWER IN THIS CONTEXT"
+                );
+                return true;
+            }
+
+            const newer = matches.slice(0, index);
+            const newest = newer[0] || {};
+
+            rememberActivityContext(
+                newest,
+                contextSource,
+                contextTarget,
+                contextUnreadOnly,
+                contextFavoritesOnly,
+                contextProblemsOnly
+            );
+            append(
+                "RECEPTION",
+                activityListResponse("NEWER", newer)
+            );
+            return true;
+        }
+
+        return false;
+    }
+
     function actionableMatches(
             sourceValue,
             favoritesOnly,
@@ -1072,6 +1334,14 @@ Scope {
 
         const selected = matches[0] || {};
 
+        rememberActivityContext(
+            selected,
+            source,
+            target,
+            false,
+            favoritesOnly,
+            problemsOnly
+        );
         append(
             "RECEPTION",
             "OPENING // " + activityLine(selected)
@@ -1141,7 +1411,7 @@ Scope {
         if (asksHelp) {
             append(
                 "RECEPTION",
-                "I can report what is new, what you missed, recent activity, favorites, Room or team history, counts, and last activity. I can also show a team, open the latest matching event, or take you to a recorded problem."
+                "I can report what is new, what you missed, recent activity, favorites, Room or team history, counts, and last activity. I can show a team or open a recorded problem, then follow up with open that, favorite that, before that, or anything newer."
             );
             return true;
         }
@@ -1179,6 +1449,19 @@ Scope {
         }
 
         if (asksWhen) {
+            if (matches.length > 0) {
+                rememberActivityContext(
+                    matches[0],
+                    source,
+                    target,
+                    asksNew,
+                    asksFavorites,
+                    false
+                );
+            } else {
+                clearActivityContext();
+            }
+
             append(
                 "RECEPTION",
                 matches.length > 0
@@ -1196,6 +1479,19 @@ Scope {
                 : label + " // NONE RECORDED"
             );
             return true;
+        }
+
+        if (matches.length > 0) {
+            rememberActivityContext(
+                matches[0],
+                source,
+                target,
+                asksNew,
+                asksFavorites,
+                false
+            );
+        } else {
+            clearActivityContext();
         }
 
         append(
@@ -1245,6 +1541,9 @@ Scope {
             return false;
 
         const query = raw.toLowerCase();
+
+        if (answerContextFollowUp(raw))
+            return true;
 
         if (answerActivityAction(raw))
             return true;

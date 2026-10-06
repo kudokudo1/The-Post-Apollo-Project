@@ -8,6 +8,11 @@ Item {
     property int minimumHandleHeight: 24
     property int wheelStep: 42
 
+    parent:
+        flickable && flickable.parent
+        ? flickable.parent
+        : null
+
     width: 10
     z: 100
 

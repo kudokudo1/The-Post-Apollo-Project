@@ -821,6 +821,25 @@ PanelWindow {
         root.closeOperationsSurface();
     }
 
+    function refreshReceptionistInbox() {
+        receptionistService.rebuildInbox(
+            roundsService.rooms,
+            specialistRegistryService.specialists
+        );
+    }
+
+    function refreshReceptionData() {
+        root.refreshReceptionistInbox();
+
+        if (!roundsService.running && !roundsService.available)
+            roundsService.refresh();
+
+        if (specialistRegistryService.loaded
+                && !specialistRegistryService.probing
+                && !specialistRegistryService.lastRefreshedAt)
+            specialistRegistryService.refreshPresence();
+    }
+
     function openReception() {
         root.leaveRoomControls();
         root.leaveBedControls();
@@ -828,6 +847,7 @@ PanelWindow {
         root.intercomMenuOpen = false;
         root.intercomTyping = false;
         root.operationsSurface = "reception";
+        root.refreshReceptionData();
     }
 
     function handleReceptionRoute(route) {
@@ -973,6 +993,7 @@ PanelWindow {
         root.keyboardOwnershipRequested();
         root.operationsSurface = "reception";
         root.menuOpen = true;
+        root.refreshReceptionData();
     }
 
     function close() {
@@ -1203,10 +1224,26 @@ PanelWindow {
         target: specialistRegistryService
 
         function onRegistryLoaded() {
+            root.refreshReceptionistInbox();
+
             if ((root.operationsSurface === "staff"
-                    || root.phoneMenuOpen)
+                    || root.operationsSurface === "reception"
+                    || root.phoneMenuOpen
+                    || root.intercomMenuOpen)
                     && !specialistRegistryService.probing)
                 specialistRegistryService.refreshPresence();
+        }
+
+        function onPresenceRefreshed() {
+            root.refreshReceptionistInbox();
+        }
+    }
+
+    Connections {
+        target: roundsService
+
+        function onRefreshed() {
+            root.refreshReceptionistInbox();
         }
     }
 
@@ -4008,6 +4045,7 @@ PanelWindow {
             readyCount: specialistRegistryService.readyCount
             specialistCount: specialistRegistryService.specialistCount
             attentionCount: roundsService.attentionCount
+            inbox: receptionistService.inbox
 
             anchors {
                 left: parent.left
@@ -4022,6 +4060,19 @@ PanelWindow {
 
             onRouteRequested: function(route) {
                 root.handleReceptionRoute(route);
+            }
+
+            onAttentionActivated: function(item) {
+                const row = item || {};
+                const kind = String(row.kind || "");
+
+                if (kind === "room") {
+                    root.openRoomFromRounds(row.room || {});
+                    return;
+                }
+
+                if (kind === "staff")
+                    root.openStaff();
             }
 
             onTypingChanged: function(active) {

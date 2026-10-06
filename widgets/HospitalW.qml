@@ -1688,7 +1688,8 @@ PanelWindow {
                 right: parent.right
                 topMargin: 18
                 leftMargin: 62
-                rightMargin: 18
+                rightMargin:
+                    root.operationsOpen ? 8 : 18
             }
 
             spacing: 12
@@ -4002,7 +4003,7 @@ PanelWindow {
                 top: fixedTop.bottom
                 bottom: actionBay.top
                 leftMargin: 62
-                rightMargin: 18
+                rightMargin: 8
                 topMargin: 8
                 bottomMargin: 10
             }
@@ -4034,7 +4035,7 @@ PanelWindow {
                 top: fixedTop.bottom
                 bottom: actionBay.top
                 leftMargin: 62
-                rightMargin: 18
+                rightMargin: 8
                 topMargin: 8
                 bottomMargin: 10
             }
@@ -4054,7 +4055,7 @@ PanelWindow {
                 top: fixedTop.bottom
                 bottom: actionBay.top
                 leftMargin: 62
-                rightMargin: 18
+                rightMargin: 8
                 topMargin: 8
                 bottomMargin: 10
             }
@@ -4077,7 +4078,7 @@ PanelWindow {
                 top: fixedTop.bottom
                 bottom: actionBay.top
                 leftMargin: 62
-                rightMargin: 18
+                rightMargin: 8
                 topMargin: 8
                 bottomMargin: 10
             }
@@ -4092,7 +4093,8 @@ PanelWindow {
                 right: parent.right
                 bottom: bottomStop.top
                 leftMargin: 62
-                rightMargin: 18
+                rightMargin:
+                    root.operationsOpen ? 8 : 18
                 bottomMargin: 8
             }
 
@@ -4311,7 +4313,7 @@ PanelWindow {
                 > hospitalScroll.height
 
             opacity: 1.0
-            visible: true
+            visible: !root.operationsOpen
             z: 300
 
             property real maxContentY:

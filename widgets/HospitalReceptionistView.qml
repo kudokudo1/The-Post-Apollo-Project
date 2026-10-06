@@ -629,6 +629,65 @@ Rectangle {
                     }
                 }
 
+                Rectangle {
+                    id: contextThere
+
+                    width: 52
+                    height: 24
+                    color:
+                        contextThereMouse.pressed
+                        && contextThereMouse.enabled
+                        ? Colors.magenta
+                        : Colors.black
+                    opacity:
+                        root.receptionistService.contextCanThere
+                        ? 1.0 : 0.30
+                    border.width:
+                        contextThereMouse.containsMouse
+                        && contextThereMouse.enabled
+                        ? 2 : 1
+                    border.color: Colors.cyan
+
+                    GohuText {
+                        anchors.centerIn: parent
+                        text: "THERE"
+                        font.pixelSize: 7
+                        color:
+                            contextThereMouse.pressed
+                            && contextThereMouse.enabled
+                            ? Colors.black
+                            : contextThereMouse.containsMouse
+                              && contextThereMouse.enabled
+                            ? Colors.orange
+                            : Colors.cyan
+                    }
+
+                    MouseArea {
+                        id: contextThereMouse
+
+                        anchors.fill: parent
+                        enabled:
+                            root.receptionistService.contextCanThere
+                        hoverEnabled: true
+                        cursorShape:
+                            enabled
+                            ? Qt.PointingHandCursor
+                            : Qt.ArrowCursor
+
+                        onClicked: {
+                            root.receptionistService
+                                .contextAction("there");
+                            Qt.callLater(function() {
+                                transcript.contentY = Math.max(
+                                    0,
+                                    transcript.contentHeight
+                                    - transcript.height
+                                );
+                            });
+                        }
+                    }
+                }
+
                 Item {
                     id: contextFavorite
 
@@ -683,7 +742,7 @@ Rectangle {
                 Rectangle {
                     id: contextBefore
 
-                    width: 56
+                    width: 52
                     height: 24
                     color:
                         contextBeforeMouse.pressed
@@ -742,7 +801,7 @@ Rectangle {
                 Rectangle {
                     id: contextNewer
 
-                    width: 54
+                    width: 52
                     height: 24
                     color:
                         contextNewerMouse.pressed

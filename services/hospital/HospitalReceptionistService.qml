@@ -208,6 +208,7 @@ Scope {
             Array.isArray(roundsRooms)
             ? roundsRooms
             : [];
+        let initialAttentionBudget = 5;
 
         for (let i = 0; i < rooms.length; ++i) {
             const room = rooms[i] || {};
@@ -238,10 +239,20 @@ Scope {
             if (behind > 0)
                 detailParts.push("BEHIND " + String(behind));
 
+            const previous =
+                String(subjectStates[subject] || "");
+            const recordInitial =
+                !previous
+                && rank > 0
+                && initialAttentionBudget > 0;
+
+            if (recordInitial)
+                initialAttentionBudget -= 1;
+
             observeSubject(
                 subject,
                 fingerprint,
-                rank > 0,
+                recordInitial,
                 {
                     source: "rounds",
                     kind: "room",
@@ -415,7 +426,7 @@ Scope {
 
         const events =
             Array.isArray(reportEvents)
-            ? reportEvents
+            ? reportEvents.slice(-5)
             : [];
 
         for (let i = 0; i < events.length; ++i)

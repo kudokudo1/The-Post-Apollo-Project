@@ -1089,6 +1089,16 @@ PanelWindow {
     }
 
     Connections {
+        target: specialistRegistryService
+
+        function onRegistryLoaded() {
+            if (root.operationsSurface === "staff"
+                    && !specialistRegistryService.probing)
+                specialistRegistryService.refreshPresence();
+        }
+    }
+
+    Connections {
         target: patientService
 
         function onRefreshed() {

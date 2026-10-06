@@ -821,15 +821,18 @@ PanelWindow {
         root.closeOperationsSurface();
     }
 
-    function refreshReceptionistInbox() {
-        receptionistService.rebuildInbox(
-            roundsService.rooms,
+    function syncReceptionistActivity() {
+        receptionistService.syncRounds(roundsService.rooms);
+        receptionistService.syncStaff(
             specialistRegistryService.specialists
+        );
+        receptionistService.syncReports(
+            certificationCoordinator.historyService.events
         );
     }
 
     function refreshReceptionData() {
-        root.refreshReceptionistInbox();
+        root.syncReceptionistActivity();
 
         if (!roundsService.running && !roundsService.available)
             roundsService.refresh();
@@ -913,10 +916,16 @@ PanelWindow {
             specialistRegistryService.refreshPresence();
     }
 
-    function openReports() {
+    function openReports(teamValue) {
         root.leaveRoomControls();
         root.leaveBedControls();
-        reportsView.teamFilter = root.selectedRoomTeam;
+
+        const requestedTeam = String(teamValue || "");
+
+        reportsView.teamFilter =
+            requestedTeam
+            ? requestedTeam
+            : root.selectedRoomTeam;
         reportsView.stateFilter = "";
         root.operationsSurface = "reports";
     }
@@ -1221,10 +1230,21 @@ PanelWindow {
     }
 
     Connections {
+        target: receptionistService
+
+        function onActivityHydratedChanged() {
+            if (receptionistService.activityHydrated)
+                root.syncReceptionistActivity();
+        }
+    }
+
+    Connections {
         target: specialistRegistryService
 
         function onRegistryLoaded() {
-            root.refreshReceptionistInbox();
+            receptionistService.syncStaff(
+                specialistRegistryService.specialists
+            );
 
             if ((root.operationsSurface === "staff"
                     || root.operationsSurface === "reception"
@@ -1235,7 +1255,9 @@ PanelWindow {
         }
 
         function onPresenceRefreshed() {
-            root.refreshReceptionistInbox();
+            receptionistService.syncStaff(
+                specialistRegistryService.specialists
+            );
         }
     }
 
@@ -1243,7 +1265,32 @@ PanelWindow {
         target: roundsService
 
         function onRefreshed() {
-            root.refreshReceptionistInbox();
+            receptionistService.syncRounds(roundsService.rooms);
+        }
+    }
+
+    Connections {
+        target: phoneService
+
+        function onCallLaunched(specialist) {
+            receptionistService.recordPhoneCall(specialist);
+        }
+    }
+
+    Connections {
+        target: intercomService
+
+        function onMessageLaunched(entry) {
+            receptionistService.recordIntercomMessage(entry);
+        }
+    }
+
+    Connections {
+        target: certificationCoordinator.historyService
+        ignoreUnknownSignals: true
+
+        function onEventRecorded(event) {
+            receptionistService.recordReportEvent(event);
         }
     }
 
@@ -4065,14 +4112,38 @@ PanelWindow {
             onAttentionActivated: function(item) {
                 const row = item || {};
                 const kind = String(row.kind || "");
+                const source = String(row.source || "");
+                const context = row.context || {};
 
                 if (kind === "room") {
-                    root.openRoomFromRounds(row.room || {});
+                    root.openRoomFromRounds(context.room || {});
                     return;
                 }
 
-                if (kind === "staff")
+                if (kind === "staff") {
                     root.openStaff();
+                    return;
+                }
+
+                if (source === "reports") {
+                    root.openReports(context.team || "");
+                    return;
+                }
+
+                if (source === "phone") {
+                    if (!root.phoneMenuOpen)
+                        root.togglePhoneMenu();
+                    return;
+                }
+
+                if (source === "intercom") {
+                    if (!root.intercomMenuOpen)
+                        root.toggleIntercomMenu();
+                    return;
+                }
+
+                if (row.route)
+                    root.handleReceptionRoute(row.route);
             }
 
             onTypingChanged: function(active) {

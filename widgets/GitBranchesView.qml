@@ -345,8 +345,8 @@ Item {
                 verticalCenter: parent.verticalCenter
             }
 
-            width: Math.max(40, modeText.implicitWidth + 12)
-            height: 20
+            width: Math.max(52, modeText.implicitWidth + 16)
+            height: 22
             color:
                 modeMouse.pressed
                 ? Colors.magenta
@@ -364,7 +364,7 @@ Item {
                 id: modeText
                 anchors.centerIn: parent
                 text: compoundButton.modeLabel
-                font.pixelSize: 7
+                font.pixelSize: 9
                 color: Colors.magenta
             }
 
@@ -571,7 +571,7 @@ Item {
                         bottomMargin: 10
                     }
 
-                    height: 48
+                    height: 52
                     color: Colors.black
                     border.width: 1
                     border.color: Colors.blue
@@ -634,7 +634,7 @@ Item {
                                 Rectangle {
                                     required property var modelData
 
-                                    height: 28
+                                    height: 32
                                     anchors.verticalCenter: parent.verticalCenter
                                     width: Math.max(
                                         112,
@@ -688,7 +688,7 @@ Item {
                                         text:
                                             (parent.isCurrent ? "★ " : "")
                                             + String(parent.modelData.name || "")
-                                        font.pixelSize: 9
+                                        font.pixelSize: 11
                                         color:
                                             parent.isCurrent
                                             ? Colors.yellow
@@ -744,15 +744,21 @@ Item {
                             bottomMargin: 4
                         }
 
-                        height: 5
+                        height: 6
                         color: Colors.cyan
-                        opacity:
-                            branchStripFlick.contentWidth
-                            > branchStripFlick.width + 1
-                            ? 0.62
-                            : 0.20
+                        opacity: 1.0
                         border.width: 1
                         border.color: Colors.cyan
+
+                        Rectangle {
+                            anchors.fill: parent
+                            color: Colors.black
+                            opacity:
+                                branchStripFlick.contentWidth
+                                > branchStripFlick.width + 1
+                                ? 0.18
+                                : 0.62
+                        }
 
                         readonly property real maxContentX:
                             Math.max(
@@ -787,8 +793,17 @@ Item {
                                   * Math.max(0, parent.width - width)
                                 : 0
                             color: Colors.magenta
+                            opacity: 1.0
                             border.width: 1
                             border.color: Colors.magenta
+
+                            RectangularShadow {
+                                anchors.fill: parent
+                                spread: 2
+                                z: -1
+                                opacity: 0.72
+                                color: Colors.magenta
+                            }
                         }
 
                         MouseArea {

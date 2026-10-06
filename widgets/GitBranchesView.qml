@@ -8,6 +8,7 @@ Item {
 
     required property var gitService
     required property var branchWorkspaceService
+    required property var branchStackStore
 
     property string selectedBranch: ""
     property string selectedSha: ""
@@ -30,6 +31,26 @@ Item {
     readonly property bool selectedIsOccupied:
         selectedWorkspace !== null
 
+    readonly property string selectedStackParent:
+        branchStackStore && selectedBranch
+        ? branchStackStore.parentOf(selectedBranch)
+        : ""
+
+    readonly property var selectedStackChildren:
+        branchStackStore && selectedBranch
+        ? branchStackStore.childrenOf(selectedBranch)
+        : []
+
+    readonly property string selectedStackRoot:
+        branchStackStore && selectedBranch
+        ? branchStackStore.stackRoot(selectedBranch)
+        : ""
+
+    readonly property var selectedStackDescendants:
+        branchStackStore && selectedBranch
+        ? branchStackStore.descendantsOf(selectedBranch)
+        : []
+
     signal createBranchRequested(string startPoint)
     signal renameBranchRequested(string branch)
     signal deleteBranchRequested(string branch)
@@ -37,6 +58,9 @@ Item {
     signal workspaceRequested(string branch)
     signal stackAboveRequested(string branch)
     signal stackBelowRequested(string branch)
+    signal stackParentRequested(string branch)
+    signal restackRequested(string branch)
+    signal submitStackRequested(string branch)
     signal compareRequested(string branch)
 
     function branchForHead(sha) {
@@ -214,6 +238,15 @@ Item {
                           + " LOCAL // "
                           + String((branchWorkspaceService.worktrees || []).length)
                           + " WORKSPACES"
+                          + (
+                              branchStackStore
+                              ? " // "
+                                + String(
+                                    (branchStackStore.repositoryRelations || []).length
+                                  )
+                                + " STACK LINKS"
+                              : ""
+                            )
                         : "NO BRANCH SERVICE"
                     font.pixelSize: 8
                     color: Colors.cyan
@@ -616,16 +649,110 @@ Item {
                         color: Colors.orange
                     }
 
-                    GohuText {
+                    Column {
                         width: parent.width
-                        text:
-                            root.selectedBranch
-                            ? "RELATIONSHIP METADATA NOT BOUND YET"
-                            : "SELECT A BRANCH"
-                        font.pixelSize: 7
-                        color: Colors.white
-                        opacity: 0.62
-                        wrapMode: Text.Wrap
+                        spacing: 2
+
+                        FactRow {
+                            label: "ROOT"
+                            value:
+                                root.selectedBranch
+                                ? root.selectedStackRoot
+                                : ""
+                            valueColor: Colors.orange
+                        }
+
+                        FactRow {
+                            label: "PARENT"
+                            value:
+                                root.selectedBranch
+                                ? (
+                                    root.selectedStackParent
+                                    || (
+                                        root.selectedBranch
+                                        === String(
+                                            branchStackStore
+                                            ? branchStackStore.trunkBranch
+                                            : ""
+                                        )
+                                        ? "TRUNK"
+                                        : "UNSET"
+                                    )
+                                  )
+                                : ""
+                            valueColor:
+                                root.selectedStackParent
+                                ? Colors.cyan
+                                : Colors.white
+                        }
+
+                        FactRow {
+                            label: "CHILDREN"
+                            value:
+                                root.selectedStackChildren.length > 0
+                                ? root.selectedStackChildren.join(" • ")
+                                : "NONE"
+                            valueColor:
+                                root.selectedStackChildren.length > 0
+                                ? Colors.magenta
+                                : Colors.white
+                        }
+
+                        FactRow {
+                            label: "BELOW"
+                            value:
+                                root.selectedStackDescendants.length > 0
+                                ? String(root.selectedStackDescendants.length)
+                                  + " DESCENDANTS"
+                                : "NONE"
+                            valueColor:
+                                root.selectedStackDescendants.length > 0
+                                ? Colors.cyan
+                                : Colors.white
+                        }
+                    }
+
+                    Grid {
+                        width: parent.width
+                        columns: 2
+                        columnSpacing: 6
+                        rowSpacing: 6
+
+                        BranchButton {
+                            width: (inspector.width - 26) / 2
+                            label: "SET PARENT"
+                            enabledAction:
+                                root.selectedBranch.length > 0
+                                && branchStackStore !== null
+                            onTriggered:
+                                root.stackParentRequested(root.selectedBranch)
+                        }
+
+                        BranchButton {
+                            width: (inspector.width - 26) / 2
+                            label: "RESTACK"
+                            enabledAction:
+                                root.selectedBranch.length > 0
+                                && (
+                                    root.selectedStackParent.length > 0
+                                    || root.selectedStackDescendants.length > 0
+                                )
+                            onTriggered:
+                                root.restackRequested(root.selectedBranch)
+                        }
+
+                        BranchButton {
+                            width: inspector.width - 20
+                            label: "SUBMIT STACK"
+                            enabledAction:
+                                root.selectedBranch.length > 0
+                                && (
+                                    root.selectedStackParent.length > 0
+                                    || root.selectedStackChildren.length > 0
+                                )
+                            onTriggered:
+                                root.submitStackRequested(root.selectedBranch)
+                        }
                     }
 
                     Item {

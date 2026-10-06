@@ -3227,13 +3227,13 @@ PanelWindow {
                                                         )
 
                                                 RectangularShadow {
-                                                    anchors.centerIn: activityTick
-                                                    width: activityTick.width
-                                                    height: activityTick.height
-                                                    spread: 1
-                                                    z: -1
+                                                    anchors.centerIn: parent
+                                                    width: 2
+                                                    height: 2
+                                                    radius: 1
+                                                    spread: 2
                                                     opacity:
-                                                        0.28
+                                                        0.16
                                                         * Number(
                                                             parent.modelData
                                                                 .intensity || 0
@@ -3241,20 +3241,19 @@ PanelWindow {
                                                     color: Colors.magenta
                                                 }
 
-                                                Rectangle {
-                                                    id: activityTick
+                                                RectangularShadow {
                                                     anchors.centerIn: parent
-                                                    width: 6
+                                                    width: 1
                                                     height: 1
                                                     radius: 1
-                                                    color: Colors.magenta
+                                                    spread: 1
                                                     opacity:
-                                                        0.72
-                                                        + 0.28
-                                                          * Number(
-                                                              parent.modelData
-                                                                  .intensity || 0
-                                                            )
+                                                        0.68
+                                                        * Number(
+                                                            parent.modelData
+                                                                .intensity || 0
+                                                          )
+                                                    color: Colors.magenta
                                                 }
 
                                                 MouseArea {
@@ -3547,16 +3546,13 @@ PanelWindow {
                                                         ) > 0
 
                                                     RectangularShadow {
-                                                        anchors.centerIn:
-                                                            remoteUnpulledTick
-                                                        width:
-                                                            remoteUnpulledTick.width
-                                                        height:
-                                                            remoteUnpulledTick.height
-                                                        spread: 1
-                                                        z: -1
+                                                        anchors.centerIn: parent
+                                                        width: 2
+                                                        height: 2
+                                                        radius: 1
+                                                        spread: 2
                                                         opacity:
-                                                            0.28
+                                                            0.16
                                                             * root.branchActivityIntensity(
                                                                 parent.parent
                                                                     .modelData
@@ -3565,13 +3561,20 @@ PanelWindow {
                                                         color: Colors.magenta
                                                     }
 
-                                                    Rectangle {
-                                                        id: remoteUnpulledTick
+                                                    RectangularShadow {
                                                         anchors.centerIn: parent
-                                                        width: 6
+                                                        width: 1
                                                         height: 1
+                                                        radius: 1
+                                                        spread: 1
+                                                        opacity:
+                                                            0.66
+                                                            * root.branchActivityIntensity(
+                                                                parent.parent
+                                                                    .modelData
+                                                                    .unpulledCount
+                                                            )
                                                         color: Colors.magenta
-                                                        opacity: 0.88
                                                     }
                                                 }
 

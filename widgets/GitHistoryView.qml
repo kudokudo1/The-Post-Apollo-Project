@@ -708,7 +708,6 @@ Item {
                         }
                     
                         NeonScrollBar {
-                            parent: historyScroll1
                             anchors {
                                 top: historyScroll1.top
                                 right: historyScroll1.right
@@ -826,7 +825,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                parent: historyScroll2
                                 anchors {
                                     top: historyScroll2.top
                                     right: historyScroll2.right
@@ -941,7 +939,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                parent: historyScroll3
                                 anchors {
                                     top: historyScroll3.top
                                     right: historyScroll3.right
@@ -1104,7 +1101,6 @@ Item {
                         }
                     
                         NeonScrollBar {
-                            parent: historyScroll4
                             anchors {
                                 top: historyScroll4.top
                                 right: historyScroll4.right
@@ -1405,7 +1401,6 @@ Item {
                         }
                     
                         NeonScrollBar {
-                            parent: historyScroll5
                             anchors {
                                 top: historyScroll5.top
                                 right: historyScroll5.right

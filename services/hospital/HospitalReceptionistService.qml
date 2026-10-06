@@ -1124,6 +1124,22 @@ Scope {
     }
 
     function openCurrentContext() {
+        const current = contextEvent();
+
+        if (current) {
+            activityActionRequested(current);
+            return true;
+        }
+
+        if (contextTarget) {
+            teamNavigationRequested(contextTarget);
+            return true;
+        }
+
+        return false;
+    }
+
+    function openContextPlace() {
         if (contextTarget) {
             teamNavigationRequested(contextTarget);
             return true;
@@ -1186,17 +1202,30 @@ Scope {
             String(actionValue || "").trim().toLowerCase();
 
         if (action === "open") {
+            const current = contextEvent();
+
             if (!openCurrentContext())
                 return false;
 
-            const current = contextEvent();
+            append(
+                "RECEPTION",
+                current
+                ? "OPENING // " + activityLine(current)
+                : contextTarget
+                ? "OPENING ROOM // " + contextTarget
+                : "OPENING CONTEXT"
+            );
+            return true;
+        }
+
+        if (action === "there") {
+            if (!openContextPlace())
+                return false;
 
             append(
                 "RECEPTION",
                 contextTarget
                 ? "OPENING ROOM // " + contextTarget
-                : current
-                ? "OPENING // " + activityLine(current)
                 : "OPENING CONTEXT"
             );
             return true;
@@ -1324,7 +1353,7 @@ Scope {
         append("OPERATOR", raw);
 
         if (goThere && contextTarget)
-            return contextAction("open");
+            return contextAction("there");
 
         const current = contextEvent();
 
@@ -1337,7 +1366,10 @@ Scope {
             return true;
         }
 
-        if (goThere || openThat)
+        if (goThere)
+            return contextAction("there");
+
+        if (openThat)
             return contextAction("open");
 
         if (favoriteThat || unfavoriteThat) {

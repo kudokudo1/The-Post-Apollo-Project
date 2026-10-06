@@ -35,6 +35,7 @@ PanelWindow {
     property bool receptionistTyping: false
     property string pendingRoundsRoomTeam: ""
     property int pendingRoundsFloorIndex: -1
+    property string pendingReceptionTeam: ""
 
     readonly property bool operationsOpen:
         root.operationsSurface.length > 0
@@ -927,6 +928,94 @@ PanelWindow {
             root.handleReceptionRoute(row.route);
     }
 
+    function roundsRoomForTeam(teamValue) {
+        const wanted =
+            String(teamValue || "").trim().toUpperCase();
+        const rooms =
+            Array.isArray(roundsService.rooms)
+            ? roundsService.rooms
+            : [];
+
+        if (!wanted)
+            return null;
+
+        for (let i = 0; i < rooms.length; ++i) {
+            const room = rooms[i] || {};
+            const candidate =
+                String(room.team || room.branch || "")
+                    .trim()
+                    .toUpperCase();
+
+            if (candidate === wanted)
+                return room;
+        }
+
+        return null;
+    }
+
+    function finishPendingReceptionTeam() {
+        const team =
+            String(root.pendingReceptionTeam || "")
+                .trim()
+                .toUpperCase();
+
+        if (!team)
+            return false;
+
+        const room = root.roundsRoomForTeam(team);
+
+        root.pendingReceptionTeam = "";
+
+        if (!room) {
+            receptionistService.append(
+                "RECEPTION",
+                "ROOM // "
+                + team
+                + " // NOT FOUND IN LIVE ROUNDS"
+            );
+            return false;
+        }
+
+        root.openRoomFromRounds(room);
+        return true;
+    }
+
+    function requestReceptionTeamNavigation(teamValue) {
+        const team =
+            String(teamValue || "").trim().toUpperCase();
+
+        if (!team)
+            return false;
+
+        const room = root.roundsRoomForTeam(team);
+
+        if (room) {
+            root.pendingReceptionTeam = "";
+            root.openRoomFromRounds(room);
+            return true;
+        }
+
+        root.pendingReceptionTeam = team;
+
+        if (roundsService.running)
+            return true;
+
+        const started = roundsService.refresh();
+
+        if (!started) {
+            root.pendingReceptionTeam = "";
+            receptionistService.append(
+                "RECEPTION",
+                "ROOM // "
+                + team
+                + " // LIVE ROUNDS UNAVAILABLE"
+            );
+            return false;
+        }
+
+        return true;
+    }
+
     function togglePhoneMenu() {
         root.phoneMenuOpen = !root.phoneMenuOpen;
 
@@ -1284,6 +1373,10 @@ PanelWindow {
         function onActivityActionRequested(item) {
             root.activateReceptionActivity(item);
         }
+
+        function onTeamNavigationRequested(team) {
+            root.requestReceptionTeamNavigation(team);
+        }
     }
 
     Connections {
@@ -1314,6 +1407,9 @@ PanelWindow {
 
         function onRefreshed() {
             receptionistService.syncRounds(roundsService.rooms);
+
+            if (root.pendingReceptionTeam)
+                root.finishPendingReceptionTeam();
         }
     }
 

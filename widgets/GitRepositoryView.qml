@@ -75,7 +75,7 @@ Item {
     }
 
     component SectionLabel: GohuText {
-        font.pixelSize: 12
+        font.pixelSize: 14
         color: Colors.magenta
     }
 
@@ -104,7 +104,7 @@ Item {
         GohuText {
             anchors.centerIn: parent
             text: button.label
-            font.pixelSize: 8
+            font.pixelSize: 10
             color:
                 mouse.pressed
                 ? Colors.black
@@ -156,7 +156,7 @@ Item {
             selectionColor: Colors.magenta
             selectedTextColor: Colors.black
             font.family: "GohuFont 11 Nerd Font Mono"
-            font.pixelSize: 9
+            font.pixelSize: 11
             clip: true
 
             onActiveFocusChanged: {
@@ -180,7 +180,7 @@ Item {
             }
             visible: editor.text.length === 0
             text: editorBox.placeholder
-            font.pixelSize: 8
+            font.pixelSize: 10
             color: Colors.white
             opacity: 0.30
         }
@@ -219,7 +219,7 @@ Item {
                             root.gitService
                             ? String(root.gitService.repoRoot || "NO LOCAL REPOSITORY")
                             : "NO LOCAL REPOSITORY"
-                        font.pixelSize: 8
+                        font.pixelSize: 10
                         color: Colors.cyan
                         elide: Text.ElideMiddle
                     }
@@ -326,7 +326,7 @@ Item {
                                     ? root.repositoryService.remotes.length
                                     : 0
                                   )
-                            font.pixelSize: 10
+                            font.pixelSize: 12
                             color: Colors.magenta
                         }
 
@@ -380,7 +380,7 @@ Item {
                                                         remoteRow.modelData.name
                                                         || ""
                                                     )
-                                                font.pixelSize: 9
+                                                font.pixelSize: 11
                                                 color: Colors.magenta
                                             }
 
@@ -392,7 +392,7 @@ Item {
                                                         remoteRow.modelData.url
                                                         || ""
                                                       )
-                                                font.pixelSize: 7
+                                                font.pixelSize: 9
                                                 color: Colors.white
                                                 elide: Text.ElideMiddle
                                             }
@@ -405,7 +405,7 @@ Item {
                                                         remoteRow.modelData.pushUrl
                                                         || ""
                                                       )
-                                                font.pixelSize: 7
+                                                font.pixelSize: 9
                                                 color: Colors.cyan
                                                 elide: Text.ElideMiddle
                                             }
@@ -658,7 +658,7 @@ Item {
                             text:
                                 "REMOTE BRANCHES // "
                                 + String(root.remoteBranchRows().length)
-                            font.pixelSize: 9
+                            font.pixelSize: 11
                             color: Colors.cyan
                         }
 
@@ -713,7 +713,7 @@ Item {
                                                     remoteBranchRow.modelData.shortSha
                                                     || ""
                                                 )
-                                            font.pixelSize: 8
+                                            font.pixelSize: 10
                                             color: Colors.white
                                             elide: Text.ElideMiddle
                                         }
@@ -856,7 +856,7 @@ Item {
                                                 + String(
                                                     tagRow.modelData.shortSha || ""
                                                   )
-                                            font.pixelSize: 9
+                                            font.pixelSize: 11
                                             color: Colors.orange
                                         }
 
@@ -866,7 +866,7 @@ Item {
                                                 String(
                                                     tagRow.modelData.subject || ""
                                                 )
-                                            font.pixelSize: 7
+                                            font.pixelSize: 9
                                             color: Colors.white
                                             elide: Text.ElideRight
                                         }
@@ -1046,7 +1046,7 @@ Item {
                                         ? root.branchWorkspaceService.worktrees.length
                                         : 0
                                       )
-                                font.pixelSize: 10
+                                font.pixelSize: 12
                                 color: Colors.cyan
                             }
 
@@ -1125,7 +1125,7 @@ Item {
                                                         worktreeRow.modelData.head
                                                         || ""
                                                       ).slice(0, 10)
-                                                font.pixelSize: 9
+                                                font.pixelSize: 11
                                                 color: Colors.white
                                                 elide: Text.ElideRight
                                             }
@@ -1137,7 +1137,7 @@ Item {
                                                         worktreeRow.modelData.path
                                                         || ""
                                                     )
-                                                font.pixelSize: 7
+                                                font.pixelSize: 9
                                                 color: Colors.cyan
                                                 elide: Text.ElideMiddle
                                             }
@@ -1153,7 +1153,7 @@ Item {
                                                         worktreeRow.modelData.dirtyCount
                                                       ) + " CHANGES"
                                                     : "CLEAN"
-                                                font.pixelSize: 7
+                                                font.pixelSize: 9
                                                 color:
                                                     Number(
                                                         worktreeRow.modelData.dirtyCount
@@ -1257,7 +1257,7 @@ Item {
                                         ? root.repositoryService.submodules.length
                                         : 0
                                       )
-                                font.pixelSize: 10
+                                font.pixelSize: 12
                                 color: Colors.magenta
                             }
 
@@ -1305,7 +1305,7 @@ Item {
                                     topPadding: 24
                                     text: "NO SUBMODULES"
                                     horizontalAlignment: Text.AlignHCenter
-                                    font.pixelSize: 10
+                                    font.pixelSize: 12
                                     color: Colors.cyan
                                 }
 
@@ -1344,7 +1344,7 @@ Item {
                                                         submoduleRow.modelData.path
                                                         || ""
                                                     )
-                                                font.pixelSize: 9
+                                                font.pixelSize: 11
                                                 color: Colors.white
                                                 elide: Text.ElideMiddle
                                             }
@@ -1361,7 +1361,7 @@ Item {
                                                         submoduleRow.modelData.sha
                                                         || ""
                                                       ).slice(0, 10)
-                                                font.pixelSize: 7
+                                                font.pixelSize: 9
                                                 color: Colors.cyan
                                             }
                                         }
@@ -1427,7 +1427,7 @@ Item {
                                         width: 205
                                         text:
                                             String(configRow.modelData.key || "")
-                                        font.pixelSize: 8
+                                        font.pixelSize: 10
                                         color: Colors.green
                                         elide: Text.ElideRight
                                     }
@@ -1444,7 +1444,7 @@ Item {
                                             String(
                                                 configRow.modelData.value || ""
                                             )
-                                        font.pixelSize: 8
+                                        font.pixelSize: 10
                                         color: Colors.white
                                         elide: Text.ElideRight
                                     }
@@ -1546,7 +1546,7 @@ Item {
                             text:
                                 "This editor is deliberately repo-local. "
                                 + "Global identity/credentials remain outside this surface."
-                            font.pixelSize: 8
+                            font.pixelSize: 10
                             color: Colors.white
                             opacity: 0.50
                             wrapMode: Text.WordWrap
@@ -1653,7 +1653,7 @@ Item {
                                                     projectLineRow.modelData.line
                                                     || 0
                                                 )
-                                            font.pixelSize: 7
+                                            font.pixelSize: 9
                                             color: Colors.cyan
                                         }
 
@@ -1670,7 +1670,7 @@ Item {
                                                     projectLineRow.modelData.text
                                                     || ""
                                                 )
-                                            font.pixelSize: 8
+                                            font.pixelSize: 10
                                             color: Colors.white
                                             elide: Text.ElideRight
                                         }
@@ -1807,7 +1807,7 @@ Item {
                                 topPadding: 24
                                 text: "NO ACTIVE HOOK FILES"
                                 horizontalAlignment: Text.AlignHCenter
-                                font.pixelSize: 10
+                                font.pixelSize: 12
                                 color: Colors.cyan
                             }
 
@@ -1840,7 +1840,7 @@ Item {
                                         width: parent.width - 112
                                         text:
                                             String(hookRow.modelData.name || "")
-                                        font.pixelSize: 9
+                                        font.pixelSize: 11
                                         color: Colors.white
                                         elide: Text.ElideRight
                                     }
@@ -1904,7 +1904,7 @@ Item {
                                 "This surface only enables/disables existing "
                                 + "repository hook files by executable bit. "
                                 + "It does not generate hook scripts or rewrite hook contents."
-                            font.pixelSize: 9
+                            font.pixelSize: 11
                             color: Colors.white
                             wrapMode: Text.WordWrap
                         }
@@ -1950,7 +1950,7 @@ Item {
                                     root.repositoryService
                                     ? root.repositoryService.objectInfo
                                     : ""
-                                font.pixelSize: 9
+                                font.pixelSize: 11
                                 color: Colors.white
                                 wrapMode: Text.WrapAnywhere
                             }
@@ -2014,7 +2014,7 @@ Item {
                                 root.repositoryService
                                 ? root.repositoryService.healthOutput
                                 : "NO REPOSITORY SERVICE"
-                            font.pixelSize: 9
+                            font.pixelSize: 11
                             color:
                                 root.repositoryService
                                 && root.repositoryService.lastError
@@ -2059,7 +2059,7 @@ Item {
                         : root.repositoryService.actionStatus
                       )
                     : "NO REPOSITORY SERVICE"
-                font.pixelSize: 8
+                font.pixelSize: 10
                 color:
                     root.armedAction
                     ? Colors.orange

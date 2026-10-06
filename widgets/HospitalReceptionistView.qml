@@ -184,13 +184,23 @@ Rectangle {
                                 ? Colors.orange
                                 : modelData.color
 
-                            NotoText {
-                                anchors.centerIn: parent
-                                anchors.verticalCenterOffset: 1
+                            Text {
+                                anchors.fill: parent
                                 text: parent.modelData.label
+                                font.family:
+                                    parent.modelData.label === "🎙"
+                                    || parent.modelData.label === "🗒"
+                                    ? "Noto Color Emoji"
+                                    : "Noto Sans Symbols 2"
                                 font.pixelSize:
-                                    parent.modelData.label === "!"
-                                    ? 11 : 18
+                                    parent.modelData.label === "☎"
+                                    ? 23
+                                    : parent.modelData.label === "🎙"
+                                    || parent.modelData.label === "🗒"
+                                    ? 20
+                                    : 11
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
                                 color:
                                     deskControlMouse.containsMouse
                                     ? Colors.orange

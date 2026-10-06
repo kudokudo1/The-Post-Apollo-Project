@@ -162,8 +162,8 @@ Rectangle {
                     Repeater {
                         model: [
                             { label: "☎", route: "phone", color: Colors.green },
-                            { label: "🎙", route: "intercom", color: Colors.omnitrix },
-                            { label: "🗒", route: "reports", color: Colors.magenta },
+                            { label: "🎙︎", route: "intercom", color: Colors.omnitrix },
+                            { label: "🗒︎", route: "reports", color: Colors.magenta },
                             { label: "!", route: "rounds", color: Colors.orange }
                         ]
 
@@ -184,19 +184,14 @@ Rectangle {
                                 ? Colors.orange
                                 : modelData.color
 
-                            Text {
+                            NotoText {
                                 anchors.fill: parent
                                 text: parent.modelData.label
-                                font.family:
-                                    parent.modelData.label === "🎙"
-                                    || parent.modelData.label === "🗒"
-                                    ? "Noto Color Emoji"
-                                    : "Noto Sans Symbols 2"
                                 font.pixelSize:
                                     parent.modelData.label === "☎"
                                     ? 23
-                                    : parent.modelData.label === "🎙"
-                                    || parent.modelData.label === "🗒"
+                                    : parent.modelData.route === "intercom"
+                                    || parent.modelData.route === "reports"
                                     ? 20
                                     : 11
                                 horizontalAlignment: Text.AlignHCenter

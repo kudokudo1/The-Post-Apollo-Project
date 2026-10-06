@@ -890,6 +890,43 @@ PanelWindow {
         }
     }
 
+    function activateReceptionActivity(item) {
+        const row = item || {};
+        const kind = String(row.kind || "");
+        const source = String(row.source || "");
+        const context = row.context || {};
+
+        if (kind === "room") {
+            root.openRoomFromRounds(context.room || {});
+            return;
+        }
+
+        if (kind === "staff") {
+            root.openStaff();
+            return;
+        }
+
+        if (source === "reports") {
+            root.openReports(context.team || "");
+            return;
+        }
+
+        if (source === "phone") {
+            if (!root.phoneMenuOpen)
+                root.togglePhoneMenu();
+            return;
+        }
+
+        if (source === "intercom") {
+            if (!root.intercomMenuOpen)
+                root.toggleIntercomMenu();
+            return;
+        }
+
+        if (row.route)
+            root.handleReceptionRoute(row.route);
+    }
+
     function togglePhoneMenu() {
         root.phoneMenuOpen = !root.phoneMenuOpen;
 
@@ -1242,6 +1279,10 @@ PanelWindow {
         function onActivityHydratedChanged() {
             if (receptionistService.activityHydrated)
                 root.syncReceptionistActivity();
+        }
+
+        function onActivityActionRequested(item) {
+            root.activateReceptionActivity(item);
         }
     }
 
@@ -4125,40 +4166,7 @@ PanelWindow {
             }
 
             onAttentionActivated: function(item) {
-                const row = item || {};
-                const kind = String(row.kind || "");
-                const source = String(row.source || "");
-                const context = row.context || {};
-
-                if (kind === "room") {
-                    root.openRoomFromRounds(context.room || {});
-                    return;
-                }
-
-                if (kind === "staff") {
-                    root.openStaff();
-                    return;
-                }
-
-                if (source === "reports") {
-                    root.openReports(context.team || "");
-                    return;
-                }
-
-                if (source === "phone") {
-                    if (!root.phoneMenuOpen)
-                        root.togglePhoneMenu();
-                    return;
-                }
-
-                if (source === "intercom") {
-                    if (!root.intercomMenuOpen)
-                        root.toggleIntercomMenu();
-                    return;
-                }
-
-                if (row.route)
-                    root.handleReceptionRoute(row.route);
+                root.activateReceptionActivity(item);
             }
 
             onTypingChanged: function(active) {

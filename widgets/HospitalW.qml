@@ -1815,11 +1815,11 @@ PanelWindow {
 
                         GohuText {
                             anchors.centerIn: parent
-                            anchors.verticalCenterOffset: 0
+                            anchors.verticalCenterOffset: 2
                             width: parent.width
                             height: parent.height
-                            text: "🎙︎"
-                            font.pixelSize: 19
+                            text: ""
+                            font.pixelSize: 20
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                             color:

@@ -1310,6 +1310,10 @@ PanelWindow {
 
         signal submitted(string value)
 
+        function syncDisplay() {
+            input.text = selectorInput.valueText;
+        }
+
         height: 28
         color: Colors.black
         border.width: 1
@@ -2384,6 +2388,8 @@ PanelWindow {
                                         spacing: 4
 
                                         SelectorInput {
+                                            id: localTargetInput
+
                                             width: parent.width - 32
                                             valueText:
                                                 gitService.localTargetDisplay
@@ -2545,6 +2551,10 @@ PanelWindow {
                                                         gitService
                                                             .selectTrackCheckoutRemote();
                                                         root.localTargetMenuOpen = false;
+                                                        Qt.callLater(function() {
+                                                            localTargetInput
+                                                                .syncDisplay();
+                                                        });
                                                     }
                                                 }
                                             }
@@ -2625,6 +2635,10 @@ PanelWindow {
                                                             gitService
                                                                 .selectLocal(index);
                                                             root.localTargetMenuOpen = false;
+                                                            Qt.callLater(function() {
+                                                                localTargetInput
+                                                                    .syncDisplay();
+                                                            });
                                                         }
                                                     }
                                                 }

@@ -329,7 +329,7 @@ Rectangle {
                     GohuText {
                         width: parent.width - inboxCount.width
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "FRONT DESK // RECENT + PINNED"
+                        text: "FRONT DESK // RECENT + FAVORITES"
                         font.pixelSize: 10
                         color: Colors.yellow
                     }
@@ -347,7 +347,7 @@ Rectangle {
                             const parts = [];
 
                             if (pinned > 0)
-                                parts.push("PIN " + String(pinned));
+                                parts.push("✦ " + String(pinned));
 
                             if (root.newCount > 0)
                                 parts.push(
@@ -500,10 +500,10 @@ Rectangle {
                                     ? Colors.orange
                                     : inboxSlot.attentionAccent
 
-                                GohuText {
+                                NotoText {
                                     anchors.centerIn: parent
-                                    text: "PIN"
-                                    font.pixelSize: 6
+                                    text: "✦"
+                                    font.pixelSize: 11
                                     color:
                                         pinMouse.containsMouse
                                         ? Colors.orange

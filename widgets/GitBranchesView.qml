@@ -799,9 +799,9 @@ Item {
 
                             RectangularShadow {
                                 anchors.fill: parent
-                                spread: 2
+                                spread: 1
                                 z: -1
-                                opacity: 0.72
+                                opacity: 0.50
                                 color: Colors.magenta
                             }
                         }

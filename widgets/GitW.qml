@@ -802,6 +802,13 @@ PanelWindow {
         changesService.refresh();
     }
 
+    function showGitHistory() {
+        root.localTargetMenuOpen = false;
+        root.remoteTargetMenuOpen = false;
+        root.gitView = "history";
+        gitService.refresh();
+    }
+
     function localTargetResults() {
         const count = gitService.localBranchCount;
         const revision = gitService.topologyRevision;
@@ -1328,6 +1335,14 @@ PanelWindow {
 
     GitService {
         id: gitService
+    }
+
+    GitHistoryService {
+        id: historyService
+        repositoryPath:
+            gitService.repoIsLocal
+            ? gitService.repoRoot
+            : ""
     }
 
     GitChangesService {
@@ -4123,6 +4138,23 @@ PanelWindow {
                         }
                     }
 
+                    GitHistoryView {
+                        id: gitHistoryView
+
+                        anchors {
+                            top: parent.top
+                            left: parent.left
+                            right: parent.right
+                            bottom: gitModeButtonRow.top
+                            bottomMargin: 8
+                        }
+
+                        visible: root.gitView === "history"
+
+                        gitService: gitService
+                        historyService: historyService
+                    }
+
                     GitChangesView {
                         id: gitChangesView
 
@@ -4197,7 +4229,7 @@ PanelWindow {
                                     name: "HISTORY",
                                     key: "history",
                                     symbol: "◴",
-                                    available: false
+                                    available: true
                                 },
                                 {
                                     name: "REPOSITORY",
@@ -4303,6 +4335,11 @@ PanelWindow {
                                             === "changes"
                                         )
                                             root.showGitChanges();
+                                        else if (
+                                            gitModeButton.modelData.key
+                                            === "history"
+                                        )
+                                            root.showGitHistory();
                                     }
                                 }
                             }

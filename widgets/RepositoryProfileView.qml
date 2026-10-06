@@ -1512,7 +1512,7 @@ Item {
 
                 Rectangle {
                     width: parent.width
-                    height: Math.max(38, parent.height - 208)
+                    height: 42
                     color: Colors.black
                     border.width: 1
                     border.color:

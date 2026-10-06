@@ -2278,6 +2278,8 @@ PanelWindow {
                 height: parent.height - 130
 
                 Item {
+                    id: gitLocalPage
+
                     anchors {
                         fill: parent
                         leftMargin: 46
@@ -2474,11 +2476,16 @@ PanelWindow {
                                 Rectangle {
                                     id: localTargetDropdown
 
+                                    parent: gitLocalPage
                                     visible: root.localTargetMenuOpen
                                     z: 1600
-                                    x: 8
-                                    y: 63
-                                    width: parent.width - 16
+                                    x:
+                                        localTargetCard
+                                            .mapToItem(gitLocalPage, 8, 63).x
+                                    y:
+                                        localTargetCard
+                                            .mapToItem(gitLocalPage, 8, 63).y
+                                    width: localTargetCard.width - 16
                                     height:
                                         Math.min(
                                             gitService.localBranchCount + 1,

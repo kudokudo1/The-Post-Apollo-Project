@@ -392,8 +392,19 @@ Scope {
 
         const out = String(actionStdoutText || "").trim();
         const err = String(actionStderrText || "").trim();
-        const first = out.split("\n")[0] || "";
-        const parts = first.split("\t");
+        const lines = out.split("\n");
+        let controlLine = "";
+
+        for (let i = lines.length - 1; i >= 0; --i) {
+            const line = String(lines[i] || "");
+            if (line.indexOf("OK\t") === 0
+                    || line.indexOf("REFUSED\t") === 0) {
+                controlLine = line;
+                break;
+            }
+        }
+
+        const parts = controlLine.split("\t");
         const kind = parts.length > 0 ? parts[0] : "";
         const detail =
             parts.length > 1

@@ -519,6 +519,7 @@ Item {
                     border.color: Colors.cyan
 
                     Flickable {
+                        id: historyScroll1
                         anchors {
                             fill: parent
                             margins: 7
@@ -705,7 +706,18 @@ Item {
                                 }
                             }
                         }
-                    }
+                    
+                        NeonScrollBar {
+                            parent: historyScroll1
+                            anchors {
+                                top: historyScroll1.top
+                                right: historyScroll1.right
+                                bottom: historyScroll1.bottom
+                                rightMargin: 2
+                            }
+                            flickable: historyScroll1
+                        }
+}
                 }
 
                 Rectangle {
@@ -787,6 +799,7 @@ Item {
                         }
 
                         Flickable {
+                            id: historyScroll2
                             width: parent.width
                             height: parent.height - 154
                             clip: true
@@ -811,7 +824,18 @@ Item {
                                     : Colors.white
                                 wrapMode: Text.WrapAnywhere
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: historyScroll2
+                                anchors {
+                                    top: historyScroll2.top
+                                    right: historyScroll2.right
+                                    bottom: historyScroll2.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: historyScroll2
+                            }
+}
 
                         Rectangle {
                             width: parent.width
@@ -835,6 +859,7 @@ Item {
                         }
 
                         Flickable {
+                            id: historyScroll3
                             width: parent.width
                             height: 92
                             clip: true
@@ -914,7 +939,18 @@ Item {
                                     }
                                 }
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: historyScroll3
+                                anchors {
+                                    top: historyScroll3.top
+                                    right: historyScroll3.right
+                                    bottom: historyScroll3.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: historyScroll3
+                            }
+}
                     }
                 }
             }
@@ -1045,6 +1081,7 @@ Item {
                     border.color: Colors.cyan
 
                     Flickable {
+                        id: historyScroll4
                         anchors {
                             fill: parent
                             margins: 8
@@ -1065,7 +1102,18 @@ Item {
                             color: Colors.white
                             wrapMode: Text.WrapAnywhere
                         }
-                    }
+                    
+                        NeonScrollBar {
+                            parent: historyScroll4
+                            anchors {
+                                top: historyScroll4.top
+                                right: historyScroll4.right
+                                bottom: historyScroll4.bottom
+                                rightMargin: 2
+                            }
+                            flickable: historyScroll4
+                        }
+}
                 }
             }
 
@@ -1322,6 +1370,7 @@ Item {
                     border.color: Colors.orange
 
                     Flickable {
+                        id: historyScroll5
                         anchors {
                             fill: parent
                             margins: 8
@@ -1354,7 +1403,18 @@ Item {
                                 : Colors.white
                             wrapMode: Text.WrapAnywhere
                         }
-                    }
+                    
+                        NeonScrollBar {
+                            parent: historyScroll5
+                            anchors {
+                                top: historyScroll5.top
+                                right: historyScroll5.right
+                                bottom: historyScroll5.bottom
+                                rightMargin: 2
+                            }
+                            flickable: historyScroll5
+                        }
+}
                 }
             }
         }

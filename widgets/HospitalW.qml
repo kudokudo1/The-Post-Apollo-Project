@@ -1793,7 +1793,7 @@ PanelWindow {
                             ? Colors.magenta
                             : intercomMouse.containsMouse
                             ? Colors.orange
-                            : Colors.cyan
+                            : Colors.omnitrix
 
                         RectangularShadow {
                             anchors.fill: parent
@@ -1810,13 +1810,14 @@ PanelWindow {
                                 ? Colors.magenta
                                 : intercomMouse.containsMouse
                                 ? Colors.orange
-                                : Colors.cyan
+                                : Colors.omnitrix
                         }
 
-                        GohuText {
+                        NotoText {
                             anchors.centerIn: parent
-                            text: "IC"
-                            font.pixelSize: 11
+                            anchors.verticalCenterOffset: 1
+                            text: "🎙"
+                            font.pixelSize: 18
                             color:
                                 intercomMouse.pressed
                                 ? Colors.black
@@ -1824,7 +1825,7 @@ PanelWindow {
                                 ? Colors.magenta
                                 : intercomMouse.containsMouse
                                 ? Colors.orange
-                                : Colors.cyan
+                                : Colors.omnitrix
 
                             layer.enabled: !intercomMouse.pressed
                             layer.effect: DropShadow {
@@ -1836,7 +1837,7 @@ PanelWindow {
                                     ? Colors.magenta
                                     : intercomMouse.containsMouse
                                     ? Colors.orange
-                                    : Colors.cyan
+                                    : Colors.omnitrix
                                 transparentBorder: true
                             }
                         }

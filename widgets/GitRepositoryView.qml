@@ -446,12 +446,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                anchors {
-                                    top: repositoryScroll1.top
-                                    right: repositoryScroll1.right
-                                    bottom: repositoryScroll1.bottom
-                                    rightMargin: 2
-                                }
                                 flickable: repositoryScroll1
                             }
 }
@@ -838,12 +832,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                anchors {
-                                    top: repositoryScroll2.top
-                                    right: repositoryScroll2.right
-                                    bottom: repositoryScroll2.bottom
-                                    rightMargin: 2
-                                }
                                 flickable: repositoryScroll2
                             }
 }
@@ -954,12 +942,6 @@ Item {
                         }
                     
                         NeonScrollBar {
-                            anchors {
-                                top: repositoryScroll3.top
-                                right: repositoryScroll3.right
-                                bottom: repositoryScroll3.bottom
-                                rightMargin: 2
-                            }
                             flickable: repositoryScroll3
                         }
 }
@@ -1371,12 +1353,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                anchors {
-                                    top: repositoryScroll4.top
-                                    right: repositoryScroll4.right
-                                    bottom: repositoryScroll4.bottom
-                                    rightMargin: 2
-                                }
                                 flickable: repositoryScroll4
                             }
 }
@@ -1525,12 +1501,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                anchors {
-                                    top: repositoryScroll5.top
-                                    right: repositoryScroll5.right
-                                    bottom: repositoryScroll5.bottom
-                                    rightMargin: 2
-                                }
                                 flickable: repositoryScroll5
                             }
 }
@@ -1636,12 +1606,6 @@ Item {
                         }
                     
                         NeonScrollBar {
-                            anchors {
-                                top: repositoryScroll6.top
-                                right: repositoryScroll6.right
-                                bottom: repositoryScroll6.bottom
-                                rightMargin: 2
-                            }
                             flickable: repositoryScroll6
                         }
 }
@@ -1869,12 +1833,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                anchors {
-                                    top: repositoryScroll7.top
-                                    right: repositoryScroll7.right
-                                    bottom: repositoryScroll7.bottom
-                                    rightMargin: 2
-                                }
                                 flickable: repositoryScroll7
                             }
 }
@@ -2067,12 +2025,6 @@ Item {
                         }
                     
                         NeonScrollBar {
-                            anchors {
-                                top: repositoryScroll8.top
-                                right: repositoryScroll8.right
-                                bottom: repositoryScroll8.bottom
-                                rightMargin: 2
-                            }
                             flickable: repositoryScroll8
                         }
 }
@@ -2155,12 +2107,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                anchors {
-                                    top: repositoryScroll9.top
-                                    right: repositoryScroll9.right
-                                    bottom: repositoryScroll9.bottom
-                                    rightMargin: 2
-                                }
                                 flickable: repositoryScroll9
                             }
 }
@@ -2234,12 +2180,6 @@ Item {
                         }
                     
                         NeonScrollBar {
-                            anchors {
-                                top: repositoryScroll10.top
-                                right: repositoryScroll10.right
-                                bottom: repositoryScroll10.bottom
-                                rightMargin: 2
-                            }
                             flickable: repositoryScroll10
                         }
 }

@@ -558,7 +558,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                parent: changesScroll1
                                 anchors {
                                     top: changesScroll1.top
                                     right: changesScroll1.right
@@ -697,7 +696,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                parent: changesScroll2
                                 anchors {
                                     top: changesScroll2.top
                                     right: changesScroll2.right
@@ -885,7 +883,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                parent: changesScroll3
                                 anchors {
                                     top: changesScroll3.top
                                     right: changesScroll3.right
@@ -1027,7 +1024,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                parent: changesScroll4
                                 anchors {
                                     top: changesScroll4.top
                                     right: changesScroll4.right
@@ -1158,7 +1154,6 @@ Item {
                         }
                     
                         NeonScrollBar {
-                            parent: changesScroll5
                             anchors {
                                 top: changesScroll5.top
                                 right: changesScroll5.right
@@ -1285,7 +1280,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                parent: changesScroll6
                                 anchors {
                                     top: changesScroll6.top
                                     right: changesScroll6.right
@@ -1457,7 +1451,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                parent: changesScroll7
                                 anchors {
                                     top: changesScroll7.top
                                     right: changesScroll7.right
@@ -1639,7 +1632,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                parent: changesScroll8
                                 anchors {
                                     top: changesScroll8.top
                                     right: changesScroll8.right

@@ -674,7 +674,7 @@ Rectangle {
                     }
 
                     visible: receptionInput.text.length === 0
-                    text: "ASK RECEPTION TO ROUTE YOU..."
+                    text: "ASK RECEPTION..."
                     font.pixelSize: 10
                     color: Colors.white
                     opacity: 0.38

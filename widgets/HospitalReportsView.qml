@@ -170,7 +170,7 @@ Item {
         property bool enabledAction: true
         signal triggered()
 
-        height: 26
+        height: 32
         color:
             !enabledAction
             ? Colors.black
@@ -188,7 +188,7 @@ Item {
         GohuText {
             anchors.centerIn: parent
             text: button.label
-            font.pixelSize: 8
+            font.pixelSize: 11
             color: mouse.pressed ? Colors.black : Colors.cyan
             opacity: button.enabledAction ? 1.0 : 0.34
         }
@@ -210,20 +210,20 @@ Item {
         property string value: ""
         property color valueColor: Colors.cyan
 
-        height: 18
+        height: 24
         spacing: 8
 
         GohuText {
             width: 88
             text: parent.label
-            font.pixelSize: 7
+            font.pixelSize: 10
             color: Colors.magenta
         }
 
         GohuText {
             width: parent.width - 96
             text: parent.value || "—"
-            font.pixelSize: 7
+            font.pixelSize: 10
             color: parent.valueColor
             elide: Text.ElideRight
         }
@@ -254,11 +254,11 @@ Item {
 
             Row {
                 width: parent.width
-                height: 30
+                height: 36
                 spacing: 8
 
                 GohuText {
-                    width: parent.width - 238
+                    width: parent.width - 286
                     anchors.verticalCenter: parent.verticalCenter
                     text:
                         "REPORTS // "
@@ -270,24 +270,24 @@ Item {
                             ? root.historyService.events.length
                             : 0
                         )
-                    font.pixelSize: 11
+                    font.pixelSize: 13
                     color: Colors.magenta
                 }
 
                 ReportButton {
-                    width: 72
+                    width: 82
                     label: "TEAM ◀"
                     onTriggered: root.cycleTeam(-1)
                 }
 
                 ReportButton {
-                    width: 72
+                    width: 82
                     label: "TEAM ▶"
                     onTriggered: root.cycleTeam(1)
                 }
 
                 ReportButton {
-                    width: 78
+                    width: 98
                     label: "CLEAR FILTER"
                     enabledAction:
                         root.teamFilter.length > 0
@@ -304,7 +304,7 @@ Item {
 
             Rectangle {
                 width: parent.width
-                height: 34
+                height: 40
                 color: Colors.black
                 border.width: 1
                 border.color: Colors.cyan
@@ -320,7 +320,7 @@ Item {
                         width: 42
                         anchors.verticalCenter: parent.verticalCenter
                         text: "TEAM"
-                        font.pixelSize: 7
+                        font.pixelSize: 10
                         color: Colors.magenta
                     }
 
@@ -328,14 +328,14 @@ Item {
                         width: (parent.width - 176) * 0.5
                         anchors.verticalCenter: parent.verticalCenter
                         text: root.teamFilter || "ALL ROOMS"
-                        font.pixelSize: 8
+                        font.pixelSize: 11
                         color: Colors.cyan
                         elide: Text.ElideRight
                     }
 
                     ReportButton {
                         width: 26
-                        height: 22
+                        height: 28
                         anchors.verticalCenter: parent.verticalCenter
                         label: "◀"
                         onTriggered: root.cycleState(-1)
@@ -345,7 +345,7 @@ Item {
                         width: (parent.width - 176) * 0.5
                         anchors.verticalCenter: parent.verticalCenter
                         text: root.stateFilter || "ALL STATES"
-                        font.pixelSize: 8
+                        font.pixelSize: 11
                         color:
                             root.stateFilter === "BLOCKED"
                             ? Colors.red
@@ -358,7 +358,7 @@ Item {
 
                     ReportButton {
                         width: 26
-                        height: 22
+                        height: 28
                         anchors.verticalCenter: parent.verticalCenter
                         label: "▶"
                         onTriggered: root.cycleState(1)
@@ -368,7 +368,7 @@ Item {
 
             Row {
                 width: parent.width
-                height: parent.height - 80
+                height: parent.height - 92
                 spacing: 10
 
                 Rectangle {
@@ -402,7 +402,7 @@ Item {
                                     required property var modelData
 
                                     width: reportColumn.width
-                                    height: 72
+                                    height: 92
                                     color:
                                         root.selectedIndex === index
                                         ? Colors.yellow
@@ -438,7 +438,7 @@ Item {
                                                     modelData.eventType
                                                     || "EVENT"
                                                 )
-                                                font.pixelSize: 8
+                                                font.pixelSize: 11
                                                 color:
                                                     root.selectedIndex === index
                                                     ? Colors.magenta
@@ -452,7 +452,7 @@ Item {
                                                     modelData.state
                                                     || "UNKNOWN"
                                                 )
-                                                font.pixelSize: 8
+                                                font.pixelSize: 11
                                                 horizontalAlignment:
                                                     Text.AlignRight
                                                 color:
@@ -471,7 +471,7 @@ Item {
                                                 modelData.team
                                                 || "NO ROOM"
                                             )
-                                            font.pixelSize: 7
+                                            font.pixelSize: 10
                                             color:
                                                 root.selectedIndex === index
                                                 ? Colors.magenta
@@ -491,7 +491,7 @@ Item {
                                                       )
                                                     : ""
                                                 )
-                                            font.pixelSize: 7
+                                            font.pixelSize: 10
                                             color: Colors.cyan
                                             opacity: 0.82
                                             elide: Text.ElideRight
@@ -503,7 +503,7 @@ Item {
                                                 modelData.recordedAt
                                                 || ""
                                             )
-                                            font.pixelSize: 6
+                                            font.pixelSize: 9
                                             color: Colors.white
                                             opacity: 0.58
                                             elide: Text.ElideRight
@@ -524,7 +524,7 @@ Item {
                                 width: parent.width
                                 visible: root.filteredEvents.length === 0
                                 text: "NO REPORTS MATCH THIS FILTER"
-                                font.pixelSize: 8
+                                font.pixelSize: 11
                                 color: Colors.cyan
                                 opacity: 0.52
                                 horizontalAlignment: Text.AlignHCenter
@@ -583,7 +583,7 @@ Item {
                                           || "EVENT"
                                       )
                                     : "SURGICAL REPORT // SELECT AN EVENT"
-                                font.pixelSize: 11
+                                font.pixelSize: 13
                                 color: Colors.magenta
                                 elide: Text.ElideRight
                             }
@@ -752,7 +752,7 @@ Item {
                             GohuText {
                                 width: parent.width
                                 text: "REASON"
-                                font.pixelSize: 7
+                                font.pixelSize: 10
                                 color: Colors.magenta
                             }
 
@@ -761,7 +761,7 @@ Item {
                                 text:
                                     root.eventReason(detailColumn.event)
                                     || "NO RECORDED REASON"
-                                font.pixelSize: 8
+                                font.pixelSize: 11
                                 color: Colors.white
                                 wrapMode: Text.Wrap
                             }
@@ -777,7 +777,7 @@ Item {
                                     + String(
                                         detailColumn.checks.reason || ""
                                     )
-                                font.pixelSize: 7
+                                font.pixelSize: 10
                                 color: Colors.cyan
                                 wrapMode: Text.Wrap
                             }

@@ -87,7 +87,7 @@ Item {
 
         signal triggered()
 
-        height: 28
+        height: 34
         color:
             !enabledAction
             ? Colors.black
@@ -111,7 +111,7 @@ Item {
         GohuText {
             anchors.centerIn: parent
             text: button.label
-            font.pixelSize: 8
+            font.pixelSize: 11
             color:
                 button.selectedAction
                 ? Colors.magenta
@@ -141,7 +141,7 @@ Item {
         property string value: "0"
         property color accent: Colors.cyan
 
-        height: 48
+        height: 58
         color: Colors.black
         border.width: 1
         border.color: accent
@@ -153,14 +153,14 @@ Item {
             GohuText {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: parent.parent.value
-                font.pixelSize: 13
+                font.pixelSize: 16
                 color: parent.parent.accent
             }
 
             GohuText {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: parent.parent.label
-                font.pixelSize: 6
+                font.pixelSize: 9
                 color: Colors.white
                 opacity: 0.72
             }
@@ -192,23 +192,23 @@ Item {
 
             Row {
                 width: parent.width
-                height: 30
+                height: 36
                 spacing: 8
 
                 GohuText {
-                    width: parent.width - 214
+                    width: parent.width - 248
                     anchors.verticalCenter: parent.verticalCenter
                     text:
                         root.roundsService.running
                         ? "ROUNDS // WALKING FLOORS"
                         : "ROUNDS // HOSPITAL BOARD"
-                    font.pixelSize: 11
+                    font.pixelSize: 13
                     color: Colors.magenta
                     elide: Text.ElideRight
                 }
 
                 RoundsButton {
-                    width: 72
+                    width: 84
                     label: "ATTENTION"
                     selectedAction: root.filterMode === "ATTENTION"
                     onTriggered: {
@@ -219,7 +219,7 @@ Item {
                 }
 
                 RoundsButton {
-                    width: 48
+                    width: 54
                     label: "ALL"
                     selectedAction: root.filterMode === "ALL"
                     onTriggered: {
@@ -230,7 +230,7 @@ Item {
                 }
 
                 RoundsButton {
-                    width: 78
+                    width: 86
                     label:
                         root.roundsService.running
                         ? "ROUNDING"
@@ -242,7 +242,7 @@ Item {
 
             Row {
                 width: parent.width
-                height: 48
+                height: 58
                 spacing: 6
 
                 MetricBox {
@@ -292,7 +292,7 @@ Item {
 
             Rectangle {
                 width: parent.width
-                height: 28
+                height: 34
                 color: Colors.black
                 border.width: 1
                 border.color:
@@ -313,7 +313,7 @@ Item {
                         ? "LAST ROUND // "
                           + root.roundsService.lastRefreshedAt
                         : "ROUNDS NOT RUN"
-                    font.pixelSize: 7
+                    font.pixelSize: 10
                     color:
                         root.roundsService.lastError
                         ? Colors.red
@@ -324,7 +324,7 @@ Item {
 
             Row {
                 width: parent.width
-                height: parent.height - 130
+                height: parent.height - 152
                 spacing: 10
 
                 Rectangle {
@@ -360,7 +360,7 @@ Item {
                                     required property var modelData
 
                                     width: roomColumn.width
-                                    height: 76
+                                    height: 96
                                     color:
                                         root.selectedIndex === index
                                         ? Colors.yellow
@@ -396,7 +396,7 @@ Item {
                                                         modelData.team
                                                         || "ROOM"
                                                     )
-                                                font.pixelSize: 8
+                                                font.pixelSize: 11
                                                 color:
                                                     root.selectedIndex === index
                                                     ? Colors.magenta
@@ -416,7 +416,7 @@ Item {
                                                         modelData.state
                                                         || "UNKNOWN"
                                                     )
-                                                font.pixelSize: 8
+                                                font.pixelSize: 11
                                                 color:
                                                     root.stateColor(
                                                         modelData.state
@@ -434,7 +434,7 @@ Item {
                                                     modelData.responsibility
                                                     || "NO RESPONSIBILITY"
                                                 )
-                                            font.pixelSize: 7
+                                            font.pixelSize: 10
                                             color: Colors.white
                                             opacity: 0.86
                                             elide: Text.ElideRight
@@ -463,7 +463,7 @@ Item {
                                                       )
                                                     : ""
                                                 )
-                                            font.pixelSize: 7
+                                            font.pixelSize: 10
                                             color: Colors.orange
                                             elide: Text.ElideRight
                                         }
@@ -475,7 +475,7 @@ Item {
                                                     modelData.updatedAt
                                                     || "NO TOUCH DATA"
                                                 )
-                                            font.pixelSize: 6
+                                            font.pixelSize: 9
                                             color: Colors.white
                                             opacity: 0.52
                                             elide: Text.ElideRight
@@ -509,7 +509,7 @@ Item {
                                     root.filterMode === "ATTENTION"
                                     ? "NO ROOMS REQUIRE ATTENTION"
                                     : "NO ROOMS AVAILABLE"
-                                font.pixelSize: 8
+                                font.pixelSize: 11
                                 color: Colors.cyan
                                 opacity: 0.62
                                 horizontalAlignment: Text.AlignHCenter
@@ -542,7 +542,7 @@ Item {
                                 ? "ROUND NOTE // "
                                   + String(parent.room.team || "ROOM")
                                 : "ROUND NOTE // SELECT ROOM"
-                            font.pixelSize: 10
+                            font.pixelSize: 12
                             color: Colors.magenta
                             elide: Text.ElideRight
                         }
@@ -559,7 +559,7 @@ Item {
                             text:
                                 "FLOOR // "
                                 + String(parent.room.floorLabel || "—")
-                            font.pixelSize: 7
+                            font.pixelSize: 10
                             color: Colors.cyan
                             elide: Text.ElideRight
                         }
@@ -569,7 +569,7 @@ Item {
                             text:
                                 "REPO // "
                                 + String(parent.room.repository || "—")
-                            font.pixelSize: 7
+                            font.pixelSize: 10
                             color: Colors.white
                             elide: Text.ElideRight
                         }
@@ -579,7 +579,7 @@ Item {
                             text:
                                 "STATE // "
                                 + String(parent.room.state || "—")
-                            font.pixelSize: 8
+                            font.pixelSize: 11
                             color:
                                 root.stateColor(parent.room.state)
                             elide: Text.ElideRight
@@ -592,7 +592,7 @@ Item {
                                 + String(parent.room.ahead || 0)
                                 + " / -"
                                 + String(parent.room.behind || 0)
-                            font.pixelSize: 7
+                            font.pixelSize: 10
                             color: Colors.orange
                         }
 
@@ -604,7 +604,7 @@ Item {
                                     root.shortSha(parent.room.head)
                                     || "—"
                                 )
-                            font.pixelSize: 7
+                            font.pixelSize: 10
                             color: Colors.blue
                             elide: Text.ElideRight
                         }
@@ -616,7 +616,7 @@ Item {
                                     parent.room.responsibility
                                     || "NO RESPONSIBILITY RECORDED"
                                 )
-                            font.pixelSize: 8
+                            font.pixelSize: 11
                             color: Colors.white
                             wrapMode: Text.Wrap
                         }

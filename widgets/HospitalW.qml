@@ -1173,7 +1173,7 @@ PanelWindow {
         GohuText {
             anchors.centerIn: parent
             text: modeTab.label
-            font.pixelSize: 11
+            font.pixelSize: 12
             color:
                 modeTab.pressed
                 ? Colors.black
@@ -1844,7 +1844,7 @@ PanelWindow {
                             root.operationsSurface === "reports"
                             ? "REPORTS // CONTEXT"
                             : "ROUNDS // HOSPITAL-WIDE"
-                        font.pixelSize: 10
+                        font.pixelSize: 12
                         color:
                             root.operationsSurface === "reports"
                             ? Colors.magenta
@@ -1896,7 +1896,7 @@ PanelWindow {
                                 + "  //  MISSING "
                                 + String(roundsService.missingCount)
                               )
-                        font.pixelSize: 9
+                        font.pixelSize: 11
                         color:
                             root.operationsSurface === "reports"
                             ? Colors.white

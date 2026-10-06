@@ -25,7 +25,7 @@ QtObject {
             ? specialists
             : [];
 
-        for (let i = 0; i < rooms.length && next.length < 6; ++i) {
+        for (let i = 0; i < rooms.length && next.length < 5; ++i) {
             const room = rooms[i] || {};
             const rank = Number(room.attentionRank || 0);
 
@@ -57,7 +57,7 @@ QtObject {
             });
         }
 
-        for (let i = 0; i < staff.length && next.length < 6; ++i) {
+        for (let i = 0; i < staff.length && next.length < 5; ++i) {
             const specialist = staff[i] || {};
             const presence =
                 String(specialist.presence || "UNKNOWN").toUpperCase();
@@ -79,16 +79,7 @@ QtObject {
             });
         }
 
-        if (next.length === 0) {
-            next.push({
-                kind: "clear",
-                title: "NO ACTIVE ATTENTION",
-                detail: "Rounds and Staff have no active alerts.",
-                route: ""
-            });
-        }
-
-        inbox = next;
+        inbox = next.slice(0, 5);
     }
 
     function append(sender, body) {

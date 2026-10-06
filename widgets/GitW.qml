@@ -780,6 +780,10 @@ PanelWindow {
             branchWorkspaceService.refresh();
         else if (root.gitView === "changes")
             changesService.refresh();
+        else if (root.gitView === "repository") {
+            repositoryService.refresh();
+            branchWorkspaceService.refresh();
+        }
     }
 
     function showGitControl() {
@@ -1333,6 +1337,11 @@ PanelWindow {
         else if (root.activePage === "git"
                 && root.gitView === "changes")
             changesService.refresh();
+        else if (root.activePage === "git"
+                && root.gitView === "repository") {
+            repositoryService.refresh();
+            branchWorkspaceService.refresh();
+        }
 
         if (root.activePage === "github")
             githubService.refresh();
@@ -1445,6 +1454,11 @@ PanelWindow {
             else if (root.activePage === "git"
                     && root.gitView === "changes")
                 changesService.refresh();
+            else if (root.activePage === "git"
+                    && root.gitView === "repository") {
+                repositoryService.refresh();
+                branchWorkspaceService.refresh();
+            }
         }
     }
 

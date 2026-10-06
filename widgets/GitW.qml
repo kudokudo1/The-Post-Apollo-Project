@@ -2572,11 +2572,8 @@ PanelWindow {
 
                                                     text:
                                                         "TRACK // CHECKOUT REMOTE"
-                                                    font.pixelSize: 8
-                                                    color:
-                                                        gitService.localTrackCheckoutMode
-                                                        ? Colors.magenta
-                                                        : Colors.blue
+                                                    font.pixelSize: 10
+                                                    color: Colors.white
                                                     elide: Text.ElideRight
                                                 }
 
@@ -2658,9 +2655,11 @@ PanelWindow {
                                                                 modelData.name
                                                                 || "UNKNOWN"
                                                             )
-                                                        font.pixelSize: 8
+                                                        font.pixelSize: 10
                                                         color:
-                                                            parent.selected
+                                                            parent.branchName === "main"
+                                                            ? Colors.magenta
+                                                            : parent.selected
                                                             ? Colors.magenta
                                                             : parent.live
                                                             ? Colors.orange

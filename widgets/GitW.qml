@@ -780,6 +780,8 @@ PanelWindow {
             branchWorkspaceService.refresh();
         else if (root.gitView === "changes")
             changesService.refresh();
+        else if (root.gitView === "history")
+            historyService.refresh(historyService.selectedRef || "ALL");
         else if (root.gitView === "repository") {
             repositoryService.refresh();
             branchWorkspaceService.refresh();
@@ -811,6 +813,7 @@ PanelWindow {
         root.remoteTargetMenuOpen = false;
         root.gitView = "history";
         gitService.refresh();
+        historyService.refresh(historyService.selectedRef || "ALL");
     }
 
     function showGitRepository() {
@@ -1338,6 +1341,9 @@ PanelWindow {
                 && root.gitView === "changes")
             changesService.refresh();
         else if (root.activePage === "git"
+                && root.gitView === "history")
+            historyService.refresh(historyService.selectedRef || "ALL");
+        else if (root.activePage === "git"
                 && root.gitView === "repository") {
             repositoryService.refresh();
             branchWorkspaceService.refresh();
@@ -1455,8 +1461,23 @@ PanelWindow {
                     && root.gitView === "changes")
                 changesService.refresh();
             else if (root.activePage === "git"
+                    && root.gitView === "history")
+                historyService.refresh(historyService.selectedRef || "ALL");
+            else if (root.activePage === "git"
                     && root.gitView === "repository") {
                 repositoryService.refresh();
+                branchWorkspaceService.refresh();
+            }
+        }
+    }
+
+    Connections {
+        target: historyService
+
+        function onActionFinished(action, success, detail) {
+            if (success) {
+                gitService.refresh();
+                changesService.refresh();
                 branchWorkspaceService.refresh();
             }
         }
@@ -4213,6 +4234,7 @@ PanelWindow {
 
                         gitService: gitService
                         historyService: historyService
+                        keyboardHost: root
                     }
 
                     GitChangesView {

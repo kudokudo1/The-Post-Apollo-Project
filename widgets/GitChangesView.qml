@@ -9,6 +9,22 @@ Item {
     property var gitService: null
     property var keyboardHost: null
 
+
+    component SectionLabel: GohuText {
+        font.pixelSize: 12
+        color: Colors.magenta
+    }
+
+    component MetaLabel: GohuText {
+        font.pixelSize: 10
+        color: Colors.cyan
+    }
+
+    component OrangeLabel: GohuText {
+        font.pixelSize: 10
+        color: Colors.orange
+    }
+
     component MiniButton: Rectangle {
         id: button
 

@@ -470,24 +470,34 @@ Scope {
     }
 
     function parseHunks(text) {
-        const lines = String(text || "").split("\n");
+        const sourceLines = String(text || "").split("\n");
         const header = [];
         const rows = [];
         let current = null;
+        let oldLine = 0;
+        let newLine = 0;
 
-        for (let i = 0; i < lines.length; ++i) {
-            const line = lines[i];
+        for (let i = 0; i < sourceLines.length; ++i) {
+            const line = sourceLines[i];
 
             if (line.indexOf("@@") === 0) {
                 if (current)
                     rows.push(current);
+
+                const match = line.match(
+                    /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/
+                );
+
+                oldLine = match ? Number(match[1] || 0) : 0;
+                newLine = match ? Number(match[3] || 0) : 0;
 
                 current = {
                     index: rows.length,
                     header: line,
                     text: line + "\n",
                     added: 0,
-                    removed: 0
+                    removed: 0,
+                    lines: []
                 };
                 continue;
             }
@@ -499,10 +509,59 @@ Scope {
 
             current.text += line + "\n";
 
-            if (line.indexOf("+") === 0 && line.indexOf("+++") !== 0)
+            const kind =
+                line.length > 0
+                ? line.charAt(0)
+                : " ";
+            const payload =
+                line.length > 0
+                ? line.slice(1)
+                : "";
+            const patchIndex = current.lines.length;
+
+            if (kind === "+") {
+                current.lines.push({
+                    patchIndex: patchIndex,
+                    kind: "+",
+                    text: payload,
+                    oldLine: 0,
+                    newLine: newLine,
+                    selectable: true
+                });
                 current.added += 1;
-            else if (line.indexOf("-") === 0 && line.indexOf("---") !== 0)
+                newLine += 1;
+            } else if (kind === "-") {
+                current.lines.push({
+                    patchIndex: patchIndex,
+                    kind: "-",
+                    text: payload,
+                    oldLine: oldLine,
+                    newLine: 0,
+                    selectable: true
+                });
                 current.removed += 1;
+                oldLine += 1;
+            } else if (kind === " ") {
+                current.lines.push({
+                    patchIndex: patchIndex,
+                    kind: " ",
+                    text: payload,
+                    oldLine: oldLine,
+                    newLine: newLine,
+                    selectable: false
+                });
+                oldLine += 1;
+                newLine += 1;
+            } else {
+                current.lines.push({
+                    patchIndex: patchIndex,
+                    kind: kind,
+                    text: payload,
+                    oldLine: 0,
+                    newLine: 0,
+                    selectable: false
+                });
+            }
         }
 
         if (current)
@@ -711,6 +770,160 @@ Scope {
                 '    esac',
                 '    printf "OK\\tSKIPPED CURRENT STEP // %s\\n" "$state"',
                 '    ;;',
+                '  stage-line|unstage-line|discard-line)',
+                '    [ -n "$a" ] || { printf "REFUSED\\tFILE REQUIRED\\n"; exit 40; }',
+                '    [ -n "$b" ] || { printf "REFUSED\\tHUNK INDEX REQUIRED\\n"; exit 41; }',
+                '    [ -n "$c" ] || { printf "REFUSED\\tLINE INDEX REQUIRED\\n"; exit 42; }',
+                '    if [ "$op" = "discard-line" ] && [ "$d" != "CONFIRM" ]; then',
+                '      printf "REFUSED\\tLINE DISCARD REQUIRES CONFIRMATION\\n"',
+                '      exit 43',
+                '    fi',
+                '    python3 - "$repo" "$a" "$op" "$b" "$c" <<\'PY\'',
+                'import difflib, os, re, subprocess, sys',
+                'repo, path, op, hunk_text, line_text = sys.argv[1:6]',
+                'hunk_index = int(hunk_text)',
+                'line_index = int(line_text)',
+                '',
+                'def run(cmd):',
+                '    return subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)',
+                '',
+                'def git_bytes(args):',
+                '    p = run(["git", "-C", repo] + args)',
+                '    if p.returncode != 0:',
+                '        return None',
+                '    return p.stdout',
+                '',
+                'def split_bytes(data):',
+                '    if data is None:',
+                '        return []',
+                '    return data.decode("utf-8", "surrogateescape").splitlines(True)',
+                '',
+                'if op == "unstage-line":',
+                '    diff_args = ["diff", "--cached", "--no-ext-diff", "--", path]',
+                'else:',
+                '    diff_args = ["diff", "--no-ext-diff", "--", path]',
+                '',
+                'diff_proc = run(["git", "-C", repo] + diff_args)',
+                'if diff_proc.returncode != 0:',
+                '    sys.stderr.buffer.write(diff_proc.stderr)',
+                '    sys.exit(diff_proc.returncode)',
+                '',
+                'diff_lines = diff_proc.stdout.decode("utf-8", "surrogateescape").splitlines(True)',
+                'hunks, current = [], None',
+                'for raw in diff_lines:',
+                '    if raw.startswith("@@"):',
+                '        if current is not None:',
+                '            hunks.append(current)',
+                '        current = [raw]',
+                '    elif current is not None:',
+                '        current.append(raw)',
+                'if current is not None:',
+                '    hunks.append(current)',
+                '',
+                'if hunk_index < 0 or hunk_index >= len(hunks):',
+                '    print("HUNK NOT FOUND", file=sys.stderr)',
+                '    sys.exit(44)',
+                '',
+                'hunk = hunks[hunk_index]',
+                'body = hunk[1:]',
+                'if line_index < 0 or line_index >= len(body):',
+                '    print("LINE NOT FOUND", file=sys.stderr)',
+                '    sys.exit(45)',
+                '',
+                'selected = body[line_index]',
+                'if not selected or selected[0] not in "+-":',
+                '    print("LINE IS NOT A CHANGE", file=sys.stderr)',
+                '    sys.exit(46)',
+                '',
+                'match = re.match(r"^@@ -(\\d+)(?:,(\\d+))? \\+(\\d+)(?:,(\\d+))? @@", hunk[0])',
+                'if not match:',
+                '    print("HUNK HEADER INVALID", file=sys.stderr)',
+                '    sys.exit(47)',
+                '',
+                'old_cursor = int(match.group(1))',
+                'new_cursor = int(match.group(3))',
+                'selected_old = 0',
+                'selected_new = 0',
+                '',
+                'for idx, raw in enumerate(body):',
+                '    prefix = raw[:1]',
+                '    if idx == line_index:',
+                '        selected_old = old_cursor',
+                '        selected_new = new_cursor',
+                '        break',
+                '    if prefix == " ":',
+                '        old_cursor += 1',
+                '        new_cursor += 1',
+                '    elif prefix == "-":',
+                '        old_cursor += 1',
+                '    elif prefix == "+":',
+                '        new_cursor += 1',
+                '',
+                'if op == "stage-line":',
+                '    base = split_bytes(git_bytes(["show", ":" + path]))',
+                '    if not base and git_bytes(["ls-files", "--error-unmatch", "--", path]) is None:',
+                '        print("UNTRACKED FILE // STAGE WHOLE FILE FIRST", file=sys.stderr)',
+                '        sys.exit(48)',
+                '    target = list(base)',
+                '    apply_cached = True',
+                '    pos = max(0, selected_old - 1)',
+                '    if selected[0] == "+":',
+                '        target.insert(min(pos, len(target)), selected[1:])',
+                '    else:',
+                '        if pos >= len(target):',
+                '            print("SOURCE LINE OUT OF RANGE", file=sys.stderr)',
+                '            sys.exit(49)',
+                '        target.pop(pos)',
+                'elif op == "unstage-line":',
+                '    base = split_bytes(git_bytes(["show", ":" + path]))',
+                '    target = list(base)',
+                '    apply_cached = True',
+                '    pos = max(0, selected_new - 1)',
+                '    if selected[0] == "+":',
+                '        if pos >= len(target):',
+                '            print("INDEX LINE OUT OF RANGE", file=sys.stderr)',
+                '            sys.exit(50)',
+                '        target.pop(pos)',
+                '    else:',
+                '        target.insert(min(pos, len(target)), selected[1:])',
+                'else:',
+                '    full_path = os.path.join(repo, path)',
+                '    try:',
+                '        with open(full_path, "rb") as fh:',
+                '            base = split_bytes(fh.read())',
+                '    except FileNotFoundError:',
+                '        base = []',
+                '    target = list(base)',
+                '    apply_cached = False',
+                '    pos = max(0, selected_new - 1)',
+                '    if selected[0] == "+":',
+                '        if pos >= len(target):',
+                '            print("WORKTREE LINE OUT OF RANGE", file=sys.stderr)',
+                '            sys.exit(51)',
+                '        target.pop(pos)',
+                '    else:',
+                '        target.insert(min(pos, len(target)), selected[1:])',
+                '',
+                'from_name = "a/" + path',
+                'to_name = "b/" + path',
+                'patch = "".join(difflib.unified_diff(base, target, fromfile=from_name, tofile=to_name, n=3))',
+                'if not patch:',
+                '    print("NO LINE PATCH PRODUCED", file=sys.stderr)',
+                '    sys.exit(52)',
+                '',
+                'apply_cmd = ["git", "-C", repo, "apply", "--whitespace=nowarn"]',
+                'if apply_cached:',
+                '    apply_cmd.append("--cached")',
+                'apply_cmd.append("-")',
+                'result = subprocess.run(apply_cmd, input=patch.encode("utf-8", "surrogateescape"), stdout=subprocess.PIPE, stderr=subprocess.PIPE)',
+                'sys.stdout.buffer.write(result.stdout)',
+                'sys.stderr.buffer.write(result.stderr)',
+                'sys.exit(result.returncode)',
+                'PY',
+                '    rc=$?',
+                '    [ "$rc" -eq 0 ] || exit "$rc"',
+                '    printf "OK\\t%s // %s // HUNK %s // LINE %s\\n" "$op" "$a" "$b" "$c"',
+                '    ;;',
                 '  stage-hunk|unstage-hunk|discard-hunk)',
                 '    [ -n "$a" ] || { printf "REFUSED\\tFILE REQUIRED\\n"; exit 36; }',
                 '    [ -n "$b" ] || { printf "REFUSED\\tHUNK INDEX REQUIRED\\n"; exit 37; }',
@@ -896,6 +1109,36 @@ Scope {
             "",
             "",
             ""
+        );
+    }
+
+    function stageLine(path, hunkIndex, lineIndex) {
+        return runAction(
+            "stage-line",
+            path,
+            String(hunkIndex),
+            String(lineIndex),
+            ""
+        );
+    }
+
+    function unstageLine(path, hunkIndex, lineIndex) {
+        return runAction(
+            "unstage-line",
+            path,
+            String(hunkIndex),
+            String(lineIndex),
+            ""
+        );
+    }
+
+    function discardLine(path, hunkIndex, lineIndex, confirmed) {
+        return runAction(
+            "discard-line",
+            path,
+            String(hunkIndex),
+            String(lineIndex),
+            confirmed ? "CONFIRM" : ""
         );
     }
 

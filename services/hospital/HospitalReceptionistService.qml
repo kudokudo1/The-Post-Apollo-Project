@@ -14,6 +14,7 @@ Scope {
 
     signal routeRequested(string route)
     signal activityActionRequested(var item)
+    signal teamNavigationRequested(string team)
 
     property var inbox: []
     property var activityEvents: []
@@ -1078,6 +1079,11 @@ Scope {
             return false;
 
         const query = raw.toLowerCase();
+        const goThere =
+            query.indexOf("take me there") >= 0
+            || query.indexOf("go there") >= 0
+            || query.indexOf("show me there") >= 0
+            || query.indexOf("take me to there") >= 0;
         const openThat =
             (
                 query.indexOf("open that") >= 0
@@ -1115,7 +1121,8 @@ Scope {
             || query.indexOf("what happened after that") >= 0
             || query.indexOf("what happened after it") >= 0;
 
-        if (!openThat
+        if (!goThere
+                && !openThat
                 && !favoriteThat
                 && !unfavoriteThat
                 && !beforeThat
@@ -1132,6 +1139,24 @@ Scope {
                 "NO ACTIVE CONTEXT // ASK ME ABOUT AN EVENT, ROOM, OR TEAM FIRST"
             );
             clearActivityContext();
+            return true;
+        }
+
+        if (goThere) {
+            if (contextTarget) {
+                append(
+                    "RECEPTION",
+                    "OPENING ROOM // " + contextTarget
+                );
+                teamNavigationRequested(contextTarget);
+                return true;
+            }
+
+            append(
+                "RECEPTION",
+                "OPENING // " + activityLine(current)
+            );
+            activityActionRequested(current);
             return true;
         }
 
@@ -1284,8 +1309,35 @@ Scope {
             query.indexOf("problem") >= 0
             || query.indexOf("issue") >= 0
             || query.indexOf("attention") >= 0;
+        const asksSpecificHistoricalEvent =
+            query.indexOf("latest") >= 0
+            || query.indexOf("newest") >= 0
+            || query.indexOf("recent") >= 0
+            || favoritesOnly
+            || problemsOnly;
 
-        // Bare team navigation means "take me to the Room" first.
+        if (target
+                && !source
+                && !asksSpecificHistoricalEvent) {
+            append("OPERATOR", raw);
+            rememberActivityContext(
+                contextEvent() || {},
+                "",
+                target,
+                false,
+                false,
+                false
+            );
+            contextTarget = target;
+            append(
+                "RECEPTION",
+                "OPENING ROOM // " + target
+            );
+            teamNavigationRequested(target);
+            return true;
+        }
+
+        // Historical event actions can still prefer a retained Rounds event.
         if (target && !source && !favoritesOnly)
             source = "rounds";
 
@@ -1411,7 +1463,7 @@ Scope {
         if (asksHelp) {
             append(
                 "RECEPTION",
-                "I can report what is new, what you missed, recent activity, favorites, Room or team history, counts, and last activity. I can show a team or open a recorded problem, then follow up with open that, favorite that, before that, or anything newer."
+                "I can report what is new, what you missed, recent activity, favorites, Room or team history, counts, and last activity. I can show a team or open a recorded problem, then follow up with open that, take me there, favorite that, before that, or anything newer."
             );
             return true;
         }

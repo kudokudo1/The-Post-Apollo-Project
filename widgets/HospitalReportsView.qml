@@ -188,7 +188,7 @@ Item {
         GohuText {
             anchors.centerIn: parent
             text: button.label
-            font.pixelSize: 13
+            font.pixelSize: 11
             color: mouse.pressed ? Colors.black : Colors.cyan
             opacity: button.enabledAction ? 1.0 : 0.34
         }
@@ -328,7 +328,7 @@ Item {
                         width: (parent.width - 176) * 0.5
                         anchors.verticalCenter: parent.verticalCenter
                         text: root.teamFilter || "ALL ROOMS"
-                        font.pixelSize: 13
+                        font.pixelSize: 11
                         color: Colors.cyan
                         elide: Text.ElideRight
                     }
@@ -345,7 +345,7 @@ Item {
                         width: (parent.width - 176) * 0.5
                         anchors.verticalCenter: parent.verticalCenter
                         text: root.stateFilter || "ALL STATES"
-                        font.pixelSize: 13
+                        font.pixelSize: 11
                         color:
                             root.stateFilter === "BLOCKED"
                             ? Colors.red
@@ -438,7 +438,7 @@ Item {
                                                     modelData.eventType
                                                     || "EVENT"
                                                 )
-                                                font.pixelSize: 13
+                                                font.pixelSize: 11
                                                 color:
                                                     root.selectedIndex === index
                                                     ? Colors.magenta
@@ -452,7 +452,7 @@ Item {
                                                     modelData.state
                                                     || "UNKNOWN"
                                                 )
-                                                font.pixelSize: 13
+                                                font.pixelSize: 11
                                                 horizontalAlignment:
                                                     Text.AlignRight
                                                 color:
@@ -524,7 +524,7 @@ Item {
                                 width: parent.width
                                 visible: root.filteredEvents.length === 0
                                 text: "NO REPORTS MATCH THIS FILTER"
-                                font.pixelSize: 13
+                                font.pixelSize: 11
                                 color: Colors.cyan
                                 opacity: 0.52
                                 horizontalAlignment: Text.AlignHCenter
@@ -761,7 +761,7 @@ Item {
                                 text:
                                     root.eventReason(detailColumn.event)
                                     || "NO RECORDED REASON"
-                                font.pixelSize: 13
+                                font.pixelSize: 11
                                 color: Colors.white
                                 wrapMode: Text.Wrap
                             }

@@ -446,7 +446,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                parent: repositoryScroll1
                                 anchors {
                                     top: repositoryScroll1.top
                                     right: repositoryScroll1.right
@@ -839,7 +838,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                parent: repositoryScroll2
                                 anchors {
                                     top: repositoryScroll2.top
                                     right: repositoryScroll2.right
@@ -956,7 +954,6 @@ Item {
                         }
                     
                         NeonScrollBar {
-                            parent: repositoryScroll3
                             anchors {
                                 top: repositoryScroll3.top
                                 right: repositoryScroll3.right
@@ -1374,7 +1371,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                parent: repositoryScroll4
                                 anchors {
                                     top: repositoryScroll4.top
                                     right: repositoryScroll4.right
@@ -1529,7 +1525,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                parent: repositoryScroll5
                                 anchors {
                                     top: repositoryScroll5.top
                                     right: repositoryScroll5.right
@@ -1641,7 +1636,6 @@ Item {
                         }
                     
                         NeonScrollBar {
-                            parent: repositoryScroll6
                             anchors {
                                 top: repositoryScroll6.top
                                 right: repositoryScroll6.right
@@ -1875,7 +1869,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                parent: repositoryScroll7
                                 anchors {
                                     top: repositoryScroll7.top
                                     right: repositoryScroll7.right
@@ -2074,7 +2067,6 @@ Item {
                         }
                     
                         NeonScrollBar {
-                            parent: repositoryScroll8
                             anchors {
                                 top: repositoryScroll8.top
                                 right: repositoryScroll8.right
@@ -2163,7 +2155,6 @@ Item {
                             }
                         
                             NeonScrollBar {
-                                parent: repositoryScroll9
                                 anchors {
                                     top: repositoryScroll9.top
                                     right: repositoryScroll9.right
@@ -2243,7 +2234,6 @@ Item {
                         }
                     
                         NeonScrollBar {
-                            parent: repositoryScroll10
                             anchors {
                                 top: repositoryScroll10.top
                                 right: repositoryScroll10.right

@@ -597,14 +597,7 @@ Item {
                                 ? "LIVE"
                                 : "SWITCH"
                             selectedAction: root.selectedIsCurrent
-                            enabledAction:
-                                root.selectedBranch.length > 0
-                                && !root.selectedIsCurrent
-                                && !root.selectedIsOccupied
-                                && branchWorkspaceService
-                                && !branchWorkspaceService.actionBusy
-                                && !branchWorkspaceService.refreshing
-
+                            enabledAction: false
                             onTriggered:
                                 branchWorkspaceService.switchBranch(
                                     root.selectedBranch,
@@ -616,7 +609,7 @@ Item {
                         BranchButton {
                             width: (inspector.width - 26) / 2
                             label: "COMPARE"
-                            enabledAction: root.selectedBranch.length > 0
+                            enabledAction: false
                             onTriggered:
                                 root.compareRequested(root.selectedBranch)
                         }
@@ -624,7 +617,7 @@ Item {
                         BranchButton {
                             width: (inspector.width - 26) / 2
                             label: "RENAME"
-                            enabledAction: root.selectedBranch.length > 0
+                            enabledAction: false
                             onTriggered:
                                 root.renameBranchRequested(root.selectedBranch)
                         }
@@ -640,7 +633,7 @@ Item {
                         BranchButton {
                             width: (inspector.width - 26) / 2
                             label: "NEW ABOVE"
-                            enabledAction: root.selectedBranch.length > 0
+                            enabledAction: false
                             onTriggered:
                                 root.stackAboveRequested(root.selectedBranch)
                         }
@@ -648,7 +641,7 @@ Item {
                         BranchButton {
                             width: (inspector.width - 26) / 2
                             label: "NEW BELOW"
-                            enabledAction: root.selectedBranch.length > 0
+                            enabledAction: false
                             onTriggered:
                                 root.stackBelowRequested(root.selectedBranch)
                         }
@@ -665,10 +658,7 @@ Item {
                             width: (inspector.width - 26) / 2
                             label: "DELETE"
                             destructive: true
-                            enabledAction:
-                                root.selectedBranch.length > 0
-                                && !root.selectedIsCurrent
-                                && !root.selectedIsOccupied
+                            enabledAction: false
                             onTriggered:
                                 root.deleteBranchRequested(root.selectedBranch)
                         }
@@ -759,9 +749,7 @@ Item {
                         BranchButton {
                             width: (inspector.width - 26) / 2
                             label: "SET PARENT"
-                            enabledAction:
-                                root.selectedBranch.length > 0
-                                && branchStackStore !== null
+                            enabledAction: false
                             onTriggered:
                                 root.stackParentRequested(root.selectedBranch)
                         }
@@ -829,12 +817,7 @@ Item {
                         BranchButton {
                             width: (inspector.width - 26) / 2
                             label: "SUBMIT STACK"
-                            enabledAction:
-                                root.selectedBranch.length > 0
-                                && (
-                                    root.selectedStackParent.length > 0
-                                    || root.selectedStackChildren.length > 0
-                                )
+                            enabledAction: false
                             onTriggered:
                                 root.submitStackRequested(root.selectedBranch)
                         }

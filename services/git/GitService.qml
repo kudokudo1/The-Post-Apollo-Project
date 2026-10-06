@@ -890,7 +890,7 @@ Scope {
         return cleaned.slice(0, 4).join(" • ");
     }
 
-    function appendCommit(sha, parentField, refs, subject) {
+    function appendCommit(sha, parentField, refs, epoch, author, subject) {
         const parentText = String(parentField || "").trim();
         const parents = parentText ? parentText.split(/\s+/) : [];
         const lane = allocateLane(sha, parents);
@@ -901,6 +901,8 @@ Scope {
             shortSha: String(sha).slice(0, 8),
             parents: parents.join(" "),
             refsText: cleanRefs(decorated),
+            epoch: Number(epoch || 0),
+            author: String(author || ""),
             subject: String(subject || ""),
             lane: lane,
             isHead: decorated.indexOf("HEAD ->") >= 0
@@ -1095,7 +1097,7 @@ Scope {
                 '  if [ "$unpulled" -eq 0 ]; then changed=0; fi',
                 '  printf "REMOTEBRANCH\\t%s\\t%s\\t%s\\t%s\\n" "$ref" "$unpulled" "$remote_only" "$changed"',
                 'done < <(git -C "$root" for-each-ref --format="%(refname:short)%09%(committerdate:unix)" refs/remotes/origin 2>/dev/null)',
-                'git -C "$root" log --all --topo-order --date-order -n 48 --pretty=format:"COMMIT%x09%H%x09%P%x09%D%x09%s"',
+                'git -C "$root" log --all --topo-order --date-order -n 48 --pretty=format:"COMMIT%x09%H%x09%P%x09%D%x09%ct%x09%an%x09%s"',
                 'printf "\\nDONE\\t\\n"'
             ].join("\n"),
             "pa-git-refresh",
@@ -1113,7 +1115,9 @@ Scope {
                 parts.length > 1 ? parts[1] : "",
                 parts.length > 2 ? parts[2] : "",
                 parts.length > 3 ? parts[3] : "",
-                parts.length > 4 ? parts.slice(4).join("\t") : ""
+                parts.length > 4 ? Number(parts[4] || 0) : 0,
+                parts.length > 5 ? parts[5] : "",
+                parts.length > 6 ? parts.slice(6).join("\t") : ""
             );
             return;
         }

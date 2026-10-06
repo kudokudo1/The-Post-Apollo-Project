@@ -814,6 +814,7 @@ PanelWindow {
     }
 
     function closeOperationsSurface() {
+        receptionistService.endVisit();
         root.operationsSurface = "";
     }
 
@@ -851,6 +852,7 @@ PanelWindow {
         root.intercomTyping = false;
         root.operationsSurface = "reception";
         root.refreshReceptionData();
+        receptionistService.beginVisit();
     }
 
     function handleReceptionRoute(route) {
@@ -917,6 +919,7 @@ PanelWindow {
     }
 
     function openReports(teamValue) {
+        receptionistService.endVisit();
         root.leaveRoomControls();
         root.leaveBedControls();
 
@@ -931,6 +934,7 @@ PanelWindow {
     }
 
     function openRounds() {
+        receptionistService.endVisit();
         root.leaveRoomControls();
         root.leaveBedControls();
         root.operationsSurface = "rounds";
@@ -940,6 +944,7 @@ PanelWindow {
     }
 
     function openStaff() {
+        receptionistService.endVisit();
         root.leaveRoomControls();
         root.leaveBedControls();
         root.operationsSurface = "staff";
@@ -1003,9 +1008,11 @@ PanelWindow {
         root.operationsSurface = "reception";
         root.menuOpen = true;
         root.refreshReceptionData();
+        receptionistService.beginVisit();
     }
 
     function close() {
+        receptionistService.endVisit();
         root.phoneMenuOpen = false;
         root.intercomMenuOpen = false;
         root.intercomTyping = false;
@@ -4098,6 +4105,8 @@ PanelWindow {
             readyCount: specialistRegistryService.readyCount
             specialistCount: specialistRegistryService.specialistCount
             attentionCount: roundsService.attentionCount
+            newCount: receptionistService.unreadCount
+            recentCount: receptionistService.recentCount
             inbox: receptionistService.inbox
 
             anchors {

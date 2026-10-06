@@ -997,6 +997,15 @@ Scope {
     }
 
     function cyclePullMode() {
+        if (localTrackCheckoutMode) {
+            actionTitle = "PULL MODE";
+            actionExitCode = 0;
+            actionOutput =
+                "TRACK MODE // checkout is an exact remote tracking operation"
+                + "\nFF / MRG does not apply until the local branch exists.";
+            return;
+        }
+
         pullMode = pullMode === "ff-only" ? "merge" : "ff-only";
         describePullMode();
     }
@@ -1108,6 +1117,15 @@ Scope {
                 ? "PULL SOURCE // UPSTREAM\nNo matching remote is configured for the selected local target."
                 : "PULL SOURCE // TARGET\nChoose a remote branch target first.";
             actionExitCode = 1;
+            return;
+        }
+
+        if (action === "push" && localTrackCheckoutMode) {
+            actionTitle = "PUSH";
+            actionExitCode = 1;
+            actionOutput =
+                "PUSH DISABLED // TRACK // CHECKOUT REMOTE IS SELECTED"
+                + "\nCreate the local tracking branch with PULL first.";
             return;
         }
 

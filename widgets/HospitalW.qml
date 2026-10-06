@@ -28,6 +28,12 @@ PanelWindow {
     property bool roomControlMode: false
     property string roomControlAction: ""
     property bool bedControlMode: false
+    property string operationsSurface: ""
+    property string pendingRoundsRoomTeam: ""
+    property int pendingRoundsFloorIndex: -1
+
+    readonly property bool operationsOpen:
+        root.operationsSurface.length > 0
     readonly property var selectedRoomData:
         auditService.roomFor(selectedRoomTeam)
     readonly property string selectedRoomBranch: {
@@ -151,7 +157,8 @@ PanelWindow {
     ]
 
     readonly property bool roomBaseActionsEnabled:
-        root.selectedRoomTeam.length > 0
+        !root.operationsOpen
+        && root.selectedRoomTeam.length > 0
         && !roomService.running
         && !roomService.rehearsing
         && !roomService.integrating
@@ -195,7 +202,7 @@ PanelWindow {
     }
 
     function enterRoomControls() {
-        if (!selectedRoomTeam)
+        if (root.operationsOpen || !selectedRoomTeam)
             return;
 
         bedControlMode = false;
@@ -211,7 +218,7 @@ PanelWindow {
     }
 
     function enterBedControls() {
-        if (!selectedRoomTeam)
+        if (root.operationsOpen || !selectedRoomTeam)
             return;
 
         roomControlMode = false;
@@ -224,13 +231,18 @@ PanelWindow {
     }
 
     function invokeMoveBed() {
-        if (!menuOpen || !moveBedButton.enabledAction)
+        if (root.operationsOpen
+                || !menuOpen
+                || !moveBedButton.enabledAction)
             return;
 
         floorService.moveBedToRoom(root.selectedRoomBranch);
     }
 
     function moveRoomControl(dx, dy) {
+        if (root.operationsOpen)
+            return;
+
         if (bedControlMode) {
             // The Bed box has one keyboard-selectable action: MOVE BED.
             // Left returns to the Room action grid. Down exits back to the
@@ -396,13 +408,18 @@ PanelWindow {
     }
 
     function invokeRoomShortcut(actionName) {
-        if (!menuOpen || !selectedRoomTeam)
+        if (root.operationsOpen
+                || !menuOpen
+                || !selectedRoomTeam)
             return;
 
         performRoomControl(actionName);
     }
 
     function handleRoomEnter() {
+        if (root.operationsOpen)
+            return;
+
         if (!selectedRoomTeam) {
             selectRoomIndex(0);
             return;
@@ -476,7 +493,8 @@ PanelWindow {
     }
 
     readonly property bool floorSwitchEnabled:
-        floorService.floorCount > 1
+        !root.operationsOpen
+        && floorService.floorCount > 1
         && !floorService.discovering
         && !patientService.refreshing
         && !roomService.running
@@ -525,7 +543,8 @@ PanelWindow {
     }
 
     readonly property bool bedSwitchEnabled:
-        floorService.bedCount > 1
+        !root.operationsOpen
+        && floorService.bedCount > 1
         && !floorService.discovering
         && !patientService.refreshing
         && !roomService.running
@@ -642,7 +661,10 @@ PanelWindow {
         sequence: "Esc"
         context: Qt.ApplicationShortcut
         enabled: root.menuOpen && root.keyboardActive
-        onActivated: root.close()
+        onActivated:
+            root.operationsOpen
+            ? root.closeOperationsSurface()
+            : root.close()
     }
 
     Shortcut {
@@ -771,12 +793,83 @@ PanelWindow {
         onActivated: root.invokeMoveBed()
     }
 
+    function closeOperationsSurface() {
+        root.operationsSurface = "";
+    }
+
+    function openReports() {
+        root.leaveRoomControls();
+        root.leaveBedControls();
+        reportsView.teamFilter = root.selectedRoomTeam;
+        reportsView.stateFilter = "";
+        root.operationsSurface = "reports";
+    }
+
+    function openRounds() {
+        root.leaveRoomControls();
+        root.leaveBedControls();
+        root.operationsSurface = "rounds";
+
+        if (!roundsService.running)
+            roundsService.refresh();
+    }
+
+    function resolvePendingRoundsRoom() {
+        const team = String(root.pendingRoundsRoomTeam || "");
+
+        if (!team)
+            return false;
+
+        if (root.pendingRoundsFloorIndex >= 0
+                && root.pendingRoundsFloorIndex
+                   !== floorService.selectedFloorIndex)
+            return false;
+
+        const index = root.roomIndexOfTeam(team);
+
+        if (index < 0)
+            return false;
+
+        root.selectRoomIndex(index);
+        root.pendingRoundsRoomTeam = "";
+        root.pendingRoundsFloorIndex = -1;
+        root.scheduleRoomEntryAudit(team);
+        return true;
+    }
+
+    function openRoomFromRounds(room) {
+        const row = room || {};
+        const team = String(row.team || "");
+        const floorIndex = Number(row.floorIndex);
+
+        if (!team)
+            return;
+
+        root.closeOperationsSurface();
+        root.pendingRoundsRoomTeam = team;
+        root.pendingRoundsFloorIndex =
+            Number.isFinite(floorIndex) ? floorIndex : -1;
+
+        if (root.pendingRoundsFloorIndex >= 0
+                && root.pendingRoundsFloorIndex
+                   !== floorService.selectedFloorIndex) {
+            if (root.floorSwitchEnabled)
+                root.selectFloor(root.pendingRoundsFloorIndex);
+            return;
+        }
+
+        if (!root.resolvePendingRoundsRoom()
+                && !auditService.running)
+            auditService.runAudit(false);
+    }
+
     function open() {
         root.keyboardOwnershipRequested();
         root.menuOpen = true;
     }
 
     function close() {
+        root.operationsSurface = "";
         root.menuOpen = false;
     }
 
@@ -895,6 +988,11 @@ PanelWindow {
             certificationCoordinator.bindRoom(roomService);
             patientService.refresh();
         }
+    }
+
+    HospitalRoundsService {
+        id: roundsService
+        floorService: floorService
     }
 
     HospitalRemoteWatcher {
@@ -1021,7 +1119,8 @@ PanelWindow {
                 return;
             }
 
-            root.ensureFirstRoomSelected();
+            if (!root.resolvePendingRoundsRoom())
+                root.ensureFirstRoomSelected();
         }
 
         function onRunningChanged() {
@@ -3076,6 +3175,8 @@ PanelWindow {
         Flickable {
             id: hospitalScroll
 
+            visible: !root.operationsOpen
+
             anchors {
                 top: fixedTop.bottom
                 bottom: actionBay.top
@@ -3127,6 +3228,51 @@ PanelWindow {
             }
         }
 
+        HospitalReportsView {
+            id: reportsView
+
+            z: 700
+            visible: root.operationsSurface === "reports"
+            historyService: certificationCoordinator.historyService
+
+            anchors {
+                left: parent.left
+                right: parent.right
+                top: fixedTop.bottom
+                bottom: actionBay.top
+                leftMargin: 62
+                rightMargin: 18
+                topMargin: 8
+                bottomMargin: 10
+            }
+
+            onCloseRequested: root.closeOperationsSurface()
+        }
+
+        HospitalRoundsView {
+            id: roundsView
+
+            z: 700
+            visible: root.operationsSurface === "rounds"
+            roundsService: roundsService
+
+            anchors {
+                left: parent.left
+                right: parent.right
+                top: fixedTop.bottom
+                bottom: actionBay.top
+                leftMargin: 62
+                rightMargin: 18
+                topMargin: 8
+                bottomMargin: 10
+            }
+
+            onCloseRequested: root.closeOperationsSurface()
+            onRoomActivated: function(room) {
+                root.openRoomFromRounds(room);
+            }
+        }
+
         Rectangle {
             id: actionBay
 
@@ -3154,7 +3300,7 @@ PanelWindow {
 
                 Row {
                     anchors.centerIn: parent
-                    spacing: 22
+                    spacing: 16
 
                     GohuText {
                         id: refreshAction
@@ -3271,6 +3417,112 @@ PanelWindow {
                             cursorShape: Qt.PointingHandCursor
 
                             onClicked: githubService.refresh()
+                        }
+                    }
+
+
+                    GohuText {
+                        id: reportsAction
+
+                        text:
+                            root.operationsSurface === "reports"
+                            ? "REPORTS // OPEN"
+                            : "REPORTS // "
+                              + String(
+                                  certificationCoordinator.historyService
+                                  && Array.isArray(
+                                      certificationCoordinator
+                                          .historyService.events
+                                  )
+                                  ? certificationCoordinator
+                                      .historyService.events.length
+                                  : 0
+                              )
+                        font.pixelSize: 10
+                        color:
+                            reportsMouse.containsMouse
+                            ? Colors.orange
+                            : root.operationsSurface === "reports"
+                            ? Colors.magenta
+                            : Colors.cyan
+
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 7
+                            opacity:
+                                reportsMouse.containsMouse
+                                ? 0.52
+                                : root.operationsSurface === "reports"
+                                ? 0.42
+                                : 0.28
+                            color: reportsAction.color
+                            transparentBorder: true
+                        }
+
+                        MouseArea {
+                            id: reportsMouse
+                            anchors.fill: parent
+                            anchors.margins: -8
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+
+                            onClicked:
+                                root.operationsSurface === "reports"
+                                ? root.closeOperationsSurface()
+                                : root.openReports()
+                        }
+                    }
+
+                    GohuText {
+                        id: roundsAction
+
+                        text:
+                            roundsService.running
+                            ? "ROUNDS // WALKING"
+                            : root.operationsSurface === "rounds"
+                            ? "ROUNDS // OPEN"
+                            : roundsService.available
+                            ? "ROUNDS // "
+                              + String(roundsService.attentionCount)
+                            : "ROUNDS"
+                        font.pixelSize: 10
+                        color:
+                            roundsMouse.containsMouse
+                            ? Colors.orange
+                            : root.operationsSurface === "rounds"
+                            ? Colors.magenta
+                            : roundsService.attentionCount > 0
+                            ? Colors.orange
+                            : Colors.cyan
+
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            radius: 5
+                            samples: 7
+                            opacity:
+                                roundsMouse.containsMouse
+                                ? 0.52
+                                : root.operationsSurface === "rounds"
+                                ? 0.42
+                                : roundsService.attentionCount > 0
+                                ? 0.38
+                                : 0.28
+                            color: roundsAction.color
+                            transparentBorder: true
+                        }
+
+                        MouseArea {
+                            id: roundsMouse
+                            anchors.fill: parent
+                            anchors.margins: -8
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+
+                            onClicked:
+                                root.operationsSurface === "rounds"
+                                ? root.closeOperationsSurface()
+                                : root.openRounds()
                         }
                     }
                 }

@@ -14,6 +14,8 @@ Item {
 
     property string selectedBranch: ""
     property string selectedSha: ""
+    property string editMode: "NAME"
+    property string newBranchMode: "ABOVE"
 
     readonly property var selectedBranchData:
         branchWorkspaceService && selectedBranch
@@ -147,6 +149,88 @@ Item {
         return sha.length > 10 ? sha.slice(0, 10) : sha;
     }
 
+    function cycleEditMode() {
+        if (editMode === "NAME")
+            editMode = "UP";
+        else if (editMode === "UP")
+            editMode = "PARENT";
+        else
+            editMode = "NAME";
+    }
+
+    function cycleNewBranchMode() {
+        newBranchMode =
+            newBranchMode === "ABOVE"
+            ? "BELOW"
+            : "ABOVE";
+    }
+
+    function triggerEditMode() {
+        if (!selectedBranch)
+            return;
+
+        if (editMode === "NAME")
+            renameBranchRequested(selectedBranch);
+        else if (editMode === "UP")
+            upstreamRequested(selectedBranch);
+        else
+            stackParentRequested(selectedBranch);
+    }
+
+    function triggerNewBranchMode() {
+        if (!selectedBranch)
+            return;
+
+        if (newBranchMode === "ABOVE")
+            stackAboveRequested(selectedBranch);
+        else
+            stackBelowRequested(selectedBranch);
+    }
+
+    function triggerRestackActuator() {
+        if (!selectedBranch || !stackPlanner || !stackExecutor)
+            return;
+
+        if (stackExecutor.running)
+            return;
+
+        if (stackExecutor.armed) {
+            stackExecutor.executeArmed();
+            return;
+        }
+
+        if (stackPlanner.startBranch === selectedBranch
+                && stackPlanner.executable
+                && stackPlanner.requiredCount > 0) {
+            stackExecutor.armFromPlanner();
+            return;
+        }
+
+        stackExecutor.disarm("NEW PREVIEW");
+        stackPlanner.buildPlan(selectedBranch, true);
+    }
+
+    function restackActuatorLabel() {
+        if (!stackPlanner || !stackExecutor)
+            return "RESTACK";
+
+        if (stackExecutor.running)
+            return "RESTACKING";
+
+        if (stackPlanner.busy)
+            return "READING";
+
+        if (stackExecutor.armed)
+            return "RESTACK";
+
+        if (stackPlanner.startBranch === selectedBranch
+                && stackPlanner.executable
+                && stackPlanner.requiredCount > 0)
+            return "ARM";
+
+        return "PREVIEW";
+    }
+
     component BranchButton: Rectangle {
         id: button
 
@@ -207,17 +291,139 @@ Item {
         }
     }
 
+    component CompoundButton: Rectangle {
+        id: compoundButton
+
+        property string actionLabel: ""
+        property string modeLabel: ""
+        property bool enabledAction: true
+        property bool modeEnabled: true
+        property bool destructive: false
+
+        signal triggered()
+        signal modeTriggered()
+
+        height: 30
+        color:
+            actionMouse.pressed
+            ? destructive ? Colors.red : Colors.orange
+            : Colors.black
+
+        border.width:
+            actionMouse.containsMouse || modeMouse.containsMouse
+            ? 2
+            : 1
+
+        border.color:
+            destructive
+            ? Colors.red
+            : actionMouse.containsMouse || modeMouse.containsMouse
+            ? Colors.orange
+            : Colors.cyan
+
+        GohuText {
+            anchors {
+                left: parent.left
+                leftMargin: 8
+                verticalCenter: parent.verticalCenter
+            }
+            text: compoundButton.actionLabel
+            font.pixelSize: 8
+            color:
+                compoundButton.destructive
+                ? Colors.red
+                : Colors.cyan
+            opacity: compoundButton.enabledAction ? 1.0 : 0.38
+        }
+
+        Rectangle {
+            id: modeTag
+
+            anchors {
+                right: parent.right
+                rightMargin: 5
+                verticalCenter: parent.verticalCenter
+            }
+
+            width: Math.max(40, modeText.implicitWidth + 12)
+            height: 20
+            color:
+                modeMouse.pressed
+                ? Colors.magenta
+                : modeMouse.containsMouse
+                ? Colors.dark
+                : Colors.black
+            border.width: 1
+            border.color:
+                modeMouse.containsMouse
+                ? Colors.orange
+                : Colors.magenta
+            opacity: compoundButton.modeEnabled ? 1.0 : 0.34
+
+            GohuText {
+                id: modeText
+                anchors.centerIn: parent
+                text: compoundButton.modeLabel
+                font.pixelSize: 7
+                color: Colors.magenta
+            }
+
+            MouseArea {
+                id: modeMouse
+                anchors.fill: parent
+                enabled: compoundButton.modeEnabled
+                hoverEnabled: true
+                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                onClicked: compoundButton.modeTriggered()
+                onWheel: function(wheel) {
+                    compoundButton.modeTriggered();
+                    wheel.accepted = true;
+                }
+            }
+        }
+
+        MouseArea {
+            id: actionMouse
+
+            anchors {
+                left: parent.left
+                top: parent.top
+                bottom: parent.bottom
+                right: modeTag.left
+            }
+
+            enabled: compoundButton.enabledAction
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            hoverEnabled: true
+            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+
+            onClicked: function(mouse) {
+                if (mouse.button === Qt.RightButton)
+                    compoundButton.modeTriggered();
+                else
+                    compoundButton.triggered();
+            }
+
+            onWheel: function(wheel) {
+                if (compoundButton.modeEnabled) {
+                    compoundButton.modeTriggered();
+                    wheel.accepted = true;
+                }
+            }
+        }
+    }
+
     component FactRow: Row {
         property string label: ""
         property string value: ""
         property color valueColor: Colors.white
 
         width: parent ? parent.width : 0
-        height: 18
-        spacing: 8
+        height: 17
+        spacing: 6
 
         GohuText {
-            width: 92
+            width: 54
             anchors.verticalCenter: parent.verticalCenter
             text: parent.label
             font.pixelSize: 7
@@ -225,7 +431,7 @@ Item {
         }
 
         GohuText {
-            width: parent.width - 100
+            width: parent.width - 60
             anchors.verticalCenter: parent.verticalCenter
             text: parent.value || "—"
             font.pixelSize: 8
@@ -354,15 +560,18 @@ Item {
                 }
 
                 Rectangle {
+                    id: branchSelectorStrip
+
                     anchors {
                         left: parent.left
+                        right: parent.right
                         bottom: parent.bottom
                         leftMargin: 12
+                        rightMargin: 12
                         bottomMargin: 10
                     }
 
-                    width: Math.min(parent.width - 24, branchStripRow.implicitWidth + 12)
-                    height: 32
+                    height: 48
                     color: Colors.black
                     border.width: 1
                     border.color: Colors.blue
@@ -370,20 +579,51 @@ Item {
                     clip: true
 
                     Flickable {
+                        id: branchStripFlick
+
                         anchors {
-                            fill: parent
-                            margins: 4
+                            left: parent.left
+                            right: parent.right
+                            top: parent.top
+                            bottom: branchStripRail.top
+                            margins: 5
+                            bottomMargin: 3
                         }
 
-                        contentWidth: branchStripRow.implicitWidth
+                        contentWidth: Math.max(width, branchStripRow.implicitWidth)
                         contentHeight: height
+                        flickableDirection: Flickable.HorizontalFlick
                         boundsBehavior: Flickable.StopAtBounds
                         clip: true
 
+                        MouseArea {
+                            anchors.fill: parent
+                            acceptedButtons: Qt.NoButton
+                            propagateComposedEvents: true
+
+                            onWheel: function(wheel) {
+                                const step =
+                                    wheel.angleDelta.y > 0
+                                    ? -72
+                                    : 72;
+
+                                branchStripFlick.contentX =
+                                    Math.max(
+                                        0,
+                                        Math.min(
+                                            branchStripRail.maxContentX,
+                                            branchStripFlick.contentX + step
+                                        )
+                                    );
+                                wheel.accepted = true;
+                            }
+                        }
+
                         Row {
                             id: branchStripRow
+
                             height: parent.height
-                            spacing: 4
+                            spacing: 5
 
                             Repeater {
                                 model:
@@ -394,12 +634,13 @@ Item {
                                 Rectangle {
                                     required property var modelData
 
-                                    height: 22
+                                    height: 28
+                                    anchors.verticalCenter: parent.verticalCenter
                                     width: Math.max(
-                                        92,
+                                        112,
                                         Math.min(
-                                            220,
-                                            branchName.implicitWidth + 18
+                                            260,
+                                            branchName.implicitWidth + 24
                                         )
                                     )
 
@@ -435,11 +676,19 @@ Item {
 
                                     GohuText {
                                         id: branchName
-                                        anchors.centerIn: parent
+
+                                        anchors {
+                                            left: parent.left
+                                            right: parent.right
+                                            verticalCenter: parent.verticalCenter
+                                            leftMargin: 8
+                                            rightMargin: 8
+                                        }
+
                                         text:
                                             (parent.isCurrent ? "★ " : "")
                                             + String(parent.modelData.name || "")
-                                        font.pixelSize: 7
+                                        font.pixelSize: 9
                                         color:
                                             parent.isCurrent
                                             ? Colors.yellow
@@ -448,6 +697,8 @@ Item {
                                             : parent.isSelected
                                             ? Colors.orange
                                             : Colors.cyan
+                                        elide: Text.ElideMiddle
+                                        horizontalAlignment: Text.AlignHCenter
                                     }
 
                                     MouseArea {
@@ -458,12 +709,133 @@ Item {
                                             root.selectBranch(
                                                 String(parent.modelData.name || "")
                                             )
+
+                                        onWheel: function(wheel) {
+                                            const step =
+                                                wheel.angleDelta.y > 0
+                                                ? -72
+                                                : 72;
+
+                                            branchStripFlick.contentX =
+                                                Math.max(
+                                                    0,
+                                                    Math.min(
+                                                        branchStripRail.maxContentX,
+                                                        branchStripFlick.contentX + step
+                                                    )
+                                                );
+                                            wheel.accepted = true;
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+
+                    Rectangle {
+                        id: branchStripRail
+
+                        anchors {
+                            left: parent.left
+                            right: parent.right
+                            bottom: parent.bottom
+                            leftMargin: 5
+                            rightMargin: 5
+                            bottomMargin: 4
+                        }
+
+                        height: 5
+                        color: Colors.cyan
+                        opacity:
+                            branchStripFlick.contentWidth
+                            > branchStripFlick.width + 1
+                            ? 0.62
+                            : 0.20
+                        border.width: 1
+                        border.color: Colors.cyan
+
+                        readonly property real maxContentX:
+                            Math.max(
+                                0,
+                                branchStripFlick.contentWidth
+                                - branchStripFlick.width
+                            )
+
+                        Rectangle {
+                            id: branchStripHandle
+
+                            height: parent.height
+                            width:
+                                Math.max(
+                                    34,
+                                    parent.width
+                                    * Math.min(
+                                        1,
+                                        branchStripFlick.width
+                                        / Math.max(
+                                            branchStripFlick.contentWidth,
+                                            1
+                                        )
+                                    )
+                                )
+                            x:
+                                branchStripRail.maxContentX > 0
+                                ? (
+                                    branchStripFlick.contentX
+                                    / branchStripRail.maxContentX
+                                  )
+                                  * Math.max(0, parent.width - width)
+                                : 0
+                            color: Colors.magenta
+                            border.width: 1
+                            border.color: Colors.magenta
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            enabled:
+                                branchStripRail.maxContentX > 0
+                            hoverEnabled: true
+                            cursorShape:
+                                enabled
+                                ? Qt.PointingHandCursor
+                                : Qt.ArrowCursor
+
+                            function scrollTo(mouseX) {
+                                const travel =
+                                    branchStripRail.width
+                                    - branchStripHandle.width;
+                                const target =
+                                    mouseX
+                                    - branchStripHandle.width / 2;
+                                const ratio =
+                                    travel > 0
+                                    ? Math.max(
+                                        0,
+                                        Math.min(
+                                            1,
+                                            target / travel
+                                        )
+                                      )
+                                    : 0;
+
+                                branchStripFlick.contentX =
+                                    ratio
+                                    * branchStripRail.maxContentX;
+                            }
+
+                            onPressed: function(mouse) {
+                                scrollTo(mouse.x);
+                            }
+
+                            onPositionChanged: function(mouse) {
+                                if (pressed)
+                                    scrollTo(mouse.x);
+                            }
+                        }
+                    }
                 }
+
             }
 
             Rectangle {
@@ -483,7 +855,7 @@ Item {
                         fill: parent
                         margins: 10
                     }
-                    spacing: 8
+                    spacing: 6
 
                     GohuText {
                         width: parent.width
@@ -508,44 +880,55 @@ Item {
 
                     Column {
                         width: parent.width
-                        spacing: 2
+                        spacing: 1
 
                         FactRow {
-                            label: "HEAD"
+                            label: "STATE"
                             value:
-                                root.selectedBranchData
-                                ? root.shortSha(root.selectedBranchData.head)
-                                : ""
-                            valueColor: Colors.orange
-                        }
-
-                        FactRow {
-                            label: "UPSTREAM"
-                            value:
-                                root.selectedBranchData
-                                ? String(root.selectedBranchData.upstream || "")
-                                : ""
-                            valueColor: Colors.cyan
-                        }
-
-                        FactRow {
-                            label: "CHECKOUT"
-                            value:
-                                root.selectedIsCurrent
-                                ? "LIVE"
-                                : root.selectedIsOccupied
-                                ? "OTHER WORKTREE"
-                                : "NOT CHECKED OUT"
+                                (
+                                    root.selectedBranchData
+                                    ? root.shortSha(root.selectedBranchData.head)
+                                    : "—"
+                                )
+                                + " // "
+                                + (
+                                    root.selectedIsCurrent
+                                    ? "LIVE"
+                                    : root.selectedIsOccupied
+                                    ? "WORKTREE"
+                                    : "IDLE"
+                                  )
+                                + (
+                                    root.selectedWorkspace
+                                    ? " // "
+                                      + String(
+                                          root.selectedWorkspace.dirtyCount || 0
+                                        )
+                                      + " DIRTY"
+                                    : ""
+                                  )
                             valueColor:
                                 root.selectedIsCurrent
                                 ? Colors.yellow
                                 : root.selectedIsOccupied
                                 ? Colors.magenta
-                                : Colors.white
+                                : Colors.orange
                         }
 
                         FactRow {
-                            label: "WORKSPACE"
+                            label: "UP"
+                            value:
+                                root.selectedBranchData
+                                ? String(
+                                    root.selectedBranchData.upstream
+                                    || "NONE"
+                                  )
+                                : ""
+                            valueColor: Colors.cyan
+                        }
+
+                        FactRow {
+                            label: "WORK"
                             value:
                                 root.selectedWorkspace
                                 ? String(root.selectedWorkspace.path || "")
@@ -554,20 +937,6 @@ Item {
                                 root.selectedWorkspace
                                 ? Colors.magenta
                                 : Colors.white
-                        }
-
-                        FactRow {
-                            label: "CHANGES"
-                            value:
-                                root.selectedWorkspace
-                                ? String(root.selectedWorkspace.dirtyCount || 0)
-                                  + " DIRTY"
-                                : "—"
-                            valueColor:
-                                root.selectedWorkspace
-                                && Number(root.selectedWorkspace.dirtyCount || 0) > 0
-                                ? Colors.orange
-                                : Colors.cyan
                         }
                     }
 
@@ -588,7 +957,7 @@ Item {
                         width: parent.width
                         columns: 2
                         columnSpacing: 6
-                        rowSpacing: 6
+                        rowSpacing: 5
 
                         BranchButton {
                             width: (inspector.width - 26) / 2
@@ -597,7 +966,13 @@ Item {
                                 ? "LIVE"
                                 : "SWITCH"
                             selectedAction: root.selectedIsCurrent
-                            enabledAction: false
+                            enabledAction:
+                                root.selectedBranch.length > 0
+                                && !root.selectedIsCurrent
+                                && !root.selectedIsOccupied
+                                && branchWorkspaceService
+                                && !branchWorkspaceService.actionBusy
+                                && !branchWorkspaceService.refreshing
                             onTriggered:
                                 branchWorkspaceService.switchBranch(
                                     root.selectedBranch,
@@ -614,42 +989,30 @@ Item {
                                 root.compareRequested(root.selectedBranch)
                         }
 
-                        BranchButton {
+                        CompoundButton {
                             width: (inspector.width - 26) / 2
-                            label: "RENAME"
+                            actionLabel: "EDIT"
+                            modeLabel: root.editMode
                             enabledAction: false
-                            onTriggered:
-                                root.renameBranchRequested(root.selectedBranch)
+                            modeEnabled: root.selectedBranch.length > 0
+                            onTriggered: root.triggerEditMode()
+                            onModeTriggered: root.cycleEditMode()
                         }
 
-                        BranchButton {
+                        CompoundButton {
                             width: (inspector.width - 26) / 2
-                            label: "UPSTREAM"
-                            enabledAction: root.selectedBranch.length > 0
-                            onTriggered:
-                                root.upstreamRequested(root.selectedBranch)
-                        }
-
-                        BranchButton {
-                            width: (inspector.width - 26) / 2
-                            label: "NEW ABOVE"
+                            actionLabel: "NEW"
+                            modeLabel: root.newBranchMode
                             enabledAction: false
-                            onTriggered:
-                                root.stackAboveRequested(root.selectedBranch)
-                        }
-
-                        BranchButton {
-                            width: (inspector.width - 26) / 2
-                            label: "NEW BELOW"
-                            enabledAction: false
-                            onTriggered:
-                                root.stackBelowRequested(root.selectedBranch)
+                            modeEnabled: root.selectedBranch.length > 0
+                            onTriggered: root.triggerNewBranchMode()
+                            onModeTriggered: root.cycleNewBranchMode()
                         }
 
                         BranchButton {
                             width: (inspector.width - 26) / 2
                             label: "WORKSPACE"
-                            enabledAction: root.selectedBranch.length > 0
+                            enabledAction: false
                             onTriggered:
                                 root.workspaceRequested(root.selectedBranch)
                         }
@@ -679,63 +1042,56 @@ Item {
 
                     Column {
                         width: parent.width
-                        spacing: 2
+                        spacing: 1
 
                         FactRow {
-                            label: "ROOT"
-                            value:
-                                root.selectedBranch
-                                ? root.selectedStackRoot
-                                : ""
-                            valueColor: Colors.orange
-                        }
-
-                        FactRow {
-                            label: "PARENT"
+                            label: "CHAIN"
                             value:
                                 root.selectedBranch
                                 ? (
-                                    root.selectedStackParent
-                                    || (
-                                        root.selectedBranch
-                                        === String(
-                                            branchStackStore
-                                            ? branchStackStore.trunkBranch
-                                            : ""
+                                    (
+                                        root.selectedStackParent
+                                        || (
+                                            root.selectedBranch
+                                            === String(
+                                                branchStackStore
+                                                ? branchStackStore.trunkBranch
+                                                : ""
+                                            )
+                                            ? "TRUNK"
+                                            : "UNSET"
                                         )
-                                        ? "TRUNK"
-                                        : "UNSET"
                                     )
+                                    + " → "
+                                    + root.selectedBranch
+                                    + (
+                                        root.selectedStackChildren.length > 0
+                                        ? " → "
+                                          + root.selectedStackChildren.join(" • ")
+                                        : ""
+                                      )
+                                  )
+                                : ""
+                            valueColor: Colors.cyan
+                        }
+
+                        FactRow {
+                            label: "TREE"
+                            value:
+                                root.selectedBranch
+                                ? (
+                                    "ROOT "
+                                    + (root.selectedStackRoot || "—")
+                                    + " // "
+                                    + String(
+                                        root.selectedStackDescendants.length
+                                      )
+                                    + " BELOW"
                                   )
                                 : ""
                             valueColor:
-                                root.selectedStackParent
-                                ? Colors.cyan
-                                : Colors.white
-                        }
-
-                        FactRow {
-                            label: "CHILDREN"
-                            value:
-                                root.selectedStackChildren.length > 0
-                                ? root.selectedStackChildren.join(" • ")
-                                : "NONE"
-                            valueColor:
-                                root.selectedStackChildren.length > 0
+                                root.selectedStackDescendants.length > 0
                                 ? Colors.magenta
-                                : Colors.white
-                        }
-
-                        FactRow {
-                            label: "BELOW"
-                            value:
-                                root.selectedStackDescendants.length > 0
-                                ? String(root.selectedStackDescendants.length)
-                                  + " DESCENDANTS"
-                                : "NONE"
-                            valueColor:
-                                root.selectedStackDescendants.length > 0
-                                ? Colors.cyan
                                 : Colors.white
                         }
                     }
@@ -744,74 +1100,32 @@ Item {
                         width: parent.width
                         columns: 2
                         columnSpacing: 6
-                        rowSpacing: 6
+                        rowSpacing: 5
 
                         BranchButton {
                             width: (inspector.width - 26) / 2
-                            label: "SET PARENT"
-                            enabledAction: false
-                            onTriggered:
-                                root.stackParentRequested(root.selectedBranch)
-                        }
-
-                        BranchButton {
-                            width: (inspector.width - 26) / 2
-                            label:
-                                stackPlanner && stackPlanner.busy
-                                ? "READING"
-                                : "PREVIEW"
-                            enabledAction:
-                                root.selectedBranch.length > 0
-                                && stackPlanner
-                                && !stackPlanner.busy
-                                && (
-                                    root.selectedStackParent.length > 0
-                                    || root.selectedStackDescendants.length > 0
-                                )
-                            onTriggered: {
-                                if (stackExecutor)
-                                    stackExecutor.disarm("NEW PREVIEW");
-
-                                stackPlanner.buildPlan(
-                                    root.selectedBranch,
-                                    true
-                                );
-                            }
-                        }
-
-                        BranchButton {
-                            width: (inspector.width - 26) / 2
-                            label:
-                                stackExecutor && stackExecutor.armed
-                                ? "ARMED"
-                                : "ARM"
+                            label: root.restackActuatorLabel()
                             selectedAction:
                                 stackExecutor && stackExecutor.armed
                             enabledAction:
-                                stackExecutor
-                                && !stackExecutor.running
-                                && !stackExecutor.armed
+                                root.selectedBranch.length > 0
                                 && stackPlanner
-                                && stackPlanner.startBranch
-                                   === root.selectedBranch
-                                && stackPlanner.executable
-                                && stackPlanner.requiredCount > 0
-                            onTriggered:
-                                stackExecutor.armFromPlanner()
-                        }
-
-                        BranchButton {
-                            width: (inspector.width - 26) / 2
-                            label:
-                                stackExecutor && stackExecutor.running
-                                ? "RESTACKING"
-                                : "RESTACK"
-                            enabledAction:
-                                stackExecutor
-                                && stackExecutor.armed
+                                && stackExecutor
                                 && !stackExecutor.running
+                                && !stackPlanner.busy
+                                && (
+                                    stackExecutor.armed
+                                    || (
+                                        stackPlanner.startBranch
+                                        === root.selectedBranch
+                                        && stackPlanner.executable
+                                        && stackPlanner.requiredCount > 0
+                                       )
+                                    || root.selectedStackParent.length > 0
+                                    || root.selectedStackDescendants.length > 0
+                                )
                             onTriggered:
-                                stackExecutor.executeArmed()
+                                root.triggerRestackActuator()
                         }
 
                         BranchButton {
@@ -829,10 +1143,10 @@ Item {
                             stackPlanner
                             && stackPlanner.plan.length > 0
                             ? Math.min(
-                                112,
-                                28 + stackPlanColumn.implicitHeight
+                                78,
+                                26 + stackPlanColumn.implicitHeight
                               )
-                            : 30
+                            : 26
                         color: Colors.black
                         border.width: 1
                         border.color:
@@ -881,7 +1195,7 @@ Item {
                                 Repeater {
                                     model:
                                         stackPlanner
-                                        ? stackPlanner.plan.slice(0, 4)
+                                        ? stackPlanner.plan.slice(0, 3)
                                         : []
 
                                     GohuText {

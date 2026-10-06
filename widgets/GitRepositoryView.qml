@@ -16,6 +16,7 @@ Item {
     property string selectedRemoteName: ""
     property string selectedRemoteBranch: ""
     property string selectedTag: ""
+    property string tagMode: "lightweight"
     property string selectedWorktreePath: ""
     property bool selectedWorktreeLocked: false
     property string projectFileKind: "ignore"
@@ -72,6 +73,23 @@ Item {
         return root.projectFileKind === "attributes"
             ? root.repositoryService.attributeLines
             : root.repositoryService.ignoreLines;
+    }
+
+    function cycleTagMode() {
+        if (root.tagMode === "lightweight")
+            root.tagMode = "annotated";
+        else if (root.tagMode === "annotated")
+            root.tagMode = "signed";
+        else
+            root.tagMode = "lightweight";
+    }
+
+    function tagModeLabel() {
+        if (root.tagMode === "annotated")
+            return "ANNOTATED";
+        if (root.tagMode === "signed")
+            return "SIGNED";
+        return "LIGHTWEIGHT";
     }
 
     component SectionLabel: GohuText {
@@ -487,6 +505,21 @@ Item {
                             }
 
                             MiniButton {
+                                width: 88
+                                height: 30
+                                label: "SYNC HEAD"
+                                accent: Colors.cyan
+                                enabledAction:
+                                    root.selectedRemoteName
+                                    && root.repositoryService
+                                    && !root.repositoryService.actionBusy
+                                onTriggered:
+                                    root.repositoryService.syncRemoteHead(
+                                        root.selectedRemoteName
+                                    )
+                            }
+
+                            MiniButton {
                                 width: 94
                                 height: 30
                                 label:
@@ -513,7 +546,14 @@ Item {
                             }
 
                             MiniButton {
-                                width: parent.width - 160 - 76 - 76 - 94 - 20
+                                width:
+                                    parent.width
+                                    - 160
+                                    - 76
+                                    - 76
+                                    - 88
+                                    - 94
+                                    - 25
                                 height: 30
                                 label: "ADD / RENAME"
                                 accent: Colors.cyan
@@ -927,9 +967,44 @@ Item {
                             text: "HEAD"
                         }
 
+                        Row {
+                            width: parent.width
+                            height: 30
+                            spacing: 6
+
+                            MiniButton {
+                                width: 136
+                                height: 30
+                                label:
+                                    "MODE "
+                                    + root.tagModeLabel()
+                                accent:
+                                    root.tagMode === "signed"
+                                    ? Colors.magenta
+                                    : root.tagMode === "annotated"
+                                    ? Colors.orange
+                                    : Colors.cyan
+                                onTriggered: root.cycleTagMode()
+                            }
+
+                            EditorBox {
+                                id: tagMessageInput
+                                width: parent.width - 142
+                                placeholder:
+                                    root.tagMode === "lightweight"
+                                    ? "MESSAGE // UNUSED FOR LIGHTWEIGHT"
+                                    : "TAG MESSAGE"
+                                accent: Colors.green
+                                keyboardOwner: root.keyboardHost
+                            }
+                        }
+
                         MiniButton {
                             width: parent.width
-                            label: "CREATE LOCAL TAG"
+                            label:
+                                "CREATE "
+                                + root.tagModeLabel()
+                                + " TAG"
                             accent: Colors.green
                             enabledAction:
                                 root.repositoryService
@@ -937,7 +1012,9 @@ Item {
                             onTriggered:
                                 root.repositoryService.createTag(
                                     tagNameInput.text.trim(),
-                                    tagTargetInput.text.trim()
+                                    tagTargetInput.text.trim(),
+                                    root.tagMode,
+                                    tagMessageInput.text
                                 )
                         }
 
@@ -986,27 +1063,60 @@ Item {
                             }
                         }
 
-                        MiniButton {
+                        Row {
                             width: parent.width
-                            label:
-                                root.armedAction === "delete-tag"
-                                ? "CONFIRM DELETE LOCAL TAG"
-                                : "DELETE SELECTED LOCAL TAG"
-                            accent: Colors.red
-                            enabledAction:
-                                root.selectedTag
-                                && root.repositoryService
-                            onTriggered:
-                                root.armOrRun(
-                                    "delete-tag",
-                                    function() {
-                                        root.repositoryService.deleteTag(
-                                            root.selectedTag,
-                                            true
-                                        );
-                                        root.selectedTag = "";
-                                    }
-                                )
+                            height: 30
+                            spacing: 6
+
+                            MiniButton {
+                                width: (parent.width - 6) / 2
+                                height: 30
+                                label:
+                                    root.armedAction === "delete-tag"
+                                    ? "CONFIRM LOCAL"
+                                    : "DELETE LOCAL TAG"
+                                accent: Colors.red
+                                enabledAction:
+                                    root.selectedTag
+                                    && root.repositoryService
+                                onTriggered:
+                                    root.armOrRun(
+                                        "delete-tag",
+                                        function() {
+                                            root.repositoryService.deleteTag(
+                                                root.selectedTag,
+                                                true
+                                            );
+                                            root.selectedTag = "";
+                                        }
+                                    )
+                            }
+
+                            MiniButton {
+                                width: (parent.width - 6) / 2
+                                height: 30
+                                label:
+                                    root.armedAction === "delete-remote-tag"
+                                    ? "CONFIRM REMOTE"
+                                    : "DELETE REMOTE TAG"
+                                accent: Colors.red
+                                enabledAction:
+                                    root.selectedTag
+                                    && tagRemoteInput.text.trim()
+                                    && root.repositoryService
+                                onTriggered:
+                                    root.armOrRun(
+                                        "delete-remote-tag",
+                                        function() {
+                                            root.repositoryService
+                                                .deleteRemoteTag(
+                                                    tagRemoteInput.text.trim(),
+                                                    root.selectedTag,
+                                                    true
+                                                );
+                                        }
+                                    )
+                            }
                         }
                     }
                 }

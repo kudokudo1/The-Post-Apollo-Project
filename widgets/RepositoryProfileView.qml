@@ -1344,7 +1344,7 @@ Item {
                                 - 196
                                 - (
                                     root.accountEmailMode === "primary"
-                                    ? 72
+                                    ? 79
                                     : 0
                                   )
                             height: parent.height

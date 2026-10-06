@@ -1441,6 +1441,7 @@ Scope {
             label += " // " + target;
 
         if (asksCount) {
+            clearActivityContext();
             append(
                 "RECEPTION",
                 activityCountResponse(label, matches)

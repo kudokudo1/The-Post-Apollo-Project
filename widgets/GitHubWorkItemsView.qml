@@ -371,12 +371,16 @@ Item {
                         spacing: 4
 
                         Row {
+                            id: workTitleRow
+
                             width: parent.width
                             height: 22
-                            spacing: 8
+                            spacing: 3
 
                             GohuText {
-                                width: 38
+                                id: workNumberLabel
+
+                                width: implicitWidth
                                 anchors.verticalCenter: parent.verticalCenter
                                 text:
                                     "#"
@@ -390,7 +394,10 @@ Item {
                             }
 
                             GohuText {
-                                width: parent.width - 46
+                                width:
+                                    parent.width
+                                    - workNumberLabel.width
+                                    - workTitleRow.spacing
                                 anchors.verticalCenter: parent.verticalCenter
                                 text:
                                     root.workService.rowTitle(

@@ -11,7 +11,10 @@ Item {
 
     property string subMode: "files"
     property string selectedPath: ""
+    property string pendingFocusPath: ""
     property var selectedFile: null
+
+    signal historyRequested(string path)
     property string selectedStashRef: ""
     property int selectedHunkIndex: -1
     property int selectedLineIndex: -1
@@ -27,6 +30,32 @@ Item {
     property bool stashRestoreIndex: false
 
     property string armedAction: ""
+
+    function focusPath(path) {
+        root.pendingFocusPath = String(path || "");
+        root.subMode = "files";
+        root.applyPendingFocus();
+    }
+
+    function applyPendingFocus() {
+        const target = String(root.pendingFocusPath || "");
+
+        if (!target || !root.changesService)
+            return;
+
+        const rows = root.changesService.files || [];
+
+        for (let i = 0; i < rows.length; ++i) {
+            const row = rows[i] || {};
+
+            if (String(row.path || "") !== target)
+                continue;
+
+            root.pendingFocusPath = "";
+            root.selectFile(row);
+            return;
+        }
+    }
 
     function selectFile(row) {
         const data = row || {};
@@ -618,7 +647,7 @@ Item {
                             spacing: 5
 
                             LabelText {
-                                width: parent.width - 360
+                                width: parent.width - 455
                                 anchors.verticalCenter: parent.verticalCenter
                                 text:
                                     root.selectedPath
@@ -694,6 +723,18 @@ Item {
                                                 true
                                             );
                                         }
+                                    )
+                            }
+
+                            MiniButton {
+                                width: 90
+                                label: "HISTORY"
+                                accent: Colors.magenta
+                                enabledAction:
+                                    root.selectedPath.length > 0
+                                onTriggered:
+                                    root.historyRequested(
+                                        root.selectedPath
                                     )
                             }
                         }
@@ -2102,6 +2143,10 @@ Item {
 
     Connections {
         target: root.changesService
+
+        function onRefreshed() {
+            root.applyPendingFocus();
+        }
 
         function onActionFinished(action, success, detail) {
             if (!success)

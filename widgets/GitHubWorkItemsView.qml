@@ -376,7 +376,7 @@ Item {
                             spacing: 8
 
                             GohuText {
-                                width: 62
+                                width: 38
                                 anchors.verticalCenter: parent.verticalCenter
                                 text:
                                     "#"
@@ -390,7 +390,7 @@ Item {
                             }
 
                             GohuText {
-                                width: parent.width - 70
+                                width: parent.width - 46
                                 anchors.verticalCenter: parent.verticalCenter
                                 text:
                                     root.workService.rowTitle(

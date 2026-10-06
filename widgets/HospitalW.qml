@@ -1901,7 +1901,7 @@ PanelWindow {
                             width: parent.width
                             height: parent.height
                             text: "☎︎"
-                            font.pixelSize: 28
+                            font.pixelSize: 25
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                             color:

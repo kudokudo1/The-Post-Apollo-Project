@@ -2497,11 +2497,13 @@ PanelWindow {
                                     visible: root.localTargetMenuOpen
                                     z: 1600
                                     x:
-                                        localTargetCard
-                                            .mapToItem(gitLocalPage, 8, 63).x
+                                        branchControlStrip.x
+                                        + localTargetCard.x
+                                        + 8
                                     y:
-                                        localTargetCard
-                                            .mapToItem(gitLocalPage, 8, 63).y
+                                        branchControlStrip.y
+                                        + localTargetCard.y
+                                        + 63
                                     width: localTargetCard.width - 16
                                     height:
                                         Math.min(

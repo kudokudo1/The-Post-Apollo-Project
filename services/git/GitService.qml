@@ -225,6 +225,157 @@ Scope {
         return -1;
     }
 
+    function branchSearchKey(value) {
+        let text = String(value || "").trim().toLowerCase();
+
+        text = text.replace(/^refs\/remotes\//, "");
+        text = text.replace(/^origin\//, "");
+        text = text.replace(/[._\/-]+/g, " ");
+
+        const ignored = {
+            "origin": true,
+            "feature": true,
+            "features": true,
+            "integration": true,
+            "integrate": true,
+            "fix": true,
+            "bugfix": true,
+            "hotfix": true,
+            "style": true,
+            "styles": true,
+            "test": true,
+            "tests": true,
+            "docs": true,
+            "doc": true,
+            "chore": true,
+            "refactor": true,
+            "release": true,
+            "branch": true
+        };
+
+        const pieces = text.split(/\s+/);
+        const meaningful = [];
+
+        for (let i = 0; i < pieces.length; ++i) {
+            const piece = String(pieces[i] || "");
+            if (piece && !ignored[piece])
+                meaningful.push(piece);
+        }
+
+        return meaningful.join("");
+    }
+
+    function fuzzyBranchScore(query, branchName) {
+        const needle = branchSearchKey(query);
+        const haystack = branchSearchKey(branchName);
+
+        if (!needle || !haystack)
+            return needle ? -1 : 0;
+
+        if (needle === haystack)
+            return 10000;
+
+        if (haystack.indexOf(needle) === 0)
+            return 8000 - Math.max(0, haystack.length - needle.length);
+
+        const substring = haystack.indexOf(needle);
+        if (substring >= 0)
+            return 6500 - substring * 12
+                         - Math.max(0, haystack.length - needle.length);
+
+        let cursor = 0;
+        let previous = -2;
+        let score = 1600;
+        let consecutive = 0;
+        let gaps = 0;
+
+        for (let i = 0; i < needle.length; ++i) {
+            const character = needle.charAt(i);
+            const found = haystack.indexOf(character, cursor);
+
+            if (found < 0)
+                return -1;
+
+            if (found === previous + 1) {
+                consecutive += 1;
+                score += 55 + consecutive * 4;
+            } else {
+                consecutive = 0;
+                gaps += Math.max(0, found - cursor);
+                score -= Math.max(0, found - cursor) * 8;
+            }
+
+            previous = found;
+            cursor = found + 1;
+        }
+
+        score -= Math.max(0, haystack.length - needle.length) * 2;
+        score -= gaps * 3;
+        return score;
+    }
+
+    function fuzzyLocalMatches(query, limit) {
+        const matches = [];
+        const maxResults = Math.max(1, Number(limit || localBranchRows.count));
+
+        for (let i = 0; i < localBranchRows.count; ++i) {
+            const row = localBranchRows.get(i);
+            const score = fuzzyBranchScore(query, row.name);
+
+            if (String(query || "").trim() && score < 0)
+                continue;
+
+            matches.push({
+                originalIndex: i,
+                name: String(row.name || ""),
+                head: String(row.head || ""),
+                upstream: String(row.upstream || ""),
+                activityEpoch: Number(row.activityEpoch || 0),
+                score: score
+            });
+        }
+
+        if (String(query || "").trim()) {
+            matches.sort(function(a, b) {
+                if (a.score !== b.score)
+                    return b.score - a.score;
+                return a.name.localeCompare(b.name);
+            });
+        }
+
+        return matches.slice(0, maxResults);
+    }
+
+    function fuzzyRemoteMatches(query, limit) {
+        const matches = [];
+        const maxResults = Math.max(1, Number(limit || remoteBranchRows.count));
+
+        for (let i = 0; i < remoteBranchRows.count; ++i) {
+            const row = remoteBranchRows.get(i);
+            const score = fuzzyBranchScore(query, row.name);
+
+            if (String(query || "").trim() && score < 0)
+                continue;
+
+            matches.push({
+                originalIndex: i,
+                name: String(row.name || ""),
+                activityEpoch: Number(row.activityEpoch || 0),
+                score: score
+            });
+        }
+
+        if (String(query || "").trim()) {
+            matches.sort(function(a, b) {
+                if (a.score !== b.score)
+                    return b.score - a.score;
+                return a.name.localeCompare(b.name);
+            });
+        }
+
+        return matches.slice(0, maxResults);
+    }
+
     function isRemoteBranchTarget(value) {
         const target = String(value || "").trim();
         const slash = target.indexOf("/");
@@ -539,27 +690,15 @@ Scope {
                 || needle === "track // checkout remote")
             return selectTrackCheckoutRemote();
 
-        let partialIndex = -1;
+        const matches = fuzzyLocalMatches(query, 1);
 
-        for (let i = 0; i < localBranchRows.count; ++i) {
-            const row = localBranchRows.get(i);
-            const name = String(row.name || "");
-            const lowerName = name.toLowerCase();
-
-            if (lowerName === needle)
-                return selectLocal(i);
-
-            if (partialIndex < 0 && lowerName.indexOf(needle) >= 0)
-                partialIndex = i;
-        }
-
-        if (partialIndex >= 0)
-            return selectLocal(partialIndex);
+        if (matches.length > 0)
+            return selectLocal(Number(matches[0].originalIndex));
 
         actionTitle = "LOCAL TARGET";
         actionExitCode = 1;
-        actionOutput = "NO LOCAL BRANCH MATCH // " + String(query || "")
-                     + "\nChoose an existing local branch.";
+        actionOutput = "NO FUZZY LOCAL MATCH // " + String(query || "")
+                     + "\nTry any recognizable part of the branch name.";
         return false;
     }
 
@@ -595,23 +734,43 @@ Scope {
 
         value = value.replace(/^refs\/remotes\//, "");
 
+        const exactCandidate =
+            value.indexOf("/") >= 0
+            ? value
+            : "origin/" + value;
+        const exactIndex = remoteIndexOf(exactCandidate);
+
+        if (exactIndex >= 0) {
+            selectRemote(exactIndex);
+            actionTitle = "REMOTE TARGET";
+            actionExitCode = 0;
+            actionOutput = "SELECTED EXISTING REMOTE // "
+                         + selectedRemoteBranch;
+            return true;
+        }
+
+        const matches = fuzzyRemoteMatches(value, 1);
+
+        if (matches.length > 0) {
+            selectRemote(Number(matches[0].originalIndex));
+            actionTitle = "REMOTE TARGET";
+            actionExitCode = 0;
+            actionOutput = "FUZZY REMOTE MATCH // " + value
+                         + "\n→ " + selectedRemoteBranch;
+            return true;
+        }
+
         if (value === "origin" && branch && branch !== "DETACHED")
             value = "origin/" + branch;
         else if (value.indexOf("/") < 0)
             value = "origin/" + value;
 
         selectedRemoteBranch = value;
-        selectedRemoteExists = remoteIndexOf(value) >= 0;
-        selectedRemoteIndex = selectedRemoteExists
-            ? remoteIndexOf(value)
-            : selectedRemoteIndex;
+        selectedRemoteExists = false;
         actionTitle = "REMOTE TARGET";
         actionExitCode = 0;
-        actionOutput = selectedRemoteExists
-            ? "SELECTED EXISTING REMOTE // " + value
-            : "REMOTE DOES NOT EXIST YET // " + value
-              + "\nPUSH will create it. Nothing has been changed yet.";
-
+        actionOutput = "REMOTE DOES NOT EXIST YET // " + value
+                     + "\nPUSH will create it. Nothing has been changed yet.";
         return true;
     }
 
@@ -642,17 +801,22 @@ Scope {
             localBranchRows.append({
                 name: String(localRow.name || ""),
                 head: String(localRow.head || ""),
-                upstream: String(localRow.upstream || "")
+                upstream: String(localRow.upstream || ""),
+                activityEpoch: Number(localRow.activityEpoch || 0)
             });
         }
 
         for (let i = 0; i < pendingRemoteBranches.length; ++i) {
-            const remoteName = String(pendingRemoteBranches[i] || "");
+            const remoteRow = pendingRemoteBranches[i] || {};
+            const remoteName = String(remoteRow.name || "");
 
             if (!isRemoteBranchTarget(remoteName))
                 continue;
 
-            remoteBranchRows.append({ name: remoteName });
+            remoteBranchRows.append({
+                name: remoteName,
+                activityEpoch: Number(remoteRow.activityEpoch || 0)
+            });
         }
 
         for (let i = 0; i < pendingTopology.length; ++i)
@@ -887,16 +1051,16 @@ Scope {
                 'printf "UPSTREAM\\t%s\\n" "$upstream"',
                 'printf "AHEAD\\t%s\\n" "$ahead"',
                 'printf "BEHIND\\t%s\\n" "$behind"',
-                'while IFS="$(printf "\\t")" read -r ref ref_head ref_upstream; do',
-                '  [ -n "$ref" ] && printf "LOCALBRANCH\\t%s\\t%s\\t%s\\n" "$ref" "$ref_head" "$ref_upstream"',
-                'done < <(git -C "$root" for-each-ref --format="%(refname:short)%09%(objectname:short=10)%09%(upstream:short)" refs/heads 2>/dev/null)',
-                'while IFS= read -r ref; do',
+                'while IFS="$(printf "\\t")" read -r ref ref_head ref_upstream ref_epoch; do',
+                '  [ -n "$ref" ] && printf "LOCALBRANCH\\t%s\\t%s\\t%s\\t%s\\n" "$ref" "$ref_head" "$ref_upstream" "$ref_epoch"',
+                'done < <(git -C "$root" for-each-ref --format="%(refname:short)%09%(objectname:short=10)%09%(upstream:short)%09%(committerdate:unix)" refs/heads 2>/dev/null)',
+                'while IFS="$(printf "\\t")" read -r ref ref_epoch; do',
                 '  [ -z "$ref" ] && continue',
                 '  [ "$ref" = "origin" ] && continue',
                 '  [ "$ref" = "origin/HEAD" ] && continue',
                 '  case "$ref" in */*) ;; *) continue ;; esac',
-                '  printf "REMOTEBRANCH\\t%s\\n" "$ref"',
-                'done < <(git -C "$root" for-each-ref --format="%(refname:short)" refs/remotes/origin 2>/dev/null)',
+                '  printf "REMOTEBRANCH\\t%s\\t%s\\n" "$ref" "$ref_epoch"',
+                'done < <(git -C "$root" for-each-ref --format="%(refname:short)%09%(committerdate:unix)" refs/remotes/origin 2>/dev/null)',
                 'git -C "$root" log --all --topo-order --date-order -n 48 --pretty=format:"COMMIT%x09%H%x09%P%x09%D%x09%s"',
                 'printf "\\nDONE\\t\\n"'
             ].join("\n"),
@@ -946,10 +1110,14 @@ Scope {
             pendingLocalBranches.push({
                 name: parts.length > 1 ? parts[1] : "",
                 head: parts.length > 2 ? parts[2] : "",
-                upstream: parts.length > 3 ? parts[3] : ""
+                upstream: parts.length > 3 ? parts[3] : "",
+                activityEpoch: parts.length > 4 ? Number(parts[4] || 0) : 0
             });
         else if (key === "REMOTEBRANCH")
-            pendingRemoteBranches.push(value);
+            pendingRemoteBranches.push({
+                name: parts.length > 1 ? parts[1] : "",
+                activityEpoch: parts.length > 2 ? Number(parts[2] || 0) : 0
+            });
         else if (key === "ERROR") {
             available = false;
             lastError = value;

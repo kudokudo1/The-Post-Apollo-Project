@@ -1508,6 +1508,8 @@ PanelWindow {
             ? Colors.orange
             : pressed
             ? (redAccent ? Colors.red : Colors.magenta)
+            : selectedAction && selectedBorderMagenta
+            ? Colors.magenta
             : primaryBlue
             ? (hovered ? Colors.cyan : Colors.blue)
             : blueAccent
@@ -1518,8 +1520,6 @@ PanelWindow {
             ? Colors.orange
             : orangeTextOnly
             ? (hovered ? Colors.orange : Colors.cyan)
-            : selectedAction && selectedBorderMagenta
-            ? Colors.magenta
             : hovered
             ? Colors.orange
             : selectedAction

@@ -1200,7 +1200,7 @@ PanelWindow {
                     )
                   )
             anchors.bottom: parent.bottom
-            color: statusValue.valueColor
+            color: Colors.magenta
             opacity: 0.74
         }
     }
@@ -1427,6 +1427,7 @@ PanelWindow {
         property bool blueAccent: false
         property bool orangeAccent: false
         property bool orangeTextOnly: false
+        property bool selectedBorderMagenta: false
         property bool redAccent: false
         property bool loading: false
         property bool loadingSucceeded: true
@@ -1517,6 +1518,8 @@ PanelWindow {
             ? Colors.orange
             : orangeTextOnly
             ? (hovered ? Colors.orange : Colors.cyan)
+            : selectedAction && selectedBorderMagenta
+            ? Colors.magenta
             : hovered
             ? Colors.orange
             : selectedAction
@@ -2701,6 +2704,7 @@ PanelWindow {
                                     selectedAction:
                                         gitService.repoIsLocal
                                         && gitService.pullSourceMode === "upstream"
+                                    selectedBorderMagenta: true
                                     onTriggered: gitService.cyclePullSource()
                                 }
 

@@ -1427,7 +1427,7 @@ PanelWindow {
         property bool blueAccent: false
         property bool orangeAccent: false
         property bool orangeTextOnly: false
-        property bool selectedBorderMagenta: false
+        property bool selectedBorderMagenta: true
         property bool redAccent: false
         property bool loading: false
         property bool loadingSucceeded: true
@@ -2704,7 +2704,6 @@ PanelWindow {
                                     selectedAction:
                                         gitService.repoIsLocal
                                         && gitService.pullSourceMode === "upstream"
-                                    selectedBorderMagenta: true
                                     onTriggered: gitService.cyclePullSource()
                                 }
 

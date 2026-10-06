@@ -1135,6 +1135,27 @@ PanelWindow {
     }
 
     Connections {
+        target: branchWorkspaceService
+
+        function onActionFinished(action, success, detail) {
+            const kind = String(action || "");
+
+            if (kind !== "SWITCH")
+                return;
+
+            gitService.actionTitle = "SWITCH";
+            gitService.actionExitCode = success ? 0 : 1;
+            gitService.actionOutput =
+                success
+                ? "SWITCH COMPLETE // " + String(detail || "")
+                : "SWITCH REFUSED // " + String(detail || "");
+
+            if (success)
+                gitService.refresh();
+        }
+    }
+
+    Connections {
         target: githubService
 
         function onWorkflowsChanged() {
@@ -2500,10 +2521,53 @@ PanelWindow {
                                         height: 28
                                         spacing: 4
 
+                                        ActionButton {
+                                            id: localTargetSwitchButton
+
+                                            width: 62
+                                            height: 28
+                                            label:
+                                                branchWorkspaceService.actionBusy
+                                                && branchWorkspaceService.actionName
+                                                   === "SWITCH"
+                                                ? "SWITCHING"
+                                                : (
+                                                    !gitService.localTrackCheckoutMode
+                                                    && gitService.selectedLocalBranch
+                                                    === gitService.branch
+                                                  )
+                                                ? "LIVE"
+                                                : "SWITCH"
+                                            enabledAction:
+                                                gitService.repoIsLocal
+                                                && !gitService.localTrackCheckoutMode
+                                                && !!gitService.selectedLocalBranch
+                                                && gitService.selectedLocalBranch
+                                                   !== gitService.branch
+                                                && !gitService.actionBusy
+                                                && !gitService.refreshing
+                                                && !branchWorkspaceService.actionBusy
+                                                && !branchWorkspaceService.refreshing
+                                            selectedAction:
+                                                !gitService.localTrackCheckoutMode
+                                                && !!gitService.selectedLocalBranch
+                                                && gitService.selectedLocalBranch
+                                                   === gitService.branch
+
+                                            onTriggered: {
+                                                root.localTargetMenuOpen = false;
+                                                branchWorkspaceService.switchBranch(
+                                                    gitService.selectedLocalBranch,
+                                                    "origin",
+                                                    false
+                                                );
+                                            }
+                                        }
+
                                         SelectorInput {
                                             id: localTargetInput
 
-                                            width: parent.width - 32
+                                            width: parent.width - 98
                                             valueText:
                                                 gitService.localTargetDisplay
                                             placeholderText: "TYPE LOCAL TARGET"

@@ -19,6 +19,7 @@ Item {
         property string label: ""
         property bool enabledAction: true
         property bool selectedAction: false
+        property bool destructive: false
         property bool keyboardNavigable:
             label !== "↑"
             && label !== "↓"
@@ -45,6 +46,10 @@ Item {
         }
 
         height: 28
+        opacity:
+            destructive
+            ? (enabledAction ? 1.0 : 0.34)
+            : 1.0
 
         color:
             !enabledAction
@@ -59,12 +64,12 @@ Item {
         border.color:
             keyboardSelector || mouseSelector
             ? Colors.orange
-            : !enabledAction
-            ? Colors.cyan
             : selectedAction
             ? Colors.magenta
             : mouse.containsMouse
             ? Colors.orange
+            : destructive
+            ? Colors.red
             : Colors.cyan
 
         GohuText {
@@ -74,13 +79,16 @@ Item {
             font.pixelSize: 8
 
             color:
-                !button.enabledAction
-                ? Colors.cyan
-                : button.keyboardSelector || button.selectedAction
+                button.keyboardSelector || button.selectedAction
                 ? Colors.magenta
+                : button.destructive
+                ? Colors.red
                 : Colors.cyan
 
-            opacity: button.enabledAction ? 1.0 : 0.34
+            opacity:
+                button.destructive
+                ? 1.0
+                : button.enabledAction ? 1.0 : 0.34
         }
 
         MouseArea {
@@ -628,7 +636,7 @@ Item {
                                         spacing: 6
 
                                         Column {
-                                            width: parent.width - 142
+                                            width: parent.width - 182
                                             anchors.verticalCenter: parent.verticalCenter
                                             spacing: 2
 
@@ -643,7 +651,7 @@ Item {
                                             GohuText {
                                                 width: parent.width
                                                 text: String(modelData.path || "")
-                                                font.pixelSize: 7
+                                                font.pixelSize: 9
                                                 color: Colors.orange
                                                 opacity: 0.78
                                                 elide: Text.ElideMiddle
@@ -662,6 +670,18 @@ Item {
                                             label: "+ QUEUE"
 
                                             onTriggered: root.libraryStore.addWorkflow(modelData)
+                                        }
+
+                                        LibraryButton {
+                                            width: 34
+                                            label: "X"
+                                            destructive: true
+                                            enabledAction: !root.githubService.actionBusy
+
+                                            onTriggered:
+                                                root.githubService.deleteWorkflow(
+                                                    String(modelData.path || "")
+                                                )
                                         }
                                     }
                                 }
@@ -733,7 +753,7 @@ Item {
                                   * workflowScrollTrack.thumbTravel
                                 : 0
 
-                            color: Colors.orange
+                            color: Colors.magenta
                             opacity:
                                 workflowFlick.contentHeight > workflowFlick.height
                                 ? 0.92

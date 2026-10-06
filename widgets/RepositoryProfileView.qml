@@ -8,8 +8,13 @@ Item {
     required property var gitService
     required property var profileService
     required property var profileStore
+    required property var accountService
     required property var keyboardHost
 
+    property string profileMode: "repositories"
+    property bool accountDirty: false
+    property string accountIdentityMode: "login"
+    property string accountEmailMode: "primary"
     property string visibilityMode: "keep"
     property string topicMode: "add"
     property string descriptionMode: "keep"
@@ -28,6 +33,24 @@ Item {
 
     function markDirty() {
         root.profileService.invalidateReview();
+    }
+
+    function loadAccountDraft() {
+        accountNameInput.text = root.accountService.displayName;
+        accountBioInput.text = root.accountService.bio;
+        accountEmailInput.text = root.accountService.email;
+        root.accountDirty = false;
+    }
+
+    function showAccountProfile() {
+        root.profileMode = "account";
+
+        if (!root.accountService.busy)
+            root.accountService.refreshProfile();
+    }
+
+    function showRepositoryProfiles() {
+        root.profileMode = "repositories";
     }
 
     component ManagerButton: Rectangle {
@@ -220,6 +243,97 @@ Item {
         }
     }
 
+    component ManagerTextArea: Rectangle {
+        id: field
+
+        property string placeholderText: ""
+        property bool enabledInput: true
+        property alias text: editor.text
+
+        signal edited()
+
+        height: 96
+        color: Colors.black
+        border.width: 1
+        border.color:
+            editor.activeFocus
+            ? Colors.magenta
+            : field.enabledInput
+            ? Colors.cyan
+            : Colors.dark
+
+        GohuText {
+            anchors {
+                left: parent.left
+                top: parent.top
+                leftMargin: 7
+                topMargin: 7
+            }
+
+            visible: editor.text.length === 0 && !editor.activeFocus
+            text: field.placeholderText
+            font.pixelSize: 8
+            color: Colors.white
+            opacity: field.enabledInput ? 0.42 : 0.22
+        }
+
+        TextEdit {
+            id: editor
+
+            anchors {
+                fill: parent
+                margins: 7
+            }
+
+            enabled: field.enabledInput
+            activeFocusOnPress: true
+            selectByMouse: true
+            wrapMode: TextEdit.Wrap
+            clip: true
+            font.family: "GohuFont 11 Nerd Font Mono"
+            font.pixelSize: 11
+            color: field.enabledInput ? Colors.white : Colors.cyan
+            selectionColor: Colors.magenta
+            selectedTextColor: Colors.black
+
+            onTextChanged: field.edited()
+
+            Keys.onEscapePressed: function(event) {
+                focus = false;
+
+                if (root.keyboardHost) {
+                    root.keyboardHost.activeTextEditor = null;
+                    root.keyboardHost.restoreGitKeyboardFocus(false);
+                }
+
+                event.accepted = true;
+            }
+
+            onActiveFocusChanged: {
+                if (!root.keyboardHost)
+                    return;
+
+                if (activeFocus)
+                    root.keyboardHost.activeTextEditor = editor;
+                else if (root.keyboardHost.activeTextEditor === editor)
+                    root.keyboardHost.activeTextEditor = null;
+            }
+        }
+    }
+
+    Connections {
+        target: root.accountService
+
+        function onProfileLoaded() {
+            root.loadAccountDraft();
+        }
+
+        function onProfileSaved(success) {
+            if (success)
+                root.loadAccountDraft();
+        }
+    }
+
     Connections {
         target: root.profileStore
 
@@ -246,15 +360,15 @@ Item {
     }
 
     Column {
+        id: repositoryManager
+
         anchors.fill: parent
+        visible: root.profileMode === "repositories"
         spacing: 10
 
-        Rectangle {
+        Item {
             width: parent.width
             height: 42
-            color: Colors.dark
-            border.width: 1
-            border.color: Colors.blue
 
             Row {
                 anchors {
@@ -265,7 +379,7 @@ Item {
                 spacing: 8
 
                 GohuText {
-                    width: parent.width - 180
+                    width: parent.width - 278
                     anchors.verticalCenter: parent.verticalCenter
                     text: "REPOSITORY PROFILE MANAGER // BATCH CONTROL"
                     font.pixelSize: 11
@@ -282,6 +396,15 @@ Item {
                         + (root.profileStore.queueCount === 1 ? "" : "S")
                     font.pixelSize: 9
                     color: Colors.cyan
+                }
+
+                ManagerButton {
+                    width: 90
+                    height: 26
+                    anchors.verticalCenter: parent.verticalCenter
+                    label: "ACCOUNT"
+                    primaryBlue: true
+                    onTriggered: root.showAccountProfile()
                 }
             }
         }
@@ -331,82 +454,150 @@ Item {
                             }
                         }
 
-                        Flickable {
+                        Item {
+                            id: catalogViewport
+
                             width: parent.width
                             height: parent.height - 34
-                            clip: true
-                            contentWidth: width
-                            contentHeight: catalogColumn.height
-                            boundsBehavior: Flickable.StopAtBounds
 
-                            Column {
-                                id: catalogColumn
+                            Flickable {
+                                id: catalogScroll
 
-                                width: parent.width
-                                spacing: 3
+                                anchors {
+                                    left: parent.left
+                                    top: parent.top
+                                    bottom: parent.bottom
+                                    right: catalogScrollTrack.left
+                                    rightMargin: 5
+                                }
 
-                                Repeater {
-                                    model: root.gitService.repoCount
+                                clip: true
+                                contentWidth: width
+                                contentHeight: catalogColumn.height
+                                flickableDirection: Flickable.VerticalFlick
+                                boundsBehavior: Flickable.StopAtBounds
 
-                                    Rectangle {
-                                        required property int index
+                                Column {
+                                    id: catalogColumn
 
-                                        readonly property var repoRow:
-                                            root.gitService.repoAt(index)
-                                        readonly property string slug:
-                                            repoRow
-                                            ? String(repoRow.remoteSlug || "")
-                                            : ""
+                                    width: catalogScroll.width
+                                    spacing: 4
 
-                                        width: catalogColumn.width
-                                        height: slug ? 28 : 0
-                                        visible: !!slug
-                                        color: Colors.black
-                                        border.width: 1
-                                        border.color:
-                                            root.profileStore.queueContains(slug)
-                                            ? Colors.blue
-                                            : Colors.dark
+                                    Repeater {
+                                        model: root.gitService.repoCount
 
-                                        Row {
-                                            anchors {
-                                                fill: parent
-                                                margins: 3
-                                            }
+                                        Rectangle {
+                                            required property int index
 
-                                            spacing: 4
+                                            readonly property var repoRow:
+                                                root.gitService.repoAt(index)
+                                            readonly property string slug:
+                                                repoRow
+                                                ? String(repoRow.remoteSlug || "")
+                                                : ""
 
-                                            GohuText {
-                                                width: parent.width - 66
-                                                anchors.verticalCenter: parent.verticalCenter
-                                                text: slug
-                                                font.pixelSize: 7
-                                                color:
-                                                    root.profileStore.queueContains(slug)
-                                                    ? Colors.blue
-                                                    : Colors.white
-                                                elide: Text.ElideRight
-                                            }
+                                            width: catalogColumn.width
+                                            height: slug ? 32 : 0
+                                            visible: !!slug
+                                            color: Colors.black
+                                            border.width: 1
+                                            border.color:
+                                                root.profileStore.queueContains(slug)
+                                                ? Colors.blue
+                                                : Colors.dark
 
-                                            ManagerButton {
-                                                width: 58
-                                                height: 22
-                                                label:
-                                                    root.profileStore.queueContains(slug)
-                                                    ? "ADDED"
-                                                    : "ADD"
-                                                primaryBlue:
-                                                    !root.profileStore.queueContains(slug)
-                                                enabledAction:
-                                                    !root.profileStore.queueContains(slug)
+                                            Row {
+                                                anchors {
+                                                    fill: parent
+                                                    margins: 4
+                                                }
 
-                                                onTriggered: {
-                                                    root.profileStore.addTarget(slug);
-                                                    root.markDirty();
+                                                spacing: 5
+
+                                                GohuText {
+                                                    width: parent.width - 68
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    text: slug
+                                                    font.pixelSize: 10
+                                                    color:
+                                                        root.profileStore.queueContains(slug)
+                                                        ? Colors.blue
+                                                        : Colors.white
+                                                    elide: Text.ElideRight
+                                                }
+
+                                                ManagerButton {
+                                                    width: 58
+                                                    height: 24
+                                                    label:
+                                                        root.profileStore.queueContains(slug)
+                                                        ? "ADDED"
+                                                        : "ADD"
+                                                    primaryBlue:
+                                                        !root.profileStore.queueContains(slug)
+                                                    enabledAction:
+                                                        !root.profileStore.queueContains(slug)
+
+                                                    onTriggered: {
+                                                        root.profileStore.addTarget(slug);
+                                                        root.markDirty();
+                                                    }
                                                 }
                                             }
                                         }
                                     }
+                                }
+                            }
+
+                            Rectangle {
+                                id: catalogScrollTrack
+
+                                width: 5
+                                anchors {
+                                    top: parent.top
+                                    bottom: parent.bottom
+                                    right: parent.right
+                                }
+
+                                color: Colors.black
+                                border.width: 1
+                                border.color: Colors.dark
+
+                                Rectangle {
+                                    width: parent.width
+                                    height:
+                                        catalogScroll.contentHeight <= 0
+                                        ? parent.height
+                                        : Math.max(
+                                            18,
+                                            parent.height
+                                            * Math.min(
+                                                1,
+                                                catalogScroll.height
+                                                / catalogScroll.contentHeight
+                                            )
+                                          )
+                                    y:
+                                        catalogScroll.contentHeight
+                                        <= catalogScroll.height
+                                        ? 0
+                                        : (
+                                            parent.height - height
+                                          )
+                                          * (
+                                              catalogScroll.contentY
+                                              / Math.max(
+                                                  1,
+                                                  catalogScroll.contentHeight
+                                                  - catalogScroll.height
+                                              )
+                                            )
+                                    color: Colors.magenta
+                                    opacity:
+                                        catalogScroll.contentHeight
+                                        > catalogScroll.height
+                                        ? 0.82
+                                        : 0.30
                                 }
                             }
                         }
@@ -938,4 +1129,417 @@ Item {
             }
         }
     }
+
+    Column {
+        id: accountManager
+
+        anchors.fill: parent
+        visible: root.profileMode === "account"
+        spacing: 10
+
+        Rectangle {
+            width: parent.width
+            height: 42
+            color: Colors.dark
+            border.width: 1
+            border.color: Colors.blue
+
+            Row {
+                anchors {
+                    fill: parent
+                    margins: 8
+                }
+
+                spacing: 8
+
+                GohuText {
+                    width: parent.width - 206
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "GITHUB ACCOUNT PROFILE"
+                    font.pixelSize: 11
+                    color: Colors.blue
+                }
+
+                ManagerButton {
+                    width: 106
+                    height: 26
+                    anchors.verticalCenter: parent.verticalCenter
+                    label: "REPOSITORIES"
+                    onTriggered: root.showRepositoryProfiles()
+                }
+
+                ManagerButton {
+                    width: 84
+                    height: 26
+                    anchors.verticalCenter: parent.verticalCenter
+                    label:
+                        root.accountService.loading
+                        ? "READING"
+                        : "REFRESH"
+                    enabledAction: !root.accountService.busy
+                    onTriggered: root.accountService.refreshProfile()
+                }
+            }
+        }
+
+        Item {
+            width: parent.width
+            height: parent.height - 46
+
+            Column {
+                anchors {
+                    fill: parent
+                    topMargin: 2
+                }
+
+                spacing: 6
+
+                Rectangle {
+                    width: parent.width
+                    height: 38
+                    color: Colors.black
+                    border.width: 1
+                    border.color:
+                        root.accountIdentityMode === "display"
+                        && root.accountDirty
+                        ? Colors.orange
+                        : Colors.blue
+
+                    Row {
+                        anchors {
+                            fill: parent
+                            margins: 6
+                        }
+
+                        spacing: 7
+
+                        GohuText {
+                            width: 114
+                            anchors.verticalCenter: parent.verticalCenter
+                            text:
+                                root.accountIdentityMode === "login"
+                                ? "GITHUB LOGIN"
+                                : "DISPLAY NAME"
+                            font.pixelSize: 8
+                            color: Colors.cyan
+                        }
+
+                        Item {
+                            width: parent.width - 196
+                            height: parent.height
+
+                            GohuText {
+                                anchors.fill: parent
+                                visible: root.accountIdentityMode === "login"
+                                verticalAlignment: Text.AlignVCenter
+                                text:
+                                    root.accountService.login
+                                    ? "@" + root.accountService.login
+                                    : "NOT LOADED"
+                                font.pixelSize: 11
+                                color: Colors.white
+                                elide: Text.ElideRight
+                            }
+
+                            TextInput {
+                                id: accountNameInput
+
+                                anchors.fill: parent
+                                visible: root.accountIdentityMode === "display"
+                                enabled:
+                                    visible
+                                    && !root.accountService.busy
+                                verticalAlignment: TextInput.AlignVCenter
+                                selectByMouse: true
+                                clip: true
+                                font.family: "GohuFont 11 Nerd Font Mono"
+                                font.pixelSize: 11
+                                color: Colors.white
+                                selectionColor: Colors.magenta
+                                selectedTextColor: Colors.black
+
+                                onTextChanged: {
+                                    if (visible)
+                                        root.accountDirty = true;
+                                }
+
+                                Keys.onEscapePressed: function(event) {
+                                    focus = false;
+
+                                    if (root.keyboardHost) {
+                                        root.keyboardHost.activeTextEditor = null;
+                                        root.keyboardHost.restoreGitKeyboardFocus(false);
+                                    }
+
+                                    event.accepted = true;
+                                }
+
+                                onActiveFocusChanged: {
+                                    if (!root.keyboardHost)
+                                        return;
+
+                                    if (activeFocus)
+                                        root.keyboardHost.activeTextEditor = accountNameInput;
+                                    else if (root.keyboardHost.activeTextEditor === accountNameInput)
+                                        root.keyboardHost.activeTextEditor = null;
+                                }
+                            }
+                        }
+
+                        ManagerButton {
+                            width: 68
+                            height: 26
+                            anchors.verticalCenter: parent.verticalCenter
+                            label:
+                                root.accountIdentityMode === "login"
+                                ? "DISPLAY"
+                                : "LOGIN"
+                            onTriggered:
+                                root.accountIdentityMode =
+                                    root.accountIdentityMode === "login"
+                                    ? "display"
+                                    : "login"
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width: parent.width
+                    height: 38
+                    color: Colors.black
+                    border.width: 1
+                    border.color:
+                        root.accountEmailMode === "primary"
+                        ? (
+                            root.accountService.primaryEmailAvailable
+                            ? Colors.blue
+                            : Colors.orange
+                          )
+                        : root.accountDirty
+                        ? Colors.orange
+                        : Colors.blue
+
+                    Row {
+                        anchors {
+                            fill: parent
+                            margins: 6
+                        }
+
+                        spacing: 7
+
+                        GohuText {
+                            width: 114
+                            anchors.verticalCenter: parent.verticalCenter
+                            text:
+                                root.accountEmailMode === "primary"
+                                ? "PRIMARY EMAIL"
+                                : "PUBLIC EMAIL"
+                            font.pixelSize: 8
+                            color: Colors.cyan
+                        }
+
+                        Item {
+                            width:
+                                parent.width
+                                - 196
+                                - (
+                                    root.accountEmailMode === "primary"
+                                    ? 79
+                                    : 0
+                                  )
+                            height: parent.height
+
+                            GohuText {
+                                anchors.fill: parent
+                                visible: root.accountEmailMode === "primary"
+                                verticalAlignment: Text.AlignVCenter
+                                text:
+                                    root.accountService.primaryEmailAvailable
+                                    ? root.accountService.primaryEmail
+                                    : root.accountService.primaryEmailMessage
+                                font.pixelSize: 11
+                                color:
+                                    root.accountService.primaryEmailAvailable
+                                    ? Colors.white
+                                    : Colors.orange
+                                elide: Text.ElideRight
+                            }
+
+                            TextInput {
+                                id: accountEmailInput
+
+                                anchors.fill: parent
+                                visible: root.accountEmailMode === "public"
+                                enabled:
+                                    visible
+                                    && !root.accountService.busy
+                                verticalAlignment: TextInput.AlignVCenter
+                                selectByMouse: true
+                                clip: true
+                                font.family: "GohuFont 11 Nerd Font Mono"
+                                font.pixelSize: 11
+                                color: Colors.white
+                                selectionColor: Colors.magenta
+                                selectedTextColor: Colors.black
+
+                                onTextChanged: {
+                                    if (visible)
+                                        root.accountDirty = true;
+                                }
+
+                                Keys.onEscapePressed: function(event) {
+                                    focus = false;
+
+                                    if (root.keyboardHost) {
+                                        root.keyboardHost.activeTextEditor = null;
+                                        root.keyboardHost.restoreGitKeyboardFocus(false);
+                                    }
+
+                                    event.accepted = true;
+                                }
+
+                                onActiveFocusChanged: {
+                                    if (!root.keyboardHost)
+                                        return;
+
+                                    if (activeFocus)
+                                        root.keyboardHost.activeTextEditor = accountEmailInput;
+                                    else if (root.keyboardHost.activeTextEditor === accountEmailInput)
+                                        root.keyboardHost.activeTextEditor = null;
+                                }
+                            }
+                        }
+
+                        ManagerButton {
+                            visible: root.accountEmailMode === "primary"
+                            width: visible ? 72 : 0
+                            height: 26
+                            anchors.verticalCenter: parent.verticalCenter
+                            label: "SETTINGS"
+                            onTriggered:
+                                Qt.openUrlExternally(
+                                    "https://github.com/settings/emails"
+                                )
+                        }
+
+                        ManagerButton {
+                            width: 68
+                            height: 26
+                            anchors.verticalCenter: parent.verticalCenter
+                            label:
+                                root.accountEmailMode === "primary"
+                                ? "PUBLIC"
+                                : "PRIMARY"
+                            onTriggered:
+                                root.accountEmailMode =
+                                    root.accountEmailMode === "primary"
+                                    ? "public"
+                                    : "primary"
+                        }
+                    }
+                }
+
+                GohuText {
+                    width: parent.width
+                    text:
+                        "LOGIN + PRIMARY EMAIL ARE ACCOUNT IDENTITY. "
+                        + "DISPLAY NAME + PUBLIC EMAIL ARE EDITABLE."
+                    font.pixelSize: 7
+                    color: Colors.orange
+                    elide: Text.ElideRight
+                }
+
+                ManagerTextArea {
+                    id: accountBioInput
+
+                    width: parent.width
+                    height: 72
+                    placeholderText: "BIO"
+                    enabledInput: !root.accountService.busy
+                    onEdited: root.accountDirty = true
+                }
+
+                Row {
+                    width: parent.width
+                    height: 30
+                    spacing: 8
+
+                    ManagerButton {
+                        width: 108
+                        height: 30
+                        label: "RESET"
+                        enabledAction:
+                            !root.accountService.busy
+                            && root.accountDirty
+                        onTriggered: root.loadAccountDraft()
+                    }
+
+                    ManagerButton {
+                        width: 132
+                        height: 30
+                        label:
+                            root.accountService.saving
+                            ? "SAVING"
+                            : "SAVE PROFILE"
+                        primaryBlue: true
+                        enabledAction:
+                            !root.accountService.busy
+                            && root.accountDirty
+
+                        onTriggered:
+                            root.accountService.saveProfile(
+                                accountNameInput.text,
+                                accountBioInput.text,
+                                accountEmailInput.text
+                            )
+                    }
+
+                    GohuText {
+                        width: parent.width - 256
+                        anchors.verticalCenter: parent.verticalCenter
+                        horizontalAlignment: Text.AlignRight
+                        text:
+                            root.accountDirty
+                            ? "UNSAVED CHANGES"
+                            : "SYNCED"
+                        font.pixelSize: 8
+                        color:
+                            root.accountDirty
+                            ? Colors.orange
+                            : Colors.cyan
+                    }
+                }
+
+                Rectangle {
+                    width: parent.width
+                    height: 42
+                    color: Colors.black
+                    border.width: 1
+                    border.color:
+                        root.accountService.lastError
+                        ? Colors.red
+                        : Colors.cyan
+
+                    GohuText {
+                        anchors {
+                            fill: parent
+                            margins: 7
+                        }
+
+                        text:
+                            root.accountService.lastError
+                            ? "ERROR // " + root.accountService.lastError
+                            : root.accountService.stateText
+                        wrapMode: Text.WrapAnywhere
+                        font.pixelSize: 8
+                        color:
+                            root.accountService.lastError
+                            ? Colors.red
+                            : Colors.white
+                    }
+                }
+            }
+        }
+    }
+
 }

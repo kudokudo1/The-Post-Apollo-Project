@@ -21,7 +21,9 @@ Scope {
 
     property string pullSourceMode: "upstream"
     readonly property string pullSourceLabel:
-        pullSourceMode === "upstream" ? "UP" : "TGT"
+        localTrackCheckoutMode
+        ? "TRACK"
+        : pullSourceMode === "upstream" ? "UP" : "TGT"
     readonly property string selectedLocalMatchingRemote:
         selectedLocalBranch
         && remoteIndexOf("origin/" + selectedLocalBranch) >= 0
@@ -29,7 +31,9 @@ Scope {
         : ""
 
     readonly property string pullSourceTarget:
-        pullSourceMode === "upstream"
+        localTrackCheckoutMode
+        ? selectedRemoteBranch
+        : pullSourceMode === "upstream"
         ? (selectedLocalUpstream || selectedLocalMatchingRemote)
         : selectedRemoteBranch
     readonly property bool pullSourceTargetValid:
@@ -58,6 +62,12 @@ Scope {
     property string selectedLocalHead: ""
     property string selectedLocalUpstream: ""
     property int selectedLocalIndex: -1
+    property bool localTrackCheckoutMode: false
+
+    readonly property string localTargetDisplay:
+        localTrackCheckoutMode
+        ? "TRACK // CHECKOUT REMOTE"
+        : selectedLocalBranch
 
     property string selectedRemoteBranch: ""
     property bool selectedRemoteExists: false
@@ -437,10 +447,31 @@ Scope {
         if (!row)
             return false;
 
+        localTrackCheckoutMode = false;
         selectedLocalIndex = index;
         selectedLocalBranch = String(row.name || "");
         selectedLocalHead = String(row.head || "");
         selectedLocalUpstream = String(row.upstream || "");
+        return true;
+    }
+
+    function selectTrackCheckoutRemote() {
+        if (actionBusy || refreshing)
+            return false;
+
+        localTrackCheckoutMode = true;
+        selectedLocalIndex = -1;
+        selectedLocalBranch = "";
+        selectedLocalHead = "";
+        selectedLocalUpstream = "";
+
+        actionTitle = "LOCAL TARGET";
+        actionExitCode = 0;
+        actionOutput =
+            "TRACK // CHECKOUT REMOTE"
+            + "\nChoose a REMOTE TARGET, then press PULL."
+            + "\nPULL will create a matching local tracking branch"
+            + " and switch the LIVE checkout onto it.";
         return true;
     }
 
@@ -501,6 +532,12 @@ Scope {
 
         if (!needle)
             return false;
+
+        if (needle === "track"
+                || needle === "checkout"
+                || needle === "track checkout"
+                || needle === "track // checkout remote")
+            return selectTrackCheckoutRemote();
 
         let partialIndex = -1;
 
@@ -960,11 +997,29 @@ Scope {
     }
 
     function cyclePullMode() {
+        if (localTrackCheckoutMode) {
+            actionTitle = "PULL MODE";
+            actionExitCode = 0;
+            actionOutput =
+                "TRACK MODE // checkout is an exact remote tracking operation"
+                + "\nFF / MRG does not apply until the local branch exists.";
+            return;
+        }
+
         pullMode = pullMode === "ff-only" ? "merge" : "ff-only";
         describePullMode();
     }
 
     function cyclePullSource() {
+        if (localTrackCheckoutMode) {
+            actionTitle = "PULL SOURCE";
+            actionExitCode = 0;
+            actionOutput =
+                "TRACK MODE // REMOTE TARGET IS THE SOURCE"
+                + "\nChoose the remote branch above, then press PULL.";
+            return;
+        }
+
         pullSourceMode =
             pullSourceMode === "upstream"
             ? "target"
@@ -999,6 +1054,10 @@ Scope {
             return;
 
         const action = String(kind || "").toLowerCase();
+        const trackCheckout =
+            action === "pull" && localTrackCheckoutMode;
+        const processAction =
+            trackCheckout ? "track-checkout" : action;
         const remoteOnly =
             !repoIsLocal
             || String(repoPath || "").indexOf("remote://") === 0;
@@ -1048,12 +1107,25 @@ Scope {
             : selectedRemoteBranch;
 
         if (action === "pull" && !isRemoteBranchTarget(syncTarget)) {
-            actionTitle = "PULL";
+            actionTitle = trackCheckout
+                ? "TRACK // CHECKOUT"
+                : "PULL";
             actionOutput =
-                pullSourceMode === "upstream"
+                trackCheckout
+                ? "TRACK // CHECKOUT NEEDS AN EXISTING REMOTE TARGET"
+                : pullSourceMode === "upstream"
                 ? "PULL SOURCE // UPSTREAM\nNo matching remote is configured for the selected local target."
                 : "PULL SOURCE // TARGET\nChoose a remote branch target first.";
             actionExitCode = 1;
+            return;
+        }
+
+        if (action === "push" && localTrackCheckoutMode) {
+            actionTitle = "PUSH";
+            actionExitCode = 1;
+            actionOutput =
+                "PUSH DISABLED // TRACK // CHECKOUT REMOTE IS SELECTED"
+                + "\nCreate the local tracking branch with PULL first.";
             return;
         }
 
@@ -1068,7 +1140,10 @@ Scope {
         }
 
         actionBusy = true;
-        actionTitle = action.toUpperCase();
+        actionTitle =
+            trackCheckout
+            ? "TRACK // CHECKOUT"
+            : action.toUpperCase();
         actionOutput = "";
         actionExitCode = 0;
 
@@ -1147,6 +1222,37 @@ Scope {
                 '    printf "FETCH // updating remote branch map from origin\\n"',
                 '    git -C "$repo" fetch --prune origin || rc=$?',
                 '    ;;',
+                '  track-checkout)',
+                '    remote="${target%%/*}"',
+                '    remote_branch="${target#*/}"',
+                '    local_branch="$remote_branch"',
+                '    printf "TRACK // CHECKOUT // %s -> %s\n" "$target" "$local_branch"',
+                '    git -C "$repo" fetch --prune "$remote" || rc=$?',
+                '    if [ "$rc" -eq 0 ] && ! git -C "$repo" show-ref --verify --quiet "refs/remotes/$target"; then',
+                '      printf "TRACK STOPPED // remote branch not found // %s\n" "$target"',
+                '      rc=1',
+                '    fi',
+                '    if [ "$rc" -eq 0 ] && git -C "$repo" show-ref --verify --quiet "refs/heads/$local_branch"; then',
+                '      printf "TRACK STOPPED // local branch already exists // %s\n" "$local_branch"',
+                '      printf "Select it as LOCAL TARGET instead.\n"',
+                '      rc=1',
+                '    fi',
+                '    if [ "$rc" -eq 0 ]; then',
+                '      dirty="$(git -C "$repo" status --porcelain=v1 2>/dev/null)"',
+                '      if [ -n "$dirty" ]; then',
+                '        printf "TRACK STOPPED // LIVE checkout is dirty\n"',
+                '        printf "Commit or stash changes before switching branches.\n"',
+                '        rc=1',
+                '      fi',
+                '    fi',
+                '    if [ "$rc" -eq 0 ]; then',
+                '      git -C "$repo" switch --track -c "$local_branch" "$target" || rc=$?',
+                '    fi',
+                '    if [ "$rc" -eq 0 ]; then',
+                '      printf "TRACKED // %s\n" "$local_branch"',
+                '      printf "LIVE CHECKOUT // %s\n" "$(git -C "$repo" branch --show-current)"',
+                '    fi',
+                '    ;;',
                 '  pull)',
                 '    remote="${target%%/*}"',
                 '    remote_branch="${target#*/}"',
@@ -1195,7 +1301,7 @@ Scope {
             ].join("\n"),
             "pa-git-action",
             repoPath,
-            action,
+            processAction,
             syncTarget,
             pullMode,
             localTarget,
@@ -1248,6 +1354,19 @@ Scope {
         if (raw === "__PA_DONE__") {
             actionBusy = false;
             actionWatchdog.stop();
+
+            if (actionTitle === "TRACK // CHECKOUT") {
+                if (actionExitCode === 0) {
+                    localTrackCheckoutMode = false;
+                    selectedLocalBranch = "";
+                    selectedLocalHead = "";
+                    selectedLocalUpstream = "";
+                    selectedLocalIndex = -1;
+                }
+
+                refresh();
+                return;
+            }
 
             if (actionTitle === "CLONE") {
                 const query = clonePendingQuery;

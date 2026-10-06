@@ -55,9 +55,24 @@ Scope {
         contextNeighbor(-1) !== null
     readonly property bool contextCanNewer:
         contextNeighbor(1) !== null
+    readonly property bool contextCanThere:
+        contextTarget.length > 0
     readonly property string contextLabel: {
+        const parts = [];
+
         if (contextTarget)
-            return contextTarget;
+            parts.push(contextTarget);
+
+        if (contextSource)
+            parts.push(contextSource.toUpperCase());
+
+        if (contextHasEvent)
+            parts.push("EVENT");
+        else if (contextTarget)
+            parts.push("ROOM");
+
+        if (parts.length > 0)
+            return parts.join(" // ");
 
         const item = contextItem || {};
         return String(

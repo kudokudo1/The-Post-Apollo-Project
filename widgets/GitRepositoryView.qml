@@ -349,6 +349,7 @@ Item {
                         }
 
                         Flickable {
+                            id: repositoryScroll1
                             width: parent.width
                             height: parent.height - 24
                             clip: true
@@ -443,7 +444,18 @@ Item {
                                     }
                                 }
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: repositoryScroll1
+                                anchors {
+                                    top: repositoryScroll1.top
+                                    right: repositoryScroll1.right
+                                    bottom: repositoryScroll1.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: repositoryScroll1
+                            }
+}
                     }
                 }
 
@@ -703,6 +715,7 @@ Item {
                         }
 
                         Flickable {
+                            id: repositoryScroll2
                             width: parent.width
                             height: parent.height - 190
                             clip: true
@@ -824,7 +837,18 @@ Item {
                                     }
                                 }
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: repositoryScroll2
+                                anchors {
+                                    top: repositoryScroll2.top
+                                    right: repositoryScroll2.right
+                                    bottom: repositoryScroll2.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: repositoryScroll2
+                            }
+}
                     }
                 }
             }
@@ -843,6 +867,7 @@ Item {
                     border.color: Colors.orange
 
                     Flickable {
+                        id: repositoryScroll3
                         anchors {
                             fill: parent
                             margins: 7
@@ -929,7 +954,18 @@ Item {
                                 }
                             }
                         }
-                    }
+                    
+                        NeonScrollBar {
+                            parent: repositoryScroll3
+                            anchors {
+                                top: repositoryScroll3.top
+                                right: repositoryScroll3.right
+                                bottom: repositoryScroll3.bottom
+                                rightMargin: 2
+                            }
+                            flickable: repositoryScroll3
+                        }
+}
                 }
 
                 Rectangle {
@@ -1173,6 +1209,7 @@ Item {
                         }
 
                         Flickable {
+                            id: repositoryScroll4
                             width: parent.width
                             height: parent.height - 34
                             clip: true
@@ -1335,7 +1372,18 @@ Item {
                                     }
                                 }
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: repositoryScroll4
+                                anchors {
+                                    top: repositoryScroll4.top
+                                    right: repositoryScroll4.right
+                                    bottom: repositoryScroll4.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: repositoryScroll4
+                            }
+}
                     }
                 }
 
@@ -1395,6 +1443,7 @@ Item {
                         }
 
                         Flickable {
+                            id: repositoryScroll5
                             width: parent.width
                             height: parent.height - 34
                             clip: true
@@ -1478,7 +1527,18 @@ Item {
                                     }
                                 }
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: repositoryScroll5
+                                anchors {
+                                    top: repositoryScroll5.top
+                                    right: repositoryScroll5.right
+                                    bottom: repositoryScroll5.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: repositoryScroll5
+                            }
+}
                     }
                 }
             }
@@ -1497,6 +1557,7 @@ Item {
                     border.color: Colors.green
 
                     Flickable {
+                        id: repositoryScroll6
                         anchors {
                             fill: parent
                             margins: 7
@@ -1578,7 +1639,18 @@ Item {
                                 }
                             }
                         }
-                    }
+                    
+                        NeonScrollBar {
+                            parent: repositoryScroll6
+                            anchors {
+                                top: repositoryScroll6.top
+                                right: repositoryScroll6.right
+                                bottom: repositoryScroll6.bottom
+                                rightMargin: 2
+                            }
+                            flickable: repositoryScroll6
+                        }
+}
                 }
 
                 Rectangle {
@@ -1718,6 +1790,7 @@ Item {
                         }
 
                         Flickable {
+                            id: repositoryScroll7
                             width: parent.width
                             height: parent.height - 34
                             clip: true
@@ -1800,7 +1873,18 @@ Item {
                                     }
                                 }
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: repositoryScroll7
+                                anchors {
+                                    top: repositoryScroll7.top
+                                    right: repositoryScroll7.right
+                                    bottom: repositoryScroll7.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: repositoryScroll7
+                            }
+}
                     }
                 }
 
@@ -1895,6 +1979,7 @@ Item {
                     border.color: Colors.blue
 
                     Flickable {
+                        id: repositoryScroll8
                         anchors {
                             fill: parent
                             margins: 7
@@ -1987,7 +2072,18 @@ Item {
                                 }
                             }
                         }
-                    }
+                    
+                        NeonScrollBar {
+                            parent: repositoryScroll8
+                            anchors {
+                                top: repositoryScroll8.top
+                                right: repositoryScroll8.right
+                                bottom: repositoryScroll8.bottom
+                                rightMargin: 2
+                            }
+                            flickable: repositoryScroll8
+                        }
+}
                 }
 
                 Rectangle {
@@ -2047,6 +2143,7 @@ Item {
                         }
 
                         Flickable {
+                            id: repositoryScroll9
                             width: parent.width
                             height: 170
                             clip: true
@@ -2064,7 +2161,18 @@ Item {
                                 color: Colors.white
                                 wrapMode: Text.WrapAnywhere
                             }
-                        }
+                        
+                            NeonScrollBar {
+                                parent: repositoryScroll9
+                                anchors {
+                                    top: repositoryScroll9.top
+                                    right: repositoryScroll9.right
+                                    bottom: repositoryScroll9.bottom
+                                    rightMargin: 2
+                                }
+                                flickable: repositoryScroll9
+                            }
+}
 
                         MiniButton {
                             width: parent.width
@@ -2109,6 +2217,7 @@ Item {
                     border.color: Colors.cyan
 
                     Flickable {
+                        id: repositoryScroll10
                         anchors {
                             fill: parent
                             margins: 8
@@ -2132,7 +2241,18 @@ Item {
                                 : Colors.white
                             wrapMode: Text.WrapAnywhere
                         }
-                    }
+                    
+                        NeonScrollBar {
+                            parent: repositoryScroll10
+                            anchors {
+                                top: repositoryScroll10.top
+                                right: repositoryScroll10.right
+                                bottom: repositoryScroll10.bottom
+                                rightMargin: 2
+                            }
+                            flickable: repositoryScroll10
+                        }
+}
                 }
             }
         }

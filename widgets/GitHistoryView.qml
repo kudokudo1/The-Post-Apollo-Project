@@ -14,6 +14,8 @@ Item {
     property int scopeIndex: 0
     property string inspectorMode: "detail"
     property string resetMode: "mixed"
+    property string selectedQuerySha: ""
+    property string selectedReflogSha: ""
     property string armedAction: ""
 
     readonly property var displayedRows: root.filteredRows()
@@ -477,12 +479,22 @@ Item {
                 model: [
                     {
                         key: "log",
-                        label: "LOG // INSPECT",
+                        label: "LOG",
                         color: Colors.cyan
                     },
                     {
+                        key: "query",
+                        label: "QUERY",
+                        color: Colors.green
+                    },
+                    {
+                        key: "reflog",
+                        label: "REFLOG",
+                        color: Colors.magenta
+                    },
+                    {
                         key: "compare",
-                        label: "COMPARE A ↔ B",
+                        label: "COMPARE",
                         color: Colors.orange
                     },
                     {
@@ -497,8 +509,8 @@ Item {
                     width:
                         (
                             parent.width
-                            - parent.spacing * 2
-                        ) / 3
+                            - parent.spacing * 4
+                        ) / 5
                     height: 34
                     label: modelData.label
                     accent: modelData.color
@@ -506,6 +518,12 @@ Item {
                     onTriggered: {
                         root.subMode = modelData.key;
                         root.armedAction = "";
+
+                        if (
+                            modelData.key === "reflog"
+                            && root.historyService
+                        )
+                            root.historyService.loadReflog();
                     }
                 }
             }
@@ -1091,6 +1109,649 @@ Item {
                 }
             }
 
+            // ===== QUERY =================================================
+            Row {
+                anchors.fill: parent
+                spacing: 8
+                visible: root.subMode === "query"
+
+                Rectangle {
+                    width: 330
+                    height: parent.height
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: Colors.green
+
+                    Column {
+                        anchors {
+                            fill: parent
+                            margins: 8
+                        }
+                        spacing: 6
+
+                        SectionLabel {
+                            text: "HISTORY // QUERY"
+                            color: Colors.green
+                        }
+
+                        EditorBox {
+                            id: queryPathInput
+                            width: parent.width
+                            placeholder: "PATH // widgets/GitW.qml"
+                            accent: Colors.cyan
+                            keyboardOwner: root.keyboardHost
+                            editorFontSize: 10
+                            placeholderFontSize: 9
+                        }
+
+                        MiniButton {
+                            width: parent.width
+                            label: "USE SELECTED FILE"
+                            accent: Colors.cyan
+                            enabledAction:
+                                root.historyService
+                                && root.historyService.selectedFile
+                            onTriggered:
+                                queryPathInput.text =
+                                    root.historyService.selectedFile
+                        }
+
+                        EditorBox {
+                            id: queryAuthorInput
+                            width: parent.width
+                            placeholder: "AUTHOR // NAME OR EMAIL"
+                            accent: Colors.magenta
+                            keyboardOwner: root.keyboardHost
+                            editorFontSize: 10
+                            placeholderFontSize: 9
+                        }
+
+                        Row {
+                            width: parent.width
+                            height: 30
+                            spacing: 6
+
+                            EditorBox {
+                                id: querySinceInput
+                                width: (parent.width - 6) / 2
+                                placeholder: "SINCE"
+                                accent: Colors.orange
+                                keyboardOwner: root.keyboardHost
+                                editorFontSize: 10
+                                placeholderFontSize: 9
+                            }
+
+                            EditorBox {
+                                id: queryUntilInput
+                                width: (parent.width - 6) / 2
+                                placeholder: "UNTIL"
+                                accent: Colors.orange
+                                keyboardOwner: root.keyboardHost
+                                editorFontSize: 10
+                                placeholderFontSize: 9
+                            }
+                        }
+
+                        EditorBox {
+                            id: queryRangeInput
+                            width: parent.width
+                            placeholder: "RANGE // A..B OR SHA..SHA"
+                            accent: Colors.yellow
+                            keyboardOwner: root.keyboardHost
+                            editorFontSize: 10
+                            placeholderFontSize: 9
+                        }
+
+                        Row {
+                            width: parent.width
+                            height: 32
+                            spacing: 6
+
+                            MiniButton {
+                                width: (parent.width - 6) / 2
+                                height: 32
+                                label:
+                                    root.historyService
+                                    && root.historyService.queryBusy
+                                    ? "QUERYING"
+                                    : "RUN QUERY"
+                                accent: Colors.green
+                                enabledAction:
+                                    root.historyService
+                                    && !root.historyService.queryBusy
+                                onTriggered: {
+                                    root.selectedQuerySha = "";
+                                    root.historyService.runQuery(
+                                        queryPathInput.text,
+                                        queryAuthorInput.text,
+                                        querySinceInput.text,
+                                        queryUntilInput.text,
+                                        queryRangeInput.text
+                                    );
+                                }
+                            }
+
+                            MiniButton {
+                                width: (parent.width - 6) / 2
+                                height: 32
+                                label: "CLEAR"
+                                accent: Colors.cyan
+                                enabledAction:
+                                    root.historyService
+                                onTriggered: {
+                                    queryPathInput.text = "";
+                                    queryAuthorInput.text = "";
+                                    querySinceInput.text = "";
+                                    queryUntilInput.text = "";
+                                    queryRangeInput.text = "";
+                                    root.selectedQuerySha = "";
+                                    root.historyService.clearQuery();
+                                }
+                            }
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text:
+                                "DATES ACCEPT GIT SYNTAX // "
+                                + "2026-10-01, 2 weeks ago, yesterday"
+                            font.pixelSize: 9
+                            color: Colors.white
+                            opacity: 0.48
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width: parent.width - 338
+                    height: parent.height
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.green
+
+                    Column {
+                        anchors {
+                            fill: parent
+                            margins: 7
+                        }
+                        spacing: 5
+
+                        Row {
+                            width: parent.width
+                            height: 28
+                            spacing: 5
+
+                            GohuText {
+                                width: parent.width - 250
+                                anchors.verticalCenter: parent.verticalCenter
+                                text:
+                                    root.historyService
+                                    ? root.historyService.queryStatus
+                                    : "NO HISTORY SERVICE"
+                                font.pixelSize: 10
+                                color: Colors.green
+                                elide: Text.ElideRight
+                            }
+
+                            MiniButton {
+                                width: 118
+                                label: "OPEN IN LOG"
+                                accent: Colors.cyan
+                                enabledAction:
+                                    root.selectedQuerySha.length > 0
+                                onTriggered: {
+                                    searchInput.text =
+                                        root.selectedQuerySha.slice(0, 8);
+                                    root.subMode = "log";
+                                }
+                            }
+
+                            MiniButton {
+                                width: 122
+                                label: "SET COMPARE A"
+                                accent: Colors.orange
+                                enabledAction:
+                                    root.selectedQuerySha.length > 0
+                                    && root.historyService
+                                onTriggered:
+                                    root.historyService.compareA =
+                                        root.selectedQuerySha
+                            }
+                        }
+
+                        Flickable {
+                            id: historyScroll6
+
+                            width: parent.width
+                            height: parent.height - 34
+                            clip: true
+                            contentWidth: width
+                            contentHeight: queryResultColumn.implicitHeight
+                            boundsBehavior: Flickable.StopAtBounds
+
+                            Column {
+                                id: queryResultColumn
+
+                                width: parent.width
+                                spacing: 3
+
+                                GohuText {
+                                    visible:
+                                        root.historyService
+                                        && !root.historyService.queryBusy
+                                        && root.historyService.queryRows.length === 0
+                                    width: parent.width
+                                    topPadding: 24
+                                    text: "NO QUERY RESULTS"
+                                    horizontalAlignment: Text.AlignHCenter
+                                    font.pixelSize: 11
+                                    color: Colors.cyan
+                                }
+
+                                Repeater {
+                                    model:
+                                        root.historyService
+                                        ? root.historyService.queryRows
+                                        : []
+
+                                    Rectangle {
+                                        id: queryRow
+
+                                        required property var modelData
+
+                                        width: queryResultColumn.width
+                                        height: 58
+                                        color:
+                                            queryMouse.containsMouse
+                                            || root.selectedQuerySha
+                                               === String(modelData.sha || "")
+                                            ? Colors.dark
+                                            : "transparent"
+                                        border.width:
+                                            root.selectedQuerySha
+                                            === String(modelData.sha || "")
+                                            ? 1 : 0
+                                        border.color: Colors.green
+
+                                        Column {
+                                            anchors {
+                                                fill: parent
+                                                margins: 6
+                                            }
+                                            spacing: 2
+
+                                            Row {
+                                                width: parent.width
+                                                height: 15
+                                                spacing: 7
+
+                                                GohuText {
+                                                    width: 68
+                                                    text:
+                                                        String(
+                                                            queryRow.modelData.shortSha
+                                                            || ""
+                                                        )
+                                                    font.pixelSize: 10
+                                                    color: Colors.orange
+                                                }
+
+                                                GohuText {
+                                                    width: parent.width - 75
+                                                    text:
+                                                        String(
+                                                            queryRow.modelData.refsText
+                                                            || ""
+                                                        )
+                                                    font.pixelSize: 9
+                                                    color: Colors.cyan
+                                                    elide: Text.ElideRight
+                                                }
+                                            }
+
+                                            GohuText {
+                                                width: parent.width
+                                                text:
+                                                    String(
+                                                        queryRow.modelData.subject
+                                                        || ""
+                                                    )
+                                                font.pixelSize: 11
+                                                color: Colors.white
+                                                elide: Text.ElideRight
+                                            }
+
+                                            GohuText {
+                                                width: parent.width
+                                                text:
+                                                    String(
+                                                        queryRow.modelData.author
+                                                        || ""
+                                                    )
+                                                    + " // "
+                                                    + root.dateLabel(
+                                                        queryRow.modelData.epoch
+                                                      )
+                                                font.pixelSize: 9
+                                                color: Colors.white
+                                                opacity: 0.50
+                                                elide: Text.ElideRight
+                                            }
+                                        }
+
+                                        MouseArea {
+                                            id: queryMouse
+
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+
+                                            onClicked: {
+                                                root.selectedQuerySha =
+                                                    String(
+                                                        queryRow.modelData.sha
+                                                        || ""
+                                                    );
+                                                root.historyService.showCommit(
+                                                    root.selectedQuerySha
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            NeonScrollBar {
+                                flickable: historyScroll6
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ===== REFLOG ================================================
+            Row {
+                anchors.fill: parent
+                spacing: 8
+                visible: root.subMode === "reflog"
+
+                Rectangle {
+                    width: 470
+                    height: parent.height
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: Colors.magenta
+
+                    Column {
+                        anchors {
+                            fill: parent
+                            margins: 7
+                        }
+                        spacing: 5
+
+                        Row {
+                            width: parent.width
+                            height: 28
+
+                            GohuText {
+                                width: parent.width - 112
+                                anchors.verticalCenter: parent.verticalCenter
+                                text:
+                                    root.historyService
+                                    ? root.historyService.reflogStatus
+                                    : "NO HISTORY SERVICE"
+                                font.pixelSize: 10
+                                color: Colors.magenta
+                                elide: Text.ElideRight
+                            }
+
+                            MiniButton {
+                                width: 108
+                                label:
+                                    root.historyService
+                                    && root.historyService.reflogBusy
+                                    ? "READING"
+                                    : "REFRESH"
+                                accent: Colors.cyan
+                                enabledAction:
+                                    root.historyService
+                                    && !root.historyService.reflogBusy
+                                onTriggered:
+                                    root.historyService.loadReflog()
+                            }
+                        }
+
+                        Flickable {
+                            id: historyScroll7
+
+                            width: parent.width
+                            height: parent.height - 34
+                            clip: true
+                            contentWidth: width
+                            contentHeight: reflogColumn.implicitHeight
+                            boundsBehavior: Flickable.StopAtBounds
+
+                            Column {
+                                id: reflogColumn
+
+                                width: parent.width
+                                spacing: 3
+
+                                Repeater {
+                                    model:
+                                        root.historyService
+                                        ? root.historyService.reflogRows
+                                        : []
+
+                                    Rectangle {
+                                        id: reflogRow
+
+                                        required property var modelData
+
+                                        width: reflogColumn.width
+                                        height: 52
+                                        color:
+                                            reflogMouse.containsMouse
+                                            || root.selectedReflogSha
+                                               === String(modelData.sha || "")
+                                            ? Colors.black
+                                            : "transparent"
+                                        border.width:
+                                            root.selectedReflogSha
+                                            === String(modelData.sha || "")
+                                            ? 1 : 0
+                                        border.color: Colors.magenta
+
+                                        Column {
+                                            anchors {
+                                                fill: parent
+                                                margins: 6
+                                            }
+                                            spacing: 2
+
+                                            GohuText {
+                                                width: parent.width
+                                                text:
+                                                    String(
+                                                        reflogRow.modelData.selector
+                                                        || ""
+                                                    )
+                                                    + " // "
+                                                    + String(
+                                                        reflogRow.modelData.shortSha
+                                                        || ""
+                                                    )
+                                                font.pixelSize: 10
+                                                color: Colors.magenta
+                                                elide: Text.ElideRight
+                                            }
+
+                                            GohuText {
+                                                width: parent.width
+                                                text:
+                                                    String(
+                                                        reflogRow.modelData.subject
+                                                        || ""
+                                                    )
+                                                font.pixelSize: 10
+                                                color: Colors.white
+                                                elide: Text.ElideRight
+                                            }
+                                        }
+
+                                        MouseArea {
+                                            id: reflogMouse
+
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+
+                                            onClicked: {
+                                                root.selectedReflogSha =
+                                                    String(
+                                                        reflogRow.modelData.sha
+                                                        || ""
+                                                    );
+                                                root.historyService.showCommit(
+                                                    root.selectedReflogSha
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            NeonScrollBar {
+                                flickable: historyScroll7
+                                starHandle: true
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width: parent.width - 478
+                    height: parent.height
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.cyan
+
+                    Column {
+                        anchors {
+                            fill: parent
+                            margins: 8
+                        }
+                        spacing: 7
+
+                        SectionLabel {
+                            text: "RECOVERY // SAFE BRANCH"
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text:
+                                root.selectedReflogSha
+                                ? root.selectedReflogSha
+                                : "SELECT A REFLOG ENTRY"
+                            font.pixelSize: 10
+                            color: Colors.orange
+                            elide: Text.ElideMiddle
+                        }
+
+                        EditorBox {
+                            id: recoveryBranchInput
+
+                            width: parent.width
+                            placeholder: "RECOVERY BRANCH NAME"
+                            accent: Colors.green
+                            keyboardOwner: root.keyboardHost
+                            editorFontSize: 10
+                            placeholderFontSize: 9
+                        }
+
+                        Row {
+                            width: parent.width
+                            height: 30
+                            spacing: 6
+
+                            MiniButton {
+                                width: (parent.width - 12) / 3
+                                height: 30
+                                label: "RECOVER BRANCH"
+                                accent: Colors.green
+                                enabledAction:
+                                    root.selectedReflogSha.length > 0
+                                    && recoveryBranchInput.text.trim().length > 0
+                                    && root.historyService
+                                    && !root.historyService.actionBusy
+                                onTriggered:
+                                    root.historyService.createBranch(
+                                        recoveryBranchInput.text.trim(),
+                                        root.selectedReflogSha
+                                    )
+                            }
+
+                            MiniButton {
+                                width: (parent.width - 12) / 3
+                                height: 30
+                                label: "COPY SHA"
+                                accent: Colors.magenta
+                                enabledAction:
+                                    root.selectedReflogSha.length > 0
+                                    && root.historyService
+                                onTriggered:
+                                    root.historyService.copySha(
+                                        root.selectedReflogSha
+                                    )
+                            }
+
+                            MiniButton {
+                                width: (parent.width - 12) / 3
+                                height: 30
+                                label: "OPEN LOG"
+                                accent: Colors.cyan
+                                enabledAction:
+                                    root.selectedReflogSha.length > 0
+                                onTriggered: {
+                                    searchInput.text =
+                                        root.selectedReflogSha.slice(0, 8);
+                                    root.subMode = "log";
+                                }
+                            }
+                        }
+
+                        Flickable {
+                            id: historyScroll8
+
+                            width: parent.width
+                            height: parent.height - 106
+                            clip: true
+                            contentWidth: width
+                            contentHeight: reflogDetail.implicitHeight
+                            boundsBehavior: Flickable.StopAtBounds
+
+                            GohuText {
+                                id: reflogDetail
+
+                                width: parent.width
+                                text:
+                                    root.historyService
+                                    ? root.historyService.detailText
+                                    : "NO HISTORY SERVICE"
+                                font.pixelSize: 10
+                                color: Colors.white
+                                wrapMode: Text.WrapAnywhere
+                            }
+
+                            NeonScrollBar {
+                                flickable: historyScroll8
+                            }
+                        }
+                    }
+                }
+            }
+
             // ===== COMPARE ===============================================
             Row {
                 anchors.fill: parent
@@ -1570,6 +2231,16 @@ Item {
                         ? "REFUSED // " + root.historyService.lastError
                         : root.historyService.actionBusy
                         ? root.historyService.actionName + " // RUNNING"
+                        : root.historyService.queryBusy
+                          && root.subMode === "query"
+                        ? "QUERY // RUNNING"
+                        : root.historyService.reflogBusy
+                          && root.subMode === "reflog"
+                        ? "REFLOG // READING"
+                        : root.subMode === "query"
+                        ? root.historyService.queryStatus
+                        : root.subMode === "reflog"
+                        ? root.historyService.reflogStatus
                         : root.historyService.refreshing
                         ? "READING HISTORY"
                         : root.historyService.actionStatus

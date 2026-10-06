@@ -9,6 +9,8 @@ Rectangle {
     property color accentColor: Colors.cyan
     property color handleColor: Colors.white
     property color handleGlowColor: Colors.magenta
+    property color activityGlowColor: Colors.magenta
+    property var activityPoints: []
     property string sideLabel: ""
     property bool enabledSlider: count > 1
 
@@ -167,6 +169,72 @@ Rectangle {
 
                 color: slider.accentColor
                 opacity: slider.count > 0 ? 0.48 : 0.14
+            }
+
+            Repeater {
+                model: slider.activityPoints || []
+
+                Item {
+                    required property int index
+                    required property var modelData
+
+                    readonly property int branchIndex:
+                        Number(modelData.index || 0)
+                    readonly property real intensity:
+                        Math.max(
+                            0,
+                            Math.min(
+                                1,
+                                Number(modelData.intensity || 0)
+                            )
+                        )
+
+                    width: 30
+                    height: 10
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    z: 5
+                    visible: intensity > 0
+
+                    y:
+                        slider.count <= 1
+                        ? (slot.height - height) / 2
+                        : (
+                            slot.height - height
+                          )
+                          * slider.clampedIndex(branchIndex)
+                          / Math.max(1, slider.count - 1)
+
+                    RectangularShadow {
+                        anchors.centerIn: activityTick
+                        width: activityTick.width
+                        height: activityTick.height
+                        spread: 3
+                        z: -1
+                        opacity: 0.68 * parent.intensity
+                        color: slider.activityGlowColor
+                    }
+
+                    Rectangle {
+                        id: activityTick
+
+                        anchors.centerIn: parent
+                        width: 22
+                        height: 2
+                        radius: 1
+                        color: slider.activityGlowColor
+                        opacity: 0.46 + 0.54 * parent.intensity
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+
+                        onClicked: {
+                            slider.indexRequested(parent.branchIndex);
+                        }
+                    }
+                }
             }
 
             RectangularShadow {

@@ -288,11 +288,10 @@ Rectangle {
             id: inboxFrame
 
             width: parent.width
-            height: 132
+            height: 82
             color: Colors.dark
             border.width: 1
             border.color: Colors.yellow
-            clip: true
 
             Column {
                 anchors {
@@ -304,12 +303,12 @@ Rectangle {
 
                 Row {
                     width: parent.width
-                    height: 20
+                    height: 18
 
                     GohuText {
                         width: parent.width - inboxCount.width
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "FRONT DESK // ATTENTION INBOX"
+                        text: "FRONT DESK // ATTENTION"
                         font.pixelSize: 10
                         color: Colors.yellow
                     }
@@ -318,114 +317,114 @@ Rectangle {
                         id: inboxCount
 
                         anchors.verticalCenter: parent.verticalCenter
-                        text:
-                            String(
-                                root.inbox.filter(function(item) {
-                                    return String((item || {}).kind || "")
-                                           !== "clear";
-                                }).length
-                            )
-                        font.pixelSize: 11
+                        text: String(Math.min(5, root.inbox.length))
+                        font.pixelSize: 10
                         color: Colors.yellow
                     }
                 }
 
-                Flickable {
-                    id: inboxScroll
+                Row {
+                    id: inboxSlots
 
                     width: parent.width
-                    height: parent.height - 25
-                    contentWidth: width
-                    contentHeight: inboxColumn.height
-                    boundsBehavior: Flickable.StopAtBounds
-                    clip: true
+                    height: 44
+                    spacing: 6
 
-                    Column {
-                        id: inboxColumn
+                    Repeater {
+                        model: 5
 
-                        width: inboxScroll.width
-                        spacing: 4
+                        Rectangle {
+                            required property int index
 
-                        Repeater {
-                            model: root.inbox
+                            readonly property var itemData:
+                                index < root.inbox.length
+                                ? root.inbox[index]
+                                : null
+                            readonly property bool occupied:
+                                itemData !== null
 
-                            Rectangle {
-                                required property var modelData
-
-                                width: inboxColumn.width
-                                height: 34
-                                color:
-                                    inboxMouse.pressed
-                                    ? Colors.black
-                                    : Colors.black
-                                border.width:
+                            width: (inboxSlots.width - 24) / 5
+                            height: inboxSlots.height
+                            color:
+                                occupied
+                                && inboxMouse.pressed
+                                ? Colors.black
+                                : Colors.black
+                            opacity: occupied ? 1.0 : 0.18
+                            border.width:
+                                occupied
+                                && inboxMouse.containsMouse
+                                ? 2 : 1
+                            border.color:
+                                !occupied
+                                ? Colors.cyan
+                                : String(itemData.kind || "") === "room"
+                                ? (
                                     inboxMouse.containsMouse
-                                    && String(modelData.route || "")
-                                    ? 2 : 1
-                                border.color:
-                                    String(modelData.kind || "") === "room"
-                                    ? (
-                                        inboxMouse.containsMouse
-                                        ? Colors.orange
-                                        : Colors.yellow
-                                      )
-                                    : String(modelData.kind || "") === "staff"
-                                    ? (
-                                        inboxMouse.containsMouse
-                                        ? Colors.orange
+                                    ? Colors.orange
+                                    : Colors.yellow
+                                  )
+                                : (
+                                    inboxMouse.containsMouse
+                                    ? Colors.orange
+                                    : Colors.magenta
+                                  )
+
+                            Column {
+                                anchors {
+                                    fill: parent
+                                    margins: 5
+                                }
+
+                                spacing: 2
+
+                                GohuText {
+                                    width: parent.width
+                                    visible: parent.parent.occupied
+                                    text:
+                                        String(
+                                            (parent.parent.itemData || {}).title
+                                            || ""
+                                        )
+                                    font.pixelSize: 8
+                                    color:
+                                        String(
+                                            (parent.parent.itemData || {}).kind
+                                            || ""
+                                        ) === "room"
+                                        ? Colors.yellow
                                         : Colors.magenta
-                                      )
-                                    : Colors.green
-
-                                Column {
-                                    anchors {
-                                        left: parent.left
-                                        right: parent.right
-                                        verticalCenter: parent.verticalCenter
-                                        leftMargin: 8
-                                        rightMargin: 8
-                                    }
-
-                                    spacing: 1
-
-                                    GohuText {
-                                        width: parent.width
-                                        text: String(parent.parent.modelData.title || "")
-                                        font.pixelSize: 9
-                                        color:
-                                            String(parent.parent.modelData.kind || "") === "room"
-                                            ? Colors.yellow
-                                            : String(parent.parent.modelData.kind || "") === "staff"
-                                            ? Colors.magenta
-                                            : Colors.green
-                                        elide: Text.ElideRight
-                                    }
-
-                                    GohuText {
-                                        width: parent.width
-                                        text: String(parent.parent.modelData.detail || "")
-                                        font.pixelSize: 8
-                                        color: Colors.white
-                                        opacity: 0.78
-                                        elide: Text.ElideRight
-                                    }
+                                    elide: Text.ElideRight
                                 }
 
-                                MouseArea {
-                                    id: inboxMouse
-
-                                    anchors.fill: parent
-                                    enabled:
-                                        String(parent.modelData.route || "").length > 0
-                                    hoverEnabled: true
-                                    cursorShape:
-                                        enabled
-                                        ? Qt.PointingHandCursor
-                                        : Qt.ArrowCursor
-
-                                    onClicked:
-                                        root.attentionActivated(parent.modelData)
+                                GohuText {
+                                    width: parent.width
+                                    visible: parent.parent.occupied
+                                    text:
+                                        String(
+                                            (parent.parent.itemData || {}).detail
+                                            || ""
+                                        )
+                                    font.pixelSize: 7
+                                    color: Colors.white
+                                    opacity: 0.72
+                                    elide: Text.ElideRight
                                 }
+                            }
+
+                            MouseArea {
+                                id: inboxMouse
+
+                                anchors.fill: parent
+                                enabled: parent.occupied
+                                hoverEnabled: true
+                                cursorShape:
+                                    enabled
+                                    ? Qt.PointingHandCursor
+                                    : Qt.ArrowCursor
+
+                                onClicked:
+                                    root.attentionActivated(parent.itemData)
                             }
                         }
                     }

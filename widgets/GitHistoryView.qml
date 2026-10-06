@@ -178,7 +178,7 @@ Item {
     }
 
     component SectionLabel: GohuText {
-        font.pixelSize: 12
+        font.pixelSize: 14
         color: Colors.magenta
     }
 
@@ -207,7 +207,7 @@ Item {
         GohuText {
             anchors.centerIn: parent
             text: button.label
-            font.pixelSize: 8
+            font.pixelSize: 10
             color:
                 mouse.pressed
                 ? Colors.black
@@ -259,7 +259,7 @@ Item {
             selectionColor: Colors.magenta
             selectedTextColor: Colors.black
             font.family: "GohuFont 11 Nerd Font Mono"
-            font.pixelSize: 9
+            font.pixelSize: 11
             clip: true
 
             onActiveFocusChanged: {
@@ -283,7 +283,7 @@ Item {
             }
             visible: editor.text.length === 0
             text: editorBox.placeholder
-            font.pixelSize: 8
+            font.pixelSize: 10
             color: Colors.white
             opacity: 0.30
         }
@@ -323,7 +323,7 @@ Item {
                             ? String(root.historyService.rows.length)
                               + " LOADED"
                             : "NO HISTORY"
-                        font.pixelSize: 8
+                        font.pixelSize: 10
                         color: Colors.cyan
                     }
                 }
@@ -352,7 +352,7 @@ Item {
                         }
                         verticalAlignment: Text.AlignVCenter
                         text: root.currentScope().label
-                        font.pixelSize: 8
+                        font.pixelSize: 10
                         color: Colors.white
                         elide: Text.ElideMiddle
                     }
@@ -582,7 +582,7 @@ Item {
                                                         commitRow.modelData.shortSha
                                                         || ""
                                                     )
-                                                font.pixelSize: 8
+                                                font.pixelSize: 10
                                                 color:
                                                     commitRow.modelData.isHead
                                                     ? Colors.magenta
@@ -596,7 +596,7 @@ Item {
                                                         commitRow.modelData.refsText
                                                         || ""
                                                     )
-                                                font.pixelSize: 7
+                                                font.pixelSize: 9
                                                 color: Colors.cyan
                                                 elide: Text.ElideRight
                                             }
@@ -609,7 +609,7 @@ Item {
                                                     commitRow.modelData.subject
                                                     || ""
                                                 )
-                                            font.pixelSize: 9
+                                            font.pixelSize: 11
                                             color: Colors.white
                                             elide: Text.ElideRight
                                         }
@@ -625,7 +625,7 @@ Item {
                                                 + root.dateLabel(
                                                     commitRow.modelData.epoch
                                                   )
-                                            font.pixelSize: 7
+                                            font.pixelSize: 9
                                             color: Colors.white
                                             opacity: 0.50
                                             elide: Text.ElideRight
@@ -743,7 +743,7 @@ Item {
                                     : root.inspectorMode === "file"
                                     ? root.historyService.fileDiffText
                                     : root.historyService.detailText
-                                font.pixelSize: 9
+                                font.pixelSize: 11
                                 color:
                                     root.historyService
                                     && root.historyService.lastError
@@ -770,7 +770,7 @@ Item {
                                     ? root.historyService.changedFiles.length
                                     : 0
                                   )
-                            font.pixelSize: 8
+                            font.pixelSize: 10
                             color: Colors.cyan
                         }
 
@@ -816,7 +816,7 @@ Item {
                                                     changedFileRow.modelData.status
                                                     || ""
                                                 )
-                                            font.pixelSize: 8
+                                            font.pixelSize: 10
                                             color: Colors.orange
                                         }
 
@@ -833,7 +833,7 @@ Item {
                                                     changedFileRow.modelData.path
                                                     || ""
                                                 )
-                                            font.pixelSize: 8
+                                            font.pixelSize: 10
                                             color: Colors.white
                                             elide: Text.ElideMiddle
                                         }
@@ -899,7 +899,7 @@ Item {
 
                                 GohuText {
                                     text: "A // BASE"
-                                    font.pixelSize: 8
+                                    font.pixelSize: 10
                                     color: Colors.cyan
                                 }
 
@@ -910,7 +910,7 @@ Item {
                                         && root.historyService.compareA
                                         ? root.historyService.compareA
                                         : "NOT SET"
-                                    font.pixelSize: 9
+                                    font.pixelSize: 11
                                     color: Colors.white
                                     elide: Text.ElideMiddle
                                 }
@@ -933,7 +933,7 @@ Item {
 
                                 GohuText {
                                     text: "B // TARGET"
-                                    font.pixelSize: 8
+                                    font.pixelSize: 10
                                     color: Colors.orange
                                 }
 
@@ -944,7 +944,7 @@ Item {
                                         && root.historyService.compareB
                                         ? root.historyService.compareB
                                         : "NOT SET"
-                                    font.pixelSize: 9
+                                    font.pixelSize: 11
                                     color: Colors.white
                                     elide: Text.ElideMiddle
                                 }
@@ -969,7 +969,7 @@ Item {
                             text:
                                 "Select commits in LOG, press SET A / SET B, then compare. "
                                 + "A and B remain pinned while you browse."
-                            font.pixelSize: 8
+                            font.pixelSize: 10
                             color: Colors.white
                             opacity: 0.56
                             wrapMode: Text.WordWrap
@@ -1001,7 +1001,7 @@ Item {
                                 root.historyService
                                 ? root.historyService.compareText
                                 : "NO HISTORY SERVICE"
-                            font.pixelSize: 9
+                            font.pixelSize: 11
                             color: Colors.white
                             wrapMode: Text.WrapAnywhere
                         }
@@ -1040,7 +1040,7 @@ Item {
                                 && root.historyService.selectedSha
                                 ? root.historyService.selectedSha
                                 : "SELECT A COMMIT IN LOG"
-                            font.pixelSize: 9
+                            font.pixelSize: 11
                             color: Colors.orange
                             elide: Text.ElideMiddle
                         }
@@ -1204,7 +1204,7 @@ Item {
 
                         GohuText {
                             text: "ANCESTRY NAVIGATION"
-                            font.pixelSize: 9
+                            font.pixelSize: 11
                             color: Colors.cyan
                         }
 
@@ -1287,7 +1287,7 @@ Item {
                                 : root.historyService
                                 ? root.historyService.detailText
                                 : "NO HISTORY SERVICE"
-                            font.pixelSize: 9
+                            font.pixelSize: 11
                             color:
                                 root.armedAction
                                 ? Colors.orange
@@ -1333,7 +1333,7 @@ Item {
                         : root.historyService.actionStatus
                       )
                     : "NO HISTORY SERVICE"
-                font.pixelSize: 8
+                font.pixelSize: 10
                 color:
                     root.armedAction
                     ? Colors.orange

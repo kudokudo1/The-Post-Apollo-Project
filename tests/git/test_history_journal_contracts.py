@@ -77,6 +77,7 @@ require(
 )
 
 for operation in (
+    "merge",
     "cherry-pick",
     "revert",
     "detach",
@@ -89,6 +90,12 @@ for operation in (
         rf'return\s+runAction\(\s*"{re.escape(operation)}"',
         f"{operation} must flow through the History action seam",
     )
+
+require(
+    "widgets/GitHistoryView.qml",
+    "ARM MERGE SELECTED INTO CURRENT",
+    "History UI must expose an armed ordinary merge control",
+)
 
 require_regex(
     "widgets/GitW.qml",

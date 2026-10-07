@@ -116,6 +116,11 @@ Item {
             if (root.stackExecutor)
                 root.stackExecutor.disarm("STACK RELATIONSHIPS CHANGED");
         }
+
+        function onRelationRejected(reason) {
+            root.managementMessage =
+                "REFUSED // " + String(reason || "STACK RELATION REJECTED");
+        }
     }
 
     Connections {
@@ -387,7 +392,12 @@ Item {
     }
 
     function cycleEditMode() {
-        editMode = editMode === "NAME" ? "UP" : "NAME";
+        if (editMode === "NAME")
+            editMode = "UP";
+        else if (editMode === "UP")
+            editMode = "PARENT";
+        else
+            editMode = "NAME";
 
         if (root.managementMode === "edit")
             root.syncManagementEditors();
@@ -409,6 +419,7 @@ Item {
             root.selectedBranchData
             ? String(root.selectedBranchData.upstream || "")
             : "";
+        parentEditor.text = root.selectedStackParent;
     }
 
     function openEditManager() {
@@ -423,8 +434,10 @@ Item {
         Qt.callLater(function() {
             if (root.editMode === "NAME")
                 renameEditor.focusEditor();
-            else
+            else if (root.editMode === "UP")
                 upstreamEditor.focusEditor();
+            else
+                parentEditor.focusEditor();
         });
     }
 
@@ -732,6 +745,102 @@ Item {
                 forceRemove
             ))
             root.managementMessage = "REFUSED // BRANCH CORE BUSY";
+    }
+
+    function stackParentBlockReason(parentName) {
+        const parent = String(parentName || "").trim();
+
+        if (!root.branchStackStore)
+            return "STACK STORE NOT CONNECTED";
+
+        if (!root.selectedBranch)
+            return "SELECT A BRANCH";
+
+        if (root.selectedIsTrunk)
+            return "TRUNK BRANCH STAYS ROOT";
+
+        if (!parent)
+            return "PARENT BRANCH REQUIRED OR USE CLEAR";
+
+        if (parent === root.selectedBranch)
+            return "BRANCH CANNOT PARENT ITSELF";
+
+        if (!root.branchWorkspaceService
+                || !root.branchWorkspaceService.branchForName(parent))
+            return "PARENT MUST BE AN EXISTING LOCAL BRANCH";
+
+        if (root.branchStackStore.wouldCreateCycle(
+                root.selectedBranch,
+                parent
+            ))
+            return "STACK CYCLE REFUSED";
+
+        return "";
+    }
+
+    function applyStackParent() {
+        if (!root.branchStackStore || !root.selectedBranch)
+            return;
+
+        const parent = String(parentEditor.text || "").trim();
+        const reason = root.stackParentBlockReason(parent);
+
+        if (reason) {
+            root.managementMessage = "REFUSED // " + reason;
+            return;
+        }
+
+        if (parent === root.selectedStackParent) {
+            root.managementMessage =
+                "NO CHANGE // PARENT IS ALREADY " + parent;
+            return;
+        }
+
+        if (!root.branchStackStore.setParent(
+                root.selectedBranch,
+                parent
+            )) {
+            if (!root.managementMessage)
+                root.managementMessage =
+                    "REFUSED // STACK PARENT CHANGE FAILED";
+            return;
+        }
+
+        root.managementMessage =
+            "OK // PARENT // "
+            + parent
+            + " → "
+            + root.selectedBranch;
+        parentEditor.text = parent;
+    }
+
+    function clearStackParent() {
+        if (!root.branchStackStore || !root.selectedBranch)
+            return;
+
+        if (root.selectedIsTrunk) {
+            root.managementMessage =
+                "REFUSED // TRUNK BRANCH STAYS ROOT";
+            return;
+        }
+
+        if (!root.selectedStackParent) {
+            root.managementMessage =
+                "NO CHANGE // STACK PARENT ALREADY CLEAR";
+            return;
+        }
+
+        if (!root.branchStackStore.clearParent(root.selectedBranch)) {
+            if (!root.managementMessage)
+                root.managementMessage =
+                    "REFUSED // CLEAR STACK PARENT FAILED";
+            return;
+        }
+
+        parentEditor.text = "";
+        root.managementMessage =
+            "OK // STACK PARENT CLEARED // "
+            + root.selectedBranch;
     }
 
     function deleteBlockReason(forceDelete) {
@@ -2136,7 +2245,7 @@ Item {
                                 spacing: 6
 
                                 BranchButton {
-                                    width: (parent.width - 6) / 2
+                                    width: (parent.width - 12) / 3
                                     label: "NAME"
                                     selectedAction: root.editMode === "NAME"
                                     onTriggered: {
@@ -2149,7 +2258,7 @@ Item {
                                 }
 
                                 BranchButton {
-                                    width: (parent.width - 6) / 2
+                                    width: (parent.width - 12) / 3
                                     label: "UPSTREAM"
                                     selectedAction: root.editMode === "UP"
                                     onTriggered: {
@@ -2157,6 +2266,22 @@ Item {
                                         root.syncManagementEditors();
                                         Qt.callLater(function() {
                                             upstreamEditor.focusEditor();
+                                        });
+                                    }
+                                }
+
+                                BranchButton {
+                                    width: (parent.width - 12) / 3
+                                    label: "PARENT"
+                                    selectedAction:
+                                        root.editMode === "PARENT"
+                                    enabledAction:
+                                        !root.selectedIsTrunk
+                                    onTriggered: {
+                                        root.editMode = "PARENT";
+                                        root.syncManagementEditors();
+                                        Qt.callLater(function() {
+                                            parentEditor.focusEditor();
                                         });
                                     }
                                 }
@@ -2259,10 +2384,128 @@ Item {
 
                             GohuText {
                                 width: parent.width
+                                visible: root.editMode === "PARENT"
+                                text:
+                                    "CURRENT PARENT // "
+                                    + (root.selectedStackParent || "NONE")
+                                font.pixelSize: 10
+                                color: Colors.cyan
+                                elide: Text.ElideMiddle
+                            }
+
+                            BranchEditor {
+                                id: parentEditor
+                                width: parent.width
+                                visible: root.editMode === "PARENT"
+                                placeholder: "LOCAL PARENT BRANCH"
+                                accent: Colors.orange
+                            }
+
+                            Rectangle {
+                                width: parent.width
+                                height: 68
+                                visible: root.editMode === "PARENT"
+                                color: Colors.dark
+                                border.width: 1
+                                border.color:
+                                    root.stackParentBlockReason(
+                                        parentEditor.text
+                                    )
+                                    ? Colors.orange
+                                    : Colors.green
+
+                                Column {
+                                    anchors {
+                                        fill: parent
+                                        margins: 7
+                                    }
+                                    spacing: 4
+
+                                    GohuText {
+                                        width: parent.width
+                                        text:
+                                            (
+                                                String(
+                                                    parentEditor.text || ""
+                                                ).trim()
+                                                || "NO PARENT"
+                                            )
+                                            + " → "
+                                            + root.selectedBranch
+                                        font.pixelSize: 10
+                                        color: Colors.green
+                                        elide: Text.ElideMiddle
+                                    }
+
+                                    GohuText {
+                                        width: parent.width
+                                        text:
+                                            root.stackParentBlockReason(
+                                                parentEditor.text
+                                            )
+                                            || "VALID LOCAL STACK RELATION"
+                                        font.pixelSize: 9
+                                        color:
+                                            root.stackParentBlockReason(
+                                                parentEditor.text
+                                            )
+                                            ? Colors.orange
+                                            : Colors.cyan
+                                        elide: Text.ElideMiddle
+                                    }
+
+                                    GohuText {
+                                        width: parent.width
+                                        text:
+                                            "RELATION ONLY // COMMITS DO NOT MOVE UNTIL RESTACK"
+                                        font.pixelSize: 8
+                                        color: Colors.white
+                                        opacity: 0.58
+                                        elide: Text.ElideRight
+                                    }
+                                }
+                            }
+
+                            Row {
+                                width: parent.width
+                                height: 32
+                                spacing: 6
+                                visible: root.editMode === "PARENT"
+
+                                BranchButton {
+                                    width: (parent.width - 6) / 2
+                                    height: 32
+                                    label: "SET PARENT"
+                                    enabledAction:
+                                        branchStackStore
+                                        && !root.selectedIsTrunk
+                                        && root.stackParentBlockReason(
+                                            parentEditor.text
+                                          ).length === 0
+                                    onTriggered: root.applyStackParent()
+                                }
+
+                                BranchButton {
+                                    width: (parent.width - 6) / 2
+                                    height: 32
+                                    label: "CLEAR"
+                                    destructive: true
+                                    enabledAction:
+                                        branchStackStore
+                                        && !root.selectedIsTrunk
+                                        && root.selectedStackParent.length > 0
+                                    onTriggered: root.clearStackParent()
+                                }
+                            }
+
+                            GohuText {
+                                width: parent.width
                                 text:
                                     root.editMode === "NAME"
                                     ? "Git renames the local branch. Stack links follow the new name automatically."
-                                    : "Use an existing remote ref such as origin/main. CLEAR removes tracking only."
+                                    : root.editMode === "UP"
+                                    ? "Use an existing remote ref such as origin/main. CLEAR removes tracking only."
+                                    : "Choose an existing local branch as the intended parent. Cycle checks happen before the relation is saved."
                                 font.pixelSize: 9
                                 color: Colors.white
                                 opacity: 0.58

@@ -117,13 +117,25 @@ Scope {
             after: cloneValue(afterState),
             metadata: cloneValue(previous.metadata || {}),
             detail: String(detail || ""),
-            recoveryClass:
-                String(previous.recoveryClass || "EVIDENCE_ONLY")
-                === "REF_RECOVERABLE"
-                && String((afterState || {}).recoveryClass || "EVIDENCE_ONLY")
-                === "REF_RECOVERABLE"
-                ? "REF_RECOVERABLE"
-                : "EVIDENCE_ONLY",
+            recoveryClass: {
+                const beforeClass =
+                    String(previous.recoveryClass || "EVIDENCE_ONLY");
+                const afterClass =
+                    String(
+                        (afterState || {}).recoveryClass
+                        || "EVIDENCE_ONLY"
+                    );
+
+                if (beforeClass === "REF_RECOVERABLE"
+                        && afterClass === "REF_RECOVERABLE")
+                    return "REF_RECOVERABLE";
+
+                if (beforeClass === "CONTENT_RECOVERABLE"
+                        && afterClass === "CONTENT_RECOVERABLE")
+                    return "CONTENT_RECOVERABLE";
+
+                return "EVIDENCE_ONLY";
+            },
             undoState: "NOT_IMPLEMENTED"
         };
 

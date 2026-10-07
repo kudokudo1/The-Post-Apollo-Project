@@ -925,9 +925,57 @@ Item {
                     }
                 }
 
+                Rectangle {
+                    id: workflowActionStatus
+
+                    width: parent.width
+                    height: visible ? 34 : 0
+                    visible:
+                        root.githubService.actionKind === "delete-workflow"
+                        && root.githubService.actionResult !== "READY"
+
+                    color: Colors.black
+                    border.width: visible ? 1 : 0
+                    border.color:
+                        root.githubService.actionResult.indexOf("ERROR //") === 0
+                        ? Colors.red
+                        : root.githubService.actionBusy
+                        ? Colors.orange
+                        : Colors.cyan
+
+                    GohuText {
+                        anchors {
+                            fill: parent
+                            margins: 5
+                        }
+
+                        text:
+                            root.githubService.actionResult
+                            + (
+                                root.githubService.actionTarget
+                                ? " // " + root.githubService.actionTarget
+                                : ""
+                              )
+                        font.pixelSize: 7
+                        color:
+                            root.githubService.actionResult.indexOf("ERROR //") === 0
+                            ? Colors.red
+                            : root.githubService.actionBusy
+                            ? Colors.orange
+                            : Colors.cyan
+                        wrapMode: Text.WrapAnywhere
+                        maximumLineCount: 2
+                        elide: Text.ElideRight
+                    }
+                }
+
                 Item {
                     width: parent.width
-                    height: parent.height - 31
+                    height:
+                        parent.height
+                        - 31
+                        - workflowActionStatus.height
+                        - (workflowActionStatus.visible ? 7 : 0)
 
                     Flickable {
                         id: workflowFlick

@@ -1070,15 +1070,15 @@ PanelWindow {
     function openChangesForPath(path) {
         const target = String(path || "").trim();
 
-        if (!target)
-            return;
-
         root.pushGitNavigationContext();
         root.localTargetMenuOpen = false;
         root.remoteTargetMenuOpen = false;
         root.activePage = "git";
         root.gitView = "changes";
-        gitChangesView.focusPath(target);
+
+        if (target)
+            gitChangesView.focusPath(target);
+
         changesService.refresh();
     }
 
@@ -1795,6 +1795,16 @@ PanelWindow {
 
     GitInteractiveRebaseService {
         id: interactiveRebaseService
+        operationJournal: operationJournalService
+        snapshotService: repositorySnapshotService
+        repositoryPath:
+            gitService.repoIsLocal
+            ? gitService.repoRoot
+            : ""
+    }
+
+    GitInteractiveRebaseSessionService {
+        id: interactiveRebaseSessionService
         operationJournal: operationJournalService
         snapshotService: repositorySnapshotService
         repositoryPath:
@@ -4888,6 +4898,8 @@ PanelWindow {
                         gitService: gitService
                         historyService: historyService
                         interactiveRebaseService: interactiveRebaseService
+                        interactiveRebaseSessionService:
+                            interactiveRebaseSessionService
                         keyboardHost: root
 
                         onChangesRequested: function(path) {

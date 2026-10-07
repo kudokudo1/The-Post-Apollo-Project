@@ -777,6 +777,67 @@ Scope {
         return row ? itemStatus(row) : "";
     }
 
+    function nextStatusForItem(item, delta) {
+        const row = item || {};
+        const options = statusOptions();
+
+        if (options.length === 0)
+            return "";
+
+        const current = itemStatus(row);
+        let index = options.indexOf(current);
+
+        if (index < 0)
+            index = Number(delta || 0) >= 0
+                ? -1
+                : 0;
+
+        index =
+            (
+                index
+                + Number(delta || 0)
+                + options.length
+            )
+            % options.length;
+
+        return options[index];
+    }
+
+    function moveItemStatusByUrl(url, delta) {
+        const row = itemByUrl(url);
+
+        if (!row) {
+            lastError =
+                "STATUS MOVE UNAVAILABLE // ITEM NOT IN SELECTED PROJECT";
+            stateText = lastError;
+            return false;
+        }
+
+        const next = nextStatusForItem(row, delta);
+
+        if (!next) {
+            lastError =
+                "STATUS MOVE UNAVAILABLE // STATUS FIELD HAS NO OPTIONS";
+            stateText = lastError;
+            return false;
+        }
+
+        return setItemStatus(row, next);
+    }
+
+    function removeItemByUrl(url, confirmed) {
+        const row = itemByUrl(url);
+
+        if (!row) {
+            lastError =
+                "REMOVE UNAVAILABLE // ITEM NOT IN SELECTED PROJECT";
+            stateText = lastError;
+            return false;
+        }
+
+        return removeItem(row, confirmed);
+    }
+
     function addExistingItem(url, kind) {
         const number = selectedNumber();
         const cleanUrl = canonicalItemUrl(url);

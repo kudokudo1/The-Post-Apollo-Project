@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "components/ConversationFeed.qml"
+      - "components/qmldir"
       - "widgets/messanger/ChatFeed.qml"
       - "services/hospital/HospitalRoomConversationAdapter.qml"
       - "widgets/HospitalRoomChatView.qml"

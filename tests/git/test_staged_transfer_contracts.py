@@ -27,7 +27,7 @@ for needle, message in (
     ('return "CHANGES/TRANSFER_STAGED";', "staged transfer must have an explicit journal kind"),
     ('layer: String(previewLayer || "worktree")', "journal metadata must record staged/worktree semantics"),
     ('git -C "$source" diff --cached --binary --full-index', "staged preview must be generated from HEAD to index"),
-    ('PARTIALLY STAGED TRANSFER IS NOT IMPLEMENTED', "first staged slice must refuse an unstaged remainder"),
+    ('function previewPartial(destinationPath, files, mode)', "partially staged files must route to the dedicated two-layer backend"),
     ('apply --check --index --binary', "staged preview must prove index-preserving applicability"),
     ('apply -R --check --index --binary', "staged MOVE must prove source index removal"),
     ('MOVED STAGED %s FILE(S)', "staged MOVE execution must be explicit"),
@@ -165,7 +165,7 @@ def smoke_move_and_undo():
         assert status(destination) == ""
 
 
-def smoke_partial_staging_refusal():
+def smoke_partial_staging_shape():
     with tempfile.TemporaryDirectory(prefix="pa-staged-partial-") as tmp:
         source, _destination = make_pair(Path(tmp))
         _patch = make_staged_change(source)
@@ -181,6 +181,6 @@ def smoke_partial_staging_refusal():
 
 smoke_copy_and_undo()
 smoke_move_and_undo()
-smoke_partial_staging_refusal()
+smoke_partial_staging_shape()
 
 print("Git staged whole-file transfer contracts: PASS")

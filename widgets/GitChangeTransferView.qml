@@ -53,6 +53,8 @@ Rectangle {
     readonly property string effectiveLayer:
         untrackedSource
         ? "untracked"
+        : String(transferLayer || "worktree").toLowerCase() === "partial"
+        ? "partial"
         : String(transferLayer || "worktree").toLowerCase() === "staged"
         ? "staged"
         : "worktree"
@@ -128,6 +130,14 @@ Rectangle {
 
         if (root.effectiveLayer === "untracked") {
             return transferService.previewUntracked(
+                selectedDestinationPath,
+                [filePath],
+                transferMode
+            );
+        }
+
+        if (root.effectiveLayer === "partial") {
+            return transferService.previewPartial(
                 selectedDestinationPath,
                 [filePath],
                 transferMode
@@ -246,6 +256,8 @@ Rectangle {
                             + String(root.hunkIndex + 1)
                         : root.effectiveLayer === "untracked"
                         ? "TRANSFER // UNTRACKED WHOLE FILE"
+                        : root.effectiveLayer === "partial"
+                        ? "TRANSFER // PARTIALLY STAGED WHOLE FILE"
                         : root.effectiveLayer === "staged"
                         ? "TRANSFER // STAGED WHOLE FILE"
                         : "TRANSFER // WORKTREE WHOLE FILE"
@@ -300,6 +312,12 @@ Rectangle {
                         "UNTRACKED REGULAR FILE // "
                         + "DESTINATION PATH MUST NOT EXIST // "
                         + "DESTINATION WORKTREE MUST BE CLEAN"
+                      )
+                    : root.effectiveLayer === "partial"
+                    ? (
+                        "TRACKED + PARTIALLY STAGED WHOLE FILE // "
+                        + "PRESERVE INDEX + WORKTREE LAYERS // "
+                        + "DESTINATION MUST BE A CLEAN EXISTING WORKTREE"
                       )
                     : root.effectiveLayer === "staged"
                     ? (

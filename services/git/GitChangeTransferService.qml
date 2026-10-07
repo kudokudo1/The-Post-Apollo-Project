@@ -127,6 +127,8 @@ Scope {
     function journalKind() {
         if (previewLayer === "staged")
             return "CHANGES/TRANSFER_STAGED";
+        if (previewLayer === "partial")
+            return "CHANGES/TRANSFER_PARTIAL";
         if (previewLayer === "untracked")
             return "CHANGES/TRANSFER_UNTRACKED";
 
@@ -145,7 +147,9 @@ Scope {
         return {
             source: "GitChangeTransferService",
             operation:
-                previewLayer === "untracked"
+                previewLayer === "partial"
+                ? "TRANSFER_PARTIAL"
+                : previewLayer === "untracked"
                 ? "TRANSFER_UNTRACKED"
                 : previewScope === "hunk"
                 ? "TRANSFER_HUNK"
@@ -419,6 +423,145 @@ Scope {
         pendingPreviewHunkIndex = -1;
         previewBusy = true;
         status = "TRANSFER // PREVIEWING STAGED";
+        previewExitSeen = false;
+        previewStdoutSeen = false;
+        previewStderrSeen = false;
+        previewExitCode = -1;
+        previewStdoutText = "";
+        previewStderrText = "";
+
+        previewProcess.exec(args);
+        return true;
+    }
+
+
+    function previewPartial(destinationPath, files, mode) {
+        if (previewBusy || transferBusy)
+            return false;
+
+        const source = String(repositoryPath || "").trim();
+        const destination = String(destinationPath || "").trim();
+        const selected = normalizedFiles(files);
+        const transferMode = normalizedMode(mode);
+
+        clearPreview();
+        lastError = "";
+
+        if (!source || !destination || selected.length === 0) {
+            lastError =
+                !source
+                ? "PARTIAL TRANSFER PREVIEW // NO SOURCE REPOSITORY"
+                : !destination
+                ? "PARTIAL TRANSFER PREVIEW // NO DESTINATION WORKTREE"
+                : "PARTIAL TRANSFER PREVIEW // NO FILES SELECTED";
+            status = lastError;
+            previewFailed(lastError);
+            return false;
+        }
+
+        const args = [
+            "bash",
+            "-lc",
+            [
+                'source="$1"',
+                'destination="$2"',
+                'mode="$3"',
+                'shift 3',
+                'files=("$@")',
+                'refuse() { printf "REFUSED\\t%s\\n" "$1"; exit 1; }',
+                'is_git_worktree() { git -C "$1" rev-parse --is-inside-work-tree >/dev/null 2>&1; }',
+                'absolute_common() {',
+                '  dir="$(git -C "$1" rev-parse --git-common-dir 2>/dev/null)" || return 1',
+                '  case "$dir" in /*) ;; *) dir="$1/$dir" ;; esac',
+                '  realpath "$dir" 2>/dev/null',
+                '}',
+                'active_state() {',
+                '  repo="$1"',
+                '  gitdir="$(git -C "$repo" rev-parse --git-dir 2>/dev/null)" || return 0',
+                '  case "$gitdir" in /*) ;; *) gitdir="$repo/$gitdir" ;; esac',
+                '  if [ -f "$gitdir/MERGE_HEAD" ]; then printf "MERGE";',
+                '  elif [ -d "$gitdir/rebase-merge" ] || [ -d "$gitdir/rebase-apply" ]; then printf "REBASE";',
+                '  elif [ -f "$gitdir/CHERRY_PICK_HEAD" ]; then printf "CHERRY_PICK";',
+                '  elif [ -f "$gitdir/REVERT_HEAD" ]; then printf "REVERT";',
+                '  else printf "NONE"; fi',
+                '}',
+                'is_git_worktree "$source" || refuse "SOURCE IS NOT A GIT WORKTREE"',
+                'is_git_worktree "$destination" || refuse "DESTINATION IS NOT A GIT WORKTREE"',
+                'source="$(realpath "$source")" || refuse "SOURCE PATH CANNOT BE RESOLVED"',
+                'destination="$(realpath "$destination")" || refuse "DESTINATION PATH CANNOT BE RESOLVED"',
+                '[ "$source" != "$destination" ] || refuse "SOURCE AND DESTINATION ARE THE SAME WORKTREE"',
+                'src_common="$(absolute_common "$source")" || refuse "SOURCE COMMON GIT DIR UNAVAILABLE"',
+                'dst_common="$(absolute_common "$destination")" || refuse "DESTINATION COMMON GIT DIR UNAVAILABLE"',
+                '[ "$src_common" = "$dst_common" ] || refuse "DESTINATION BELONGS TO A DIFFERENT REPOSITORY"',
+                'src_branch="$(git -C "$source" branch --show-current 2>/dev/null || true)"',
+                'dst_branch="$(git -C "$destination" branch --show-current 2>/dev/null || true)"',
+                'src_head="$(git -C "$source" rev-parse HEAD 2>/dev/null || true)"',
+                'dst_head="$(git -C "$destination" rev-parse HEAD 2>/dev/null || true)"',
+                '[ -n "$src_branch" ] || refuse "SOURCE WORKTREE IS DETACHED"',
+                '[ -n "$dst_branch" ] || refuse "DESTINATION WORKTREE IS DETACHED"',
+                '[ "$src_branch" != "$dst_branch" ] || refuse "SOURCE AND DESTINATION USE THE SAME BRANCH"',
+                '[ "$(active_state "$source")" = "NONE" ] || refuse "SOURCE HAS AN ACTIVE GIT OPERATION"',
+                '[ "$(active_state "$destination")" = "NONE" ] || refuse "DESTINATION HAS AN ACTIVE GIT OPERATION"',
+                '[ -z "$(git -C "$destination" status --porcelain=v1 --untracked-files=all 2>/dev/null)" ] || refuse "DESTINATION WORKTREE IS NOT CLEAN"',
+                'for path in "$@"; do',
+                '  git -C "$source" ls-files --error-unmatch -- "$path" >/dev/null 2>&1 || refuse "UNTRACKED OR UNKNOWN SOURCE PATH // $path"',
+                '  [ -z "$(git -C "$source" ls-files -u -- "$path" 2>/dev/null)" ] || refuse "CONFLICTED SOURCE PATH // $path"',
+                'done',
+                'git -C "$source" diff --cached --quiet -- "$@"',
+                'rc=$?',
+                '[ "$rc" -eq 1 ] || { [ "$rc" -eq 0 ] && refuse "SELECTED PATHS HAVE NO STAGED CHANGES"; refuse "STAGED DIFF CHECK FAILED"; }',
+                'git -C "$source" diff --quiet -- "$@"',
+                'rc=$?',
+                '[ "$rc" -eq 1 ] || { [ "$rc" -eq 0 ] && refuse "SELECTED PATHS HAVE NO UNSTAGED CHANGES"; refuse "WORKTREE DIFF CHECK FAILED"; }',
+                'tmp="$(mktemp -d "${TMPDIR:-/tmp}/pa-partial-preview.XXXXXX")" || refuse "TEMP DIRECTORY CREATE FAILED"',
+                'staged="$tmp/staged.patch"',
+                'worktree="$tmp/worktree.patch"',
+                'bundle="$tmp/bundle.txt"',
+                'rehearsal="$tmp/rehearsal"',
+                'cleanup() { git -C "$source" worktree remove --force "$rehearsal" >/dev/null 2>&1 || true; rm -rf "$tmp"; }',
+                'trap cleanup EXIT INT TERM',
+                'git -C "$source" diff --cached --binary --full-index -- "$@" >"$staged" || refuse "PARTIAL STAGED PATCH GENERATION FAILED"',
+                'git -C "$source" diff --binary --full-index -- "$@" >"$worktree" || refuse "PARTIAL WORKTREE PATCH GENERATION FAILED"',
+                '[ -s "$staged" ] || refuse "PARTIAL STAGED PATCH IS EMPTY"',
+                '[ -s "$worktree" ] || refuse "PARTIAL WORKTREE PATCH IS EMPTY"',
+                'git -C "$source" worktree add --detach --quiet "$rehearsal" "$dst_head" >/dev/null 2>&1 || refuse "DESTINATION REHEARSAL WORKTREE CREATE FAILED"',
+                'git -C "$rehearsal" apply --cached --binary "$staged" || refuse "PARTIAL STAGED PATCH DOES NOT APPLY TO DESTINATION INDEX"',
+                'git -C "$rehearsal" apply --binary "$staged" || refuse "PARTIAL STAGED PATCH DOES NOT APPLY TO DESTINATION WORKTREE"',
+                'git -C "$rehearsal" apply --binary "$worktree" || refuse "PARTIAL WORKTREE PATCH DOES NOT APPLY AFTER STAGED PATCH"',
+                'if [ "$mode" = "move" ]; then',
+                '  git -C "$rehearsal" reset --hard "$src_head" >/dev/null 2>&1 || refuse "SOURCE REHEARSAL RESET FAILED"',
+                '  git -C "$rehearsal" apply --cached --binary "$staged" || refuse "SOURCE REHEARSAL STAGED INDEX APPLY FAILED"',
+                '  git -C "$rehearsal" apply --binary "$staged" || refuse "SOURCE REHEARSAL STAGED WORKTREE APPLY FAILED"',
+                '  git -C "$rehearsal" apply --binary "$worktree" || refuse "SOURCE REHEARSAL WORKTREE APPLY FAILED"',
+                '  git -C "$rehearsal" apply -R --binary "$worktree" || refuse "SOURCE PARTIAL WORKTREE PATCH CANNOT BE REMOVED CLEANLY"',
+                '  git -C "$rehearsal" apply -R --binary "$staged" || refuse "SOURCE PARTIAL STAGED WORKTREE PATCH CANNOT BE REMOVED CLEANLY"',
+                '  git -C "$rehearsal" apply -R --cached --binary "$staged" || refuse "SOURCE PARTIAL STAGED INDEX PATCH CANNOT BE REMOVED CLEANLY"',
+                'fi',
+                '{ printf "STAGED64\\t"; base64 -w0 "$staged"; printf "\\nWORKTREE64\\t"; base64 -w0 "$worktree"; printf "\\n"; } >"$bundle"',
+                'fingerprint="$(sha256sum "$bundle" | awk "{print \\$1}")"',
+                'bytes="$(wc -c <"$bundle" | tr -d " ")"',
+                'staged_lines="$(wc -l <"$staged" | tr -d " ")"',
+                'worktree_lines="$(wc -l <"$worktree" | tr -d " ")"',
+                'lines=$((staged_lines + worktree_lines))',
+                'if [ "$bytes" -le "524288" ]; then printf "PATCH64\\t"; base64 -w0 "$bundle"; printf "\\n"; fi',
+                'printf "PREVIEW\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$fingerprint" "$bytes" "$lines" "$src_branch" "$dst_branch" "$src_head" "$dst_head" "$mode"',
+                'for path in "$@"; do printf "FILE\\t%s\\n" "$path"; done'
+            ].join("\n"),
+            "git-partial-change-transfer-preview",
+            source,
+            destination,
+            transferMode
+        ];
+
+        for (let i = 0; i < selected.length; ++i)
+            args.push(selected[i]);
+
+        pendingPreviewDestination = destination;
+        pendingPreviewScope = "file";
+        pendingPreviewLayer = "partial";
+        pendingPreviewHunkIndex = -1;
+        previewBusy = true;
+        status = "TRANSFER // PREVIEWING PARTIAL";
         previewExitSeen = false;
         previewStdoutSeen = false;
         previewStderrSeen = false;
@@ -924,13 +1067,23 @@ Scope {
                 '  git -C "$source" diff --cached --quiet -- "${files[@]}"',
                 '  rc=$?',
                 '  [ "$rc" -eq 1 ] || refuse "SELECTED STAGED PATCH DISAPPEARED SINCE PREVIEW"',
+                'elif [ "$layer" = "partial" ]; then',
+                '  git -C "$source" diff --cached --quiet -- "${files[@]}"',
+                '  rc=$?',
+                '  [ "$rc" -eq 1 ] || refuse "SELECTED PARTIAL STAGED PATCH DISAPPEARED SINCE PREVIEW"',
+                '  git -C "$source" diff --quiet -- "${files[@]}"',
+                '  rc=$?',
+                '  [ "$rc" -eq 1 ] || refuse "SELECTED PARTIAL WORKTREE PATCH DISAPPEARED SINCE PREVIEW"',
                 'else',
                 '  git -C "$source" diff --cached --quiet -- "${files[@]}"',
                 '  rc=$?',
                 '  [ "$rc" -eq 0 ] || refuse "SELECTED PATH STAGING CHANGED SINCE PREVIEW"',
                 'fi',
                 'patch="$(mktemp "${TMPDIR:-/tmp}/pa-transfer-exec.XXXXXX")" || refuse "TEMP PATCH CREATE FAILED"',
-                'trap \'rm -f "$patch"\' EXIT INT TERM',
+                'partial_staged=""',
+                'partial_worktree=""',
+                'cleanup_transfer_patches() { rm -f "$patch"; [ -z "$partial_staged" ] || rm -f "$partial_staged"; [ -z "$partial_worktree" ] || rm -f "$partial_worktree"; }',
+                'trap cleanup_transfer_patches EXIT INT TERM',
                 'if [ "$scope" = "hunk" ]; then',
                 '  [ "${#files[@]}" -eq 1 ] || refuse "HUNK TRANSFER REQUIRES EXACTLY ONE FILE"',
                 '  python3 - "$source" "${files[0]}" "$hunk_index" "$patch" <<\'PY\'',
@@ -964,6 +1117,14 @@ Scope {
                 'else',
                 '  if [ "$layer" = "staged" ]; then',
                 '    git -C "$source" diff --cached --binary --full-index -- "${files[@]}" >"$patch" || refuse "STAGED PATCH REGENERATION FAILED"',
+                '  elif [ "$layer" = "partial" ]; then',
+                '    partial_staged="$(mktemp "${TMPDIR:-/tmp}/pa-transfer-staged.XXXXXX")" || refuse "PARTIAL STAGED TEMP PATCH CREATE FAILED"',
+                '    partial_worktree="$(mktemp "${TMPDIR:-/tmp}/pa-transfer-worktree.XXXXXX")" || refuse "PARTIAL WORKTREE TEMP PATCH CREATE FAILED"',
+                '    git -C "$source" diff --cached --binary --full-index -- "${files[@]}" >"$partial_staged" || refuse "PARTIAL STAGED PATCH REGENERATION FAILED"',
+                '    git -C "$source" diff --binary --full-index -- "${files[@]}" >"$partial_worktree" || refuse "PARTIAL WORKTREE PATCH REGENERATION FAILED"',
+                '    [ -s "$partial_staged" ] || refuse "PARTIAL STAGED PATCH DISAPPEARED SINCE PREVIEW"',
+                '    [ -s "$partial_worktree" ] || refuse "PARTIAL WORKTREE PATCH DISAPPEARED SINCE PREVIEW"',
+                '    { printf "STAGED64\\t"; base64 -w0 "$partial_staged"; printf "\\nWORKTREE64\\t"; base64 -w0 "$partial_worktree"; printf "\\n"; } >"$patch"',
                 '  elif [ "$layer" = "untracked" ]; then',
                 '    : >"$patch"',
                 '    for path in "${files[@]}"; do',
@@ -993,6 +1154,43 @@ Scope {
                 '    printf "OK\\tMOVED STAGED %s FILE(S) // %s -> %s\\n" "${#files[@]}" "$source" "$destination"',
                 '  else',
                 '    printf "OK\\tCOPIED STAGED %s FILE(S) // %s -> %s\\n" "${#files[@]}" "$source" "$destination"',
+                '  fi',
+                'elif [ "$layer" = "partial" ]; then',
+                '  partial_apply() {',
+                '    local repo="$1"',
+                '    git -C "$repo" apply --cached --binary "$partial_staged" || return 1',
+                '    if ! git -C "$repo" apply --binary "$partial_staged"; then',
+                '      git -C "$repo" apply -R --cached --binary "$partial_staged" >/dev/null 2>&1 || true',
+                '      return 1',
+                '    fi',
+                '    if ! git -C "$repo" apply --binary "$partial_worktree"; then',
+                '      git -C "$repo" apply -R --binary "$partial_staged" >/dev/null 2>&1 || true',
+                '      git -C "$repo" apply -R --cached --binary "$partial_staged" >/dev/null 2>&1 || true',
+                '      return 1',
+                '    fi',
+                '  }',
+                '  partial_remove() {',
+                '    local repo="$1"',
+                '    git -C "$repo" apply -R --binary "$partial_worktree" || return 1',
+                '    if ! git -C "$repo" apply -R --binary "$partial_staged"; then',
+                '      git -C "$repo" apply --binary "$partial_worktree" >/dev/null 2>&1 || true',
+                '      return 1',
+                '    fi',
+                '    if ! git -C "$repo" apply -R --cached --binary "$partial_staged"; then',
+                '      git -C "$repo" apply --binary "$partial_staged" >/dev/null 2>&1 || true',
+                '      git -C "$repo" apply --binary "$partial_worktree" >/dev/null 2>&1 || true',
+                '      return 1',
+                '    fi',
+                '  }',
+                '  partial_apply "$destination" || refuse "DESTINATION PARTIAL TWO-LAYER APPLY FAILED"',
+                '  if [ "$mode" = "move" ]; then',
+                '    if ! partial_remove "$source"; then',
+                '      partial_remove "$destination" >/dev/null 2>&1 || { printf "REFUSED\\tSOURCE PARTIAL REMOVE FAILED // DESTINATION ROLLBACK FAILED\\n"; exit 9; }',
+                '      refuse "SOURCE PARTIAL REMOVE FAILED // DESTINATION ROLLED BACK"',
+                '    fi',
+                '    printf "OK\\tMOVED PARTIALLY STAGED %s FILE(S) // %s -> %s\\n" "${#files[@]}" "$source" "$destination"',
+                '  else',
+                '    printf "OK\\tCOPIED PARTIALLY STAGED %s FILE(S) // %s -> %s\\n" "${#files[@]}" "$source" "$destination"',
                 '  fi',
                 'else',
                 '  git -C "$destination" apply --check --binary "$patch" >/dev/null 2>&1 || refuse "PATCH NO LONGER APPLIES TO DESTINATION"',

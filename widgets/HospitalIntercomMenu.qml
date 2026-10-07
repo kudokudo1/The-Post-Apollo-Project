@@ -545,15 +545,33 @@ Rectangle {
             ? 2 : 1
         border.color:
             root.speechInputService.recording
-            ? Colors.magenta
+            ? Colors.omnitrix
             : root.speechInputService.stopping
               || root.speechInputService.transcribing
             ? Colors.orange
             : micMouse.containsMouse
             ? Colors.orange
-            : root.speechInputService.backendReady
-            ? Colors.cyan
-            : Colors.magenta
+            : Colors.omnitrix
+
+        RectangularShadow {
+            anchors.fill: parent
+            spread: 4
+            z: -1
+            opacity:
+                root.speechInputService.stopping
+                  || root.speechInputService.transcribing
+                ? 0.24
+                : micMouse.containsMouse
+                ? 0.48 : 0.34
+            color:
+                root.speechInputService.stopping
+                  || root.speechInputService.transcribing
+                ? Colors.orange
+                : micMouse.containsMouse
+                ? Colors.orange
+                : Colors.omnitrix
+        }
+
         opacity:
             root.speechInputService.stopping
             || root.speechInputService.transcribing
@@ -564,16 +582,14 @@ Rectangle {
         GohuText {
             anchors.centerIn: parent
             anchors.verticalCenterOffset: 1
-            text: "🎙︎"
+            text: "🗣︎"
             font.pixelSize: 22
             color:
                 root.speechInputService.recording
-                ? Colors.magenta
+                ? Colors.omnitrix
                 : micMouse.containsMouse
                 ? Colors.orange
-                : root.speechInputService.backendReady
-                ? Colors.cyan
-                : Colors.magenta
+                : Colors.omnitrix
         }
 
         MouseArea {
@@ -620,10 +636,26 @@ Rectangle {
             sendMouse.containsMouse ? 2 : 1
         border.color:
             root.speechInputService.recording
-            ? Colors.magenta
+            ? Colors.omnitrix
             : sendMouse.containsMouse
             ? Colors.orange
             : Colors.green
+
+        RectangularShadow {
+            anchors.fill: parent
+            spread: 4
+            z: -1
+            opacity:
+                sendMouse.containsMouse
+                ? 0.48 : 0.28
+            color:
+                root.speechInputService.recording
+                ? Colors.omnitrix
+                : sendMouse.containsMouse
+                ? Colors.orange
+                : Colors.green
+        }
+
         opacity:
             root.selectedSpecialist
             && String(root.selectedSpecialist.presence || "") === "READY"
@@ -647,7 +679,7 @@ Rectangle {
             font.pixelSize: 11
             color:
                 root.speechInputService.recording
-                ? Colors.magenta
+                ? Colors.omnitrix
                 : sendMouse.containsMouse
                 ? Colors.orange
                 : Colors.green

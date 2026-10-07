@@ -641,7 +641,11 @@ Rectangle {
 
             DropShadow {
                 anchors.fill: spaceBand
-                source: spaceBand
+                source:
+                    spaceBand.Window.window !== null
+                    ? spaceBand
+                    : null
+                visible: source !== null
 
                 z: -1
 
@@ -1057,7 +1061,11 @@ Rectangle {
 
             DropShadow {
                 anchors.fill: skyBand
-                source: skyBand
+                source:
+                    skyBand.Window.window !== null
+                    ? skyBand
+                    : null
+                visible: source !== null
 
                 z: -1
 
@@ -1390,7 +1398,11 @@ Rectangle {
 
             DropShadow {
                 anchors.fill: groundBand
-                source: groundBand
+                source:
+                    groundBand.Window.window !== null
+                    ? groundBand
+                    : null
+                visible: source !== null
 
                 z: -1
 

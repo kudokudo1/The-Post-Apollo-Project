@@ -1,0 +1,31 @@
+name: Session Adapter Contracts
+
+on:
+  pull_request:
+    paths:
+      - "services/messaging/SessionAdapter.qml"
+      - "services/messaging/SessionBridge.py"
+      - "tests/messaging/test_session_adapter_contracts.py"
+      - ".github/workflows/session-adapter-contracts.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "services/messaging/SessionAdapter.qml"
+      - "services/messaging/SessionBridge.py"
+      - "tests/messaging/test_session_adapter_contracts.py"
+      - ".github/workflows/session-adapter-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate Session adapter contracts
+        run: python3 tests/messaging/test_session_adapter_contracts.py

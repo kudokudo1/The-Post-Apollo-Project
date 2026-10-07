@@ -178,6 +178,12 @@ Rectangle {
             return false;
         }
 
+        if (path.charAt(0) !== "/") {
+            root.createDestinationMessage =
+                "REFUSED // ABSOLUTE DESTINATION PATH REQUIRED";
+            return false;
+        }
+
         if (root.branchWorkspaceService.branchForName(branch)) {
             root.createDestinationMessage =
                 "REFUSED // LOCAL BRANCH ALREADY EXISTS";

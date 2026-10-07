@@ -16,3 +16,4 @@ NeonScrollBar 1.0 NeonScrollBar.qml
 DockButton 1.0 DockButton.qml
 ActionButton 1.0 ActionButton.qml
 SafeDropShadow 1.0 SafeDropShadow.qml
+SurfaceFrame 1.0 SurfaceFrame.qml

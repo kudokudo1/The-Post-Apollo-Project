@@ -1,0 +1,33 @@
+name: "Surface frame contracts"
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "components/SurfaceFrame.qml"
+      - "components/qmldir"
+      - "tests/components/test_surface_frame_contracts.py"
+      - ".github/workflows/surface-frame-contracts.yml"
+  pull_request:
+    paths:
+      - "components/SurfaceFrame.qml"
+      - "components/qmldir"
+      - "tests/components/test_surface_frame_contracts.py"
+      - ".github/workflows/surface-frame-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    name: Surface frame contracts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate reusable surface frame contracts
+        run: python3 tests/components/test_surface_frame_contracts.py

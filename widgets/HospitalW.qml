@@ -4136,10 +4136,7 @@ PanelWindow {
                             spacing: 6
 
                             Repeater {
-                                model:
-                                    roomAiDock.stopVisible
-                                    ? ["QUICK", "CHAT", "DOCTOR", "STOP"]
-                                    : ["QUICK", "CHAT", "DOCTOR"]
+                                model: ["QUICK", "CHAT", "DOCTOR"]
 
                                 Rectangle {
                                     id: roomAiButton
@@ -4284,6 +4281,63 @@ PanelWindow {
                                                 doctorRuntimeService.cancel("OPERATOR");
                                         }
                                     }
+                                }
+                            }
+
+                            Rectangle {
+                                id: roomStopButton
+
+                                visible: roomAiDock.stopVisible
+                                width:
+                                    (
+                                        roomAiDock.width
+                                        - roomAiDock.spacing
+                                          * (roomAiDock.buttonCount - 1)
+                                    ) / roomAiDock.buttonCount
+                                height: parent.height
+                                color:
+                                    roomStopMouse.pressed
+                                    ? Colors.red
+                                    : Colors.black
+                                border.width: 1
+                                border.color: Colors.red
+                                opacity:
+                                    doctorRuntimeService.cancelling
+                                    ? 0.55 : 1.0
+
+                                RectangularShadow {
+                                    anchors.fill: parent
+                                    z: -1
+                                    spread: 2
+                                    opacity: 0.24
+                                    color: Colors.red
+                                }
+
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    text:
+                                        doctorRuntimeService.cancelling
+                                        ? "STOPPING"
+                                        : "STOP"
+                                    font.pixelSize: 8
+                                    color: Colors.red
+                                }
+
+                                MouseArea {
+                                    id: roomStopMouse
+
+                                    anchors.fill: parent
+                                    enabled:
+                                        doctorRuntimeService.operating
+                                        && !doctorRuntimeService.cancelling
+                                    hoverEnabled: true
+                                    cursorShape:
+                                        enabled
+                                        ? Qt.PointingHandCursor
+                                        : Qt.ArrowCursor
+
+                                    onClicked:
+                                        doctorRuntimeService.cancel("OPERATOR")
                                 }
                             }
                         }

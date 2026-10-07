@@ -109,7 +109,7 @@ Rectangle {
         focusedChannelLabel = "";
     }
 
-    function sendCurrent() {
+    function sendCurrent(freshValue) {
         const specialist = selectedSpecialist;
         const body = String(messageInput.text || "").trim();
 
@@ -121,7 +121,8 @@ Rectangle {
                 channelType,
                 channelLabel,
                 body,
-                workingDirectory))
+                workingDirectory,
+                !!freshValue))
             return false;
 
         messageInput.text = "";
@@ -142,7 +143,7 @@ Rectangle {
                 || speechInputService.transcribing)
             return false;
 
-        return sendCurrent();
+        return sendCurrent(false);
     }
 
     function acceptVoiceTranscript(
@@ -918,12 +919,21 @@ Rectangle {
             anchors.fill: parent
             enabled: sendButton.enabledAction
             hoverEnabled: true
+            acceptedButtons:
+                Qt.LeftButton | Qt.RightButton
             cursorShape:
                 enabled
                 ? Qt.PointingHandCursor
                 : Qt.ArrowCursor
 
-            onClicked: root.sendCurrentVoiceAware()
+            onClicked: function(mouse) {
+                if (mouse.button === Qt.RightButton) {
+                    root.sendCurrent(true);
+                    return;
+                }
+
+                root.sendCurrentVoiceAware();
+            }
         }
     }
 

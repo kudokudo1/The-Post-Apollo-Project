@@ -40,6 +40,7 @@ PanelWindow {
     property string pendingRoundsRoomTeam: ""
     property int pendingRoundsFloorIndex: -1
     property string pendingReceptionTeam: ""
+    property string pendingPhoneAttachTeam: ""
     property var pendingReceptionRoundsSelection: null
     property string selectedDoctorId: ""
     property string selectedProviderId: ""
@@ -1692,6 +1693,12 @@ PanelWindow {
         root.pendingRoundsRoomTeam = "";
         root.pendingRoundsFloorIndex = -1;
         root.scheduleRoomEntryAudit(team);
+
+        if (String(root.pendingPhoneAttachTeam || "") === team) {
+            root.pendingPhoneAttachTeam = "";
+            Qt.callLater(root.openRoomChat);
+        }
+
         return true;
     }
 
@@ -1949,14 +1956,21 @@ PanelWindow {
         roomId: root.selectedRoomTeam
     }
 
+    HospitalPersistentDispatchService {
+        id: persistentDispatchService
+    }
+
     HospitalPhoneService {
         id: phoneService
         registryService: specialistRegistryService
+        responsibilityService: responsibilityService
     }
 
     HospitalIntercomService {
         id: intercomService
         registryService: specialistRegistryService
+        responsibilityService: responsibilityService
+        dispatchService: persistentDispatchService
     }
 
     HospitalReceptionistService {
@@ -2266,8 +2280,38 @@ PanelWindow {
     Connections {
         target: phoneService
 
+        function onPersistentCallRequested(roomTeam, specialist) {
+            root.pendingPhoneAttachTeam =
+                String(roomTeam || "");
+            root.phoneMenuOpen = false;
+
+            if (!root.requestReceptionTeamNavigation(roomTeam))
+                root.pendingPhoneAttachTeam = "";
+        }
+
         function onCallLaunched(specialist) {
             receptionistService.recordPhoneCall(specialist);
+        }
+    }
+
+    Connections {
+        target: persistentDispatchService
+
+        function onDispatchCompleted(roomId, sessionId, result) {
+            intercomService.lastStatus =
+                "INTERCOM DELIVERED // ROOM "
+                + String(roomId || "");
+
+            if (String(root.selectedRoomTeam || "")
+                    === String(roomId || "")) {
+                roomChatView.refresh();
+            }
+        }
+
+        function onDispatchFailed(roomId, message) {
+            intercomService.lastStatus = "";
+            intercomService.lastError =
+                String(message || "INTERCOM DELIVERY FAILED");
         }
     }
 

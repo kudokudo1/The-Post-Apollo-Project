@@ -261,16 +261,23 @@ Rectangle {
                         anchors.fill: parent
                         enabled: phoneSpecialistRow.ready
                         hoverEnabled: true
+                        acceptedButtons:
+                            Qt.LeftButton | Qt.RightButton
                         cursorShape:
                             enabled
                             ? Qt.PointingHandCursor
                             : Qt.ArrowCursor
 
-                        onClicked: {
+                        onClicked: function(mouse) {
+                            const fresh =
+                                mouse.button === Qt.RightButton;
+
                             if (
                                 root.phoneService.callSpecialist(
                                     phoneSpecialistRow.modelData,
-                                    root.workingDirectory
+                                    root.workingDirectory,
+                                    "",
+                                    fresh
                                 )
                             )
                                 root.callLaunched(
@@ -311,7 +318,7 @@ Rectangle {
             ? root.phoneService.lastStatus
             : root.registryService.probing
             ? "CHECKING SPECIALIST PRESENCE"
-            : "SELECT SPECIALIST // CLICK TO CALL"
+            : "LEFT ATTACH ROOM DOCTOR // RIGHT FRESH TERMINAL"
         font.pixelSize: 9
         color:
             root.phoneService.lastError

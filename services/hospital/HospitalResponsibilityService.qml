@@ -110,6 +110,27 @@ Scope {
         return false;
     }
 
+    function roomForSpecialist(recordValue) {
+        const rows =
+            roundsService && Array.isArray(roundsService.rooms)
+            ? roundsService.rooms
+            : [];
+        const matches = [];
+
+        for (let i = 0; i < rows.length; ++i) {
+            const room = rows[i] || {};
+            if (!root.specialistMatch(recordValue, room))
+                continue;
+
+            if (String(room.team || "") === String(currentRoomId || ""))
+                return room;
+
+            matches.push(room);
+        }
+
+        return matches.length === 1 ? matches[0] : null;
+    }
+
     function specialistsForRoom(roomValue) {
         const rows =
             registryService && Array.isArray(registryService.specialists)

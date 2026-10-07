@@ -1786,6 +1786,11 @@ PanelWindow {
             roomReportService.refresh();
         }
 
+        onReportFeedbackCompleted: function(reportId, result) {
+            roomChatView.refresh();
+            roomReportService.refresh();
+        }
+
         onTurnCancelled: function(result) {
             roomChatView.refresh();
         }
@@ -5629,6 +5634,7 @@ PanelWindow {
             visible: root.operationsSurface === "roomReports"
 
             reportService: roomReportService
+            runtimeService: doctorRuntimeService
 
             anchors {
                 left: parent.left

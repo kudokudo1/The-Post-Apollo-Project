@@ -5,6 +5,7 @@ Item {
     id: root
 
     required property var reportService
+    required property var runtimeService
 
     property int selectedIndex: -1
 
@@ -41,6 +42,18 @@ Item {
                : Colors.orange;
     }
 
+    function feedbackSessionMatches(report) {
+        const row = report || {};
+        const reportSession =
+            String(row.sessionId || "").trim();
+        const activeSession =
+            String(runtimeService.sessionId || "").trim();
+
+        return reportSession.length > 0
+            && activeSession.length > 0
+            && reportSession === activeSession;
+    }
+
     function filesSummary(report) {
         const row = report || {};
         const count = Number(row.changedFileCount || 0);
@@ -65,6 +78,10 @@ Item {
         if (selectedIndex < 0
                 || selectedIndex >= displayReports.length)
             selectedIndex = 0;
+    }
+
+    onSelectedIndexChanged: {
+        feedbackEditor.text = "";
     }
 
     component ReportButton: Rectangle {
@@ -444,11 +461,14 @@ Item {
 
                         width: parent.width
                         height:
-                            parent.height
-                            - (
-                                root.selectedReport
-                                ? 126 : 42
-                              )
+                            Math.max(
+                                80,
+                                parent.height
+                                - (
+                                    root.selectedReport
+                                    ? 222 : 138
+                                  )
+                            )
                         clip: true
                         contentWidth: width
                         contentHeight:
@@ -517,8 +537,161 @@ Item {
                             }
                         }
                     }
+
+                    Rectangle {
+                        id: feedbackComposer
+
+                        width: parent.width
+                        height: 88
+                        visible: root.selectedReport !== null
+                        color: Colors.black
+                        border.width: 1
+                        border.color:
+                            root.feedbackSessionMatches(
+                                root.selectedReport
+                            )
+                            ? Colors.red
+                            : Colors.orange
+
+                        Column {
+                            anchors {
+                                fill: parent
+                                margins: 7
+                            }
+                            spacing: 5
+
+                            GohuText {
+                                width: parent.width
+                                text: {
+                                    if (!root.selectedReport)
+                                        return "";
+
+                                    if (!root.feedbackSessionMatches(
+                                                root.selectedReport))
+                                        return "REPORT BUG // ARCHIVED SESSION // FEEDBACK DISABLED";
+
+                                    if (runtimeService.feedbackRunning
+                                            && runtimeService.feedbackReportId
+                                               === String(
+                                                    root.selectedReport.id
+                                                  ))
+                                        return "REPORT BUG // SENDING TO SAME DOCTOR SESSION…";
+
+                                    return "REPORT BUG // SEND FEEDBACK TO SAME DOCTOR SESSION";
+                                }
+                                font.pixelSize: 8
+                                color:
+                                    root.feedbackSessionMatches(
+                                        root.selectedReport
+                                    )
+                                    ? Colors.red
+                                    : Colors.orange
+                                elide: Text.ElideRight
+                            }
+
+                            Row {
+                                width: parent.width
+                                height: 54
+                                spacing: 7
+
+                                Rectangle {
+                                    width: parent.width - 124
+                                    height: parent.height
+                                    color: Colors.dark
+                                    border.width: 1
+                                    border.color:
+                                        feedbackEditor.activeFocus
+                                        ? Colors.orange
+                                        : Colors.cyan
+
+                                    TextEdit {
+                                        id: feedbackEditor
+
+                                        anchors {
+                                            fill: parent
+                                            margins: 6
+                                        }
+                                        color: Colors.white
+                                        font.family:
+                                            "GohuFont 11 Nerd Font Mono"
+                                        font.pixelSize: 9
+                                        wrapMode: TextEdit.Wrap
+                                        selectByMouse: true
+                                        enabled:
+                                            root.feedbackSessionMatches(
+                                                root.selectedReport
+                                            )
+                                            && !runtimeService.feedbackRunning
+                                    }
+
+                                    GohuText {
+                                        anchors {
+                                            left: parent.left
+                                            right: parent.right
+                                            top: parent.top
+                                            margins: 7
+                                        }
+                                        visible:
+                                            !feedbackEditor.text.length
+                                            && !feedbackEditor.activeFocus
+                                        text:
+                                            "Describe the bug, regression, missing verification, or correction…"
+                                        font.pixelSize: 8
+                                        color: Colors.white
+                                        opacity: 0.45
+                                        elide: Text.ElideRight
+                                    }
+                                }
+
+                                ReportButton {
+                                    width: 117
+                                    height: parent.height
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    label:
+                                        runtimeService.feedbackRunning
+                                        && runtimeService.feedbackReportId
+                                           === String(
+                                                root.selectedReport.id
+                                              )
+                                        ? "SENDING…"
+                                        : "REPORT BUG"
+                                    accent: Colors.red
+                                    enabledAction:
+                                        root.selectedReport !== null
+                                        && root.feedbackSessionMatches(
+                                            root.selectedReport
+                                        )
+                                        && feedbackEditor.text.trim().length > 0
+                                        && !runtimeService.feedbackRunning
+                                        && !runtimeService.operating
+                                        && !runtimeService.quickRunning
+                                        && !runtimeService.cancelling
+
+                                    onTriggered: {
+                                        runtimeService.reportFeedback(
+                                            root.selectedReport.id,
+                                            feedbackEditor.text
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
+        }
+    }
+
+    Connections {
+        target: runtimeService
+
+        function onReportFeedbackCompleted(reportId, result) {
+            if (root.selectedReport
+                    && String(root.selectedReport.id)
+                       === String(reportId))
+                feedbackEditor.text = "";
+
+            reportService.refresh();
         }
     }
 }

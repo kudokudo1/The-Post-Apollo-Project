@@ -17,10 +17,13 @@ Scope {
     property bool cancelling: false
     property bool quickRunning: false
     property string quickCommand: ""
+    property bool feedbackRunning: false
+    property string feedbackReportId: ""
     property string lastError: ""
     property var lastStatusPayload: null
     property var lastCancelResult: null
     property var lastQuickResult: null
+    property var lastFeedbackResult: null
 
     readonly property string displayStatus:
         cancelling
@@ -35,6 +38,7 @@ Scope {
     signal statusRefreshed()
     signal turnCancelled(var result)
     signal quickCompleted(string command, var result)
+    signal reportFeedbackCompleted(string reportId, var result)
 
     function pxArgs(args) {
         const suffix = Array.isArray(args) ? args : [];
@@ -195,7 +199,11 @@ Scope {
             "PAUSE"
         ];
 
-        if (!id || quickRunning || quickProcess.running)
+        if (!id
+                || quickRunning
+                || quickProcess.running
+                || feedbackRunning
+                || feedbackProcess.running)
             return false;
 
         if (allowed.indexOf(command) < 0) {
@@ -222,6 +230,53 @@ Scope {
             "quick",
             id,
             command,
+            "--json"
+        ]));
+        return true;
+    }
+
+    function reportFeedback(reportIdValue, feedbackValue) {
+        const id = String(sessionId || "").trim();
+        const reportId = String(reportIdValue || "").trim();
+        const feedback = String(feedbackValue || "").trim();
+
+        if (!id) {
+            lastError = "ROOM REPORT FEEDBACK // NO ACTIVE SESSION";
+            return false;
+        }
+
+        if (!reportId) {
+            lastError = "ROOM REPORT FEEDBACK // NO REPORT SELECTED";
+            return false;
+        }
+
+        if (!feedback) {
+            lastError = "ROOM REPORT FEEDBACK // FEEDBACK IS EMPTY";
+            return false;
+        }
+
+        if (operating
+                || quickRunning
+                || cancelling
+                || feedbackRunning
+                || feedbackProcess.running) {
+            lastError =
+                "ROOM REPORT FEEDBACK // DOCTOR ALREADY OPERATING";
+            return false;
+        }
+
+        feedbackRunning = true;
+        feedbackReportId = reportId;
+        lastFeedbackResult = null;
+        lastError = "";
+
+        feedbackProcess.exec(pxArgs([
+            "agent",
+            "report-feedback",
+            id,
+            reportId,
+            "--feedback",
+            feedback,
             "--json"
         ]));
         return true;
@@ -386,6 +441,59 @@ Scope {
                 root.quickCompleted(
                     completedCommand,
                     root.lastQuickResult
+                );
+
+            Qt.callLater(root.refresh);
+        }
+    }
+
+    Process {
+        id: feedbackProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const body = String(this.text || "").trim();
+
+                if (!body)
+                    return;
+
+                try {
+                    root.lastFeedbackResult = JSON.parse(body);
+                    root.lastError = "";
+                } catch (error) {
+                    root.lastError = root.compactPxError(
+                        body || error,
+                        "ROOM REPORT FEEDBACK"
+                    );
+                }
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                const detail = String(this.text || "").trim();
+
+                if (detail)
+                    root.lastError = root.compactPxError(
+                        detail,
+                        "ROOM REPORT FEEDBACK"
+                    );
+            }
+        }
+
+        onExited: function(code, exitStatus) {
+            const reportId = root.feedbackReportId;
+            root.feedbackRunning = false;
+            root.feedbackReportId = "";
+
+            if (Number(code) !== 0 && !root.lastError)
+                root.lastError =
+                    "PX AGENT REPORT FEEDBACK EXIT " + String(code);
+
+            if (Number(code) === 0 && root.lastFeedbackResult)
+                root.reportFeedbackCompleted(
+                    reportId,
+                    root.lastFeedbackResult
                 );
 
             Qt.callLater(root.refresh);

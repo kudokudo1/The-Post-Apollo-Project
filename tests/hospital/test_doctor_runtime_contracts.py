@@ -19,16 +19,21 @@ for needle in (
     'property bool cancelling: false',
     'property bool quickRunning: false',
     'property string quickCommand: ""',
+    'property bool feedbackRunning: false',
+    'property string feedbackReportId: ""',
     'property var lastQuickResult: null',
+    'property var lastFeedbackResult: null',
     'readonly property string displayStatus:',
     'readonly property string elapsedLabel:',
     'function refresh()',
     'function cancel(reasonValue)',
     'function quick(commandValue)',
+    'function reportFeedback(reportIdValue, feedbackValue)',
     '"agent",',
     '"status",',
     '"cancel",',
     '"quick",',
+    '"report-feedback",',
     'interval: root.operating ? 1000 : 3000',
     '.local/share/post-apollo-dev-runtime/bin/px',
 ):
@@ -36,6 +41,9 @@ for needle in (
 
 assert "Quickshell.execDetached" not in service
 assert 'root.turnCancelled(root.lastCancelResult);' in service
+assert 'root.reportFeedbackCompleted(' in service
+assert 'id: feedbackProcess' in service
+assert 'ROOM REPORT FEEDBACK // DOCTOR ALREADY OPERATING' in service
 
 hospital = HOSPITAL.read_text()
 for needle in (

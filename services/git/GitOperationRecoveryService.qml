@@ -693,6 +693,7 @@ Scope {
                 || !destinationPath
                 || beforePath !== destinationPath
                 || !expectedHead
+                || !expectedOrigin
                 || !expectedFingerprint) {
             return refuse(
                 "CLONE DOES NOT HAVE EXACT EXTERNAL RECOVERY EVIDENCE"

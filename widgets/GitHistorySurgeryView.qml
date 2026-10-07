@@ -7,6 +7,7 @@ Rectangle {
     required property var foldService
     required property var splitService
     required property var splitPatchService
+    required property var splitLineService
     required property var absorbService
     property var historyService: null
     property var keyboardHost: null
@@ -140,6 +141,7 @@ Rectangle {
                     !foldService.executionBusy
                     && !splitService.executionBusy
                     && !splitPatchService.executionBusy
+                    && !splitLineService.executionBusy
                     && !absorbService.executionBusy
                 onTriggered: root.mode = "fold"
             }
@@ -153,6 +155,7 @@ Rectangle {
                     !foldService.executionBusy
                     && !splitService.executionBusy
                     && !splitPatchService.executionBusy
+                    && !splitLineService.executionBusy
                     && !absorbService.executionBusy
                 onTriggered: root.mode = "split"
             }
@@ -166,6 +169,7 @@ Rectangle {
                     !foldService.executionBusy
                     && !splitService.executionBusy
                     && !splitPatchService.executionBusy
+                    && !splitLineService.executionBusy
                     && !absorbService.executionBusy
                 onTriggered: root.mode = "absorb"
             }
@@ -557,6 +561,7 @@ Rectangle {
 
         fileService: root.splitService
         hunkService: root.splitPatchService
+        lineService: root.splitLineService
         historyService: root.historyService
         keyboardHost: root.keyboardHost
     }

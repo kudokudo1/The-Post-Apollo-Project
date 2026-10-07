@@ -8,6 +8,7 @@ ADAPTER = ROOT / "services" / "hospital" / "HospitalRoomConversationAdapter.qml"
 ROOM_CHAT = ROOT / "widgets" / "HospitalRoomChatView.qml"
 PROVIDERS = ROOT / "services" / "hospital" / "HospitalProviderService.qml"
 DOCTORS = ROOT / "services" / "hospital" / "HospitalDoctorService.qml"
+HOSPITAL = ROOT / "widgets" / "HospitalW.qml"
 
 assert SHARED.is_file(), SHARED
 
@@ -137,3 +138,30 @@ assert "function releaseDoctor(idValue)" in doctors
 assert "provider" not in doctors.lower()
 
 print("hospital staffing services contracts: PASS")
+
+
+assert HOSPITAL.is_file(), HOSPITAL
+hospital = HOSPITAL.read_text()
+for needle in (
+    'property string selectedDoctorId: ""',
+    'property string selectedProviderId: ""',
+    'function openRoomChat()',
+    'function openRoomDoctor()',
+    'HospitalDoctorService {',
+    'HospitalProviderService {',
+    'id: roomAiDock',
+    'model: ["QUICK", "CHAT", "DOCTOR"]',
+    'HospitalRoomChatView {',
+    'visible: root.operationsSurface === "chat"',
+    'visible: root.operationsSurface === "doctor"',
+    'doctorId: root.selectedDoctorId',
+    'providerId: root.selectedProviderId',
+):
+    assert needle in hospital, needle
+
+assert 'modelData !== "QUICK"' in hospital
+assert 'root.openRoomChat();' in hospital
+assert 'root.openRoomDoctor();' in hospital
+assert "Quickshell.execDetached" not in hospital[hospital.find("id: roomAiDock"):hospital.find("id: roomInspectActions")]
+
+print("hospital room AI dock contracts: PASS")

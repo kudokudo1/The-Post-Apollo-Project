@@ -329,10 +329,22 @@ Rectangle {
                     GohuText {
                         width: parent.width
                         text:
-                            "PLAN // "
-                            + String(rebaseService.plan.length)
-                            + " COMMIT"
-                            + (rebaseService.plan.length === 1 ? "" : "S")
+                            rebaseService.mergePreserving
+                            ? (
+                                "PLAN // MERGE-PRESERVING // "
+                                + String(rebaseService.plan.length)
+                                + " EDITABLE // "
+                                + String(rebaseService.mergeCommitCount)
+                                + " MERGE"
+                                + (rebaseService.mergeCommitCount === 1 ? "" : "S")
+                                + " // TOPOLOGY LOCKED"
+                              )
+                            : (
+                                "PLAN // "
+                                + String(rebaseService.plan.length)
+                                + " COMMIT"
+                                + (rebaseService.plan.length === 1 ? "" : "S")
+                              )
                         font.pixelSize: 10
                         color: Colors.cyan
                     }
@@ -569,6 +581,7 @@ Rectangle {
                             accent: Colors.cyan
                             enabledAction:
                                 root.selectedIndex > 0
+                                && !rebaseService.mergePreserving
                                 && !rebaseService.executionBusy
                             onTriggered: root.moveSelected(-1)
                         }
@@ -581,6 +594,7 @@ Rectangle {
                                 root.selectedIndex >= 0
                                 && root.selectedIndex
                                    < rebaseService.plan.length - 1
+                                && !rebaseService.mergePreserving
                                 && !rebaseService.executionBusy
                             onTriggered: root.moveSelected(1)
                         }
@@ -682,7 +696,8 @@ Rectangle {
                                     rebaseService.armedBaseSha,
                                     rebaseService.armedBranch,
                                     rebaseService.armedHeadSha,
-                                    rebaseService.plan
+                                    rebaseService.plan,
+                                    rebaseService.armedMergePreserving
                                 );
                                 return;
                             }
@@ -714,8 +729,15 @@ Rectangle {
                     rebaseService.lastError
                     ? rebaseService.lastError
                     : (
-                        "REHEARSAL FIRST // LIVE BRANCH MOVES ONLY "
-                        + "AFTER A CLEAN TEMP-WORKTREE REWRITE"
+                        rebaseService.mergePreserving
+                        ? (
+                            "MERGE-PRESERVING // GIT OWNS LABEL / RESET / MERGE "
+                            + "TOPOLOGY // COMMIT ORDER LOCKED // REHEARSAL FIRST"
+                          )
+                        : (
+                            "REHEARSAL FIRST // LIVE BRANCH MOVES ONLY "
+                            + "AFTER A CLEAN TEMP-WORKTREE REWRITE"
+                          )
                       )
                 font.pixelSize: 9
                 color:

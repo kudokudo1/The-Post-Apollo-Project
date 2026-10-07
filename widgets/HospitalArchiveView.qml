@@ -500,7 +500,7 @@ Item {
 
                 NeonScrollBar {
                     flickable: archiveList
-                    starHandle: true
+                    handleStyle: "star"
                 }
             }
 

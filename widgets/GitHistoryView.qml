@@ -11,6 +11,7 @@ Item {
     property var interactiveRebaseSessionService: null
     property var historyFoldService: null
     property var historySplitService: null
+    property var historySplitPatchService: null
     property var historyAbsorbService: null
     property var keyboardHost: null
 
@@ -2778,6 +2779,7 @@ Item {
 
                 foldService: root.historyFoldService
                 splitService: root.historySplitService
+                splitPatchService: root.historySplitPatchService
                 absorbService: root.historyAbsorbService
                 historyService: root.historyService
                 keyboardHost: root.keyboardHost

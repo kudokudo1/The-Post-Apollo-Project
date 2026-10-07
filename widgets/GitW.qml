@@ -1417,6 +1417,25 @@ PanelWindow {
             return repositoryProfileService.resultText;
         }
 
+        if (root.githubView === "control"
+                || root.githubView === "library") {
+            if (githubService.pxRuntimeState === "STALE")
+                return "PX STALE // "
+                    + githubService.pxRuntimeDetail;
+
+            if (githubService.pxRuntimeState === "MISSING")
+                return "PX MISSING // "
+                    + githubService.pxRuntimeDetail;
+
+            if (githubService.pxRuntimeState === "SOURCE_MISSING")
+                return "PX SOURCE UNKNOWN // "
+                    + githubService.pxRuntimeDetail;
+
+            if (githubService.pxRuntimeState === "ERROR")
+                return "PX CHECK ERROR // "
+                    + githubService.pxRuntimeDetail;
+        }
+
         if (githubService.factoryBusy)
             return githubService.factoryMode === "install"
                    ? "SAVING // VALIDATING + INSTALLING"
@@ -1496,6 +1515,17 @@ PanelWindow {
             return repositoryProfileService.busy
                    ? Colors.blue
                    : Colors.white;
+        }
+
+        if (root.githubView === "control"
+                || root.githubView === "library") {
+            if (githubService.pxRuntimeState === "MISSING"
+                    || githubService.pxRuntimeState === "ERROR")
+                return Colors.red;
+
+            if (githubService.pxRuntimeState === "STALE"
+                    || githubService.pxRuntimeState === "SOURCE_MISSING")
+                return Colors.orange;
         }
 
         if (githubService.factoryValidationStatus === "FAIL"

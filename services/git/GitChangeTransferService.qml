@@ -506,7 +506,7 @@ Scope {
                 '  [ ! -e "$destination/$path" ] && [ ! -L "$destination/$path" ] || refuse "DESTINATION PATH ALREADY EXISTS // $path"',
                 'done',
                 'patch="$(mktemp "${TMPDIR:-/tmp}/pa-untracked-transfer-preview.XXXXXX")" || refuse "TEMP PATCH CREATE FAILED"',
-                'trap \\'rm -f "$patch"\\' EXIT INT TERM',
+                'trap \'rm -f "$patch"\' EXIT INT TERM',
                 ': >"$patch"',
                 'for path in "${files[@]}"; do',
                 '  git -C "$source" diff --no-index --binary --full-index -- /dev/null "$path" >>"$patch" 2>/dev/null',
@@ -522,7 +522,7 @@ Scope {
                 'if [ "$bytes" -le "524288" ]; then printf "PATCH64\\t"; base64 -w0 "$patch"; printf "\\n"; fi',
                 'printf "PREVIEW\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$fingerprint" "$bytes" "$lines" "$src_branch" "$dst_branch" "$src_head" "$dst_head" "$mode"',
                 'for path in "${files[@]}"; do printf "FILE\\t%s\\n" "$path"; done'
-            ].join("\\n"),
+            ].join("\n"),
             "git-untracked-transfer-preview",
             source,
             destination,

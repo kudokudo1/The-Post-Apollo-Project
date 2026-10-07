@@ -30,6 +30,37 @@ Rectangle {
         return Colors.blue;
     }
 
+    function responsibilityFor(entryValue) {
+        if (!responsibilityService)
+            return null;
+
+        const entry = entryValue || {};
+        const pull = entry.pullRequest || {};
+
+        return responsibilityService.contextForWorkItem({
+            kind: "pull_request",
+            repository: root.repositorySlug,
+            number: Number(pull.number || 0),
+            title: String(pull.title || ""),
+            url: String(pull.url || ""),
+            headRefName: String(pull.headRefName || ""),
+            baseRefName: String(pull.baseRefName || ""),
+            headSha: String(pull.headRefOid || pull.headSha || ""),
+            primaryState: String(entry.state || ""),
+            mergeStateStatus: String(
+                pull.mergeStateStatus || pull.mergeable || entry.state || ""
+            ),
+            reviewDecision: String(pull.reviewDecision || ""),
+            checkPassed: Number(entry.checkPassed || 0),
+            checkFailed: Number(entry.checkFailed || 0),
+            checkPending: Number(entry.checkPending || 0),
+            blocked:
+                String(entry.state || "").toUpperCase() === "BLOCKED",
+            pendingChecks:
+                String(entry.state || "").toUpperCase() === "AWAITING_CHECKS"
+        });
+    }
+
     function refresh() {
         if (!repositorySlug || queueProvider.busy)
             return false;
@@ -223,7 +254,7 @@ Rectangle {
                 required property var modelData
 
                 width: ListView.view.width
-                height: 108
+                height: 122
                 color: Colors.black
                 border.width: 1
                 border.color: root.stateColor(modelData.state)
@@ -311,16 +342,9 @@ Rectangle {
 
                         GohuText {
                             width: parent.width
+                            id: ownershipLine
                             property var responsibility:
-                                root.responsibilityService
-                                ? root.responsibilityService.contextFor(
-                                    root.repositorySlug,
-                                    String(
-                                        (row.modelData.pullRequest || {}).headRefName
-                                        || ""
-                                    )
-                                  )
-                                : null
+                                root.responsibilityFor(row.modelData)
                             text:
                                 !responsibility
                                 ? "OWNER // UNMAPPED"
@@ -352,6 +376,23 @@ Rectangle {
                                   && responsibility.confidence !== "UNMAPPED"
                                 ? Colors.blue
                                 : Colors.magenta
+                            elide: Text.ElideRight
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text:
+                                ownershipLine.responsibility
+                                && ownershipLine.responsibility.chain
+                                ? "CHAIN // "
+                                  + String(ownershipLine.responsibility.chain)
+                                : "CHAIN // NO DURABLE ROOM/SESSION EVIDENCE"
+                            font.pixelSize: 7
+                            color:
+                                ownershipLine.responsibility
+                                && ownershipLine.responsibility.blocker
+                                ? Colors.orange
+                                : Colors.cyan
                             elide: Text.ElideRight
                         }
                     }

@@ -104,8 +104,13 @@ require_regex(
 )
 require(
     SURGERY,
-    'label: "SPLIT // NEXT"',
-    "Split must remain visibly unavailable until implemented",
+    'label: "SPLIT"',
+    "Split must be a live Surgery mode",
+)
+require(
+    SURGERY,
+    'selectedAction: root.surgeryMode === "split"',
+    "Surgery must expose Split selection state",
 )
 
 require(

@@ -54,6 +54,27 @@ for preset in ("1H", "6H", "12H", "1D", "3D", "7D"):
     require(HUB, f'label: "{preset}"', f"manager must expose {preset} snooze preset")
 require(HUB, "NotificationsService.snoozeApp(", "ZZ button must call backend snooze policy")
 require(HUB, "NotificationsService.toggleDnd(", "DND button must call backend DND policy")
+require(SERVICE, "function clearNotificationsForSource(appKey)", "service must support source-wide history clearing")
+require_regex(
+    SERVICE,
+    r"function clearNotificationsForSource\(appKey\).*?notifications\.remove\(i\).*?activeNotifications\.remove\(i\).*?scheduleHistorySave",
+    "clear-all must remove source entries from history and active popups, then persist",
+)
+require(HUB, 'label: "CLEAR ALL"', "notification cards must expose a clear-all control")
+require(HUB, 'width: 108', "clear-all control should span roughly the ZZ/DND/X control length")
+require_regex(
+    HUB,
+    r'label: "CLEAR ALL".*?danger: true.*?requestClearAllForApp',
+    "clear-all control must be red and request confirmation rather than deleting immediately",
+)
+require(HUB, 'text: "CLEAR ALL NOTIFICATIONS?"', "clear-all must show a confirmation window")
+require(HUB, 'label: "NO"', "confirmation must expose NO")
+require(HUB, 'label: "YES"', "confirmation must expose YES")
+require_regex(
+    HUB,
+    r"function confirmClearAll\(\).*?NotificationsService\.clearNotificationsForSource\(root\.pendingClearAllKey\)",
+    "YES must execute source-wide clearing",
+)
 
 hub = read(HUB)
 assert 'toggleAppFlag(notificationEntry.appKey, "snoozed")' not in hub, "ZZ must not be frontend-only state"

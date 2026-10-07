@@ -42,7 +42,7 @@ for needle in (
     'root.selectedReport.body',
     'function feedbackSessionMatches(report)',
     '"REPORT BUG"',
-    '"ARCHIVED SESSION // FEEDBACK DISABLED"',
+    'ARCHIVED SESSION // FEEDBACK DISABLED',
     'runtimeService.reportFeedback(',
     'runtimeService.feedbackRunning',
     '!runtimeService.operating',

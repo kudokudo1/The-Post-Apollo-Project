@@ -818,6 +818,40 @@ Scope {
                === "NONE";
     }
 
+    function stashSnapshotCanRecover(before, after) {
+        const first = before || {};
+        const second = after || {};
+        const beforeWorking = first.workingState || {};
+        const afterWorking = second.workingState || {};
+        const beforeIndex = first.index || {};
+        const afterIndex = second.index || {};
+        const branch = String(first.branch || "");
+        const head = String(first.head || "");
+        const branchRef = "refs/heads/" + branch;
+        const beforeStash = snapshotRefSha(first, "refs/stash");
+        const afterStash = snapshotRefSha(second, "refs/stash");
+
+        return branch
+            && head
+            && String(second.branch || "") === branch
+            && String(second.head || "") === head
+            && snapshotRefSha(first, branchRef) === head
+            && snapshotRefSha(second, branchRef) === head
+            && afterStash
+            && afterStash !== beforeStash
+            && String(beforeIndex.tree || "")
+            && String(afterIndex.tree || "")
+            && Number(beforeWorking.conflictCount || 0) === 0
+            && Number(afterWorking.stagedCount || 0) === 0
+            && Number(afterWorking.unstagedCount || 0) === 0
+            && Number(afterWorking.untrackedCount || 0) === 0
+            && Number(afterWorking.conflictCount || 0) === 0
+            && String((first.operationState || {}).state || "NONE")
+               === "NONE"
+            && String((second.operationState || {}).state || "NONE")
+               === "NONE";
+    }
+
     function journalSnapshot(snapshot, phase) {
         const out = cloneSnapshot(snapshot);
         const stage = String(phase || "");
@@ -857,6 +891,59 @@ Scope {
             out.recoveryClass = "EVIDENCE_ONLY";
             out.recoveryReason =
                 "COMMIT/AMEND CONTENT TRANSITION IS NOT EXACT";
+            return out;
+        }
+
+        if (operation === "stash") {
+            const args =
+                Array.isArray(pendingArguments)
+                ? pendingArguments
+                : [];
+            const mode =
+                args.length > 1
+                ? String(args[1] || "all")
+                : "all";
+
+            if (mode !== "all") {
+                out.recoveryClass = "EVIDENCE_ONLY";
+                out.recoveryReason =
+                    "ONLY FULL STASH CREATION HAS EXACT AUTOMATIC UNDO";
+                return out;
+            }
+
+            if (stage === "BEFORE") {
+                const working = out.workingState || {};
+                const index = out.index || {};
+
+                if (String(out.branch || "")
+                        && String(out.head || "")
+                        && String(index.tree || "")
+                        && Number(working.conflictCount || 0) === 0
+                        && String(
+                            (out.operationState || {}).state || "NONE"
+                        ) === "NONE") {
+                    out.recoveryClass = "CONTENT_RECOVERABLE";
+                    out.recoveryReason =
+                        "FULL STASH WILL PRESERVE DIRTY CONTENT "
+                        + "IN A DURABLE STASH OBJECT";
+                    return out;
+                }
+            } else if (stage === "AFTER"
+                    && pendingBeforeSnapshot
+                    && stashSnapshotCanRecover(
+                        pendingBeforeSnapshot,
+                        out
+                    )) {
+                out.recoveryClass = "CONTENT_RECOVERABLE";
+                out.recoveryReason =
+                    "FULL STASH CAN RESTORE THE EXACT PRE-STASH "
+                    + "INDEX + WORKTREE + UNTRACKED STATE";
+                return out;
+            }
+
+            out.recoveryClass = "EVIDENCE_ONLY";
+            out.recoveryReason =
+                "STASH CONTENT TRANSITION IS NOT EXACT";
             return out;
         }
 

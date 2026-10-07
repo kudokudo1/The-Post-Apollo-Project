@@ -2001,6 +2001,22 @@ Scope {
         return true;
     }
 
+    function cloneUndoAfterSnapshot() {
+        const plan = pendingPlan || {};
+
+        return {
+            snapshotVersion: 1,
+            repository: String(plan.destinationPath || repositoryPath || ""),
+            capturedAt: new Date().toISOString(),
+            externalBoundary: "CLONE_UNDO",
+            destinationPath: String(plan.destinationPath || ""),
+            destinationPresent: false,
+            recoveryClass: "EXTERNAL_RECOVERABLE",
+            recoveryReason:
+                "EXACT CREATED CLONE DIRECTORY REMOVED"
+        };
+    }
+
     function maybeFinish() {
         if (!busy || !exitSeen || !stdoutSeen || !stderrSeen)
             return;
@@ -2025,6 +2041,16 @@ Scope {
                 ? "UNDO COMPLETE"
                 : "UNDO REFUSED"
             );
+
+        if (pendingRecoverySuccess
+                && String((pendingPlan || {}).strategy || "")
+                    === "DELETE_EXACT_CLONE") {
+            finalizeRecovery(
+                cloneUndoAfterSnapshot(),
+                ""
+            );
+            return;
+        }
 
         snapshotPhase = "AFTER";
         pendingSnapshotRequest = snapshotService.capture(

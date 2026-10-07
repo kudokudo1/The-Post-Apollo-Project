@@ -1720,7 +1720,9 @@ Item {
                                     onTriggered: {
                                         root.editMode = "NAME";
                                         root.syncManagementEditors();
-                                        Qt.callLater(renameEditor.focusEditor);
+                                        Qt.callLater(function() {
+                                            renameEditor.focusEditor();
+                                        });
                                     }
                                 }
 
@@ -1731,7 +1733,9 @@ Item {
                                     onTriggered: {
                                         root.editMode = "UP";
                                         root.syncManagementEditors();
-                                        Qt.callLater(upstreamEditor.focusEditor);
+                                        Qt.callLater(function() {
+                                            upstreamEditor.focusEditor();
+                                        });
                                     }
                                 }
                             }

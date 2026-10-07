@@ -1972,6 +1972,9 @@ Item {
                             NeonScrollBar {
                                 flickable: historyScroll7
                                 starHandle: true
+                                topInset: 3
+                                bottomInset: 8
+                                rightInset: 5
                             }
                         }
                     }

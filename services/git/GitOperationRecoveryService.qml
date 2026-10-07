@@ -230,6 +230,89 @@ Scope {
         };
     }
 
+    function commitRecoveryPlan(record) {
+        const row = record || {};
+        const metadata = row.metadata || {};
+
+        if (String(row.kind || "") !== "CHANGES/COMMIT")
+            return null;
+
+        if (String(row.recoveryClass || "") !== "CONTENT_RECOVERABLE"
+                || String((row.before || {}).recoveryClass || "")
+                   !== "CONTENT_RECOVERABLE"
+                || String((row.after || {}).recoveryClass || "")
+                   !== "CONTENT_RECOVERABLE") {
+            return refuse(
+                "COMMIT/AMEND DOES NOT HAVE EXACT CONTENT RECOVERY"
+            );
+        }
+
+        const before = row.before || {};
+        const after = row.after || {};
+        const beforeWorking = before.workingState || {};
+        const afterWorking = after.workingState || {};
+        const beforeIndex = before.index || {};
+        const afterIndex = after.index || {};
+        const branch = String(before.branch || "");
+        const ref = "refs/heads/" + branch;
+        const restoreSha = refSha(before, ref);
+        const expectedSha = refSha(after, ref);
+        const expectedIndexTree = String(afterIndex.tree || "");
+        const expectedWorktreeHash =
+            String(afterWorking.worktreePatchHash || "");
+        const expectedUntrackedHash =
+            String(afterWorking.untrackedListHash || "");
+
+        if (!branch
+                || String(after.branch || "") !== branch
+                || !restoreSha
+                || !expectedSha
+                || restoreSha === expectedSha
+                || String(before.head || "") !== restoreSha
+                || String(after.head || "") !== expectedSha
+                || !String(beforeIndex.tree || "")
+                || String(beforeIndex.tree || "") !== expectedIndexTree
+                || Number(afterWorking.stagedCount || 0) !== 0
+                || Number(beforeWorking.conflictCount || 0) !== 0
+                || Number(afterWorking.conflictCount || 0) !== 0
+                || String(beforeWorking.worktreePatchHash || "")
+                   !== expectedWorktreeHash
+                || String(beforeWorking.untrackedListHash || "")
+                   !== expectedUntrackedHash
+                || Number(beforeWorking.unstagedCount || 0)
+                   !== Number(afterWorking.unstagedCount || 0)
+                || Number(beforeWorking.untrackedCount || 0)
+                   !== Number(afterWorking.untrackedCount || 0)) {
+            return refuse(
+                "COMMIT/AMEND CONTENT TRANSITION IS NOT EXACT"
+            );
+        }
+
+        const args =
+            Array.isArray(metadata.arguments)
+            ? metadata.arguments
+            : [];
+        const amended =
+            args.length > 1
+            && String(args[1] || "") === "1";
+
+        return {
+            allowed: true,
+            strategy: "UNDO_COMMIT_TO_STAGED",
+            branch: branch,
+            restoreSha: restoreSha,
+            expectedSha: expectedSha,
+            expectedIndexTree: expectedIndexTree,
+            expectedWorktreeHash: expectedWorktreeHash,
+            expectedUntrackedHash: expectedUntrackedHash,
+            summary:
+                (amended ? "UNDO AMEND" : "UNDO COMMIT")
+                + " // RESTORE "
+                + restoreSha.slice(0, 12)
+                + " + STAGED CONTENT"
+        };
+    }
+
     function preview(record) {
         const row = record || {};
         const kind = String(row.kind || "");
@@ -251,6 +334,10 @@ Scope {
         const absorbPlan = absorbRecoveryPlan(row);
         if (absorbPlan)
             return absorbPlan;
+
+        const commitPlan = commitRecoveryPlan(row);
+        if (commitPlan)
+            return commitPlan;
 
         if (recoveryClass !== "REF_RECOVERABLE"
                 || String(before.recoveryClass || "") !== "REF_RECOVERABLE"
@@ -797,6 +884,13 @@ Scope {
             a = String(plan.branch || "");
             b = String(plan.restoreSha || "");
             c = String(plan.expectedSha || "");
+        } else if (strategy === "UNDO_COMMIT_TO_STAGED") {
+            a = String(plan.branch || "");
+            b = String(plan.restoreSha || "");
+            c = String(plan.expectedSha || "");
+            d = String(plan.expectedIndexTree || "");
+            e = String(plan.expectedWorktreeHash || "");
+            f = String(plan.expectedUntrackedHash || "");
         } else if (strategy === "UNDO_ABSORB_STAGED") {
             a = String(plan.branch || "");
             b = String(plan.restoreSha || "");
@@ -831,7 +925,7 @@ Scope {
                 '  printf "REFUSED\\tNOT A GIT WORKTREE\\n"',
                 '  exit 21',
                 'fi',
-                'if [ "$strategy" != "UNDO_TRANSFER_CONTENT" ]; then',
+                'if [ "$strategy" != "UNDO_TRANSFER_CONTENT" ] && [ "$strategy" != "UNDO_COMMIT_TO_STAGED" ]; then',
                 '  while IFS= read -r wt; do',
                 '    [ -n "$wt" ] || continue',
                 '    if [ -n "$(git -C "$wt" status --porcelain=v1 --untracked-files=all 2>/dev/null)" ]; then',
@@ -1011,6 +1105,32 @@ Scope {
                 '      exit 124',
                 '    fi',
                 '    printf "OK\\tRESTORED PRE-REBASE HEAD // %s\\n" "$branch"',
+                '    ;;',
+                '  UNDO_COMMIT_TO_STAGED)',
+                '    branch="$a"',
+                '    restore="$b"',
+                '    expected="$c"',
+                '    expected_index_tree="$d"',
+                '    expected_worktree_hash="$e"',
+                '    expected_untracked_hash="$f"',
+                '    ref="refs/heads/$branch"',
+                '    head_ref="$(git -C "$repo" symbolic-ref -q HEAD 2>/dev/null || true)"',
+                '    [ "$head_ref" = "$ref" ] || { printf "REFUSED\\tCOMMIT BRANCH IS NOT CURRENTLY CHECKED OUT\\n"; exit 141; }',
+                '    actual="$(git -C "$repo" rev-parse -q --verify "$ref" 2>/dev/null || true)"',
+                '    [ "$actual" = "$expected" ] || { printf "REFUSED\\tCOMMIT BRANCH MOVED SINCE OPERATION\\n"; exit 142; }',
+                '    git -C "$repo" cat-file -e "$restore^{commit}" 2>/dev/null || { printf "REFUSED\\tPRE-COMMIT HEAD MISSING\\n"; exit 143; }',
+                '    [ -z "$(git -C "$repo" ls-files -u 2>/dev/null)" ] || { printf "REFUSED\\tCURRENT INDEX HAS CONFLICTS\\n"; exit 144; }',
+                '    actual_index_tree="$(git -C "$repo" write-tree 2>/dev/null || true)"',
+                '    [ "$actual_index_tree" = "$expected_index_tree" ] || { printf "REFUSED\\tINDEX CHANGED SINCE COMMIT\\n"; exit 145; }',
+                '    expected_head_tree="$(git -C "$repo" rev-parse "$expected^{tree}" 2>/dev/null || true)"',
+                '    [ "$expected_head_tree" = "$expected_index_tree" ] || { printf "REFUSED\\tRECORDED COMMIT INDEX NO LONGER MATCHES HEAD TREE\\n"; exit 146; }',
+                '    actual_worktree_hash="$(git -C "$repo" diff --binary 2>/dev/null | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
+                '    [ "$actual_worktree_hash" = "$expected_worktree_hash" ] || { printf "REFUSED\\tWORKTREE CHANGED SINCE COMMIT\\n"; exit 147; }',
+                '    actual_untracked_hash="$(git -C "$repo" ls-files --others --exclude-standard -z 2>/dev/null | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
+                '    [ "$actual_untracked_hash" = "$expected_untracked_hash" ] || { printf "REFUSED\\tUNTRACKED FILE SET CHANGED SINCE COMMIT\\n"; exit 148; }',
+                '    git -C "$repo" update-ref ORIG_HEAD "$expected" >/dev/null 2>&1 || true',
+                '    git -C "$repo" update-ref "$ref" "$restore" "$expected" || { printf "REFUSED\\tGUARDED COMMIT UNDO REF RESTORE FAILED\\n"; exit 149; }',
+                '    printf "OK\\tRESTORED PRE-COMMIT HEAD + STAGED CONTENT // %s\\n" "$branch"',
                 '    ;;',
                 '  UNDO_ABSORB_STAGED)',
                 '    branch="$a"',
@@ -1238,6 +1358,7 @@ Scope {
                     String((snapshot || {}).recoveryClass || "");
 
                 if (strategy !== "UNDO_TRANSFER_CONTENT"
+                        && strategy !== "UNDO_COMMIT_TO_STAGED"
                         && snapshotClass !== "REF_RECOVERABLE") {
                     root.failBeforeSnapshot(
                         "CURRENT REPOSITORY STATE IS NOT CLEAN REF-RECOVERABLE"

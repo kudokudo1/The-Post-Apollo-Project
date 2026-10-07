@@ -125,17 +125,35 @@ require(
     "DESTINATION REMOVE FAILED // SOURCE ROLLED BACK",
     "MOVE Undo must roll source restoration back on destination failure",
 )
-require_regex(
+require(
     RECOVERY,
-    r'if \[ "\$strategy" != "UNDO_TRANSFER_CONTENT" \]; then.*'
-    r'WORKTREE DIRTY // UNDO WILL NOT DISCARD CONTENT',
-    "content Undo must use its own exact guards instead of generic clean-worktree refusal",
+    '[ "$strategy" != "UNDO_TRANSFER_CONTENT" ]',
+    "transfer Undo must remain exempt from the generic clean-worktree shell guard",
 )
-require_regex(
+require(
     RECOVERY,
-    r'strategy !== "UNDO_TRANSFER_CONTENT".*'
-    r'snapshotClass !== "REF_RECOVERABLE"',
-    "content Undo must be allowed to snapshot a deliberately dirty transfer state",
+    '[ "$strategy" != "UNDO_COMMIT_TO_STAGED" ]',
+    "commit Undo may share the content-aware shell-guard exception without removing transfer protection",
+)
+require(
+    RECOVERY,
+    "WORKTREE DIRTY // UNDO WILL NOT DISCARD CONTENT",
+    "all non-content-aware recovery strategies must retain the generic dirty-worktree refusal",
+)
+require(
+    RECOVERY,
+    'strategy !== "UNDO_TRANSFER_CONTENT"',
+    "transfer Undo must remain exempt from the clean snapshot-class gate",
+)
+require(
+    RECOVERY,
+    'strategy !== "UNDO_COMMIT_TO_STAGED"',
+    "commit Undo may share the content-aware snapshot exception without weakening transfer recovery",
+)
+require(
+    RECOVERY,
+    'snapshotClass !== "REF_RECOVERABLE"',
+    "ordinary recovery must still require a clean ref-recoverable current state",
 )
 
 

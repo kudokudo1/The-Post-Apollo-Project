@@ -19,6 +19,7 @@ Scope {
     property string lastError: ""
 
     property string pendingJournalId: ""
+    property var pendingBeforeSnapshot: null
     property string pendingSnapshotRequest: ""
     property string snapshotPhase: ""
     property string pendingOperation: ""
@@ -764,8 +765,100 @@ Scope {
         }
     }
 
-    function journalSnapshot(snapshot) {
+    function snapshotRefSha(snapshot, refName) {
+        const refs =
+            snapshot && Array.isArray(snapshot.refs)
+            ? snapshot.refs
+            : [];
+        const needle = String(refName || "");
+
+        for (let i = 0; i < refs.length; ++i) {
+            const row = refs[i] || {};
+            if (String(row.ref || "") === needle)
+                return String(row.sha || "");
+        }
+
+        return "";
+    }
+
+    function commitSnapshotCanRecover(before, after) {
+        const first = before || {};
+        const second = after || {};
+        const beforeWorking = first.workingState || {};
+        const afterWorking = second.workingState || {};
+        const beforeIndex = first.index || {};
+        const afterIndex = second.index || {};
+        const branch = String(first.branch || "");
+        const ref = "refs/heads/" + branch;
+
+        return branch
+            && String(second.branch || "") === branch
+            && String(first.head || "")
+            && String(second.head || "")
+            && String(first.head || "") !== String(second.head || "")
+            && snapshotRefSha(first, ref) === String(first.head || "")
+            && snapshotRefSha(second, ref) === String(second.head || "")
+            && String(beforeIndex.tree || "")
+            && String(beforeIndex.tree || "")
+               === String(afterIndex.tree || "")
+            && Number(afterWorking.stagedCount || 0) === 0
+            && Number(beforeWorking.conflictCount || 0) === 0
+            && Number(afterWorking.conflictCount || 0) === 0
+            && String(beforeWorking.worktreePatchHash || "")
+               === String(afterWorking.worktreePatchHash || "")
+            && String(beforeWorking.untrackedListHash || "")
+               === String(afterWorking.untrackedListHash || "")
+            && Number(beforeWorking.unstagedCount || 0)
+               === Number(afterWorking.unstagedCount || 0)
+            && Number(beforeWorking.untrackedCount || 0)
+               === Number(afterWorking.untrackedCount || 0)
+            && String((first.operationState || {}).state || "NONE")
+               === "NONE"
+            && String((second.operationState || {}).state || "NONE")
+               === "NONE";
+    }
+
+    function journalSnapshot(snapshot, phase) {
         const out = cloneSnapshot(snapshot);
+        const stage = String(phase || "");
+        const operation = String(pendingOperation || "");
+
+        if (operation === "commit") {
+            if (stage === "BEFORE") {
+                const working = out.workingState || {};
+                const index = out.index || {};
+
+                if (String(out.branch || "")
+                        && String(out.head || "")
+                        && String(index.tree || "")
+                        && Number(working.conflictCount || 0) === 0
+                        && String(
+                            (out.operationState || {}).state || "NONE"
+                        ) === "NONE") {
+                    out.recoveryClass = "CONTENT_RECOVERABLE";
+                    out.recoveryReason =
+                        "COMMIT/AMEND SOFT-RESET CANDIDATE // "
+                        + "INDEX + WORKTREE EVIDENCE CAPTURED";
+                    return out;
+                }
+            } else if (stage === "AFTER"
+                    && pendingBeforeSnapshot
+                    && commitSnapshotCanRecover(
+                        pendingBeforeSnapshot,
+                        out
+                    )) {
+                out.recoveryClass = "CONTENT_RECOVERABLE";
+                out.recoveryReason =
+                    "COMMIT/AMEND CAN RESTORE PREVIOUS HEAD "
+                    + "WITHOUT DISCARDING INDEX OR WORKTREE CONTENT";
+                return out;
+            }
+
+            out.recoveryClass = "EVIDENCE_ONLY";
+            out.recoveryReason =
+                "COMMIT/AMEND CONTENT TRANSITION IS NOT EXACT";
+            return out;
+        }
 
         out.recoveryClass = "EVIDENCE_ONLY";
         out.recoveryReason =
@@ -776,6 +869,7 @@ Scope {
 
     function clearPendingMutation() {
         pendingJournalId = "";
+        pendingBeforeSnapshot = null;
         pendingSnapshotRequest = "";
         snapshotPhase = "";
         pendingOperation = "";
@@ -1447,7 +1541,7 @@ Scope {
         const warning = String(snapshotWarning || "");
         const snapshot =
             afterSnapshot
-            ? journalSnapshot(afterSnapshot)
+            ? journalSnapshot(afterSnapshot, "AFTER")
             : {
                 snapshotVersion: 1,
                 repository: String(repositoryPath || ""),
@@ -1586,7 +1680,10 @@ Scope {
 
             if (root.snapshotPhase === "BEFORE") {
                 root.snapshotPhase = "";
-                const beforeSnapshot = root.journalSnapshot(snapshot);
+                const beforeSnapshot =
+                    root.journalSnapshot(snapshot, "BEFORE");
+                root.pendingBeforeSnapshot =
+                    root.cloneSnapshot(beforeSnapshot);
 
                 root.pendingJournalId =
                     root.operationJournal

@@ -8,6 +8,7 @@ Item {
     property var gitService: null
     property var historyService: null
     property var interactiveRebaseService: null
+    property var interactiveRebaseSessionService: null
     property var keyboardHost: null
 
     property string subMode: "log"
@@ -2737,7 +2738,13 @@ Item {
                 visible: root.subMode === "rebase"
 
                 rebaseService: root.interactiveRebaseService
+                rebaseSessionService:
+                    root.interactiveRebaseSessionService
                 keyboardHost: root.keyboardHost
+
+                onOpenChangesRequested: function(path) {
+                    root.changesRequested(path);
+                }
             }
 
             // ===== OPERATE ===============================================

@@ -836,7 +836,9 @@ Scope {
         "favourite", "favourites", "pinned", "starred",
         "saved", "open", "show", "take", "bring",
         "send", "find", "locate", "there", "this",
-        "that", "anything", "something", "update"
+        "that", "anything", "something", "update",
+        "hello", "hey", "thanks", "thank", "morning",
+        "afternoon", "evening", "good", "going"
     ]
 
     function editDistanceOneOrLess(leftValue, rightValue) {
@@ -944,6 +946,66 @@ Scope {
             .replace(/[a-z]+/g, function(word) {
                 return root.fuzzyWord(word);
             });
+    }
+
+    function socialQuery(textValue) {
+        return looseQuery(textValue)
+            .replace(/[!?.,;:]+/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+    }
+
+    function answerSocial(textValue) {
+        const raw = String(textValue || "").trim();
+
+        if (!raw)
+            return false;
+
+        const query = socialQuery(raw);
+        let response = "";
+
+        if (query === "hi"
+                || query === "hey"
+                || query === "hello"
+                || query === "hi there"
+                || query === "hey there"
+                || query === "hello there"
+                || query === "hi reception"
+                || query === "hey reception"
+                || query === "hello reception") {
+            response = "Hey. Front desk's up.";
+        } else if (query === "what's up"
+                || query === "whats up"
+                || query === "what is up"
+                || query === "sup") {
+            response = "Front desk's up. Hospital's still moving.";
+        } else if (query === "how's it going"
+                || query === "hows it going"
+                || query === "how is it going"
+                || query === "how are you"
+                || query === "you good"
+                || query === "are you good") {
+            response = "Doing fine. Desk is online.";
+        } else if (query === "good morning") {
+            response = "Morning. Front desk's online.";
+        } else if (query === "good afternoon") {
+            response = "Afternoon. Front desk's online.";
+        } else if (query === "good evening") {
+            response = "Evening. Front desk's online.";
+        } else if (query === "thanks"
+                || query === "thank you"
+                || query === "thank you reception"
+                || query === "thanks reception"
+                || query === "appreciate it") {
+            response = "Any time.";
+        }
+
+        if (!response)
+            return false;
+
+        append("OPERATOR", raw);
+        append("RECEPTION", response);
+        return true;
     }
 
     function activityQuerySource(queryValue) {
@@ -2120,6 +2182,9 @@ Scope {
             return false;
 
         const query = looseQuery(raw);
+
+        if (answerSocial(raw))
+            return true;
 
         if (answerContextFollowUp(raw))
             return true;

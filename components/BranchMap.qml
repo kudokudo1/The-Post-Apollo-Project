@@ -128,7 +128,7 @@ Rectangle {
                 font.pixelSize: 12
                 color: Colors.magenta
 
-                layer.enabled: true
+                layer.enabled: Window.window !== null
                 layer.effect: DropShadow {
                     radius: 6
                     samples: 7
@@ -323,7 +323,7 @@ Rectangle {
                             verticalAlignment: Text.AlignVCenter
                             color: Colors.orange
 
-                            layer.enabled: true
+                            layer.enabled: Window.window !== null
                             layer.effect: DropShadow {
                                 radius: 15
                                 samples: 25
@@ -351,7 +351,7 @@ Rectangle {
                             verticalAlignment: Text.AlignVCenter
                             color: starColor
 
-                            layer.enabled: true
+                            layer.enabled: Window.window !== null
                             layer.effect: DropShadow {
                                 radius: isHead ? 7 : 5
                                 samples: isHead ? 9 : 7
@@ -382,7 +382,7 @@ Rectangle {
                                 font.pixelSize: 9
                                 color: Colors.orange
 
-                                layer.enabled: true
+                                layer.enabled: Window.window !== null
                                 layer.effect: DropShadow {
                                     radius: 7
                                     samples: 9
@@ -428,7 +428,7 @@ Rectangle {
                                                     ? Colors.white
                                                     : Colors.cyan
 
-                                                layer.enabled: true
+                                                layer.enabled: Window.window !== null
                                                 layer.effect: DropShadow {
                                                     radius: 7
                                                     samples: 9
@@ -445,7 +445,7 @@ Rectangle {
                                                 font.pixelSize: 11
                                                 color: Colors.white
 
-                                                layer.enabled: true
+                                                layer.enabled: Window.window !== null
                                                 layer.effect: DropShadow {
                                                     radius: 7
                                                     samples: 9
@@ -466,7 +466,7 @@ Rectangle {
                                         font.pixelSize: 9
                                         color: Colors.white
 
-                                        layer.enabled: true
+                                        layer.enabled: Window.window !== null
                                         layer.effect: DropShadow {
                                             radius: 7
                                             samples: 9
@@ -492,7 +492,7 @@ Rectangle {
                                             : Colors.blue
                                         elide: Text.ElideRight
 
-                                        layer.enabled: true
+                                        layer.enabled: Window.window !== null
                                         layer.effect: DropShadow {
                                             radius: 7
                                             samples: 9

@@ -11,6 +11,7 @@ Item {
     required property var branchStackStore
     required property var stackPlanner
     required property var stackExecutor
+    property var keyboardHost: null
 
     property string selectedBranch: ""
     property string selectedSha: ""
@@ -18,6 +19,12 @@ Item {
     property string pendingFocusSha: ""
     property string editMode: "NAME"
     property string newBranchMode: "ABOVE"
+    property string managementMode: ""
+    property string managementMessage: ""
+    property string managementArm: ""
+    property string pendingRenameOld: ""
+    property string pendingRenameNew: ""
+    property string pendingDeleteBranch: ""
 
     readonly property var selectedBranchData:
         branchWorkspaceService && selectedBranch
@@ -36,6 +43,14 @@ Item {
 
     readonly property bool selectedIsOccupied:
         selectedWorkspace !== null
+
+    readonly property bool selectedIsMerged:
+        Boolean(selectedBranchData && selectedBranchData.merged)
+
+    readonly property bool selectedIsTrunk:
+        selectedBranch.length > 0
+        && branchStackStore
+        && selectedBranch === String(branchStackStore.trunkBranch || "main")
 
     readonly property string selectedStackParent:
         branchStackStore && selectedBranch
@@ -71,6 +86,10 @@ Item {
     signal historyRequested(string branch)
 
     onSelectedBranchChanged: {
+        root.managementMode = "";
+        root.managementMessage = "";
+        root.managementArm = "";
+
         if (stackPlanner)
             stackPlanner.clear();
 
@@ -105,6 +124,66 @@ Item {
                 root.stackExecutor.disarm("BRANCH STATE CHANGED");
 
             root.applyFocusContext();
+
+            if (root.managementMode === "edit"
+                    && root.editMode === "UP"
+                    && root.selectedBranchData)
+                upstreamEditor.text =
+                    String(root.selectedBranchData.upstream || "");
+        }
+
+        function onActionFinished(action, success, detail) {
+            const kind = String(action || "");
+            const message = String(detail || "");
+
+            if (kind !== "RENAME"
+                    && kind !== "SET-UPSTREAM"
+                    && kind !== "CLEAR-UPSTREAM"
+                    && kind !== "DELETE")
+                return;
+
+            root.managementMessage =
+                (success ? "OK // " : "REFUSED // ")
+                + message;
+
+            if (!success) {
+                root.managementArm = "";
+                return;
+            }
+
+            if (kind === "RENAME") {
+                if (root.branchStackStore
+                        && root.pendingRenameOld
+                        && root.pendingRenameNew)
+                    root.branchStackStore.renameBranch(
+                        root.pendingRenameOld,
+                        root.pendingRenameNew
+                    );
+
+                root.pendingFocusBranch = root.pendingRenameNew;
+                root.pendingFocusSha = "";
+                root.managementMode = "";
+                root.managementArm = "";
+                return;
+            }
+
+            if (kind === "DELETE") {
+                if (root.branchStackStore && root.pendingDeleteBranch)
+                    root.branchStackStore.removeBranch(
+                        root.pendingDeleteBranch
+                    );
+
+                root.selectedBranch = "";
+                root.selectedSha = "";
+                root.pendingDeleteBranch = "";
+                root.managementMode = "";
+                root.managementArm = "";
+                return;
+            }
+
+            root.pendingFocusBranch = root.selectedBranch;
+            root.pendingFocusSha = "";
+            root.managementArm = "";
         }
     }
 
@@ -199,12 +278,10 @@ Item {
     }
 
     function cycleEditMode() {
-        if (editMode === "NAME")
-            editMode = "UP";
-        else if (editMode === "UP")
-            editMode = "PARENT";
-        else
-            editMode = "NAME";
+        editMode = editMode === "NAME" ? "UP" : "NAME";
+
+        if (root.managementMode === "edit")
+            root.syncManagementEditors();
     }
 
     function cycleNewBranchMode() {
@@ -214,16 +291,180 @@ Item {
             : "ABOVE";
     }
 
-    function triggerEditMode() {
-        if (!selectedBranch)
+    function syncManagementEditors() {
+        if (!root.selectedBranch)
             return;
 
-        if (editMode === "NAME")
-            renameBranchRequested(selectedBranch);
-        else if (editMode === "UP")
-            upstreamRequested(selectedBranch);
-        else
-            stackParentRequested(selectedBranch);
+        renameEditor.text = root.selectedBranch;
+        upstreamEditor.text =
+            root.selectedBranchData
+            ? String(root.selectedBranchData.upstream || "")
+            : "";
+    }
+
+    function openEditManager() {
+        if (!root.selectedBranch || !root.branchWorkspaceService)
+            return;
+
+        root.managementMode = "edit";
+        root.managementMessage = "";
+        root.managementArm = "";
+        root.syncManagementEditors();
+
+        Qt.callLater(function() {
+            if (root.editMode === "NAME")
+                renameEditor.focusEditor();
+            else
+                upstreamEditor.focusEditor();
+        });
+    }
+
+    function openDeleteManager() {
+        if (!root.selectedBranch || !root.branchWorkspaceService)
+            return;
+
+        root.managementMode = "delete";
+        root.managementMessage = "";
+        root.managementArm = "";
+        deleteConfirmEditor.text = "";
+    }
+
+    function closeManager() {
+        root.managementMode = "";
+        root.managementMessage = "";
+        root.managementArm = "";
+
+        if (root.keyboardHost
+                && root.keyboardHost.activeTextEditor)
+            root.keyboardHost.activeTextEditor = null;
+    }
+
+    function deleteBlockReason(forceDelete) {
+        if (!root.selectedBranch)
+            return "SELECT A BRANCH";
+
+        if (root.selectedIsTrunk)
+            return "TRUNK BRANCH PROTECTED";
+
+        if (root.selectedIsCurrent)
+            return "CURRENT BRANCH // SWITCH FIRST";
+
+        if (root.selectedIsOccupied)
+            return "BRANCH HAS A WORKTREE // REMOVE IT FIRST";
+
+        if (!forceDelete && !root.selectedIsMerged)
+            return "NOT MERGED // SAFE DELETE REFUSED";
+
+        return "";
+    }
+
+    function applyRename() {
+        if (!root.branchWorkspaceService || !root.selectedBranch)
+            return;
+
+        const nextName = String(renameEditor.text || "").trim();
+
+        if (!nextName) {
+            root.managementMessage = "REFUSED // NEW NAME REQUIRED";
+            return;
+        }
+
+        if (nextName === root.selectedBranch) {
+            root.managementMessage = "NO CHANGE // NAME IS THE SAME";
+            return;
+        }
+
+        root.pendingRenameOld = root.selectedBranch;
+        root.pendingRenameNew = nextName;
+        root.pendingFocusBranch = nextName;
+        root.pendingFocusSha = "";
+
+        if (!root.branchWorkspaceService.renameBranch(
+                root.pendingRenameOld,
+                root.pendingRenameNew
+            ))
+            root.managementMessage = "REFUSED // BRANCH CORE BUSY";
+    }
+
+    function applyUpstream() {
+        if (!root.branchWorkspaceService || !root.selectedBranch)
+            return;
+
+        const upstream = String(upstreamEditor.text || "").trim();
+
+        if (!upstream) {
+            root.managementMessage =
+                "REFUSED // UPSTREAM REQUIRED OR USE CLEAR";
+            return;
+        }
+
+        root.pendingFocusBranch = root.selectedBranch;
+        root.pendingFocusSha = "";
+
+        if (!root.branchWorkspaceService.setUpstream(
+                root.selectedBranch,
+                upstream
+            ))
+            root.managementMessage = "REFUSED // BRANCH CORE BUSY";
+    }
+
+    function clearUpstream() {
+        if (!root.branchWorkspaceService || !root.selectedBranch)
+            return;
+
+        root.pendingFocusBranch = root.selectedBranch;
+        root.pendingFocusSha = "";
+
+        if (!root.branchWorkspaceService.clearUpstream(
+                root.selectedBranch
+            ))
+            root.managementMessage = "REFUSED // BRANCH CORE BUSY";
+    }
+
+    function requestDelete(forceDelete) {
+        if (!root.branchWorkspaceService || !root.selectedBranch)
+            return;
+
+        const reason = root.deleteBlockReason(forceDelete);
+
+        if (reason) {
+            root.managementMessage = "REFUSED // " + reason;
+            root.managementArm = "";
+            return;
+        }
+
+        const armKey = forceDelete ? "delete-force" : "delete-safe";
+
+        if (forceDelete
+                && String(deleteConfirmEditor.text || "").trim()
+                   !== root.selectedBranch) {
+            root.managementMessage =
+                "TYPE THE EXACT BRANCH NAME TO FORCE DELETE";
+            root.managementArm = "";
+            return;
+        }
+
+        if (root.managementArm !== armKey) {
+            root.managementArm = armKey;
+            root.managementMessage =
+                forceDelete
+                ? "ARMED // FORCE DELETE // PRESS AGAIN"
+                : "ARMED // SAFE DELETE // PRESS AGAIN";
+            return;
+        }
+
+        root.pendingDeleteBranch = root.selectedBranch;
+        root.managementArm = "";
+
+        if (!root.branchWorkspaceService.deleteBranch(
+                root.pendingDeleteBranch,
+                forceDelete
+            ))
+            root.managementMessage = "REFUSED // BRANCH CORE BUSY";
+    }
+
+    function triggerEditMode() {
+        root.openEditManager();
     }
 
     function triggerNewBranchMode() {
@@ -459,6 +700,73 @@ Item {
                     wheel.accepted = true;
                 }
             }
+        }
+    }
+
+    component BranchEditor: Rectangle {
+        id: editorBox
+
+        property alias text: editor.text
+        property string placeholder: ""
+        property color accent: Colors.cyan
+
+        function focusEditor() {
+            editor.forceActiveFocus();
+            editor.selectAll();
+        }
+
+        height: 34
+        color: Colors.black
+        border.width: 1
+        border.color:
+            editor.activeFocus
+            ? Colors.orange
+            : editorBox.accent
+        clip: true
+
+        TextInput {
+            id: editor
+
+            anchors {
+                fill: parent
+                leftMargin: 8
+                rightMargin: 8
+            }
+
+            verticalAlignment: Text.AlignVCenter
+            color: Colors.white
+            selectionColor: Colors.magenta
+            selectedTextColor: Colors.black
+            font.family: "GohuFont 11 Nerd Font Mono"
+            font.pixelSize: 11
+            clip: true
+
+            onActiveFocusChanged: {
+                if (!root.keyboardHost)
+                    return;
+
+                if (activeFocus)
+                    root.keyboardHost.activeTextEditor = editor;
+                else if (root.keyboardHost.activeTextEditor === editor)
+                    root.keyboardHost.activeTextEditor = null;
+            }
+        }
+
+        GohuText {
+            anchors {
+                left: parent.left
+                right: parent.right
+                verticalCenter: parent.verticalCenter
+                leftMargin: 8
+                rightMargin: 8
+            }
+
+            visible: editor.text.length === 0
+            text: editorBox.placeholder
+            font.pixelSize: 10
+            color: Colors.white
+            opacity: 0.34
+            elide: Text.ElideRight
         }
     }
 
@@ -1060,8 +1368,14 @@ Item {
                             width: (inspector.width - 26) / 2
                             actionLabel: "EDIT"
                             modeLabel: root.editMode
-                            enabledAction: false
-                            modeEnabled: root.selectedBranch.length > 0
+                            enabledAction:
+                                root.selectedBranch.length > 0
+                                && branchWorkspaceService
+                                && !branchWorkspaceService.actionBusy
+                                && !branchWorkspaceService.refreshing
+                            modeEnabled:
+                                root.selectedBranch.length > 0
+                                && !branchWorkspaceService.actionBusy
                             onTriggered: root.triggerEditMode()
                             onModeTriggered: root.cycleEditMode()
                         }
@@ -1088,9 +1402,12 @@ Item {
                             width: (inspector.width - 26) / 2
                             label: "DELETE"
                             destructive: true
-                            enabledAction: false
-                            onTriggered:
-                                root.deleteBranchRequested(root.selectedBranch)
+                            enabledAction:
+                                root.selectedBranch.length > 0
+                                && branchWorkspaceService
+                                && !branchWorkspaceService.actionBusy
+                                && !branchWorkspaceService.refreshing
+                            onTriggered: root.openDeleteManager()
                         }
                     }
 
@@ -1320,6 +1637,345 @@ Item {
                             ? Colors.red
                             : Colors.cyan
                         wrapMode: Text.WrapAnywhere
+                    }
+                }
+
+                Rectangle {
+                    id: branchManager
+
+                    anchors {
+                        fill: parent
+                        margins: 6
+                    }
+
+                    visible: root.managementMode.length > 0
+                    z: 500
+                    color: Colors.black
+                    border.width: 2
+                    border.color:
+                        root.managementMode === "delete"
+                        ? Colors.red
+                        : Colors.magenta
+                    clip: true
+
+                    Column {
+                        anchors {
+                            fill: parent
+                            margins: 10
+                        }
+                        spacing: 8
+
+                        Row {
+                            width: parent.width
+                            height: 32
+                            spacing: 6
+
+                            GohuText {
+                                width: parent.width - 82
+                                anchors.verticalCenter: parent.verticalCenter
+                                text:
+                                    root.managementMode === "delete"
+                                    ? "DELETE // " + root.selectedBranch
+                                    : "EDIT // " + root.selectedBranch
+                                font.pixelSize: 13
+                                color:
+                                    root.managementMode === "delete"
+                                    ? Colors.red
+                                    : Colors.magenta
+                                elide: Text.ElideMiddle
+                            }
+
+                            BranchButton {
+                                width: 76
+                                height: 32
+                                label: "CLOSE"
+                                onTriggered: root.closeManager()
+                            }
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 1
+                            color:
+                                root.managementMode === "delete"
+                                ? Colors.red
+                                : Colors.cyan
+                            opacity: 0.46
+                        }
+
+                        Column {
+                            width: parent.width
+                            spacing: 8
+                            visible: root.managementMode === "edit"
+
+                            Row {
+                                width: parent.width
+                                height: 30
+                                spacing: 6
+
+                                BranchButton {
+                                    width: (parent.width - 6) / 2
+                                    label: "NAME"
+                                    selectedAction: root.editMode === "NAME"
+                                    onTriggered: {
+                                        root.editMode = "NAME";
+                                        root.syncManagementEditors();
+                                        Qt.callLater(renameEditor.focusEditor);
+                                    }
+                                }
+
+                                BranchButton {
+                                    width: (parent.width - 6) / 2
+                                    label: "UPSTREAM"
+                                    selectedAction: root.editMode === "UP"
+                                    onTriggered: {
+                                        root.editMode = "UP";
+                                        root.syncManagementEditors();
+                                        Qt.callLater(upstreamEditor.focusEditor);
+                                    }
+                                }
+                            }
+
+                            GohuText {
+                                width: parent.width
+                                visible: root.editMode === "NAME"
+                                text:
+                                    "RENAME LOCAL BRANCH // "
+                                    + root.selectedBranch
+                                font.pixelSize: 10
+                                color: Colors.cyan
+                                elide: Text.ElideMiddle
+                            }
+
+                            BranchEditor {
+                                id: renameEditor
+                                width: parent.width
+                                visible: root.editMode === "NAME"
+                                placeholder: "NEW BRANCH NAME"
+                                accent: Colors.magenta
+                            }
+
+                            BranchButton {
+                                width: parent.width
+                                visible: root.editMode === "NAME"
+                                label:
+                                    branchWorkspaceService
+                                    && branchWorkspaceService.actionBusy
+                                    ? "RENAMING"
+                                    : "APPLY RENAME"
+                                enabledAction:
+                                    root.editMode === "NAME"
+                                    && branchWorkspaceService
+                                    && !branchWorkspaceService.actionBusy
+                                    && String(renameEditor.text || "").trim().length > 0
+                                onTriggered: root.applyRename()
+                            }
+
+                            GohuText {
+                                width: parent.width
+                                visible: root.editMode === "UP"
+                                text:
+                                    "CURRENT // "
+                                    + (
+                                        root.selectedBranchData
+                                        ? String(
+                                            root.selectedBranchData.upstream
+                                            || "NONE"
+                                          )
+                                        : "NONE"
+                                      )
+                                font.pixelSize: 10
+                                color: Colors.cyan
+                                elide: Text.ElideMiddle
+                            }
+
+                            BranchEditor {
+                                id: upstreamEditor
+                                width: parent.width
+                                visible: root.editMode === "UP"
+                                placeholder: "UPSTREAM // origin/main"
+                                accent: Colors.cyan
+                            }
+
+                            Row {
+                                width: parent.width
+                                height: 32
+                                spacing: 6
+                                visible: root.editMode === "UP"
+
+                                BranchButton {
+                                    width: (parent.width - 6) / 2
+                                    height: 32
+                                    label: "SET UPSTREAM"
+                                    enabledAction:
+                                        branchWorkspaceService
+                                        && !branchWorkspaceService.actionBusy
+                                        && String(upstreamEditor.text || "").trim().length > 0
+                                    onTriggered: root.applyUpstream()
+                                }
+
+                                BranchButton {
+                                    width: (parent.width - 6) / 2
+                                    height: 32
+                                    label: "CLEAR"
+                                    destructive: true
+                                    enabledAction:
+                                        branchWorkspaceService
+                                        && !branchWorkspaceService.actionBusy
+                                        && root.selectedBranchData
+                                        && String(
+                                            root.selectedBranchData.upstream
+                                            || ""
+                                          ).length > 0
+                                    onTriggered: root.clearUpstream()
+                                }
+                            }
+
+                            GohuText {
+                                width: parent.width
+                                text:
+                                    root.editMode === "NAME"
+                                    ? "Git renames the local branch. Stack links follow the new name automatically."
+                                    : "Use an existing remote ref such as origin/main. CLEAR removes tracking only."
+                                font.pixelSize: 9
+                                color: Colors.white
+                                opacity: 0.58
+                                wrapMode: Text.WordWrap
+                            }
+                        }
+
+                        Column {
+                            width: parent.width
+                            spacing: 8
+                            visible: root.managementMode === "delete"
+
+                            FactRow {
+                                label: "STATE"
+                                value:
+                                    root.selectedIsCurrent
+                                    ? "CURRENT // PROTECTED"
+                                    : root.selectedIsOccupied
+                                    ? "WORKTREE // PROTECTED"
+                                    : root.selectedIsTrunk
+                                    ? "TRUNK // PROTECTED"
+                                    : root.selectedIsMerged
+                                    ? "MERGED // SAFE DELETE AVAILABLE"
+                                    : "UNMERGED // FORCE REQUIRED"
+                                valueColor:
+                                    root.deleteBlockReason(false)
+                                    ? Colors.orange
+                                    : Colors.green
+                            }
+
+                            GohuText {
+                                width: parent.width
+                                text:
+                                    root.deleteBlockReason(false)
+                                    ? root.deleteBlockReason(false)
+                                    : "SAFE DELETE USES GIT -d AND REFUSES UNMERGED WORK"
+                                font.pixelSize: 10
+                                color:
+                                    root.deleteBlockReason(false)
+                                    ? Colors.orange
+                                    : Colors.cyan
+                                wrapMode: Text.WordWrap
+                            }
+
+                            BranchButton {
+                                width: parent.width
+                                height: 34
+                                label:
+                                    root.managementArm === "delete-safe"
+                                    ? "CONFIRM SAFE DELETE"
+                                    : "SAFE DELETE"
+                                destructive: true
+                                enabledAction:
+                                    branchWorkspaceService
+                                    && !branchWorkspaceService.actionBusy
+                                    && root.deleteBlockReason(false).length === 0
+                                onTriggered: root.requestDelete(false)
+                            }
+
+                            Rectangle {
+                                width: parent.width
+                                height: 1
+                                color: Colors.red
+                                opacity: 0.42
+                            }
+
+                            GohuText {
+                                width: parent.width
+                                text:
+                                    "FORCE DELETE BYPASSES MERGE SAFETY. "
+                                    + "TYPE THE EXACT BRANCH NAME:"
+                                font.pixelSize: 10
+                                color: Colors.red
+                                wrapMode: Text.WordWrap
+                            }
+
+                            BranchEditor {
+                                id: deleteConfirmEditor
+                                width: parent.width
+                                placeholder:
+                                    root.selectedBranch
+                                    ? root.selectedBranch
+                                    : "BRANCH NAME"
+                                accent: Colors.red
+                            }
+
+                            BranchButton {
+                                width: parent.width
+                                height: 34
+                                label:
+                                    root.managementArm === "delete-force"
+                                    ? "CONFIRM FORCE DELETE"
+                                    : "FORCE DELETE"
+                                destructive: true
+                                enabledAction:
+                                    branchWorkspaceService
+                                    && !branchWorkspaceService.actionBusy
+                                    && root.deleteBlockReason(true).length === 0
+                                    && String(
+                                        deleteConfirmEditor.text || ""
+                                      ).trim() === root.selectedBranch
+                                onTriggered: root.requestDelete(true)
+                            }
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 52
+                            color: Colors.dark
+                            border.width: 1
+                            border.color:
+                                root.managementMessage.indexOf("REFUSED") === 0
+                                ? Colors.red
+                                : root.managementMessage.indexOf("ARMED") === 0
+                                ? Colors.orange
+                                : Colors.cyan
+
+                            GohuText {
+                                anchors {
+                                    fill: parent
+                                    margins: 7
+                                }
+                                text:
+                                    root.managementMessage
+                                    || (
+                                        root.managementMode === "delete"
+                                        ? "DELETE WAITS FOR EXPLICIT CONFIRMATION"
+                                        : "EDIT CHANGES ONLY THE SELECTED LOCAL BRANCH"
+                                       )
+                                font.pixelSize: 9
+                                color:
+                                    root.managementMessage.indexOf("REFUSED") === 0
+                                    ? Colors.red
+                                    : root.managementMessage.indexOf("ARMED") === 0
+                                    ? Colors.orange
+                                    : Colors.cyan
+                                wrapMode: Text.WordWrap
+                            }
+                        }
                     }
                 }
             }

@@ -156,7 +156,7 @@ Item {
         }
 
         height: 28
-        opacity: enabledAction ? 1.0 : 0.34
+        opacity: 1.0
         color:
             keyboardSelector || selectedAction
             ? Colors.yellow
@@ -179,7 +179,7 @@ Item {
         GohuText {
             anchors.centerIn: parent
             text: button.label
-            font.pixelSize: 8
+            font.pixelSize: 9
             color:
                 button.keyboardSelector
                 || button.selectedAction
@@ -187,6 +187,10 @@ Item {
                 : button.primaryBlue
                 ? Colors.blue
                 : Colors.cyan
+            opacity:
+                button.enabledAction
+                ? 1.0
+                : 0.34
         }
 
         MouseArea {
@@ -346,7 +350,7 @@ Item {
                         text:
                             root.gitService.repoRemoteSlug
                             || "NO ACTIVE REPOSITORY"
-                        font.pixelSize: 8
+                        font.pixelSize: 9
                         color:
                             root.gitService.repoRemoteSlug
                             ? Colors.blue
@@ -369,7 +373,7 @@ Item {
                               )
                             : "NO PROJECT SELECTED"
                           )
-                    font.pixelSize: 8
+                    font.pixelSize: 9
                     color:
                         root.projectService.selectedNumber() > 0
                         ? Colors.cyan
@@ -440,7 +444,7 @@ Item {
                 width: 96
                 anchors.verticalCenter: parent.verticalCenter
                 text: "PROJECT FILTER"
-                font.pixelSize: 8
+                font.pixelSize: 9
                 color: Colors.magenta
             }
 
@@ -494,7 +498,7 @@ Item {
                         + root.projectService.selectedTitle()
                       )
                     : "NO PROJECT SELECTED"
-                font.pixelSize: 8
+                font.pixelSize: 9
                 color:
                     root.projectService.selectedNumber() > 0
                     ? Colors.cyan
@@ -630,7 +634,7 @@ Item {
                                         )
                                     : ""
                                   )
-                            font.pixelSize: 8
+                            font.pixelSize: 9
                             color:
                                 root.workService.rowState(sourceRow.modelData)
                                 === "OPEN"
@@ -653,7 +657,7 @@ Item {
                                     + root.workService.pullCheckSummary(
                                         sourceRow.modelData
                                     )
-                                font.pixelSize: 8
+                                font.pixelSize: 9
                                 color:
                                     sourceRow.checkState === "FAIL"
                                     || sourceRow.checkState === "ERROR"
@@ -678,7 +682,7 @@ Item {
                                     + root.workService.pullReviewSummary(
                                         sourceRow.modelData
                                     )
-                                font.pixelSize: 8
+                                font.pixelSize: 9
                                 color:
                                     sourceRow.reviewState === "CHANGES_REQUESTED"
                                     || sourceRow.reviewState === "ERROR"
@@ -703,7 +707,7 @@ Item {
                                     + root.workService.pullMergeSummary(
                                         sourceRow.modelData
                                     )
-                                font.pixelSize: 8
+                                font.pixelSize: 9
                                 color:
                                     sourceRow.mergeState === "BLOCKED"
                                     || sourceRow.mergeState === "DIRTY"
@@ -744,7 +748,7 @@ Item {
                                       )
                                     : ""
                                   )
-                            font.pixelSize: 7
+                            font.pixelSize: 9
                             color: Colors.cyan
                             opacity: 0.60
                             elide: Text.ElideRight

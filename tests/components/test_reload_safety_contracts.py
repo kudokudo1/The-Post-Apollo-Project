@@ -23,7 +23,11 @@ for needle in (
 ):
     assert needle in RESTART, f"safe restart helper missing {needle!r}"
 
-assert "quickshell reload" not in RESTART.lower(), (
+command_lines = "\n".join(
+    line for line in RESTART.splitlines()
+    if line.strip() and not line.lstrip().startswith("#")
+).lower()
+assert "quickshell reload" not in command_lines, (
     "safe restart must cross a process boundary, not use in-process reload"
 )
 

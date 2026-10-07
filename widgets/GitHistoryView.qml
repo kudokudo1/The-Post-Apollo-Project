@@ -369,6 +369,46 @@ Item {
             : "NO FILTERS // LOG ALREADY SHOWS GENERAL HISTORY";
     }
 
+    function queryInputsMatchExecuted() {
+        if (!root.historyService)
+            return true;
+
+        return (
+            String(queryPathInput.text || "").trim()
+            === String(root.historyService.queryPath || "")
+            && String(queryAuthorInput.text || "").trim()
+               === String(root.historyService.queryAuthor || "")
+            && String(queryMessageInput.text || "").trim()
+               === String(root.historyService.queryMessage || "")
+            && String(querySinceInput.text || "").trim()
+               === String(root.historyService.querySince || "")
+            && String(queryUntilInput.text || "").trim()
+               === String(root.historyService.queryUntil || "")
+            && String(queryRangeInput.text || "").trim()
+               === String(root.historyService.queryRange || "")
+        );
+    }
+
+    function openQueryResultInLog() {
+        if (!root.historyService || !root.selectedQuerySha)
+            return;
+
+        const sha = root.selectedQuerySha;
+
+        root.pendingScopeRef = "ALL";
+        root.syncScopeIndex("ALL");
+        root.searchQuery = sha.slice(0, 8);
+        searchInput.text = root.searchQuery;
+        root.subMode = "log";
+
+        root.historyService.refresh(
+            "ALL",
+            root.historyService.selectedMode
+        );
+
+        root.historyService.showCommit(sha);
+    }
+
     function applyQueryPreset(kind) {
         const preset = String(kind || "");
 
@@ -1780,39 +1820,55 @@ Item {
                             spacing: 5
 
                             GohuText {
-                                width: parent.width - 250
+                                width: parent.width - 322
                                 anchors.verticalCenter: parent.verticalCenter
                                 text:
-                                    root.historyService
+                                    !root.historyService
+                                    ? "NO HISTORY SERVICE"
+                                    : root.historyService.queryBusy
                                     ? root.historyService.queryStatus
-                                    : "NO HISTORY SERVICE"
+                                    : !root.queryInputsMatchExecuted()
+                                    ? "CHANGED // RUN TO APPLY"
+                                    : root.historyService.queryStatus
                                 font.pixelSize: 10
-                                color: Colors.green
+                                color:
+                                    !root.queryInputsMatchExecuted()
+                                    ? Colors.orange
+                                    : Colors.green
                                 elide: Text.ElideRight
                             }
 
                             MiniButton {
-                                width: 118
+                                width: 108
                                 label: "OPEN IN LOG"
                                 accent: Colors.cyan
                                 enabledAction:
                                     root.selectedQuerySha.length > 0
-                                onTriggered: {
-                                    searchInput.text =
-                                        root.selectedQuerySha.slice(0, 8);
-                                    root.subMode = "log";
-                                }
+                                onTriggered:
+                                    root.openQueryResultInLog()
                             }
 
                             MiniButton {
-                                width: 122
-                                label: "SET COMPARE A"
+                                width: 96
+                                label: "SET A"
                                 accent: Colors.orange
                                 enabledAction:
                                     root.selectedQuerySha.length > 0
                                     && root.historyService
                                 onTriggered:
                                     root.historyService.compareA =
+                                        root.selectedQuerySha
+                            }
+
+                            MiniButton {
+                                width: 96
+                                label: "SET B"
+                                accent: Colors.orange
+                                enabledAction:
+                                    root.selectedQuerySha.length > 0
+                                    && root.historyService
+                                onTriggered:
+                                    root.historyService.compareB =
                                         root.selectedQuerySha
                             }
                         }

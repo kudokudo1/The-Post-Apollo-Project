@@ -1192,8 +1192,17 @@ PanelWindow {
         githubService.refresh();
     }
 
+    onOperationsSurfaceChanged: {
+        if (root.operationsSurface !== "reception"
+                && speechInputService.busy)
+            speechInputService.cancel();
+    }
+
     onMenuOpenChanged: {
         if (!root.menuOpen) {
+            if (speechInputService.busy)
+                speechInputService.cancel();
+
             root.leaveRoomControls();
             root.leaveBedControls();
             return;
@@ -1285,6 +1294,17 @@ PanelWindow {
 
     HospitalReceptionistService {
         id: receptionistService
+    }
+
+    HospitalSpeechInputService {
+        id: speechInputService
+
+        onVoiceError: function(message) {
+            receptionistService.append(
+                "RECEPTION",
+                String(message || "VOICE INPUT ERROR")
+            );
+        }
     }
 
     HospitalRemoteWatcher {
@@ -4234,6 +4254,7 @@ PanelWindow {
             z: 700
             visible: root.operationsSurface === "reception"
             receptionistService: receptionistService
+            speechInputService: speechInputService
             floorLabel: floorService.floorLabel
             roomLabel:
                 root.selectedRoomTeam

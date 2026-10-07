@@ -267,15 +267,17 @@ Scope {
                 (cloneValue(block.oursLines || []) || [])
                 .concat(cloneValue(block.theirsLines || []) || []);
 
-        rows.splice(
-            Number(block.startLine || 0),
+        const start = Number(block.startLine || 0);
+        const count =
             Number(block.endLine || 0)
-                - Number(block.startLine || 0)
-                + 1,
-            ...replacement
-        );
+            - start
+            + 1;
+        const nextRows =
+            rows.slice(0, start)
+            .concat(replacement)
+            .concat(rows.slice(start + count));
 
-        resultText = rows.join("\n");
+        resultText = nextRows.join("\n");
         updateParsedResult();
 
         if (blocks.length > 0)

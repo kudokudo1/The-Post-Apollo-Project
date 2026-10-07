@@ -17,6 +17,8 @@ Scope {
     required property var branchWorkspaceService
 
     property string repositoryPath: ""
+    property var operationJournal: null
+    property var snapshotService: null
     property string repoSlug: ""
     property string remoteName: "origin"
 
@@ -48,6 +50,13 @@ Scope {
     property int submitExitCode: -1
     property string submitStdout: ""
     property string submitStderr: ""
+
+    property string pendingJournalId: ""
+    property string pendingSnapshotRequest: ""
+    property string snapshotPhase: ""
+    property var pendingSubmitArgs: []
+    property bool pendingSubmissionSuccess: false
+    property string pendingSubmissionDetail: ""
 
     signal previewReady(var plan)
     signal submissionFinished(bool success, var result)
@@ -419,6 +428,151 @@ Scope {
             : "STACK SUBMIT // NOT ARMED";
     }
 
+    function cloneSnapshot(snapshot) {
+        try {
+            return JSON.parse(JSON.stringify(snapshot || {}));
+        } catch (error) {
+            return {};
+        }
+    }
+
+    function journalSnapshot(snapshot) {
+        const out = cloneSnapshot(snapshot);
+
+        out.recoveryClass = "EVIDENCE_ONLY";
+        out.recoveryReason =
+            "STACK SUBMIT MUTATES REMOTE REFS + GITHUB PR STATE";
+
+        return out;
+    }
+
+    function clearPendingSubmission() {
+        pendingJournalId = "";
+        pendingSnapshotRequest = "";
+        snapshotPhase = "";
+        pendingSubmitArgs = [];
+        pendingSubmissionSuccess = false;
+        pendingSubmissionDetail = "";
+    }
+
+    function journalContext() {
+        const rows =
+            Array.isArray(armedPlan)
+            ? armedPlan
+            : [];
+
+        return {
+            source: "GitStackSubmitService",
+            repositorySlug: String(repoSlug || ""),
+            remote: String(remoteName || "origin"),
+            startBranch: String(startBranch || ""),
+            fingerprint: String(armedFingerprint || ""),
+            recoveryClass: "EVIDENCE_ONLY",
+            steps: rows.map(function(row) {
+                const item = row || {};
+
+                return {
+                    branch: String(item.branch || ""),
+                    parent: String(item.parent || ""),
+                    localHead: String(item.localHead || ""),
+                    parentHead: String(item.parentHead || ""),
+                    remoteHead: String(item.remoteHead || ""),
+                    prNumber: String(item.prNumber || ""),
+                    prUrl: String(item.prUrl || ""),
+                    prState: String(item.prState || ""),
+                    prBase: String(item.prBase || ""),
+                    status: String(item.status || "")
+                };
+            })
+        };
+    }
+
+    function failBeforeSnapshot(detail) {
+        const message =
+            "STACK SUBMIT BEFORE SNAPSHOT FAILED // "
+            + String(detail || "SNAPSHOT UNAVAILABLE");
+
+        submitBusy = false;
+        lastError = message;
+        submitState = "STACK SUBMIT // REFUSED";
+        disarm("SNAPSHOT FAILED");
+        clearPendingSubmission();
+        submissionFinished(false, lastResult);
+    }
+
+    function startPendingSubmission() {
+        if (!submitBusy
+                || !Array.isArray(pendingSubmitArgs)
+                || pendingSubmitArgs.length === 0)
+            return false;
+
+        submitState = "STACK SUBMIT // PUSHING + OPENING PRS";
+        submitProcess.exec(pendingSubmitArgs);
+        submitWatchdog.restart();
+        return true;
+    }
+
+    function finalizeSubmission(afterSnapshot, snapshotWarning) {
+        const warning = String(snapshotWarning || "");
+        const detail = String(pendingSubmissionDetail || "");
+        const success = pendingSubmissionSuccess;
+        const snapshot =
+            afterSnapshot
+            ? journalSnapshot(afterSnapshot)
+            : {
+                snapshotVersion: 1,
+                repository: String(repositoryPath || ""),
+                capturedAt: new Date().toISOString(),
+                captureFailed: true,
+                recoveryClass: "EVIDENCE_ONLY",
+                recoveryReason:
+                    warning
+                    || "STACK SUBMIT AFTER SNAPSHOT UNAVAILABLE"
+            };
+
+        if (pendingJournalId && operationJournal) {
+            if (success)
+                operationJournal.completeOperation(
+                    pendingJournalId,
+                    snapshot,
+                    warning
+                    ? detail + " // " + warning
+                    : detail
+                );
+            else
+                operationJournal.failOperation(
+                    pendingJournalId,
+                    snapshot,
+                    warning
+                    ? detail + " // " + warning
+                    : detail
+                );
+        }
+
+        submitBusy = false;
+        submitWatchdog.stop();
+
+        if (!success) {
+            lastError =
+                detail
+                || "STACK SUBMIT FAILED";
+            if (warning)
+                lastError += " // " + warning;
+            submitState = "STACK SUBMIT // REFUSED";
+            disarm("SUBMISSION FAILED");
+        } else {
+            submitState =
+                warning
+                ? "STACK SUBMIT // COMPLETE // SNAPSHOT WARNING"
+                : "STACK SUBMIT // COMPLETE";
+            lastError = warning;
+            disarm("COMPLETE");
+        }
+
+        clearPendingSubmission();
+        submissionFinished(success, lastResult);
+    }
+
     function submitArmed() {
         if (submitBusy)
             return false;
@@ -547,8 +701,21 @@ Scope {
             args.push(String(row.status || ""));
         }
 
+        if ((operationJournal && !snapshotService)
+                || (snapshotService && !operationJournal)) {
+            lastError =
+                "STACK SUBMIT REFUSED // JOURNAL + SNAPSHOT SERVICES MUST BE PAIRED";
+            return false;
+        }
+
+        clearPendingSubmission();
+        pendingSubmitArgs = args;
+
         submitBusy = true;
-        submitState = "STACK SUBMIT // PUSHING + OPENING PRS";
+        submitState =
+            operationJournal && snapshotService
+            ? "STACK SUBMIT // SNAPSHOT BEFORE"
+            : "STACK SUBMIT // PUSHING + OPENING PRS";
         lastError = "";
         lastResult = [];
 
@@ -560,8 +727,21 @@ Scope {
         submitStderr = "";
 
         armTimer.stop();
-        submitProcess.exec(args);
-        submitWatchdog.restart();
+
+        if (!operationJournal && !snapshotService)
+            return startPendingSubmission();
+
+        snapshotPhase = "BEFORE";
+        pendingSnapshotRequest = snapshotService.capture(
+            "STACK BEFORE // SUBMIT",
+            journalContext()
+        );
+
+        if (!pendingSnapshotRequest) {
+            failBeforeSnapshot("SNAPSHOT SERVICE BUSY OR UNAVAILABLE");
+            return false;
+        }
+
         return true;
     }
 
@@ -606,29 +786,112 @@ Scope {
                 || !submitExitSeen)
             return;
 
-        submitBusy = false;
         submitWatchdog.stop();
         parseSubmit(submitStdout);
 
-        if (submitExitCode !== 0 || lastError) {
-            const detail = String(
+        pendingSubmissionSuccess =
+            submitExitCode === 0
+            && !lastError;
+        pendingSubmissionDetail =
+            pendingSubmissionSuccess
+            ? (
+                lastResult.length > 0
+                ? String(lastResult.length)
+                    + " STACK PR RESULT ROWS"
+                : "STACK SUBMIT COMPLETE"
+              )
+            : String(
                 lastError
                 || submitStderr
                 || submitStdout
                 || ("STACK SUBMIT EXIT " + submitExitCode)
-            ).trim();
+              ).trim();
 
-            lastError = detail || "STACK SUBMIT FAILED";
-            submitState = "STACK SUBMIT // REFUSED";
-            disarm("SUBMISSION FAILED");
-            submissionFinished(false, lastResult);
+        if (!operationJournal || !snapshotService) {
+            finalizeSubmission(null, "");
             return;
         }
 
-        submitState = "STACK SUBMIT // COMPLETE";
-        lastError = "";
-        disarm("COMPLETE");
-        submissionFinished(true, lastResult);
+        submitState = "STACK SUBMIT // SNAPSHOT AFTER";
+        snapshotPhase = "AFTER";
+        pendingSnapshotRequest = snapshotService.capture(
+            "STACK AFTER // SUBMIT",
+            journalContext()
+        );
+
+        if (!pendingSnapshotRequest) {
+            finalizeSubmission(
+                null,
+                "AFTER SNAPSHOT COULD NOT START"
+            );
+        }
+    }
+
+    Connections {
+        target: root.snapshotService
+        enabled: root.snapshotService !== null
+        ignoreUnknownSignals: true
+
+        function onSnapshotReady(requestId, snapshot) {
+            if (String(requestId || "")
+                    !== String(root.pendingSnapshotRequest || ""))
+                return;
+
+            root.pendingSnapshotRequest = "";
+
+            if (root.snapshotPhase === "BEFORE") {
+                root.snapshotPhase = "";
+                const beforeSnapshot = root.journalSnapshot(snapshot);
+
+                root.pendingJournalId =
+                    root.operationJournal
+                    ? root.operationJournal.beginOperation(
+                        "STACK/SUBMIT",
+                        beforeSnapshot,
+                        root.journalContext()
+                    )
+                    : "";
+
+                if (root.operationJournal
+                        && !root.pendingJournalId) {
+                    root.failBeforeSnapshot(
+                        "JOURNAL RECORD COULD NOT START"
+                    );
+                    return;
+                }
+
+                root.startPendingSubmission();
+                return;
+            }
+
+            if (root.snapshotPhase === "AFTER") {
+                root.snapshotPhase = "";
+                root.finalizeSubmission(snapshot, "");
+            }
+        }
+
+        function onSnapshotFailed(requestId, detail) {
+            if (String(requestId || "")
+                    !== String(root.pendingSnapshotRequest || ""))
+                return;
+
+            root.pendingSnapshotRequest = "";
+
+            if (root.snapshotPhase === "BEFORE") {
+                root.snapshotPhase = "";
+                root.failBeforeSnapshot(detail);
+                return;
+            }
+
+            if (root.snapshotPhase === "AFTER") {
+                root.snapshotPhase = "";
+                root.finalizeSubmission(
+                    null,
+                    "AFTER SNAPSHOT FAILED // "
+                        + String(detail || "UNKNOWN ERROR")
+                );
+            }
+        }
     }
 
     Process {
@@ -720,11 +983,30 @@ Scope {
             if (!root.submitBusy)
                 return;
 
-            root.submitBusy = false;
-            root.lastError =
+            const detail =
                 "STACK SUBMIT TIMEOUT // VERIFY REMOTE + PR STATE";
+
+            if (root.pendingJournalId && root.operationJournal) {
+                root.operationJournal.failOperation(
+                    root.pendingJournalId,
+                    {
+                        snapshotVersion: 1,
+                        repository: String(root.repositoryPath || ""),
+                        capturedAt: new Date().toISOString(),
+                        captureFailed: true,
+                        recoveryClass: "EVIDENCE_ONLY",
+                        recoveryReason:
+                            "STACK SUBMIT TIMEOUT // REMOTE + PR STATE UNCERTAIN"
+                    },
+                    detail
+                );
+            }
+
+            root.submitBusy = false;
+            root.lastError = detail;
             root.submitState = "STACK SUBMIT // UNCERTAIN";
             root.disarm("TIMEOUT");
+            root.clearPendingSubmission();
             root.submissionFinished(false, root.lastResult);
         }
     }

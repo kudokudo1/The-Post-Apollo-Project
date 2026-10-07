@@ -65,7 +65,7 @@ required property var controller
                                 font.pixelSize: 10
                                 color: systemMonitorBody.accent
 
-                                layer.enabled: true
+                                layer.enabled: Window.window !== null
                                 layer.effect: DropShadow {
                                     radius: 6
                                     samples: 5
@@ -89,7 +89,7 @@ required property var controller
                                 font.pixelSize: 18
                                 color: systemMonitorBody.accent
 
-                                layer.enabled: true
+                                layer.enabled: Window.window !== null
                                 layer.effect: DropShadow {
                                     radius: 7
                                     samples: 5
@@ -119,7 +119,7 @@ required property var controller
                                 font.pixelSize: 13
                                 color: systemMonitorBody.accent
 
-                                layer.enabled: parent.favorite
+                                layer.enabled: Window.window !== null && (parent.favorite)
                                 layer.effect: DropShadow {
                                     radius: 5
                                     samples: 5
@@ -181,7 +181,7 @@ required property var controller
                                 font.pixelSize: 10
                                 color: systemMonitorBody.accent
 
-                                layer.enabled: true
+                                layer.enabled: Window.window !== null
                                 layer.effect: DropShadow {
                                     radius: 6
                                     samples: 5
@@ -215,7 +215,7 @@ required property var controller
                                         : Colors.white
                                     elide: Text.ElideRight
 
-                                    layer.enabled: true
+                                    layer.enabled: Window.window !== null
                                     layer.effect: DropShadow {
                                         radius: 6
                                         samples: 5
@@ -273,7 +273,7 @@ required property var controller
                                                 fontSizeMode: Text.HorizontalFit
                                                 minimumPixelSize: 7
                                                 color: Colors.cyan
-                                                layer.enabled: true
+                                                layer.enabled: Window.window !== null
                                                 layer.effect: DropShadow {
                                                     radius: 5
                                                     samples: 5
@@ -317,7 +317,7 @@ required property var controller
                                 font.pixelSize: 13
                                 color: systemMonitorBody.accent
 
-                                layer.enabled: parent.favorite
+                                layer.enabled: Window.window !== null && (parent.favorite)
                                 layer.effect: DropShadow {
                                     radius: 5
                                     samples: 5
@@ -408,7 +408,7 @@ required property var controller
                         ? 24 : 32
                     color: systemMonitorBody.accent
 
-                    layer.enabled: true
+                    layer.enabled: Window.window !== null
                     layer.effect: DropShadow {
                         radius: 6
                         samples: 5
@@ -437,7 +437,7 @@ required property var controller
                     color: systemMonitorBody.accent
                     wrapMode: Text.Wrap
 
-                    layer.enabled: true
+                    layer.enabled: Window.window !== null
                     layer.effect: DropShadow {
                         radius: 5
                         samples: 5
@@ -499,7 +499,7 @@ required property var controller
                     font.pixelSize: 13
                     color: Colors.red
 
-                    layer.enabled: true
+                    layer.enabled: Window.window !== null
                     layer.effect: DropShadow {
                         radius: 5
                         samples: 5
@@ -523,7 +523,7 @@ required property var controller
                     font.pixelSize: 9
                     color: Colors.yellow
 
-                    layer.enabled: text.length > 0
+                    layer.enabled: Window.window !== null && (text.length > 0)
                     layer.effect: DropShadow {
                         radius: 4
                         samples: 5
@@ -623,7 +623,7 @@ required property var controller
 
                             opacity: parent.canRun ? 1.0 : 0.42
 
-                            layer.enabled: parent.canRun
+                            layer.enabled: Window.window !== null && (parent.canRun)
                             layer.effect: DropShadow {
                                 radius: 5
                                 samples: 5
@@ -736,7 +736,7 @@ required property var controller
                             font.pixelSize: 12
                             color: systemMonitorBody.accent
 
-                            layer.enabled: true
+                            layer.enabled: Window.window !== null
                             layer.effect: DropShadow {
                                 radius: 4
                                 samples: 5
@@ -768,7 +768,7 @@ required property var controller
                             horizontalAlignment: Text.AlignRight
                             elide: Text.ElideRight
 
-                            layer.enabled: true
+                            layer.enabled: Window.window !== null
                             layer.effect: DropShadow {
                                 radius: 4
                                 samples: 5
@@ -814,7 +814,7 @@ required property var controller
                                     ? Colors.red
                                     : Colors.white
 
-                                layer.enabled: parent.canKill
+                                layer.enabled: Window.window !== null && (parent.canKill)
                                 layer.effect: DropShadow {
                                     radius: 4
                                     samples: 5

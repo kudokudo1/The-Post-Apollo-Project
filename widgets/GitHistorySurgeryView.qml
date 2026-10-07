@@ -5,6 +5,7 @@ Rectangle {
     id: root
 
     required property var foldService
+    required property var splitService
     required property var absorbService
     property var historyService: null
     property var keyboardHost: null
@@ -139,9 +140,10 @@ Rectangle {
 
             SurgeryButton {
                 width: (parent.width - 12) / 3
-                label: "SPLIT // NEXT"
+                label: "SPLIT"
                 accent: Colors.orange
-                enabledAction: false
+                selectedAction: root.surgeryMode === "split"
+                onTriggered: root.surgeryMode = "split"
             }
 
             SurgeryButton {
@@ -520,6 +522,26 @@ Rectangle {
                 elide: Text.ElideRight
             }
         }
+    }
+
+    GitHistorySplitView {
+        anchors {
+            left: parent.left
+            right: parent.right
+            top: parent.top
+            bottom: parent.bottom
+            leftMargin: 8
+            rightMargin: 8
+            topMargin: 45
+            bottomMargin: 8
+        }
+
+        z: 4000
+        visible: root.surgeryMode === "split"
+
+        splitService: root.splitService
+        historyService: root.historyService
+        keyboardHost: root.keyboardHost
     }
 
     GitHistoryAbsorbView {

@@ -207,35 +207,42 @@ Scope {
         for (let i = 0; i < source.length; ++i) {
             const row = source[i] || {};
             const status = String(row.status || "UNKNOWN");
+            const metadata = cloneValue(row.metadata || {}) || {};
+            const durableRunning =
+                status === "RUNNING"
+                && Boolean(metadata.durableSession);
+            const interrupted =
+                status === "RUNNING"
+                && !durableRunning;
             const record = {
                 schemaVersion: Number(row.schemaVersion || schemaVersion),
                 id: String(row.id || ""),
                 repository: String(row.repository || ""),
                 kind: String(row.kind || "UNKNOWN"),
                 status:
-                    status === "RUNNING"
+                    interrupted
                     ? "INTERRUPTED"
                     : status,
                 startedAt: String(row.startedAt || ""),
                 completedAt:
-                    status === "RUNNING"
+                    interrupted
                     ? nowIso()
                     : String(row.completedAt || ""),
                 before: cloneValue(row.before),
                 after: cloneValue(row.after),
-                metadata: cloneValue(row.metadata || {}),
+                metadata: metadata,
                 detail:
-                    status === "RUNNING"
+                    interrupted
                     ? "APPLICATION EXITED BEFORE OPERATION COMPLETION WAS RECORDED"
                     : String(row.detail || ""),
                 recoveryClass:
-                    status === "RUNNING"
+                    interrupted
                     ? "EVIDENCE_ONLY"
                     : String(row.recoveryClass || "EVIDENCE_ONLY"),
                 undoState: String(row.undoState || "NOT_IMPLEMENTED")
             };
 
-            if (status === "RUNNING")
+            if (interrupted)
                 repairedInterrupted = true;
 
             next.push(record);

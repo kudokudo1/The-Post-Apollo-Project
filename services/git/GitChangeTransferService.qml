@@ -43,6 +43,8 @@ Scope {
     property string previewDestinationBranch: ""
     property string previewSourceHead: ""
     property string previewDestinationHead: ""
+    property string previewSourceOperation: ""
+    property string previewConflictFingerprint: ""
     property int previewPatchBytes: 0
     property int previewPatchLines: 0
 
@@ -120,6 +122,8 @@ Scope {
         previewDestinationBranch = "";
         previewSourceHead = "";
         previewDestinationHead = "";
+        previewSourceOperation = "";
+        previewConflictFingerprint = "";
         previewPatchBytes = 0;
         previewPatchLines = 0;
     }
@@ -129,6 +133,8 @@ Scope {
             return "CHANGES/TRANSFER_STAGED";
         if (previewLayer === "partial")
             return "CHANGES/TRANSFER_PARTIAL";
+        if (previewLayer === "conflict-result")
+            return "CHANGES/TRANSFER_CONFLICT_RESULT";
         if (previewLayer === "untracked")
             return "CHANGES/TRANSFER_UNTRACKED";
 
@@ -147,7 +153,9 @@ Scope {
         return {
             source: "GitChangeTransferService",
             operation:
-                previewLayer === "partial"
+                previewLayer === "conflict-result"
+                ? "TRANSFER_CONFLICT_RESULT"
+                : previewLayer === "partial"
                 ? "TRANSFER_PARTIAL"
                 : previewLayer === "untracked"
                 ? "TRANSFER_UNTRACKED"
@@ -164,6 +172,8 @@ Scope {
             destinationBranch: String(previewDestinationBranch || ""),
             sourceHead: String(previewSourceHead || ""),
             destinationHead: String(previewDestinationHead || ""),
+            sourceOperation: String(previewSourceOperation || ""),
+            conflictFingerprint: String(previewConflictFingerprint || ""),
             files: previewFiles.slice(),
             fingerprint: String(previewFingerprint || ""),
             patchBytes: Number(previewPatchBytes || 0),
@@ -573,6 +583,129 @@ Scope {
         return true;
     }
 
+
+    function previewConflictResult(destinationPath, file, mode) {
+        if (previewBusy || transferBusy)
+            return false;
+
+        const source = String(repositoryPath || "").trim();
+        const destination = String(destinationPath || "").trim();
+        const selected = normalizedFiles([file]);
+        const transferMode = normalizedMode(mode);
+
+        clearPreview();
+        lastError = "";
+
+        if (transferMode !== "copy") {
+            lastError =
+                "CONFLICT RESULT TRANSFER IS COPY-ONLY // "
+                + "SOURCE OPERATION STATE MUST STAY IN PLACE";
+            status = "TRANSFER // REFUSED";
+            previewFailed(lastError);
+            return false;
+        }
+
+        if (!source || !destination || selected.length !== 1) {
+            lastError =
+                !source
+                ? "CONFLICT RESULT PREVIEW // NO SOURCE REPOSITORY"
+                : !destination
+                ? "CONFLICT RESULT PREVIEW // NO DESTINATION WORKTREE"
+                : "CONFLICT RESULT PREVIEW // EXACTLY ONE FILE REQUIRED";
+            status = lastError;
+            previewFailed(lastError);
+            return false;
+        }
+
+        const target = selected[0];
+        const args = [
+            "bash",
+            "-lc",
+            [
+                'source="$1"',
+                'destination="$2"',
+                'path="$3"',
+                'refuse() { printf "REFUSED\\t%s\\n" "$1"; exit 1; }',
+                'absolute_common() {',
+                '  dir="$(git -C "$1" rev-parse --git-common-dir 2>/dev/null)" || return 1',
+                '  case "$dir" in /*) ;; *) dir="$1/$dir" ;; esac',
+                '  realpath "$dir" 2>/dev/null',
+                '}',
+                'active_state() {',
+                '  repo="$1"',
+                '  gitdir="$(git -C "$repo" rev-parse --git-dir 2>/dev/null)" || return 0',
+                '  case "$gitdir" in /*) ;; *) gitdir="$repo/$gitdir" ;; esac',
+                '  if [ -f "$gitdir/MERGE_HEAD" ]; then printf "MERGE";',
+                '  elif [ -d "$gitdir/rebase-merge" ] || [ -d "$gitdir/rebase-apply" ]; then printf "REBASE";',
+                '  elif [ -f "$gitdir/CHERRY_PICK_HEAD" ]; then printf "CHERRY_PICK";',
+                '  elif [ -f "$gitdir/REVERT_HEAD" ]; then printf "REVERT";',
+                '  else printf "NONE"; fi',
+                '}',
+                'git -C "$source" rev-parse --is-inside-work-tree >/dev/null 2>&1 || refuse "SOURCE IS NOT A GIT WORKTREE"',
+                'git -C "$destination" rev-parse --is-inside-work-tree >/dev/null 2>&1 || refuse "DESTINATION IS NOT A GIT WORKTREE"',
+                'source="$(realpath "$source")" || refuse "SOURCE PATH CANNOT BE RESOLVED"',
+                'destination="$(realpath "$destination")" || refuse "DESTINATION PATH CANNOT BE RESOLVED"',
+                '[ "$source" != "$destination" ] || refuse "SOURCE AND DESTINATION ARE THE SAME WORKTREE"',
+                'src_common="$(absolute_common "$source")" || refuse "SOURCE COMMON GIT DIR UNAVAILABLE"',
+                'dst_common="$(absolute_common "$destination")" || refuse "DESTINATION COMMON GIT DIR UNAVAILABLE"',
+                '[ "$src_common" = "$dst_common" ] || refuse "DESTINATION BELONGS TO A DIFFERENT REPOSITORY"',
+                'src_branch="$(git -C "$source" branch --show-current 2>/dev/null || true)"',
+                'dst_branch="$(git -C "$destination" branch --show-current 2>/dev/null || true)"',
+                'src_head="$(git -C "$source" rev-parse HEAD 2>/dev/null || true)"',
+                'dst_head="$(git -C "$destination" rev-parse HEAD 2>/dev/null || true)"',
+                '[ -n "$src_branch" ] || refuse "SOURCE WORKTREE IS DETACHED"',
+                '[ -n "$dst_branch" ] || refuse "DESTINATION WORKTREE IS DETACHED"',
+                '[ "$src_branch" != "$dst_branch" ] || refuse "SOURCE AND DESTINATION USE THE SAME BRANCH"',
+                'source_state="$(active_state "$source")"',
+                'case "$source_state" in MERGE|REBASE|CHERRY_PICK|REVERT) ;; *) refuse "SOURCE CONFLICT HAS NO SUPPORTED ACTIVE OPERATION" ;; esac',
+                '[ "$(active_state "$destination")" = "NONE" ] || refuse "DESTINATION HAS AN ACTIVE GIT OPERATION"',
+                '[ -z "$(git -C "$destination" status --porcelain=v1 --untracked-files=all 2>/dev/null)" ] || refuse "DESTINATION WORKTREE IS NOT CLEAN"',
+                'stages="$(git -C "$source" ls-files -u -- "$path" 2>/dev/null)"',
+                '[ -n "$stages" ] || refuse "SOURCE PATH IS NOT CURRENTLY CONFLICTED"',
+                '[ -f "$source/$path" ] || refuse "CONFLICT RESULT COPY SUPPORTS REGULAR FILE RESULTS ONLY"',
+                'stage_fingerprint="$(printf "%s\\n" "$stages" | sha256sum | awk "{print \\$1}")"',
+                'tmp="$(mktemp -d "${TMPDIR:-/tmp}/pa-conflict-result-preview.XXXXXX")" || refuse "TEMP DIRECTORY CREATE FAILED"',
+                'rehearsal="$tmp/rehearsal"',
+                'patch="$tmp/result.patch"',
+                'cleanup() { git -C "$source" worktree remove --force "$rehearsal" >/dev/null 2>&1 || true; rm -rf "$tmp"; }',
+                'trap cleanup EXIT INT TERM',
+                'git -C "$source" worktree add --detach --quiet "$rehearsal" "$dst_head" >/dev/null 2>&1 || refuse "DESTINATION REHEARSAL WORKTREE CREATE FAILED"',
+                'mkdir -p "$rehearsal/$(dirname "$path")" || refuse "DESTINATION RESULT DIRECTORY CREATE FAILED"',
+                'cp -- "$source/$path" "$rehearsal/$path" || refuse "CONFLICT RESULT COPY INTO REHEARSAL FAILED"',
+                'git -C "$rehearsal" diff --binary --full-index -- "$path" >"$patch" || refuse "CONFLICT RESULT PATCH GENERATION FAILED"',
+                '[ -s "$patch" ] || refuse "CONFLICT RESULT MATCHES DESTINATION // NOTHING TO COPY"',
+                'git -C "$destination" apply --check --binary "$patch" >/dev/null 2>&1 || refuse "CONFLICT RESULT DOES NOT APPLY CLEANLY TO DESTINATION"',
+                'fingerprint="$(sha256sum "$patch" | awk "{print \\$1}")"',
+                'bytes="$(wc -c <"$patch" | tr -d " ")"',
+                'lines="$(wc -l <"$patch" | tr -d " ")"',
+                'if [ "$bytes" -le "524288" ]; then printf "PATCH64\\t"; base64 -w0 "$patch"; printf "\\n"; fi',
+                'printf "PREVIEW\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\tcopy\\n" "$fingerprint" "$bytes" "$lines" "$src_branch" "$dst_branch" "$src_head" "$dst_head"',
+                'printf "CONFLICT\\t%s\\t%s\\n" "$source_state" "$stage_fingerprint"',
+                'printf "FILE\\t%s\\n" "$path"'
+            ].join("\n"),
+            "git-conflict-result-transfer-preview",
+            source,
+            destination,
+            target
+        ];
+
+        pendingPreviewDestination = destination;
+        pendingPreviewScope = "file";
+        pendingPreviewLayer = "conflict-result";
+        pendingPreviewHunkIndex = -1;
+        previewBusy = true;
+        status = "TRANSFER // PREVIEWING CONFLICT RESULT";
+        previewExitSeen = false;
+        previewStdoutSeen = false;
+        previewStderrSeen = false;
+        previewExitCode = -1;
+        previewStdoutText = "";
+        previewStderrText = "";
+
+        previewProcess.exec(args);
+        return true;
+    }
+
     function previewUntracked(destinationPath, files, mode) {
         if (previewBusy || transferBusy)
             return false;
@@ -850,6 +983,8 @@ Scope {
         const lines = out.split("\n");
         let header = null;
         let patchBase64 = "";
+        let sourceOperation = "";
+        let conflictFingerprint = "";
         const files = [];
 
         for (let i = 0; i < lines.length; ++i) {
@@ -859,7 +994,11 @@ Scope {
                 header = line.split("\t");
             else if (line.indexOf("PATCH64\t") === 0)
                 patchBase64 = line.slice(8);
-            else if (line.indexOf("FILE\t") === 0)
+            else if (line.indexOf("CONFLICT\t") === 0) {
+                const conflictParts = line.split("\t");
+                sourceOperation = String(conflictParts[1] || "");
+                conflictFingerprint = String(conflictParts[2] || "");
+            } else if (line.indexOf("FILE\t") === 0)
                 files.push(line.slice(5));
         }
 
@@ -893,6 +1032,8 @@ Scope {
         previewDestinationBranch = String(header[5] || "");
         previewSourceHead = String(header[6] || "");
         previewDestinationHead = String(header[7] || "");
+        previewSourceOperation = sourceOperation;
+        previewConflictFingerprint = conflictFingerprint;
         previewMode = normalizedMode(header[8]);
         previewDestinationPath = String(pendingPreviewDestination || "");
         previewScope = String(pendingPreviewScope || "file");
@@ -920,6 +1061,8 @@ Scope {
             destinationBranch: previewDestinationBranch,
             sourceHead: previewSourceHead,
             destinationHead: previewDestinationHead,
+            sourceOperation: previewSourceOperation,
+            conflictFingerprint: previewConflictFingerprint,
             mode: previewMode,
             scope: previewScope,
             layer: previewLayer,

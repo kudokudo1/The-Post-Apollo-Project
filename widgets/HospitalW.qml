@@ -892,6 +892,171 @@ PanelWindow {
         }
     }
 
+    function specialistMentionedIn(textValue) {
+        const query =
+            String(textValue || "").trim().toLowerCase();
+        const rows =
+            specialistRegistryService
+            && Array.isArray(
+                specialistRegistryService.specialists
+            )
+            ? specialistRegistryService.specialists
+            : [];
+
+        if (!query)
+            return null;
+
+        for (let i = 0; i < rows.length; ++i) {
+            const row = rows[i] || {};
+            const id =
+                String(row.id || "").trim().toLowerCase();
+            const name =
+                String(row.name || "").trim().toLowerCase();
+
+            if ((id && query.indexOf(id) >= 0)
+                    || (name && query.indexOf(name) >= 0))
+                return row;
+        }
+
+        return null;
+    }
+
+    function syncHospitalContextFromReception(questionValue) {
+        const item = receptionistService.contextItem;
+        const target =
+            String(
+                receptionistService.contextTarget
+                || ""
+            ).trim();
+
+        if (item) {
+            hospitalContextService.captureActivity(
+                item,
+                questionValue
+            );
+            return true;
+        }
+
+        if (target) {
+            hospitalContextService.captureTeam(target);
+            hospitalContextService.setOperatorQuestion(
+                questionValue
+            );
+            return true;
+        }
+
+        if (hospitalContextService.active) {
+            hospitalContextService.setOperatorQuestion(
+                questionValue
+            );
+            return true;
+        }
+
+        if (root.selectedRoomTeam) {
+            hospitalContextService.captureTeam(
+                root.selectedRoomTeam
+            );
+            hospitalContextService.setOperatorQuestion(
+                questionValue
+            );
+            return true;
+        }
+
+        return false;
+    }
+
+    function requestReceptionSpecialistHandoff(
+            modeValue,
+            operatorTextValue) {
+        const mode =
+            String(modeValue || "").trim().toLowerCase();
+        const operatorText =
+            String(operatorTextValue || "").trim();
+        const specialist =
+            root.specialistMentionedIn(operatorText);
+
+        if (!specialist) {
+            receptionistService.append(
+                "RECEPTION",
+                "HANDOFF // NAME A SPECIALIST FROM THE LIVE STAFF REGISTRY"
+            );
+            return false;
+        }
+
+        if (!root.syncHospitalContextFromReception(
+                operatorText)) {
+            receptionistService.append(
+                "RECEPTION",
+                "HANDOFF // NO LIVE ROOM, REPORT, EVENT, OR STAFF CONTEXT"
+            );
+            return false;
+        }
+
+        const body =
+            hospitalContextService.handoffBody(
+                operatorText
+            );
+        const specialistName =
+            String(
+                specialist.name
+                || specialist.id
+                || "SPECIALIST"
+            );
+
+        if (mode === "phone") {
+            if (!phoneService.callSpecialist(
+                    specialist,
+                    floorService.bedPath,
+                    body)) {
+                receptionistService.append(
+                    "RECEPTION",
+                    phoneService.lastError
+                    || "HANDOFF // PHONE FAILED"
+                );
+                return false;
+            }
+
+            receptionistService.append(
+                "RECEPTION",
+                "HANDOFF // PHONE // "
+                + specialistName
+                + " // CONTEXT ATTACHED"
+            );
+            return true;
+        }
+
+        const channelType =
+            hospitalContextService.team
+            ? "ROOM"
+            : "HOSPITAL";
+        const channelLabel =
+            hospitalContextService.team
+            || "HOSPITAL WIDE";
+
+        if (!intercomService.sendMessage(
+                specialist,
+                channelType,
+                channelLabel,
+                body,
+                floorService.bedPath)) {
+            receptionistService.append(
+                "RECEPTION",
+                intercomService.lastError
+                || "HANDOFF // INTERCOM FAILED"
+            );
+            return false;
+        }
+
+        receptionistService.append(
+            "RECEPTION",
+            "HANDOFF // INTERCOM // "
+            + specialistName
+            + " // "
+            + hospitalContextService.label
+        );
+        return true;
+    }
+
     function openReceptionReportEvent(itemValue) {
         const item = itemValue || {};
         const context = item.context || {};
@@ -990,6 +1155,12 @@ PanelWindow {
 
     function activateReceptionActivity(item) {
         const row = item || {};
+
+        hospitalContextService.captureActivity(
+            row,
+            ""
+        );
+
         const kind =
             String(row.kind || "").toLowerCase();
         const source =
@@ -1257,6 +1428,7 @@ PanelWindow {
         if (!team)
             return;
 
+        hospitalContextService.captureRoom(row);
         root.closeOperationsSurface();
         root.pendingRoundsRoomTeam = team;
         root.pendingRoundsFloorIndex =
@@ -1446,6 +1618,10 @@ PanelWindow {
         id: receptionistService
     }
 
+    HospitalContextService {
+        id: hospitalContextService
+    }
+
     HospitalSpeechInputService {
         id: speechInputService
 
@@ -1551,6 +1727,27 @@ PanelWindow {
 
         function onTeamNavigationRequested(team) {
             root.requestReceptionTeamNavigation(team);
+        }
+
+        function onContextEventKeyChanged() {
+            Qt.callLater(function() {
+                root.syncHospitalContextFromReception("");
+            });
+        }
+
+        function onContextTargetChanged() {
+            Qt.callLater(function() {
+                root.syncHospitalContextFromReception("");
+            });
+        }
+
+        function onSpecialistHandoffRequested(
+                mode,
+                operatorText) {
+            root.requestReceptionSpecialistHandoff(
+                mode,
+                operatorText
+            );
         }
     }
 
@@ -4516,6 +4713,11 @@ PanelWindow {
                 bottomMargin: 10
             }
 
+            onEventActivated: function(event) {
+                hospitalContextService.captureReport(
+                    event
+                );
+            }
         }
 
         HospitalRoundsView {
@@ -4557,6 +4759,12 @@ PanelWindow {
                 rightMargin: 18
                 topMargin: 8
                 bottomMargin: 10
+            }
+
+            onSpecialistSelected: function(specialist) {
+                hospitalContextService.captureSpecialist(
+                    specialist
+                );
             }
         }
 

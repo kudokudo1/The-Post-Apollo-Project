@@ -10,6 +10,7 @@ Rectangle {
     property string sourcePath: ""
     property string filePath: ""
     property string transferScope: "file"
+    property string transferLayer: "worktree"
     property int hunkIndex: -1
     property string hunkSummary: ""
     property string selectedDestinationPath: ""
@@ -48,6 +49,10 @@ Rectangle {
         && !Boolean(selectedWorktree.detached)
         && Number(selectedWorktree.dirtyCount || 0) === 0
 
+    readonly property bool stagedLayer:
+        transferScope === "file"
+        && String(transferLayer || "worktree").toLowerCase() === "staged"
+
     readonly property bool previewMatchesSelection:
         transferService
         && transferService.hasPreview
@@ -57,6 +62,8 @@ Rectangle {
             === String(transferMode || "")
         && String(transferService.previewScope || "file")
             === String(transferScope || "file")
+        && String(transferService.previewLayer || "worktree")
+            === (root.stagedLayer ? "staged" : "worktree")
         && (
             transferScope !== "hunk"
             || Number(transferService.previewHunkIndex)
@@ -111,6 +118,14 @@ Rectangle {
             );
         }
 
+        if (root.stagedLayer) {
+            return transferService.previewStaged(
+                selectedDestinationPath,
+                [filePath],
+                transferMode
+            );
+        }
+
         return transferService.preview(
             selectedDestinationPath,
             [filePath],
@@ -130,6 +145,7 @@ Rectangle {
     onFilePathChanged: invalidatePreview()
     onSourcePathChanged: invalidatePreview()
     onTransferScopeChanged: invalidatePreview()
+    onTransferLayerChanged: invalidatePreview()
     onHunkIndexChanged: invalidatePreview()
 
     Connections {
@@ -211,7 +227,9 @@ Rectangle {
                         root.transferScope === "hunk"
                         ? "TRANSFER // HUNK "
                             + String(root.hunkIndex + 1)
-                        : "TRANSFER // WHOLE FILE"
+                        : root.stagedLayer
+                        ? "TRANSFER // STAGED WHOLE FILE"
+                        : "TRANSFER // WORKTREE WHOLE FILE"
                     font.pixelSize: 13
                     color: Colors.magenta
                 }
@@ -258,8 +276,13 @@ Rectangle {
                         "HUNK SLICE // WORKTREE HUNK ONLY // "
                         + "DESTINATION MUST BE A CLEAN EXISTING WORKTREE"
                       )
+                    : root.stagedLayer
+                    ? (
+                        "TRACKED + STAGED WHOLE FILE // INDEX LAYER // "
+                        + "DESTINATION MUST BE A CLEAN EXISTING WORKTREE"
+                      )
                     : (
-                        "TRACKED + UNSTAGED WHOLE FILE // "
+                        "TRACKED + UNSTAGED WHOLE FILE // WORKTREE LAYER // "
                         + "DESTINATION MUST BE A CLEAN EXISTING WORKTREE"
                       )
                 font.pixelSize: 9

@@ -1871,8 +1871,8 @@ Item {
                         Flickable {
                             id: historyScroll7
 
-                            width: parent.width
-                            height: Math.max(0, parent.height - y)
+                            width: Math.max(0, parent.width - 8)
+                            height: Math.max(0, parent.height - y - 4)
                             clip: true
                             contentWidth: width
                             contentHeight: reflogColumn.implicitHeight

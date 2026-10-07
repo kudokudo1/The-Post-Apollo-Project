@@ -6,6 +6,9 @@ import re
 
 ROOT = Path(__file__).resolve().parents[2]
 
+# Fold is the first live History Surgery organ. Absorb and Split are layered
+# on stacked follow-up branches so each surgery primitive can land independently.
+
 
 def read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")

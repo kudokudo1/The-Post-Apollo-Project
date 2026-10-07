@@ -2062,6 +2062,8 @@ Item {
                         ? Colors.red
                         : root.managementMode === "new"
                         ? Colors.green
+                        : root.managementMode === "workspace"
+                        ? Colors.blue
                         : Colors.magenta
                     clip: true
 
@@ -2085,6 +2087,8 @@ Item {
                                     ? "DELETE // " + root.selectedBranch
                                     : root.managementMode === "new"
                                     ? "NEW // " + root.selectedBranch
+                                    : root.managementMode === "workspace"
+                                    ? "WORKSPACE // " + root.selectedBranch
                                     : "EDIT // " + root.selectedBranch
                                 font.pixelSize: 13
                                 color:
@@ -2092,6 +2096,8 @@ Item {
                                     ? Colors.red
                                     : root.managementMode === "new"
                                     ? Colors.green
+                                    : root.managementMode === "workspace"
+                                    ? Colors.blue
                                     : Colors.magenta
                                 elide: Text.ElideMiddle
                             }
@@ -2112,6 +2118,8 @@ Item {
                                 ? Colors.red
                                 : root.managementMode === "new"
                                 ? Colors.green
+                                : root.managementMode === "workspace"
+                                ? Colors.blue
                                 : Colors.cyan
                             opacity: 0.46
                         }
@@ -2406,6 +2414,376 @@ Item {
                         Column {
                             width: parent.width
                             spacing: 8
+                            visible: root.managementMode === "workspace"
+
+                            Column {
+                                width: parent.width
+                                spacing: 6
+                                visible: root.selectedWorkspace !== null
+
+                                FactRow {
+                                    label: "PATH"
+                                    value:
+                                        root.selectedWorkspace
+                                        ? String(
+                                            root.selectedWorkspace.path
+                                            || ""
+                                          )
+                                        : ""
+                                    valueColor: Colors.cyan
+                                }
+
+                                FactRow {
+                                    label: "STATE"
+                                    value:
+                                        root.workspacePrimary()
+                                        ? "PRIMARY // PROTECTED"
+                                        : Boolean(
+                                            root.selectedWorkspace
+                                            && root.selectedWorkspace.locked
+                                          )
+                                        ? "LOCKED"
+                                        : Number(
+                                            root.selectedWorkspace
+                                            ? root.selectedWorkspace.dirtyCount
+                                            : 0
+                                          ) > 0
+                                        ? String(
+                                            root.selectedWorkspace.dirtyCount
+                                          ) + " DIRTY"
+                                        : "CLEAN"
+                                    valueColor:
+                                        root.workspacePrimary()
+                                        ? Colors.orange
+                                        : Boolean(
+                                            root.selectedWorkspace
+                                            && root.selectedWorkspace.locked
+                                          )
+                                        ? Colors.magenta
+                                        : Number(
+                                            root.selectedWorkspace
+                                            ? root.selectedWorkspace.dirtyCount
+                                            : 0
+                                          ) > 0
+                                        ? Colors.orange
+                                        : Colors.green
+                                }
+
+                                GohuText {
+                                    width: parent.width
+                                    text:
+                                        root.workspaceRemoveBlockReason(false)
+                                        || "SAFE REMOVE AVAILABLE"
+                                    font.pixelSize: 10
+                                    color:
+                                        root.workspaceRemoveBlockReason(false)
+                                        ? Colors.orange
+                                        : Colors.cyan
+                                    wrapMode: Text.WordWrap
+                                }
+
+                                BranchButton {
+                                    width: parent.width
+                                    height: 34
+                                    label:
+                                        root.managementArm === "workspace-remove"
+                                        ? "CONFIRM REMOVE WORKSPACE"
+                                        : "REMOVE WORKSPACE"
+                                    destructive: true
+                                    enabledAction:
+                                        branchWorkspaceService
+                                        && !branchWorkspaceService.actionBusy
+                                        && root.workspaceRemoveBlockReason(
+                                            false
+                                          ).length === 0
+                                    onTriggered:
+                                        root.requestRemoveWorkspace(false)
+                                }
+
+                                Rectangle {
+                                    width: parent.width
+                                    height: 1
+                                    color: Colors.red
+                                    opacity: 0.38
+                                }
+
+                                GohuText {
+                                    width: parent.width
+                                    text:
+                                        "FORCE REMOVE DISCARDS A DIRTY SECONDARY "
+                                        + "WORKTREE. TYPE THE EXACT BRANCH NAME:"
+                                    font.pixelSize: 9
+                                    color: Colors.red
+                                    wrapMode: Text.WordWrap
+                                }
+
+                                BranchEditor {
+                                    id: workspaceConfirmEditor
+                                    width: parent.width
+                                    placeholder:
+                                        root.selectedBranch
+                                        ? root.selectedBranch
+                                        : "BRANCH NAME"
+                                    accent: Colors.red
+                                }
+
+                                BranchButton {
+                                    width: parent.width
+                                    height: 34
+                                    label:
+                                        root.managementArm
+                                        === "workspace-force-remove"
+                                        ? "CONFIRM FORCE REMOVE"
+                                        : "FORCE REMOVE"
+                                    destructive: true
+                                    enabledAction:
+                                        branchWorkspaceService
+                                        && !branchWorkspaceService.actionBusy
+                                        && root.workspaceRemoveBlockReason(
+                                            true
+                                          ).length === 0
+                                        && String(
+                                            workspaceConfirmEditor.text
+                                            || ""
+                                          ).trim() === root.selectedBranch
+                                    onTriggered:
+                                        root.requestRemoveWorkspace(true)
+                                }
+
+                                GohuText {
+                                    width: parent.width
+                                    text:
+                                        Boolean(
+                                            root.selectedWorkspace
+                                            && root.selectedWorkspace.locked
+                                          )
+                                        ? "LOCKED WORKTREES MUST BE UNLOCKED IN REPOSITORY // WORKTREES."
+                                        : root.workspacePrimary()
+                                        ? "THE PRIMARY WORKTREE IS NEVER REMOVED FROM THIS BRANCH PANEL."
+                                        : "Removing the worktree does not delete the branch."
+                                    font.pixelSize: 9
+                                    color: Colors.white
+                                    opacity: 0.58
+                                    wrapMode: Text.WordWrap
+                                }
+                            }
+
+                            Column {
+                                width: parent.width
+                                spacing: 8
+                                visible: root.selectedWorkspace === null
+
+                                Row {
+                                    width: parent.width
+                                    height: 32
+                                    spacing: 6
+
+                                    BranchButton {
+                                        width: (parent.width - 6) / 2
+                                        height: 32
+                                        label: "ATTACH"
+                                        selectedAction:
+                                            root.workspaceMode === "ATTACH"
+                                        onTriggered: {
+                                            root.workspaceMode = "ATTACH";
+                                            workspaceBranchEditor.text = "";
+                                            workspacePathEditor.text =
+                                                root.workspaceDefaultPath(
+                                                    root.selectedBranch
+                                                );
+                                        }
+                                    }
+
+                                    BranchButton {
+                                        width: (parent.width - 6) / 2
+                                        height: 32
+                                        label: "NEW"
+                                        selectedAction:
+                                            root.workspaceMode === "NEW"
+                                        onTriggered: {
+                                            root.workspaceMode = "NEW";
+                                            workspaceBranchEditor.text = "";
+                                            workspacePathEditor.text = "";
+                                            Qt.callLater(function() {
+                                                workspaceBranchEditor
+                                                    .focusEditor();
+                                            });
+                                        }
+                                    }
+                                }
+
+                                GohuText {
+                                    width: parent.width
+                                    text:
+                                        root.workspaceMode === "NEW"
+                                        ? "NEW BRANCH + WORKTREE FROM // "
+                                          + root.selectedBranch
+                                        : "ATTACH SELECTED BRANCH // "
+                                          + root.selectedBranch
+                                    font.pixelSize: 10
+                                    color: Colors.cyan
+                                    elide: Text.ElideMiddle
+                                }
+
+                                BranchEditor {
+                                    id: workspaceBranchEditor
+                                    width: parent.width
+                                    visible: root.workspaceMode === "NEW"
+                                    placeholder: "NEW BRANCH NAME"
+                                    accent: Colors.green
+                                }
+
+                                Row {
+                                    width: parent.width
+                                    height: 34
+                                    spacing: 6
+
+                                    BranchEditor {
+                                        id: workspacePathEditor
+                                        width: parent.width - 94
+                                        placeholder: "ABSOLUTE WORKTREE PATH"
+                                        accent: Colors.blue
+                                    }
+
+                                    BranchButton {
+                                        width: 88
+                                        height: 34
+                                        label: "AUTO"
+                                        enabledAction:
+                                            root.workspaceMode === "ATTACH"
+                                            || String(
+                                                workspaceBranchEditor.text
+                                                || ""
+                                              ).trim().length > 0
+                                        onTriggered:
+                                            workspacePathEditor.text =
+                                                root.workspaceDefaultPath(
+                                                    root.workspaceMode
+                                                    === "NEW"
+                                                    ? workspaceBranchEditor.text
+                                                    : root.selectedBranch
+                                                )
+                                    }
+                                }
+
+                                Rectangle {
+                                    width: parent.width
+                                    height: 72
+                                    color: Colors.dark
+                                    border.width: 1
+                                    border.color: Colors.blue
+
+                                    Column {
+                                        anchors {
+                                            fill: parent
+                                            margins: 7
+                                        }
+                                        spacing: 4
+
+                                        GohuText {
+                                            width: parent.width
+                                            text:
+                                                root.workspaceMode === "NEW"
+                                                ? (
+                                                    root.selectedBranch
+                                                    + " → "
+                                                    + (
+                                                        String(
+                                                            workspaceBranchEditor.text
+                                                            || ""
+                                                        ).trim()
+                                                        || "NEW"
+                                                      )
+                                                  )
+                                                : root.selectedBranch
+                                            font.pixelSize: 10
+                                            color:
+                                                root.workspaceMode === "NEW"
+                                                ? Colors.green
+                                                : Colors.cyan
+                                            elide: Text.ElideMiddle
+                                        }
+
+                                        GohuText {
+                                            width: parent.width
+                                            text:
+                                                "PATH // "
+                                                + (
+                                                    String(
+                                                        workspacePathEditor.text
+                                                        || ""
+                                                    ).trim()
+                                                    || "NOT SET"
+                                                  )
+                                            font.pixelSize: 9
+                                            color: Colors.blue
+                                            elide: Text.ElideMiddle
+                                        }
+
+                                        GohuText {
+                                            width: parent.width
+                                            text:
+                                                root.workspaceMode === "NEW"
+                                                ? "NEW WORKSPACE BRANCH BECOMES A STACK CHILD OF THE SELECTED BRANCH."
+                                                : "ATTACH CHECKS OUT THE SELECTED EXISTING BRANCH IN A SECONDARY WORKTREE."
+                                            font.pixelSize: 8
+                                            color: Colors.white
+                                            opacity: 0.58
+                                            elide: Text.ElideRight
+                                        }
+                                    }
+                                }
+
+                                BranchButton {
+                                    width: parent.width
+                                    height: 36
+                                    label:
+                                        branchWorkspaceService
+                                        && branchWorkspaceService.actionBusy
+                                        ? "CREATING WORKSPACE"
+                                        : root.workspaceMode === "NEW"
+                                        ? "CREATE NEW WORKSPACE"
+                                        : "ATTACH WORKSPACE"
+                                    enabledAction:
+                                        branchWorkspaceService
+                                        && !branchWorkspaceService.actionBusy
+                                        && !branchWorkspaceService.refreshing
+                                        && String(
+                                            workspacePathEditor.text
+                                            || ""
+                                          ).trim().length > 0
+                                        && (
+                                            root.workspaceMode !== "NEW"
+                                            || String(
+                                                workspaceBranchEditor.text
+                                                || ""
+                                              ).trim().length > 0
+                                           )
+                                    onTriggered: {
+                                        if (root.workspaceMode === "NEW")
+                                            root.applyNewWorkspace();
+                                        else
+                                            root.applyAttachWorkspace();
+                                    }
+                                }
+
+                                GohuText {
+                                    width: parent.width
+                                    text:
+                                        root.workspaceMode === "NEW"
+                                        ? "Git creates the branch and checks it out only in the new worktree. Your current checkout does not move."
+                                        : "Git checks the selected branch out in the new path. The current checkout does not move."
+                                    font.pixelSize: 9
+                                    color: Colors.white
+                                    opacity: 0.60
+                                    wrapMode: Text.WordWrap
+                                }
+                            }
+                        }
+
+                        Column {
+                            width: parent.width
+                            spacing: 8
                             visible: root.managementMode === "delete"
 
                             FactRow {
@@ -2525,6 +2903,12 @@ Item {
                                         ? "DELETE WAITS FOR EXPLICIT CONFIRMATION"
                                         : root.managementMode === "new"
                                         ? "CREATE DOES NOT SWITCH THE LIVE CHECKOUT"
+                                        : root.managementMode === "workspace"
+                                        ? (
+                                            root.selectedWorkspace
+                                            ? "WORKSPACE IS ATTACHED TO THE SELECTED BRANCH"
+                                            : "WORKSPACE CREATION DOES NOT MOVE THE CURRENT CHECKOUT"
+                                          )
                                         : "EDIT CHANGES ONLY THE SELECTED LOCAL BRANCH"
                                        )
                                 font.pixelSize: 9

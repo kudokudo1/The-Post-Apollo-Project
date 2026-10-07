@@ -26,6 +26,7 @@ for needle, message in (
     ("function createDestination()", "Transfer must expose guarded destination creation"),
     ("branchWorkspaceService.createWorktree(", "Transfer must reuse the shared branch/worktree service"),
     ('"HEAD"', "new Transfer destinations must start from the source HEAD"),
+    ("ABSOLUTE DESTINATION PATH REQUIRED", "custom destination paths must be canonicalizable for refresh selection"),
     ('String(action || "") !== "NEW-WORKTREE"', "Transfer must wait for the branch service completion signal"),
     ("root.chooseDestination(createdPath)", "created worktree must be selected only after topology refresh"),
     ("PREVIEW REQUIRED", "creation must not bypass the normal Transfer preview gate"),

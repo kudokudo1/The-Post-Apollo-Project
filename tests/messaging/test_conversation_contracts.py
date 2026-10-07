@@ -51,11 +51,22 @@ assert "function refreshMessages()" in adapter
 assert "function sendMessage(conversationId, textValue)" in adapter
 assert '"hospital",\n            "rooms"' in adapter
 assert '"hospital",\n            "messages"' in adapter
-assert '"message-append"' in adapter
+assert '"agent",\n            "session-create"' in adapter
+assert '"agent",\n            "turn"' in adapter
+assert '"--prompt-json-stdin"' in adapter
+assert "stdinEnabled: true" in adapter
+assert "turnProcess.write(" in adapter
+assert "function compatibleSession(rows)" in adapter
+assert '"hospital",\n            "sessions"' in adapter
+assert "function discoverSession(roomIdValue, continueAfter)" in adapter
+assert "function createSessionForPendingTurn()" in adapter
+assert "function runPendingTurn()" in adapter
+assert "Quickshell.execDetached" not in adapter
+assert '"kitty"' not in adapter
 assert "codex" not in adapter.lower()
 assert "hermes" not in adapter.lower()
 
-print("hospital conversation adapter contract: PASS")
+print("hospital live doctor adapter contract: PASS")
 
 
 assert ROOM_CHAT.is_file(), ROOM_CHAT
@@ -90,3 +101,15 @@ assert "function roomBinding()" in room_chat
 assert "adapter.bindRoom(root.roomBinding())" in room_chat
 
 print("hospital room binding contract: PASS")
+
+
+room_chat = ROOM_CHAT.read_text()
+assert 'property string providerId: ""' in room_chat
+assert 'property string doctorId: ""' in room_chat
+assert "readonly property string activeSessionId: adapter.activeSessionId" in room_chat
+assert "providerId: root.providerId" in room_chat
+assert "doctorId: root.doctorId" in room_chat
+assert "workingDirectory: root.bedPath" in room_chat
+assert 'return root.providerId ? "READY TO CONNECT" : "ROOM CHAT";' in room_chat
+
+print("hospital live doctor chat view contract: PASS")

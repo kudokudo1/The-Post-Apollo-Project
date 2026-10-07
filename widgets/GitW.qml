@@ -1985,6 +1985,16 @@ PanelWindow {
             : ""
     }
 
+    GitHistorySplitService {
+        id: historySplitService
+        operationJournal: operationJournalService
+        snapshotService: repositorySnapshotService
+        repositoryPath:
+            gitService.repoIsLocal
+            ? gitService.repoRoot
+            : ""
+    }
+
     GitChangesService {
         id: changesService
         operationJournal: operationJournalService
@@ -5079,6 +5089,7 @@ PanelWindow {
                         interactiveRebaseSessionService:
                             interactiveRebaseSessionService
                         historyFoldService: historyFoldService
+                        historySplitService: historySplitService
                         keyboardHost: root
 
                         onChangesRequested: function(path) {

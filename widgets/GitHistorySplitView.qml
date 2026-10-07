@@ -4,15 +4,13 @@ import qs.components
 Rectangle {
     id: root
 
-    required property var foldService
     required property var splitService
     property var historyService: null
     property var keyboardHost: null
-    property string mode: "fold"
 
     color: Colors.dark
     border.width: 1
-    border.color: Colors.red
+    border.color: Colors.orange
 
     component InputBox: Rectangle {
         id: inputBox
@@ -74,7 +72,7 @@ Rectangle {
         }
     }
 
-    component SurgeryButton: Rectangle {
+    component SplitButton: Rectangle {
         id: button
 
         property string label: ""
@@ -119,45 +117,14 @@ Rectangle {
         }
     }
 
+    function firstCount() {
+        return splitService.selectedFirstPaths().length;
+    }
+
     Column {
         anchors.fill: parent
         anchors.margins: 8
         spacing: 7
-
-        Row {
-            width: parent.width
-            height: 30
-            spacing: 6
-
-            SurgeryButton {
-                width: (parent.width - 12) / 3
-                label: "FOLD"
-                accent: Colors.red
-                selectedAction: root.mode === "fold"
-                enabledAction:
-                    !foldService.executionBusy
-                    && !splitService.executionBusy
-                onTriggered: root.mode = "fold"
-            }
-
-            SurgeryButton {
-                width: (parent.width - 12) / 3
-                label: "SPLIT"
-                accent: Colors.orange
-                selectedAction: root.mode === "split"
-                enabledAction:
-                    !foldService.executionBusy
-                    && !splitService.executionBusy
-                onTriggered: root.mode = "split"
-            }
-
-            SurgeryButton {
-                width: (parent.width - 12) / 3
-                label: "ABSORB // NEXT"
-                accent: Colors.magenta
-                enabledAction: false
-            }
-        }
 
         Rectangle {
             width: parent.width
@@ -165,9 +132,9 @@ Rectangle {
             color: Colors.black
             border.width: 1
             border.color:
-                foldService.lastError
+                splitService.lastError
                 ? Colors.red
-                : foldService.armed
+                : splitService.armed
                 ? Colors.orange
                 : Colors.cyan
 
@@ -183,22 +150,22 @@ Rectangle {
 
                     GohuText {
                         width: parent.width
-                        text: "HISTORY SURGERY // FOLD"
+                        text: "HISTORY SURGERY // SPLIT BY FILE"
                         font.pixelSize: 12
-                        color: Colors.red
+                        color: Colors.orange
                     }
 
                     GohuText {
                         width: parent.width
                         text:
-                            foldService.lastError
-                            ? "REFUSED // " + foldService.lastError
-                            : String(foldService.state || "READY")
+                            splitService.lastError
+                            ? "REFUSED // " + splitService.lastError
+                            : String(splitService.state || "READY")
                         font.pixelSize: 9
                         color:
-                            foldService.lastError
+                            splitService.lastError
                             ? Colors.red
-                            : foldService.armed
+                            : splitService.armed
                             ? Colors.orange
                             : Colors.cyan
                         elide: Text.ElideRight
@@ -210,11 +177,11 @@ Rectangle {
                     anchors.verticalCenter: parent.verticalCenter
                     horizontalAlignment: Text.AlignRight
                     text:
-                        foldService.branchName
+                        splitService.branchName
                         ? (
-                            foldService.branchName
+                            splitService.branchName
                             + " // "
-                            + String(foldService.headSha || "").slice(0, 10)
+                            + String(splitService.headSha || "").slice(0, 10)
                           )
                         : "CURRENT BRANCH"
                     font.pixelSize: 9
@@ -230,80 +197,49 @@ Rectangle {
             spacing: 6
 
             InputBox {
-                id: oldestInput
-                width: (parent.width - 160) / 2
-                placeholder: "OLDEST COMMIT SHA / REF"
-                accent: Colors.cyan
+                id: targetInput
+                width: parent.width - 314
+                placeholder: "TARGET COMMIT SHA / REF"
+                accent: Colors.orange
                 keyboardOwner: root.keyboardHost
             }
 
-            InputBox {
-                id: newestInput
-                width: (parent.width - 160) / 2
-                placeholder: "NEWEST COMMIT SHA / REF"
-                accent: Colors.magenta
-                keyboardOwner: root.keyboardHost
-            }
-
-            SurgeryButton {
+            SplitButton {
                 width: 148
+                label: "USE SELECTED"
+                accent: Colors.cyan
+                enabledAction:
+                    root.historyService
+                    && String(root.historyService.selectedSha || "").length > 0
+                    && !splitService.executionBusy
+                onTriggered:
+                    targetInput.text =
+                        String(root.historyService.selectedSha || "")
+            }
+
+            SplitButton {
+                width: 154
                 label:
-                    foldService.previewBusy
-                    ? "READING RANGE"
-                    : "PREVIEW FOLD"
+                    splitService.previewBusy
+                    ? "READING COMMIT"
+                    : "PREVIEW SPLIT"
                 accent: Colors.green
                 enabledAction:
-                    !foldService.previewBusy
-                    && !foldService.executionBusy
-                    && oldestInput.text.trim().length > 0
-                    && newestInput.text.trim().length > 0
+                    !splitService.previewBusy
+                    && !splitService.executionBusy
+                    && targetInput.text.trim().length > 0
                 onTriggered:
-                    foldService.preview(
-                        oldestInput.text.trim(),
-                        newestInput.text.trim()
-                    )
+                    splitService.preview(targetInput.text.trim())
             }
         }
 
         Row {
             width: parent.width
-            height: 28
-            spacing: 6
-
-            SurgeryButton {
-                width: (parent.width - 6) / 2
-                label: "USE SELECTED AS OLDEST"
-                accent: Colors.cyan
-                enabledAction:
-                    root.historyService
-                    && String(root.historyService.selectedSha || "").length > 0
-                    && !foldService.executionBusy
-                onTriggered:
-                    oldestInput.text =
-                        String(root.historyService.selectedSha || "")
-            }
-
-            SurgeryButton {
-                width: (parent.width - 6) / 2
-                label: "USE SELECTED AS NEWEST"
-                accent: Colors.magenta
-                enabledAction:
-                    root.historyService
-                    && String(root.historyService.selectedSha || "").length > 0
-                    && !foldService.executionBusy
-                onTriggered:
-                    newestInput.text =
-                        String(root.historyService.selectedSha || "")
-            }
-        }
-
-        Row {
-            width: parent.width
-            height: parent.height - 236
+            height: parent.height - 184
             spacing: 8
 
             Rectangle {
-                width: Math.floor(parent.width * 0.57)
+                width: Math.floor(parent.width * 0.55)
                 height: parent.height
                 color: Colors.black
                 border.width: 1
@@ -317,9 +253,16 @@ Rectangle {
                     GohuText {
                         width: parent.width
                         text:
-                            "FOLD RANGE // "
-                            + String(foldService.commits.length)
-                            + " COMMITS"
+                            "FILE PARTITION // PART 1 "
+                            + String(root.firstCount())
+                            + " // PART 2 "
+                            + String(
+                                Math.max(
+                                    0,
+                                    splitService.files.length
+                                    - root.firstCount()
+                                )
+                              )
                         font.pixelSize: 10
                         color: Colors.cyan
                     }
@@ -329,22 +272,25 @@ Rectangle {
                         height: parent.height - 28
                         clip: true
                         spacing: 4
-                        model: foldService.commits
+                        model: splitService.files
 
                         delegate: Rectangle {
-                            id: commitRow
+                            id: fileRow
 
                             required property int index
                             required property var modelData
 
                             width: ListView.view.width
                             height: 42
-                            color: Colors.dark
+                            color:
+                                rowMouse.containsMouse
+                                ? Colors.dark
+                                : "transparent"
                             border.width: 1
                             border.color:
-                                index === 0
-                                ? Colors.red
-                                : Colors.orange
+                                Boolean(modelData.first)
+                                ? Colors.orange
+                                : Colors.magenta
 
                             Row {
                                 anchors.fill: parent
@@ -352,40 +298,58 @@ Rectangle {
                                 spacing: 8
 
                                 GohuText {
-                                    width: 76
+                                    width: 72
                                     anchors.verticalCenter: parent.verticalCenter
                                     text:
-                                        index === 0
-                                        ? "KEEP"
-                                        : "FOLD"
+                                        Boolean(modelData.first)
+                                        ? "PART 1"
+                                        : "PART 2"
                                     font.pixelSize: 9
                                     color:
-                                        index === 0
-                                        ? Colors.red
-                                        : Colors.orange
+                                        Boolean(modelData.first)
+                                        ? Colors.orange
+                                        : Colors.magenta
                                 }
 
                                 GohuText {
-                                    width: parent.width - 84
+                                    width: 34
                                     anchors.verticalCenter: parent.verticalCenter
-                                    text:
-                                        String(modelData.sha || "").slice(0, 10)
-                                        + " // "
-                                        + String(modelData.subject || "")
+                                    text: String(modelData.status || "")
+                                    font.pixelSize: 9
+                                    color: Colors.cyan
+                                }
+
+                                GohuText {
+                                    width: parent.width - 114
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: String(modelData.path || "")
                                     font.pixelSize: 9
                                     color: Colors.white
-                                    elide: Text.ElideRight
+                                    elide: Text.ElideMiddle
                                 }
+                            }
+
+                            MouseArea {
+                                id: rowMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+
+                                onClicked:
+                                    splitService.setFirstFile(
+                                        fileRow.index,
+                                        !Boolean(fileRow.modelData.first)
+                                    )
                             }
                         }
 
                         GohuText {
                             anchors.centerIn: parent
                             visible:
-                                !foldService.previewBusy
-                                && foldService.commits.length === 0
+                                !splitService.previewBusy
+                                && splitService.files.length === 0
                             text:
-                                "SELECT A CONTIGUOUS OLDEST → NEWEST RANGE"
+                                "PREVIEW A COMMIT WITH 2+ CHANGED FILES"
                             font.pixelSize: 10
                             color: Colors.orange
                             opacity: 0.7
@@ -395,11 +359,11 @@ Rectangle {
             }
 
             Rectangle {
-                width: parent.width - Math.floor(parent.width * 0.57) - 8
+                width: parent.width - Math.floor(parent.width * 0.55) - 8
                 height: parent.height
                 color: Colors.black
                 border.width: 1
-                border.color: Colors.red
+                border.color: Colors.orange
 
                 Column {
                     anchors.fill: parent
@@ -408,42 +372,30 @@ Rectangle {
 
                     GohuText {
                         width: parent.width
-                        text: "FOLDED COMMIT"
+                        text: "REPLACEMENT COMMITS"
                         font.pixelSize: 10
-                        color: Colors.red
+                        color: Colors.orange
                     }
 
                     InputBox {
-                        id: messageInput
+                        id: firstMessageInput
                         width: parent.width
-                        placeholder: "FOLDED COMMIT MESSAGE"
-                        accent: Colors.red
+                        placeholder: "PART 1 COMMIT MESSAGE"
+                        accent: Colors.orange
                         keyboardOwner: root.keyboardHost
-
-                        onTextChanged: {
-                            if (text !== foldService.foldMessage)
-                                foldService.setMessage(text);
-                        }
                     }
 
-                    SurgeryButton {
+                    InputBox {
+                        id: secondMessageInput
                         width: parent.width
-                        label: "LOAD DEFAULT MESSAGE"
-                        accent: Colors.cyan
-                        enabledAction:
-                            foldService.commits.length > 0
-                            && !foldService.executionBusy
-                        onTriggered:
-                            messageInput.text =
-                                String(
-                                    (foldService.commits[0] || {}).subject
-                                    || ""
-                                )
+                        placeholder: "PART 2 COMMIT MESSAGE"
+                        accent: Colors.magenta
+                        keyboardOwner: root.keyboardHost
                     }
 
                     Rectangle {
                         width: parent.width
-                        height: 76
+                        height: 86
                         color: Colors.dark
                         border.width: 1
                         border.color: Colors.orange
@@ -452,10 +404,11 @@ Rectangle {
                             anchors.fill: parent
                             anchors.margins: 7
                             text:
-                                "STRICT FIRST SLICE\n"
-                                + "• contiguous commits only\n"
-                                + "• no merge-containing rewrite range\n"
-                                + "• rehearsal before live ref movement"
+                                "STRICT FILE SPLIT SLICE\n"
+                                + "• one non-merge commit\n"
+                                + "• both file groups must be non-empty\n"
+                                + "• renames/copies refused for now\n"
+                                + "• descendants replay after rehearsal"
                             font.pixelSize: 8
                             color: Colors.orange
                             wrapMode: Text.Wrap
@@ -464,44 +417,48 @@ Rectangle {
 
                     Item {
                         width: parent.width
-                        height: Math.max(0, parent.height - 232)
+                        height: Math.max(0, parent.height - 266)
                     }
 
-                    SurgeryButton {
+                    SplitButton {
                         width: parent.width
                         height: 34
                         label:
-                            foldService.armed
-                            ? "ARMED // EXACT RANGE FROZEN"
-                            : "ARM FOLD"
+                            splitService.armed
+                            ? "ARMED // PARTITION FROZEN"
+                            : "ARM SPLIT"
                         accent: Colors.orange
-                        selectedAction: foldService.armed
+                        selectedAction: splitService.armed
                         enabledAction:
-                            foldService.commits.length >= 2
-                            && messageInput.text.trim().length > 0
-                            && !foldService.previewBusy
-                            && !foldService.executionBusy
+                            splitService.files.length >= 2
+                            && root.firstCount() > 0
+                            && root.firstCount() < splitService.files.length
+                            && firstMessageInput.text.trim().length > 0
+                            && secondMessageInput.text.trim().length > 0
+                            && !splitService.previewBusy
+                            && !splitService.executionBusy
                         onTriggered: {
-                            foldService.setMessage(
-                                messageInput.text.trim()
+                            splitService.setMessages(
+                                firstMessageInput.text.trim(),
+                                secondMessageInput.text.trim()
                             );
-                            foldService.arm();
+                            splitService.arm();
                         }
                     }
 
-                    SurgeryButton {
+                    SplitButton {
                         width: parent.width
                         height: 38
                         label:
-                            foldService.executionBusy
-                            ? "REHEARSING / FOLDING"
-                            : "EXECUTE REHEARSED FOLD"
+                            splitService.executionBusy
+                            ? "REHEARSING / SPLITTING"
+                            : "EXECUTE REHEARSED SPLIT"
                         accent: Colors.red
                         enabledAction:
-                            foldService.armed
-                            && !foldService.previewBusy
-                            && !foldService.executionBusy
-                        onTriggered: foldService.executeArmed()
+                            splitService.armed
+                            && !splitService.previewBusy
+                            && !splitService.executionBusy
+                        onTriggered: splitService.executeArmed()
                     }
                 }
             }
@@ -519,8 +476,8 @@ Rectangle {
                 anchors.margins: 7
                 verticalAlignment: Text.AlignVCenter
                 text:
-                    "OPERATIONS UNDO RESTORES THE EXACT PRE-FOLD BRANCH HEAD "
-                    + "ONLY WHILE THE REWRITTEN REF STILL MATCHES"
+                    "CLICK FILE ROWS TO TOGGLE PART 1 / PART 2 // "
+                    + "OPERATIONS UNDO RESTORES THE EXACT PRE-SPLIT HEAD"
                 font.pixelSize: 9
                 color: Colors.cyan
                 elide: Text.ElideRight
@@ -528,34 +485,15 @@ Rectangle {
         }
     }
 
-    GitHistorySplitView {
-        anchors {
-            top: parent.top
-            left: parent.left
-            right: parent.right
-            bottom: parent.bottom
-            topMargin: 45
-            leftMargin: 8
-            rightMargin: 8
-            bottomMargin: 8
-        }
-
-        visible: root.mode === "split"
-        z: 1000
-
-        splitService: root.splitService
-        historyService: root.historyService
-        keyboardHost: root.keyboardHost
-    }
-
     Connections {
-        target: foldService
+        target: splitService
         ignoreUnknownSignals: true
 
-        function onPreviewReady(commits) {
-            if (commits.length > 0)
-                messageInput.text =
-                    String((commits[0] || {}).subject || "");
+        function onPreviewReady(files) {
+            firstMessageInput.text =
+                String(splitService.firstMessage || "");
+            secondMessageInput.text =
+                String(splitService.secondMessage || "");
         }
     }
 }

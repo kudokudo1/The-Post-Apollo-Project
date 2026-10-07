@@ -210,8 +210,7 @@ Item {
 
     function reconcileProjectSelection() {
         if (!root.repositoryService
-                || root.selectedProjectLine <= 0
-                || !root.selectedProjectText)
+                || root.selectedProjectLine <= 0)
             return;
 
         const rows = root.projectLines();
@@ -3203,16 +3202,13 @@ Item {
             const name = String(action || "");
 
             if (name === "APPEND-FILE-LINE") {
-                root.selectedProjectText =
-                    String(projectLineInput.text || "");
-                root.selectedProjectLine = -1;
+                root.clearProjectSelection(true);
                 return;
             }
 
             if (name === "REPLACE-FILE-LINE") {
                 root.selectedProjectText =
                     String(projectLineInput.text || "");
-                root.selectedProjectLine = -1;
                 return;
             }
 

@@ -184,7 +184,7 @@ Rectangle {
 
             color: Colors.cyan
 
-            layer.enabled: true
+            layer.enabled: Window.window !== null
 
             layer.effect: DropShadow {
                 color: Colors.cyan
@@ -237,7 +237,7 @@ Rectangle {
 
                 color: Colors.orange
 
-                layer.enabled: true
+                layer.enabled: Window.window !== null
 
                 layer.effect: DropShadow {
                     color: Colors.orange
@@ -386,7 +386,7 @@ Rectangle {
 
                 z: 2
 
-                layer.enabled: contactButton.isSelected || contactButton.isHovered
+                layer.enabled: Window.window !== null && (contactButton.isSelected || contactButton.isHovered)
 
                 layer.effect: DropShadow {
                     color: Colors.orange

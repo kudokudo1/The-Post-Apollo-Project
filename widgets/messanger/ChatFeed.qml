@@ -1,5 +1,5 @@
 import QtQuick
-import "../../components"
+import qs.components
 
 // Compatibility wrapper for the Social/Messaging surface.
 // The reusable conversation UI now lives in components/ConversationFeed.qml

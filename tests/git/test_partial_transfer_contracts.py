@@ -34,6 +34,8 @@ for needle, message in (
     ("DESTINATION REHEARSAL WORKTREE CREATE FAILED", "preview must rehearse the two-layer landing"),
     ("MOVED PARTIALLY STAGED %s FILE(S)", "MOVE must preserve explicit partial semantics"),
     ("COPIED PARTIALLY STAGED %s FILE(S)", "COPY must preserve explicit partial semantics"),
+    ("'  partial_apply() {',", "partial apply shell function must remain a valid QML array entry"),
+    ("'  partial_remove() {',", "partial remove shell function must remain a valid QML array entry"),
 ):
     require(TRANSFER, needle, message)
 

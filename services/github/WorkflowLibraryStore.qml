@@ -9,6 +9,8 @@ Scope {
 
     property var queue: []
     property var savedSets: []
+    property string queueRepository: ""
+    property string queueRef: ""
 
     signal procedureDispatched(string name, var procedure)
 
@@ -30,6 +32,35 @@ Scope {
             return !root.workflowAvailable(item.path);
         }).length
 
+    readonly property bool queueRepositoryMatches:
+        queue.length === 0
+        || !queueRepository
+        || queueRepository === repoSlug
+
+    onRepoSlugChanged: {
+        if (queue.length > 0
+                && queueRepository
+                && queueRepository !== repoSlug) {
+            queue = [];
+            queueRef = "";
+        }
+
+        queueRepository = repoSlug;
+    }
+
+    function ensureQueueRepository() {
+        if (!repoSlug)
+            return false;
+
+        if (queueRepository && queueRepository !== repoSlug) {
+            queue = [];
+            queueRef = "";
+        }
+
+        queueRepository = repoSlug;
+        return true;
+    }
+
     function workflowAvailable(path) {
         const target = String(path || "");
 
@@ -42,17 +73,18 @@ Scope {
     }
 
     function addWorkflow(workflow) {
-        if (!workflow)
-            return;
+        if (!workflow || !ensureQueueRepository())
+            return false;
 
         const path = String(workflow.path || "");
         if (!path)
-            return;
+            return false;
 
         queue = queue.concat([{
             path: path,
             name: String(workflow.name || path)
         }]);
+        return true;
     }
 
     function removeQueueIndex(index) {
@@ -78,17 +110,29 @@ Scope {
 
     function clearQueue() {
         queue = [];
+        queueRef = "";
+        queueRepository = repoSlug;
+    }
+
+    function setQueueRef(value) {
+        queueRef = String(value || "").trim();
     }
 
     function runQueue() {
-        if (!githubService || queue.length === 0 || missingQueueCount > 0)
-            return;
+        if (!githubService
+                || queue.length === 0
+                || missingQueueCount > 0
+                || !queueRepositoryMatches
+                || queueRepository !== repoSlug)
+            return false;
 
         githubService.runWorkflowBatch(
             queue.map(function(item) {
                 return String(item.path || "");
-            })
+            }),
+            queueRef
         );
+        return true;
     }
 
     function globalSetIndex(repository, name) {
@@ -101,15 +145,25 @@ Scope {
         return -1;
     }
 
-    function saveQueueAsSet(name) {
+    function saveQueueAsSet(name, confirmedOverwrite) {
         const clean = String(name || "").trim();
 
-        if (!clean || !repoSlug || queue.length === 0)
-            return;
+        if (!clean
+                || !repoSlug
+                || queue.length === 0
+                || queueRepository !== repoSlug)
+            return false;
+
+        const existing = globalSetIndex(repoSlug, clean);
+
+        if (existing >= 0 && !confirmedOverwrite)
+            return false;
 
         const record = {
+            schemaVersion: 2,
             repository: repoSlug,
             name: clean,
+            ref: String(queueRef || "").trim(),
             items: queue.map(function(item) {
                 return {
                     path: String(item.path || ""),
@@ -119,7 +173,6 @@ Scope {
         };
 
         const next = savedSets.slice();
-        const existing = globalSetIndex(repoSlug, clean);
 
         if (existing >= 0)
             next[existing] = record;
@@ -128,23 +181,29 @@ Scope {
 
         savedSets = next;
         persistSets();
+        return true;
     }
 
     function loadSet(setRecord) {
-        if (!setRecord || !Array.isArray(setRecord.items))
-            return;
+        if (!setRecord
+                || !Array.isArray(setRecord.items)
+                || String(setRecord.repository || "") !== repoSlug)
+            return false;
 
+        queueRepository = repoSlug;
+        queueRef = String(setRecord.ref || "").trim();
         queue = setRecord.items.map(function(item) {
             return {
                 path: String(item.path || ""),
                 name: String(item.name || item.path || "")
             };
         });
+        return true;
     }
 
-    function deleteSet(setRecord) {
-        if (!setRecord)
-            return;
+    function deleteSet(setRecord, confirmed) {
+        if (!setRecord || !confirmed)
+            return false;
 
         const index = globalSetIndex(
             String(setRecord.repository || ""),
@@ -152,12 +211,13 @@ Scope {
         );
 
         if (index < 0)
-            return;
+            return false;
 
         const next = savedSets.slice();
         next.splice(index, 1);
         savedSets = next;
         persistSets();
+        return true;
     }
 
     function setMissingCount(setRecord) {
@@ -186,13 +246,23 @@ Scope {
             return !item.available;
         }).length;
 
+        const repository =
+            String(setRecord.repository || "");
+        const repositoryMatches =
+            repository === repoSlug;
+
         return {
-            schemaVersion: 1,
-            repository: String(setRecord.repository || ""),
+            schemaVersion: Number(setRecord.schemaVersion || 1),
+            repository: repository,
             name: String(setRecord.name || ""),
+            ref: String(setRecord.ref || "").trim(),
             workflowCount: items.length,
             missingCount: missing,
-            runnable: items.length > 0 && missing === 0,
+            repositoryMatches: repositoryMatches,
+            runnable:
+                items.length > 0
+                && missing === 0
+                && repositoryMatches,
             workflows: items
         };
     }
@@ -243,16 +313,19 @@ Scope {
 
     function runSet(setRecord) {
         if (!githubService || !setRecord
+                || String(setRecord.repository || "") !== repoSlug
                 || !Array.isArray(setRecord.items)
                 || setRecord.items.length === 0
                 || setMissingCount(setRecord) > 0)
-            return;
+            return false;
 
         githubService.runWorkflowBatch(
             setRecord.items.map(function(item) {
                 return String(item.path || "");
-            })
+            }),
+            String(setRecord.ref || "").trim()
         );
+        return true;
     }
 
     function loadSetsFromDisk() {

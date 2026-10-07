@@ -59,6 +59,31 @@ Item {
         return true;
     }
 
+    function selectSpecialistById(value) {
+        const wanted = String(value || "").trim();
+
+        if (!wanted)
+            return false;
+
+        filterMode = "ALL";
+
+        const rows =
+            root.registryService
+            && Array.isArray(root.registryService.specialists)
+            ? root.registryService.specialists
+            : [];
+
+        for (let i = 0; i < rows.length; ++i) {
+            if (String((rows[i] || {}).id || "") !== wanted)
+                continue;
+
+            selectedIndex = i;
+            return true;
+        }
+
+        return false;
+    }
+
     onDisplayedSpecialistsChanged: {
         if (displayedSpecialists.length === 0)
             selectedIndex = -1;

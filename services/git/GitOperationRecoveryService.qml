@@ -1926,7 +1926,7 @@ Scope {
                 '      git -C "$destination" apply -R --binary --whitespace=nowarn "$patch" || { printf "REFUSED\\tCONFLICT RESULT COPY REMOVE FAILED\\n"; exit 123; }',
                 '      printf "OK\\tUNDID CONFLICT RESULT COPY // SOURCE CONFLICT LEFT UNTOUCHED\\n"',
                 '    elif [ "$layer" = "partial" ]; then',
-                '      partial_apply() {
+                '      partial_apply() {',
                 '        local repo="$1"',
                 '        git -C "$repo" apply --cached --binary --whitespace=nowarn "$partial_staged" || return 1',
                 '        if ! git -C "$repo" apply --binary --whitespace=nowarn "$partial_staged"; then',

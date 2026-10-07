@@ -26,11 +26,26 @@ for needle, label in (
     ("property var roundsService: null", "Rounds evidence"),
     ("property var registryService: null", "Specialist evidence"),
     ("property var assignmentService: null", "Assignment evidence"),
+    ("property var durableRooms: []", "durable Room evidence"),
+    ("property var durableSessions: []", "persistent session evidence"),
+    ("function refreshDurableGraph()", "durable graph refresh"),
+    ('"hospital", "rooms"', "PX durable Room query"),
+    ('"hospital", "sessions"', "PX persistent session query"),
     ("function roomScore(roomValue, repositoryValue, branchValue)", "room scorer"),
     ("function bestRoom(repositoryValue, branchValue)", "room resolver"),
     ("function specialistsForRoom(roomValue)", "specialist resolver"),
+    ("function durableRoomFor(roomValue, repositoryValue, branchValue)", "durable Room resolver"),
+    ("function activeSessionForRoom(roomIdValue)", "persistent session resolver"),
     ("function activeAssignmentForRoom(roomValue)", "active assignment"),
     ("function contextFor(repositoryValue, branchValue)", "responsibility context"),
+    ("function blockerForWorkItem(itemValue)", "blocker resolver"),
+    ("function responsibilityChain(contextValue)", "responsibility chain"),
+    ("function contextForWorkItem(itemValue)", "work-item graph context"),
+    ("bedPath:", "Bed identity"),
+    ("doctorId:", "Doctor identity"),
+    ("sessionId:", "session identity"),
+    ("assignmentId:", "Assignment identity"),
+    ("context.evidence = {", "evidence edge"),
     ('return "EXACT";', "exact confidence"),
     ('return "UNMAPPED";', "unmapped confidence"),
 ):
@@ -42,13 +57,15 @@ for needle, label in (
     ("registryService: specialistRegistryService", "Specialist injection"),
     ("assignmentService: assignmentService", "Assignment injection"),
     ("responsibilityService: responsibilityService", "Attention injection"),
+    ("responsibilityService.refreshDurableGraph();", "live responsibility refresh"),
 ):
     require(HOSPITAL, needle, label)
 
 for needle, label in (
     ("property var responsibilityService: null", "Attention ownership dependency"),
-    ("responsibilityService.contextFor(", "Attention ownership lookup"),
+    ("responsibilityService.contextForWorkItem(item)", "Attention work-item ownership lookup"),
     ('"OWNER // "', "Attention ownership rendering"),
+    ('"CHAIN // "', "Attention responsibility chain rendering"),
     ('+ " // ROOM "', "Room identity rendering"),
     ("responsibility.confidence", "ownership confidence rendering"),
 ):
@@ -56,8 +73,9 @@ for needle, label in (
 
 for needle, label in (
     ("property var responsibilityService: null", "Queue ownership dependency"),
-    ("responsibilityService.contextFor(", "Queue ownership lookup"),
+    ("responsibilityService.contextForWorkItem({", "Queue work-item ownership lookup"),
     ('"OWNER // "', "Queue ownership rendering"),
+    ('"CHAIN // "', "Queue responsibility chain rendering"),
     ('+ " // ROOM "', "Queue Room rendering"),
     ("responsibility.assignmentTitle", "Queue Assignment rendering"),
 ):
@@ -81,4 +99,4 @@ if errors:
     raise SystemExit(1)
 
 print("POST-APOLLO HOSPITAL RESPONSIBILITY CONTRACTS // PASS")
-print("checked repo/branch -> Room -> Specialist/Assignment ownership mapping")
+print("checked PR/repo/branch -> Room/Bed -> Doctor/session -> Assignment/evidence ownership graph")

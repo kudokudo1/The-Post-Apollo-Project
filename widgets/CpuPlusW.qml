@@ -922,7 +922,7 @@ PanelWindow {
 
                                 color: modeButton.contentColor
 
-                                layer.enabled: !modeButton.isPressed
+                                layer.enabled: Window.window !== null && (!modeButton.isPressed)
                                 layer.effect: DropShadow {
                                     horizontalOffset: 0
                                     verticalOffset: 0
@@ -1256,7 +1256,7 @@ PanelWindow {
                                 selectedMonitorIdentity.entry
                             )
 
-                        layer.enabled: true
+                        layer.enabled: Window.window !== null
                         layer.effect: DropShadow {
                             radius: 8
                             samples: 7
@@ -1298,7 +1298,7 @@ PanelWindow {
 
                         elide: Text.ElideRight
 
-                        layer.enabled: true
+                        layer.enabled: Window.window !== null
                         layer.effect: DropShadow {
                             radius: 7
                             samples: 7
@@ -1422,7 +1422,7 @@ PanelWindow {
                     ? Colors.orange
                     : Colors.cyan
 
-                layer.enabled: true
+                layer.enabled: Window.window !== null
                 layer.effect: DropShadow {
                     radius: 10
                     samples: 9
@@ -1755,7 +1755,7 @@ PanelWindow {
                                         ? Colors.omnitrix
                                         : Colors.cyan
 
-                                    layer.enabled: !subModeButton.isPressed
+                                    layer.enabled: Window.window !== null && (!subModeButton.isPressed)
                                     layer.effect: DropShadow {
                                         radius: 7
                                         samples: 7
@@ -2042,7 +2042,7 @@ PanelWindow {
                                               monitorRowButton.modelData
                                           )
 
-                                    layer.enabled: !monitorRowButton.isPressed
+                                    layer.enabled: Window.window !== null && (!monitorRowButton.isPressed)
                                     layer.effect: DropShadow {
                                         radius: 6
                                         samples: 5

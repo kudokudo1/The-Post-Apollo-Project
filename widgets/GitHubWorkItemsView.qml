@@ -18,6 +18,8 @@ Item {
     property string armedProjectRemoveUrl: ""
 
     signal pullRequestControlRequested(var row)
+    signal issueControlRequested(var row)
+    signal issueCreateRequested()
 
     readonly property bool isPulls: kind === "pulls"
     readonly property var sourceRows:
@@ -464,7 +466,9 @@ Item {
 
             SearchField {
                 id: searchField
-                width: parent.width - 264
+                width:
+                    parent.width
+                    - (root.isPulls ? 264 : 362)
                 height: parent.height
                 placeholderText:
                     root.isPulls
@@ -473,6 +477,18 @@ Item {
 
                 onTextChanged:
                     root.searchText = text
+            }
+
+            ViewButton {
+                visible: !root.isPulls
+                width: 92
+                height: parent.height
+                label: "NEW ISSUE"
+                primaryBlue: true
+                enabledAction:
+                    !root.busy
+                    && !!root.gitService.repoRemoteSlug
+                onTriggered: root.issueCreateRequested()
             }
 
             ViewButton {
@@ -832,13 +848,15 @@ Item {
                                         sourceRow.modelData
                                     );
                                 } else {
-                                    Qt.openUrlExternally(sourceRow.itemUrl);
+                                    root.issueControlRequested(
+                                        sourceRow.modelData
+                                    );
                                 }
                             }
                         }
 
                         ViewButton {
-                            visible: root.isPulls
+                            visible: true
                             width: parent.width
                             height: 25
                             label: "WEB"

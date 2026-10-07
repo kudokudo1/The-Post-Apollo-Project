@@ -20,6 +20,9 @@ PanelWindow {
     property string githubView: "control"
     property bool pullRequestControlOpen: false
     property var selectedPullRequest: null
+    property bool issueControlOpen: false
+    property bool issueCreateMode: false
+    property var selectedIssue: null
     property bool projectsExpanded: false
     property string factoryTemplate: "smoke"
     property string factoryTrigger: "manual"
@@ -677,10 +680,14 @@ PanelWindow {
                     gitService.discoverRepos();
                 else if (githubView === "projects")
                     githubProjectsService.refreshProjects();
-                else if (githubView === "issues")
-                    githubWorkItemsService.refreshIssues(
-                        gitService.repoRemoteSlug
-                    );
+                else if (githubView === "issues") {
+                    if (root.issueControlOpen)
+                        issueControlView.refreshFacts();
+                    else
+                        githubWorkItemsService.refreshIssues(
+                            gitService.repoRemoteSlug
+                        );
+                }
                 else if (githubView === "pulls") {
                     if (root.pullRequestControlOpen)
                         pullRequestControlView.refreshFacts();
@@ -1382,6 +1389,9 @@ PanelWindow {
     function showGithubIssues() {
         root.workflowMenuOpen = false;
         root.runInspectorOpen = false;
+        root.issueControlOpen = false;
+        root.issueCreateMode = false;
+        root.selectedIssue = null;
         root.githubView = "issues";
 
         githubWorkItemsService.refreshIssues(
@@ -1391,6 +1401,73 @@ PanelWindow {
         if (!githubProjectsService.busy
                 && githubProjectsService.projects.length === 0)
             githubProjectsService.refreshProjects();
+    }
+
+    function openIssueControl(row) {
+        const candidate = row || {};
+        const number = githubWorkItemsService.rowNumber(candidate);
+
+        if (number <= 0 || !gitService.repoRemoteSlug)
+            return false;
+
+        root.selectedIssue = candidate;
+        root.issueCreateMode = false;
+        root.issueControlOpen = true;
+        root.clearGitKeyboardControl();
+        Qt.callLater(root.ensureGitKeyboardControl);
+        root.restoreGitKeyboardFocus(false);
+        return true;
+    }
+
+    function openIssueCreate() {
+        if (!gitService.repoRemoteSlug)
+            return false;
+
+        root.selectedIssue = null;
+        root.issueCreateMode = true;
+        root.issueControlOpen = true;
+        root.clearGitKeyboardControl();
+        Qt.callLater(root.ensureGitKeyboardControl);
+        root.restoreGitKeyboardFocus(false);
+        return true;
+    }
+
+    function closeIssueControl() {
+        root.issueControlOpen = false;
+        root.issueCreateMode = false;
+        root.selectedIssue = null;
+
+        if (gitService.repoRemoteSlug
+                && !githubWorkItemsService.issuesBusy) {
+            githubWorkItemsService.refreshIssues(
+                gitService.repoRemoteSlug
+            );
+        }
+
+        root.clearGitKeyboardControl();
+        Qt.callLater(root.ensureGitKeyboardControl);
+        root.restoreGitKeyboardFocus(false);
+    }
+
+    function refreshSelectedIssue() {
+        if (!root.issueControlOpen
+                || root.issueCreateMode
+                || !root.selectedIssue)
+            return;
+
+        const number =
+            githubWorkItemsService.rowNumber(root.selectedIssue);
+        const rows =
+            Array.isArray(githubWorkItemsService.issues)
+            ? githubWorkItemsService.issues
+            : [];
+
+        for (let i = 0; i < rows.length; ++i) {
+            if (githubWorkItemsService.rowNumber(rows[i]) === number) {
+                root.selectedIssue = rows[i];
+                return;
+            }
+        }
     }
 
     function showGithubPulls() {
@@ -1855,6 +1932,10 @@ PanelWindow {
         repoSlug: gitService.repoRemoteSlug
     }
 
+    GitHubIssueLifecycleService {
+        id: githubIssueLifecycleService
+    }
+
     GitHubPullRequestLifecycleService {
         id: githubPullRequestLifecycleService
     }
@@ -1877,6 +1958,10 @@ PanelWindow {
 
     Connections {
         target: githubWorkItemsService
+
+        function onIssuesRefreshed() {
+            root.refreshSelectedIssue();
+        }
 
         function onPullsRefreshed() {
             root.refreshSelectedPullRequest();
@@ -1906,6 +1991,9 @@ PanelWindow {
         function onRepoRemoteSlugChanged() {
             root.pullRequestControlOpen = false;
             root.selectedPullRequest = null;
+            root.issueControlOpen = false;
+            root.issueCreateMode = false;
+            root.selectedIssue = null;
         }
 
         function onRefreshed() {
@@ -6113,14 +6201,68 @@ PanelWindow {
                             }
 
                             GitHubWorkItemsView {
+                                id: githubIssuesListView
+
                                 anchors.fill: parent
-                                visible: root.githubView === "issues"
+                                visible:
+                                    root.githubView === "issues"
+                                    && !root.issueControlOpen
 
                                 kind: "issues"
                                 workService: githubWorkItemsService
                                 projectService: githubProjectsService
                                 gitService: gitService
                                 keyboardHost: root
+
+                                onIssueControlRequested: function(row) {
+                                    root.openIssueControl(row);
+                                }
+
+                                onIssueCreateRequested:
+                                    root.openIssueCreate()
+                            }
+
+                            GitHubIssueControlView {
+                                id: issueControlView
+
+                                anchors.fill: parent
+                                visible:
+                                    root.githubView === "issues"
+                                    && root.issueControlOpen
+
+                                lifecycleService:
+                                    githubIssueLifecycleService
+                                repositorySlug: gitService.repoRemoteSlug
+                                createMode: root.issueCreateMode
+                                issueNumber:
+                                    root.issueCreateMode
+                                    ? 0
+                                    : githubWorkItemsService.rowNumber(
+                                        root.selectedIssue
+                                      )
+                                issueTitle:
+                                    root.issueCreateMode
+                                    ? ""
+                                    : githubWorkItemsService.rowTitle(
+                                        root.selectedIssue
+                                      )
+                                issueState:
+                                    root.issueCreateMode
+                                    ? "OPEN"
+                                    : githubWorkItemsService.rowState(
+                                        root.selectedIssue
+                                      )
+
+                                onCloseRequested:
+                                    root.closeIssueControl()
+
+                                onTargetRefreshRequested: {
+                                    if (!githubWorkItemsService.issuesBusy) {
+                                        githubWorkItemsService.refreshIssues(
+                                            gitService.repoRemoteSlug
+                                        );
+                                    }
+                                }
                             }
 
                             GitHubWorkItemsView {

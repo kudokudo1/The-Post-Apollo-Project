@@ -193,7 +193,7 @@ Item {
                             color:
                                 pressed ? Colors.black
                                 : hunterMetricButton.stateColor
-                            layer.enabled: !pressed
+                            layer.enabled: Window.window !== null && (!pressed)
                             layer.effect: DropShadow {
                                 radius: 7
                                 samples: 7
@@ -283,7 +283,7 @@ Item {
                                 : selected ? Colors.magenta
                                 : hovered ? Colors.orange
                                 : modelData.accent
-                            layer.enabled: true
+                            layer.enabled: Window.window !== null
                             layer.effect: DropShadow {
                                 radius: 6
                                 samples: 5

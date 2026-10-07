@@ -5840,6 +5840,7 @@ PanelWindow {
                                 workService: githubWorkItemsService
                                 projectService: githubProjectsService
                                 gitService: gitService
+                                keyboardHost: root
                             }
 
                             GitHubWorkItemsView {
@@ -5850,6 +5851,7 @@ PanelWindow {
                                 workService: githubWorkItemsService
                                 projectService: githubProjectsService
                                 gitService: gitService
+                                keyboardHost: root
                             }
                         }
 

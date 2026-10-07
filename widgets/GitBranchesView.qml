@@ -1639,7 +1639,7 @@ Item {
                     font.pixelSize: 12
                     color: Colors.magenta
 
-                    layer.enabled: true
+                    layer.enabled: Window.window !== null
                     layer.effect: DropShadow {
                         radius: 7
                         samples: 9

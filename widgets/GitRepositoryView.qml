@@ -1758,11 +1758,7 @@ Item {
                             Flickable {
                                 id: repositoryScroll7
 
-                                anchors {
-                                    fill: parent
-                                    rightMargin: 12
-                                    bottomMargin: 10
-                                }
+                                anchors.fill: parent
                                 clip: true
                                 contentWidth: width
                                 contentHeight: projectLineColumn.implicitHeight

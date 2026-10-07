@@ -99,15 +99,15 @@ PanelWindow {
     WlrLayershell.keyboardFocus: weatherStation.menuOpen ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     anchors {
-        top: false
-        bottom: true
+        top: true
+        bottom: false
         right: true
         left: false
     }
 
     margins {
         top: 0
-        bottom: 90
+        bottom: 0
         right: 20
         left: 0
     }

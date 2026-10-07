@@ -365,6 +365,7 @@ PanelWindow {
                 screen: Quickshell.screens.find(s => s.name === "DP-5")
 
                 weatherService: weatherService
+                spaceService: spaceService
             }
         }
 

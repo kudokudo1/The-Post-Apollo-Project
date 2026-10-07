@@ -118,6 +118,20 @@ PanelWindow {
             root.selectedProviderId = root.firstAvailableProviderId();
     }
 
+    function openRoomQuick() {
+        if (!root.selectedRoomTeam
+                || !roomChatView.activeSessionId)
+            return false;
+
+        root.leaveRoomControls();
+        root.leaveBedControls();
+        root.phoneMenuOpen = false;
+        root.intercomMenuOpen = false;
+        root.operationsSurface = "quick";
+        doctorRuntimeService.refresh();
+        return true;
+    }
+
     function openRoomChat() {
         if (!root.selectedRoomTeam || !floorService.bedPath)
             return false;
@@ -1744,6 +1758,12 @@ PanelWindow {
         id: providerService
 
         onProvidersRefreshed: root.syncRoomAISelection()
+    }
+
+    HospitalDoctorRuntimeService {
+        id: doctorRuntimeService
+
+        sessionId: roomChatView.activeSessionId
     }
 
     HospitalPhoneService {
@@ -4105,6 +4125,12 @@ PanelWindow {
                         Row {
                             id: roomAiDock
 
+                            readonly property bool stopVisible:
+                                doctorRuntimeService.operating
+                                || doctorRuntimeService.cancelling
+                            readonly property int buttonCount:
+                                stopVisible ? 4 : 3
+
                             width: parent.width
                             height: 26
                             spacing: 6
@@ -4117,7 +4143,9 @@ PanelWindow {
 
                                     required property string modelData
                                     readonly property bool selectedAction:
-                                        (modelData === "CHAT"
+                                        (modelData === "QUICK"
+                                            && root.operationsSurface === "quick")
+                                        || (modelData === "CHAT"
                                             && root.operationsSurface === "chat")
                                         || (modelData === "DOCTOR"
                                             && root.operationsSurface === "doctor")
@@ -4125,19 +4153,26 @@ PanelWindow {
                                         root.selectedRoomTeam.length > 0
                                         && (
                                             modelData !== "QUICK"
-                                            ? true
-                                            : false
+                                            || roomChatView.activeSessionId.length > 0
                                         )
                                         && (
                                             modelData !== "CHAT"
                                             || floorService.bedPath.length > 0
                                         )
+                                        && (
+                                            modelData !== "STOP"
+                                            || (
+                                                doctorRuntimeService.operating
+                                                && !doctorRuntimeService.cancelling
+                                            )
+                                        )
 
                                     width:
                                         (
                                             roomAiDock.width
-                                            - roomAiDock.spacing * 2
-                                        ) / 3
+                                            - roomAiDock.spacing
+                                              * (roomAiDock.buttonCount - 1)
+                                        ) / roomAiDock.buttonCount
                                     height: parent.height
 
                                     color:
@@ -4152,6 +4187,8 @@ PanelWindow {
                                         ? Colors.orange
                                         : selectedAction
                                         ? Colors.magenta
+                                        : modelData === "STOP"
+                                        ? Colors.red
                                         : modelData === "DOCTOR"
                                         ? Colors.green
                                         : modelData === "CHAT"
@@ -4170,7 +4207,9 @@ PanelWindow {
                                             ? selectedAction ? 0.40 : 0.18
                                             : 0.08
                                         color:
-                                            modelData === "DOCTOR"
+                                            modelData === "STOP"
+                                            ? Colors.red
+                                            : modelData === "DOCTOR"
                                             ? Colors.green
                                             : modelData === "CHAT"
                                             ? Colors.cyan
@@ -4186,12 +4225,23 @@ PanelWindow {
                                                 + root.selectedProviderId
                                                     .toUpperCase()
                                             : roomAiButton.modelData === "QUICK"
-                                            ? "QUICK // NEXT"
+                                            ? (
+                                                "QUICK // "
+                                                + doctorRuntimeService.displayStatus
+                                              )
+                                            : roomAiButton.modelData === "STOP"
+                                            ? (
+                                                doctorRuntimeService.cancelling
+                                                ? "STOPPING"
+                                                : "STOP"
+                                              )
                                             : roomAiButton.modelData
                                         font.pixelSize: 8
                                         color:
                                             roomAiMouse.pressed
                                             ? Colors.black
+                                            : roomAiButton.modelData === "STOP"
+                                            ? Colors.red
                                             : roomAiButton.modelData === "DOCTOR"
                                             ? Colors.green
                                             : roomAiButton.modelData === "CHAT"
@@ -4212,15 +4262,82 @@ PanelWindow {
                                             : Qt.ArrowCursor
 
                                         onClicked: {
+                                            if (roomAiButton.modelData === "QUICK") {
+                                                root.openRoomQuick();
+                                                return;
+                                            }
+
                                             if (roomAiButton.modelData === "CHAT") {
                                                 root.openRoomChat();
                                                 return;
                                             }
 
-                                            if (roomAiButton.modelData === "DOCTOR")
+                                            if (roomAiButton.modelData === "DOCTOR") {
                                                 root.openRoomDoctor();
+                                                return;
+                                            }
+
+                                            if (roomAiButton.modelData === "STOP")
+                                                doctorRuntimeService.cancel("OPERATOR");
                                         }
                                     }
+                                }
+                            }
+
+                            Rectangle {
+                                id: roomStopButton
+
+                                visible: roomAiDock.stopVisible
+                                width:
+                                    (
+                                        roomAiDock.width
+                                        - roomAiDock.spacing
+                                          * (roomAiDock.buttonCount - 1)
+                                    ) / roomAiDock.buttonCount
+                                height: parent.height
+                                color:
+                                    roomStopMouse.pressed
+                                    ? Colors.red
+                                    : Colors.black
+                                border.width: 1
+                                border.color: Colors.red
+                                opacity:
+                                    doctorRuntimeService.cancelling
+                                    ? 0.55 : 1.0
+
+                                RectangularShadow {
+                                    anchors.fill: parent
+                                    z: -1
+                                    spread: 2
+                                    opacity: 0.24
+                                    color: Colors.red
+                                }
+
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    text:
+                                        doctorRuntimeService.cancelling
+                                        ? "STOPPING"
+                                        : "STOP"
+                                    font.pixelSize: 8
+                                    color: Colors.red
+                                }
+
+                                MouseArea {
+                                    id: roomStopMouse
+
+                                    anchors.fill: parent
+                                    enabled:
+                                        doctorRuntimeService.operating
+                                        && !doctorRuntimeService.cancelling
+                                    hoverEnabled: true
+                                    cursorShape:
+                                        enabled
+                                        ? Qt.PointingHandCursor
+                                        : Qt.ArrowCursor
+
+                                    onClicked:
+                                        doctorRuntimeService.cancel("OPERATOR")
                                 }
                             }
                         }
@@ -5014,6 +5131,220 @@ PanelWindow {
                 root.phoneMenuOpen = false
         }
 
+        Rectangle {
+            id: roomQuickView
+
+            z: 700
+            visible: root.operationsSurface === "quick"
+
+            anchors {
+                left: parent.left
+                right: parent.right
+                top: fixedTop.bottom
+                bottom: actionBay.top
+                leftMargin: 18
+                rightMargin: 18
+                topMargin: 8
+                bottomMargin: 10
+            }
+
+            color: Colors.dark
+            border.width: 1
+            border.color:
+                doctorRuntimeService.status === "FAILED"
+                ? Colors.red
+                : doctorRuntimeService.operating
+                ? Colors.orange
+                : Colors.blue
+
+            RectangularShadow {
+                anchors.fill: parent
+                z: -1
+                spread: 4
+                opacity: 0.28
+                color:
+                    doctorRuntimeService.status === "FAILED"
+                    ? Colors.red
+                    : doctorRuntimeService.operating
+                    ? Colors.orange
+                    : Colors.blue
+            }
+
+            Column {
+                anchors {
+                    fill: parent
+                    margins: 14
+                }
+                spacing: 10
+
+                SectionLabel {
+                    width: parent.width
+                    text:
+                        "QUICK // "
+                        + (
+                            root.selectedRoomTeam
+                            ? root.selectedRoomTeam
+                            : "NO ROOM"
+                        )
+                }
+
+                GohuText {
+                    width: parent.width
+                    text:
+                        (
+                            root.selectedProviderId
+                            ? root.selectedProviderId.toUpperCase()
+                            : "NO PROVIDER"
+                        )
+                        + " // "
+                        + doctorRuntimeService.displayStatus
+                        + (
+                            doctorRuntimeService.operating
+                            || doctorRuntimeService.cancelling
+                            ? " // " + doctorRuntimeService.elapsedLabel
+                            : ""
+                        )
+                    font.pixelSize: 14
+                    color:
+                        doctorRuntimeService.status === "FAILED"
+                        ? Colors.red
+                        : doctorRuntimeService.status === "PAUSED"
+                        ? Colors.blue
+                        : doctorRuntimeService.operating
+                        ? Colors.orange
+                        : doctorRuntimeService.status === "WAITING"
+                        ? Colors.cyan
+                        : Colors.white
+                    elide: Text.ElideRight
+                }
+
+                MetaValue {
+                    width: parent.width
+                    text:
+                        roomChatView.activeSessionId
+                        ? "SESSION // " + roomChatView.activeSessionId
+                        : "SESSION // NONE"
+                    elide: Text.ElideMiddle
+                }
+
+                MetaValue {
+                    width: parent.width
+                    text:
+                        root.selectedDoctorId
+                        ? "DOCTOR // " + root.selectedDoctorId
+                        : "DOCTOR // UNASSIGNED"
+                    elide: Text.ElideRight
+                }
+
+                Row {
+                    width: parent.width
+                    height: 34
+                    spacing: 8
+
+                    Repeater {
+                        model: ["STATUS", "CHAT", "STOP"]
+
+                        Rectangle {
+                            id: quickAction
+
+                            required property string modelData
+                            readonly property bool enabledAction:
+                                modelData !== "STOP"
+                                || (
+                                    doctorRuntimeService.operating
+                                    && !doctorRuntimeService.cancelling
+                                )
+
+                            width:
+                                (
+                                    parent.width
+                                    - parent.spacing * 2
+                                ) / 3
+                            height: parent.height
+                            color:
+                                quickMouse.pressed
+                                ? (
+                                    modelData === "STOP"
+                                    ? Colors.red
+                                    : Colors.orange
+                                  )
+                                : Colors.black
+                            border.width: 1
+                            border.color:
+                                modelData === "STOP"
+                                ? Colors.red
+                                : modelData === "CHAT"
+                                ? Colors.cyan
+                                : Colors.blue
+                            opacity: enabledAction ? 1.0 : 0.38
+
+                            GohuText {
+                                anchors.centerIn: parent
+                                text:
+                                    quickAction.modelData === "STOP"
+                                    && doctorRuntimeService.cancelling
+                                    ? "STOPPING"
+                                    : quickAction.modelData
+                                font.pixelSize: 10
+                                color:
+                                    quickAction.modelData === "STOP"
+                                    ? Colors.red
+                                    : quickAction.modelData === "CHAT"
+                                    ? Colors.cyan
+                                    : Colors.blue
+                            }
+
+                            MouseArea {
+                                id: quickMouse
+
+                                anchors.fill: parent
+                                enabled: quickAction.enabledAction
+                                hoverEnabled: true
+                                cursorShape:
+                                    enabled
+                                    ? Qt.PointingHandCursor
+                                    : Qt.ArrowCursor
+
+                                onClicked: {
+                                    if (quickAction.modelData === "STATUS") {
+                                        doctorRuntimeService.refresh();
+                                        return;
+                                    }
+
+                                    if (quickAction.modelData === "CHAT") {
+                                        root.openRoomChat();
+                                        return;
+                                    }
+
+                                    if (quickAction.modelData === "STOP")
+                                        doctorRuntimeService.cancel("OPERATOR");
+                                }
+                            }
+                        }
+                    }
+                }
+
+                GohuText {
+                    width: parent.width
+                    height: Math.min(implicitHeight, 58)
+                    visible: doctorRuntimeService.lastError.length > 0
+                    text: doctorRuntimeService.lastError
+                    font.pixelSize: 9
+                    color: Colors.red
+                    wrapMode: Text.Wrap
+                    maximumLineCount: 4
+                    elide: Text.ElideRight
+                    clip: true
+                }
+
+                MetaLabel {
+                    width: parent.width
+                    text:
+                        "SUPERVISED CONTROL // STATUS + STOP ACTIVE"
+                }
+            }
+        }
+
         HospitalRoomChatView {
             id: roomChatView
 
@@ -5042,6 +5373,126 @@ PanelWindow {
             }
 
             onCloseRequested: root.showSurgery()
+        }
+
+        Rectangle {
+            id: roomChatRuntimeHud
+
+            z: 730
+            visible:
+                root.operationsSurface === "chat"
+                && roomChatView.activeSessionId.length > 0
+
+            anchors {
+                top: fixedTop.bottom
+                right: parent.right
+                topMargin: 14
+                rightMargin: 30
+            }
+
+            width: 286
+            height: 28
+            color: Colors.black
+            border.width: 1
+            border.color:
+                doctorRuntimeService.status === "FAILED"
+                ? Colors.red
+                : doctorRuntimeService.operating
+                ? Colors.orange
+                : doctorRuntimeService.status === "PAUSED"
+                ? Colors.blue
+                : Colors.cyan
+
+            Row {
+                anchors {
+                    fill: parent
+                    leftMargin: 8
+                    rightMargin: 4
+                }
+                spacing: 6
+
+                GohuText {
+                    width:
+                        parent.width
+                        - (
+                            chatStopButton.visible
+                            ? chatStopButton.width + parent.spacing
+                            : 0
+                          )
+                    anchors.verticalCenter: parent.verticalCenter
+                    text:
+                        (
+                            root.selectedProviderId
+                            ? root.selectedProviderId.toUpperCase()
+                            : "DOCTOR"
+                        )
+                        + " // "
+                        + doctorRuntimeService.displayStatus
+                        + (
+                            doctorRuntimeService.operating
+                            || doctorRuntimeService.cancelling
+                            ? " // " + doctorRuntimeService.elapsedLabel
+                            : ""
+                        )
+                    font.pixelSize: 9
+                    color:
+                        doctorRuntimeService.status === "FAILED"
+                        ? Colors.red
+                        : doctorRuntimeService.operating
+                        ? Colors.orange
+                        : doctorRuntimeService.status === "PAUSED"
+                        ? Colors.blue
+                        : Colors.cyan
+                    elide: Text.ElideRight
+                }
+
+                Rectangle {
+                    id: chatStopButton
+
+                    visible:
+                        doctorRuntimeService.operating
+                        || doctorRuntimeService.cancelling
+                    width: 58
+                    height: 20
+                    anchors.verticalCenter: parent.verticalCenter
+                    color:
+                        chatStopMouse.pressed
+                        ? Colors.red
+                        : Colors.black
+                    border.width: 1
+                    border.color: Colors.red
+                    opacity:
+                        doctorRuntimeService.cancelling
+                        ? 0.55 : 1.0
+
+                    GohuText {
+                        anchors.centerIn: parent
+                        text:
+                            doctorRuntimeService.cancelling
+                            ? "STOPPING"
+                            : "STOP"
+                        font.pixelSize: 8
+                        color: Colors.red
+                    }
+
+                    MouseArea {
+                        id: chatStopMouse
+
+                        anchors.fill: parent
+                        enabled:
+                            doctorRuntimeService.operating
+                            && !doctorRuntimeService.cancelling
+                        hoverEnabled: true
+                        cursorShape:
+                            enabled
+                            ? Qt.PointingHandCursor
+                            : Qt.ArrowCursor
+
+                        onClicked:
+                            doctorRuntimeService.cancel("OPERATOR")
+                    }
+                }
+            }
         }
 
         Rectangle {

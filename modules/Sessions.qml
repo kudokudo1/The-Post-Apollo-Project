@@ -4,165 +4,75 @@ import "../components"
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 
-Rectangle {
+DockButton {
     id: sessionsDock
 
     property var messagingWindow
-    readonly property bool menuOpen: messagingWindow && messagingWindow.menuOpen
+    readonly property bool menuOpen:
+        messagingWindow && messagingWindow.menuOpen
 
     implicitHeight: 50
     implicitWidth: 25
-
-    color: sessionsDock.menuOpen ? Colors.yellow : Colors.black
     radius: 0
 
-    // ============================================================
-    // ICON + TEXT GLOW
-    // ============================================================
+    open: menuOpen
 
-    Item {
-        id: sessionsTextGlowContainer
+    normalDockGlowColor: Colors.omnitrix
+    hoverDockGlowColor: Colors.omnitrix
+    pressedDockGlowColor: Colors.omnitrix
 
-        anchors.fill: parent
+    normalContentGlowColor: Colors.omnitrix
+    hoverContentGlowColor: Colors.omnitrix
+    pressedContentGlowColor: Colors.omnitrix
 
-        Image {
-            id: sessionsIcon
+    contentGlowIdleOpacity: 0.60
+    contentGlowHoverOpacity: 0.80
+    contentGlowPressedOpacity: 1.0
+    contentGlowHoverRadius: 14
+    contentGlowPressedRadius: 14
+    contentGlowHoverSamples: 15
+    contentGlowPressedSamples: 15
 
-            anchors.centerIn: parent
+    softGlowIdleOpacity: 0.40
+    softGlowHoverOpacity: 0.50
+    softGlowPressedOpacity: 0.60
 
-            source: Qt.resolvedUrl("../assets/Sessions.png")
+    wideGlowIdleOpacity: 0.07
+    wideGlowHoverOpacity: 0.10
+    wideGlowPressedOpacity: 0.11
 
-            width: sessionsDock.width - 10
-            height: sessionsDock.height - 5
+    contentGlowSource: sessionsIcon
 
-            fillMode: Image.PreserveAspectFit
+    Image {
+        id: sessionsIcon
 
-            smooth: false
-        }
+        anchors.centerIn: parent
 
-        ColorOverlay {
-            anchors.fill: sessionsIcon
-            source: sessionsIcon
-            color: Colors.magenta
-            visible: sessionsDock.menuOpen
-        }
+        source: Qt.resolvedUrl("../assets/Sessions.png")
 
-        DropShadow {
-            id: sessionsTextGlow
+        width: sessionsDock.width - 10
+        height: sessionsDock.height - 5
 
-            anchors.fill: sessionsIcon
-            source: sessionsIcon
-
-            horizontalOffset: 0
-            verticalOffset: 0
-
-            radius: 14
-            samples: 15
-
-            z: 2
-
-            opacity: sessionsMouse.pressed ? 1.0 : sessionsMouse.containsMouse ? 0.8 : 0.6
-
-            color: sessionsDock.menuOpen ? Colors.magenta : Colors.omnitrix
-
-            transparentBorder: true
-        }
+        fillMode: Image.PreserveAspectFit
+        smooth: false
     }
 
-    // ============================================================
-    // MOUSE
-    // ============================================================
-
-    MouseArea {
-        id: sessionsMouse
-
-        anchors.fill: parent
-
-        hoverEnabled: true
-
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
-
-        onClicked: function (mouse) {
-
-            // ====================================================
-            // LEFT CLICK
-            // ====================================================
-
-            if (mouse.button === Qt.LeftButton) {
-
-                /*
-                 * IMPORTANT:
-                 *
-                 * Do NOT change MessagingW.visible/menuOpen
-                 * directly while this MouseArea is still handling
-                 * the click.
-                 *
-                 * The Quickshell/Qt crash trace shows:
-                 *
-                 * QQuickMouseArea::clicked
-                 * -> ProxyWindowBase::setVisibleDirect
-                 * -> createWindow
-                 * -> QQuickItem::setParentItem
-                 * -> QQuickMouseArea::itemChange
-                 * -> isUnderMouse
-                 * -> SIGSEGV
-                 *
-                 * Qt.callLater() lets this mouse event finish
-                 * before Quickshell creates/destroys the
-                 * MessagingW PanelWindow.
-                 */
-
-                Qt.callLater(function () {
-                    if (!sessionsDock.messagingWindow)
-                        return;
-
-                    sessionsDock.messagingWindow.menuOpen = !sessionsDock.messagingWindow.menuOpen;
-                });
-            }
-
-            // ====================================================
-            // RIGHT CLICK
-            // ====================================================
-
-            if (mouse.button === Qt.RightButton) {
-                // Right-click function
-            }
-        }
+    ColorOverlay {
+        anchors.fill: sessionsIcon
+        source: sessionsIcon
+        color: Colors.magenta
+        visible: sessionsDock.open
     }
 
-    // ============================================================
-    // SOFT GLOW
-    // ============================================================
+    onLeftClicked: {
+        // Do not change MessagingW.menuOpen while DockButton's internal
+        // MouseArea is still delivering the click. Finish the event first.
+        Qt.callLater(function () {
+            if (!sessionsDock.messagingWindow)
+                return;
 
-    RectangularShadow {
-        id: sessionsDockSoftGlow
-
-        anchors.fill: parent
-
-        spread: 3
-
-        z: -1
-
-        opacity: sessionsMouse.pressed ? 0.6 : sessionsMouse.containsMouse ? 0.5 : 0.4
-
-        color: sessionsDock.menuOpen ? Colors.magenta : Colors.omnitrix
-    }
-
-    // ============================================================
-    // WIDE GLOW
-    // ============================================================
-
-    RectangularShadow {
-        id: sessionsDockWideGlow
-
-        anchors.fill: parent
-
-        spread: 10
-
-        z: 1
-
-        opacity: sessionsMouse.pressed ? 0.11 : sessionsMouse.containsMouse ? 0.10 : 0.07
-
-        color: sessionsDock.menuOpen ? Colors.magenta : Colors.omnitrix
+            sessionsDock.messagingWindow.menuOpen =
+                !sessionsDock.messagingWindow.menuOpen;
+        });
     }
 }

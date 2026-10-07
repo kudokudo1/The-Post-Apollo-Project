@@ -6,7 +6,7 @@ import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 import Quickshell.Services.Pipewire
 
-Rectangle {
+DockButton {
     id: volumebarDock
 
     property int contentEdgePadding: 2
@@ -17,7 +17,24 @@ Rectangle {
     // existing typography while guaranteeing a small edge buffer.
     implicitWidth: Math.max(130, Math.ceil(root.implicitWidth) + (contentEdgePadding * 2))
 
-    color: Colors.black
+    contentGlowEnabled: false
+
+    normalDockGlowColor:
+        !root.ready
+        ? Colors.blue
+        : root.muted
+        ? Colors.yellow
+        : root.glowColor
+    hoverDockGlowColor: normalDockGlowColor
+    pressedDockGlowColor: normalDockGlowColor
+
+    softGlowIdleOpacity: 0.40
+    softGlowHoverOpacity: 0.50
+    softGlowPressedOpacity: 0.60
+
+    wideGlowIdleOpacity: 0.07
+    wideGlowHoverOpacity: 0.09
+    wideGlowPressedOpacity: 0.12
 
     RowLayout {
         id: root
@@ -156,7 +173,7 @@ Rectangle {
 
                 z: 2
 
-                opacity: volumebarDockMouse.pressed ? 1.0 : volumebarDockMouse.containsMouse ? 0.8 : 0.6
+                opacity: volumebarDock.pressed ? 1.0 : volumebarDock.hovered ? 0.8 : 0.6
 
                 color: !root.ready ? Colors.blue : root.muted ? Colors.yellow : root.vol <= 15 ? Colors.cyan : root.volumeColor
 
@@ -212,7 +229,7 @@ Rectangle {
 
                 z: 2
 
-                opacity: volumebarDockMouse.pressed ? 1.0 : volumebarDockMouse.containsMouse ? 0.8 : 0.6
+                opacity: volumebarDock.pressed ? 1.0 : volumebarDock.hovered ? 0.8 : 0.6
 
                 color: !root.ready ? Colors.blue : root.muted ? Colors.yellow : root.vol <= 15 ? Colors.cyan : root.volumeColor
 
@@ -225,60 +242,20 @@ Rectangle {
         objects: [root.sink]
     }
 
-    MouseArea {
-        id: volumebarDockMouse
-
-        anchors.fill: parent
-
-        hoverEnabled: true
-
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
-
-        onClicked: function (mouse) {
-            if (mouse.button === Qt.LeftButton) {
-                // Left-click function
-            }
-
-            if (mouse.button === Qt.RightButton) {
-                if (root.ready)
-                    root.sink.audio.muted = !root.sink.audio.muted;
-            }
-        }
-
-        onWheel: function (wheel) {
-            if (!root.ready)
-                return;
-
-            if (wheel.angleDelta.y > 0)
-                root.sink.audio.volume = root.sink.audio.volume + 0.05;
-            else if (wheel.angleDelta.y < 0)
-                root.sink.audio.volume = Math.max(root.sink.audio.volume - 0.05, 0.0);
-        }
+    onRightClicked: {
+        if (root.ready)
+            root.sink.audio.muted = !root.sink.audio.muted;
     }
 
-    RectangularShadow {
-        id: volumebarDockSoftGlow
+    onWheel: function(wheelEvent) {
+        if (!root.ready)
+            return;
 
-        anchors.fill: parent
-
-        spread: 3
-        z: -1
-
-        opacity: volumebarDockMouse.pressed ? 0.6 : volumebarDockMouse.containsMouse ? 0.5 : 0.4
-
-        color: !root.ready ? Colors.blue : root.muted ? Colors.yellow : root.glowColor
+        if (wheelEvent.angleDelta.y > 0)
+            root.sink.audio.volume = root.sink.audio.volume + 0.05;
+        else if (wheelEvent.angleDelta.y < 0)
+            root.sink.audio.volume =
+                Math.max(root.sink.audio.volume - 0.05, 0.0);
     }
 
-    RectangularShadow {
-        id: volumebarDockWideGlow
-
-        anchors.fill: parent
-
-        spread: 10
-        z: 1
-
-        opacity: volumebarDockMouse.pressed ? 0.12 : volumebarDockMouse.containsMouse ? 0.09 : 0.07
-
-        color: !root.ready ? Colors.blue : root.muted ? Colors.yellow : root.glowColor
-    }
 }

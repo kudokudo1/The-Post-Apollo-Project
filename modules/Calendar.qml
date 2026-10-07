@@ -1,99 +1,50 @@
 import QtQuick
 import Quickshell
 import "../components"
-import QtQuick.Effects
-import Qt5Compat.GraphicalEffects
 
-Rectangle {
+DockButton {
     id: calendarDock
 
     implicitHeight: 50
     implicitWidth: 113
     radius: 7
-    color: Colors.black
 
-    Item {
-        id: calendarTextGlowContainer
+    normalForegroundColor: Colors.white
+    hoverForegroundColor: Colors.cyan
+    pressedForegroundColor: Colors.cyan
 
-        anchors.fill: parent
+    normalContentGlowColor: Colors.cyan
+    hoverContentGlowColor: Colors.cyan
+    pressedContentGlowColor: Colors.cyan
 
-        NotoText {
-            id: calendarText
+    normalDockGlowColor: Colors.cyan
+    hoverDockGlowColor: Colors.cyan
+    pressedDockGlowColor: Colors.cyan
 
-            anchors.centerIn: parent
+    contentGlowIdleOpacity: 0.60
+    contentGlowHoverOpacity: 0.80
+    contentGlowPressedOpacity: 1.0
+    contentGlowHoverRadius: 14
+    contentGlowPressedRadius: 14
+    contentGlowHoverSamples: 15
+    contentGlowPressedSamples: 15
 
-            text: " ⌯⌲ 🗓 ⋆˙⟡ "
+    softGlowIdleOpacity: 0.40
+    softGlowHoverOpacity: 0.50
+    softGlowPressedOpacity: 0.60
 
-            font.pixelSize: 20
+    wideGlowIdleOpacity: 0.07
+    wideGlowHoverOpacity: 0.09
+    wideGlowPressedOpacity: 0.12
 
-            color: calendarMouse.pressed ? Colors.cyan : calendarMouse.containsMouse ? Colors.cyan : Colors.white
-        }
+    contentGlowSource: calendarText
 
-        DropShadow {
-            id: calendarTextGlow
+    NotoText {
+        id: calendarText
+        anchors.centerIn: parent
 
-            anchors.fill: calendarText
-            source: calendarText
-
-            horizontalOffset: 0
-            verticalOffset: 0
-
-            radius: 14
-            samples: 15
-
-            z: 2
-
-            opacity: calendarMouse.pressed ? 1.0 : calendarMouse.containsMouse ? 0.8 : 0.6
-
-            color: calendarMouse.pressed ? Colors.cyan : calendarMouse.containsMouse ? Colors.cyan : Colors.cyan
-
-            transparentBorder: true
-        }
-    }
-
-    MouseArea {
-        id: calendarMouse
-
-        anchors.fill: parent
-
-        hoverEnabled: true
-
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
-
-        onClicked: function (mouse) {
-            if (mouse.button === Qt.LeftButton) {
-                // Left-click function
-            }
-
-            if (mouse.button === Qt.RightButton) {
-                // Right-click function
-            }
-        }
-    }
-
-    RectangularShadow {
-        id: calendarDockSoftGlow
-
-        anchors.fill: parent
-
-        spread: 3
-        z: -1
-
-        opacity: calendarMouse.pressed ? 0.6 : calendarMouse.containsMouse ? 0.5 : 0.4
-
-        color: calendarMouse.pressed ? Colors.cyan : calendarMouse.containsMouse ? Colors.cyan : Colors.cyan
-    }
-
-    RectangularShadow {
-        id: calendarDockWideGlow
-
-        anchors.fill: parent
-
-        spread: 10
-        z: 1
-
-        opacity: calendarMouse.pressed ? 0.12 : calendarMouse.containsMouse ? 0.09 : 0.07
-
-        color: calendarMouse.pressed ? Colors.cyan : calendarMouse.containsMouse ? Colors.cyan : Colors.cyan
+        text: " ⌯⌲ 🗓 ⋆˙⟡ "
+        font.pixelSize: 20
+        color: calendarDock.foregroundColor
     }
 }

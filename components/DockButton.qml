@@ -42,8 +42,15 @@ Rectangle {
 
     property real contentGlowIdleRadius: 14
     property real contentGlowActiveRadius: 18
+    property real contentGlowHoverRadius: contentGlowActiveRadius
+    property real contentGlowPressedRadius: contentGlowActiveRadius
+    property real contentGlowOpenRadius: contentGlowActiveRadius
+
     property int contentGlowIdleSamples: 15
     property int contentGlowActiveSamples: 21
+    property int contentGlowHoverSamples: contentGlowActiveSamples
+    property int contentGlowPressedSamples: contentGlowActiveSamples
+    property int contentGlowOpenSamples: contentGlowActiveSamples
 
     // Git-derived tight rear halo.
     property real softGlowIdleOpacity: 0.32
@@ -130,6 +137,7 @@ Rectangle {
     signal rightClicked(var mouseEvent)
     signal hoverEntered()
     signal hoverExited()
+    signal wheel(var wheelEvent)
 
     // Keep artwork and its content glow on the same local stacking plane.
     // This matches the original Git button: the root-level wide wash (z: 1)
@@ -164,12 +172,20 @@ Rectangle {
             horizontalOffset: 0
             verticalOffset: 0
 
-            radius: dockButton.energized
-                    ? dockButton.contentGlowActiveRadius
+            radius: dockButton.open
+                    ? dockButton.contentGlowOpenRadius
+                    : dockButton.pressed
+                    ? dockButton.contentGlowPressedRadius
+                    : dockButton.hovered
+                    ? dockButton.contentGlowHoverRadius
                     : dockButton.contentGlowIdleRadius
 
-            samples: dockButton.energized
-                     ? dockButton.contentGlowActiveSamples
+            samples: dockButton.open
+                     ? dockButton.contentGlowOpenSamples
+                     : dockButton.pressed
+                     ? dockButton.contentGlowPressedSamples
+                     : dockButton.hovered
+                     ? dockButton.contentGlowHoverSamples
                      : dockButton.contentGlowIdleSamples
 
             z: 2
@@ -206,6 +222,10 @@ Rectangle {
                 dockButton.leftClicked(mouseEvent);
             else if (mouseEvent.button === Qt.RightButton)
                 dockButton.rightClicked(mouseEvent);
+        }
+
+        onWheel: function(wheelEvent) {
+            dockButton.wheel(wheelEvent);
         }
     }
 

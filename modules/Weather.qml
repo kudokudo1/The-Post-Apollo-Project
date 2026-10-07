@@ -1,110 +1,62 @@
 import QtQuick
 import Quickshell
 import "../components"
-import QtQuick.Effects
-import Qt5Compat.GraphicalEffects
 
-Rectangle {
+DockButton {
     id: weatherDock
+
     property var weatherStationWindow: null
-    readonly property bool menuOpen: weatherStationWindow && weatherStationWindow.menuOpen
+    readonly property bool menuOpen:
+        weatherStationWindow && weatherStationWindow.menuOpen
 
     implicitHeight: 50
     implicitWidth: 90
 
-    color: weatherDock.menuOpen ? Colors.yellow : Colors.black
-
     signal weatherClicked
 
-    Item {
-        id: weatherTextGlowContainer
+    open: menuOpen
 
-        anchors.fill: parent
+    normalForegroundColor: Colors.orange
+    hoverForegroundColor: Colors.orange
+    pressedForegroundColor: Colors.orange
 
-        Text {
-            id: weatherText
+    normalContentGlowColor: Colors.orange
+    hoverContentGlowColor: Colors.orange
+    pressedContentGlowColor: Colors.orange
 
-            anchors.centerIn: parent
+    normalDockGlowColor: Colors.orange
+    hoverDockGlowColor: Colors.orange
+    pressedDockGlowColor: Colors.orange
 
-            // Placeholder for now.
-            // Later this can become:
-            // "☀ 72°"
-            // "☁ 68°"
-            // "🌧 61°"
-            text: "🌡"
+    contentGlowIdleOpacity: 0.60
+    contentGlowHoverOpacity: 0.80
+    contentGlowPressedOpacity: 1.0
+    contentGlowHoverRadius: 14
+    contentGlowPressedRadius: 14
+    contentGlowHoverSamples: 15
+    contentGlowPressedSamples: 15
 
-            font.pixelSize: 20
+    softGlowIdleOpacity: 0.40
+    softGlowHoverOpacity: 0.50
+    softGlowPressedOpacity: 0.60
 
-            color: weatherDock.menuOpen ? Colors.magenta : Colors.orange
-        }
+    wideGlowIdleOpacity: 0.07
+    wideGlowHoverOpacity: 0.09
+    wideGlowPressedOpacity: 0.12
 
-        DropShadow {
-            id: weatherTextGlow
+    contentGlowSource: weatherText
 
-            anchors.fill: weatherText
-            source: weatherText
+    Text {
+        id: weatherText
+        anchors.centerIn: parent
 
-            horizontalOffset: 0
-            verticalOffset: 0
-
-            radius: 14
-            samples: 15
-
-            z: 2
-
-            opacity: weatherMouse.pressed ? 1.0 : weatherMouse.containsMouse ? 0.8 : 0.6
-
-            color: weatherDock.menuOpen ? Colors.magenta : Colors.orange
-
-            transparentBorder: true
-        }
+        text: "🌡"
+        font.pixelSize: 20
+        color: weatherDock.foregroundColor
     }
 
-    MouseArea {
-        id: weatherMouse
-
-        anchors.fill: parent
-
-        hoverEnabled: true
-
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
-
-        onClicked: function (mouse) {
-            if (mouse.button === Qt.LeftButton) {
-                if (weatherDock.weatherStationWindow)
-                    weatherDock.weatherStationWindow.toggle();
-            }
-
-            if (mouse.button === Qt.RightButton) {
-                // Leave unused for now.
-                // We can give this Observatory / alternate behavior later.
-            }
-        }
-    }
-
-    RectangularShadow {
-        id: weatherDockSoftGlow
-
-        anchors.fill: parent
-
-        spread: 3
-        z: -1
-
-        opacity: weatherMouse.pressed ? 0.6 : weatherMouse.containsMouse ? 0.5 : 0.4
-
-        color: weatherDock.menuOpen ? Colors.magenta : Colors.orange
-    }
-
-    RectangularShadow {
-        id: weatherDockWideGlow
-
-        anchors.fill: parent
-
-        spread: 10
-        z: 1
-
-        opacity: weatherMouse.pressed ? 0.12 : weatherMouse.containsMouse ? 0.09 : 0.07
-
-        color: weatherDock.menuOpen ? Colors.magenta : Colors.orange
+    onLeftClicked: {
+        if (weatherStationWindow)
+            weatherStationWindow.toggle();
     }
 }

@@ -93,7 +93,7 @@ PanelWindow {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
 
-        Rectangle {
+        DockButton {
             id: powerButton
 
             radius: width / 100
@@ -104,82 +104,79 @@ PanelWindow {
             x: 155
             y: 230
 
-            color: menuOpen || confirmShutdown || confirmReboot ? Colors.yellow : Colors.black
+            acceptedButtons: Qt.LeftButton
+            open: menuOpen || confirmShutdown || confirmReboot
+
+            normalForegroundColor: Colors.white
+            hoverForegroundColor: Colors.orange
+            pressedForegroundColor: Colors.orange
+
+            normalContentGlowColor: Colors.cyan
+            hoverContentGlowColor: Colors.orange
+            pressedContentGlowColor: Colors.orange
+
+            normalDockGlowColor: Colors.cyan
+            hoverDockGlowColor: Colors.orange
+            pressedDockGlowColor: Colors.orange
+
+            contentGlowIdleOpacity: 0.30
+            contentGlowHoverOpacity: 0.50
+            contentGlowPressedOpacity: 0.70
+            contentGlowIdleRadius: 19
+            contentGlowHoverRadius: 19
+            contentGlowPressedRadius: 19
+            contentGlowIdleSamples: 17
+            contentGlowHoverSamples: 17
+            contentGlowPressedSamples: 17
+
+            softGlowSpread: 1
+            softGlowIdleOpacity: 0.50
+            softGlowHoverOpacity: 0.70
+            softGlowPressedOpacity: 0.90
+
+            // The original closed Power button had no wide front wash.
+            // Keep that base behavior; OPEN uses the shared Git-derived 0.22.
+            wideGlowIdleOpacity: 0.0
+            wideGlowHoverOpacity: 0.0
+            wideGlowPressedOpacity: 0.0
+
+            contentGlowSource: powerGlyph
 
             Text {
+                id: powerGlyph
+
                 anchors.centerIn: parent
                 text: "⏻"
                 font.pixelSize: 35
-
-                color: menuOpen || confirmShutdown || confirmReboot ? Colors.magenta : powerMouse.pressed ? Colors.orange : powerMouse.containsMouse ? Colors.orange : Colors.white
+                color: powerButton.foregroundColor
             }
 
-            MouseArea {
-                id: powerMouse
+            onHoverEntered: {
+                console.log("Mouse entered button");
+            }
 
-                width: parent.width
-                height: parent.height
+            onHoverExited: {
+                console.log("Mouse left button");
+            }
 
-                hoverEnabled: true
-
-                onEntered: {
-                    console.log("Mouse entered button");
-                }
-
-                onExited: {
-                    console.log("Mouse left button");
-                }
-
-                onPressed: {
+            onPressedChanged: {
+                if (pressed)
                     pressCount++;
-                }
-
-                onClicked: {
-                    clickCount++;
-                    menuOpen = !menuOpen;
-                    confirmShutdown = false;
-                    confirmReboot = false;
-                    if (menuOpen) {
-                        selectedIndex = 1;
-                        powerMenu.forceActiveFocus();
-                    }
-
-                    console.log("Menu open:", menuOpen);
-                }
             }
-        }
 
-        DropShadow {
-            source: powerButton
-            anchors.centerIn: powerButton
+            onLeftClicked: {
+                clickCount++;
+                menuOpen = !menuOpen;
+                confirmShutdown = false;
+                confirmReboot = false;
 
-            width: powerButton.width - 0
-            height: powerButton.height - 0
+                if (menuOpen) {
+                    selectedIndex = 1;
+                    powerMenu.forceActiveFocus();
+                }
 
-            horizontalOffset: 0
-            verticalOffset: 0
-            radius: 19
-            samples: 17
-            z: 1
-
-            opacity: powerMouse.pressed ? 0.7 : powerMouse.containsMouse ? 0.5 : 0.3
-
-            color: menuOpen || confirmShutdown || confirmReboot ? Colors.magenta : powerMouse.pressed ? Colors.orange : powerMouse.containsMouse ? Colors.orange : Colors.cyan
-            transparentBorder: true
-        }
-
-        RectangularShadow {
-            anchors.fill: powerButton
-
-            width: powerButton.width
-            height: powerButton.height
-
-            spread: 1
-            z: -1
-
-            opacity: powerMouse.pressed ? 0.9 : powerMouse.containsMouse ? 0.7 : 0.5
-
-            color: menuOpen || confirmShutdown || confirmReboot ? Colors.magenta : powerMouse.pressed ? Colors.orange : powerMouse.containsMouse ? Colors.orange : Colors.cyan
+                console.log("Menu open:", menuOpen);
+            }
         }
     }
 

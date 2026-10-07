@@ -7,12 +7,25 @@ import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 import Quickshell.Networking
 
-Rectangle {
+DockButton {
     id: networkDock
 
     implicitHeight: 50
     implicitWidth: root.implicitWidth + 8
-    color: Colors.black
+
+    contentGlowEnabled: false
+
+    normalDockGlowColor: root.networkGlowColor
+    hoverDockGlowColor: root.networkGlowColor
+    pressedDockGlowColor: root.networkGlowColor
+
+    softGlowIdleOpacity: 0.40
+    softGlowHoverOpacity: 0.50
+    softGlowPressedOpacity: 0.60
+
+    wideGlowIdleOpacity: 0.07
+    wideGlowHoverOpacity: 0.09
+    wideGlowPressedOpacity: 0.12
 
     RowLayout {
         id: root
@@ -575,7 +588,7 @@ Rectangle {
 
                 z: 2
 
-                opacity: networkDockMouse.pressed ? 0.6 : networkDockMouse.containsMouse ? 0.8 : 1.0
+                opacity: networkDock.pressed ? 0.6 : networkDock.hovered ? 0.8 : 1.0
 
                 color: root.networkGlowColor
 
@@ -718,51 +731,12 @@ Rectangle {
     // MOUSE
     // =============================================
 
-    MouseArea {
-        id: networkDockMouse
-
-        anchors.fill: parent
-
-        hoverEnabled: true
-
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
-
-        onClicked: function (mouse) {
-            if (mouse.button === Qt.LeftButton) {
-                Quickshell.execDetached(["nm-connection-editor"]);
-            }
-
-            if (mouse.button === Qt.RightButton) {
-                root.ethernetMode = !root.ethernetMode;
-            }
-        }
+    onLeftClicked: {
+        Quickshell.execDetached(["nm-connection-editor"]);
     }
 
-    // =============================================
-    // SHADOWS
-    // =============================================
-
-    RectangularShadow {
-        anchors.fill: parent
-
-        spread: 3
-
-        z: -1
-
-        opacity: networkDockMouse.pressed ? 0.6 : networkDockMouse.containsMouse ? 0.5 : 0.4
-
-        color: root.networkGlowColor
+    onRightClicked: {
+        root.ethernetMode = !root.ethernetMode;
     }
 
-    RectangularShadow {
-        anchors.fill: parent
-
-        spread: 10
-
-        z: 1
-
-        opacity: networkDockMouse.pressed ? 0.12 : networkDockMouse.containsMouse ? 0.09 : 0.07
-
-        color: root.networkGlowColor
-    }
 }

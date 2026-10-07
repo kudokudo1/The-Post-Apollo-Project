@@ -1,112 +1,67 @@
 import QtQuick
 import Quickshell
 import "../components"
-import QtQuick.Effects
-import Qt5Compat.GraphicalEffects
 
-Item {
+DockButton {
     id: appmenuRoot
 
-    implicitWidth: appmenuButton.implicitWidth
-    implicitHeight: appmenuButton.implicitHeight
+    implicitWidth: 65
+    implicitHeight: 50
 
     property var appControlWindow
-    readonly property bool menuOpen: appControlWindow && appControlWindow.menuOpen
+    readonly property bool menuOpen:
+        appControlWindow && appControlWindow.menuOpen
 
-    Rectangle {
-        id: appmenuButton
+    open: menuOpen
 
-        implicitWidth: 65
-        implicitHeight: 50
+    normalForegroundColor: Colors.white
+    hoverForegroundColor: Colors.white
+    pressedForegroundColor: Colors.white
 
-        color: appmenuRoot.menuOpen ? Colors.yellow : Colors.black
+    normalContentGlowColor: Colors.cyan
+    hoverContentGlowColor: Colors.orange
+    pressedContentGlowColor: Colors.magenta
 
-        Item {
-            id: appmenuIconContainer
+    normalDockGlowColor: Colors.cyan
+    hoverDockGlowColor: Colors.orange
+    pressedDockGlowColor: Colors.magenta
 
-            anchors.fill: parent
+    contentGlowIdleOpacity: 0.60
+    contentGlowHoverOpacity: 0.80
+    contentGlowPressedOpacity: 1.0
+    contentGlowHoverRadius: 14
+    contentGlowPressedRadius: 14
+    contentGlowHoverSamples: 15
+    contentGlowPressedSamples: 15
 
-            GohuText {
-                id: appmenuIcon
+    softGlowIdleOpacity: 0.40
+    softGlowHoverOpacity: 0.50
+    softGlowPressedOpacity: 0.60
 
-                anchors.centerIn: parent
+    wideGlowIdleOpacity: 0.07
+    wideGlowHoverOpacity: 0.09
+    wideGlowPressedOpacity: 0.12
 
-                text: "-⋆♱⋆-"
+    contentGlowSource: appmenuIcon
 
-                font.pixelSize: 19
-                font.weight: 700
+    GohuText {
+        id: appmenuIcon
+        anchors.centerIn: parent
 
-                color: appmenuRoot.menuOpen ? Colors.magenta : Colors.white
-            }
-
-            DropShadow {
-                id: appmenuIconGlow
-
-                anchors.fill: appmenuIcon
-                source: appmenuIcon
-
-                verticalOffset: 0
-
-                radius: 14
-                samples: 15
-
-                z: 2
-
-                opacity: appmenuMouse.pressed ? 1.0 : appmenuMouse.containsMouse ? 0.8 : 0.6
-
-                color: appmenuRoot.menuOpen ? Colors.magenta : appmenuMouse.pressed ? Colors.magenta : appmenuMouse.containsMouse ? Colors.orange : Colors.cyan
-
-                transparentBorder: true
-            }
-        }
+        text: "-⋆♱⋆-"
+        font.pixelSize: 19
+        font.weight: 700
+        color: appmenuRoot.foregroundColor
     }
 
-    MouseArea {
-        id: appmenuMouse
+    onLeftClicked: {
+        console.log("applauncherbutton", "left clicked");
 
-        anchors.fill: appmenuButton
-
-        hoverEnabled: true
-
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
-
-        onClicked: function (mouse) {
-            if (mouse.button === Qt.LeftButton) {
-                console.log("applauncherbutton", "left clicked");
-                if (appControlWindow) {
-                    appControlWindow.menuOpen = !appControlWindow.menuOpen;
-                }
-            }
-
-            if (mouse.button === Qt.RightButton) {
-                console.log("applauncherbutton", "right clicked");
-            }
-        }
+        if (appControlWindow)
+            appControlWindow.menuOpen = !appControlWindow.menuOpen;
     }
 
-    RectangularShadow {
-        id: appmenuDockSoftGlow
-
-        anchors.fill: appmenuButton
-
-        spread: 3
-        z: -1
-
-        opacity: appmenuMouse.pressed ? 0.6 : appmenuMouse.containsMouse ? 0.5 : 0.4
-
-        color: appmenuRoot.menuOpen ? Colors.magenta : appmenuMouse.pressed ? Colors.magenta : appmenuMouse.containsMouse ? Colors.orange : Colors.cyan
-    }
-
-    RectangularShadow {
-        id: appmenuDockWideGlow
-
-        anchors.fill: appmenuButton
-
-        spread: 10
-        z: 1
-
-        opacity: appmenuMouse.pressed ? 0.12 : appmenuMouse.containsMouse ? 0.09 : 0.07
-
-        color: appmenuRoot.menuOpen ? Colors.magenta : appmenuMouse.pressed ? Colors.magenta : appmenuMouse.containsMouse ? Colors.orange : Colors.cyan
+    onRightClicked: {
+        console.log("applauncherbutton", "right clicked");
     }
 }

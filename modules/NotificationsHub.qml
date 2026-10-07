@@ -3,10 +3,8 @@ import Quickshell
 import Quickshell.Wayland
 import qs.components
 import qs.services.notifications
-import QtQuick.Effects
-import Qt5Compat.GraphicalEffects
 
-Rectangle {
+DockButton {
     id: dock
 
     signal toggleRequested
@@ -16,99 +14,48 @@ Rectangle {
     implicitHeight: 50
     implicitWidth: 130
 
-    color: dock.menuOpen ? Colors.yellow : Colors.black
+    open: menuOpen
 
-    // ===== CONTENT ==============================================
+    normalForegroundColor: Colors.cyan
+    hoverForegroundColor: Colors.cyan
+    pressedForegroundColor: Colors.white
 
-    Item {
-        id: textglowContainer
+    normalContentGlowColor: Colors.cyan
+    hoverContentGlowColor: Colors.cyan
+    pressedContentGlowColor: Colors.cyan
 
-        anchors.fill: parent
+    normalDockGlowColor: Colors.cyan
+    hoverDockGlowColor: Colors.cyan
+    pressedDockGlowColor: Colors.cyan
 
-        GohuText {
-            id: text
+    contentGlowIdleOpacity: 0.60
+    contentGlowHoverOpacity: 0.80
+    contentGlowPressedOpacity: 1.0
+    contentGlowHoverRadius: 14
+    contentGlowPressedRadius: 14
+    contentGlowHoverSamples: 15
+    contentGlowPressedSamples: 15
 
-            anchors.centerIn: parent
+    softGlowIdleOpacity: 0.40
+    softGlowHoverOpacity: 0.50
+    softGlowPressedOpacity: 0.60
 
-            text: "-⋆🗒⋆-"
+    wideGlowIdleOpacity: 0.07
+    wideGlowHoverOpacity: 0.09
+    wideGlowPressedOpacity: 0.12
 
-            font.pixelSize: 25
+    contentGlowSource: text
 
-            color: dock.menuOpen ? Colors.orange : mouse.pressed ? Colors.white : Colors.cyan
-        }
+    GohuText {
+        id: text
+        anchors.centerIn: parent
 
-        DropShadow {
-            id: textGlow
-
-            anchors.fill: text
-
-            source: text
-
-            horizontalOffset: 0
-            verticalOffset: 0
-
-            radius: 14
-            samples: 15
-
-            z: 2
-
-            opacity: dock.menuOpen ? 1.0 : mouse.pressed ? 1.0 : mouse.containsMouse ? 0.8 : 0.6
-
-            color: dock.menuOpen ? Colors.magenta : Colors.cyan
-
-            transparentBorder: true
-        }
+        text: "-⋆🗒⋆-"
+        font.pixelSize: 25
+        color: dock.foregroundColor
     }
 
-    // ===== INPUT ================================================
-
-    MouseArea {
-        id: mouse
-
-        anchors.fill: parent
-
-        hoverEnabled: true
-
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
-
-        onClicked: function (mouse) {
-            if (mouse.button === Qt.LeftButton) {
-                dock.toggleRequested();
-            }
-
-            if (mouse.button === Qt.RightButton) {
-                // Reserved
-            }
-        }
-    }
-
-    // ===== EFFECTS ==============================================
-
-    RectangularShadow {
-        id: dockSoftGlow
-
-        anchors.fill: parent
-
-        spread: 3
-
-        z: -1
-
-        opacity: dock.menuOpen ? 0.75 : mouse.pressed ? 0.6 : mouse.containsMouse ? 0.5 : 0.4
-
-        color: dock.menuOpen ? Colors.magenta : Colors.cyan
-    }
-
-    RectangularShadow {
-        id: dockWideGlow
-
-        anchors.fill: parent
-
-        spread: 10
-
-        z: 1
-
-        opacity: dock.menuOpen ? 0.16 : mouse.pressed ? 0.12 : mouse.containsMouse ? 0.09 : 0.07
-
-        color: dock.menuOpen ? Colors.magenta : Colors.cyan
+    onLeftClicked: {
+        dock.toggleRequested();
     }
 }

@@ -19,6 +19,8 @@ Item {
     property string topicMode: "add"
     property string descriptionMode: "keep"
     property string setNameDraft: ""
+    property string armedSetAction: ""
+    property string armedSetName: ""
 
     function currentDraft() {
         return {
@@ -33,6 +35,71 @@ Item {
 
     function markDirty() {
         root.profileService.invalidateReview();
+        root.armedSetAction = "";
+        root.armedSetName = "";
+    }
+
+    function catalogContains(slugValue) {
+        const slug = String(slugValue || "").trim();
+
+        if (!slug)
+            return false;
+
+        for (let i = 0; i < root.gitService.repoCount; ++i) {
+            const row = root.gitService.repoAt(i);
+            if (row && String(row.remoteSlug || "") === slug)
+                return true;
+        }
+
+        return false;
+    }
+
+    function targetMissing(slugValue) {
+        return root.gitService.repoCount > 0
+            && !root.gitService.discoveringRepos
+            && !root.catalogContains(slugValue);
+    }
+
+    function queueMissingCount() {
+        let count = 0;
+        const queue = root.profileStore.queue || [];
+
+        for (let i = 0; i < queue.length; ++i) {
+            if (root.targetMissing(queue[i]))
+                count += 1;
+        }
+
+        return count;
+    }
+
+    function savedSetMissingCount(record) {
+        const targets =
+            record && Array.isArray(record.targets)
+            ? record.targets
+            : [];
+        let count = 0;
+
+        for (let i = 0; i < targets.length; ++i) {
+            if (root.targetMissing(targets[i]))
+                count += 1;
+        }
+
+        return count;
+    }
+
+    function setActionArmed(action, nameValue) {
+        return root.armedSetAction === String(action || "")
+            && root.armedSetName === String(nameValue || "");
+    }
+
+    function armSetAction(action, nameValue) {
+        root.armedSetAction = String(action || "");
+        root.armedSetName = String(nameValue || "");
+    }
+
+    function clearSetArm() {
+        root.armedSetAction = "";
+        root.armedSetName = "";
     }
 
     function loadAccountDraft() {
@@ -338,6 +405,7 @@ Item {
         target: root.profileStore
 
         function onSetLoaded(record) {
+            root.clearSetArm();
             root.visibilityMode = String(record.visibility || "keep");
             root.topicMode = String(record.topicMode || "add");
             root.descriptionMode = String(record.descriptionMode || "keep");
@@ -354,8 +422,8 @@ Item {
         target: root.profileService
 
         function onBatchFinished(success) {
-            if (success)
-                root.gitService.discoverRepos();
+            root.clearSetArm();
+            root.gitService.discoverRepos();
         }
     }
 
@@ -681,9 +749,20 @@ Item {
                                             GohuText {
                                                 width: parent.width - 42
                                                 anchors.verticalCenter: parent.verticalCenter
-                                                text: String(modelData || "")
+                                                text:
+                                                    String(modelData || "")
+                                                    + (
+                                                        root.targetMissing(
+                                                            modelData
+                                                        )
+                                                        ? " // STALE"
+                                                        : ""
+                                                      )
                                                 font.pixelSize: 7
-                                                color: Colors.white
+                                                color:
+                                                    root.targetMissing(modelData)
+                                                    ? Colors.red
+                                                    : Colors.white
                                                 elide: Text.ElideRight
                                             }
 
@@ -739,17 +818,56 @@ Item {
                             ManagerButton {
                                 width: 83
                                 height: 28
-                                label: "SAVE SET"
+                                label: {
+                                    const name =
+                                        setNameInput.text.trim();
+                                    const exists =
+                                        root.profileStore.setIndex(name)
+                                        >= 0;
+
+                                    if (exists
+                                            && root.setActionArmed(
+                                                "overwrite",
+                                                name
+                                            ))
+                                        return "CONFIRM";
+
+                                    return exists
+                                        ? "OVERWRITE"
+                                        : "SAVE SET";
+                                }
                                 primaryBlue: true
                                 enabledAction:
                                     root.profileStore.queueCount > 0
                                     && setNameInput.text.trim().length > 0
+                                    && root.queueMissingCount() === 0
 
-                                onTriggered:
+                                onTriggered: {
+                                    const name =
+                                        setNameInput.text.trim();
+                                    const exists =
+                                        root.profileStore.setIndex(name)
+                                        >= 0;
+
+                                    if (exists
+                                            && !root.setActionArmed(
+                                                "overwrite",
+                                                name
+                                            )) {
+                                        root.armSetAction(
+                                            "overwrite",
+                                            name
+                                        );
+                                        return;
+                                    }
+
                                     root.profileStore.saveSet(
-                                        setNameInput.text.trim(),
-                                        root.currentDraft()
-                                    )
+                                        name,
+                                        root.currentDraft(),
+                                        exists
+                                    );
+                                    root.clearSetArm();
+                                }
                             }
                         }
 
@@ -806,8 +924,28 @@ Item {
                                                         ? modelData.targets.length
                                                         : 0
                                                     )
+                                                    + (
+                                                        root.savedSetMissingCount(
+                                                            modelData
+                                                        ) > 0
+                                                        ? (
+                                                            " // "
+                                                            + String(
+                                                                root.savedSetMissingCount(
+                                                                    modelData
+                                                                )
+                                                              )
+                                                            + " STALE"
+                                                          )
+                                                        : ""
+                                                      )
                                                 font.pixelSize: 7
-                                                color: Colors.white
+                                                color:
+                                                    root.savedSetMissingCount(
+                                                        modelData
+                                                    ) > 0
+                                                    ? Colors.red
+                                                    : Colors.white
                                                 elide: Text.ElideRight
                                             }
 
@@ -822,10 +960,41 @@ Item {
                                             ManagerButton {
                                                 width: 40
                                                 height: 24
-                                                label: "×"
+                                                label:
+                                                    root.setActionArmed(
+                                                        "delete",
+                                                        String(
+                                                            modelData.name
+                                                            || ""
+                                                        )
+                                                    )
+                                                    ? "!"
+                                                    : "×"
                                                 dangerAccent: true
-                                                onTriggered:
-                                                    root.profileStore.deleteSet(modelData)
+                                                onTriggered: {
+                                                    const name =
+                                                        String(
+                                                            modelData.name
+                                                            || ""
+                                                        );
+
+                                                    if (!root.setActionArmed(
+                                                            "delete",
+                                                            name
+                                                        )) {
+                                                        root.armSetAction(
+                                                            "delete",
+                                                            name
+                                                        );
+                                                        return;
+                                                    }
+
+                                                    root.profileStore.deleteSet(
+                                                        modelData,
+                                                        true
+                                                    );
+                                                    root.clearSetArm();
+                                                }
                                             }
                                         }
                                     }
@@ -1040,6 +1209,7 @@ Item {
                                 enabledAction:
                                     !root.profileService.busy
                                     && root.profileStore.queueCount > 0
+                                    && root.queueMissingCount() === 0
 
                                 onTriggered:
                                     root.profileService.previewBatch(
@@ -1072,13 +1242,42 @@ Item {
                                 anchors.verticalCenter: parent.verticalCenter
                                 horizontalAlignment: Text.AlignRight
                                 text:
-                                    root.profileService.reviewReady
+                                    root.queueMissingCount() > 0
+                                    ? (
+                                        String(
+                                            root.queueMissingCount()
+                                          )
+                                        + " STALE TARGET"
+                                        + (
+                                            root.queueMissingCount() === 1
+                                            ? ""
+                                            : "S"
+                                          )
+                                        + " // REMOVE OR REFRESH"
+                                      )
+                                    : root.profileService.reviewReady
                                     ? "REVIEWED // ARMED"
-                                    : "REVIEW REQUIRED"
+                                    : (
+                                        String(
+                                            root.profileService
+                                                .batchSuccessCount
+                                          )
+                                        + " OK // "
+                                        + String(
+                                            root.profileService
+                                                .batchFailureCount
+                                          )
+                                        + " FAILED"
+                                      )
                                 font.pixelSize: 8
                                 color:
-                                    root.profileService.reviewReady
+                                    root.queueMissingCount() > 0
+                                    ? Colors.red
+                                    : root.profileService.reviewReady
                                     ? Colors.orange
+                                    : root.profileService
+                                          .batchFailureCount > 0
+                                    ? Colors.red
                                     : Colors.cyan
                             }
                         }

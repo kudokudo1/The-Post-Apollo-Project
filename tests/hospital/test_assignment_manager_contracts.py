@@ -17,11 +17,13 @@ for needle in (
     'function createAssignment(',
     'function updateAssignment(',
     'function activateAssignment(assignmentIdValue)',
+    'function startAllReady()',
     'function setAssignmentStatus(assignmentIdValue, statusValue)',
     '"assignments"',
     '"assignment-create"',
     '"assignment-update"',
     '"assignment-activate"',
+    '"orchestrate-ready"',
     '"assignment-status"',
     '"READ"',
     '"EDIT"',
@@ -52,9 +54,12 @@ for needle in (
     'assignmentService.createAssignment(',
     'assignmentService.updateAssignment(',
     'assignmentService.activateAssignment(',
+    'assignmentService.startAllReady()',
     'assignmentService.setAssignmentStatus(',
     'permissionsInput.text',
     'phaseInput.text',
+    '"START READY"',
+    'assignmentService.orchestrating',
 ):
     assert needle in view, needle
 

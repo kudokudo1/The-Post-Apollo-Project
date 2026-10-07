@@ -88,6 +88,15 @@ Item {
             && !Boolean(row.untracked);
     }
 
+    function partialFileTransferEligible() {
+        const row = root.selectedFile || {};
+
+        return root.baseWholeFileTransferEligible()
+            && Boolean(row.staged)
+            && Boolean(row.unstaged)
+            && !Boolean(row.untracked);
+    }
+
     function untrackedFileTransferEligible() {
         const row = root.selectedFile || {};
 
@@ -99,6 +108,7 @@ Item {
         const wholeFileCandidate =
             root.worktreeFileTransferEligible()
             || root.stagedFileTransferEligible()
+            || root.partialFileTransferEligible()
             || root.untrackedFileTransferEligible();
 
         return wholeFileCandidate;
@@ -159,6 +169,8 @@ Item {
             ? "worktree"
             : root.untrackedFileTransferEligible()
             ? "untracked"
+            : root.partialFileTransferEligible()
+            ? "partial"
             : root.stagedFileTransferEligible()
             ? "staged"
             : "worktree";

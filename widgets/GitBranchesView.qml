@@ -151,6 +151,14 @@ Item {
                 + message;
 
             if (!success) {
+                if (kind === "CREATE") {
+                    root.pendingCreateName = "";
+                    root.pendingCreateAnchor = "";
+                    root.pendingCreateMode = "";
+                    root.pendingFocusBranch = "";
+                    root.pendingFocusSha = "";
+                }
+
                 root.managementArm = "";
                 return;
             }
@@ -195,17 +203,23 @@ Item {
                         root.pendingCreateMode
                     );
 
-                root.pendingFocusBranch = root.pendingCreateName;
-                root.pendingFocusSha = "";
-                root.managementMessage =
-                    linked
-                    ? "OK // CREATED + STACK LINKED"
-                    : "CREATED // STACK LINK REFUSED";
+                if (linked) {
+                    root.pendingFocusBranch = root.pendingCreateName;
+                    root.pendingFocusSha = "";
+                    root.managementMessage =
+                        "OK // CREATED + STACK LINKED";
+                    root.managementMode = "";
+                } else {
+                    root.pendingFocusBranch = "";
+                    root.pendingFocusSha = "";
+                    root.managementMessage =
+                        "CREATED // STACK LINK REFUSED // "
+                        + "BRANCH EXISTS BUT NEEDS STACK REPAIR";
+                }
 
                 root.pendingCreateName = "";
                 root.pendingCreateAnchor = "";
                 root.pendingCreateMode = "";
-                root.managementMode = "";
                 root.managementArm = "";
                 return;
             }
@@ -1782,6 +1796,8 @@ Item {
                     border.color:
                         root.managementMode === "delete"
                         ? Colors.red
+                        : root.managementMode === "new"
+                        ? Colors.green
                         : Colors.magenta
                     clip: true
 
@@ -1803,11 +1819,15 @@ Item {
                                 text:
                                     root.managementMode === "delete"
                                     ? "DELETE // " + root.selectedBranch
+                                    : root.managementMode === "new"
+                                    ? "NEW // " + root.selectedBranch
                                     : "EDIT // " + root.selectedBranch
                                 font.pixelSize: 13
                                 color:
                                     root.managementMode === "delete"
                                     ? Colors.red
+                                    : root.managementMode === "new"
+                                    ? Colors.green
                                     : Colors.magenta
                                 elide: Text.ElideMiddle
                             }
@@ -1826,6 +1846,8 @@ Item {
                             color:
                                 root.managementMode === "delete"
                                 ? Colors.red
+                                : root.managementMode === "new"
+                                ? Colors.green
                                 : Colors.cyan
                             opacity: 0.46
                         }
@@ -1978,6 +2000,148 @@ Item {
                         Column {
                             width: parent.width
                             spacing: 8
+                            visible: root.managementMode === "new"
+
+                            GohuText {
+                                width: parent.width
+                                text:
+                                    "CREATE RELATIVE TO // "
+                                    + root.selectedBranch
+                                font.pixelSize: 10
+                                color: Colors.cyan
+                                elide: Text.ElideMiddle
+                            }
+
+                            Row {
+                                width: parent.width
+                                height: 32
+                                spacing: 6
+
+                                BranchButton {
+                                    width: (parent.width - 6) / 2
+                                    height: 32
+                                    label: "ABOVE"
+                                    selectedAction:
+                                        root.newBranchMode === "ABOVE"
+                                    onTriggered:
+                                        root.newBranchMode = "ABOVE"
+                                }
+
+                                BranchButton {
+                                    width: (parent.width - 6) / 2
+                                    height: 32
+                                    label: "BELOW"
+                                    selectedAction:
+                                        root.newBranchMode === "BELOW"
+                                    enabledAction:
+                                        root.selectedStackParent.length > 0
+                                    onTriggered:
+                                        root.newBranchMode = "BELOW"
+                                }
+                            }
+
+                            BranchEditor {
+                                id: newBranchEditor
+                                width: parent.width
+                                placeholder: "NEW BRANCH NAME"
+                                accent: Colors.green
+                            }
+
+                            Rectangle {
+                                width: parent.width
+                                height: 72
+                                color: Colors.dark
+                                border.width: 1
+                                border.color:
+                                    root.newBranchBlockReason()
+                                    ? Colors.orange
+                                    : Colors.green
+
+                                Column {
+                                    anchors {
+                                        fill: parent
+                                        margins: 7
+                                    }
+                                    spacing: 4
+
+                                    GohuText {
+                                        width: parent.width
+                                        text:
+                                            root.newBranchMode
+                                            + " // "
+                                            + root.newBranchPreview(
+                                                newBranchEditor.text
+                                              )
+                                        font.pixelSize: 10
+                                        color: Colors.green
+                                        elide: Text.ElideMiddle
+                                    }
+
+                                    GohuText {
+                                        width: parent.width
+                                        text:
+                                            root.newBranchBlockReason()
+                                            ? root.newBranchBlockReason()
+                                            : (
+                                                "START // "
+                                                + root.newBranchStartPoint()
+                                              )
+                                        font.pixelSize: 9
+                                        color:
+                                            root.newBranchBlockReason()
+                                            ? Colors.orange
+                                            : Colors.cyan
+                                        elide: Text.ElideMiddle
+                                    }
+
+                                    GohuText {
+                                        width: parent.width
+                                        text:
+                                            root.newBranchMode === "ABOVE"
+                                            ? "NEW BECOMES A CHILD OF THE SELECTED BRANCH"
+                                            : "NEW IS INSERTED BETWEEN THE SELECTED BRANCH AND ITS PARENT"
+                                        font.pixelSize: 8
+                                        color: Colors.white
+                                        opacity: 0.58
+                                        elide: Text.ElideRight
+                                    }
+                                }
+                            }
+
+                            BranchButton {
+                                width: parent.width
+                                height: 36
+                                label:
+                                    branchWorkspaceService
+                                    && branchWorkspaceService.actionBusy
+                                    ? "CREATING"
+                                    : "CREATE BRANCH"
+                                enabledAction:
+                                    branchWorkspaceService
+                                    && !branchWorkspaceService.actionBusy
+                                    && !branchWorkspaceService.refreshing
+                                    && root.newBranchBlockReason().length === 0
+                                    && String(
+                                        newBranchEditor.text || ""
+                                      ).trim().length > 0
+                                onTriggered: root.applyCreateBranch()
+                            }
+
+                            GohuText {
+                                width: parent.width
+                                text:
+                                    "CREATE ONLY // LIVE CHECKOUT DOES NOT SWITCH. "
+                                    + "The new branch is selected here after Git confirms creation."
+                                font.pixelSize: 9
+                                color: Colors.white
+                                opacity: 0.62
+                                wrapMode: Text.WordWrap
+                            }
+                        }
+
+                        Column {
+                            width: parent.width
+                            spacing: 8
                             visible: root.managementMode === "delete"
 
                             FactRow {
@@ -2095,6 +2259,8 @@ Item {
                                     || (
                                         root.managementMode === "delete"
                                         ? "DELETE WAITS FOR EXPLICIT CONFIRMATION"
+                                        : root.managementMode === "new"
+                                        ? "CREATE DOES NOT SWITCH THE LIVE CHECKOUT"
                                         : "EDIT CHANGES ONLY THE SELECTED LOCAL BRANCH"
                                        )
                                 font.pixelSize: 9

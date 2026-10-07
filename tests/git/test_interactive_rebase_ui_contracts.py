@@ -30,6 +30,16 @@ require(
     "required property var rebaseService",
     "rebase UI must use the standalone rebase engine",
 )
+require(
+    VIEW,
+    "component EditorBox: Rectangle",
+    "standalone rebase view must own the EditorBox type it instantiates",
+)
+require(
+    VIEW,
+    "property var keyboardOwner: null",
+    "rebase EditorBox must preserve HISTORY keyboard ownership",
+)
 for action in ("pick", "reword", "squash", "fixup", "drop"):
     require(
         VIEW,

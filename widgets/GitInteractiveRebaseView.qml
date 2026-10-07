@@ -58,6 +58,73 @@ Rectangle {
             selectedIndex = target;
     }
 
+    component EditorBox: Rectangle {
+        id: editorBox
+
+        property alias text: editor.text
+        property string placeholder: ""
+        property color accent: Colors.cyan
+        property var keyboardOwner: null
+        property int editorFontSize: 11
+        property int placeholderFontSize: 10
+
+        height: 30
+        clip: true
+        color: Colors.black
+        border.width: 1
+        border.color:
+            editor.activeFocus
+            ? Colors.orange
+            : accent
+
+        TextInput {
+            id: editor
+
+            anchors {
+                fill: parent
+                leftMargin: 8
+                rightMargin: 8
+            }
+
+            verticalAlignment: Text.AlignVCenter
+            color: Colors.white
+            selectionColor: Colors.magenta
+            selectedTextColor: Colors.black
+            font.family: "GohuFont 11 Nerd Font Mono"
+            font.pixelSize: editorBox.editorFontSize
+            clip: true
+
+            onActiveFocusChanged: {
+                if (!editorBox.keyboardOwner)
+                    return;
+
+                if (activeFocus)
+                    editorBox.keyboardOwner.activeTextEditor = editor;
+                else if (
+                    editorBox.keyboardOwner.activeTextEditor === editor
+                )
+                    editorBox.keyboardOwner.activeTextEditor = null;
+            }
+        }
+
+        GohuText {
+            anchors {
+                left: parent.left
+                right: parent.right
+                verticalCenter: parent.verticalCenter
+                leftMargin: 8
+                rightMargin: 8
+            }
+
+            visible: editor.text.length === 0
+            text: editorBox.placeholder
+            font.pixelSize: editorBox.placeholderFontSize
+            color: Colors.white
+            opacity: 0.30
+            elide: Text.ElideRight
+        }
+    }
+
     component RebaseButton: Rectangle {
         id: button
 

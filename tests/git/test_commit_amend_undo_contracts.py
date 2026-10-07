@@ -26,7 +26,8 @@ for needle, message in (
     ("COMMIT/AMEND CONTENT TRANSITION IS NOT EXACT", "inexact commit transitions must fall back to evidence-only"),
     ("beforeWorking.worktreePatchHash", "commit recovery must preserve worktree patch identity"),
     ("beforeWorking.untrackedListHash", "commit recovery must preserve untracked-set identity"),
-    ("String(beforeIndex.tree || "") !== expectedIndexTree", "commit recovery must preserve index tree identity"),
+    ('String(beforeIndex.tree || "")', "commit recovery must capture the pre-commit index tree"),
+    ('String(afterIndex.tree || "")', "commit recovery must compare the post-commit index tree"),
 ):
     require(CHANGES, needle, message)
 

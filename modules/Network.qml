@@ -335,12 +335,17 @@ Rectangle {
 
                     visible: !root.ethernetMode && !root.wifiEnabled
 
-                    implicitWidth: networkIconRow.iconSize
+                    // The offline star composition is wider than the normal
+                    // icon slot. Let the slot grow around the actual glyphs
+                    // instead of letting them paint outside the module.
+                    implicitWidth: Math.max(networkIconRow.iconSize, wifiOffText.implicitWidth + 4)
                     implicitHeight: networkIconRow.iconSize
 
                     Layout.alignment: Qt.AlignVCenter
 
                     Text {
+                        id: wifiOffText
+
                         anchors.centerIn: parent
 
                         text: "° ๋࣭ ⭑⋆.°"

@@ -132,6 +132,7 @@ Item {
         property bool selectedAction: false
         property bool enabledAction: true
         property bool primaryBlue: false
+        property int keyboardListIndex: -1
 
         readonly property bool keyboardSelected:
             !!root.keyboardHost
@@ -153,6 +154,11 @@ Item {
         Component.onDestruction: {
             if (root.keyboardHost)
                 root.keyboardHost.unregisterGitKeyboardControl(button);
+        }
+
+        onKeyboardSelectedChanged: {
+            if (keyboardSelected && keyboardListIndex >= 0)
+                root.ensureListIndexVisible(keyboardListIndex);
         }
 
         height: 28
@@ -231,10 +237,36 @@ Item {
         property alias text: editor.text
         property string placeholderText: "SEARCH"
 
+        readonly property bool keyboardSelected:
+            !!root.keyboardHost
+            && root.keyboardHost.gitKeyboardControl === field
+        readonly property bool keyboardSelector:
+            keyboardSelected
+            && root.keyboardHost.gitSelectorSource === "keyboard"
+
+        signal triggered()
+
+        Component.onCompleted: {
+            if (root.keyboardHost)
+                root.keyboardHost.registerGitKeyboardControl(field);
+        }
+
+        Component.onDestruction: {
+            if (root.keyboardHost)
+                root.keyboardHost.unregisterGitKeyboardControl(field);
+        }
+
+        onTriggered: editor.forceActiveFocus()
+
         height: 28
         color: Colors.black
-        border.width: 1
-        border.color: editor.activeFocus ? Colors.orange : Colors.cyan
+        border.width: keyboardSelector ? 2 : 1
+        border.color:
+            editor.activeFocus
+            ? Colors.magenta
+            : keyboardSelector
+            ? Colors.orange
+            : Colors.cyan
 
         TextInput {
             id: editor
@@ -278,10 +310,12 @@ Item {
                 if (!root.keyboardHost)
                     return;
 
-                if (activeFocus)
+                if (activeFocus) {
+                    root.keyboardHost.gitKeyboardControl = field;
                     root.keyboardHost.activeTextEditor = editor;
-                else if (root.keyboardHost.activeTextEditor === editor)
+                } else if (root.keyboardHost.activeTextEditor === editor) {
                     root.keyboardHost.activeTextEditor = null;
+                }
             }
 
             Text {
@@ -294,6 +328,20 @@ Item {
                 opacity: 0.40
             }
         }
+    }
+
+    function ensureListIndexVisible(index) {
+        const target = Number(index);
+
+        if (!isFinite(target)
+                || target < 0
+                || target >= root.visibleRows.length)
+            return;
+
+        sourceList.positionViewAtIndex(
+            target,
+            ListView.Contain
+        );
     }
 
     onVisibleChanged: {
@@ -526,6 +574,7 @@ Item {
                 clip: true
                 spacing: 5
                 model: root.visibleRows
+                cacheBuffer: Math.max(height, 416)
                 boundsBehavior: Flickable.StopAtBounds
 
                 delegate: Rectangle {
@@ -771,6 +820,7 @@ Item {
                             width: parent.width
                             height: 25
                             label: "OPEN"
+                            keyboardListIndex: sourceRow.index
                             enabledAction: !!sourceRow.itemUrl
                             onTriggered: {
                                 root.armedProjectRemoveUrl = "";
@@ -783,6 +833,7 @@ Item {
                             width: parent.width
                             height: 25
                             label: "ADD TO PROJECT"
+                            keyboardListIndex: sourceRow.index
                             primaryBlue: true
                             enabledAction:
                                 !root.projectService.busy
@@ -807,6 +858,7 @@ Item {
                                 width: (parent.width - 4) / 2
                                 height: parent.height
                                 label: "◀ STATUS"
+                                keyboardListIndex: sourceRow.index
                                 enabledAction:
                                     !root.projectService.busy
                                     && root.projectService.statusOptions().length > 0
@@ -821,6 +873,7 @@ Item {
                                 width: (parent.width - 4) / 2
                                 height: parent.height
                                 label: "STATUS ▶"
+                                keyboardListIndex: sourceRow.index
                                 enabledAction:
                                     !root.projectService.busy
                                     && root.projectService.statusOptions().length > 0
@@ -836,6 +889,7 @@ Item {
                             visible: sourceRow.alreadyAdded
                             width: parent.width
                             height: 25
+                            keyboardListIndex: sourceRow.index
                             label:
                                 root.armedProjectRemoveUrl
                                 === sourceRow.itemUrl

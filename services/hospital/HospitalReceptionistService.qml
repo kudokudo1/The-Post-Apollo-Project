@@ -820,8 +820,134 @@ Scope {
             : next;
     }
 
+    readonly property var fuzzyVocabulary: [
+        "what", "where", "when", "which",
+        "problem", "problems", "issue", "issues",
+        "wrong", "broken", "broke", "failed", "failure",
+        "trouble", "holdup", "holding", "blocking",
+        "happening", "happened", "changed", "doing",
+        "going", "important", "attention", "recent",
+        "latest", "newest", "newer", "older", "before",
+        "previous", "activity", "history", "evidence",
+        "report", "reports", "round", "rounds",
+        "staff", "specialist", "specialists",
+        "intercom", "message", "messages",
+        "phone", "call", "calls", "favorite", "favorites",
+        "favourite", "favourites", "pinned", "starred",
+        "saved", "open", "show", "take", "bring",
+        "send", "find", "locate", "there", "this",
+        "that", "anything", "something", "update"
+    ]
+
+    function editDistanceOneOrLess(leftValue, rightValue) {
+        const left = String(leftValue || "").toLowerCase();
+        const right = String(rightValue || "").toLowerCase();
+
+        if (left === right)
+            return 0;
+
+        const delta = left.length - right.length;
+
+        if (Math.abs(delta) > 1)
+            return 2;
+
+        if (delta === 0) {
+            let mismatches = 0;
+
+            for (let i = 0; i < left.length; ++i) {
+                if (left[i] !== right[i]) {
+                    mismatches += 1;
+
+                    if (mismatches > 1)
+                        return 2;
+                }
+            }
+
+            return mismatches;
+        }
+
+        const shorter = delta < 0 ? left : right;
+        const longer = delta < 0 ? right : left;
+        let shortIndex = 0;
+        let longIndex = 0;
+        let skipped = false;
+
+        while (shortIndex < shorter.length
+                && longIndex < longer.length) {
+            if (shorter[shortIndex] === longer[longIndex]) {
+                shortIndex += 1;
+                longIndex += 1;
+                continue;
+            }
+
+            if (skipped)
+                return 2;
+
+            skipped = true;
+            longIndex += 1;
+        }
+
+        return 1;
+    }
+
+    function fuzzyWord(wordValue) {
+        const word = String(wordValue || "").toLowerCase();
+
+        if (!word)
+            return word;
+
+        if (/^t\d+(?:-[a-z0-9]+)?$/i.test(word))
+            return word;
+
+        let best = word;
+        let bestDistance = 2;
+        let bestCount = 0;
+
+        for (let i = 0; i < fuzzyVocabulary.length; ++i) {
+            const candidate =
+                String(fuzzyVocabulary[i] || "").toLowerCase();
+
+            if (!candidate)
+                continue;
+
+            if (word === candidate)
+                return word;
+
+            // Keep tiny ordinary words exact except for WHAT, which is a
+            // deliberate convenience case ("wht", "hat", etc.).
+            if (word.length < 4
+                    && candidate !== "what")
+                continue;
+
+            const distance =
+                editDistanceOneOrLess(word, candidate);
+
+            if (distance < bestDistance) {
+                best = candidate;
+                bestDistance = distance;
+                bestCount = 1;
+            } else if (distance === bestDistance
+                    && distance <= 1) {
+                bestCount += 1;
+            }
+        }
+
+        // Do not guess when a typo is equally close to two commands.
+        return bestDistance <= 1 && bestCount === 1
+            ? best
+            : word;
+    }
+
+    function looseQuery(textValue) {
+        return String(textValue || "")
+            .toLowerCase()
+            .replace(/[a-z]+/g, function(word) {
+                return root.fuzzyWord(word);
+            });
+    }
+
     function activityQuerySource(queryValue) {
-        const query = String(queryValue || "").toLowerCase();
+        const query = looseQuery(queryValue);
 
         if (query.indexOf("report") >= 0
                 || query.indexOf("history") >= 0
@@ -1319,7 +1445,7 @@ Scope {
         if (!raw)
             return false;
 
-        const query = raw.toLowerCase();
+        const query = looseQuery(raw);
         const asksContextStatus =
             query === "what's going on"
             || query === "whats going on"
@@ -1607,7 +1733,7 @@ Scope {
         if (!raw)
             return false;
 
-        const query = raw.toLowerCase();
+        const query = looseQuery(raw);
         const asksLocation =
             query.indexOf("where is") >= 0
             || query.indexOf("where's") >= 0
@@ -1745,7 +1871,7 @@ Scope {
         if (!raw)
             return false;
 
-        const query = raw.toLowerCase();
+        const query = looseQuery(raw);
         const targetHint = activityTargetFromQuery(raw);
         const asksDoing =
             !!targetHint
@@ -1993,7 +2119,7 @@ Scope {
         if (!raw)
             return false;
 
-        const query = raw.toLowerCase();
+        const query = looseQuery(raw);
 
         if (answerContextFollowUp(raw))
             return true;

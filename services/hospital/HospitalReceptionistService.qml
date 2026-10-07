@@ -3567,7 +3567,7 @@ Scope {
         if (asksHelp) {
             append(
                 "RECEPTION",
-                "I understand recent activity, archive history, archive status and cleanup, oldest or earliest activity, critical/action/notice/routine attention levels, ranked priorities like top three or what should I look at first, what changed, what went wrong, what needs attention, favorites, Room or team history, counts, and time windows like today, yesterday, this morning, this week, last week, this month, last month, the last 3 hours, the last 2 weeks, since 2026-10-01, on 2026-10-01, or from 2026-10-01 to 2026-10-05. Selective archive cleanup is previewed first; say confirm archive cleanup to execute it or cancel archive cleanup to abort. I can also find or show a team, then follow up with open this, take me there, favorite this, go back, or next one."
+                "I understand recent activity, archive history, archive status and cleanup, oldest or earliest activity, critical/action/notice/routine attention levels, ranked priorities like top three or what should I look at first, what changed, what went wrong, what needs attention, favorites, Room or team history, counts, and time windows like today, yesterday, this morning, this week, last week, this month, last month, the last 3 hours, the last 2 weeks, since 2026-10-01, on 2026-10-01, or from 2026-10-01 to 2026-10-05. Selective archive cleanup is previewed first; say confirm archive cleanup to execute it or cancel archive cleanup to abort. I can also find or show a team, then follow up with open this, take me there, favorite this, go back, or next one. When a live context is selected, you can say call Codex about this, message Hermes about this, or name another registered specialist."
             );
             return true;
         }
@@ -3825,6 +3825,20 @@ Scope {
             return false;
 
         const query = looseQuery(raw);
+
+        if (pendingArchiveCleanupSpec) {
+            const maintenanceQuery = socialQuery(raw);
+            const keepsCleanupArm =
+                maintenanceQuery.indexOf("archive") >= 0
+                && maintenanceQuery.indexOf("cleanup") >= 0
+                && (
+                    maintenanceQuery.indexOf("confirm") >= 0
+                    || maintenanceQuery.indexOf("cancel") >= 0
+                   );
+
+            if (!keepsCleanupArm)
+                pendingArchiveCleanupSpec = null;
+        }
 
         if (answerSocial(raw))
             return true;

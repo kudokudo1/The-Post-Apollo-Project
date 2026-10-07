@@ -8,7 +8,7 @@ Scope {
     property var transcript: [
         {
             sender: "RECEPTION",
-            body: "Front desk online. I can route you to Surgery, Reports, Rounds, Staff, Phone, or Intercom."
+            body: "Front desk online. I can route you to Surgery, Archive, Reports, Rounds, Staff, Phone, or Intercom."
         }
     ]
 
@@ -3838,6 +3838,8 @@ Scope {
 
         if (target === "surgery")
             response = "Routing to Surgery.";
+        else if (target === "archive")
+            response = "Opening Reception archive.";
         else if (target === "reports")
             response = "Opening surgical history and evidence.";
         else if (target === "rounds")
@@ -3851,7 +3853,7 @@ Scope {
         else {
             append(
                 "RECEPTION",
-                "I can route Surgery, Reports, Rounds, Staff, Phone, or Intercom."
+                "I can route Surgery, Archive, Reports, Rounds, Staff, Phone, or Intercom."
             );
             return false;
         }
@@ -3891,6 +3893,12 @@ Scope {
 
         if (answerActivityAction(raw))
             return true;
+
+        if (query.indexOf("open archive") >= 0
+                || query.indexOf("show archive browser") >= 0
+                || query.indexOf("browse archive") >= 0
+                || query.indexOf("go to archive") >= 0)
+            return request("archive", raw);
 
         if (answerArchiveMaintenance(raw))
             return true;

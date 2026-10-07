@@ -126,9 +126,14 @@ require_regex(
     SERVICE,
     r'if \(root\.snapshotPhase === "BEFORE"\).*'
     r'operationJournal\.beginOperation\(.*'
-    r'"CHANGES/TRANSFER".*'
+    r'root\.journalKind\(\).*'
     r'root\.executeTransferProcess\(\)',
-    "transfer mutation must wait for snapshot + journal start",
+    "transfer mutation must wait for snapshot + scoped journal start",
+)
+require(
+    SERVICE,
+    '"CHANGES/TRANSFER"',
+    "whole-file transfer must retain its journal kind",
 )
 require_regex(
     SERVICE,

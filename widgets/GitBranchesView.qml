@@ -2519,6 +2519,8 @@ Item {
                                     ? "WORKSPACE // " + root.selectedBranch
                                     : root.managementMode === "restack"
                                     ? "RESTACK // " + root.selectedBranch
+                                    : root.managementMode === "submit"
+                                    ? "SUBMIT STACK // " + root.selectedBranch
                                     : "EDIT // " + root.selectedBranch
                                 font.pixelSize: 13
                                 color:
@@ -2530,6 +2532,8 @@ Item {
                                     ? Colors.blue
                                     : root.managementMode === "restack"
                                     ? Colors.orange
+                                    : root.managementMode === "submit"
+                                    ? Colors.magenta
                                     : Colors.magenta
                                 elide: Text.ElideMiddle
                             }
@@ -2545,6 +2549,11 @@ Item {
                                         && stackExecutor
                                         && stackExecutor.running
                                      )
+                                    && !(
+                                        root.managementMode === "submit"
+                                        && stackSubmitService
+                                        && stackSubmitService.submitBusy
+                                       )
                                 onTriggered: root.closeManager()
                             }
                         }
@@ -2561,6 +2570,8 @@ Item {
                                 ? Colors.blue
                                 : root.managementMode === "restack"
                                 ? Colors.orange
+                                : root.managementMode === "submit"
+                                ? Colors.magenta
                                 : Colors.cyan
                             opacity: 0.46
                         }
@@ -3717,6 +3728,374 @@ Item {
                         Column {
                             width: parent.width
                             spacing: 8
+                            visible: root.managementMode === "submit"
+
+                            Rectangle {
+                                width: parent.width
+                                height: 86
+                                color: Colors.dark
+                                border.width: 1
+                                border.color:
+                                    stackSubmitService
+                                    && stackSubmitService.invalidCount > 0
+                                    ? Colors.red
+                                    : stackSubmitService
+                                      && stackSubmitService.armed
+                                    ? Colors.orange
+                                    : Colors.magenta
+
+                                Column {
+                                    anchors {
+                                        fill: parent
+                                        margins: 7
+                                    }
+                                    spacing: 4
+
+                                    FactRow {
+                                        label: "STAGE"
+                                        value: root.submitStageText()
+                                        valueColor:
+                                            stackSubmitService
+                                            && stackSubmitService.submitBusy
+                                            ? Colors.orange
+                                            : stackSubmitService
+                                              && stackSubmitService.armed
+                                            ? Colors.orange
+                                            : Colors.cyan
+                                    }
+
+                                    FactRow {
+                                        label: "PLAN"
+                                        value:
+                                            stackSubmitService
+                                            ? (
+                                                String(
+                                                    stackSubmitService.plan.length
+                                                  )
+                                                + " PR // "
+                                                + String(
+                                                    stackSubmitService.createCount
+                                                  )
+                                                + " CREATE // "
+                                                + String(
+                                                    stackSubmitService.reuseCount
+                                                  )
+                                                + " EXISTING"
+                                              )
+                                            : "NOT CONNECTED"
+                                        valueColor:
+                                            stackSubmitService
+                                            && stackSubmitService.invalidCount > 0
+                                            ? Colors.red
+                                            : Colors.green
+                                    }
+
+                                    GohuText {
+                                        width: parent.width
+                                        text:
+                                            stackSubmitService
+                                            && stackSubmitService.lastError
+                                            ? stackSubmitService.lastError
+                                            : "Preview reads local heads, remote heads, and existing PR bases. Submit uses atomic force-with-lease."
+                                        font.pixelSize: 8
+                                        color:
+                                            stackSubmitService
+                                            && stackSubmitService.lastError
+                                            ? Colors.red
+                                            : Colors.white
+                                        opacity:
+                                            stackSubmitService
+                                            && stackSubmitService.lastError
+                                            ? 1.0
+                                            : 0.62
+                                        elide: Text.ElideRight
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                width: parent.width
+                                height: 148
+                                color: Colors.black
+                                border.width: 1
+                                border.color:
+                                    stackSubmitService
+                                    && stackSubmitService.invalidCount > 0
+                                    ? Colors.red
+                                    : Colors.magenta
+                                clip: true
+
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    visible:
+                                        !stackSubmitService
+                                        || (
+                                            !stackSubmitService.previewBusy
+                                            && stackSubmitService.plan.length
+                                               === 0
+                                           )
+                                    text:
+                                        stackSubmitService
+                                        && stackSubmitService.startBranch
+                                           === root.selectedBranch
+                                        ? "NOTHING TO SUBMIT"
+                                        : "PRESS PREVIEW TO INSPECT PULL REQUESTS"
+                                    font.pixelSize: 10
+                                    color: Colors.cyan
+                                    opacity: 0.62
+                                }
+
+                                Flickable {
+                                    id: submitPlanFlick
+
+                                    anchors {
+                                        fill: parent
+                                        margins: 5
+                                        rightMargin: 14
+                                    }
+
+                                    visible:
+                                        stackSubmitService
+                                        && stackSubmitService.plan.length > 0
+                                    clip: true
+                                    contentWidth: width
+                                    contentHeight:
+                                        submitPlanRows.implicitHeight
+                                    boundsBehavior: Flickable.StopAtBounds
+
+                                    Column {
+                                        id: submitPlanRows
+                                        width: parent.width
+                                        spacing: 3
+
+                                        Repeater {
+                                            model:
+                                                stackSubmitService
+                                                ? stackSubmitService.plan
+                                                : []
+
+                                            Rectangle {
+                                                required property var modelData
+
+                                                width: submitPlanRows.width
+                                                height: 46
+                                                color: Colors.dark
+                                                border.width: 1
+                                                border.color:
+                                                    [
+                                                        "MISSING_BRANCH",
+                                                        "MISSING_PARENT",
+                                                        "MERGED_PR",
+                                                        "ERROR"
+                                                    ].indexOf(
+                                                        String(
+                                                            modelData.status
+                                                            || ""
+                                                        )
+                                                    ) >= 0
+                                                    ? Colors.red
+                                                    : [
+                                                        "UPDATE_BASE",
+                                                        "REOPEN_EXISTING",
+                                                        "REOPEN_UPDATE_BASE"
+                                                    ].indexOf(
+                                                        String(
+                                                            modelData.status
+                                                            || ""
+                                                        )
+                                                    ) >= 0
+                                                    ? Colors.orange
+                                                    : String(
+                                                        modelData.status
+                                                        || ""
+                                                      ) === "CREATE_PR"
+                                                    ? Colors.green
+                                                    : Colors.cyan
+
+                                                Column {
+                                                    anchors {
+                                                        fill: parent
+                                                        margins: 5
+                                                    }
+                                                    spacing: 2
+
+                                                    GohuText {
+                                                        width: parent.width
+                                                        text:
+                                                            String(
+                                                                modelData.branch
+                                                                || ""
+                                                            )
+                                                            + " → "
+                                                            + String(
+                                                                modelData.parent
+                                                                || ""
+                                                            )
+                                                        font.pixelSize: 10
+                                                        color: Colors.white
+                                                        elide: Text.ElideMiddle
+                                                    }
+
+                                                    GohuText {
+                                                        width: parent.width
+                                                        text:
+                                                            String(
+                                                                modelData.status
+                                                                || ""
+                                                            )
+                                                            + (
+                                                                modelData.prNumber
+                                                                ? " // PR #"
+                                                                  + String(
+                                                                      modelData.prNumber
+                                                                    )
+                                                                : ""
+                                                              )
+                                                            + " // "
+                                                            + (
+                                                                modelData.remoteHead
+                                                                ? "REMOTE "
+                                                                  + root.shortSha(
+                                                                      modelData.remoteHead
+                                                                    )
+                                                                : "REMOTE NEW"
+                                                              )
+                                                        font.pixelSize: 8
+                                                        color:
+                                                            [
+                                                                "MISSING_BRANCH",
+                                                                "MISSING_PARENT",
+                                                                "MERGED_PR",
+                                                                "ERROR"
+                                                            ].indexOf(
+                                                                String(
+                                                                    modelData.status
+                                                                    || ""
+                                                                )
+                                                            ) >= 0
+                                                            ? Colors.red
+                                                            : [
+                                                                "UPDATE_BASE",
+                                                                "REOPEN_EXISTING",
+                                                                "REOPEN_UPDATE_BASE"
+                                                            ].indexOf(
+                                                                String(
+                                                                    modelData.status
+                                                                    || ""
+                                                                )
+                                                            ) >= 0
+                                                            ? Colors.orange
+                                                            : String(
+                                                                modelData.status
+                                                                || ""
+                                                              ) === "CREATE_PR"
+                                                            ? Colors.green
+                                                            : Colors.cyan
+                                                        elide: Text.ElideMiddle
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                NeonScrollBar {
+                                    flickable: submitPlanFlick
+                                    starHandle: true
+                                }
+                            }
+
+                            Row {
+                                width: parent.width
+                                height: 34
+                                spacing: 6
+
+                                BranchButton {
+                                    width: (parent.width - 6) / 2
+                                    height: 34
+                                    label:
+                                        stackSubmitService
+                                        && stackSubmitService.previewBusy
+                                        ? "READING"
+                                        : "PREVIEW"
+                                    enabledAction:
+                                        stackSubmitService
+                                        && !stackSubmitService.previewBusy
+                                        && !stackSubmitService.submitBusy
+                                    onTriggered: root.previewSubmitStack()
+                                }
+
+                                BranchButton {
+                                    width: (parent.width - 6) / 2
+                                    height: 34
+                                    label:
+                                        stackSubmitService
+                                        && stackSubmitService.armed
+                                        ? "ARMED ✓"
+                                        : "ARM"
+                                    selectedAction:
+                                        stackSubmitService
+                                        && stackSubmitService.armed
+                                    enabledAction:
+                                        stackSubmitService
+                                        && !stackSubmitService.previewBusy
+                                        && !stackSubmitService.submitBusy
+                                        && !stackSubmitService.armed
+                                        && stackSubmitService.startBranch
+                                           === root.selectedBranch
+                                        && stackSubmitService.executable
+                                    onTriggered: root.armSubmitStack()
+                                }
+                            }
+
+                            Row {
+                                width: parent.width
+                                height: 36
+                                spacing: 6
+
+                                BranchButton {
+                                    width: (parent.width - 6) / 2
+                                    height: 36
+                                    label:
+                                        stackSubmitService
+                                        && stackSubmitService.submitBusy
+                                        ? "SUBMITTING"
+                                        : "SUBMIT"
+                                    destructive: true
+                                    enabledAction:
+                                        stackSubmitService
+                                        && stackSubmitService.armed
+                                        && !stackSubmitService.submitBusy
+                                    onTriggered: root.executeSubmitStack()
+                                }
+
+                                BranchButton {
+                                    width: (parent.width - 6) / 2
+                                    height: 36
+                                    label: "DISARM"
+                                    destructive: true
+                                    enabledAction:
+                                        stackSubmitService
+                                        && stackSubmitService.armed
+                                        && !stackSubmitService.submitBusy
+                                    onTriggered: root.disarmSubmitStack()
+                                }
+                            }
+
+                            GohuText {
+                                width: parent.width
+                                text:
+                                    "SUBMIT atomically pushes the previewed stack with exact force-with-lease guards, then creates, reuses, retargets, or reopens the matching GitHub pull requests."
+                                font.pixelSize: 9
+                                color: Colors.white
+                                opacity: 0.62
+                                wrapMode: Text.WordWrap
+                            }
+                        }
+
+                        Column {
+                            width: parent.width
+                            spacing: 8
                             visible: root.managementMode === "delete"
 
                             FactRow {
@@ -3844,6 +4223,8 @@ Item {
                                           )
                                         : root.managementMode === "restack"
                                         ? "RESTACK REQUIRES PREVIEW → ARM → EXECUTE"
+                                        : root.managementMode === "submit"
+                                        ? "SUBMIT STACK REQUIRES PREVIEW → ARM → SUBMIT"
                                         : "EDIT CHANGES ONLY THE SELECTED LOCAL BRANCH"
                                        )
                                 font.pixelSize: 9

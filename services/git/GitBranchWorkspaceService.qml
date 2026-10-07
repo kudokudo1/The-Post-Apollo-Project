@@ -10,6 +10,11 @@ Scope {
     id: root
 
     property string repositoryPath: ""
+    property var operationJournal: null
+
+    property string pendingJournalId: ""
+    property string pendingJournalDetail: ""
+    property bool pendingJournalCompletion: false
 
     property bool refreshing: false
     property bool actionBusy: false
@@ -66,6 +71,64 @@ Scope {
 
     function branchIsOccupied(name) {
         return worktreeForBranch(name) !== null;
+    }
+
+    function journalSnapshot() {
+        return {
+            branch: String(currentBranch || ""),
+            head: String(currentHead || ""),
+            branches: branches.map(function(row) {
+                const item = row || {};
+                return {
+                    name: String(item.name || ""),
+                    head: String(item.head || ""),
+                    upstream: String(item.upstream || ""),
+                    merged: Boolean(item.merged)
+                };
+            }),
+            worktrees: worktrees.map(function(row) {
+                const item = row || {};
+                return {
+                    path: String(item.path || ""),
+                    head: String(item.head || ""),
+                    branch: String(item.branch || ""),
+                    detached: Boolean(item.detached),
+                    locked: Boolean(item.locked),
+                    prunable: Boolean(item.prunable),
+                    dirtyCount: Number(item.dirtyCount || 0)
+                };
+            })
+        };
+    }
+
+    function finishPendingJournal(success, detail) {
+        const operationId = String(pendingJournalId || "");
+
+        if (!operationId || !operationJournal) {
+            pendingJournalId = "";
+            pendingJournalDetail = "";
+            pendingJournalCompletion = false;
+            return;
+        }
+
+        const snapshot = journalSnapshot();
+
+        if (success)
+            operationJournal.completeOperation(
+                operationId,
+                snapshot,
+                String(detail || "")
+            );
+        else
+            operationJournal.failOperation(
+                operationId,
+                snapshot,
+                String(detail || "")
+            );
+
+        pendingJournalId = "";
+        pendingJournalDetail = "";
+        pendingJournalCompletion = false;
     }
 
     function refresh() {
@@ -248,11 +311,25 @@ Scope {
             ).trim();
 
             lastError = detail || "BRANCH INSPECTION FAILED";
+
+            if (pendingJournalCompletion) {
+                finishPendingJournal(
+                    true,
+                    pendingJournalDetail
+                    + " // AFTER SNAPSHOT FAILED // "
+                    + lastError
+                );
+            }
+
             return;
         }
 
         parseInspection(inspectStdoutText);
         lastError = "";
+
+        if (pendingJournalCompletion)
+            finishPendingJournal(true, pendingJournalDetail);
+
         refreshed();
     }
 
@@ -266,6 +343,25 @@ Scope {
         if (!repo || !op) {
             lastError = !repo ? "NO REPOSITORY" : "NO OPERATION";
             return false;
+        }
+
+        pendingJournalId = "";
+        pendingJournalDetail = "";
+        pendingJournalCompletion = false;
+
+        if (operationJournal) {
+            pendingJournalId = operationJournal.beginOperation(
+                "BRANCH_WORKSPACE/" + op.toUpperCase(),
+                journalSnapshot(),
+                {
+                    source: "GitBranchWorkspaceService",
+                    arguments: [
+                        String(a || ""),
+                        String(b || ""),
+                        String(c || "")
+                    ]
+                }
+            );
         }
 
         actionBusy = true;
@@ -476,13 +572,24 @@ Scope {
         if (actionExitCode === 0 && kind === "OK") {
             actionStatus = actionName + " // " + (detail || "OK");
             lastError = "";
+            pendingJournalDetail = detail || "OK";
+            pendingJournalCompletion = !!pendingJournalId;
             actionFinished(actionName, true, detail || "OK");
-            refresh();
+
+            if (!refresh() && pendingJournalCompletion) {
+                finishPendingJournal(
+                    true,
+                    pendingJournalDetail
+                    + " // AFTER SNAPSHOT UNAVAILABLE"
+                );
+            }
+
             return;
         }
 
         lastError = detail || (actionName + " FAILED");
         actionStatus = actionName + " // REFUSED";
+        finishPendingJournal(false, lastError);
         actionFinished(actionName, false, lastError);
     }
 

@@ -195,14 +195,19 @@ Scope {
             return refuse("OPERATION IS NOT CLEAN REF-RECOVERABLE");
         }
 
-        if (kind === "HISTORY/INTERACTIVE_REBASE") {
+        const historyRewrite =
+            kind === "HISTORY/INTERACTIVE_REBASE"
+            || kind === "HISTORY/INTERACTIVE_REBASE_SESSION"
+            || kind === "HISTORY/FOLD_COMMITS";
+
+        if (historyRewrite) {
             const beforeBranch = String(before.branch || "");
             const afterBranch = String(after.branch || "");
 
             if (!beforeBranch
                     || beforeBranch !== afterBranch) {
                 return refuse(
-                    "REBASE BRANCH IDENTITY CHANGED"
+                    "HISTORY REWRITE BRANCH IDENTITY CHANGED"
                 );
             }
 
@@ -216,7 +221,7 @@ Scope {
                     || String(before.head || "") !== beforeSha
                     || String(after.head || "") !== afterSha) {
                 return refuse(
-                    "REBASE REF TRANSITION IS NOT EXACT"
+                    "HISTORY REWRITE REF TRANSITION IS NOT EXACT"
                 );
             }
 

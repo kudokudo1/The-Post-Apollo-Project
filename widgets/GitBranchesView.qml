@@ -2159,15 +2159,6 @@ Item {
                                 && stackPlanner
                                 && stackExecutor
                                 && !stackExecutor.running
-                                && (
-                                    root.selectedStackParent.length > 0
-                                    || root.selectedStackDescendants.length > 0
-                                    || (
-                                        stackPlanner.startBranch
-                                        === root.selectedBranch
-                                        && stackPlanner.plan.length > 0
-                                       )
-                                )
                             onTriggered:
                                 root.triggerRestackActuator()
                         }

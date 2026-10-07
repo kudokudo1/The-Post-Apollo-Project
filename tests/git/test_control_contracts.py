@@ -55,8 +55,13 @@ def no_conflict_markers(path: str) -> None:
 # to PX rather than embedding raw gh mutation syntax.
 require(
     "services/github/GitHubService.qml",
-    'px" delete-workflow "$1" "$2"',
+    'delete-workflow "$1" "$2"',
     "workflow deletion must route through PX",
+)
+require(
+    "services/github/GitHubService.qml",
+    "PX DELETE-WORKFLOW UNAVAILABLE // UPDATE DEV EXPERIENCE RUNTIME",
+    "workflow deletion must report stale runtime capability clearly",
 )
 require(
     "services/github/GitHubService.qml",

@@ -498,6 +498,14 @@ Scope {
         };
     }
 
+    function diagnosticsFor(sha) {
+        const targetSha = textValue(sha, currentHead);
+        return diagnosticFacts(
+            targetSha,
+            inspectorEvidence(targetSha)
+        );
+    }
+
     function buildEvidencePacket(sha) {
         const targetSha = textValue(sha, currentHead);
         const matchingRuns = runsForSha(targetSha);

@@ -126,9 +126,122 @@ Scope {
     property string actionStdoutText: ""
     property string actionStderrText: ""
 
+    property string pxRuntimeState: "UNKNOWN"
+    property string pxRuntimeInstalledHash: ""
+    property string pxRuntimeSourceHash: ""
+    property string pxRuntimeSourceHead: ""
+    property string pxRuntimeDetail: "PX RUNTIME NOT CHECKED"
+
+    readonly property bool pxRuntimeStale:
+        pxRuntimeState === "STALE"
+    readonly property bool pxRuntimeMissing:
+        pxRuntimeState === "MISSING"
+
     property string lastError: ""
 
+    function parsePxRuntime(payload) {
+        const raw = String(payload || "").trim();
+        const lines = raw.split("\n");
+        let row = null;
+
+        for (let i = 0; i < lines.length; ++i) {
+            const line = String(lines[i] || "");
+            if (line.indexOf("PX\t") === 0) {
+                row = line.split("\t");
+                break;
+            }
+        }
+
+        if (!row) {
+            pxRuntimeState = "ERROR";
+            pxRuntimeDetail =
+                "PX RUNTIME CHECK RETURNED NO IDENTITY";
+            return;
+        }
+
+        pxRuntimeState =
+            String(row.length > 1 ? row[1] : "ERROR")
+            .toUpperCase();
+        pxRuntimeInstalledHash =
+            String(row.length > 2 ? row[2] : "");
+        pxRuntimeSourceHash =
+            String(row.length > 3 ? row[3] : "");
+        pxRuntimeSourceHead =
+            String(row.length > 4 ? row[4] : "");
+
+        if (pxRuntimeState === "CURRENT") {
+            pxRuntimeDetail =
+                "INSTALLED PX MATCHES RUNTIME SOURCE"
+                + (
+                    pxRuntimeSourceHead
+                    ? " // " + pxRuntimeSourceHead.slice(0, 10)
+                    : ""
+                  );
+        } else if (pxRuntimeState === "STALE") {
+            pxRuntimeDetail =
+                "INSTALLED PX DIFFERS FROM RUNTIME SOURCE"
+                + (
+                    pxRuntimeSourceHead
+                    ? " // SOURCE " + pxRuntimeSourceHead.slice(0, 10)
+                    : ""
+                  );
+        } else if (pxRuntimeState === "MISSING") {
+            pxRuntimeDetail =
+                "INSTALLED PX MISSING // ~/.local/bin/px";
+        } else if (pxRuntimeState === "SOURCE_MISSING") {
+            pxRuntimeDetail =
+                "PX SOURCE COPY MISSING // CANNOT COMPARE INSTALL";
+        } else {
+            pxRuntimeDetail =
+                "PX RUNTIME IDENTITY CHECK FAILED";
+        }
+    }
+
+    function refreshPxRuntime() {
+        if (pxRuntimeProcess.running)
+            return false;
+
+        pxRuntimeState = "CHECKING";
+        pxRuntimeDetail = "CHECKING INSTALLED PX IDENTITY";
+
+        pxRuntimeProcess.exec([
+            "bash",
+            "-lc",
+            [
+                'installed="$HOME/.local/bin/px"',
+                'runtime="$HOME/.local/share/post-apollo-dev-runtime"',
+                'source="$runtime/bin/px"',
+                'if [ ! -f "$installed" ]; then',
+                '  printf "PX\\tMISSING\\n"',
+                '  exit 0',
+                'fi',
+                'installed_hash="$(sha256sum "$installed" 2>/dev/null | awk \'{print $1}\')"',
+                'if [ -z "$installed_hash" ]; then',
+                '  printf "PX\\tERROR\\n"',
+                '  exit 0',
+                'fi',
+                'if [ ! -f "$source" ]; then',
+                '  printf "PX\\tSOURCE_MISSING\\t%s\\n" "$installed_hash"',
+                '  exit 0',
+                'fi',
+                'source_hash="$(sha256sum "$source" 2>/dev/null | awk \'{print $1}\')"',
+                'head="$(git -C "$runtime" rev-parse HEAD 2>/dev/null || true)"',
+                'if [ -z "$source_hash" ]; then',
+                '  printf "PX\\tERROR\\t%s\\t\\t%s\\n" "$installed_hash" "$head"',
+                '  exit 0',
+                'fi',
+                'state="STALE"',
+                '[ "$installed_hash" = "$source_hash" ] && state="CURRENT"',
+                'printf "PX\\t%s\\t%s\\t%s\\t%s\\n" "$state" "$installed_hash" "$source_hash" "$head"'
+            ].join("\n")
+        ]);
+
+        return true;
+    }
+
     function refresh() {
+        refreshPxRuntime();
+
         if (refreshing)
             return;
 
@@ -954,6 +1067,39 @@ Scope {
             githubService.factoryExitCode = Number(exitCode);
             githubService.factoryExitSeen = true;
             githubService.maybeFinishFactory();
+        }
+    }
+
+    Process {
+        id: pxRuntimeProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                githubService.parsePxRuntime(this.text);
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                const error = String(this.text || "").trim();
+
+                if (error
+                        && githubService.pxRuntimeState === "CHECKING") {
+                    githubService.pxRuntimeState = "ERROR";
+                    githubService.pxRuntimeDetail =
+                        "PX RUNTIME CHECK // " + error;
+                }
+            }
+        }
+
+        onExited: function(exitCode, exitStatus) {
+            if (Number(exitCode) !== 0
+                    && githubService.pxRuntimeState === "CHECKING") {
+                githubService.pxRuntimeState = "ERROR";
+                githubService.pxRuntimeDetail =
+                    "PX RUNTIME CHECK EXIT "
+                    + String(exitCode);
+            }
         }
     }
 

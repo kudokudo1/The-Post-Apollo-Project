@@ -29,6 +29,7 @@ assert "Quickshell.execDetached" not in service
 view = VIEW.read_text()
 for needle in (
     'required property var reportService',
+    'required property var runtimeService',
     'readonly property var displayReports:',
     'return source.slice().reverse();',
     'signal closeRequested()',
@@ -39,6 +40,14 @@ for needle in (
     'root.selectedReport.changedFiles',
     'textFormat: Text.MarkdownText',
     'root.selectedReport.body',
+    'function feedbackSessionMatches(report)',
+    '"REPORT BUG"',
+    '"ARCHIVED SESSION // FEEDBACK DISABLED"',
+    'runtimeService.reportFeedback(',
+    'runtimeService.feedbackRunning',
+    '!runtimeService.operating',
+    'Connections {',
+    'function onReportFeedbackCompleted(reportId, result)',
 ):
     assert needle in view, needle
 
@@ -57,8 +66,10 @@ for needle in (
     'id: roomReportsView',
     'visible: root.operationsSurface === "roomReports"',
     'reportService: roomReportService',
+    'runtimeService: doctorRuntimeService',
     'onCloseRequested: root.showSurgery()',
     'onChatRequested: root.openRoomChat()',
+    'onReportFeedbackCompleted: function(reportId, result)',
 ):
     assert needle in hospital, needle
 
@@ -82,3 +93,17 @@ assert 'roomCheckpointService.refresh();' in quick_refresh
 assert 'roomReportService.refresh();' in quick_refresh
 
 print("hospital Room Reports / Doctor Notes contracts: PASS")
+
+
+feedback_handler = hospital.index(
+    'onReportFeedbackCompleted: function(reportId, result)'
+)
+feedback_handler_end = hospital.index(
+    'onTurnCancelled: function(result)',
+    feedback_handler,
+)
+feedback_refresh = hospital[feedback_handler:feedback_handler_end]
+assert 'roomChatView.refresh();' in feedback_refresh
+assert 'roomReportService.refresh();' in feedback_refresh
+
+print("hospital Room Report feedback contracts: PASS")

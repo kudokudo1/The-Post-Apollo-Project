@@ -846,9 +846,11 @@ Singleton {
             const policyWasPruned = root.loadPolicies();
 
             root.policyReady = true;
-            root.policyStatus = "ready";
 
-            if (policyWasPruned)
+            if (root.policyStatus !== "parse-error")
+                root.policyStatus = "ready";
+
+            if (policyWasPruned && root.policyStatus !== "parse-error")
                 root.savePolicies();
         }
 

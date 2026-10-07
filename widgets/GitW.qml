@@ -2765,7 +2765,7 @@ PanelWindow {
                 top: parent.top
                 topMargin: 148
                 bottom: parent.bottom
-                bottomMargin: 26
+                bottomMargin: 18
             }
 
             count: gitService.remoteBranchCount
@@ -3131,6 +3131,8 @@ PanelWindow {
 
                         anchors {
                             fill: parent
+                            leftMargin: 46
+                            rightMargin: 46
                             topMargin: root.gitCanGoBack ? 34 : 0
                             bottomMargin: 66
                         }
@@ -4663,6 +4665,14 @@ PanelWindow {
                             left: parent.left
                             right: parent.right
                             bottom: parent.bottom
+                            leftMargin:
+                                root.gitView === "control"
+                                ? 46
+                                : 0
+                            rightMargin:
+                                root.gitView === "control"
+                                ? 46
+                                : 0
                         }
 
                         height: 56

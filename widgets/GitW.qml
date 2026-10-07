@@ -2068,7 +2068,7 @@ PanelWindow {
         repositoryPath:
             gitService.repoIsLocal
             ? gitService.repoRoot
-            : ""
+            : gitService.cloneDestinationPath
     }
 
     GitOperationRecoveryService {
@@ -2079,6 +2079,31 @@ PanelWindow {
             gitService.repoIsLocal
             ? gitService.repoRoot
             : ""
+    }
+
+    Connections {
+        target: operationRecoveryService
+        ignoreUnknownSignals: true
+
+        function onRecoveryFinished(operationId, success, detail) {
+            if (!success)
+                return;
+
+            const index =
+                operationJournalService.entryIndex(operationId);
+
+            if (index < 0
+                    || index >= operationJournalService.entries.length)
+                return;
+
+            const record =
+                operationJournalService.entries[index] || {};
+
+            if (String(record.kind || "") !== "CONTROL/CLONE")
+                return;
+
+            gitService.discoverRepos();
+        }
     }
 
     GitBranchWorkspaceService {

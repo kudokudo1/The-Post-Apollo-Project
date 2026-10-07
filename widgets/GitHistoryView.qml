@@ -311,6 +311,7 @@ Item {
         root.subMode = "query";
         queryPathInput.text = target;
         queryAuthorInput.text = "";
+        queryMessageInput.text = "";
         querySinceInput.text = "";
         queryUntilInput.text = "";
         queryRangeInput.text = "";
@@ -321,8 +322,68 @@ Item {
             "",
             "",
             "",
+            "",
             ""
         );
+    }
+
+    function queryHasFilters() {
+        return Boolean(
+            String(queryPathInput.text || "").trim()
+            || String(queryAuthorInput.text || "").trim()
+            || String(queryMessageInput.text || "").trim()
+            || String(querySinceInput.text || "").trim()
+            || String(queryUntilInput.text || "").trim()
+            || String(queryRangeInput.text || "").trim()
+        );
+    }
+
+    function queryFilterSummary() {
+        const parts = [];
+
+        const path = String(queryPathInput.text || "").trim();
+        const author = String(queryAuthorInput.text || "").trim();
+        const message = String(queryMessageInput.text || "").trim();
+        const since = String(querySinceInput.text || "").trim();
+        const until = String(queryUntilInput.text || "").trim();
+        const range = String(queryRangeInput.text || "").trim();
+
+        if (path)
+            parts.push("PATH " + path);
+        if (author)
+            parts.push(
+                "AUTHOR "
+                + (author === "@me" ? "ME" : author)
+            );
+        if (message)
+            parts.push("MESSAGE " + message);
+        if (since)
+            parts.push("SINCE " + since);
+        if (until)
+            parts.push("UNTIL " + until);
+        if (range)
+            parts.push("RANGE " + range);
+
+        return parts.length > 0
+            ? parts.join(" // ")
+            : "NO FILTERS // LOG ALREADY SHOWS GENERAL HISTORY";
+    }
+
+    function applyQueryPreset(kind) {
+        const preset = String(kind || "");
+
+        if (preset === "today") {
+            querySinceInput.text = "midnight";
+            queryUntilInput.text = "";
+        } else if (preset === "7d") {
+            querySinceInput.text = "7 days ago";
+            queryUntilInput.text = "";
+        } else if (preset === "30d") {
+            querySinceInput.text = "30 days ago";
+            queryUntilInput.text = "";
+        } else if (preset === "me") {
+            queryAuthorInput.text = "@me";
+        }
     }
 
     function navigationContext() {
@@ -355,6 +416,10 @@ Item {
                 root.historyService
                 ? String(root.historyService.queryAuthor || "")
                 : "",
+            queryMessage:
+                root.historyService
+                ? String(root.historyService.queryMessage || "")
+                : "",
             querySince:
                 root.historyService
                 ? String(root.historyService.querySince || "")
@@ -386,6 +451,7 @@ Item {
         if (root.subMode === "query") {
             queryPathInput.text = String(ctx.queryPath || "");
             queryAuthorInput.text = String(ctx.queryAuthor || "");
+            queryMessageInput.text = String(ctx.queryMessage || "");
             querySinceInput.text = String(ctx.querySince || "");
             queryUntilInput.text = String(ctx.queryUntil || "");
             queryRangeInput.text = String(ctx.queryRange || "");
@@ -395,7 +461,8 @@ Item {
                 queryAuthorInput.text,
                 querySinceInput.text,
                 queryUntilInput.text,
-                queryRangeInput.text
+                queryRangeInput.text,
+                queryMessageInput.text
             );
         } else if (root.subMode === "reflog") {
             root.historyService.loadReflog();
@@ -1511,6 +1578,16 @@ Item {
                             placeholderFontSize: 9
                         }
 
+                        EditorBox {
+                            id: queryMessageInput
+                            width: parent.width
+                            placeholder: "MESSAGE // WORDS IN COMMIT MESSAGE"
+                            accent: Colors.green
+                            keyboardOwner: root.keyboardHost
+                            editorFontSize: 10
+                            placeholderFontSize: 9
+                        }
+
                         Row {
                             width: parent.width
                             height: 30
@@ -1549,6 +1626,52 @@ Item {
 
                         Row {
                             width: parent.width
+                            height: 28
+                            spacing: 5
+
+                            MiniButton {
+                                width: (parent.width - 15) / 4
+                                label: "TODAY"
+                                accent: Colors.orange
+                                selected:
+                                    querySinceInput.text === "midnight"
+                                onTriggered:
+                                    root.applyQueryPreset("today")
+                            }
+
+                            MiniButton {
+                                width: (parent.width - 15) / 4
+                                label: "7 DAYS"
+                                accent: Colors.orange
+                                selected:
+                                    querySinceInput.text === "7 days ago"
+                                onTriggered:
+                                    root.applyQueryPreset("7d")
+                            }
+
+                            MiniButton {
+                                width: (parent.width - 15) / 4
+                                label: "30 DAYS"
+                                accent: Colors.orange
+                                selected:
+                                    querySinceInput.text === "30 days ago"
+                                onTriggered:
+                                    root.applyQueryPreset("30d")
+                            }
+
+                            MiniButton {
+                                width: (parent.width - 15) / 4
+                                label: "ME"
+                                accent: Colors.magenta
+                                selected:
+                                    queryAuthorInput.text === "@me"
+                                onTriggered:
+                                    root.applyQueryPreset("me")
+                            }
+                        }
+
+                        Row {
+                            width: parent.width
                             height: 32
                             spacing: 6
 
@@ -1564,6 +1687,7 @@ Item {
                                 enabledAction:
                                     root.historyService
                                     && !root.historyService.queryBusy
+                                    && root.queryHasFilters()
                                 onTriggered: {
                                     root.selectedQuerySha = "";
                                     root.historyService.runQuery(
@@ -1571,7 +1695,8 @@ Item {
                                         queryAuthorInput.text,
                                         querySinceInput.text,
                                         queryUntilInput.text,
-                                        queryRangeInput.text
+                                        queryRangeInput.text,
+                                        queryMessageInput.text
                                     );
                                 }
                             }
@@ -1586,12 +1711,39 @@ Item {
                                 onTriggered: {
                                     queryPathInput.text = "";
                                     queryAuthorInput.text = "";
+                                    queryMessageInput.text = "";
                                     querySinceInput.text = "";
                                     queryUntilInput.text = "";
                                     queryRangeInput.text = "";
                                     root.selectedQuerySha = "";
                                     root.historyService.clearQuery();
                                 }
+                            }
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 52
+                            color: Colors.black
+                            border.width: 1
+                            border.color:
+                                root.queryHasFilters()
+                                ? Colors.green
+                                : Colors.cyan
+
+                            GohuText {
+                                anchors {
+                                    fill: parent
+                                    margins: 6
+                                }
+                                text: root.queryFilterSummary()
+                                font.pixelSize: 9
+                                color:
+                                    root.queryHasFilters()
+                                    ? Colors.green
+                                    : Colors.cyan
+                                wrapMode: Text.WordWrap
+                                elide: Text.ElideRight
                             }
                         }
 

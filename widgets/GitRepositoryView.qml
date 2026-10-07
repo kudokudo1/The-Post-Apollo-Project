@@ -582,6 +582,190 @@ Item {
         return "LIGHTWEIGHT";
     }
 
+    function selectedRemoteRow() {
+        if (!root.repositoryService || !root.selectedRemoteName)
+            return null;
+
+        const rows = root.repositoryService.remotes || [];
+
+        for (let i = 0; i < rows.length; ++i) {
+            if (String(rows[i].name || "") === root.selectedRemoteName)
+                return rows[i];
+        }
+
+        return null;
+    }
+
+    function selectedTagRow() {
+        if (!root.repositoryService || !root.selectedTag)
+            return null;
+
+        const rows = root.repositoryService.tags || [];
+
+        for (let i = 0; i < rows.length; ++i) {
+            if (String(rows[i].name || "") === root.selectedTag)
+                return rows[i];
+        }
+
+        return null;
+    }
+
+    function ageLabel(epochValue) {
+        const epoch = Number(epochValue || 0);
+
+        if (epoch <= 0)
+            return "UNKNOWN";
+
+        const seconds = Math.max(
+            0,
+            Math.floor(Date.now() / 1000) - epoch
+        );
+
+        if (seconds < 3600)
+            return String(Math.max(1, Math.floor(seconds / 60))) + "M";
+        if (seconds < 86400)
+            return String(Math.floor(seconds / 3600)) + "H";
+        if (seconds < 86400 * 90)
+            return String(Math.floor(seconds / 86400)) + "D";
+        if (seconds < 86400 * 365)
+            return String(Math.floor(seconds / (86400 * 30))) + "MO";
+
+        return String(Math.floor(seconds / (86400 * 365))) + "Y";
+    }
+
+    function remoteNewestEpoch(nameValue) {
+        if (!root.repositoryService)
+            return 0;
+
+        const name = String(nameValue || "");
+        const rows = root.repositoryService.remoteBranches || [];
+        let newest = 0;
+
+        for (let i = 0; i < rows.length; ++i) {
+            const row = rows[i] || {};
+            if (String(row.remote || "") !== name)
+                continue;
+
+            newest = Math.max(newest, Number(row.epoch || 0));
+        }
+
+        return newest;
+    }
+
+    function remoteOldestEpoch(nameValue) {
+        if (!root.repositoryService)
+            return 0;
+
+        const name = String(nameValue || "");
+        const rows = root.repositoryService.remoteBranches || [];
+        let oldest = 0;
+
+        for (let i = 0; i < rows.length; ++i) {
+            const row = rows[i] || {};
+            if (String(row.remote || "") !== name)
+                continue;
+
+            const epoch = Number(row.epoch || 0);
+            if (epoch <= 0)
+                continue;
+
+            if (oldest <= 0 || epoch < oldest)
+                oldest = epoch;
+        }
+
+        return oldest;
+    }
+
+    function remoteUpstreamCount(nameValue) {
+        if (!root.repositoryService)
+            return 0;
+
+        const remote = String(nameValue || "");
+        const rows = root.repositoryService.configRows || [];
+        let count = 0;
+
+        for (let i = 0; i < rows.length; ++i) {
+            const row = rows[i] || {};
+            const key = String(row.key || "");
+            const value = String(row.value || "");
+
+            if (key.indexOf("branch.") === 0
+                    && key.lastIndexOf(".remote")
+                       === key.length - 7
+                    && value === remote)
+                count += 1;
+        }
+
+        return count;
+    }
+
+    function remoteTransportLabel(rowValue) {
+        const row = rowValue || {};
+        const fetchUrl = String(row.url || "");
+        const pushUrl = String(row.pushUrl || "");
+
+        if (!fetchUrl && !pushUrl)
+            return "NO URL";
+
+        return fetchUrl === pushUrl
+            ? "SAME FETCH/PUSH"
+            : "SPLIT FETCH/PUSH";
+    }
+
+    function tagKindLabel(rowValue) {
+        const row = rowValue || {};
+        const kind = String(row.kind || "lightweight");
+
+        if (kind === "signed")
+            return "SIGNED";
+        if (kind === "annotated")
+            return "ANNOTATED";
+        return "LIGHTWEIGHT";
+    }
+
+    function tagKindColor(rowValue) {
+        const kind = String((rowValue || {}).kind || "lightweight");
+
+        if (kind === "signed")
+            return Colors.magenta;
+        if (kind === "annotated")
+            return Colors.orange;
+        return Colors.cyan;
+    }
+
+    function selectedTagRemoteState() {
+        if (!root.repositoryService
+                || !root.selectedTag
+                || !tagRemoteInput.text.trim())
+            return "UNCHECKED";
+
+        if (root.repositoryService.tagRemoteCheckTag
+                !== root.selectedTag
+                || root.repositoryService.tagRemoteCheckRemote
+                   !== tagRemoteInput.text.trim())
+            return "UNCHECKED";
+
+        return String(
+            root.repositoryService.tagRemoteCheckState
+            || "UNCHECKED"
+        );
+    }
+
+    function tagRemoteStateColor() {
+        const state = root.selectedTagRemoteState();
+
+        if (state === "MATCH")
+            return Colors.green;
+        if (state === "MISSING")
+            return Colors.orange;
+        if (state === "DIVERGED" || state === "ERROR")
+            return Colors.red;
+        if (state === "CHECKING")
+            return Colors.cyan;
+
+        return Colors.blue;
+    }
+
     component SectionLabel: GohuText {
         font.pixelSize: 14
         color: Colors.magenta

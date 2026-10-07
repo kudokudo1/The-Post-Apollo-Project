@@ -269,11 +269,21 @@ Item {
         return state;
     }
 
+    function commitTrailerRisk() {
+        return Boolean(
+            root.commitAmend
+            && root.changesService
+            && root.changesService.headTrailers.length > 0
+            && commitInput.text.trim().length > 0
+        );
+    }
+
     function commitPolicyText() {
         if (!root.changesService)
             return "UNKNOWN";
 
         const hooks = root.changesService.commitHooks || [];
+        const trailers = root.changesService.headTrailers || [];
         let text =
             root.commitNoVerify
             ? "NO VERIFY // "
@@ -285,6 +295,19 @@ Item {
 
         if (root.changesService.commitTemplate)
             text += " // TEMPLATE";
+
+        if (root.commitAmend && trailers.length > 0) {
+            text +=
+                root.commitTrailerRisk()
+                ? " // REPLACES "
+                  + String(trailers.length)
+                  + " HEAD TRAILER"
+                  + (trailers.length === 1 ? "" : "S")
+                : " // PRESERVES "
+                  + String(trailers.length)
+                  + " HEAD TRAILER"
+                  + (trailers.length === 1 ? "" : "S");
+        }
 
         return text;
     }
@@ -2181,6 +2204,8 @@ Item {
                         accent:
                             root.commitNoVerify
                             ? Colors.red
+                            : root.commitTrailerRisk()
+                            ? Colors.orange
                             : root.changesService
                               && root.changesService.commitHooks.length > 0
                             ? Colors.orange

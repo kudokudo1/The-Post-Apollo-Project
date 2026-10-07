@@ -1306,6 +1306,9 @@ PanelWindow {
             if (speechInputService.busy)
                 speechInputService.cancel();
 
+            if (intercomSpeechInputService.busy)
+                intercomSpeechInputService.cancel();
+
             root.leaveRoomControls();
             root.leaveBedControls();
             return;
@@ -1408,6 +1411,11 @@ PanelWindow {
                 String(message || "VOICE INPUT ERROR")
             );
         }
+    }
+
+    HospitalSpeechInputService {
+        id: intercomSpeechInputService
+        audioFileName: "hospital-intercom-voice.wav"
     }
 
     HospitalRemoteWatcher {
@@ -4293,6 +4301,7 @@ PanelWindow {
 
             registryService: specialistRegistryService
             intercomService: intercomService
+            speechInputService: intercomSpeechInputService
             workingDirectory: floorService.bedPath
             floorLabel: floorService.floorLabel
             roomLabel:

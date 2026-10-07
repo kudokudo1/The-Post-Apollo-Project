@@ -7,6 +7,7 @@ Item {
 
     property var gitService: null
     property var historyService: null
+    property var interactiveRebaseService: null
     property var keyboardHost: null
 
     property string subMode: "log"
@@ -1044,6 +1045,11 @@ Item {
                         key: "operate",
                         label: "OPERATE",
                         color: Colors.red
+                    },
+                    {
+                        key: "rebase",
+                        label: "REBASE",
+                        color: Colors.magenta
                     }
                 ]
 
@@ -1052,8 +1058,8 @@ Item {
                     width:
                         (
                             parent.width
-                            - parent.spacing * 4
-                        ) / 5
+                            - parent.spacing * 5
+                        ) / 6
                     height: 34
                     label: modelData.label
                     accent: modelData.color
@@ -2723,6 +2729,15 @@ Item {
                         }
 }
                 }
+            }
+
+            // ===== REBASE ================================================
+            GitInteractiveRebaseView {
+                anchors.fill: parent
+                visible: root.subMode === "rebase"
+
+                rebaseService: root.interactiveRebaseService
+                keyboardHost: root.keyboardHost
             }
 
             // ===== OPERATE ===============================================

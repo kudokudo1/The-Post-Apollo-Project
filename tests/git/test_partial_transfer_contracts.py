@@ -154,13 +154,13 @@ def make_partial_change(source: Path):
     return staged, worktree
 
 
-def apply_index(repo: Path, patch: bytes, reverse=False, check_only=False):
+def apply_cached(repo: Path, patch: bytes, reverse=False, check_only=False):
     args = ["apply"]
     if reverse:
         args.append("-R")
     if check_only:
         args.append("--check")
-    args.extend(["--index", "--binary", "--whitespace=nowarn", "-"])
+    args.extend(["--cached", "--binary", "--whitespace=nowarn", "-"])
     return git(repo, *args, input_bytes=patch, check=False)
 
 
@@ -172,6 +172,16 @@ def apply_worktree(repo: Path, patch: bytes, reverse=False, check_only=False):
         args.append("--check")
     args.extend(["--binary", "--whitespace=nowarn", "-"])
     return git(repo, *args, input_bytes=patch, check=False)
+
+
+def apply_staged_layer(repo: Path, patch: bytes):
+    assert apply_cached(repo, patch).returncode == 0
+    assert apply_worktree(repo, patch).returncode == 0
+
+
+def remove_staged_layer(repo: Path, patch: bytes):
+    assert apply_worktree(repo, patch, reverse=True).returncode == 0
+    assert apply_cached(repo, patch, reverse=True).returncode == 0
 
 
 def assert_partial(repo: Path, staged: bytes, worktree: bytes):
@@ -187,8 +197,8 @@ def smoke_copy_and_undo():
         fingerprint = hashlib.sha256(payload).hexdigest()
         assert fingerprint
 
-        assert apply_index(destination, staged, check_only=True).returncode == 0
-        assert apply_index(destination, staged).returncode == 0
+        assert apply_cached(destination, staged, check_only=True).returncode == 0
+        apply_staged_layer(destination, staged)
         assert apply_worktree(destination, worktree).returncode == 0
 
         assert_partial(source, staged, worktree)
@@ -197,7 +207,7 @@ def smoke_copy_and_undo():
         # COPY Undo removes worktree layer first, then staged layer.
         assert apply_worktree(destination, worktree, reverse=True, check_only=True).returncode == 0
         assert apply_worktree(destination, worktree, reverse=True).returncode == 0
-        assert apply_index(destination, staged, reverse=True).returncode == 0
+        remove_staged_layer(destination, staged)
 
         assert_partial(source, staged, worktree)
         assert status(destination) == ""
@@ -209,20 +219,20 @@ def smoke_move_and_undo():
         staged, worktree = make_partial_change(source)
 
         # MOVE lands staged first, then worktree; source removes in reverse order.
-        assert apply_index(destination, staged).returncode == 0
+        apply_staged_layer(destination, staged)
         assert apply_worktree(destination, worktree).returncode == 0
         assert apply_worktree(source, worktree, reverse=True).returncode == 0
-        assert apply_index(source, staged, reverse=True).returncode == 0
+        remove_staged_layer(source, staged)
 
         assert status(source) == ""
         assert_partial(destination, staged, worktree)
 
         # MOVE Undo restores source staged first, then worktree; removes destination in reverse.
-        assert apply_index(source, staged, check_only=True).returncode == 0
-        assert apply_index(source, staged).returncode == 0
+        assert apply_cached(source, staged, check_only=True).returncode == 0
+        apply_staged_layer(source, staged)
         assert apply_worktree(source, worktree).returncode == 0
         assert apply_worktree(destination, worktree, reverse=True).returncode == 0
-        assert apply_index(destination, staged, reverse=True).returncode == 0
+        remove_staged_layer(destination, staged)
 
         assert_partial(source, staged, worktree)
         assert status(destination) == ""

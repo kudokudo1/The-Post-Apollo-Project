@@ -735,6 +735,7 @@ Scope {
         const sourceHead = String(previewSourceHead || "");
         const destinationHead = String(previewDestinationHead || "");
         const scope = String(previewScope || "file");
+        const layer = String(previewLayer || "worktree");
         const hunkIndex = Number(previewHunkIndex);
 
         if (!source
@@ -762,7 +763,8 @@ Scope {
                 'expected_destination_head="$6"',
                 'scope="$7"',
                 'hunk_index="$8"',
-                'shift 8',
+                'layer="$9"',
+                'shift 9',
                 'files=("$@")',
                 'refuse() { printf "REFUSED\\t%s\\n" "$1"; exit 1; }',
                 'source="$(realpath "$source")" || refuse "SOURCE PATH CANNOT BE RESOLVED"',
@@ -847,7 +849,8 @@ Scope {
             sourceHead,
             destinationHead,
             scope,
-            String(hunkIndex)
+            String(hunkIndex),
+            layer
         ];
 
         for (let i = 0; i < files.length; ++i)

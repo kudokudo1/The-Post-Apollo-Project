@@ -15,6 +15,7 @@ Item {
 
     property bool transferOpen: false
     property string transferScope: "file"
+    property string transferLayer: "worktree"
     property int transferHunkIndex: -1
     property int transferLineIndex: -1
 
@@ -56,25 +57,48 @@ Item {
             : ""
     }
 
-    function fileTransferEligible() {
+    function baseWholeFileTransferEligible() {
         const row = root.selectedFile || {};
-
-        const wholeFileCandidate =
-            Boolean(row.untracked)
-            || (
-                Boolean(row.unstaged)
-                && !Boolean(row.staged)
-              );
 
         return !!root.changesService
             && !!root.transferService
             && !!root.branchWorkspaceService
             && root.selectedPath.length > 0
-            && wholeFileCandidate
             && !Boolean(row.conflict)
             && !root.changesService.actionBusy
             && !root.transferService.previewBusy
             && !root.transferService.transferBusy;
+    }
+
+    function worktreeFileTransferEligible() {
+        const row = root.selectedFile || {};
+
+        return root.baseWholeFileTransferEligible()
+            && Boolean(row.unstaged)
+            && !Boolean(row.staged)
+            && !Boolean(row.untracked);
+    }
+
+    function stagedFileTransferEligible() {
+        const row = root.selectedFile || {};
+
+        return root.baseWholeFileTransferEligible()
+            && Boolean(row.staged)
+            && !Boolean(row.unstaged)
+            && !Boolean(row.untracked);
+    }
+
+    function untrackedFileTransferEligible() {
+        const row = root.selectedFile || {};
+
+        return root.baseWholeFileTransferEligible()
+            && Boolean(row.untracked);
+    }
+
+    function fileTransferEligible() {
+        return root.worktreeFileTransferEligible()
+            || root.stagedFileTransferEligible()
+            || root.untrackedFileTransferEligible();
     }
 
     function transferEligible() {
@@ -82,7 +106,7 @@ Item {
     }
 
     function hunkTransferEligible() {
-        return root.fileTransferEligible()
+        return root.worktreeFileTransferEligible()
             && root.hunkMode === "worktree"
             && root.selectedHunkIndex >= 0
             && !root.changesService.hunkBusy;
@@ -91,7 +115,7 @@ Item {
     function lineTransferEligible() {
         const line = root.selectedLine();
 
-        return root.fileTransferEligible()
+        return root.worktreeFileTransferEligible()
             && root.hunkMode === "worktree"
             && root.selectedHunkIndex >= 0
             && root.selectedLineIndex >= 0
@@ -127,6 +151,14 @@ Item {
         lineTransferService.clearPreview();
 
         root.transferScope = requested;
+        root.transferLayer =
+            requested !== "file"
+            ? "worktree"
+            : root.untrackedFileTransferEligible()
+            ? "untracked"
+            : root.stagedFileTransferEligible()
+            ? "staged"
+            : "worktree";
         root.transferHunkIndex =
             requested === "hunk" || requested === "line"
             ? root.selectedHunkIndex
@@ -146,6 +178,7 @@ Item {
     function closeTransfer() {
         root.transferOpen = false;
         root.transferScope = "file";
+        root.transferLayer = "worktree";
         root.transferHunkIndex = -1;
         root.transferLineIndex = -1;
 
@@ -2671,6 +2704,7 @@ Item {
             ? Boolean(root.selectedFile.untracked)
             : false
         transferScope: root.transferScope
+        transferLayer: root.transferLayer
         hunkIndex: root.transferHunkIndex
         hunkSummary:
             root.transferScope === "hunk"

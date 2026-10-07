@@ -766,6 +766,51 @@ Item {
         return Colors.blue;
     }
 
+    function tagRemoteStatusText() {
+        if (!root.repositoryService)
+            return "NO REPOSITORY SERVICE";
+
+        const state = root.selectedTagRemoteState();
+        const remote = String(tagRemoteInput.text || "").trim();
+
+        if (state === "MATCH")
+            return (
+                "MATCH // "
+                + remote
+                + " RESOLVES TO "
+                + String(
+                    root.repositoryService.tagRemoteTarget
+                    || ""
+                  ).slice(0, 10)
+            );
+
+        if (state === "MISSING")
+            return "MISSING // PUSH SELECTED TAG WILL CREATE IT";
+
+        if (state === "DIVERGED")
+            return (
+                "DIVERGED // LOCAL "
+                + String(
+                    root.repositoryService.tagRemoteLocalTarget
+                    || ""
+                  ).slice(0, 10)
+                + " // REMOTE "
+                + String(
+                    root.repositoryService.tagRemoteTarget
+                    || ""
+                  ).slice(0, 10)
+                + " // NORMAL PUSH WILL REFUSE"
+            );
+
+        if (state === "CHECKING")
+            return "CHECKING REMOTE TAG // NETWORK READ";
+
+        if (state === "ERROR")
+            return "REMOTE TAG CHECK FAILED // SEE STATUS BAR";
+
+        return "UNCHECKED // REMOTE PRESENCE REQUIRES EXPLICIT NETWORK READ";
+    }
+
     component SectionLabel: GohuText {
         font.pixelSize: 14
         color: Colors.magenta
@@ -1680,7 +1725,7 @@ Item {
                                     required property var modelData
 
                                     width: tagColumn.width
-                                    height: 48
+                                    height: 62
                                     color:
                                         tagMouse.containsMouse
                                         || root.selectedTag
@@ -1705,11 +1750,44 @@ Item {
                                             text:
                                                 String(tagRow.modelData.name || "")
                                                 + " // "
-                                                + String(
-                                                    tagRow.modelData.shortSha || ""
+                                                + root.tagKindLabel(
+                                                    tagRow.modelData
+                                                )
+                                                + (
+                                                    Boolean(
+                                                        tagRow.modelData.atHead
+                                                    )
+                                                    ? " // HEAD ✓"
+                                                    : ""
                                                   )
                                             font.pixelSize: 11
-                                            color: Colors.orange
+                                            color:
+                                                root.tagKindColor(
+                                                    tagRow.modelData
+                                                )
+                                            elide: Text.ElideRight
+                                        }
+
+                                        GohuText {
+                                            width: parent.width
+                                            text:
+                                                String(
+                                                    tagRow.modelData.targetType
+                                                    || "object"
+                                                ).toUpperCase()
+                                                + " // "
+                                                + String(
+                                                    tagRow.modelData.targetSha
+                                                    || tagRow.modelData.shortSha
+                                                    || ""
+                                                  ).slice(0, 10)
+                                                + " // AGE "
+                                                + root.ageLabel(
+                                                    tagRow.modelData.epoch
+                                                )
+                                            font.pixelSize: 8
+                                            color: Colors.cyan
+                                            elide: Text.ElideRight
                                         }
 
                                         GohuText {
@@ -1736,6 +1814,10 @@ Item {
                                                 );
                                             tagNameInput.text =
                                                 root.selectedTag;
+                                            if (root.repositoryService)
+                                                root.repositoryService
+                                                    .clearTagRemoteCheck();
+                                            root.armedAction = "";
                                         }
                                     }
                                 }
@@ -1764,6 +1846,111 @@ Item {
 
                         SectionLabel {
                             text: "TAG OPERATIONS"
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 88
+                            color: Colors.dark
+                            border.width: 1
+                            border.color:
+                                root.selectedTag
+                                ? root.tagKindColor(
+                                    root.selectedTagRow()
+                                  )
+                                : Colors.orange
+
+                            Column {
+                                anchors {
+                                    fill: parent
+                                    margins: 7
+                                }
+                                spacing: 4
+
+                                GohuText {
+                                    width: parent.width
+                                    text: {
+                                        const row =
+                                            root.selectedTagRow();
+
+                                        if (!row)
+                                            return "TAG INTELLIGENCE // SELECT TAG";
+
+                                        return (
+                                            "TAG INTELLIGENCE // "
+                                            + root.tagKindLabel(row)
+                                            + (
+                                                Boolean(row.atHead)
+                                                ? " // POINTS AT HEAD"
+                                                : ""
+                                              )
+                                        );
+                                    }
+                                    font.pixelSize: 10
+                                    color:
+                                        root.selectedTag
+                                        ? root.tagKindColor(
+                                            root.selectedTagRow()
+                                          )
+                                        : Colors.orange
+                                    elide: Text.ElideRight
+                                }
+
+                                GohuText {
+                                    width: parent.width
+                                    text: {
+                                        const row =
+                                            root.selectedTagRow();
+
+                                        if (!row)
+                                            return "NO TAG SELECTED";
+
+                                        return (
+                                            "TAG OBJECT "
+                                            + String(
+                                                row.shortSha || ""
+                                              )
+                                            + " // TARGET "
+                                            + String(
+                                                row.targetType || "object"
+                                              ).toUpperCase()
+                                            + " "
+                                            + String(
+                                                row.targetSha || ""
+                                              ).slice(0, 10)
+                                            + " // AGE "
+                                            + root.ageLabel(row.epoch)
+                                        );
+                                    }
+                                    font.pixelSize: 9
+                                    color: Colors.cyan
+                                    elide: Text.ElideRight
+                                }
+
+                                GohuText {
+                                    width: parent.width
+                                    text: {
+                                        const row =
+                                            root.selectedTagRow();
+
+                                        if (!row)
+                                            return "Lightweight tags point directly at an object; annotated and signed tags have their own tag object.";
+
+                                        if (String(row.kind || "") === "signed")
+                                            return "SIGNED tag object detected // remote comparison uses the peeled target.";
+
+                                        if (String(row.kind || "") === "annotated")
+                                            return "ANNOTATED tag object // remote comparison uses the peeled target.";
+
+                                        return "LIGHTWEIGHT tag // tag ref points directly at its target object.";
+                                    }
+                                    font.pixelSize: 8
+                                    color: Colors.white
+                                    opacity: 0.60
+                                    wrapMode: Text.WordWrap
+                                    elide: Text.ElideRight
+                                }
+                            }
                         }
 
                         EditorBox {
@@ -1834,13 +2021,69 @@ Item {
                                 )
                         }
 
-                        EditorBox {
-                            id: tagRemoteInput
+                        Row {
                             width: parent.width
-                            placeholder: "REMOTE FOR TAG PUSH"
-                            accent: Colors.magenta
-                            keyboardOwner: root.keyboardHost
-                            text: "origin"
+                            height: 30
+                            spacing: 6
+
+                            EditorBox {
+                                id: tagRemoteInput
+                                width: parent.width - 146
+                                placeholder: "REMOTE FOR TAG PUSH"
+                                accent: Colors.magenta
+                                keyboardOwner: root.keyboardHost
+                                text: "origin"
+
+                                onTextChanged: {
+                                    if (root.repositoryService)
+                                        root.repositoryService
+                                            .clearTagRemoteCheck();
+                                    root.armedAction = "";
+                                }
+                            }
+
+                            MiniButton {
+                                width: 140
+                                height: 30
+                                label:
+                                    root.selectedTagRemoteState()
+                                    === "CHECKING"
+                                    ? "CHECKING"
+                                    : "CHECK REMOTE TAG"
+                                accent: root.tagRemoteStateColor()
+                                enabledAction:
+                                    root.selectedTag
+                                    && tagRemoteInput.text.trim()
+                                    && root.repositoryService
+                                    && !root.repositoryService.actionBusy
+                                onTriggered:
+                                    root.repositoryService.checkRemoteTag(
+                                        tagRemoteInput.text.trim(),
+                                        root.selectedTag
+                                    )
+                            }
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 42
+                            color: Colors.dark
+                            border.width: 1
+                            border.color:
+                                root.tagRemoteStateColor()
+
+                            GohuText {
+                                anchors {
+                                    fill: parent
+                                    margins: 7
+                                }
+                                verticalAlignment: Text.AlignVCenter
+                                text: root.tagRemoteStatusText()
+                                font.pixelSize: 9
+                                color: root.tagRemoteStateColor()
+                                wrapMode: Text.WordWrap
+                                elide: Text.ElideRight
+                            }
                         }
 
                         Row {
@@ -1857,6 +2100,11 @@ Item {
                                     root.selectedTag
                                     && tagRemoteInput.text.trim()
                                     && root.repositoryService
+                                    && !root.repositoryService.actionBusy
+                                    && root.selectedTagRemoteState()
+                                       !== "MATCH"
+                                    && root.selectedTagRemoteState()
+                                       !== "DIVERGED"
                                 onTriggered:
                                     root.repositoryService.pushTag(
                                         tagRemoteInput.text.trim(),
@@ -1872,6 +2120,7 @@ Item {
                                 enabledAction:
                                     tagRemoteInput.text.trim()
                                     && root.repositoryService
+                                    && !root.repositoryService.actionBusy
                                 onTriggered:
                                     root.repositoryService.pushAllTags(
                                         tagRemoteInput.text.trim()
@@ -1920,6 +2169,9 @@ Item {
                                     root.selectedTag
                                     && tagRemoteInput.text.trim()
                                     && root.repositoryService
+                                    && !root.repositoryService.actionBusy
+                                    && root.selectedTagRemoteState()
+                                       !== "MISSING"
                                 onTriggered:
                                     root.armOrRun(
                                         "delete-remote-tag",

@@ -24,6 +24,7 @@ Rectangle {
 
     signal closeRequested()
     signal pullRequestRequested(string repository, int number)
+    signal queueRequested(string repository, string branch)
 
     color: Colors.dark
     border.width: 1
@@ -329,22 +330,39 @@ Rectangle {
                         }
                     }
 
-                    AttnButton {
-                        id: openButton
-
+                    Column {
                         width: 98
                         anchors.verticalCenter: parent.verticalCenter
-                        label: "OPEN PULLS"
-                        accent:
-                            root.stateColor(row.modelData.primaryState)
-                        enabledAction:
-                            Number(row.modelData.number || 0) > 0
-                            && String(row.modelData.repository || "").length > 0
-                        onTriggered:
-                            root.pullRequestRequested(
-                                String(row.modelData.repository || ""),
-                                Number(row.modelData.number || 0)
-                            )
+                        spacing: 5
+
+                        AttnButton {
+                            width: parent.width
+                            label: "OPEN PULLS"
+                            accent:
+                                root.stateColor(row.modelData.primaryState)
+                            enabledAction:
+                                Number(row.modelData.number || 0) > 0
+                                && String(row.modelData.repository || "").length > 0
+                            onTriggered:
+                                root.pullRequestRequested(
+                                    String(row.modelData.repository || ""),
+                                    Number(row.modelData.number || 0)
+                                )
+                        }
+
+                        AttnButton {
+                            width: parent.width
+                            label: "QUEUE"
+                            accent: Colors.blue
+                            enabledAction:
+                                String(row.modelData.repository || "").length > 0
+                                && String(row.modelData.baseRefName || "").length > 0
+                            onTriggered:
+                                root.queueRequested(
+                                    String(row.modelData.repository || ""),
+                                    String(row.modelData.baseRefName || "")
+                                )
+                        }
                     }
                 }
 

@@ -30,6 +30,9 @@ PanelWindow {
     property string roomControlAction: ""
     property bool bedControlMode: false
     property string operationsSurface: ""
+    property string attentionSubview: "triage"
+    property string attentionQueueRepository: ""
+    property string attentionQueueBranch: ""
     property bool phoneMenuOpen: false
     property bool intercomMenuOpen: false
     property bool intercomTyping: false
@@ -1599,7 +1602,33 @@ PanelWindow {
         root.leaveBedControls();
         root.phoneMenuOpen = false;
         root.intercomMenuOpen = false;
+        root.attentionSubview = "triage";
+        root.attentionQueueRepository = "";
+        root.attentionQueueBranch = "";
         root.operationsSurface = "attention";
+        root.refreshGithubAttention();
+    }
+
+    function openAttentionQueue(repository, branch) {
+        const repo = String(repository || "").trim();
+        const base = String(branch || "").trim();
+
+        if (!/^[^/\s]+\/[^/\s]+$/.test(repo))
+            return false;
+
+        root.attentionQueueRepository = repo;
+        root.attentionQueueBranch = base;
+        root.attentionSubview = "queue";
+        root.operationsSurface = "attention";
+
+        if (!hospitalMergeQueueProvider.busy)
+            hospitalMergeQueueProvider.refresh(repo, base);
+
+        return true;
+    }
+
+    function closeAttentionQueue() {
+        root.attentionSubview = "triage";
         root.refreshGithubAttention();
     }
 
@@ -1938,6 +1967,10 @@ PanelWindow {
         id: githubAttentionProvider
     }
 
+    GitHubMergeQueueProvider {
+        id: hospitalMergeQueueProvider
+    }
+
     Connections {
         target: attentionCatalogGitService
 
@@ -1954,8 +1987,29 @@ PanelWindow {
         running:
             root.menuOpen
             && root.operationsSurface === "attention"
+            && root.attentionSubview === "triage"
 
         onTriggered: root.refreshGithubAttention()
+    }
+
+    Timer {
+        id: attentionQueueRefreshTimer
+        interval: 300000
+        repeat: true
+        running:
+            root.menuOpen
+            && root.operationsSurface === "attention"
+            && root.attentionSubview === "queue"
+
+        onTriggered: {
+            if (!hospitalMergeQueueProvider.busy
+                    && root.attentionQueueRepository) {
+                hospitalMergeQueueProvider.refresh(
+                    root.attentionQueueRepository,
+                    root.attentionQueueBranch
+                );
+            }
+        }
     }
 
     HospitalService {
@@ -6199,7 +6253,9 @@ PanelWindow {
             id: githubAttentionView
 
             z: 700
-            visible: root.operationsSurface === "attention"
+            visible:
+                root.operationsSurface === "attention"
+                && root.attentionSubview === "triage"
             attentionProvider: githubAttentionProvider
 
             anchors {
@@ -6214,6 +6270,45 @@ PanelWindow {
             }
 
             onCloseRequested: root.showSurgery()
+
+            onPullRequestRequested: function(repository, number) {
+                root.githubPullRequestRequested(
+                    repository,
+                    number
+                );
+            }
+
+            onQueueRequested: function(repository, branch) {
+                root.openAttentionQueue(
+                    repository,
+                    branch
+                );
+            }
+        }
+
+        HospitalGitHubMergeQueueView {
+            id: githubMergeQueueView
+
+            z: 700
+            visible:
+                root.operationsSurface === "attention"
+                && root.attentionSubview === "queue"
+            queueProvider: hospitalMergeQueueProvider
+            repositorySlug: root.attentionQueueRepository
+            branchName: root.attentionQueueBranch
+
+            anchors {
+                left: parent.left
+                right: parent.right
+                top: fixedTop.bottom
+                bottom: actionBay.top
+                leftMargin: 18
+                rightMargin: 18
+                topMargin: 8
+                bottomMargin: 10
+            }
+
+            onCloseRequested: root.closeAttentionQueue()
 
             onPullRequestRequested: function(repository, number) {
                 root.githubPullRequestRequested(

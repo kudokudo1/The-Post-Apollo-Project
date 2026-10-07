@@ -171,6 +171,65 @@ Scope {
         };
     }
 
+    function absorbRecoveryPlan(record) {
+        const row = record || {};
+        const metadata = row.metadata || {};
+        const kind = String(row.kind || "");
+
+        if (kind !== "HISTORY/ABSORB_STAGED")
+            return null;
+
+        if (String(row.recoveryClass || "") !== "CONTENT_RECOVERABLE"
+                || String((row.before || {}).recoveryClass || "")
+                   !== "CONTENT_RECOVERABLE"
+                || String((row.after || {}).recoveryClass || "")
+                   !== "CONTENT_RECOVERABLE") {
+            return refuse(
+                "ABSORB DOES NOT HAVE DURABLE CONTENT RECOVERY"
+            );
+        }
+
+        const branch = String(metadata.branch || "");
+        const patchBase64 = String(metadata.patchBase64 || "");
+        const fingerprint = String(metadata.fingerprint || "");
+        const patchBytes = Number(metadata.patchBytes || 0);
+        const before = row.before || {};
+        const after = row.after || {};
+        const beforeBranch = String(before.branch || "");
+        const afterBranch = String(after.branch || "");
+        const ref = "refs/heads/" + branch;
+        const restoreSha = refSha(before, ref);
+        const expectedSha = refSha(after, ref);
+
+        if (!branch
+                || beforeBranch !== branch
+                || afterBranch !== branch
+                || !restoreSha
+                || !expectedSha
+                || restoreSha === expectedSha
+                || String(before.head || "") !== restoreSha
+                || String(after.head || "") !== expectedSha
+                || !patchBase64
+                || !fingerprint
+                || patchBytes <= 0) {
+            return refuse("ABSORB RECOVERY PAYLOAD IS INCOMPLETE");
+        }
+
+        return {
+            allowed: true,
+            strategy: "UNDO_ABSORB_STAGED",
+            branch: branch,
+            restoreSha: restoreSha,
+            expectedSha: expectedSha,
+            patchBase64: patchBase64,
+            fingerprint: fingerprint,
+            patchBytes: patchBytes,
+            summary:
+                "RESTORE PRE-ABSORB HISTORY + STAGED PATCH // "
+                + branch
+        };
+    }
+
     function preview(record) {
         const row = record || {};
         const kind = String(row.kind || "");
@@ -188,6 +247,10 @@ Scope {
         const transferPlan = transferRecoveryPlan(row);
         if (transferPlan)
             return transferPlan;
+
+        const absorbPlan = absorbRecoveryPlan(row);
+        if (absorbPlan)
+            return absorbPlan;
 
         if (recoveryClass !== "REF_RECOVERABLE"
                 || String(before.recoveryClass || "") !== "REF_RECOVERABLE"
@@ -664,6 +727,13 @@ Scope {
             a = String(plan.branch || "");
             b = String(plan.restoreSha || "");
             c = String(plan.expectedSha || "");
+        } else if (strategy === "UNDO_ABSORB_STAGED") {
+            a = String(plan.branch || "");
+            b = String(plan.restoreSha || "");
+            c = String(plan.expectedSha || "");
+            d = String(plan.patchBase64 || "");
+            e = String(plan.fingerprint || "");
+            f = String(plan.patchBytes || "");
         } else if (strategy === "UNDO_TRANSFER_CONTENT") {
             a = String(plan.sourcePath || "");
             b = String(plan.destinationPath || "");
@@ -844,6 +914,47 @@ Scope {
                 '      exit 124',
                 '    fi',
                 '    printf "OK\\tRESTORED PRE-REBASE HEAD // %s\\n" "$branch"',
+                '    ;;',
+                '  UNDO_ABSORB_STAGED)',
+                '    branch="$a"',
+                '    restore="$b"',
+                '    expected="$c"',
+                '    payload="$d"',
+                '    expected_fingerprint="$e"',
+                '    expected_bytes="$f"',
+                '    ref="refs/heads/$branch"',
+                '    head_ref="$(git -C "$repo" symbolic-ref -q HEAD 2>/dev/null || true)"',
+                '    [ "$head_ref" = "$ref" ] || { printf "REFUSED\\tABSORB BRANCH IS NOT CURRENTLY CHECKED OUT\\n"; exit 125; }',
+                '    actual="$(git -C "$repo" rev-parse -q --verify "$ref" 2>/dev/null || true)"',
+                '    [ "$actual" = "$expected" ] || { printf "REFUSED\\tABSORB BRANCH MOVED SINCE OPERATION\\n"; exit 126; }',
+                '    git -C "$repo" cat-file -e "$restore^{commit}" 2>/dev/null || { printf "REFUSED\\tPRE-ABSORB COMMIT MISSING\\n"; exit 127; }',
+                '    patch="$(mktemp "${TMPDIR:-/tmp}/pa-absorb-undo.XXXXXX")" || { printf "REFUSED\\tABSORB RECOVERY PATCH TEMPFILE FAILED\\n"; exit 128; }',
+                '    tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/pa-absorb-preflight.XXXXXX")" || { rm -f "$patch"; printf "REFUSED\\tABSORB PREFLIGHT TEMP DIR FAILED\\n"; exit 129; }',
+                '    trap \'git -C "$repo" worktree remove --force "$tmpdir/wt" >/dev/null 2>&1 || true; rm -rf "$tmpdir" "$patch"\' EXIT INT TERM',
+                '    printf "%s" "$payload" | base64 -d >"$patch" 2>/dev/null || { printf "REFUSED\\tABSORB RECOVERY PATCH DECODE FAILED\\n"; exit 130; }',
+                '    actual_fingerprint="$(sha256sum "$patch" | awk "{print \\$1}")"',
+                '    [ "$actual_fingerprint" = "$expected_fingerprint" ] || { printf "REFUSED\\tABSORB RECOVERY PATCH FINGERPRINT MISMATCH\\n"; exit 131; }',
+                '    actual_bytes="$(wc -c <"$patch" | tr -d " ")"',
+                '    [ -z "$expected_bytes" ] || [ "$actual_bytes" = "$expected_bytes" ] || { printf "REFUSED\\tABSORB RECOVERY PATCH SIZE MISMATCH\\n"; exit 132; }',
+                '    git -C "$repo" worktree add --detach "$tmpdir/wt" "$restore" >/dev/null 2>&1 || { printf "REFUSED\\tABSORB PREFLIGHT WORKTREE FAILED\\n"; exit 133; }',
+                '    git -C "$tmpdir/wt" apply --check --index --binary --whitespace=nowarn "$patch" >/dev/null 2>&1 || { printf "REFUSED\\tPRE-ABSORB STAGED PATCH NO LONGER APPLIES\\n"; exit 134; }',
+                '    git -C "$repo" worktree remove --force "$tmpdir/wt" >/dev/null 2>&1 || { printf "REFUSED\\tABSORB PREFLIGHT CLEANUP FAILED\\n"; exit 135; }',
+                '    git -C "$repo" update-ref ORIG_HEAD "$expected" >/dev/null 2>&1 || true',
+                '    git -C "$repo" update-ref "$ref" "$restore" "$expected" || { printf "REFUSED\\tGUARDED ABSORB HISTORY RESTORE FAILED\\n"; exit 136; }',
+                '    if ! git -C "$repo" reset --hard "$restore" >/dev/null 2>&1; then',
+                '      git -C "$repo" update-ref "$ref" "$expected" "$restore" >/dev/null 2>&1 || { printf "REFUSED\\tABSORB HISTORY REALIGN FAILED // REF ROLLBACK FAILED\\n"; exit 137; }',
+                '      git -C "$repo" reset --hard "$expected" >/dev/null 2>&1 || true',
+                '      printf "REFUSED\\tABSORB HISTORY REALIGN FAILED // REF ROLLED BACK\\n"',
+                '      exit 138',
+                '    fi',
+                '    if ! git -C "$repo" apply --index --binary --whitespace=nowarn "$patch"; then',
+                '      git -C "$repo" reset --hard "$restore" >/dev/null 2>&1 || true',
+                '      git -C "$repo" update-ref "$ref" "$expected" "$restore" >/dev/null 2>&1 || { printf "REFUSED\\tABSORB PATCH RESTORE FAILED // HISTORY ROLLBACK FAILED\\n"; exit 139; }',
+                '      git -C "$repo" reset --hard "$expected" >/dev/null 2>&1 || true',
+                '      printf "REFUSED\\tABSORB PATCH RESTORE FAILED // HISTORY ROLLED BACK\\n"',
+                '      exit 140',
+                '    fi',
+                '    printf "OK\\tRESTORED PRE-ABSORB HISTORY + STAGED PATCH // %s\\n" "$branch"',
                 '    ;;',
                 '  UNDO_TRANSFER_CONTENT)',
                 '    source="$a"',

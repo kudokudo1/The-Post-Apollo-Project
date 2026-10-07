@@ -1541,24 +1541,6 @@ PanelWindow {
         return Colors.white;
     }
 
-    function cycleFactoryTemplate() {
-        root.factoryTemplate = root.factoryTemplate === "smoke"
-                               ? "shell-check"
-                               : "smoke";
-        githubService.clearFactoryResult();
-    }
-
-    function cycleFactoryTrigger() {
-        if (root.factoryTrigger === "manual")
-            root.factoryTrigger = "push";
-        else if (root.factoryTrigger === "push")
-            root.factoryTrigger = "manual+push";
-        else
-            root.factoryTrigger = "manual";
-
-        githubService.clearFactoryResult();
-    }
-
     function cycleWorkflow() {
         const count = githubService.workflows.length;
 

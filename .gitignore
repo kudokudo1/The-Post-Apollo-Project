@@ -34,3 +34,6 @@ repository-profile-sets.json
 
 # Local Git operation journal state
 git-operation-journal.json
+
+# Local persistent interactive-rebase session state
+git-rebase-sessions.json

@@ -63,6 +63,7 @@ Scope {
     property double contextStartEpoch: 0
     property double contextEndEpoch: 0
     property string contextTimeLabel: ""
+    property string contextAttentionMode: ""
 
     readonly property bool contextActive:
         contextEventKey.length > 0
@@ -90,6 +91,11 @@ Scope {
 
         if (contextTimeLabel)
             parts.push(contextTimeLabel);
+
+        if (contextAttentionMode)
+            parts.push(
+                attentionModeLabel(contextAttentionMode)
+            );
 
         if (contextHasEvent)
             parts.push("EVENT");
@@ -1439,7 +1445,9 @@ Scope {
         "friday", "saturday", "sunday",
         "archive", "archives", "earliest", "oldest", "first",
         "clean", "cleanup", "prune", "compact", "size", "depth",
-        "capacity", "health", "duplicate", "duplicates"
+        "capacity", "health", "duplicate", "duplicates",
+        "critical", "urgent", "serious", "action", "notice", "notices",
+        "routine", "background", "priority", "priorities", "ignore"
     ]
 
     function editDistanceOneOrLess(leftValue, rightValue) {
@@ -1742,7 +1750,10 @@ Scope {
         }).join(" // ");
     }
 
-    function activityListResponse(labelValue, eventsValue) {
+    function activityListResponse(
+            labelValue,
+            eventsValue,
+            showAttention) {
         const label = String(labelValue || "RECENT");
         const events =
             Array.isArray(eventsValue)
@@ -1754,8 +1765,16 @@ Scope {
 
         const lines = [label + " // " + String(events.length)];
 
-        for (let i = 0; i < events.length; ++i)
-            lines.push("- " + activityLine(events[i] || {}));
+        for (let i = 0; i < events.length; ++i) {
+            lines.push(
+                "- "
+                + (
+                    showAttention
+                    ? attentionActivityLine(events[i] || {})
+                    : activityLine(events[i] || {})
+                  )
+            );
+        }
 
         return lines.join("\n");
     }
@@ -1807,6 +1826,218 @@ Scope {
         return parts.join(" // ");
     }
 
+    function activityAttentionScore(eventValue) {
+        const event = eventValue || {};
+        const source =
+            String(event.source || "").toLowerCase();
+        const context = event.context || {};
+        const room = context.room || {};
+        const state =
+            String(
+                context.state
+                || room.state
+                || ""
+            ).toUpperCase();
+        const title =
+            String(event.title || "").toUpperCase();
+        const detail =
+            String(event.detail || "").toUpperCase();
+        const text =
+            [state, title, detail].join(" ");
+        let score = 20;
+
+        if (source === "rounds") {
+            const rank =
+                Number(room.attentionRank || 0);
+
+            if (rank >= 90)
+                score = Math.max(score, 95);
+            else if (rank >= 60)
+                score = Math.max(score, 75);
+            else if (rank > 0)
+                score = Math.max(score, 45);
+            else
+                score = Math.max(score, 10);
+        } else if (source === "reports") {
+            if (state === "BLOCKED")
+                score = Math.max(score, 100);
+            else if (state === "REOPENED")
+                score = Math.max(score, 90);
+            else if (state === "INTEGRATING")
+                score = Math.max(score, 75);
+            else if (state === "ARMED")
+                score = Math.max(score, 65);
+            else if (state === "CANDIDATE")
+                score = Math.max(score, 45);
+            else if (state === "VERIFIED"
+                    || state === "CERTIFIED"
+                    || state === "POST_OP")
+                score = Math.max(score, 35);
+            else if (state === "IN_MAIN")
+                score = Math.max(score, 15);
+            else
+                score = Math.max(score, 30);
+        } else if (source === "staff") {
+            if (title.indexOf("OFFLINE //") === 0)
+                score = Math.max(score, 75);
+            else if (title.indexOf("UNKNOWN //") === 0)
+                score = Math.max(score, 40);
+            else
+                score = Math.max(score, 10);
+        } else if (source === "phone"
+                || source === "intercom") {
+            score = Math.max(score, 35);
+        }
+
+        if (text.indexOf("BLOCKED") >= 0
+                || text.indexOf("DIVERGED") >= 0
+                || text.indexOf("MISSING") >= 0
+                || text.indexOf("FAILED") >= 0
+                || text.indexOf("FAILURE") >= 0
+                || text.indexOf("ERROR") >= 0)
+            score = Math.max(score, 95);
+
+        if (text.indexOf("REOPENED") >= 0)
+            score = Math.max(score, 90);
+
+        if (text.indexOf("OFFLINE") >= 0
+                || text.indexOf("AHEAD") >= 0
+                || text.indexOf("BEHIND") >= 0
+                || text.indexOf("STALE") >= 0)
+            score = Math.max(score, 70);
+
+        if (text.indexOf("ATTENTION") >= 0
+                || text.indexOf("WARNING") >= 0
+                || text.indexOf("CHECK") >= 0)
+            score = Math.max(score, 45);
+
+        return Math.max(0, Math.min(100, score));
+    }
+
+    function activityAttentionLabel(eventValue) {
+        const score = activityAttentionScore(eventValue);
+
+        if (score >= 90)
+            return "CRITICAL";
+        if (score >= 60)
+            return "ACTION";
+        if (score >= 30)
+            return "NOTICE";
+
+        return "ROUTINE";
+    }
+
+    function attentionModeLabel(modeValue) {
+        const mode =
+            String(modeValue || "").toLowerCase();
+
+        if (mode === "critical")
+            return "CRITICAL";
+        if (mode === "action")
+            return "ACTION+";
+        if (mode === "notice")
+            return "NOTICE";
+        if (mode === "routine")
+            return "ROUTINE";
+
+        return "";
+    }
+
+    function activityAttentionQuery(queryValue) {
+        const query = looseQuery(queryValue);
+        let mode = "";
+
+        if (query.indexOf("critical") >= 0
+                || query.indexOf("urgent") >= 0
+                || query.indexOf("serious") >= 0)
+            mode = "critical";
+        else if (query.indexOf("routine") >= 0
+                || query.indexOf("background") >= 0
+                || query.indexOf("low priority") >= 0
+                || query.indexOf("can i ignore") >= 0
+                || query.indexOf("can ignore") >= 0)
+            mode = "routine";
+        else if (query.indexOf("notice") >= 0
+                || query.indexOf("notices") >= 0
+                || query.indexOf("fyi") >= 0)
+            mode = "notice";
+        else if (query.indexOf("action") >= 0
+                || query.indexOf("what needs me") >= 0
+                || query.indexOf("needs me") >= 0
+                || query.indexOf("needs attention") >= 0
+                || query.indexOf("what should i check") >= 0
+                || query.indexOf("what should i look at") >= 0
+                || query.indexOf("anything important") >= 0)
+            mode = "action";
+
+        return {
+            active: mode.length > 0,
+            mode: mode,
+            label: attentionModeLabel(mode)
+        };
+    }
+
+    function eventMatchesAttentionMode(eventValue, modeValue) {
+        const mode =
+            String(modeValue || "").toLowerCase();
+        const score =
+            activityAttentionScore(eventValue);
+
+        if (!mode)
+            return true;
+        if (mode === "critical")
+            return score >= 90;
+        if (mode === "action")
+            return score >= 60;
+        if (mode === "notice")
+            return score >= 30 && score < 60;
+        if (mode === "routine")
+            return score < 30;
+
+        return true;
+    }
+
+    function filterActivityByAttention(
+            eventsValue,
+            modeValue) {
+        const events =
+            Array.isArray(eventsValue)
+            ? eventsValue.slice()
+            : [];
+        const mode =
+            String(modeValue || "").toLowerCase();
+
+        if (!mode)
+            return events;
+
+        const filtered =
+            events.filter(function(event) {
+                return root.eventMatchesAttentionMode(
+                    event || {},
+                    mode
+                );
+            });
+
+        filtered.sort(function(a, b) {
+            const scoreDelta =
+                root.activityAttentionScore(b)
+                - root.activityAttentionScore(a);
+
+            if (scoreDelta !== 0)
+                return scoreDelta;
+
+            return root.eventEpoch(b) - root.eventEpoch(a);
+        });
+
+        return filtered;
+    }
+
+    function attentionActivityLine(eventValue) {
+        return activityAttentionLabel(eventValue)
+            + " // "
+            + activityLine(eventValue);
+    }
+
     function isProblemActivity(eventValue) {
         const event = eventValue || {};
         const source =
@@ -1842,6 +2073,7 @@ Scope {
         contextStartEpoch = 0;
         contextEndEpoch = 0;
         contextTimeLabel = "";
+        contextAttentionMode = "";
     }
 
     function rememberActivityContext(
@@ -1853,7 +2085,8 @@ Scope {
             problemsOnlyValue,
             startEpochValue,
             endEpochValue,
-            timeLabelValue) {
+            timeLabelValue,
+            attentionModeValue) {
         const event = eventValue || {};
         const key = eventKey(event);
 
@@ -1871,6 +2104,8 @@ Scope {
         contextStartEpoch = Number(startEpochValue || 0);
         contextEndEpoch = Number(endEpochValue || 0);
         contextTimeLabel = String(timeLabelValue || "");
+        contextAttentionMode =
+            String(attentionModeValue || "").toLowerCase();
         return true;
     }
 
@@ -1906,6 +2141,12 @@ Scope {
                 return root.isProblemActivity(event || {});
             });
         }
+
+        matches =
+            filterActivityByAttention(
+                matches,
+                contextAttentionMode
+            );
 
         return matches;
     }
@@ -2006,7 +2247,8 @@ Scope {
             contextProblemsOnly,
             contextStartEpoch,
             contextEndEpoch,
-            contextTimeLabel
+            contextTimeLabel,
+            contextAttentionMode
         );
         return true;
     }
@@ -2026,7 +2268,8 @@ Scope {
             contextProblemsOnly,
             contextStartEpoch,
             contextEndEpoch,
-            contextTimeLabel
+            contextTimeLabel,
+            contextAttentionMode
         );
         return true;
     }
@@ -2433,7 +2676,8 @@ Scope {
             targetValue,
             problemsOnly,
             startEpochValue,
-            endEpochValue) {
+            endEpochValue,
+            attentionModeValue) {
         let matches =
             matchingActivity(
                 sourceValue,
@@ -2449,6 +2693,12 @@ Scope {
                 return root.isProblemActivity(event || {});
             });
         }
+
+        matches =
+            filterActivityByAttention(
+                matches,
+                attentionModeValue
+            );
 
         return matches;
     }
@@ -2487,6 +2737,7 @@ Scope {
 
         const target = activityTargetFromQuery(raw);
         const timeWindow = activityTimeWindow(query);
+        const attention = activityAttentionQuery(query);
         let source = activityQuerySource(query);
         const favoritesOnly =
             query.indexOf("favorite") >= 0
@@ -2508,6 +2759,7 @@ Scope {
             || query.indexOf("recent") >= 0
             || favoritesOnly
             || problemsOnly
+            || attention.active
             || timeWindow.active;
 
         if (target
@@ -2523,6 +2775,7 @@ Scope {
             contextStartEpoch = 0;
             contextEndEpoch = 0;
             contextTimeLabel = "";
+            contextAttentionMode = "";
             append(
                 "RECEPTION",
                 "OPENING ROOM // " + target
@@ -2542,7 +2795,8 @@ Scope {
                 target,
                 problemsOnly,
                 timeWindow.startEpoch,
-                timeWindow.endEpoch
+                timeWindow.endEpoch,
+                attention.mode
             );
 
         // A team may not have a retained Rounds event. Fall back to any
@@ -2558,7 +2812,8 @@ Scope {
                     target,
                     false,
                     timeWindow.startEpoch,
-                    timeWindow.endEpoch
+                    timeWindow.endEpoch,
+                    attention.mode
                 );
         }
 
@@ -2570,6 +2825,7 @@ Scope {
                 source ? source.toUpperCase() : "",
                 favoritesOnly ? "FAVORITE" : "",
                 problemsOnly ? "PROBLEM" : "",
+                attention.active ? attention.label : "",
                 timeWindow.active ? timeWindow.label : ""
             ].filter(function(value) {
                 return String(value || "").length > 0;
@@ -2594,11 +2850,18 @@ Scope {
             problemsOnly,
             timeWindow.startEpoch,
             timeWindow.endEpoch,
-            timeWindow.label
+            timeWindow.label,
+            attention.mode
         );
         append(
             "RECEPTION",
-            "OPENING // " + activityLine(selected)
+            "OPENING // "
+            + (
+                attention.active
+                ? activityAttentionLabel(selected) + " // "
+                : ""
+              )
+            + activityLine(selected)
         );
         activityActionRequested(selected);
         return true;
@@ -2613,6 +2876,7 @@ Scope {
         const query = looseQuery(raw);
         const targetHint = activityTargetFromQuery(raw);
         const timeWindow = activityTimeWindow(query);
+        const attention = activityAttentionQuery(query);
         const asksDoing =
             !!targetHint
             && (
@@ -2724,6 +2988,7 @@ Scope {
                 && !asksArchive
                 && !asksOldest
                 && !asksHelp
+                && !attention.active
                 && !timeWindow.active)
             return false;
 
@@ -2732,7 +2997,7 @@ Scope {
         if (asksHelp) {
             append(
                 "RECEPTION",
-                "I understand recent activity, archive history, archive status and cleanup, oldest or earliest activity, what changed, what went wrong, what needs attention, favorites, Room or team history, counts, and time windows like today, yesterday, this morning, this week, since Monday, or the last 3 hours. I can also find or show a team, then follow up with open this, take me there, favorite this, go back, or next one."
+                "I understand recent activity, archive history, archive status and cleanup, oldest or earliest activity, critical/action/notice/routine attention levels, what changed, what went wrong, what needs attention, favorites, Room or team history, counts, and time windows like today, yesterday, this morning, this week, since Monday, or the last 3 hours. I can also find or show a team, then follow up with open this, take me there, favorite this, go back, or next one."
             );
             return true;
         }
@@ -2762,10 +3027,18 @@ Scope {
             });
         }
 
+        matches =
+            filterActivityByAttention(
+                matches,
+                attention.mode
+            );
+
         let label = "";
 
         if (asksFavorites)
             label = "FAVORITES";
+        else if (attention.active)
+            label = attention.label;
         else if (asksProblems)
             label = "IMPORTANT";
         else if (asksNew)
@@ -2809,7 +3082,8 @@ Scope {
                     asksProblems,
                     timeWindow.startEpoch,
                     timeWindow.endEpoch,
-                    timeWindow.label
+                    timeWindow.label,
+                attention.mode
                 );
             } else {
                 clearActivityContext();
@@ -2838,7 +3112,8 @@ Scope {
                     asksProblems,
                     timeWindow.startEpoch,
                     timeWindow.endEpoch,
-                    timeWindow.label
+                    timeWindow.label,
+                attention.mode
                 );
             } else {
                 clearActivityContext();
@@ -2878,7 +3153,8 @@ Scope {
                 asksProblems,
                 timeWindow.startEpoch,
                 timeWindow.endEpoch,
-                timeWindow.label
+                timeWindow.label,
+            attention.mode
             );
         } else {
             clearActivityContext();
@@ -2886,7 +3162,11 @@ Scope {
 
         append(
             "RECEPTION",
-            activityListResponse(label, matches)
+            activityListResponse(
+                label,
+                matches,
+                attention.active
+            )
         );
         return true;
     }

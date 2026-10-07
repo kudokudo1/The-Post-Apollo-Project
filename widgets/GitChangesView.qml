@@ -15,6 +15,7 @@ Item {
 
     property bool transferOpen: false
     property string transferScope: "file"
+    property string transferLayer: "worktree"
     property int transferHunkIndex: -1
     property int transferLineIndex: -1
 
@@ -56,7 +57,7 @@ Item {
             : ""
     }
 
-    function fileTransferEligible() {
+    function worktreeFileTransferEligible() {
         const row = root.selectedFile || {};
 
         return !!root.changesService
@@ -72,12 +73,33 @@ Item {
             && !root.transferService.transferBusy;
     }
 
+    function stagedFileTransferEligible() {
+        const row = root.selectedFile || {};
+
+        return !!root.changesService
+            && !!root.transferService
+            && !!root.branchWorkspaceService
+            && root.selectedPath.length > 0
+            && Boolean(row.staged)
+            && !Boolean(row.unstaged)
+            && !Boolean(row.untracked)
+            && !Boolean(row.conflict)
+            && !root.changesService.actionBusy
+            && !root.transferService.previewBusy
+            && !root.transferService.transferBusy;
+    }
+
+    function fileTransferEligible() {
+        return root.worktreeFileTransferEligible()
+            || root.stagedFileTransferEligible();
+    }
+
     function transferEligible() {
         return root.fileTransferEligible();
     }
 
     function hunkTransferEligible() {
-        return root.fileTransferEligible()
+        return root.worktreeFileTransferEligible()
             && root.hunkMode === "worktree"
             && root.selectedHunkIndex >= 0
             && !root.changesService.hunkBusy;
@@ -86,7 +108,7 @@ Item {
     function lineTransferEligible() {
         const line = root.selectedLine();
 
-        return root.fileTransferEligible()
+        return root.worktreeFileTransferEligible()
             && root.hunkMode === "worktree"
             && root.selectedHunkIndex >= 0
             && root.selectedLineIndex >= 0
@@ -122,6 +144,11 @@ Item {
         lineTransferService.clearPreview();
 
         root.transferScope = requested;
+        root.transferLayer =
+            requested === "file"
+            && root.stagedFileTransferEligible()
+            ? "staged"
+            : "worktree";
         root.transferHunkIndex =
             requested === "hunk" || requested === "line"
             ? root.selectedHunkIndex
@@ -141,6 +168,7 @@ Item {
     function closeTransfer() {
         root.transferOpen = false;
         root.transferScope = "file";
+        root.transferLayer = "worktree";
         root.transferHunkIndex = -1;
         root.transferLineIndex = -1;
 
@@ -2662,6 +2690,7 @@ Item {
             : ""
         filePath: root.selectedPath
         transferScope: root.transferScope
+        transferLayer: root.transferLayer
         hunkIndex: root.transferHunkIndex
         hunkSummary:
             root.transferScope === "hunk"

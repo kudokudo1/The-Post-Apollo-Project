@@ -11,6 +11,7 @@ Item {
     required property var branchStackStore
     required property var stackPlanner
     required property var stackExecutor
+    required property var stackSubmitService
     property var keyboardHost: null
 
     property string selectedBranch: ""
@@ -102,6 +103,9 @@ Item {
 
         if (stackExecutor)
             stackExecutor.disarm("BRANCH SELECTION CHANGED");
+
+        if (stackSubmitService)
+            stackSubmitService.clear();
     }
 
     Connections {
@@ -115,6 +119,9 @@ Item {
 
             if (root.stackExecutor)
                 root.stackExecutor.disarm("STACK RELATIONSHIPS CHANGED");
+
+            if (root.stackSubmitService)
+                root.stackSubmitService.clear();
         }
 
         function onRelationRejected(reason) {
@@ -134,6 +141,12 @@ Item {
 
             if (root.stackExecutor)
                 root.stackExecutor.disarm("BRANCH STATE CHANGED");
+
+            if (root.stackSubmitService
+                    && root.stackSubmitService.armed)
+                root.stackSubmitService.disarm(
+                    "BRANCH STATE CHANGED"
+                );
 
             root.applyFocusContext();
 
@@ -360,6 +373,70 @@ Item {
         }
     }
 
+    Connections {
+        target: root.stackSubmitService
+        enabled: root.stackSubmitService !== null
+        ignoreUnknownSignals: true
+
+        function onPreviewReady(plan) {
+            if (root.managementMode !== "submit")
+                return;
+
+            if (root.stackSubmitService.lastError) {
+                root.managementMessage =
+                    "REFUSED // "
+                    + root.stackSubmitService.lastError;
+                return;
+            }
+
+            if (root.stackSubmitService.plan.length === 0) {
+                root.managementMessage =
+                    "PREVIEW READY // NOTHING TO SUBMIT";
+                return;
+            }
+
+            if (root.stackSubmitService.invalidCount > 0) {
+                root.managementMessage =
+                    "REFUSED // "
+                    + String(root.stackSubmitService.invalidCount)
+                    + " BLOCKED PR"
+                    + (
+                        root.stackSubmitService.invalidCount === 1
+                        ? ""
+                        : "S"
+                      );
+                return;
+            }
+
+            root.managementMessage =
+                "PREVIEW READY // "
+                + String(root.stackSubmitService.plan.length)
+                + " PR"
+                + (
+                    root.stackSubmitService.plan.length === 1
+                    ? ""
+                    : "S"
+                  );
+        }
+
+        function onSubmissionFinished(success, result) {
+            if (root.managementMode !== "submit")
+                return;
+
+            root.managementMessage =
+                success
+                ? "OK // STACK SUBMITTED // "
+                  + String((result || []).length)
+                  + " PR"
+                  + ((result || []).length === 1 ? "" : "S")
+                : "REFUSED // "
+                  + String(
+                      root.stackSubmitService.lastError
+                      || "STACK SUBMISSION FAILED"
+                    );
+        }
+    }
+
     function focusContext(branchName, sha) {
         root.pendingFocusBranch = String(branchName || "");
         root.pendingFocusSha = String(sha || "");
@@ -568,6 +645,11 @@ Item {
                 && root.stackExecutor
                 && root.stackExecutor.armed)
             root.stackExecutor.disarm("PANEL CLOSED");
+
+        if (root.managementMode === "submit"
+                && root.stackSubmitService
+                && root.stackSubmitService.armed)
+            root.stackSubmitService.disarm("PANEL CLOSED");
 
         root.managementMode = "";
         root.managementMessage = "";
@@ -1041,6 +1123,95 @@ Item {
 
     function triggerNewBranchMode() {
         root.openNewManager();
+    }
+
+    function submitStageText() {
+        if (!root.stackSubmitService)
+            return "NOT CONNECTED";
+
+        if (root.stackSubmitService.submitBusy)
+            return "SUBMITTING";
+
+        if (root.stackSubmitService.previewBusy)
+            return "READING";
+
+        if (root.stackSubmitService.armed)
+            return "ARMED";
+
+        if (root.stackSubmitService.startBranch === root.selectedBranch
+                && root.stackSubmitService.plan.length > 0)
+            return "PREVIEWED";
+
+        return "READY";
+    }
+
+    function openSubmitManager() {
+        if (!root.selectedBranch || !root.stackSubmitService)
+            return;
+
+        root.managementMode = "submit";
+        root.managementMessage = "";
+        root.managementArm = "";
+    }
+
+    function previewSubmitStack() {
+        if (!root.stackSubmitService || !root.selectedBranch)
+            return;
+
+        root.managementMessage =
+            "READING // REMOTE HEADS + PULL REQUESTS";
+
+        if (!root.stackSubmitService.preview(root.selectedBranch))
+            root.managementMessage =
+                "REFUSED // "
+                + String(
+                    root.stackSubmitService.lastError
+                    || "STACK SUBMIT PREVIEW COULD NOT START"
+                  );
+    }
+
+    function armSubmitStack() {
+        if (!root.stackSubmitService)
+            return;
+
+        if (!root.stackSubmitService.arm()) {
+            root.managementMessage =
+                "REFUSED // "
+                + String(
+                    root.stackSubmitService.lastError
+                    || "STACK SUBMIT ARM FAILED"
+                  );
+            return;
+        }
+
+        root.managementMessage =
+            "ARMED // " + root.stackSubmitService.armStatus;
+    }
+
+    function executeSubmitStack() {
+        if (!root.stackSubmitService)
+            return;
+
+        if (!root.stackSubmitService.submitArmed()) {
+            root.managementMessage =
+                "REFUSED // "
+                + String(
+                    root.stackSubmitService.lastError
+                    || "STACK SUBMISSION COULD NOT START"
+                  );
+            return;
+        }
+
+        root.managementMessage =
+            "STACK SUBMIT // ATOMIC PUSH + PR UPDATE";
+    }
+
+    function disarmSubmitStack() {
+        if (!root.stackSubmitService)
+            return;
+
+        root.stackSubmitService.disarm("OPERATOR CANCELLED");
+        root.managementMessage = "STACK SUBMIT // DISARMED";
     }
 
     function restackOccupiedBranch() {
@@ -2165,10 +2336,19 @@ Item {
 
                         BranchButton {
                             width: (inspector.width - 26) / 2
-                            label: "SUBMIT STACK"
-                            enabledAction: false
-                            onTriggered:
-                                root.submitStackRequested(root.selectedBranch)
+                            label:
+                                stackSubmitService
+                                && stackSubmitService.armed
+                                ? "SUBMIT STACK ✓"
+                                : "SUBMIT STACK"
+                            selectedAction:
+                                stackSubmitService
+                                && stackSubmitService.armed
+                            enabledAction:
+                                root.selectedBranch.length > 0
+                                && stackSubmitService
+                                && !stackSubmitService.submitBusy
+                            onTriggered: root.openSubmitManager()
                         }
                     }
 

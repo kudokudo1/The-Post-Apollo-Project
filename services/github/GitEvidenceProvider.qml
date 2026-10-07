@@ -396,9 +396,9 @@ Scope {
             : "UNAVAILABLE";
 
         const repositoryMatchesLocalOrigin =
-            Boolean(githubRepository)
-            && Boolean(checkoutRepository)
-            && githubRepository === checkoutRepository;
+            githubRepository && checkoutRepository
+            ? githubRepository === checkoutRepository
+            : null;
         const targetMatchesCurrentHead =
             Boolean(target)
             && Boolean(currentHead)

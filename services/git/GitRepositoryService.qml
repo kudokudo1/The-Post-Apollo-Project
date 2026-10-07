@@ -70,18 +70,6 @@ Scope {
     readonly property bool available:
         String(repositoryPath || "").trim().length > 0
 
-    function remoteAt(index) {
-        if (index < 0 || index >= remotes.length)
-            return null;
-        return remotes[index];
-    }
-
-    function tagAt(index) {
-        if (index < 0 || index >= tags.length)
-            return null;
-        return tags[index];
-    }
-
     function refresh() {
         const repo = String(repositoryPath || "").trim();
 

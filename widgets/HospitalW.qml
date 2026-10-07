@@ -36,6 +36,7 @@ PanelWindow {
     property string pendingRoundsRoomTeam: ""
     property int pendingRoundsFloorIndex: -1
     property string pendingReceptionTeam: ""
+    property var pendingReceptionRoundsSelection: null
 
     readonly property bool operationsOpen:
         root.operationsSurface.length > 0
@@ -891,11 +892,117 @@ PanelWindow {
         }
     }
 
+    function openReceptionReportEvent(itemValue) {
+        const item = itemValue || {};
+        const context = item.context || {};
+        const identity = {
+            team: String(context.team || ""),
+            eventType: String(context.eventType || ""),
+            state: String(context.state || ""),
+            recordedAt: String(
+                context.recordedAt
+                || item.recordedAt
+                || ""
+            )
+        };
+
+        root.openReports(identity.team);
+
+        Qt.callLater(function() {
+            if (reportsView.selectEventIdentity(identity))
+                return;
+
+            receptionistService.append(
+                "RECEPTION",
+                "REPORT // "
+                + (
+                    identity.team
+                    ? identity.team + " // "
+                    : ""
+                  )
+                + "EXACT EVENT NOT FOUND IN RETAINED REPORTS"
+            );
+        });
+    }
+
+    function receptionRoundsIdentity(itemValue) {
+        const item = itemValue || {};
+        const context = item.context || {};
+        const room = context.room || {};
+
+        return {
+            team: String(
+                context.team
+                || room.team
+                || room.branch
+                || ""
+            ),
+            repository: String(room.repository || ""),
+            floorIndex:
+                Number.isFinite(Number(room.floorIndex))
+                ? Number(room.floorIndex)
+                : -1
+        };
+    }
+
+    function finishPendingReceptionRoundsSelection(reportMissing) {
+        const identity =
+            root.pendingReceptionRoundsSelection;
+
+        if (!identity)
+            return false;
+
+        if (roundsView.selectRoomIdentity(identity)) {
+            root.pendingReceptionRoundsSelection = null;
+            return true;
+        }
+
+        if (!reportMissing)
+            return false;
+
+        root.pendingReceptionRoundsSelection = null;
+        receptionistService.append(
+            "RECEPTION",
+            "ROUNDS // "
+            + String(identity.team || "ROOM")
+            + " // NOT FOUND IN LIVE ROUNDS"
+        );
+        return false;
+    }
+
+    function openReceptionRoundsEvent(itemValue) {
+        const identity =
+            root.receptionRoundsIdentity(itemValue);
+
+        root.pendingReceptionRoundsSelection = identity;
+        root.openRounds();
+
+        Qt.callLater(function() {
+            if (root.finishPendingReceptionRoundsSelection(false))
+                return;
+
+            // openRounds() starts a refresh whenever the lane is free.
+            // If no refresh is running, there will be no later callback.
+            if (!roundsService.running)
+                root.finishPendingReceptionRoundsSelection(true);
+        });
+    }
+
     function activateReceptionActivity(item) {
         const row = item || {};
         const kind = String(row.kind || "");
         const source = String(row.source || "");
         const context = row.context || {};
+
+        if (source === "reports") {
+            root.openReceptionReportEvent(row);
+            return;
+        }
+
+        if (source === "rounds") {
+            root.openReceptionRoundsEvent(row);
+            return;
+        }
 
         if (kind === "room") {
             root.openRoomFromRounds(context.room || {});
@@ -904,11 +1011,6 @@ PanelWindow {
 
         if (kind === "staff") {
             root.openStaff();
-            return;
-        }
-
-        if (source === "reports") {
-            root.openReports(context.team || "");
             return;
         }
 
@@ -1143,6 +1245,7 @@ PanelWindow {
         root.intercomMenuOpen = false;
         root.intercomTyping = false;
         root.receptionistTyping = false;
+        root.pendingReceptionRoundsSelection = null;
         root.operationsSurface = "";
         root.menuOpen = false;
     }
@@ -1430,6 +1533,9 @@ PanelWindow {
 
             if (root.pendingReceptionTeam)
                 root.finishPendingReceptionTeam();
+
+            if (root.pendingReceptionRoundsSelection)
+                root.finishPendingReceptionRoundsSelection(true);
         }
     }
 

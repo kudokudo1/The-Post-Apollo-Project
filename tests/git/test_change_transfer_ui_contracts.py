@@ -58,9 +58,11 @@ require(
     'label: "COPY"',
     "transfer panel must expose COPY mode",
 )
-require(
+require_regex(
     VIEW,
-    'label: "PREVIEW"',
+    r'label:\s*transferService\.previewBusy\s*'
+    r'\? "PREVIEWING"\s*'
+    r': "PREVIEW"',
     "transfer panel must require an explicit preview action",
 )
 require(

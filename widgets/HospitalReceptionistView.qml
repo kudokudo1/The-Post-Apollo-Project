@@ -156,7 +156,7 @@ Rectangle {
                 font.pixelSize: 14
                 color: Colors.magenta
 
-                layer.enabled: true
+                layer.enabled: Window.window !== null
                 layer.effect: DropShadow {
                     radius: 8
                     samples: 9
@@ -247,7 +247,7 @@ Rectangle {
                     elide: Text.ElideRight
                     width: parent.width - deskControls.width - 34
 
-                    layer.enabled: true
+                    layer.enabled: Window.window !== null
                     layer.effect: DropShadow {
                         radius: 6
                         samples: 7
@@ -549,7 +549,7 @@ Rectangle {
                             horizontalAlignment: Text.AlignHCenter
                             elide: Text.ElideRight
 
-                            layer.enabled: true
+                            layer.enabled: Window.window !== null
                             layer.effect: DropShadow {
                                 radius: 5
                                 samples: 7
@@ -1748,7 +1748,7 @@ Rectangle {
                         ? Colors.orange
                         : Colors.omnitrix
 
-                    layer.enabled: true
+                    layer.enabled: Window.window !== null
                     layer.effect: DropShadow {
                         radius: 7
                         samples: 9

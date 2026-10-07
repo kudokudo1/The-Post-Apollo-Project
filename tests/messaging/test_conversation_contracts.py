@@ -137,3 +137,18 @@ assert "function releaseDoctor(idValue)" in doctors
 assert "provider" not in doctors.lower()
 
 print("hospital staffing services contracts: PASS")
+
+
+adapter = ADAPTER.read_text()
+assert 'const roomProviderId = String(room.providerId || "").trim();' in adapter
+assert '"--provider-id"' in adapter
+assert "args.push(roomProviderId);" in adapter
+
+room_chat = ROOM_CHAT.read_text()
+assert "readonly property string storedProviderId:" in room_chat
+assert "readonly property string effectiveProviderId:" in room_chat
+assert "String(root.providerId || root.storedProviderId || "").trim()" in room_chat
+assert "providerId: root.effectiveProviderId" in room_chat
+assert "onProviderIdChanged: scheduleRoomBinding()" in room_chat
+
+print("hospital Room provider persistence contracts: PASS")

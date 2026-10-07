@@ -9,6 +9,8 @@ Item {
     required property var projectService
     required property var gitService
 
+    property var keyboardHost: null
+
     property string kind: "issues"
     property string stateFilter: "all"
     property string projectFilter: "all"
@@ -131,14 +133,42 @@ Item {
         property bool enabledAction: true
         property bool primaryBlue: false
 
+        readonly property bool keyboardSelected:
+            !!root.keyboardHost
+            && root.keyboardHost.gitKeyboardControl === button
+        readonly property bool keyboardSelector:
+            keyboardSelected
+            && root.keyboardHost.gitSelectorSource === "keyboard"
+        readonly property bool mouseSelector:
+            keyboardSelected
+            && root.keyboardHost.gitSelectorSource === "mouse"
+
         signal triggered()
+
+        Component.onCompleted: {
+            if (root.keyboardHost)
+                root.keyboardHost.registerGitKeyboardControl(button);
+        }
+
+        Component.onDestruction: {
+            if (root.keyboardHost)
+                root.keyboardHost.unregisterGitKeyboardControl(button);
+        }
 
         height: 28
         opacity: enabledAction ? 1.0 : 0.34
-        color: selectedAction ? Colors.yellow : Colors.black
-        border.width: 1
+        color:
+            keyboardSelector || selectedAction
+            ? Colors.yellow
+            : Colors.black
+        border.width:
+            keyboardSelector || mouseSelector
+            ? 2
+            : 1
         border.color:
-            selectedAction
+            keyboardSelector || mouseSelector
+            ? Colors.orange
+            : selectedAction
             ? Colors.orange
             : primaryBlue
             ? Colors.blue
@@ -151,7 +181,8 @@ Item {
             text: button.label
             font.pixelSize: 8
             color:
-                button.selectedAction
+                button.keyboardSelector
+                || button.selectedAction
                 ? Colors.magenta
                 : button.primaryBlue
                 ? Colors.blue
@@ -167,7 +198,26 @@ Item {
                 enabled
                 ? Qt.PointingHandCursor
                 : Qt.ArrowCursor
-            onClicked: button.triggered()
+
+            onEntered: {
+                if (root.keyboardHost)
+                    root.keyboardHost
+                        .selectGitControlFromMouse(button);
+            }
+
+            onPositionChanged: {
+                if (root.keyboardHost)
+                    root.keyboardHost
+                        .selectGitControlFromMouse(button);
+            }
+
+            onClicked: {
+                if (root.keyboardHost)
+                    root.keyboardHost
+                        .selectGitControlFromMouse(button);
+
+                button.triggered();
+            }
         }
     }
 
@@ -190,6 +240,8 @@ Item {
                 rightMargin: 8
             }
 
+            activeFocusOnPress: true
+            selectByMouse: true
             verticalAlignment: TextInput.AlignVCenter
             font.family: "GohuFont 11 Nerd Font Mono"
             font.pixelSize: 9
@@ -197,6 +249,36 @@ Item {
             selectionColor: Colors.magenta
             selectedTextColor: Colors.black
             clip: true
+
+            onAccepted: {
+                focus = false;
+
+                if (root.keyboardHost) {
+                    root.keyboardHost.activeTextEditor = null;
+                    root.keyboardHost.restoreGitKeyboardFocus(false);
+                }
+            }
+
+            Keys.onEscapePressed: function(event) {
+                focus = false;
+
+                if (root.keyboardHost) {
+                    root.keyboardHost.activeTextEditor = null;
+                    root.keyboardHost.restoreGitKeyboardFocus(false);
+                }
+
+                event.accepted = true;
+            }
+
+            onActiveFocusChanged: {
+                if (!root.keyboardHost)
+                    return;
+
+                if (activeFocus)
+                    root.keyboardHost.activeTextEditor = editor;
+                else if (root.keyboardHost.activeTextEditor === editor)
+                    root.keyboardHost.activeTextEditor = null;
+            }
 
             Text {
                 anchors.verticalCenter: parent.verticalCenter

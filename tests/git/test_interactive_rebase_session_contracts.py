@@ -61,6 +61,11 @@ for needle, message in (
     ('durableSession: true', "persistent rebase journal record must be durable"),
     ('"HISTORY/INTERACTIVE_REBASE_SESSION"', "persistent rebase needs its own operation kind"),
     ('allowed = {"pick", "reword", "squash", "fixup", "drop", "edit"}', "session engine must support edit"),
+    ('property bool mergePreserving: false', "persistent sessions must retain merge-preserving identity"),
+    ('"--rebase-merges"', "merge-preserving persistent sessions must use Git merge topology"),
+    ('PA_REBASE_EDIT_MODE', "merge-preserving edit must distinguish rehearsal from live pause"),
+    ('effective = "pick" if action == "reword" or (action == "edit" and edit_mode == "rehearsal") else action', "merge-preserving rehearsal must neutralize edit pauses only during rehearsal"),
+    ('mergePreserving: Boolean(row.mergePreserving)', "journal metadata must retain merge-preserving identity"),
     ('rehearsal_todo.append("pick {} {}".format(sha, subject))', "edit must rehearse as a non-pausing pick"),
     ('live_todo.append("edit {} {}".format(sha, subject))', "live plan must preserve edit"),
     ('"rebase-merge"', "session inspector must understand interactive rebase state"),
@@ -238,8 +243,106 @@ def smoke_conflict_handoff():
         git(repo, "rebase", "--abort")
 
 
+
+def smoke_merge_preserving_edit_continue():
+    with tempfile.TemporaryDirectory(prefix="pa-rebase-merge-edit-") as tmp:
+        root = Path(tmp)
+        repo = root / "repo"
+        repo.mkdir()
+        git(repo, "init", "-q")
+        git(repo, "config", "user.name", "Post Apollo Test")
+        git(repo, "config", "user.email", "test@example.invalid")
+
+        (repo / "base.txt").write_text("base\n", encoding="utf-8")
+        base = commit(repo, "base")
+        main_branch = git(repo, "branch", "--show-current").stdout.decode().strip()
+
+        git(repo, "switch", "-qc", "feature")
+        (repo / "feature.txt").write_text("feature\n", encoding="utf-8")
+        commit(repo, "feature")
+
+        git(repo, "switch", "-q", main_branch)
+        (repo / "main.txt").write_text("main\n", encoding="utf-8")
+        commit(repo, "main side")
+        git(repo, "merge", "--no-ff", "--no-edit", "feature")
+
+        (repo / "post.txt").write_text("post\n", encoding="utf-8")
+        edit_sha = commit(repo, "post merge edit target")
+
+        editor = root / "merge-edit-sequence-editor"
+        editor.write_text(
+            """#!/usr/bin/env python3
+import os, sys
+target = os.environ["PA_EDIT_SHA"]
+path = sys.argv[1]
+with open(path, "r", encoding="utf-8") as handle:
+    lines = handle.read().splitlines()
+out = []
+seen = False
+for line in lines:
+    stripped = line.lstrip()
+    indent = line[:len(line) - len(stripped)]
+    parts = stripped.split(None, 2)
+    if len(parts) >= 2 and parts[0] in ("pick", "p") and target.startswith(parts[1]):
+        rest = parts[2] if len(parts) > 2 else ""
+        out.append(f"{indent}edit {parts[1]} {rest}".rstrip())
+        seen = True
+    else:
+        out.append(line)
+if not seen:
+    raise SystemExit("edit target missing from merge-preserving todo")
+with open(path, "w", encoding="utf-8") as handle:
+    handle.write("\\n".join(out) + "\\n")
+""",
+            encoding="utf-8",
+        )
+        editor.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
+
+        env = dict(os.environ)
+        env["GIT_SEQUENCE_EDITOR"] = str(editor)
+        env["GIT_EDITOR"] = ":"
+        env["PA_EDIT_SHA"] = edit_sha
+        result = git(
+            repo,
+            "-c",
+            "commit.gpgSign=false",
+            "rebase",
+            "-i",
+            "--rebase-merges",
+            "--empty=keep",
+            "--reapply-cherry-picks",
+            base,
+            env=env,
+            check=False,
+        )
+        assert rebase_dir(repo) is not None, (
+            result.stdout.decode(),
+            result.stderr.decode(),
+        )
+
+        continue_env = dict(os.environ)
+        continue_env["GIT_EDITOR"] = ":"
+        continued = git(
+            repo,
+            "rebase",
+            "--continue",
+            env=continue_env,
+            check=False,
+        )
+        assert continued.returncode == 0, continued.stderr.decode()
+        assert rebase_dir(repo) is None
+        assert git(repo, "status", "--porcelain=v1").stdout == b""
+        merge_count = int(
+            git(repo, "rev-list", "--count", "--merges", f"{base}..HEAD")
+            .stdout.decode()
+            .strip()
+        )
+        assert merge_count == 1
+
+
 smoke_edit_continue()
 smoke_edit_abort()
 smoke_conflict_handoff()
+smoke_merge_preserving_edit_continue()
 
 print("Git persistent interactive rebase session contracts: PASS")

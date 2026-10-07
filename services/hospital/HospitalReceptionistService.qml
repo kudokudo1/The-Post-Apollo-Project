@@ -1967,7 +1967,8 @@ Scope {
                 || query.indexOf("needs attention") >= 0
                 || query.indexOf("what should i check") >= 0
                 || query.indexOf("what should i look at") >= 0
-                || query.indexOf("anything important") >= 0)
+                || query.indexOf("important") >= 0
+                || query.indexOf("high priority") >= 0)
             mode = "action";
 
         return {
@@ -2939,8 +2940,6 @@ Scope {
             || query.indexOf("anything important") >= 0
             || query.indexOf("what broke") >= 0
             || query.indexOf("what failed") >= 0
-            || query.indexOf("what needs attention") >= 0
-            || query.indexOf("needs attention") >= 0
             || query.indexOf("holdup") >= 0
             || query.indexOf("hold up") >= 0
             || query.indexOf("holding us up") >= 0
@@ -2950,9 +2949,6 @@ Scope {
             || query.indexOf("what is the problem") >= 0
             || query.indexOf("blocking us") >= 0
             || query.indexOf("blocking things") >= 0
-            || query.indexOf("what needs me") >= 0
-            || query.indexOf("what should i check") >= 0
-            || query.indexOf("what should i look at") >= 0
             || query.indexOf("problem") >= 0
             || query.indexOf("issue") >= 0
             || query.indexOf("trouble") >= 0;
@@ -3083,7 +3079,7 @@ Scope {
                     timeWindow.startEpoch,
                     timeWindow.endEpoch,
                     timeWindow.label,
-                attention.mode
+                    attention.mode
                 );
             } else {
                 clearActivityContext();
@@ -3113,7 +3109,7 @@ Scope {
                     timeWindow.startEpoch,
                     timeWindow.endEpoch,
                     timeWindow.label,
-                attention.mode
+                    attention.mode
                 );
             } else {
                 clearActivityContext();
@@ -3154,7 +3150,7 @@ Scope {
                 timeWindow.startEpoch,
                 timeWindow.endEpoch,
                 timeWindow.label,
-            attention.mode
+                attention.mode
             );
         } else {
             clearActivityContext();

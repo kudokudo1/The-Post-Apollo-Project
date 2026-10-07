@@ -1,0 +1,31 @@
+name: Hospital Doctor Runtime
+
+on:
+  pull_request:
+    paths:
+      - "services/hospital/HospitalDoctorRuntimeService.qml"
+      - "widgets/HospitalW.qml"
+      - "tests/hospital/test_doctor_runtime_contracts.py"
+      - ".github/workflows/hospital-doctor-runtime.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "services/hospital/HospitalDoctorRuntimeService.qml"
+      - "widgets/HospitalW.qml"
+      - "tests/hospital/test_doctor_runtime_contracts.py"
+      - ".github/workflows/hospital-doctor-runtime.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate Doctor supervision contracts
+        run: python3 tests/hospital/test_doctor_runtime_contracts.py

@@ -24,9 +24,42 @@ Scope {
         return [
             "bash",
             "-lc",
-            'exec "$HOME/.local/bin/px" "$@"',
+            'px="$HOME/.local/share/post-apollo-dev-runtime/bin/px"; '
+                + '[ -x "$px" ] || px="$HOME/.local/bin/px"; '
+                + 'exec "$px" "$@"',
             "hospital-provider-service"
         ].concat(suffix);
+    }
+
+    function compactPxError(value, context) {
+        const detail = String(value || "").trim();
+
+        if (!detail)
+            return "";
+
+        const lower = detail.toLowerCase();
+
+        if (lower.indexOf("unknown command hospital") >= 0
+                || lower.indexOf("unknown command agent") >= 0
+                || lower.indexOf("post-apollo px control bus") >= 0)
+            return "PX RUNTIME OUT OF DATE // UPDATE POST-APOLLO DEV EXPERIENCE";
+
+        const rows = detail.split("\n").map(function(row) {
+            return String(row || "").trim();
+        }).filter(function(row) {
+            return row.length > 0;
+        });
+
+        let message =
+            rows.length > 0
+            ? rows[rows.length - 1]
+            : detail;
+
+        if (message.length > 240)
+            message = message.slice(0, 237) + "...";
+
+        const prefix = String(context || "").trim();
+        return prefix ? prefix + " // " + message : message;
     }
 
     function normalizeProvider(record) {
@@ -75,8 +108,10 @@ Scope {
 
         stdout: StdioCollector {
             onStreamFinished: {
+                const body = String(this.text || "").trim();
+
                 try {
-                    const result = JSON.parse(String(this.text || "[]"));
+                    const result = JSON.parse(body || "[]");
 
                     if (!Array.isArray(result))
                         throw new Error("PX agent providers returned non-array data");
@@ -89,8 +124,10 @@ Scope {
                     root.lastError = "";
                 } catch (error) {
                     root.providers = [];
-                    root.lastError =
-                        "HOSPITAL PROVIDERS // " + String(error);
+                    root.lastError = root.compactPxError(
+                        body || error,
+                        "HOSPITAL PROVIDERS"
+                    );
                 }
             }
         }
@@ -99,7 +136,10 @@ Scope {
             onStreamFinished: {
                 const detail = String(this.text || "").trim();
                 if (detail)
-                    root.lastError = detail;
+                    root.lastError = root.compactPxError(
+                        detail,
+                        "HOSPITAL PROVIDERS"
+                    );
             }
         }
 

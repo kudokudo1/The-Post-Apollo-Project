@@ -951,6 +951,73 @@ Rectangle {
                 TextInput {
                     id: receptionInput
 
+                    property int historyIndex: -1
+                    property string historyDraft: ""
+
+                    function historyEntries() {
+                        const rows =
+                            root.receptionistService.transcript || [];
+                        const entries = [];
+
+                        for (let i = 0; i < rows.length; ++i) {
+                            const row = rows[i] || {};
+
+                            if (String(row.sender || "") !== "OPERATOR")
+                                continue;
+
+                            const body =
+                                String(row.body || "").trim();
+
+                            if (body)
+                                entries.push(body);
+                        }
+
+                        return entries;
+                    }
+
+                    function resetHistory() {
+                        historyIndex = -1;
+                        historyDraft = "";
+                    }
+
+                    function applyHistoryText(value) {
+                        text = String(value || "");
+                        cursorPosition = text.length;
+                    }
+
+                    function historyPrevious() {
+                        const entries = historyEntries();
+
+                        if (entries.length === 0)
+                            return;
+
+                        if (historyIndex < 0) {
+                            historyDraft = String(text || "");
+                            historyIndex = entries.length - 1;
+                        } else if (historyIndex > 0) {
+                            historyIndex -= 1;
+                        }
+
+                        applyHistoryText(entries[historyIndex]);
+                    }
+
+                    function historyNext() {
+                        const entries = historyEntries();
+
+                        if (historyIndex < 0)
+                            return;
+
+                        if (historyIndex < entries.length - 1) {
+                            historyIndex += 1;
+                            applyHistoryText(entries[historyIndex]);
+                            return;
+                        }
+
+                        const draft = historyDraft;
+                        resetHistory();
+                        applyHistoryText(draft);
+                    }
+
                     anchors {
                         fill: parent
                         leftMargin: 10
@@ -967,11 +1034,35 @@ Rectangle {
                     onActiveFocusChanged:
                         root.typingChanged(activeFocus)
 
+                    onTextEdited: {
+                        if (historyIndex >= 0) {
+                            historyIndex = -1;
+                            historyDraft = "";
+                        }
+                    }
+
+                    Keys.onUpPressed: function(event) {
+                        historyPrevious();
+                        event.accepted = true;
+                    }
+
+                    Keys.onDownPressed: function(event) {
+                        historyNext();
+                        event.accepted = true;
+                    }
+
                     Keys.onReturnPressed: function(event) {
                         const message = String(text || "").trim();
 
-                        if (root.receptionistService.submit(message))
-                            text = "";
+                        if (message) {
+                            const accepted =
+                                root.receptionistService.submit(message);
+
+                            resetHistory();
+
+                            if (accepted)
+                                text = "";
+                        }
 
                         Qt.callLater(function() {
                             transcript.contentY = Math.max(
@@ -1045,6 +1136,7 @@ Rectangle {
                             String(receptionInput.text || "").trim();
 
                         root.receptionistService.submit(message);
+                        receptionInput.resetHistory();
                         receptionInput.text = "";
 
                         Qt.callLater(function() {

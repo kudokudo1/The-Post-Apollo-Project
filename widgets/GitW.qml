@@ -1896,6 +1896,16 @@ PanelWindow {
             : ""
     }
 
+    GitHistoryAbsorbService {
+        id: historyAbsorbService
+        operationJournal: operationJournalService
+        snapshotService: repositorySnapshotService
+        repositoryPath:
+            gitService.repoIsLocal
+            ? gitService.repoRoot
+            : ""
+    }
+
     GitChangesService {
         id: changesService
         operationJournal: operationJournalService
@@ -4990,6 +5000,7 @@ PanelWindow {
                         interactiveRebaseSessionService:
                             interactiveRebaseSessionService
                         historyFoldService: historyFoldService
+                        historyAbsorbService: historyAbsorbService
                         keyboardHost: root
 
                         onChangesRequested: function(path) {

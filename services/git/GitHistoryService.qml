@@ -42,6 +42,7 @@ Scope {
     property string querySince: ""
     property string queryUntil: ""
     property string queryRange: ""
+    property string queryMessage: ""
 
     property bool reflogBusy: false
     property var reflogRows: []
@@ -316,7 +317,7 @@ Scope {
         refreshed();
     }
 
-    function runQuery(path, author, sinceText, untilText, rangeText) {
+    function runQuery(path, author, sinceText, untilText, rangeText, messageText) {
         const repo = String(repositoryPath || "").trim();
 
         if (!repo || queryBusy)
@@ -327,6 +328,7 @@ Scope {
         querySince = String(sinceText || "").trim();
         queryUntil = String(untilText || "").trim();
         queryRange = String(rangeText || "").trim();
+        queryMessage = String(messageText || "").trim();
 
         queryBusy = true;
         queryRows = [];
@@ -350,9 +352,17 @@ Scope {
                 'since_text="$4"',
                 'until_text="$5"',
                 'range_text="$6"',
-                'python3 - "$repo" "$path" "$author" "$since_text" "$until_text" "$range_text" <<\'PY\'',
+                'message_text="$7"',
+                'python3 - "$repo" "$path" "$author" "$since_text" "$until_text" "$range_text" "$message_text" <<\'PY\'',
                 'import subprocess, sys',
-                'repo, path, author, since_text, until_text, range_text = sys.argv[1:7]',
+                'repo, path, author, since_text, until_text, range_text, message_text = sys.argv[1:8]',
+                'if author == "@me":',
+                '    email = subprocess.run(["git", "-C", repo, "config", "user.email"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True).stdout.strip()',
+                '    name = subprocess.run(["git", "-C", repo, "config", "user.name"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True).stdout.strip()',
+                '    author = email or name',
+                '    if not author:',
+                '        print("QUERY IDENTITY NOT CONFIGURED", file=sys.stderr)',
+                '        sys.exit(23)',
                 'cmd = [',
                 '    "git", "-C", repo, "log",',
                 '    "--date-order", "-n", "200",',
@@ -364,6 +374,9 @@ Scope {
                 '    cmd.append("--all")',
                 'if author:',
                 '    cmd.append("--author=" + author)',
+                'if message_text:',
+                '    cmd.append("--grep=" + message_text)',
+                '    cmd.append("--regexp-ignore-case")',
                 'if since_text:',
                 '    cmd.append("--since=" + since_text)',
                 'if until_text:',
@@ -382,7 +395,8 @@ Scope {
             queryAuthor,
             querySince,
             queryUntil,
-            queryRange
+            queryRange,
+            queryMessage
         ]);
 
         return true;
@@ -461,6 +475,7 @@ Scope {
         querySince = "";
         queryUntil = "";
         queryRange = "";
+        queryMessage = "";
         queryRows = [];
         queryStatus = "READY";
     }

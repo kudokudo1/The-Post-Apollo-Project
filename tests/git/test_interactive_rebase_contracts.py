@@ -51,7 +51,7 @@ require(
 )
 require(
     SERVICE,
-    "worktree add",
+    '"worktree", "add", "--detach"',
     "rewrite must rehearse in a temporary detached worktree",
 )
 require(

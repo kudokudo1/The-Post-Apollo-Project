@@ -30,6 +30,18 @@ Item {
         root.armedSetName = "";
     }
 
+    Connections {
+        target: root.libraryStore
+
+        function onQueueRefChanged() {
+            if (!queueRefInput.activeFocus
+                    && queueRefInput.text
+                       !== root.libraryStore.queueRef)
+                queueRefInput.text =
+                    root.libraryStore.queueRef;
+        }
+    }
+
     component LibraryButton: Rectangle {
         id: button
 
@@ -874,14 +886,42 @@ Item {
 
                                         LibraryButton {
                                             width: 34
-                                            label: "X"
-                                            destructive: true
-                                            enabledAction: !root.githubService.actionBusy
-
-                                            onTriggered:
-                                                root.githubService.deleteWorkflow(
-                                                    String(modelData.path || "")
+                                            label:
+                                                root.setActionArmed(
+                                                    "delete-workflow",
+                                                    String(
+                                                        modelData.path
+                                                        || ""
+                                                    )
                                                 )
+                                                ? "!"
+                                                : "X"
+                                            destructive: true
+                                            enabledAction:
+                                                !root.githubService.actionBusy
+
+                                            onTriggered: {
+                                                const path =
+                                                    String(
+                                                        modelData.path
+                                                        || ""
+                                                    );
+
+                                                if (!root.setActionArmed(
+                                                        "delete-workflow",
+                                                        path
+                                                    )) {
+                                                    root.armSetAction(
+                                                        "delete-workflow",
+                                                        path
+                                                    );
+                                                    return;
+                                                }
+
+                                                root.githubService
+                                                    .deleteWorkflow(path);
+                                                root.clearSetArm();
+                                            }
                                         }
                                     }
                                 }

@@ -18,6 +18,24 @@ Item {
 
     readonly property string activeSessionId: adapter.activeSessionId
 
+    readonly property string storedProviderId: {
+        const rows =
+            Array.isArray(adapter.conversations)
+            ? adapter.conversations
+            : [];
+
+        for (let i = 0; i < rows.length; ++i) {
+            const row = rows[i] || {};
+            if (String(row.id || "") === String(root.roomId || ""))
+                return String(row.providerId || "").trim();
+        }
+
+        return "";
+    }
+
+    readonly property string effectiveProviderId:
+        String(root.providerId || root.storedProviderId || "").trim()
+
     signal closeRequested()
 
     readonly property var conversation: {
@@ -39,8 +57,8 @@ Item {
             id: root.roomId,
             displayNameInProfile: root.roomId,
             nickname:
-                root.providerId
-                ? String(root.providerId).toUpperCase()
+                root.effectiveProviderId
+                ? root.effectiveProviderId.toUpperCase()
                 : ""
         };
     }
@@ -67,7 +85,9 @@ Item {
         if (root.activeSessionId)
             return "CONNECTED";
 
-        return root.providerId ? "READY TO CONNECT" : "ROOM CHAT";
+        return root.effectiveProviderId
+            ? "READY TO CONNECT"
+            : "ROOM CHAT";
     }
 
     function roomBinding() {
@@ -80,6 +100,7 @@ Item {
             branch: root.branch,
             bedPath: root.bedPath,
             doctorId: root.doctorId,
+            providerId: root.effectiveProviderId,
             assignmentId: root.assignmentId
         };
     }
@@ -116,13 +137,14 @@ Item {
     onBranchChanged: scheduleRoomBinding()
     onBedPathChanged: scheduleRoomBinding()
     onDoctorIdChanged: scheduleRoomBinding()
+    onProviderIdChanged: scheduleRoomBinding()
     onAssignmentIdChanged: scheduleRoomBinding()
 
     HospitalRoomConversationAdapter {
         id: adapter
 
         doctorId: root.doctorId
-        providerId: root.providerId
+        providerId: root.effectiveProviderId
         workingDirectory: root.bedPath
     }
 

@@ -66,9 +66,6 @@ Item {
         }
     }
 
-    onActiveSessionIdChanged:
-        adapter.activeSessionId = root.activeSessionId
-
     HospitalRoomConversationAdapter {
         id: adapter
 

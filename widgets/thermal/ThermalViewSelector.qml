@@ -140,7 +140,7 @@ Rectangle {
                         text: "༄｡°"
                         font.pixelSize: 15
                         color: fanButton.pressed ? Colors.black : fanButton.stateColor
-                        layer.enabled: !fanButton.pressed
+                        layer.enabled: Window.window !== null && (!fanButton.pressed)
                         layer.effect: DropShadow {
                             radius: 9
                             samples: 9

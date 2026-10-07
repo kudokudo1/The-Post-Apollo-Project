@@ -835,7 +835,7 @@ Item {
                                                         spacing: 5
 
                                                         GohuText {
-                                                            width: parent.width - 91
+                                                            width: parent.width - 151
                                                             anchors.verticalCenter: parent.verticalCenter
                                                             text:
                                                                 root.projectService.itemTitle(

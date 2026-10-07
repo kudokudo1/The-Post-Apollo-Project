@@ -87,11 +87,16 @@ require_regex(
 require_regex(
     CHANGES,
     r"function fileTransferEligible\(\).*"
+    r"Boolean\(row\.untracked\).*"
     r"Boolean\(row\.unstaged\).*"
     r"!Boolean\(row\.staged\).*"
-    r"!Boolean\(row\.untracked\).*"
     r"!Boolean\(row\.conflict\)",
-    "Changes must not offer whole-file transfer for unsupported file states",
+    "Changes must allow untracked or clean unstaged whole-file transfer while refusing conflicts",
+)
+require(
+    VIEW,
+    "transferService.previewUntracked(",
+    "untracked whole-file preview must use the dedicated guarded backend path",
 )
 require(
     CHANGES,

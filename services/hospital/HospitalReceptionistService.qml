@@ -1324,7 +1324,10 @@ Scope {
             query.indexOf("take me there") >= 0
             || query.indexOf("go there") >= 0
             || query.indexOf("show me there") >= 0
-            || query.indexOf("take me to there") >= 0;
+            || query.indexOf("take me to there") >= 0
+            || query.indexOf("bring me there") >= 0
+            || query.indexOf("send me there") >= 0
+            || query.indexOf("head there") >= 0;
         const openThat =
             (
                 query.indexOf("open that") >= 0
@@ -1335,6 +1338,10 @@ Scope {
                 || query.indexOf("take me to it") >= 0
                 || query.indexOf("go to that") >= 0
                 || query.indexOf("go to it") >= 0
+                || query.indexOf("open this") >= 0
+                || query.indexOf("show me this") >= 0
+                || query.indexOf("take me to this") >= 0
+                || query.indexOf("go to this") >= 0
             );
         const favoriteThat =
             query.indexOf("favorite that") >= 0
@@ -1342,25 +1349,40 @@ Scope {
             || query.indexOf("favourite that") >= 0
             || query.indexOf("favourite it") >= 0
             || query.indexOf("pin that") >= 0
-            || query.indexOf("pin it") >= 0;
+            || query.indexOf("pin it") >= 0
+            || query.indexOf("favorite this") >= 0
+            || query.indexOf("favourite this") >= 0
+            || query.indexOf("pin this") >= 0;
         const unfavoriteThat =
             query.indexOf("unfavorite that") >= 0
             || query.indexOf("unfavorite it") >= 0
             || query.indexOf("unfavourite that") >= 0
             || query.indexOf("unfavourite it") >= 0
             || query.indexOf("unpin that") >= 0
-            || query.indexOf("unpin it") >= 0;
+            || query.indexOf("unpin it") >= 0
+            || query.indexOf("unfavorite this") >= 0
+            || query.indexOf("unfavourite this") >= 0
+            || query.indexOf("unpin this") >= 0;
         const beforeThat =
             query.indexOf("before that") >= 0
             || query.indexOf("before it") >= 0
             || query.indexOf("previous one") >= 0
-            || query.indexOf("previous event") >= 0;
+            || query.indexOf("previous event") >= 0
+            || query === "take me back"
+            || query === "go back"
+            || query === "back"
+            || query.indexOf("back one") >= 0
+            || query.indexOf("older one") >= 0
+            || query.indexOf("older event") >= 0;
         const newerThanThat =
             query.indexOf("anything newer") >= 0
             || query.indexOf("anything after that") >= 0
             || query.indexOf("anything after it") >= 0
             || query.indexOf("what happened after that") >= 0
-            || query.indexOf("what happened after it") >= 0;
+            || query.indexOf("what happened after it") >= 0
+            || query.indexOf("next one") >= 0
+            || query.indexOf("next event") >= 0
+            || query.indexOf("newer one") >= 0;
 
         if (!goThere
                 && !openThat
@@ -1462,17 +1484,27 @@ Scope {
             return false;
 
         const query = raw.toLowerCase();
+        const asksLocation =
+            query.indexOf("where is") >= 0
+            || query.indexOf("where's") >= 0
+            || query.indexOf("wheres") >= 0
+            || query.indexOf("find ") >= 0
+            || query.indexOf("locate ") >= 0;
         const asksAction =
             query.indexOf("show me") >= 0
             || query.indexOf("take me to") >= 0
             || query.indexOf("go to") >= 0
             || query.indexOf("jump to") >= 0
+            || query.indexOf("bring me to") >= 0
+            || query.indexOf("send me to") >= 0
+            || query.indexOf("head to") >= 0
             || query.indexOf("open the latest") >= 0
             || query.indexOf("open latest") >= 0
             || query.indexOf("open the newest") >= 0
             || query.indexOf("open newest") >= 0
             || query.indexOf("open the recent") >= 0
-            || query.indexOf("open recent") >= 0;
+            || query.indexOf("open recent") >= 0
+            || asksLocation;
 
         if (!asksAction)
             return false;
@@ -1486,7 +1518,13 @@ Scope {
         const problemsOnly =
             query.indexOf("problem") >= 0
             || query.indexOf("issue") >= 0
-            || query.indexOf("attention") >= 0;
+            || query.indexOf("attention") >= 0
+            || query.indexOf("wrong") >= 0
+            || query.indexOf("broke") >= 0
+            || query.indexOf("broken") >= 0
+            || query.indexOf("failed") >= 0
+            || query.indexOf("failure") >= 0
+            || query.indexOf("trouble") >= 0;
         const asksSpecificHistoricalEvent =
             query.indexOf("latest") >= 0
             || query.indexOf("newest") >= 0
@@ -1597,13 +1635,26 @@ Scope {
             query.indexOf("favorite") >= 0
             || query.indexOf("favourite") >= 0
             || query.indexOf("pinned") >= 0
-            || query.indexOf("kept") >= 0;
+            || query.indexOf("kept") >= 0
+            || query.indexOf("starred") >= 0
+            || query.indexOf("saved") >= 0;
         const asksRecent =
             query.indexOf("recent") >= 0
             || query.indexOf("latest") >= 0
             || query.indexOf("what happened") >= 0
             || query.indexOf("what's happened") >= 0
             || query.indexOf("whats happened") >= 0
+            || query.indexOf("what changed") >= 0
+            || query.indexOf("what's changed") >= 0
+            || query.indexOf("whats changed") >= 0
+            || query.indexOf("what is going on") >= 0
+            || query.indexOf("what's going on") >= 0
+            || query.indexOf("whats going on") >= 0
+            || query.indexOf("catch me up") >= 0
+            || query.indexOf("update me") >= 0
+            || query.indexOf("give me an update") >= 0
+            || query.indexOf("anything happen") >= 0
+            || query.indexOf("did anything happen") >= 0
             || query.indexOf("activity") >= 0
             || query.indexOf("last call") >= 0
             || query.indexOf("last report") >= 0
@@ -1611,6 +1662,22 @@ Scope {
             || query.indexOf("last intercom") >= 0
             || query.indexOf("last message") >= 0
             || query.indexOf("last staff") >= 0;
+        const asksProblems =
+            query.indexOf("what went wrong") >= 0
+            || query.indexOf("what's wrong") >= 0
+            || query.indexOf("whats wrong") >= 0
+            || query.indexOf("anything wrong") >= 0
+            || query.indexOf("anything important") >= 0
+            || query.indexOf("what broke") >= 0
+            || query.indexOf("what failed") >= 0
+            || query.indexOf("what needs attention") >= 0
+            || query.indexOf("needs attention") >= 0
+            || query.indexOf("what needs me") >= 0
+            || query.indexOf("what should i check") >= 0
+            || query.indexOf("what should i look at") >= 0
+            || query.indexOf("problem") >= 0
+            || query.indexOf("issue") >= 0
+            || query.indexOf("trouble") >= 0;
         const asksWhen =
             query.indexOf("when was") >= 0
             || query.indexOf("when did") >= 0
@@ -1628,6 +1695,7 @@ Scope {
         if (!asksNew
                 && !asksFavorites
                 && !asksRecent
+                && !asksProblems
                 && !asksWhen
                 && !asksCount
                 && !asksHelp)
@@ -1638,24 +1706,33 @@ Scope {
         if (asksHelp) {
             append(
                 "RECEPTION",
-                "I can report what is new, what you missed, recent activity, favorites, Room or team history, counts, and last activity. I can show a team or open a recorded problem, then follow up with open that, take me there, favorite that, before that, or anything newer."
+                "I understand recent activity, what changed, what went wrong, what needs attention, favorites, Room or team history, counts, and last activity. I can also find or show a team, then follow up with open this, take me there, favorite this, go back, or next one."
             );
             return true;
         }
 
         const source = activityQuerySource(query);
         const target = activityTargetFromQuery(raw);
-        const matches =
+        let matches =
             matchingActivity(
                 source,
                 asksNew,
                 asksFavorites,
                 target
             );
+
+        if (asksProblems) {
+            matches = matches.filter(function(event) {
+                return root.isProblemActivity(event || {});
+            });
+        }
+
         let label = "";
 
         if (asksFavorites)
             label = "FAVORITES";
+        else if (asksProblems)
+            label = "IMPORTANT";
         else if (asksNew)
             label = "NEW SINCE LAST VISIT";
         else
@@ -1684,7 +1761,7 @@ Scope {
                     target,
                     asksNew,
                     asksFavorites,
-                    false
+                    asksProblems
                 );
             } else {
                 clearActivityContext();
@@ -1716,7 +1793,7 @@ Scope {
                 target,
                 asksNew,
                 asksFavorites,
-                false
+                asksProblems
             );
         } else {
             clearActivityContext();

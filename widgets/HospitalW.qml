@@ -1879,6 +1879,14 @@ PanelWindow {
         id: specialistRegistryService
     }
 
+    HospitalResponsibilityService {
+        id: responsibilityService
+        roundsService: roundsService
+        registryService: specialistRegistryService
+        assignmentService: assignmentService
+        currentRoomId: root.selectedRoomTeam
+    }
+
     HospitalDoctorService {
         id: doctorService
 
@@ -6527,6 +6535,7 @@ PanelWindow {
                 root.operationsSurface === "attention"
                 && root.attentionSubview === "triage"
             attentionProvider: githubAttentionProvider
+            responsibilityService: responsibilityService
 
             anchors {
                 left: parent.left

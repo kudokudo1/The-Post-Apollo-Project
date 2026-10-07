@@ -5,6 +5,7 @@ Rectangle {
     id: root
 
     required property var attentionProvider
+    property var responsibilityService: null
 
     property string stateFilter: "ALL"
     property int selectedIndex: -1
@@ -245,7 +246,7 @@ Rectangle {
                 required property var modelData
 
                 width: ListView.view.width
-                height: 88
+                height: 104
                 color: Colors.black
                 border.width: 1
                 border.color:
@@ -326,6 +327,48 @@ Rectangle {
                                   )
                             font.pixelSize: 8
                             color: Colors.orange
+                            elide: Text.ElideRight
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            property var responsibility:
+                                root.responsibilityService
+                                ? root.responsibilityService.contextFor(
+                                    String(row.modelData.repository || ""),
+                                    String(row.modelData.headRefName || "")
+                                  )
+                                : null
+                            text:
+                                !responsibility
+                                ? "OWNER // UNMAPPED"
+                                : (
+                                    "OWNER // "
+                                    + String(
+                                        responsibility.ownerLabel
+                                        || "UNMAPPED"
+                                      )
+                                    + (
+                                        responsibility.roomTeam
+                                        ? " // ROOM "
+                                          + String(responsibility.roomTeam)
+                                        : ""
+                                      )
+                                    + " // "
+                                    + String(
+                                        responsibility.confidence
+                                        || "UNMAPPED"
+                                      )
+                                  )
+                            font.pixelSize: 8
+                            color:
+                                responsibility
+                                && responsibility.confidence === "EXACT"
+                                ? Colors.green
+                                : responsibility
+                                  && responsibility.confidence !== "UNMAPPED"
+                                ? Colors.blue
+                                : Colors.magenta
                             elide: Text.ElideRight
                         }
                     }

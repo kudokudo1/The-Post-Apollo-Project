@@ -8,7 +8,7 @@ Scope {
     property var transcript: [
         {
             sender: "RECEPTION",
-            body: "Front desk online. I can route you to Surgery, Reports, Rounds, Staff, Phone, or Intercom."
+            body: "Front desk online. I can route you to Surgery, Archive, Reports, Rounds, Staff, Phone, or Intercom."
         }
     ]
 
@@ -55,6 +55,9 @@ Scope {
     property var pinnedKeys: []
     property int pinnedCount: 0
     property int maxPinnedEvents: 5
+    property string lastArchiveExportStatus: ""
+    readonly property string archiveExportPath:
+        Quickshell.dataPath("hospital-reception-export.json")
 
     // Session-local conversational reference. This is intentionally not
     // persisted: Reception remembers "that" only inside the live session.
@@ -118,6 +121,15 @@ Scope {
     }
 
     FileView {
+        id: archiveExportFile
+
+        path: root.archiveExportPath
+        blockWrites: true
+        atomicWrites: true
+        printErrors: false
+    }
+
+    FileView {
         id: activityFile
 
         path: Quickshell.dataPath("hospital-reception.json")
@@ -136,6 +148,37 @@ Scope {
         onAdapterUpdated: writeAdapter()
         onLoaded: root.hydrateActivity()
         onLoadFailed: root.hydrateActivity()
+    }
+
+    function exportArchive(eventsValue, labelValue) {
+        const rows =
+            Array.isArray(eventsValue)
+            ? eventsValue.slice()
+            : activityEvents.slice();
+        const label =
+            String(labelValue || "HOSPITAL RECEPTION ARCHIVE");
+
+        try {
+            archiveExportFile.setText(
+                JSON.stringify({
+                    schemaVersion: 1,
+                    exportedAt: nowIso(),
+                    label: label,
+                    count: rows.length,
+                    events: rows
+                }, null, 2)
+            );
+            lastArchiveExportStatus =
+                "EXPORTED "
+                + String(rows.length)
+                + " EVENTS // "
+                + archiveExportPath;
+            return true;
+        } catch (error) {
+            lastArchiveExportStatus =
+                "EXPORT FAILED // " + String(error);
+            return false;
+        }
     }
 
     function nowIso() {
@@ -3795,6 +3838,8 @@ Scope {
 
         if (target === "surgery")
             response = "Routing to Surgery.";
+        else if (target === "archive")
+            response = "Opening Reception archive.";
         else if (target === "reports")
             response = "Opening surgical history and evidence.";
         else if (target === "rounds")
@@ -3808,7 +3853,7 @@ Scope {
         else {
             append(
                 "RECEPTION",
-                "I can route Surgery, Reports, Rounds, Staff, Phone, or Intercom."
+                "I can route Surgery, Archive, Reports, Rounds, Staff, Phone, or Intercom."
             );
             return false;
         }
@@ -3848,6 +3893,12 @@ Scope {
 
         if (answerActivityAction(raw))
             return true;
+
+        if (query.indexOf("open archive") >= 0
+                || query.indexOf("show archive browser") >= 0
+                || query.indexOf("browse archive") >= 0
+                || query.indexOf("go to archive") >= 0)
+            return request("archive", raw);
 
         if (answerArchiveMaintenance(raw))
             return true;

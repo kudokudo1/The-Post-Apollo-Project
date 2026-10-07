@@ -865,6 +865,11 @@ PanelWindow {
             return;
         }
 
+        if (target === "archive") {
+            root.openArchive();
+            return;
+        }
+
         if (target === "reports") {
             root.openReports();
             return;
@@ -1359,6 +1364,13 @@ PanelWindow {
                 && specialistRegistryService.loaded
                 && !specialistRegistryService.probing)
             specialistRegistryService.refreshPresence();
+    }
+
+    function openArchive() {
+        receptionistService.endVisit();
+        root.leaveRoomControls();
+        root.leaveBedControls();
+        root.operationsSurface = "archive";
     }
 
     function openReports(teamValue) {
@@ -2324,6 +2336,8 @@ PanelWindow {
                     text:
                         root.operationsSurface === "reception"
                         ? "HOSPITAL // RECEPTION"
+                        : root.operationsSurface === "archive"
+                        ? "HOSPITAL // ARCHIVE"
                         : root.operationsSurface === "reports"
                         ? "HOSPITAL // REPORTS"
                         : root.operationsSurface === "rounds"
@@ -2353,6 +2367,8 @@ PanelWindow {
                     text:
                         root.operationsSurface === "reception"
                         ? "FRONT DESK // COORDINATION"
+                        : root.operationsSurface === "archive"
+                        ? "RECEPTION HISTORY // BROWSE + EXPORT"
                         : root.operationsSurface === "reports"
                         ? "SURGICAL HISTORY // EVIDENCE"
                         : root.operationsSurface === "rounds"
@@ -2572,6 +2588,13 @@ PanelWindow {
                             text:
                                 root.operationsSurface === "reception"
                                 ? "DESK OPEN"
+                                : root.operationsSurface === "archive"
+                                ? (
+                                    "ARCHIVE "
+                                    + String(
+                                        receptionistService.archiveCount
+                                    )
+                                  )
                                 : root.operationsSurface === "reports"
                                 ? (
                                     "REPORTS "
@@ -2614,6 +2637,8 @@ PanelWindow {
                             color:
                                 root.operationsSurface === "reception"
                                 ? Colors.green
+                                : root.operationsSurface === "archive"
+                                ? Colors.cyan
                                 : root.operationsSurface === "reports"
                                 ? Colors.magenta
                                 : root.operationsSurface === "rounds"
@@ -2741,35 +2766,42 @@ PanelWindow {
                 spacing: 10
 
                 HospitalModeTab {
-                    width: (parent.width - 40) / 5
+                    width: (parent.width - 50) / 6
                     label: "RECEPTION"
                     selected: root.operationsSurface === "reception"
                     onTriggered: root.openReception()
                 }
 
                 HospitalModeTab {
-                    width: (parent.width - 40) / 5
+                    width: (parent.width - 50) / 6
                     label: "SURGERY"
                     selected: !root.operationsOpen
                     onTriggered: root.showSurgery()
                 }
 
                 HospitalModeTab {
-                    width: (parent.width - 40) / 5
+                    width: (parent.width - 50) / 6
+                    label: "ARCHIVE"
+                    selected: root.operationsSurface === "archive"
+                    onTriggered: root.openArchive()
+                }
+
+                HospitalModeTab {
+                    width: (parent.width - 50) / 6
                     label: "REPORTS"
                     selected: root.operationsSurface === "reports"
                     onTriggered: root.openReports()
                 }
 
                 HospitalModeTab {
-                    width: (parent.width - 40) / 5
+                    width: (parent.width - 50) / 6
                     label: "ROUNDS"
                     selected: root.operationsSurface === "rounds"
                     onTriggered: root.openRounds()
                 }
 
                 HospitalModeTab {
-                    width: (parent.width - 40) / 5
+                    width: (parent.width - 50) / 6
                     label: "STAFF"
                     selected: root.operationsSurface === "staff"
                     onTriggered: root.openStaff()
@@ -2787,6 +2819,8 @@ PanelWindow {
                 border.color:
                     root.operationsSurface === "reception"
                     ? Colors.green
+                    : root.operationsSurface === "archive"
+                    ? Colors.cyan
                     : root.operationsSurface === "reports"
                     ? Colors.magenta
                     : root.operationsSurface === "staff"
@@ -2801,6 +2835,8 @@ PanelWindow {
                     color:
                         root.operationsSurface === "reception"
                         ? Colors.green
+                        : root.operationsSurface === "archive"
+                        ? Colors.cyan
                         : root.operationsSurface === "reports"
                         ? Colors.magenta
                         : root.operationsSurface === "staff"
@@ -2821,6 +2857,8 @@ PanelWindow {
                         text:
                             root.operationsSurface === "reception"
                             ? "RECEPTION // DESK"
+                            : root.operationsSurface === "archive"
+                            ? "ARCHIVE // HISTORY"
                             : root.operationsSurface === "reports"
                             ? "REPORTS // CONTEXT"
                             : root.operationsSurface === "staff"
@@ -2830,6 +2868,8 @@ PanelWindow {
                         color:
                             root.operationsSurface === "reception"
                             ? Colors.green
+                            : root.operationsSurface === "archive"
+                            ? Colors.cyan
                             : root.operationsSurface === "reports"
                             ? Colors.magenta
                             : root.operationsSurface === "staff"
@@ -2852,6 +2892,25 @@ PanelWindow {
                                 + String(specialistRegistryService.readyCount)
                                 + "/"
                                 + String(specialistRegistryService.specialistCount)
+                              )
+                            : root.operationsSurface === "archive"
+                            ? (
+                                "VISIBLE "
+                                + String(
+                                    archiveView.filteredEvents.length
+                                  )
+                                + " / "
+                                + String(
+                                    receptionistService.archiveCount
+                                  )
+                                + "  //  FAVORITES "
+                                + String(
+                                    receptionistService.pinnedCount
+                                  )
+                                + "  //  "
+                                + archiveView.sourceFilter
+                                + "  //  "
+                                + archiveView.attentionFilter
                               )
                             : root.operationsSurface === "reports"
                             ? (
@@ -2916,6 +2975,8 @@ PanelWindow {
                         font.pixelSize: 11
                         color:
                             root.operationsSurface === "reception"
+                            ? Colors.white
+                            : root.operationsSurface === "archive"
                             ? Colors.white
                             : root.operationsSurface === "reports"
                             ? Colors.white
@@ -4661,6 +4722,33 @@ PanelWindow {
                         && root.menuOpen
                         && root.keyboardActive)
                     keyboardFocusAnchor.forceActiveFocus();
+            }
+        }
+
+        HospitalArchiveView {
+            id: archiveView
+
+            z: 700
+            visible: root.operationsSurface === "archive"
+            receptionistService: receptionistService
+
+            anchors {
+                left: parent.left
+                right: parent.right
+                top: fixedTop.bottom
+                bottom: actionBay.top
+                leftMargin: 18
+                rightMargin: 18
+                topMargin: 8
+                bottomMargin: 10
+            }
+
+            onEventActivated: function(event) {
+                hospitalContextService.captureActivity(
+                    event,
+                    ""
+                );
+                root.activateReceptionActivity(event);
             }
         }
 

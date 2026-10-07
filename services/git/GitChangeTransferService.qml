@@ -35,6 +35,8 @@ Scope {
     property int previewHunkIndex: -1
     property var previewFiles: []
     property string previewFingerprint: ""
+    property string previewPatchBase64: ""
+    property int maxRecoveryPatchBytes: 524288
     property string previewSourceBranch: ""
     property string previewDestinationBranch: ""
     property string previewSourceHead: ""
@@ -109,6 +111,7 @@ Scope {
         previewHunkIndex = -1;
         previewFiles = [];
         previewFingerprint = "";
+        previewPatchBase64 = "";
         previewSourceBranch = "";
         previewDestinationBranch = "";
         previewSourceHead = "";
@@ -121,6 +124,12 @@ Scope {
         return previewScope === "hunk"
             ? "CHANGES/TRANSFER_HUNK"
             : "CHANGES/TRANSFER";
+    }
+
+    function contentRecoverable() {
+        return previewPatchBase64.length > 0
+            && previewPatchBytes > 0
+            && previewPatchBytes <= maxRecoveryPatchBytes;
     }
 
     function transferContext() {
@@ -141,7 +150,15 @@ Scope {
             destinationHead: String(previewDestinationHead || ""),
             files: previewFiles.slice(),
             fingerprint: String(previewFingerprint || ""),
-            recoveryClass: "EVIDENCE_ONLY"
+            patchBytes: Number(previewPatchBytes || 0),
+            patchBase64:
+                contentRecoverable()
+                ? String(previewPatchBase64 || "")
+                : "",
+            recoveryClass:
+                contentRecoverable()
+                ? "CONTENT_RECOVERABLE"
+                : "EVIDENCE_ONLY"
         };
     }
 
@@ -154,9 +171,17 @@ Scope {
             out = {};
         }
 
-        out.recoveryClass = "EVIDENCE_ONLY";
-        out.recoveryReason =
-            "CHANGE TRANSFER CONTENT RECOVERY IS NOT YET IMPLEMENTED";
+        if (contentRecoverable()) {
+            out.recoveryClass = "CONTENT_RECOVERABLE";
+            out.recoveryReason =
+                "EXACT TRANSFER PATCH STORED IN JOURNAL";
+        } else {
+            out.recoveryClass = "EVIDENCE_ONLY";
+            out.recoveryReason =
+                previewPatchBytes > maxRecoveryPatchBytes
+                ? "TRANSFER PATCH EXCEEDS RECOVERY PAYLOAD LIMIT"
+                : "TRANSFER PATCH RECOVERY PAYLOAD UNAVAILABLE";
+        }
         return out;
     }
 
@@ -246,6 +271,7 @@ Scope {
                 'fingerprint="$(sha256sum "$patch" | awk "{print \\$1}")"',
                 'bytes="$(wc -c <"$patch" | tr -d " ")"',
                 'lines="$(wc -l <"$patch" | tr -d " ")"',
+                'if [ "$bytes" -le "524288" ]; then printf "PATCH64\\t"; base64 -w0 "$patch"; printf "\\n"; fi',
                 'printf "PREVIEW\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$fingerprint" "$bytes" "$lines" "$src_branch" "$dst_branch" "$src_head" "$dst_head" "$mode"',
                 'for path in "${files[@]}"; do printf "FILE\\t%s\\n" "$path"; done'
             ].join("\n"),
@@ -389,6 +415,7 @@ Scope {
                 'fingerprint="$(sha256sum "$patch" | awk "{print \\$1}")"',
                 'bytes="$(wc -c <"$patch" | tr -d " ")"',
                 'lines="$(wc -l <"$patch" | tr -d " ")"',
+                'if [ "$bytes" -le "524288" ]; then printf "PATCH64\\t"; base64 -w0 "$patch"; printf "\\n"; fi',
                 'printf "PREVIEW\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$fingerprint" "$bytes" "$lines" "$src_branch" "$dst_branch" "$src_head" "$dst_head" "$mode"',
                 'printf "FILE\\t%s\\n" "$path"'
             ].join("\n"),
@@ -429,6 +456,7 @@ Scope {
         const err = String(previewStderrText || "").trim();
         const lines = out.split("\n");
         let header = null;
+        let patchBase64 = "";
         const files = [];
 
         for (let i = 0; i < lines.length; ++i) {
@@ -436,6 +464,8 @@ Scope {
 
             if (line.indexOf("PREVIEW\t") === 0)
                 header = line.split("\t");
+            else if (line.indexOf("PATCH64\t") === 0)
+                patchBase64 = line.slice(8);
             else if (line.indexOf("FILE\t") === 0)
                 files.push(line.slice(5));
         }
@@ -463,6 +493,7 @@ Scope {
         }
 
         previewFingerprint = String(header[1] || "");
+        previewPatchBase64 = String(patchBase64 || "");
         previewPatchBytes = Number(header[2] || 0);
         previewPatchLines = Number(header[3] || 0);
         previewSourceBranch = String(header[4] || "");
@@ -500,6 +531,10 @@ Scope {
             files: previewFiles.slice(),
             fingerprint: previewFingerprint,
             patchBytes: previewPatchBytes,
+            recoveryClass:
+                contentRecoverable()
+                ? "CONTENT_RECOVERABLE"
+                : "EVIDENCE_ONLY",
             patchLines: previewPatchLines
         });
     }

@@ -165,3 +165,23 @@ assert 'root.openRoomDoctor();' in hospital
 assert "Quickshell.execDetached" not in hospital[hospital.find("id: roomAiDock"):hospital.find("id: roomInspectActions")]
 
 print("hospital room AI dock contracts: PASS")
+
+
+for service_path in (ADAPTER, PROVIDERS, DOCTORS):
+    service = service_path.read_text()
+    assert '.local/share/post-apollo-dev-runtime/bin/px' in service, service_path
+    assert '.local/bin/px' in service, service_path
+    assert 'function compactPxError(value, context)' in service, service_path
+    assert 'PX RUNTIME OUT OF DATE // UPDATE POST-APOLLO DEV EXPERIENCE' in service, service_path
+
+shared = SHARED.read_text()
+assert "maximumLineCount: 5" in shared
+assert "maximumLineCount: 3" in shared
+assert "elide: Text.ElideRight" in shared
+
+hospital = HOSPITAL.read_text()
+doctor_view = hospital[hospital.find("id: roomDoctorView"):]
+assert "maximumLineCount: 4" in doctor_view
+assert "clip: true" in doctor_view
+
+print("hospital PX compatibility and error containment: PASS")

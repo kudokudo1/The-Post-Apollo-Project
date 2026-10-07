@@ -6,8 +6,7 @@ import re
 
 ROOT = Path(__file__).resolve().parents[2]
 
-# Fold and file-group Split are live History Surgery organs. Absorb remains
-# the next surgery primitive and lands independently.
+# Fold, file-group Split, and staged Absorb are live History Surgery organs.
 
 
 def read(path: str) -> str:
@@ -62,8 +61,30 @@ require_regex(
 )
 require(
     VIEW,
-    'label: "ABSORB // NEXT"',
-    "Absorb must remain visibly unavailable until implemented",
+    "required property var absorbService",
+    "Surgery surface must accept the Absorb backend",
+)
+require(
+    VIEW,
+    'label: "ABSORB"',
+    "Absorb must be a live Surgery mode",
+)
+require(
+    VIEW,
+    'selectedAction: root.mode === "absorb"',
+    "Surgery must show Absorb selection state",
+)
+require(
+    VIEW,
+    'onTriggered: root.mode = "absorb"',
+    "Surgery mode selector must open Absorb",
+)
+require_regex(
+    VIEW,
+    r"GitHistoryAbsorbView \{.*"
+    r'visible: root\.mode === "absorb".*'
+    r"absorbService: root\.absorbService",
+    "Surgery must host Absorb without replacing Fold or Split",
 )
 require(
     VIEW,
@@ -126,13 +147,19 @@ require(
     "property var historySplitService: null",
     "HISTORY must accept the shared Split service",
 )
+require(
+    HISTORY,
+    "property var historyAbsorbService: null",
+    "HISTORY must accept the shared Absorb service",
+)
 require_regex(
     HISTORY,
     r"GitHistorySurgeryView \{.*"
     r'visible: root\.subMode === "surgery".*'
     r"foldService: root\.historyFoldService.*"
-    r"splitService: root\.historySplitService",
-    "HISTORY must host Fold + Split on the Surgery surface",
+    r"splitService: root\.historySplitService.*"
+    r"absorbService: root\.historyAbsorbService",
+    "HISTORY must host Fold + Split + Absorb on the Surgery surface",
 )
 
 require_regex(
@@ -153,10 +180,19 @@ require_regex(
 )
 require_regex(
     GITW,
+    r"GitHistoryAbsorbService \{.*"
+    r"id: historyAbsorbService.*"
+    r"operationJournal: operationJournalService.*"
+    r"snapshotService: repositorySnapshotService",
+    "GitW must host Absorb with shared journal and snapshots",
+)
+require_regex(
+    GITW,
     r"GitHistoryView \{.*"
     r"historyFoldService: historyFoldService.*"
-    r"historySplitService: historySplitService",
-    "GitW must pass Fold + Split into HISTORY",
+    r"historySplitService: historySplitService.*"
+    r"historyAbsorbService: historyAbsorbService",
+    "GitW must pass Fold + Split + Absorb into HISTORY",
 )
 
-print("Git HISTORY Surgery Fold + Split UI contracts: PASS")
+print("Git HISTORY Surgery Fold + Split + Absorb UI contracts: PASS")

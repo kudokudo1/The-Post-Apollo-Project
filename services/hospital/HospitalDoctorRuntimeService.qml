@@ -15,9 +15,12 @@ Scope {
 
     property bool refreshing: false
     property bool cancelling: false
+    property bool quickRunning: false
+    property string quickCommand: ""
     property string lastError: ""
     property var lastStatusPayload: null
     property var lastCancelResult: null
+    property var lastQuickResult: null
 
     readonly property string displayStatus:
         cancelling
@@ -31,6 +34,7 @@ Scope {
 
     signal statusRefreshed()
     signal turnCancelled(var result)
+    signal quickCompleted(string command, var result)
 
     function pxArgs(args) {
         const suffix = Array.isArray(args) ? args : [];
@@ -177,6 +181,52 @@ Scope {
         return true;
     }
 
+    function quick(commandValue) {
+        const id = String(sessionId || "").trim();
+        const command =
+            String(commandValue || "").trim().toUpperCase();
+        const allowed = [
+            "GO",
+            "CONTINUE",
+            "STATUS",
+            "REPORT",
+            "CHECKLIST",
+            "NEXT",
+            "PAUSE"
+        ];
+
+        if (!id || quickRunning || quickProcess.running)
+            return false;
+
+        if (allowed.indexOf(command) < 0) {
+            lastError =
+                "HOSPITAL QUICK // UNKNOWN COMMAND // " + command;
+            return false;
+        }
+
+        if (operating
+                && command !== "STATUS"
+                && command !== "PAUSE") {
+            lastError =
+                "HOSPITAL QUICK // DOCTOR ALREADY OPERATING";
+            return false;
+        }
+
+        quickRunning = true;
+        quickCommand = command;
+        lastError = "";
+        lastQuickResult = null;
+
+        quickProcess.exec(pxArgs([
+            "agent",
+            "quick",
+            id,
+            command,
+            "--json"
+        ]));
+        return true;
+    }
+
     onSessionIdChanged: {
         resetRuntime();
 
@@ -284,6 +334,59 @@ Scope {
 
             if (Number(code) === 0 && root.lastCancelResult)
                 root.turnCancelled(root.lastCancelResult);
+
+            Qt.callLater(root.refresh);
+        }
+    }
+
+    Process {
+        id: quickProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const body = String(this.text || "").trim();
+
+                if (!body)
+                    return;
+
+                try {
+                    root.lastQuickResult = JSON.parse(body);
+                    root.lastError = "";
+                } catch (error) {
+                    root.lastError = root.compactPxError(
+                        body || error,
+                        "HOSPITAL QUICK"
+                    );
+                }
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                const detail = String(this.text || "").trim();
+
+                if (detail)
+                    root.lastError = root.compactPxError(
+                        detail,
+                        "HOSPITAL QUICK"
+                    );
+            }
+        }
+
+        onExited: function(code, exitStatus) {
+            const completedCommand = root.quickCommand;
+            root.quickRunning = false;
+            root.quickCommand = "";
+
+            if (Number(code) !== 0 && !root.lastError)
+                root.lastError =
+                    "PX AGENT QUICK EXIT " + String(code);
+
+            if (Number(code) === 0 && root.lastQuickResult)
+                root.quickCompleted(
+                    completedCommand,
+                    root.lastQuickResult
+                );
 
             Qt.callLater(root.refresh);
         }

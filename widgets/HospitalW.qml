@@ -1764,6 +1764,14 @@ PanelWindow {
         id: doctorRuntimeService
 
         sessionId: roomChatView.activeSessionId
+
+        onQuickCompleted: function(command, result) {
+            roomChatView.refresh();
+        }
+
+        onTurnCancelled: function(result) {
+            roomChatView.refresh();
+        }
     }
 
     HospitalPhoneService {
@@ -5197,6 +5205,15 @@ PanelWindow {
                             : "NO PROVIDER"
                         )
                         + " // "
+                        + (
+                            doctorRuntimeService.quickRunning
+                            ? (
+                                "QUICK "
+                                + doctorRuntimeService.quickCommand
+                                + " // "
+                              )
+                            : ""
+                          )
                         + doctorRuntimeService.displayStatus
                         + (
                             doctorRuntimeService.operating
@@ -5324,6 +5341,114 @@ PanelWindow {
                     }
                 }
 
+                Row {
+                    id: semanticQuickActions
+
+                    width: parent.width
+                    height: 34
+                    spacing: 6
+
+                    Repeater {
+                        model: [
+                            "CONTINUE",
+                            "REPORT",
+                            "CHECKLIST",
+                            "NEXT",
+                            "PAUSE"
+                        ]
+
+                        Rectangle {
+                            id: semanticQuickAction
+
+                            required property string modelData
+
+                            readonly property bool isPause:
+                                modelData === "PAUSE"
+                            readonly property bool enabledAction:
+                                roomChatView.activeSessionId.length > 0
+                                && !doctorRuntimeService.cancelling
+                                && (
+                                    isPause
+                                    ? (
+                                        !doctorRuntimeService.quickRunning
+                                        || doctorRuntimeService.operating
+                                      )
+                                    : (
+                                        !doctorRuntimeService.quickRunning
+                                        && !doctorRuntimeService.operating
+                                      )
+                                )
+
+                            width:
+                                (
+                                    semanticQuickActions.width
+                                    - semanticQuickActions.spacing * 4
+                                ) / 5
+                            height: parent.height
+
+                            color:
+                                semanticQuickMouse.pressed
+                                ? (
+                                    semanticQuickAction.isPause
+                                    ? Colors.orange
+                                    : Colors.blue
+                                  )
+                                : Colors.black
+                            border.width: 1
+                            border.color:
+                                semanticQuickAction.isPause
+                                ? Colors.orange
+                                : Colors.blue
+                            opacity:
+                                semanticQuickAction.enabledAction
+                                ? 1.0 : 0.38
+
+                            GohuText {
+                                anchors.centerIn: parent
+                                width: parent.width - 6
+                                text:
+                                    doctorRuntimeService.quickRunning
+                                    && doctorRuntimeService.quickCommand
+                                       === semanticQuickAction.modelData
+                                    ? semanticQuickAction.modelData + "…"
+                                    : semanticQuickAction.modelData
+                                font.pixelSize: 8
+                                color:
+                                    semanticQuickAction.isPause
+                                    ? Colors.orange
+                                    : Colors.blue
+                                horizontalAlignment: Text.AlignHCenter
+                                elide: Text.ElideRight
+                            }
+
+                            MouseArea {
+                                id: semanticQuickMouse
+
+                                anchors.fill: parent
+                                enabled:
+                                    semanticQuickAction.enabledAction
+                                hoverEnabled: true
+                                cursorShape:
+                                    enabled
+                                    ? Qt.PointingHandCursor
+                                    : Qt.ArrowCursor
+
+                                onClicked: {
+                                    if (semanticQuickAction.isPause
+                                            && doctorRuntimeService.operating) {
+                                        doctorRuntimeService.cancel("PAUSE");
+                                        return;
+                                    }
+
+                                    doctorRuntimeService.quick(
+                                        semanticQuickAction.modelData
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+
                 GohuText {
                     width: parent.width
                     height: Math.min(implicitHeight, 58)
@@ -5340,7 +5465,7 @@ PanelWindow {
                 MetaLabel {
                     width: parent.width
                     text:
-                        "SUPERVISED CONTROL // STATUS + STOP ACTIVE"
+                        "SUPERVISED CONTROL // QUICK + STATUS + STOP"
                 }
             }
         }

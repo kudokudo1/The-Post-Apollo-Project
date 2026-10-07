@@ -10,8 +10,25 @@ Item {
 
     property var keyboardHost: null
     property string setNameDraft: ""
+    property string armedSetAction: ""
+    property string armedSetName: ""
 
     signal workflowSelected(int index)
+
+    function setActionArmed(action, nameValue) {
+        return root.armedSetAction === String(action || "")
+            && root.armedSetName === String(nameValue || "");
+    }
+
+    function armSetAction(action, nameValue) {
+        root.armedSetAction = String(action || "");
+        root.armedSetName = String(nameValue || "");
+    }
+
+    function clearSetArm() {
+        root.armedSetAction = "";
+        root.armedSetName = "";
+    }
 
     component LibraryButton: Rectangle {
         id: button
@@ -179,6 +196,7 @@ Item {
                             enabledAction:
                                 root.libraryStore.queue.length > 0
                                 && root.libraryStore.missingQueueCount === 0
+                                && root.libraryStore.queueRepositoryMatches
                                 && !root.githubService.actionBusy
 
                             onTriggered: root.libraryStore.runQueue()
@@ -203,9 +221,101 @@ Item {
                             : Colors.cyan
                     }
 
+                    Row {
+                        width: parent.width
+                        height: 28
+                        spacing: 6
+
+                        GohuText {
+                            width: 68
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "TARGET REF"
+                            font.pixelSize: 8
+                            color: Colors.orange
+                        }
+
+                        Rectangle {
+                            width: parent.width - 74
+                            height: 28
+                            color: Colors.black
+                            border.width: 1
+                            border.color:
+                                queueRefInput.activeFocus
+                                ? Colors.magenta
+                                : Colors.cyan
+
+                            GohuText {
+                                anchors {
+                                    left: parent.left
+                                    verticalCenter: parent.verticalCenter
+                                    leftMargin: 6
+                                }
+                                visible:
+                                    queueRefInput.text.length === 0
+                                    && !queueRefInput.activeFocus
+                                text: "DEFAULT BRANCH // OR TYPE BRANCH / TAG / SHA"
+                                font.pixelSize: 8
+                                color: Colors.white
+                                opacity: 0.38
+                            }
+
+                            TextInput {
+                                id: queueRefInput
+                                anchors {
+                                    fill: parent
+                                    margins: 5
+                                }
+                                activeFocusOnPress: true
+                                selectByMouse: true
+                                verticalAlignment: TextInput.AlignVCenter
+                                font.family: "GohuFont 11 Nerd Font Mono"
+                                font.pixelSize: 8
+                                color: Colors.white
+                                selectionColor: Colors.magenta
+                                selectedTextColor: Colors.black
+                                text: root.libraryStore.queueRef
+
+                                onTextChanged: {
+                                    root.libraryStore.setQueueRef(text);
+                                    root.clearSetArm();
+                                }
+
+                                onAccepted: {
+                                    focus = false;
+
+                                    if (root.keyboardHost) {
+                                        root.keyboardHost.activeTextEditor = null;
+                                        root.keyboardHost.restoreGitKeyboardFocus(false);
+                                    }
+                                }
+
+                                Keys.onEscapePressed: function(event) {
+                                    focus = false;
+
+                                    if (root.keyboardHost) {
+                                        root.keyboardHost.activeTextEditor = null;
+                                        root.keyboardHost.restoreGitKeyboardFocus(false);
+                                    }
+
+                                    event.accepted = true;
+                                }
+
+                                onActiveFocusChanged: {
+                                    if (!root.keyboardHost)
+                                        return;
+
+                                    if (activeFocus)
+                                        root.keyboardHost.activeTextEditor = queueRefInput;
+                                    else if (root.keyboardHost.activeTextEditor === queueRefInput)
+                                        root.keyboardHost.activeTextEditor = null;
+                                }
+                            }
+                        }
+                    }
+
                     Flickable {
                         width: parent.width
-                        height: parent.height - 92
+                        height: parent.height - 126
 
                         clip: true
                         contentWidth: width
@@ -384,15 +494,58 @@ Item {
 
                         LibraryButton {
                             width: 92
-                            label: "SAVE SET"
+                            label: {
+                                const name =
+                                    root.setNameDraft.trim();
+                                const exists =
+                                    root.libraryStore.globalSetIndex(
+                                        root.libraryStore.repoSlug,
+                                        name
+                                    ) >= 0;
+
+                                if (exists
+                                        && root.setActionArmed(
+                                            "overwrite",
+                                            name
+                                        ))
+                                    return "CONFIRM";
+
+                                return exists
+                                    ? "OVERWRITE"
+                                    : "SAVE SET";
+                            }
 
                             enabledAction:
                                 root.libraryStore.queue.length > 0
+                                && root.libraryStore.queueRepositoryMatches
                                 && root.setNameDraft.trim().length > 0
 
                             onTriggered: {
-                                root.libraryStore.saveQueueAsSet(root.setNameDraft);
-                                root.setNameDraft = "";
+                                const name =
+                                    root.setNameDraft.trim();
+                                const exists =
+                                    root.libraryStore.globalSetIndex(
+                                        root.libraryStore.repoSlug,
+                                        name
+                                    ) >= 0;
+
+                                if (exists
+                                        && !root.setActionArmed(
+                                            "overwrite",
+                                            name
+                                        )) {
+                                    root.armSetAction(
+                                        "overwrite",
+                                        name
+                                    );
+                                    return;
+                                }
+
+                                root.libraryStore.saveQueueAsSet(
+                                    name,
+                                    exists
+                                );
+                                root.clearSetArm();
                             }
                         }
                     }
@@ -458,7 +611,7 @@ Item {
                                     required property var modelData
 
                                     width: setColumn.width
-                                    height: 38
+                                    height: 46
 
                                     color: Colors.black
                                     border.width: 1
@@ -496,7 +649,11 @@ Item {
                                                         ? modelData.items.length
                                                         : 0
                                                     )
-                                                    + " WORKFLOWS"
+                                                    + " WORKFLOWS // REF "
+                                                    + (
+                                                        String(modelData.ref || "").trim()
+                                                        || "DEFAULT"
+                                                      )
                                                     + (
                                                         root.libraryStore.setMissingCount(modelData) > 0
                                                         ? " // MISSING "
@@ -508,6 +665,7 @@ Item {
                                                     root.libraryStore.setMissingCount(modelData) > 0
                                                     ? Colors.red
                                                     : Colors.cyan
+                                                elide: Text.ElideRight
                                             }
                                         }
 
@@ -516,7 +674,17 @@ Item {
                                             height: 26
                                             label: "LOAD"
 
-                                            onTriggered: root.libraryStore.loadSet(modelData)
+                                            onTriggered: {
+                                                root.libraryStore.loadSet(
+                                                    modelData
+                                                );
+                                                root.setNameDraft =
+                                                    String(
+                                                        modelData.name
+                                                        || ""
+                                                    );
+                                                root.clearSetArm();
+                                            }
                                         }
 
                                         LibraryButton {
@@ -534,9 +702,41 @@ Item {
                                         LibraryButton {
                                             width: 58
                                             height: 26
-                                            label: "DELETE"
+                                            label:
+                                                root.setActionArmed(
+                                                    "delete",
+                                                    String(
+                                                        modelData.name
+                                                        || ""
+                                                    )
+                                                )
+                                                ? "CONFIRM"
+                                                : "DELETE"
 
-                                            onTriggered: root.libraryStore.deleteSet(modelData)
+                                            onTriggered: {
+                                                const name =
+                                                    String(
+                                                        modelData.name
+                                                        || ""
+                                                    );
+
+                                                if (!root.setActionArmed(
+                                                        "delete",
+                                                        name
+                                                    )) {
+                                                    root.armSetAction(
+                                                        "delete",
+                                                        name
+                                                    );
+                                                    return;
+                                                }
+
+                                                root.libraryStore.deleteSet(
+                                                    modelData,
+                                                    true
+                                                );
+                                                root.clearSetArm();
+                                            }
                                         }
                                     }
                                 }

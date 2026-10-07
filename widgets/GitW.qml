@@ -1643,6 +1643,8 @@ PanelWindow {
 
     GitHistoryService {
         id: historyService
+        operationJournal: operationJournalService
+        snapshotService: repositorySnapshotService
         repositoryPath:
             gitService.repoIsLocal
             ? gitService.repoRoot

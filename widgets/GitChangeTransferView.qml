@@ -9,6 +9,9 @@ Rectangle {
 
     property string sourcePath: ""
     property string filePath: ""
+    property string transferScope: "file"
+    property int hunkIndex: -1
+    property string hunkSummary: ""
     property string selectedDestinationPath: ""
     property string transferMode: "move"
 
@@ -52,6 +55,13 @@ Rectangle {
             === String(selectedDestinationPath || "")
         && String(transferService.previewMode || "")
             === String(transferMode || "")
+        && String(transferService.previewScope || "file")
+            === String(transferScope || "file")
+        && (
+            transferScope !== "hunk"
+            || Number(transferService.previewHunkIndex)
+                === Number(hunkIndex)
+           )
         && transferService.previewFiles.length === 1
         && String(transferService.previewFiles[0] || "")
             === String(filePath || "")
@@ -92,6 +102,15 @@ Rectangle {
                 || transferService.transferBusy)
             return false;
 
+        if (transferScope === "hunk") {
+            return transferService.previewHunk(
+                selectedDestinationPath,
+                filePath,
+                hunkIndex,
+                transferMode
+            );
+        }
+
         return transferService.preview(
             selectedDestinationPath,
             [filePath],
@@ -110,6 +129,8 @@ Rectangle {
 
     onFilePathChanged: invalidatePreview()
     onSourcePathChanged: invalidatePreview()
+    onTransferScopeChanged: invalidatePreview()
+    onHunkIndexChanged: invalidatePreview()
 
     Connections {
         target: branchWorkspaceService
@@ -186,7 +207,11 @@ Rectangle {
                 spacing: 2
 
                 GohuText {
-                    text: "TRANSFER // WHOLE FILE"
+                    text:
+                        root.transferScope === "hunk"
+                        ? "TRANSFER // HUNK "
+                            + String(root.hunkIndex + 1)
+                        : "TRANSFER // WHOLE FILE"
                     font.pixelSize: 13
                     color: Colors.magenta
                 }
@@ -195,7 +220,12 @@ Rectangle {
                     width: parent.width
                     text:
                         filePath
-                        ? filePath
+                        ? (
+                            root.transferScope === "hunk"
+                            && root.hunkSummary
+                            ? filePath + " // " + root.hunkSummary
+                            : filePath
+                          )
                         : "NO FILE SELECTED"
                     font.pixelSize: 9
                     color: Colors.white
@@ -223,8 +253,15 @@ Rectangle {
                 anchors.margins: 7
                 verticalAlignment: Text.AlignVCenter
                 text:
-                    "FIRST SLICE // TRACKED + UNSTAGED ONLY // "
-                    + "DESTINATION MUST BE A CLEAN EXISTING WORKTREE"
+                    root.transferScope === "hunk"
+                    ? (
+                        "HUNK SLICE // WORKTREE HUNK ONLY // "
+                        + "DESTINATION MUST BE A CLEAN EXISTING WORKTREE"
+                      )
+                    : (
+                        "TRACKED + UNSTAGED WHOLE FILE // "
+                        + "DESTINATION MUST BE A CLEAN EXISTING WORKTREE"
+                      )
                 font.pixelSize: 9
                 color: Colors.orange
                 wrapMode: Text.Wrap

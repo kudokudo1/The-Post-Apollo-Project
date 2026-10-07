@@ -12,6 +12,8 @@ Item {
     property var keyboardHost: null
 
     property bool transferOpen: false
+    property string transferScope: "file"
+    property int transferHunkIndex: -1
 
     property string subMode: "files"
     property string selectedPath: ""
@@ -35,7 +37,7 @@ Item {
 
     property string armedAction: ""
 
-    function transferEligible() {
+    function fileTransferEligible() {
         const row = root.selectedFile || {};
 
         return !!root.changesService
@@ -51,12 +53,37 @@ Item {
             && !root.transferService.transferBusy;
     }
 
-    function openTransfer() {
-        if (!root.transferEligible())
+    function transferEligible() {
+        return root.fileTransferEligible();
+    }
+
+    function hunkTransferEligible() {
+        return root.fileTransferEligible()
+            && root.hunkMode === "worktree"
+            && root.selectedHunkIndex >= 0
+            && !root.changesService.hunkBusy;
+    }
+
+    function openTransfer(scope) {
+        const requested =
+            String(scope || "file") === "hunk"
+            ? "hunk"
+            : "file";
+        const eligible =
+            requested === "hunk"
+            ? root.hunkTransferEligible()
+            : root.fileTransferEligible();
+
+        if (!eligible)
             return false;
 
         root.clearArm();
         root.transferService.clearPreview();
+        root.transferScope = requested;
+        root.transferHunkIndex =
+            requested === "hunk"
+            ? root.selectedHunkIndex
+            : -1;
         root.transferOpen = true;
 
         if (!root.branchWorkspaceService.refreshing)
@@ -67,6 +94,8 @@ Item {
 
     function closeTransfer() {
         root.transferOpen = false;
+        root.transferScope = "file";
+        root.transferHunkIndex = -1;
 
         if (root.transferService)
             root.transferService.clearPreview();
@@ -1081,8 +1110,8 @@ Item {
                                 width: 86
                                 label: "TRANSFER"
                                 accent: Colors.blue
-                                enabledAction: root.transferEligible()
-                                onTriggered: root.openTransfer()
+                                enabledAction: root.fileTransferEligible()
+                                onTriggered: root.openTransfer("file")
                             }
 
                             MiniButton {
@@ -1340,7 +1369,7 @@ Item {
                             spacing: 5
 
                             LabelText {
-                                width: parent.width - 344
+                                width: parent.width - 435
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: root.selectedHunkSummary()
                                 color:
@@ -1404,6 +1433,14 @@ Item {
                                             );
                                         }
                                     )
+                            }
+
+                            MiniButton {
+                                width: 86
+                                label: "TRANSFER"
+                                accent: Colors.blue
+                                enabledAction: root.hunkTransferEligible()
+                                onTriggered: root.openTransfer("hunk")
                             }
 
                             MiniButton {
@@ -2562,6 +2599,12 @@ Item {
             ? String(root.gitService.repoRoot || "")
             : ""
         filePath: root.selectedPath
+        transferScope: root.transferScope
+        hunkIndex: root.transferHunkIndex
+        hunkSummary:
+            root.transferScope === "hunk"
+            ? root.selectedHunkSummary()
+            : ""
 
         onCloseRequested: root.closeTransfer()
     }
@@ -2576,6 +2619,8 @@ Item {
                 return;
 
             root.transferOpen = false;
+            root.transferScope = "file";
+            root.transferHunkIndex = -1;
             root.clearArm();
 
             if (root.changesService)

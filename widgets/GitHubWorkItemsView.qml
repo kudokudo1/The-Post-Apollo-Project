@@ -337,6 +337,13 @@ Item {
                         root.workService.rowUrl(modelData)
                     readonly property bool alreadyAdded:
                         root.projectService.containsItemUrl(itemUrl)
+                    readonly property string projectStatus:
+                        alreadyAdded
+                        ? (
+                            root.projectService.itemStatusByUrl(itemUrl)
+                            || "NO STATUS"
+                          )
+                        : ""
                     readonly property string checkState:
                         root.isPulls
                         ? root.workService.pullCheckState(modelData)
@@ -517,18 +524,28 @@ Item {
                         GohuText {
                             width: parent.width
                             text:
-                                root.isPulls
-                                ? (
-                                    root.workService.pullBranches(
-                                        sourceRow.modelData
-                                    )
-                                    || "BRANCH DATA UNAVAILABLE"
-                                  )
-                                : (
-                                    root.workService.issueLabels(
-                                        sourceRow.modelData
-                                    ).join(" // ")
-                                    || "NO LABELS"
+                                (
+                                    root.isPulls
+                                    ? (
+                                        root.workService.pullBranches(
+                                            sourceRow.modelData
+                                        )
+                                        || "BRANCH DATA UNAVAILABLE"
+                                      )
+                                    : (
+                                        root.workService.issueLabels(
+                                            sourceRow.modelData
+                                        ).join(" // ")
+                                        || "NO LABELS"
+                                      )
+                                )
+                                + (
+                                    sourceRow.alreadyAdded
+                                    ? (
+                                        " // PROJECT "
+                                        + sourceRow.projectStatus
+                                      )
+                                    : ""
                                   )
                             font.pixelSize: 7
                             color: Colors.cyan

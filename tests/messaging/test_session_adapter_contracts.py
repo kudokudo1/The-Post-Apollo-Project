@@ -1,8 +1,10 @@
+import importlib.util
 import json
 import os
 import subprocess
 import sys
 import tempfile
+import types
 from pathlib import Path
 
 
@@ -50,6 +52,79 @@ assert '"DATABASE_FALLBACK"' in bridge
 assert "session-cli read failed:" in bridge
 assert 'row["direction"] = direction' in bridge
 assert "Writes still go through session-cli/CDP" in bridge
+assert "def _cdp_send_direct(" in bridge
+assert "suppress_origin=True" in bridge
+assert 'parser.add_argument("--cdp-direct"' in bridge
+
+# Prove the CDP fallback suppresses Origin and preserves Session's existing
+# sendMessage renderer contract without touching a live Session instance.
+spec = importlib.util.spec_from_file_location("session_bridge_contract", BRIDGE)
+session_bridge = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(session_bridge)
+
+capture = {}
+
+
+class FakeSocket:
+    def __init__(self):
+        self.closed = False
+        self.sent = None
+
+    def send(self, payload):
+        self.sent = json.loads(payload)
+
+    def recv(self):
+        return json.dumps(
+            {
+                "id": 1,
+                "result": {
+                    "result": {
+                        "value": True,
+                    }
+                },
+            }
+        )
+
+    def close(self):
+        self.closed = True
+
+
+fake_socket = FakeSocket()
+
+
+def fake_create_connection(url, **kwargs):
+    capture["url"] = url
+    capture["kwargs"] = kwargs
+    return fake_socket
+
+
+previous_websocket = sys.modules.get("websocket")
+sys.modules["websocket"] = types.SimpleNamespace(
+    create_connection=fake_create_connection
+)
+previous_url_lookup = session_bridge._cdp_websocket_url
+session_bridge._cdp_websocket_url = lambda: "ws://localhost:9222/devtools/page/test"
+
+try:
+    send_result = session_bridge._cdp_send_direct("05-test", 'hello "world"')
+finally:
+    session_bridge._cdp_websocket_url = previous_url_lookup
+    if previous_websocket is None:
+        sys.modules.pop("websocket", None)
+    else:
+        sys.modules["websocket"] = previous_websocket
+
+assert send_result == "sent"
+assert capture["kwargs"]["suppress_origin"] is True
+assert capture["kwargs"]["timeout"] >= 1.0
+assert fake_socket.closed is True
+assert fake_socket.sent["method"] == "Runtime.evaluate"
+params = fake_socket.sent["params"]
+assert params["returnByValue"] is True
+assert params["awaitPromise"] is True
+assert 'window.getConversationController().get("05-test")' in params["expression"]
+assert 'body: "hello \\"world\\""' in params["expression"]
 
 # Exercise the normal bridge path with a fake session-cli. This proves the
 # QML-facing JSON contract survives the wrapper and that message direction /

@@ -33,6 +33,8 @@ Scope {
     property string previewFingerprint: ""
     property string previewSourceBranch: ""
     property string previewDestinationBranch: ""
+    property string previewSourceHead: ""
+    property string previewDestinationHead: ""
     property int previewPatchBytes: 0
     property int previewPatchLines: 0
 
@@ -101,6 +103,8 @@ Scope {
         previewFingerprint = "";
         previewSourceBranch = "";
         previewDestinationBranch = "";
+        previewSourceHead = "";
+        previewDestinationHead = "";
         previewPatchBytes = 0;
         previewPatchLines = 0;
     }
@@ -114,6 +118,8 @@ Scope {
             destinationPath: String(previewDestinationPath || ""),
             sourceBranch: String(previewSourceBranch || ""),
             destinationBranch: String(previewDestinationBranch || ""),
+            sourceHead: String(previewSourceHead || ""),
+            destinationHead: String(previewDestinationHead || ""),
             files: previewFiles.slice(),
             fingerprint: String(previewFingerprint || ""),
             recoveryClass: "EVIDENCE_ONLY"
@@ -195,6 +201,8 @@ Scope {
                 '[ "$src_common" = "$dst_common" ] || refuse "DESTINATION BELONGS TO A DIFFERENT REPOSITORY"',
                 'src_branch="$(git -C "$source" branch --show-current 2>/dev/null || true)"',
                 'dst_branch="$(git -C "$destination" branch --show-current 2>/dev/null || true)"',
+                'src_head="$(git -C "$source" rev-parse HEAD 2>/dev/null || true)"',
+                'dst_head="$(git -C "$destination" rev-parse HEAD 2>/dev/null || true)"',
                 '[ -n "$src_branch" ] || refuse "SOURCE WORKTREE IS DETACHED"',
                 '[ -n "$dst_branch" ] || refuse "DESTINATION WORKTREE IS DETACHED"',
                 '[ "$src_branch" != "$dst_branch" ] || refuse "SOURCE AND DESTINATION USE THE SAME BRANCH"',
@@ -219,7 +227,7 @@ Scope {
                 'fingerprint="$(sha256sum "$patch" | awk "{print \\$1}")"',
                 'bytes="$(wc -c <"$patch" | tr -d " ")"',
                 'lines="$(wc -l <"$patch" | tr -d " ")"',
-                'printf "PREVIEW\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$fingerprint" "$bytes" "$lines" "$src_branch" "$dst_branch" "$mode"',
+                'printf "PREVIEW\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$fingerprint" "$bytes" "$lines" "$src_branch" "$dst_branch" "$src_head" "$dst_head" "$mode"',
                 'for path in "${files[@]}"; do printf "FILE\\t%s\\n" "$path"; done'
             ].join("\n"),
             "git-change-transfer-preview",
@@ -269,7 +277,7 @@ Scope {
                 files.push(line.slice(5));
         }
 
-        if (previewExitCode !== 0 || !header || header.length < 7) {
+        if (previewExitCode !== 0 || !header || header.length < 9) {
             let refused = "";
 
             for (let i = 0; i < lines.length; ++i) {
@@ -296,7 +304,9 @@ Scope {
         previewPatchLines = Number(header[3] || 0);
         previewSourceBranch = String(header[4] || "");
         previewDestinationBranch = String(header[5] || "");
-        previewMode = normalizedMode(header[6]);
+        previewSourceHead = String(header[6] || "");
+        previewDestinationHead = String(header[7] || "");
+        previewMode = normalizedMode(header[8]);
         previewDestinationPath = String(pendingPreviewDestination || "");
         previewFiles = files;
         pendingPreviewDestination = "";
@@ -312,6 +322,8 @@ Scope {
             destinationPath: previewDestinationPath,
             sourceBranch: previewSourceBranch,
             destinationBranch: previewDestinationBranch,
+            sourceHead: previewSourceHead,
+            destinationHead: previewDestinationHead,
             mode: previewMode,
             files: previewFiles.slice(),
             fingerprint: previewFingerprint,
@@ -383,8 +395,15 @@ Scope {
             ? previewFiles.slice()
             : [];
         const fingerprint = String(previewFingerprint || "");
+        const sourceHead = String(previewSourceHead || "");
+        const destinationHead = String(previewDestinationHead || "");
 
-        if (!source || !destination || files.length === 0 || !fingerprint) {
+        if (!source
+                || !destination
+                || files.length === 0
+                || !fingerprint
+                || !sourceHead
+                || !destinationHead) {
             finalizeTransfer(
                 null,
                 "TRANSFER PREVIEW IDENTITY LOST BEFORE EXECUTION"
@@ -400,7 +419,9 @@ Scope {
                 'destination="$2"',
                 'mode="$3"',
                 'expected="$4"',
-                'shift 4',
+                'expected_source_head="$5"',
+                'expected_destination_head="$6"',
+                'shift 6',
                 'files=("$@")',
                 'refuse() { printf "REFUSED\\t%s\\n" "$1"; exit 1; }',
                 'source="$(realpath "$source")" || refuse "SOURCE PATH CANNOT BE RESOLVED"',
@@ -413,6 +434,8 @@ Scope {
                 'src_common="$(realpath "$src_common")"',
                 'dst_common="$(realpath "$dst_common")"',
                 '[ "$src_common" = "$dst_common" ] || refuse "DESTINATION BELONGS TO A DIFFERENT REPOSITORY"',
+                '[ "$(git -C "$source" rev-parse HEAD 2>/dev/null || true)" = "$expected_source_head" ] || refuse "SOURCE HEAD CHANGED SINCE PREVIEW"',
+                '[ "$(git -C "$destination" rev-parse HEAD 2>/dev/null || true)" = "$expected_destination_head" ] || refuse "DESTINATION HEAD CHANGED SINCE PREVIEW"',
                 '[ -z "$(git -C "$destination" status --porcelain=v1 --untracked-files=all 2>/dev/null)" ] || refuse "DESTINATION CHANGED SINCE PREVIEW"',
                 'for path in "${files[@]}"; do',
                 '  git -C "$source" ls-files --error-unmatch -- "$path" >/dev/null 2>&1 || refuse "SOURCE PATH NO LONGER TRACKED // $path"',
@@ -447,7 +470,9 @@ Scope {
             source,
             destination,
             mode,
-            fingerprint
+            fingerprint,
+            sourceHead,
+            destinationHead
         ];
 
         for (let i = 0; i < files.length; ++i)

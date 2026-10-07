@@ -81,6 +81,29 @@ Scope {
 
     readonly property var evidencePacket:
         certification.evidencePacket
+    readonly property var evidenceDiagnostics: {
+        if (!evidenceProvider)
+            return ({ state: "ERROR", summary: "ERROR // EVIDENCE PROVIDER MISSING" });
+
+        const target =
+            certification.candidateHead
+            || certification.verifiedHead
+            || certification.certifiedHead
+            || (
+                roomService
+                ? String(roomService.head || "")
+                : ""
+               );
+
+        if (typeof evidenceProvider.diagnosticsFor === "function")
+            return evidenceProvider.diagnosticsFor(target);
+
+        return evidenceProvider.liveDiagnostics || ({});
+    }
+    readonly property string evidenceDiagnosticState:
+        String((evidenceDiagnostics || {}).state || "UNKNOWN")
+    readonly property string evidenceDiagnosticSummary:
+        String((evidenceDiagnostics || {}).summary || "")
     readonly property var historyService:
         certification.historyService
 
@@ -444,6 +467,7 @@ Scope {
         const completeness = data.completeness || {};
         const summary = facts.runSummary || {};
         const staleness = facts.staleness || {};
+        const diagnostics = data.diagnostics || {};
         const snapshot = roomService
                          ? roomService.certificationSnapshot()
                          : {};
@@ -481,6 +505,10 @@ Scope {
         } else if (!repositoryMatches || !shaMatches) {
             status = "FAIL";
             reason = "EVIDENCE TARGET DOES NOT MATCH CANDIDATE";
+        } else if (diagnostics.repositoryMatchesLocalOrigin === false) {
+            status = "FAIL";
+            reason =
+                "LOCAL GIT ORIGIN DOES NOT MATCH GITHUB EVIDENCE REPOSITORY";
         } else if (staleness.exactQueryTargetsRequestedSha === false) {
             status = "FAIL";
             reason = "EXACT-SHA QUERY TARGET DRIFT";
@@ -529,6 +557,9 @@ Scope {
             failedRuns: failed,
             schemaMatches: schemaMatches,
             providerMatches: providerMatches,
+            localRepositoryMatches:
+                diagnostics.repositoryMatchesLocalOrigin !== false,
+            diagnostics: diagnostics,
             provider: String(data.provider || ""),
             capturedAt: String(data.capturedAt || "")
         };

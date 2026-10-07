@@ -4654,6 +4654,7 @@ PanelWindow {
                         branchStackStore: branchStackStore
                         stackPlanner: stackPlanner
                         stackExecutor: stackExecutor
+                        keyboardHost: root
 
                         onHistoryRequested: function(branch) {
                             root.openHistoryForBranch(branch);

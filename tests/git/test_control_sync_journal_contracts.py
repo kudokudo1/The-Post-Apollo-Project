@@ -42,15 +42,32 @@ journal_helper = re.search(
 assert journal_helper, "journal-action classifier must exist"
 helper_body = journal_helper.group(1)
 
-for operation in ("fetch", "pull", "push", "track-checkout"):
+for operation in ("fetch", "pull", "push", "track-checkout", "clone"):
     assert f'"{operation}"' in helper_body, (
         f"{operation} must be classified as a journaled CONTROL mutation"
     )
 
-for operation in ("status", "diff", "log", "clone"):
+for operation in ("status", "diff", "log"):
     assert f'"{operation}"' not in helper_body, (
-        f"{operation} must stay outside the CONTROL repository-mutation journal"
+        f"{operation} must stay outside the CONTROL mutation journal"
     )
+
+require_regex(
+    SERVICE,
+    r'if \(processAction === "clone"\).*'
+    r'operationJournal\.beginOperation\(\s*'
+    r'"CONTROL/CLONE".*'
+    r'cloneBoundaryBeforeSnapshot\(\).*'
+    r'startPendingActionProcess\(\)',
+    "clone must use a dedicated external-boundary journal start instead of a repository BEFORE snapshot",
+)
+require_regex(
+    SERVICE,
+    r'if \(pendingProcessAction === "clone"\).*'
+    r'finalizeControlAction\(\s*'
+    r'cloneBoundaryAfterSnapshot\(\)',
+    "clone must close its journal with synthetic external after-state evidence",
+)
 
 require_regex(
     SERVICE,

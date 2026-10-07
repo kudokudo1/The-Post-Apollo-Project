@@ -1655,6 +1655,8 @@ PanelWindow {
 
     GitChangesService {
         id: changesService
+        operationJournal: operationJournalService
+        snapshotService: repositorySnapshotService
         repositoryPath:
             gitService.repoIsLocal
             ? gitService.repoRoot

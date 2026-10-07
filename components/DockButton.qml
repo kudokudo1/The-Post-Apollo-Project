@@ -147,17 +147,19 @@ Rectangle {
             z: 0
         }
 
-        DropShadow {
-            readonly property point sourceOrigin: dockButton.contentGlowSource
+        SafeDropShadow {
+            id: contentGlow
+
+            readonly property point sourceOrigin: sourceAttached
                                                   ? dockButton.contentGlowSource.mapToItem(contentLayer, 0, 0)
                                                   : Qt.point(0, 0)
 
             x: sourceOrigin.x
             y: sourceOrigin.y
-            width: dockButton.contentGlowSource ? dockButton.contentGlowSource.width : 0
-            height: dockButton.contentGlowSource ? dockButton.contentGlowSource.height : 0
+            width: sourceAttached ? dockButton.contentGlowSource.width : 0
+            height: sourceAttached ? dockButton.contentGlowSource.height : 0
 
-            source: dockButton.contentGlowSource
+            safeSource: dockButton.contentGlowSource
 
             horizontalOffset: 0
             verticalOffset: 0
@@ -171,7 +173,7 @@ Rectangle {
                      : dockButton.contentGlowIdleSamples
 
             z: 2
-            visible: dockButton.contentGlowEnabled
+            requestedVisible: dockButton.contentGlowEnabled
             opacity: dockButton.contentGlowOpacity
             color: dockButton.contentGlowColor
 

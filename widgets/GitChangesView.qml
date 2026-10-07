@@ -139,6 +139,59 @@ Item {
         return lines[root.selectedLineIndex];
     }
 
+    function hunkDirectionText() {
+        return root.hunkMode === "staged"
+            ? "INDEX → WORKTREE"
+            : "WORKTREE → INDEX";
+    }
+
+    function selectedHunkSummary() {
+        const hunk = root.selectedHunk();
+
+        if (!hunk)
+            return "SELECT A HUNK // " + root.hunkDirectionText();
+
+        return (
+            "HUNK "
+            + String(root.selectedHunkIndex + 1)
+            + " // +"
+            + String(hunk.added || 0)
+            + " -"
+            + String(hunk.removed || 0)
+            + " // "
+            + root.hunkDirectionText()
+        );
+    }
+
+    function selectedLineSummary() {
+        const line = root.selectedLine();
+
+        if (!line)
+            return "SELECT A +/- LINE // " + root.hunkDirectionText();
+
+        const number =
+            line.kind === "+"
+            ? line.newLine
+            : line.oldLine;
+        const action =
+            root.hunkMode === "staged"
+            ? "UNSTAGE"
+            : "STAGE";
+
+        return (
+            "LINE "
+            + String(number || "?")
+            + " // "
+            + (
+                line.kind === "+"
+                ? "ADD"
+                : "REMOVE"
+              )
+            + " // "
+            + action
+        );
+    }
+
     function armOrRun(key, callback) {
         const token = String(key || "");
         if (root.armedAction !== token) {
@@ -994,6 +1047,9 @@ Item {
                                 enabledAction:
                                     root.selectedFile
                                     && !Boolean(root.selectedFile.untracked)
+                                    && Boolean(root.selectedFile.unstaged)
+                                    && root.changesService
+                                    && !root.changesService.actionBusy
                                 onTriggered:
                                     root.setHunkMode("worktree")
                             }
@@ -1006,6 +1062,9 @@ Item {
                                 enabledAction:
                                     root.selectedFile
                                     && !Boolean(root.selectedFile.untracked)
+                                    && Boolean(root.selectedFile.staged)
+                                    && root.changesService
+                                    && !root.changesService.actionBusy
                                 onTriggered:
                                     root.setHunkMode("staged")
                             }
@@ -1164,21 +1223,22 @@ Item {
                             spacing: 5
 
                             LabelText {
-                                width: parent.width - 292
+                                width: parent.width - 344
                                 anchors.verticalCenter: parent.verticalCenter
-                                text:
-                                    root.selectedHunkIndex >= 0
-                                    ? "HUNK "
-                                      + String(root.selectedHunkIndex + 1)
-                                    : "SELECT A HUNK"
+                                text: root.selectedHunkSummary()
+                                color:
+                                    root.hunkMode === "staged"
+                                    ? Colors.orange
+                                    : Colors.green
+                                elide: Text.ElideRight
                             }
 
                             MiniButton {
-                                width: 88
+                                width: 116
                                 label:
                                     root.hunkMode === "staged"
-                                    ? "UNSTAGE"
-                                    : "STAGE"
+                                    ? "UNSTAGE HUNK"
+                                    : "STAGE HUNK"
                                 accent:
                                     root.hunkMode === "staged"
                                     ? Colors.orange
@@ -1204,11 +1264,11 @@ Item {
                             }
 
                             MiniButton {
-                                width: 92
+                                width: 110
                                 label:
                                     root.armedAction === "discard-hunk"
-                                    ? "CONFIRM"
-                                    : "DISCARD"
+                                    ? "CONFIRM HUNK"
+                                    : "DISCARD HUNK"
                                 accent: Colors.red
                                 enabledAction:
                                     root.hunkMode === "worktree"
@@ -1230,7 +1290,7 @@ Item {
                             }
 
                             MiniButton {
-                                width: 102
+                                width: 108
                                 label: "RELOAD"
                                 accent: Colors.cyan
                                 enabledAction:
@@ -1255,26 +1315,7 @@ Item {
                             LabelText {
                                 width: parent.width - 230
                                 anchors.verticalCenter: parent.verticalCenter
-                                text: {
-                                    const line = root.selectedLine();
-
-                                    if (!line)
-                                        return "SELECT A +/- LINE";
-
-                                    const number =
-                                        line.kind === "+"
-                                        ? line.newLine
-                                        : line.oldLine;
-
-                                    return "LINE "
-                                        + String(number || "?")
-                                        + " // "
-                                        + (
-                                            line.kind === "+"
-                                            ? "ADD"
-                                            : "REMOVE"
-                                          );
-                                }
+                                text: root.selectedLineSummary()
                                 color:
                                     root.selectedLine()
                                     && root.selectedLine().kind === "+"
@@ -2408,8 +2449,10 @@ Item {
             if (
                 actionText.indexOf("LINE") >= 0
                 || actionText.indexOf("HUNK") >= 0
-            )
+            ) {
+                root.selectedHunkIndex = -1;
                 root.selectedLineIndex = -1;
+            }
 
             if (actionText === "COMMIT") {
                 commitInput.text = "";

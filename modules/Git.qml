@@ -90,7 +90,7 @@ Rectangle {
         anchors.fill: parent
         spread: 3
         z: -1
-        color: Colors.yellow
+        color: dock.menuOpen ? Colors.magenta : Colors.yellow
         opacity: dock.menuOpen
                  ? 0.86
                  : mouse.pressed
@@ -104,7 +104,7 @@ Rectangle {
         anchors.fill: parent
         spread: 10
         z: 1
-        color: Colors.yellow
+        color: dock.menuOpen ? Colors.magenta : Colors.yellow
         opacity: dock.menuOpen
                  ? 0.22
                  : mouse.pressed

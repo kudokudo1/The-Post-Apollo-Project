@@ -54,7 +54,7 @@ Rectangle {
 
             opacity: dock.menuOpen ? 1.0 : mouse.pressed ? 1.0 : mouse.containsMouse ? 0.8 : 0.6
 
-            color: dock.menuOpen ? Colors.orange : Colors.cyan
+            color: dock.menuOpen ? Colors.magenta : Colors.cyan
 
             transparentBorder: true
         }
@@ -95,7 +95,7 @@ Rectangle {
 
         opacity: dock.menuOpen ? 0.75 : mouse.pressed ? 0.6 : mouse.containsMouse ? 0.5 : 0.4
 
-        color: dock.menuOpen ? Colors.orange : Colors.cyan
+        color: dock.menuOpen ? Colors.magenta : Colors.cyan
     }
 
     RectangularShadow {
@@ -109,6 +109,6 @@ Rectangle {
 
         opacity: dock.menuOpen ? 0.16 : mouse.pressed ? 0.12 : mouse.containsMouse ? 0.09 : 0.07
 
-        color: dock.menuOpen ? Colors.orange : Colors.cyan
+        color: dock.menuOpen ? Colors.magenta : Colors.cyan
     }
 }

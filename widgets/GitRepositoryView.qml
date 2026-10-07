@@ -21,6 +21,8 @@ Item {
     property bool selectedWorktreeLocked: false
     property string projectFileKind: "ignore"
     property int selectedProjectLine: -1
+    property string selectedProjectText: ""
+    property string projectLineFilterText: ""
     property string armedAction: ""
     property string configCategory: "all"
     property string configFilterText: ""
@@ -76,6 +78,199 @@ Item {
         return root.projectFileKind === "attributes"
             ? root.repositoryService.attributeLines
             : root.repositoryService.ignoreLines;
+    }
+
+    function projectLineType(value) {
+        const raw = String(value || "");
+        const visible = raw.replace(/^\s+/, "");
+
+        if (!raw.trim())
+            return "blank";
+
+        if (visible.indexOf("#") === 0)
+            return "comment";
+
+        if (root.projectFileKind === "ignore"
+                && visible.indexOf("!") === 0)
+            return "negate";
+
+        if (root.projectFileKind === "attributes"
+                && visible.indexOf("[attr]") === 0)
+            return "macro";
+
+        return "rule";
+    }
+
+    function projectLineTypeLabel(typeValue) {
+        const type = String(typeValue || "rule");
+
+        if (type === "comment")
+            return "COMMENT";
+        if (type === "blank")
+            return "BLANK";
+        if (type === "negate")
+            return "NEGATE";
+        if (type === "macro")
+            return "MACRO";
+        return "RULE";
+    }
+
+    function projectLineColor(typeValue) {
+        const type = String(typeValue || "rule");
+
+        if (type === "comment")
+            return Colors.cyan;
+        if (type === "blank")
+            return Colors.blue;
+        if (type === "negate")
+            return Colors.orange;
+        if (type === "macro")
+            return Colors.magenta;
+        return Colors.green;
+    }
+
+    function projectLinesForView() {
+        const source = root.projectLines();
+        const needle =
+            String(root.projectLineFilterText || "")
+            .trim()
+            .toLowerCase();
+        const out = [];
+
+        for (let i = 0; i < source.length; ++i) {
+            const row = source[i] || {};
+            const text = String(row.text || "");
+            const type = root.projectLineType(text);
+
+            if (needle) {
+                const haystack = (
+                    text
+                    + " "
+                    + root.projectLineTypeLabel(type)
+                    + " "
+                    + String(row.line || "")
+                ).toLowerCase();
+
+                if (haystack.indexOf(needle) < 0)
+                    continue;
+            }
+
+            out.push({
+                line: Number(row.line || 0),
+                text: text,
+                type: type
+            });
+        }
+
+        return out;
+    }
+
+    function projectLineExists(value) {
+        const text = String(value || "");
+        const rows = root.projectLines();
+
+        for (let i = 0; i < rows.length; ++i) {
+            if (String(rows[i].text || "") === text)
+                return true;
+        }
+
+        return false;
+    }
+
+    function projectLineCount(typeValue) {
+        const rows = root.projectLines();
+        const type = String(typeValue || "");
+        let count = 0;
+
+        for (let i = 0; i < rows.length; ++i) {
+            if (root.projectLineType(rows[i].text) === type)
+                count += 1;
+        }
+
+        return count;
+    }
+
+    function selectProjectLine(row) {
+        const data = row || {};
+
+        root.selectedProjectLine = Number(data.line || -1);
+        root.selectedProjectText = String(data.text || "");
+        projectLineInput.text = root.selectedProjectText;
+        root.armedAction = "";
+    }
+
+    function clearProjectSelection(clearInput) {
+        root.selectedProjectLine = -1;
+        root.selectedProjectText = "";
+        root.armedAction = "";
+
+        if (clearInput)
+            projectLineInput.text = "";
+    }
+
+    function reconcileProjectSelection() {
+        if (!root.repositoryService
+                || root.selectedProjectLine <= 0
+                || !root.selectedProjectText)
+            return;
+
+        const rows = root.projectLines();
+
+        for (let i = 0; i < rows.length; ++i) {
+            const row = rows[i] || {};
+
+            if (Number(row.line || 0) === root.selectedProjectLine
+                    && String(row.text || "")
+                       === root.selectedProjectText)
+                return;
+        }
+
+        let matchLine = -1;
+        let matches = 0;
+
+        for (let i = 0; i < rows.length; ++i) {
+            const row = rows[i] || {};
+
+            if (String(row.text || "") !== root.selectedProjectText)
+                continue;
+
+            matches += 1;
+            matchLine = Number(row.line || -1);
+        }
+
+        if (matches === 1) {
+            root.selectedProjectLine = matchLine;
+            return;
+        }
+
+        root.clearProjectSelection(false);
+    }
+
+    function projectInputChanged() {
+        return root.selectedProjectLine > 0
+            && String(projectLineInput.text || "")
+               !== root.selectedProjectText;
+    }
+
+    function projectInputDuplicate() {
+        const text = String(projectLineInput.text || "");
+
+        if (!text)
+            return false;
+
+        if (root.selectedProjectLine > 0
+                && text === root.selectedProjectText)
+            return false;
+
+        return root.projectLineExists(text);
+    }
+
+    function projectFileGuidance() {
+        if (root.projectFileKind === "attributes") {
+            return "RULE assigns Git attributes to a path pattern. MACRO defines a reusable [attr] name. Comments and blank lines are preserved exactly.";
+        }
+
+        return "RULE ignores matching untracked paths. NEGATE (!) re-includes a path after an earlier ignore. Comments and blank lines are preserved exactly.";
     }
 
     function configCategoryForKey(keyValue) {
@@ -2158,12 +2353,15 @@ Item {
                 visible: root.subMode === "files"
 
                 Rectangle {
-                    width: 520
+                    width: 560
                     height: parent.height
                     clip: true
                     color: Colors.dark
                     border.width: 1
-                    border.color: Colors.yellow
+                    border.color:
+                        root.projectFileKind === "attributes"
+                        ? Colors.cyan
+                        : Colors.yellow
 
                     Column {
                         anchors {
@@ -2185,8 +2383,7 @@ Item {
                                     root.projectFileKind === "ignore"
                                 onTriggered: {
                                     root.projectFileKind = "ignore";
-                                    root.selectedProjectLine = -1;
-                                    root.armedAction = "";
+                                    root.clearProjectSelection(true);
                                 }
                             }
 
@@ -2198,17 +2395,45 @@ Item {
                                     root.projectFileKind === "attributes"
                                 onTriggered: {
                                     root.projectFileKind = "attributes";
-                                    root.selectedProjectLine = -1;
-                                    root.armedAction = "";
+                                    root.clearProjectSelection(true);
                                 }
                             }
+
+                            GohuText {
+                                width: parent.width - 254
+                                anchors.verticalCenter:
+                                    parent.verticalCenter
+                                text:
+                                    String(root.projectLinesForView().length)
+                                    + " SHOWN / "
+                                    + String(root.projectLines().length)
+                                    + " LINES"
+                                horizontalAlignment: Text.AlignRight
+                                font.pixelSize: 9
+                                color:
+                                    root.projectFileKind === "attributes"
+                                    ? Colors.cyan
+                                    : Colors.yellow
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        EditorBox {
+                            id: projectFilterInput
+                            width: parent.width
+                            placeholder:
+                                "FILTER RULES // TEXT / TYPE / LINE"
+                            accent: Colors.cyan
+                            keyboardOwner: root.keyboardHost
+                            onTextChanged:
+                                root.projectLineFilterText = text
                         }
 
                         Item {
                             id: projectFilesViewport
 
                             width: parent.width
-                            height: Math.max(0, parent.height - 33)
+                            height: Math.max(0, parent.height - 68)
                             clip: false
 
                             Flickable {
@@ -2217,34 +2442,74 @@ Item {
                                 anchors.fill: parent
                                 clip: true
                                 contentWidth: width
-                                contentHeight: projectLineColumn.implicitHeight
-                                boundsBehavior: Flickable.StopAtBounds
+                                contentHeight:
+                                    projectLineColumn.implicitHeight
+                                boundsBehavior:
+                                    Flickable.StopAtBounds
 
                                 Column {
                                     id: projectLineColumn
                                     width: parent.width
                                     spacing: 2
 
+                                    GohuText {
+                                        visible:
+                                            root.projectLinesForView().length
+                                            === 0
+                                        width: parent.width
+                                        topPadding: 24
+                                        text:
+                                            root.projectLineFilterText
+                                            ? "NO RULES MATCH FILTER"
+                                            : "FILE IS EMPTY"
+                                        horizontalAlignment:
+                                            Text.AlignHCenter
+                                        font.pixelSize: 11
+                                        color: Colors.cyan
+                                    }
+
                                     Repeater {
-                                        model: root.projectLines()
+                                        model: root.projectLinesForView()
 
                                         Rectangle {
                                             id: projectLineRow
                                             required property var modelData
 
                                             width: projectLineColumn.width
-                                            height: 28
+                                            height: 32
                                             color:
                                                 projectLineMouse.containsMouse
-                                                || root.selectedProjectLine
-                                                   === Number(modelData.line || 0)
+                                                || (
+                                                    root.selectedProjectLine
+                                                    === Number(
+                                                        modelData.line
+                                                        || 0
+                                                    )
+                                                    && root.selectedProjectText
+                                                       === String(
+                                                           modelData.text
+                                                           || ""
+                                                       )
+                                                   )
                                                 ? Colors.black
                                                 : "transparent"
                                             border.width:
                                                 root.selectedProjectLine
-                                                === Number(modelData.line || 0)
-                                                ? 1 : 0
-                                            border.color: Colors.yellow
+                                                === Number(
+                                                    modelData.line
+                                                    || 0
+                                                )
+                                                && root.selectedProjectText
+                                                   === String(
+                                                       modelData.text
+                                                       || ""
+                                                   )
+                                                ? 1
+                                                : 0
+                                            border.color:
+                                                root.projectLineColor(
+                                                    modelData.type
+                                                )
 
                                             GohuText {
                                                 anchors {
@@ -2252,7 +2517,7 @@ Item {
                                                     verticalCenter:
                                                         parent.verticalCenter
                                                 }
-                                                width: 38
+                                                width: 34
                                                 text:
                                                     String(
                                                         projectLineRow.modelData.line
@@ -2265,10 +2530,31 @@ Item {
                                             GohuText {
                                                 anchors {
                                                     left: parent.left
+                                                    verticalCenter:
+                                                        parent.verticalCenter
+                                                    leftMargin: 38
+                                                }
+                                                width: 68
+                                                text:
+                                                    root.projectLineTypeLabel(
+                                                        projectLineRow.modelData.type
+                                                    )
+                                                font.pixelSize: 8
+                                                color:
+                                                    root.projectLineColor(
+                                                        projectLineRow.modelData.type
+                                                    )
+                                                elide: Text.ElideRight
+                                            }
+
+                                            GohuText {
+                                                anchors {
+                                                    left: parent.left
                                                     right: parent.right
                                                     verticalCenter:
                                                         parent.verticalCenter
-                                                    leftMargin: 42
+                                                    leftMargin: 112
+                                                    rightMargin: 7
                                                 }
                                                 text:
                                                     String(
@@ -2276,7 +2562,18 @@ Item {
                                                         || ""
                                                     )
                                                 font.pixelSize: 10
-                                                color: Colors.white
+                                                color:
+                                                    projectLineRow.modelData.type
+                                                    === "comment"
+                                                    || projectLineRow.modelData.type
+                                                       === "blank"
+                                                    ? Colors.cyan
+                                                    : Colors.white
+                                                opacity:
+                                                    projectLineRow.modelData.type
+                                                    === "blank"
+                                                    ? 0.38
+                                                    : 1.0
                                                 elide: Text.ElideRight
                                             }
 
@@ -2284,13 +2581,12 @@ Item {
                                                 id: projectLineMouse
                                                 anchors.fill: parent
                                                 hoverEnabled: true
-                                                cursorShape: Qt.PointingHandCursor
+                                                cursorShape:
+                                                    Qt.PointingHandCursor
                                                 onClicked:
-                                                    root.selectedProjectLine =
-                                                        Number(
-                                                            projectLineRow.modelData.line
-                                                            || -1
-                                                        )
+                                                    root.selectProjectLine(
+                                                        projectLineRow.modelData
+                                                    )
                                             }
                                         }
                                     }
@@ -2308,11 +2604,14 @@ Item {
                 }
 
                 Rectangle {
-                    width: parent.width - 528
+                    width: parent.width - 568
                     height: parent.height
                     color: Colors.black
                     border.width: 1
-                    border.color: Colors.cyan
+                    border.color:
+                        root.projectFileKind === "attributes"
+                        ? Colors.cyan
+                        : Colors.yellow
 
                     Column {
                         anchors {
@@ -2324,8 +2623,124 @@ Item {
                         SectionLabel {
                             text:
                                 root.projectFileKind === "attributes"
-                                ? ".GITATTRIBUTES"
-                                : ".GITIGNORE"
+                                ? ".GITATTRIBUTES // RULE EDITOR"
+                                : ".GITIGNORE // RULE EDITOR"
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 94
+                            color: Colors.dark
+                            border.width: 1
+                            border.color:
+                                root.projectLineColor(
+                                    root.projectLineType(
+                                        projectLineInput.text
+                                    )
+                                )
+
+                            Column {
+                                anchors {
+                                    fill: parent
+                                    margins: 7
+                                }
+                                spacing: 4
+
+                                GohuText {
+                                    width: parent.width
+                                    text:
+                                        root.selectedProjectLine > 0
+                                        ? (
+                                            "SELECTED // LINE "
+                                            + String(
+                                                root.selectedProjectLine
+                                              )
+                                            + " // "
+                                            + root.projectLineTypeLabel(
+                                                root.projectLineType(
+                                                    root.selectedProjectText
+                                                )
+                                              )
+                                          )
+                                        : (
+                                            "NEW LINE // "
+                                            + root.projectLineTypeLabel(
+                                                root.projectLineType(
+                                                    projectLineInput.text
+                                                )
+                                              )
+                                          )
+                                    font.pixelSize: 10
+                                    color:
+                                        root.projectLineColor(
+                                            root.projectLineType(
+                                                root.selectedProjectLine > 0
+                                                ? root.selectedProjectText
+                                                : projectLineInput.text
+                                            )
+                                        )
+                                    elide: Text.ElideRight
+                                }
+
+                                GohuText {
+                                    width: parent.width
+                                    text:
+                                        "RULE "
+                                        + String(
+                                            root.projectLineCount("rule")
+                                          )
+                                        + (
+                                            root.projectFileKind === "ignore"
+                                            ? " // NEGATE "
+                                              + String(
+                                                  root.projectLineCount(
+                                                      "negate"
+                                                  )
+                                                )
+                                            : " // MACRO "
+                                              + String(
+                                                  root.projectLineCount(
+                                                      "macro"
+                                                  )
+                                                )
+                                          )
+                                        + " // COMMENT "
+                                        + String(
+                                            root.projectLineCount("comment")
+                                          )
+                                        + " // BLANK "
+                                        + String(
+                                            root.projectLineCount("blank")
+                                          )
+                                    font.pixelSize: 9
+                                    color: Colors.cyan
+                                    elide: Text.ElideRight
+                                }
+
+                                GohuText {
+                                    width: parent.width
+                                    text:
+                                        root.projectInputDuplicate()
+                                        ? "ALREADY EXISTS // APPEND + REPLACE REFUSED"
+                                        : root.projectInputChanged()
+                                        ? "EDITED // REPLACE SELECTED LINE TO APPLY"
+                                        : root.projectFileGuidance()
+                                    font.pixelSize: 8
+                                    color:
+                                        root.projectInputDuplicate()
+                                        ? Colors.red
+                                        : root.projectInputChanged()
+                                        ? Colors.orange
+                                        : Colors.white
+                                    opacity:
+                                        root.projectInputDuplicate()
+                                        || root.projectInputChanged()
+                                        ? 1.0
+                                        : 0.62
+                                    wrapMode: Text.WordWrap
+                                    elide: Text.ElideRight
+                                }
+                            }
                         }
 
                         EditorBox {
@@ -2340,24 +2755,84 @@ Item {
                                 ? Colors.cyan
                                 : Colors.yellow
                             keyboardOwner: root.keyboardHost
+                            onTextChanged:
+                                root.armedAction = ""
+                        }
+
+                        Row {
+                            width: parent.width
+                            height: 30
+                            spacing: 6
+
+                            MiniButton {
+                                width: 96
+                                height: 30
+                                label: "NEW LINE"
+                                accent: Colors.cyan
+                                enabledAction:
+                                    root.selectedProjectLine > 0
+                                    || projectLineInput.text.length > 0
+                                onTriggered:
+                                    root.clearProjectSelection(true)
+                            }
+
+                            MiniButton {
+                                width: parent.width - 102
+                                height: 30
+                                label:
+                                    root.projectInputDuplicate()
+                                    ? "ALREADY EXISTS"
+                                    : "APPEND UNIQUE LINE"
+                                accent: Colors.green
+                                enabledAction:
+                                    root.repositoryService
+                                    && !root.repositoryService.actionBusy
+                                    && root.selectedProjectLine <= 0
+                                    && projectLineInput.text.trim().length > 0
+                                    && !root.projectInputDuplicate()
+                                onTriggered:
+                                    root.repositoryService.appendProjectLine(
+                                        root.projectFileKind,
+                                        projectLineInput.text
+                                    )
+                            }
                         }
 
                         MiniButton {
                             width: parent.width
-                            label: "APPEND UNIQUE LINE"
-                            accent: Colors.green
+                            height: 30
+                            label:
+                                root.armedAction === "replace-project-line"
+                                ? "CONFIRM REPLACE LINE "
+                                  + String(root.selectedProjectLine)
+                                : "REPLACE SELECTED LINE"
+                            accent: Colors.orange
                             enabledAction:
                                 root.repositoryService
+                                && !root.repositoryService.actionBusy
+                                && root.selectedProjectLine > 0
+                                && root.projectInputChanged()
                                 && projectLineInput.text.trim().length > 0
+                                && !root.projectInputDuplicate()
                             onTriggered:
-                                root.repositoryService.appendProjectLine(
-                                    root.projectFileKind,
-                                    projectLineInput.text
+                                root.armOrRun(
+                                    "replace-project-line",
+                                    function() {
+                                        root.repositoryService
+                                            .replaceProjectLine(
+                                                root.projectFileKind,
+                                                root.selectedProjectLine,
+                                                root.selectedProjectText,
+                                                projectLineInput.text,
+                                                true
+                                            );
+                                    }
                                 )
                         }
 
                         MiniButton {
                             width: parent.width
+                            height: 30
                             label:
                                 root.armedAction === "remove-project-line"
                                 ? "CONFIRM REMOVE LINE "
@@ -2366,19 +2841,31 @@ Item {
                             accent: Colors.red
                             enabledAction:
                                 root.repositoryService
+                                && !root.repositoryService.actionBusy
                                 && root.selectedProjectLine > 0
                             onTriggered:
                                 root.armOrRun(
                                     "remove-project-line",
                                     function() {
-                                        root.repositoryService.removeProjectLine(
-                                            root.projectFileKind,
-                                            root.selectedProjectLine,
-                                            true
-                                        );
-                                        root.selectedProjectLine = -1;
+                                        root.repositoryService
+                                            .removeProjectLine(
+                                                root.projectFileKind,
+                                                root.selectedProjectLine,
+                                                root.selectedProjectText,
+                                                true
+                                            );
                                     }
                                 )
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text:
+                                "REPLACE and REMOVE verify the exact selected text before writing. If the file changed or the line moved unexpectedly, the operation refuses instead of modifying another rule."
+                            font.pixelSize: 9
+                            color: Colors.white
+                            opacity: 0.52
+                            wrapMode: Text.WordWrap
                         }
                     }
                 }
@@ -2699,4 +3186,39 @@ Item {
             }
         }
     }
+
+    Connections {
+        target: root.repositoryService
+        enabled: root.repositoryService !== null
+        ignoreUnknownSignals: true
+
+        function onRefreshed() {
+            root.reconcileProjectSelection();
+        }
+
+        function onActionFinished(action, success, detail) {
+            if (!success)
+                return;
+
+            const name = String(action || "");
+
+            if (name === "APPEND-FILE-LINE") {
+                root.selectedProjectText =
+                    String(projectLineInput.text || "");
+                root.selectedProjectLine = -1;
+                return;
+            }
+
+            if (name === "REPLACE-FILE-LINE") {
+                root.selectedProjectText =
+                    String(projectLineInput.text || "");
+                root.selectedProjectLine = -1;
+                return;
+            }
+
+            if (name === "REMOVE-FILE-LINE")
+                root.clearProjectSelection(true);
+        }
+    }
+
 }

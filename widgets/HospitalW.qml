@@ -6573,6 +6573,7 @@ PanelWindow {
                 root.operationsSurface === "attention"
                 && root.attentionSubview === "queue"
             queueProvider: hospitalMergeQueueProvider
+            responsibilityService: responsibilityService
             repositorySlug: root.attentionQueueRepository
             branchName: root.attentionQueueBranch
 

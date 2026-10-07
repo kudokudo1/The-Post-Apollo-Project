@@ -5,6 +5,7 @@ Rectangle {
     id: root
 
     required property var queueProvider
+    property var responsibilityService: null
 
     property string repositorySlug: ""
     property string branchName: ""
@@ -222,7 +223,7 @@ Rectangle {
                 required property var modelData
 
                 width: ListView.view.width
-                height: 92
+                height: 108
                 color: Colors.black
                 border.width: 1
                 border.color: root.stateColor(modelData.state)
@@ -305,6 +306,52 @@ Rectangle {
                                   )
                             font.pixelSize: 8
                             color: Colors.cyan
+                            elide: Text.ElideRight
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            property var responsibility:
+                                root.responsibilityService
+                                ? root.responsibilityService.contextFor(
+                                    root.repositorySlug,
+                                    String(
+                                        (row.modelData.pullRequest || {}).headRefName
+                                        || ""
+                                    )
+                                  )
+                                : null
+                            text:
+                                !responsibility
+                                ? "OWNER // UNMAPPED"
+                                : (
+                                    "OWNER // "
+                                    + String(
+                                        responsibility.ownerLabel
+                                        || "UNMAPPED"
+                                      )
+                                    + (
+                                        responsibility.roomTeam
+                                        ? " // ROOM "
+                                          + String(responsibility.roomTeam)
+                                        : ""
+                                      )
+                                    + (
+                                        responsibility.assignmentTitle
+                                        ? " // ORDER "
+                                          + String(responsibility.assignmentTitle)
+                                        : ""
+                                      )
+                                  )
+                            font.pixelSize: 8
+                            color:
+                                responsibility
+                                && responsibility.confidence === "EXACT"
+                                ? Colors.green
+                                : responsibility
+                                  && responsibility.confidence !== "UNMAPPED"
+                                ? Colors.blue
+                                : Colors.magenta
                             elide: Text.ElideRight
                         }
                     }

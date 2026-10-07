@@ -11,6 +11,9 @@ HOSPITAL = (ROOT / "widgets/HospitalW.qml").read_text(encoding="utf-8")
 ATTENTION = (
     ROOT / "widgets/HospitalGitHubAttentionView.qml"
 ).read_text(encoding="utf-8")
+QUEUE = (
+    ROOT / "widgets/HospitalGitHubMergeQueueView.qml"
+).read_text(encoding="utf-8")
 errors = []
 
 
@@ -50,6 +53,15 @@ for needle, label in (
     ("responsibility.confidence", "ownership confidence rendering"),
 ):
     require(ATTENTION, needle, label)
+
+for needle, label in (
+    ("property var responsibilityService: null", "Queue ownership dependency"),
+    ("responsibilityService.contextFor(", "Queue ownership lookup"),
+    ('"OWNER // "', "Queue ownership rendering"),
+    ('+ " // ROOM "', "Queue Room rendering"),
+    ("responsibility.assignmentTitle", "Queue Assignment rendering"),
+):
+    require(QUEUE, needle, label)
 
 for forbidden in (
     "GitHistoryFoldService",

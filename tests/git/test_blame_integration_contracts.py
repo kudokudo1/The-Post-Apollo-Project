@@ -69,7 +69,7 @@ require(
 )
 require(
     GITW,
-    "gitHistoryView.selectCommit(commit, "")",
+    'gitHistoryView.selectCommit(commit, "")',
     "History uses canonical commit selection",
 )
 require(

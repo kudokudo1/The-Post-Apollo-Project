@@ -25,6 +25,7 @@ Scope {
     // still projects only five recent/favorite items into inbox.
     property int maxActivityEvents: 2000
     property int guaranteedRecentEvents: 250
+    property int reportArchiveBackfillLimit: 250
 
     readonly property int archiveCount:
         activityEvents.length
@@ -1089,7 +1090,7 @@ Scope {
 
         const events =
             Array.isArray(reportEvents)
-            ? reportEvents.slice(-5)
+            ? reportEvents.slice(-reportArchiveBackfillLimit)
             : [];
 
         for (let i = 0; i < events.length; ++i)
@@ -2430,7 +2431,14 @@ Scope {
             return true;
         }
 
-        const source = activityQuerySource(query);
+        let source = activityQuerySource(query);
+
+        if (asksArchive
+                && source === "reports"
+                && query.indexOf("report") < 0
+                && query.indexOf("evidence") < 0)
+            source = "";
+
         const target = targetHint;
         let matches =
             matchingActivity(

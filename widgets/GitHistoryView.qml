@@ -19,6 +19,8 @@ Item {
     property string selectedReflogSha: ""
     property string selectedCommitRefs: ""
     property string armedAction: ""
+    property int ancestryParentIndex: 0
+    property int ancestryChildIndex: 0
 
     signal changesRequested(string path)
     signal branchesRequested(string branch, string sha)
@@ -414,6 +416,70 @@ Item {
         const selectedSha = String(ctx.selectedSha || "");
         if (selectedSha)
             root.historyService.showCommit(selectedSha);
+    }
+
+    function ancestryChoice(kind) {
+        if (!root.historyService)
+            return "";
+
+        const source =
+            kind === "parent"
+            ? root.historyService.selectedParents
+            : root.historyService.selectedChildren;
+        const count = source ? source.length : 0;
+
+        if (count <= 0)
+            return "";
+
+        const rawIndex =
+            kind === "parent"
+            ? root.ancestryParentIndex
+            : root.ancestryChildIndex;
+        const index = Math.max(
+            0,
+            Math.min(count - 1, Number(rawIndex || 0))
+        );
+
+        return String(source[index] || "");
+    }
+
+    function cycleAncestry(kind, delta) {
+        if (!root.historyService)
+            return;
+
+        const source =
+            kind === "parent"
+            ? root.historyService.selectedParents
+            : root.historyService.selectedChildren;
+        const count = source ? source.length : 0;
+
+        if (count <= 1)
+            return;
+
+        if (kind === "parent") {
+            root.ancestryParentIndex =
+                (
+                    root.ancestryParentIndex
+                    + Number(delta || 0)
+                    + count
+                ) % count;
+        } else {
+            root.ancestryChildIndex =
+                (
+                    root.ancestryChildIndex
+                    + Number(delta || 0)
+                    + count
+                ) % count;
+        }
+    }
+
+    function openAncestry(kind) {
+        const sha = root.ancestryChoice(kind);
+
+        if (!sha)
+            return;
+
+        root.selectCommit(sha, "");
     }
 
     function selectCommit(sha, refsText) {
@@ -2392,42 +2458,102 @@ Item {
                             height: 30
                             spacing: 5
 
-                            MiniButton {
+                            Row {
                                 width: (parent.width - 5) / 2
-                                label:
-                                    "PARENT "
-                                    + String(
+                                height: 30
+                                spacing: 3
+
+                                MiniButton {
+                                    width: 28
+                                    height: 30
+                                    label: "‹"
+                                    accent: Colors.cyan
+                                    enabledAction:
                                         root.historyService
-                                        ? root.historyService.selectedParents.length
-                                        : 0
-                                      )
-                                accent: Colors.cyan
-                                enabledAction:
-                                    root.historyService
-                                    && root.historyService.selectedParents.length > 0
-                                onTriggered:
-                                    root.selectCommit(
-                                        root.historyService.selectedParents[0]
-                                    )
+                                        && root.historyService.selectedParents.length > 1
+                                    onTriggered:
+                                        root.cycleAncestry("parent", -1)
+                                }
+
+                                MiniButton {
+                                    width: parent.width - 62
+                                    height: 30
+                                    label:
+                                        root.historyService
+                                        && root.historyService.selectedParents.length > 0
+                                        ? "PARENT "
+                                          + String(root.ancestryParentIndex + 1)
+                                          + "/"
+                                          + String(root.historyService.selectedParents.length)
+                                        : "PARENT 0"
+                                    accent: Colors.cyan
+                                    enabledAction:
+                                        root.historyService
+                                        && root.historyService.selectedParents.length > 0
+                                    onTriggered:
+                                        root.openAncestry("parent")
+                                }
+
+                                MiniButton {
+                                    width: 28
+                                    height: 30
+                                    label: "›"
+                                    accent: Colors.cyan
+                                    enabledAction:
+                                        root.historyService
+                                        && root.historyService.selectedParents.length > 1
+                                    onTriggered:
+                                        root.cycleAncestry("parent", 1)
+                                }
                             }
 
-                            MiniButton {
+                            Row {
                                 width: (parent.width - 5) / 2
-                                label:
-                                    "CHILD "
-                                    + String(
+                                height: 30
+                                spacing: 3
+
+                                MiniButton {
+                                    width: 28
+                                    height: 30
+                                    label: "‹"
+                                    accent: Colors.orange
+                                    enabledAction:
                                         root.historyService
-                                        ? root.historyService.selectedChildren.length
-                                        : 0
-                                      )
-                                accent: Colors.orange
-                                enabledAction:
-                                    root.historyService
-                                    && root.historyService.selectedChildren.length > 0
-                                onTriggered:
-                                    root.selectCommit(
-                                        root.historyService.selectedChildren[0]
-                                    )
+                                        && root.historyService.selectedChildren.length > 1
+                                    onTriggered:
+                                        root.cycleAncestry("child", -1)
+                                }
+
+                                MiniButton {
+                                    width: parent.width - 62
+                                    height: 30
+                                    label:
+                                        root.historyService
+                                        && root.historyService.selectedChildren.length > 0
+                                        ? "CHILD "
+                                          + String(root.ancestryChildIndex + 1)
+                                          + "/"
+                                          + String(root.historyService.selectedChildren.length)
+                                        : "CHILD 0"
+                                    accent: Colors.orange
+                                    enabledAction:
+                                        root.historyService
+                                        && root.historyService.selectedChildren.length > 0
+                                    onTriggered:
+                                        root.openAncestry("child")
+                                }
+
+                                MiniButton {
+                                    width: 28
+                                    height: 30
+                                    label: "›"
+                                    accent: Colors.orange
+                                    enabledAction:
+                                        root.historyService
+                                        && root.historyService.selectedChildren.length > 1
+                                    onTriggered:
+                                        root.cycleAncestry("child", 1)
+                                }
                             }
                         }
                     }
@@ -2549,6 +2675,14 @@ Item {
             root.syncScopeIndex(
                 root.historyService.selectedRef || "ALL"
             );
+        }
+
+        function onSelectedParentsChanged() {
+            root.ancestryParentIndex = 0;
+        }
+
+        function onSelectedChildrenChanged() {
+            root.ancestryChildIndex = 0;
         }
 
         function onBranchRefsChanged() {

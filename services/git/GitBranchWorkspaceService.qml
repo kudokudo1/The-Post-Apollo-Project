@@ -117,6 +117,15 @@ Scope {
                 'head="$(git -C "$repo" rev-parse HEAD 2>/dev/null || true)"',
                 'printf "CURRENT\\t%s\\t%s\\n" "$current" "$head"',
                 'git -C "$repo" for-each-ref --format="BRANCH%09%(refname:short)%09%(objectname)%09%(upstream:short)" refs/heads 2>/dev/null',
+                'while IFS= read -r name; do',
+                '  [ -n "$name" ] || continue',
+                '  branch_ref="refs/heads/$name"',
+                '  upstream="$(git -C "$repo" for-each-ref --format="%(upstream:short)" "$branch_ref" 2>/dev/null)"',
+                '  target="$upstream"',
+                '  [ -n "$target" ] || target="HEAD"',
+                '  if git -C "$repo" merge-base --is-ancestor "$branch_ref" "$target" >/dev/null 2>&1; then merged="1"; else merged="0"; fi',
+                '  printf "MERGED\t%s\t%s\n" "$name" "$merged"',
+                'done < <(git -C "$repo" for-each-ref --format="%(refname:short)" refs/heads 2>/dev/null)',
                 'git -C "$repo" worktree list --porcelain 2>/dev/null',
                 'while IFS= read -r wt; do',
                 '  count="$(git -C "$wt" status --porcelain=v1 2>/dev/null | wc -l | tr -d " ")"',
@@ -135,6 +144,7 @@ Scope {
         const branchRows = [];
         const treeRows = [];
         const dirtyByPath = {};
+        const mergedByBranch = {};
 
         let tree = null;
         let nextCurrentBranch = "";
@@ -168,6 +178,13 @@ Scope {
                     head: parts.length > 2 ? parts[2] : "",
                     upstream: parts.length > 3 ? parts[3] : ""
                 });
+                continue;
+            }
+
+            if (line.indexOf("MERGED\t") === 0) {
+                const parts = line.split("\t");
+                if (parts.length > 2)
+                    mergedByBranch[parts[1]] = parts[2] === "1";
                 continue;
             }
 
@@ -212,6 +229,11 @@ Scope {
         for (let i = 0; i < treeRows.length; ++i) {
             const row = treeRows[i];
             row.dirtyCount = Number(dirtyByPath[row.path] || 0);
+        }
+
+        for (let i = 0; i < branchRows.length; ++i) {
+            const row = branchRows[i];
+            row.merged = Boolean(mergedByBranch[row.name]);
         }
 
         currentBranch = nextCurrentBranch;

@@ -2693,6 +2693,16 @@ PanelWindow {
                             ? Colors.orange
                             : Colors.white
                         elide: Text.ElideRight
+
+                        layer.enabled:
+                            root.operationsSurface === "reception"
+                        layer.effect: DropShadow {
+                            radius: 7
+                            samples: 9
+                            opacity: 0.52
+                            color: Colors.cyan
+                            transparentBorder: true
+                        }
                     }
                 }
             }

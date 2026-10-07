@@ -28,6 +28,10 @@ Item {
     property string pendingCreateName: ""
     property string pendingCreateAnchor: ""
     property string pendingCreateMode: ""
+    property string workspaceMode: "ATTACH"
+    property string pendingWorkspaceBranch: ""
+    property string pendingWorkspaceAnchor: ""
+    property string pendingWorkspacePath: ""
 
     readonly property var selectedBranchData:
         branchWorkspaceService && selectedBranch
@@ -143,7 +147,10 @@ Item {
                     && kind !== "SET-UPSTREAM"
                     && kind !== "CLEAR-UPSTREAM"
                     && kind !== "DELETE"
-                    && kind !== "CREATE")
+                    && kind !== "CREATE"
+                    && kind !== "ADD-WORKTREE"
+                    && kind !== "NEW-WORKTREE"
+                    && kind !== "REMOVE-WORKTREE")
                 return;
 
             root.managementMessage =
@@ -155,6 +162,16 @@ Item {
                     root.pendingCreateName = "";
                     root.pendingCreateAnchor = "";
                     root.pendingCreateMode = "";
+                    root.pendingFocusBranch = "";
+                    root.pendingFocusSha = "";
+                }
+
+                if (kind === "ADD-WORKTREE"
+                        || kind === "NEW-WORKTREE"
+                        || kind === "REMOVE-WORKTREE") {
+                    root.pendingWorkspaceBranch = "";
+                    root.pendingWorkspaceAnchor = "";
+                    root.pendingWorkspacePath = "";
                     root.pendingFocusBranch = "";
                     root.pendingFocusSha = "";
                 }
@@ -220,6 +237,55 @@ Item {
                 root.pendingCreateName = "";
                 root.pendingCreateAnchor = "";
                 root.pendingCreateMode = "";
+                root.managementArm = "";
+                return;
+            }
+
+            if (kind === "ADD-WORKTREE") {
+                root.pendingFocusBranch = root.pendingWorkspaceBranch;
+                root.pendingFocusSha = "";
+                root.managementMessage =
+                    "OK // WORKSPACE ATTACHED // "
+                    + root.pendingWorkspacePath;
+                root.pendingWorkspaceBranch = "";
+                root.pendingWorkspaceAnchor = "";
+                root.pendingWorkspacePath = "";
+                root.managementArm = "";
+                return;
+            }
+
+            if (kind === "NEW-WORKTREE") {
+                let linked = true;
+
+                if (root.branchStackStore)
+                    linked = root.branchStackStore.attachCreatedBranch(
+                        root.pendingWorkspaceAnchor,
+                        root.pendingWorkspaceBranch,
+                        "ABOVE"
+                    );
+
+                root.pendingFocusBranch = root.pendingWorkspaceBranch;
+                root.pendingFocusSha = "";
+                root.managementMessage =
+                    linked
+                    ? "OK // NEW WORKSPACE + STACK LINKED"
+                    : "WORKSPACE CREATED // STACK LINK REFUSED";
+
+                root.pendingWorkspaceBranch = "";
+                root.pendingWorkspaceAnchor = "";
+                root.pendingWorkspacePath = "";
+                root.managementArm = "";
+                return;
+            }
+
+            if (kind === "REMOVE-WORKTREE") {
+                root.pendingFocusBranch = root.selectedBranch;
+                root.pendingFocusSha = "";
+                root.managementMessage =
+                    "OK // WORKSPACE REMOVED";
+                root.pendingWorkspaceBranch = "";
+                root.pendingWorkspaceAnchor = "";
+                root.pendingWorkspacePath = "";
                 root.managementArm = "";
                 return;
             }
@@ -386,6 +452,41 @@ Item {
         });
     }
 
+    function workspaceDefaultPath(branchName) {
+        const repo =
+            root.branchWorkspaceService
+            ? String(root.branchWorkspaceService.repositoryPath || "").trim()
+            : "";
+        const branch =
+            String(branchName || "")
+            .split("/")
+            .join("-");
+
+        if (!repo || !branch)
+            return "";
+
+        return repo + "-wt-" + branch;
+    }
+
+    function openWorkspaceManager() {
+        if (!root.selectedBranch || !root.branchWorkspaceService)
+            return;
+
+        root.managementMode = "workspace";
+        root.managementMessage = "";
+        root.managementArm = "";
+        root.workspaceMode =
+            root.selectedWorkspace
+            ? "ATTACHED"
+            : "ATTACH";
+
+        workspacePathEditor.text =
+            root.selectedWorkspace
+            ? String(root.selectedWorkspace.path || "")
+            : root.workspaceDefaultPath(root.selectedBranch);
+        workspaceBranchEditor.text = "";
+    }
+
     function closeManager() {
         root.managementMode = "";
         root.managementMessage = "";
@@ -476,6 +577,161 @@ Item {
             root.pendingCreateMode = "";
             root.managementMessage = "REFUSED // BRANCH CORE BUSY";
         }
+    }
+
+    function workspacePrimary() {
+        if (!root.selectedWorkspace || !root.branchWorkspaceService)
+            return false;
+
+        return String(root.selectedWorkspace.path || "")
+            === String(root.branchWorkspaceService.repositoryPath || "");
+    }
+
+    function workspaceRemoveBlockReason(forceRemove) {
+        if (!root.selectedWorkspace)
+            return "NO WORKSPACE ATTACHED";
+
+        if (root.workspacePrimary())
+            return "PRIMARY WORKTREE PROTECTED";
+
+        if (Boolean(root.selectedWorkspace.locked))
+            return "WORKTREE LOCKED // UNLOCK IN REPOSITORY";
+
+        const dirty =
+            Number(root.selectedWorkspace.dirtyCount || 0);
+
+        if (!forceRemove && dirty > 0)
+            return "DIRTY WORKTREE // FORCE REQUIRED";
+
+        return "";
+    }
+
+    function applyAttachWorkspace() {
+        if (!root.branchWorkspaceService || !root.selectedBranch)
+            return;
+
+        if (root.selectedWorkspace) {
+            root.managementMessage =
+                "REFUSED // BRANCH ALREADY HAS A WORKSPACE";
+            return;
+        }
+
+        const path = String(workspacePathEditor.text || "").trim();
+
+        if (!path) {
+            root.managementMessage =
+                "REFUSED // WORKSPACE PATH REQUIRED";
+            return;
+        }
+
+        root.pendingWorkspaceBranch = root.selectedBranch;
+        root.pendingWorkspaceAnchor = root.selectedBranch;
+        root.pendingWorkspacePath = path;
+        root.pendingFocusBranch = root.selectedBranch;
+        root.pendingFocusSha = "";
+
+        if (!root.branchWorkspaceService.addWorktree(
+                path,
+                root.selectedBranch
+            )) {
+            root.pendingWorkspaceBranch = "";
+            root.pendingWorkspaceAnchor = "";
+            root.pendingWorkspacePath = "";
+            root.managementMessage = "REFUSED // BRANCH CORE BUSY";
+        }
+    }
+
+    function applyNewWorkspace() {
+        if (!root.branchWorkspaceService || !root.selectedBranch)
+            return;
+
+        const path = String(workspacePathEditor.text || "").trim();
+        const branch =
+            String(workspaceBranchEditor.text || "").trim();
+
+        if (!branch) {
+            root.managementMessage =
+                "REFUSED // NEW BRANCH NAME REQUIRED";
+            return;
+        }
+
+        if (!path) {
+            root.managementMessage =
+                "REFUSED // WORKSPACE PATH REQUIRED";
+            return;
+        }
+
+        if (root.branchWorkspaceService.branchForName(branch)) {
+            root.managementMessage =
+                "REFUSED // LOCAL BRANCH ALREADY EXISTS";
+            return;
+        }
+
+        root.pendingWorkspaceBranch = branch;
+        root.pendingWorkspaceAnchor = root.selectedBranch;
+        root.pendingWorkspacePath = path;
+        root.pendingFocusBranch = branch;
+        root.pendingFocusSha = "";
+
+        if (!root.branchWorkspaceService.createWorktree(
+                path,
+                branch,
+                root.selectedBranch
+            )) {
+            root.pendingWorkspaceBranch = "";
+            root.pendingWorkspaceAnchor = "";
+            root.pendingWorkspacePath = "";
+            root.pendingFocusBranch = "";
+            root.managementMessage = "REFUSED // BRANCH CORE BUSY";
+        }
+    }
+
+    function requestRemoveWorkspace(forceRemove) {
+        if (!root.branchWorkspaceService || !root.selectedWorkspace)
+            return;
+
+        const reason = root.workspaceRemoveBlockReason(forceRemove);
+
+        if (reason) {
+            root.managementMessage = "REFUSED // " + reason;
+            root.managementArm = "";
+            return;
+        }
+
+        const armKey =
+            forceRemove
+            ? "workspace-force-remove"
+            : "workspace-remove";
+
+        if (forceRemove
+                && String(workspaceConfirmEditor.text || "").trim()
+                   !== root.selectedBranch) {
+            root.managementMessage =
+                "TYPE THE EXACT BRANCH NAME TO FORCE REMOVE";
+            root.managementArm = "";
+            return;
+        }
+
+        if (root.managementArm !== armKey) {
+            root.managementArm = armKey;
+            root.managementMessage =
+                forceRemove
+                ? "ARMED // FORCE REMOVE WORKSPACE // PRESS AGAIN"
+                : "ARMED // REMOVE WORKSPACE // PRESS AGAIN";
+            return;
+        }
+
+        root.pendingWorkspaceBranch = root.selectedBranch;
+        root.pendingWorkspaceAnchor = root.selectedBranch;
+        root.pendingWorkspacePath =
+            String(root.selectedWorkspace.path || "");
+        root.managementArm = "";
+
+        if (!root.branchWorkspaceService.removeWorktree(
+                root.pendingWorkspacePath,
+                forceRemove
+            ))
+            root.managementMessage = "REFUSED // BRANCH CORE BUSY";
     }
 
     function deleteBlockReason(forceDelete) {
@@ -1533,10 +1789,18 @@ Item {
 
                         BranchButton {
                             width: (inspector.width - 26) / 2
-                            label: "WORKSPACE"
-                            enabledAction: false
-                            onTriggered:
-                                root.workspaceRequested(root.selectedBranch)
+                            label:
+                                root.selectedWorkspace
+                                ? "WORKSPACE ✓"
+                                : "WORKSPACE"
+                            selectedAction:
+                                root.selectedWorkspace !== null
+                            enabledAction:
+                                root.selectedBranch.length > 0
+                                && branchWorkspaceService
+                                && !branchWorkspaceService.actionBusy
+                                && !branchWorkspaceService.refreshing
+                            onTriggered: root.openWorkspaceManager()
                         }
 
                         BranchButton {

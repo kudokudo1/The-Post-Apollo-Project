@@ -1732,6 +1732,8 @@ PanelWindow {
         id: stackSubmitService
         branchStackStore: branchStackStore
         branchWorkspaceService: branchWorkspaceService
+        operationJournal: operationJournalService
+        snapshotService: repositorySnapshotService
         repositoryPath:
             gitService.repoIsLocal
             ? gitService.repoRoot

@@ -452,6 +452,7 @@ Item {
                                 font.pixelSize: 8
                                 color:
                                     sourceRow.checkState === "FAIL"
+                                    || sourceRow.checkState === "ERROR"
                                     ? Colors.red
                                     : sourceRow.checkState === "PENDING"
                                     ? Colors.orange
@@ -476,6 +477,7 @@ Item {
                                 font.pixelSize: 8
                                 color:
                                     sourceRow.reviewState === "CHANGES_REQUESTED"
+                                    || sourceRow.reviewState === "ERROR"
                                     ? Colors.red
                                     : sourceRow.reviewState === "REVIEW_REQUIRED"
                                     ? Colors.orange

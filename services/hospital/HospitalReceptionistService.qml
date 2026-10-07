@@ -2047,7 +2047,7 @@ Scope {
 
         const topMatch =
             query.match(
-                /\\btop\\s+(\\d+|one|two|three|four|five|six|seven|eight|nine|ten)\\b/
+                /\btop\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b/
             );
 
         if (topMatch && topMatch[1]) {

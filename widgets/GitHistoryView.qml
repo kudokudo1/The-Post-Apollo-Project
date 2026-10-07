@@ -12,6 +12,7 @@ Item {
     property string subMode: "log"
     property string searchQuery: ""
     property int scopeIndex: 0
+    property string pendingScopeRef: ""
     property string inspectorMode: "detail"
     property string resetMode: "mixed"
     property string selectedQuerySha: ""
@@ -71,17 +72,84 @@ Item {
         return out;
     }
 
+    function scopeLabelForRef(refValue) {
+        const ref = String(refValue || "ALL");
+
+        if (!ref || ref === "ALL")
+            return "ALL";
+
+        if (ref.indexOf("refs/heads/") === 0)
+            return "BRANCH " + ref.slice("refs/heads/".length);
+
+        if (ref.indexOf("refs/tags/") === 0)
+            return "TAG " + ref.slice("refs/tags/".length);
+
+        return ref;
+    }
+
+    function scopeIndexForRef(refValue) {
+        const ref = String(refValue || "ALL");
+        const entries = root.scopeEntries();
+
+        for (let i = 0; i < entries.length; ++i) {
+            if (String(entries[i].ref || "") === ref)
+                return i;
+        }
+
+        return -1;
+    }
+
+    function syncScopeIndex(refValue) {
+        const ref = String(refValue || "ALL");
+        const index = root.scopeIndexForRef(ref);
+
+        if (index >= 0) {
+            root.scopeIndex = index;
+            root.pendingScopeRef = "";
+            return true;
+        }
+
+        if (ref === "ALL") {
+            root.scopeIndex = 0;
+            root.pendingScopeRef = "";
+            return true;
+        }
+
+        root.pendingScopeRef = ref;
+        return false;
+    }
+
     function currentScope() {
         const entries = root.scopeEntries();
         if (entries.length === 0)
             return { label: "ALL", ref: "ALL" };
 
-        root.scopeIndex = Math.max(
+        const activeRef =
+            String(root.pendingScopeRef || "")
+            || (
+                root.historyService
+                ? String(root.historyService.selectedRef || "")
+                : ""
+               );
+
+        if (activeRef) {
+            const activeIndex = root.scopeIndexForRef(activeRef);
+
+            if (activeIndex >= 0)
+                return entries[activeIndex];
+
+            return {
+                label: root.scopeLabelForRef(activeRef),
+                ref: activeRef
+            };
+        }
+
+        const index = Math.max(
             0,
             Math.min(entries.length - 1, root.scopeIndex)
         );
 
-        return entries[root.scopeIndex];
+        return entries[index];
     }
 
     function cycleScope(delta) {
@@ -89,13 +157,30 @@ Item {
         if (entries.length <= 0)
             return;
 
+        const activeRef =
+            String(root.pendingScopeRef || "")
+            || (
+                root.historyService
+                ? String(root.historyService.selectedRef || "")
+                : ""
+               );
+        const activeIndex = root.scopeIndexForRef(activeRef);
+        const startIndex =
+            activeIndex >= 0
+            ? activeIndex
+            : Math.max(
+                0,
+                Math.min(entries.length - 1, root.scopeIndex)
+              );
+
         root.scopeIndex =
-            (root.scopeIndex + Number(delta || 0) + entries.length)
+            (startIndex + Number(delta || 0) + entries.length)
             % entries.length;
+        root.pendingScopeRef = "";
 
         if (root.historyService)
             root.historyService.refresh(
-                root.currentScope().ref,
+                entries[root.scopeIndex].ref,
                 root.historyService.selectedMode
             );
     }
@@ -206,15 +291,8 @@ Item {
         root.selectedCommitRefs = "";
 
         const target = "refs/heads/" + branch;
-        const entries = root.scopeEntries();
-
-        for (let i = 0; i < entries.length; ++i) {
-            if (String(entries[i].ref || "") !== target)
-                continue;
-
-            root.scopeIndex = i;
-            break;
-        }
+        root.pendingScopeRef = target;
+        root.syncScopeIndex(target);
 
         root.historyService.refresh(
             target,
@@ -243,6 +321,99 @@ Item {
             "",
             ""
         );
+    }
+
+    function navigationContext() {
+        return {
+            subMode: root.subMode,
+            searchQuery: root.searchQuery,
+            scopeRef:
+                root.historyService
+                ? String(root.historyService.selectedRef || "ALL")
+                : root.currentScope().ref,
+            historyMode:
+                root.historyService
+                ? String(root.historyService.selectedMode || "all")
+                : "all",
+            selectedSha:
+                root.historyService
+                ? String(root.historyService.selectedSha || "")
+                : "",
+            selectedFile:
+                root.historyService
+                ? String(root.historyService.selectedFile || "")
+                : "",
+            selectedQuerySha: root.selectedQuerySha,
+            selectedReflogSha: root.selectedReflogSha,
+            queryPath:
+                root.historyService
+                ? String(root.historyService.queryPath || "")
+                : "",
+            queryAuthor:
+                root.historyService
+                ? String(root.historyService.queryAuthor || "")
+                : "",
+            querySince:
+                root.historyService
+                ? String(root.historyService.querySince || "")
+                : "",
+            queryUntil:
+                root.historyService
+                ? String(root.historyService.queryUntil || "")
+                : "",
+            queryRange:
+                root.historyService
+                ? String(root.historyService.queryRange || "")
+                : ""
+        };
+    }
+
+    function restoreNavigationContext(context) {
+        const ctx = context || {};
+
+        root.armedAction = "";
+        root.subMode = String(ctx.subMode || "log");
+        root.searchQuery = String(ctx.searchQuery || "");
+        searchInput.text = root.searchQuery;
+        root.selectedQuerySha = String(ctx.selectedQuerySha || "");
+        root.selectedReflogSha = String(ctx.selectedReflogSha || "");
+
+        if (!root.historyService)
+            return;
+
+        if (root.subMode === "query") {
+            queryPathInput.text = String(ctx.queryPath || "");
+            queryAuthorInput.text = String(ctx.queryAuthor || "");
+            querySinceInput.text = String(ctx.querySince || "");
+            queryUntilInput.text = String(ctx.queryUntil || "");
+            queryRangeInput.text = String(ctx.queryRange || "");
+
+            root.historyService.runQuery(
+                queryPathInput.text,
+                queryAuthorInput.text,
+                querySinceInput.text,
+                queryUntilInput.text,
+                queryRangeInput.text
+            );
+        } else if (root.subMode === "reflog") {
+            root.historyService.loadReflog();
+        } else {
+            const scopeRef = String(ctx.scopeRef || "ALL");
+            root.pendingScopeRef = scopeRef;
+            root.syncScopeIndex(scopeRef);
+            root.historyService.refresh(
+                scopeRef,
+                String(
+                    ctx.historyMode
+                    || root.historyService.selectedMode
+                    || "all"
+                )
+            );
+        }
+
+        const selectedSha = String(ctx.selectedSha || "");
+        if (selectedSha)
+            root.historyService.showCommit(selectedSha);
     }
 
     function selectCommit(sha, refsText) {
@@ -2366,6 +2537,34 @@ Item {
                     : Colors.cyan
                 elide: Text.ElideRight
             }
+        }
+    }
+
+    Connections {
+        target: root.historyService
+        enabled: root.historyService !== null
+        ignoreUnknownSignals: true
+
+        function onRefreshed() {
+            root.syncScopeIndex(
+                root.historyService.selectedRef || "ALL"
+            );
+        }
+
+        function onBranchRefsChanged() {
+            root.syncScopeIndex(
+                root.pendingScopeRef
+                || root.historyService.selectedRef
+                || "ALL"
+            );
+        }
+
+        function onTagRefsChanged() {
+            root.syncScopeIndex(
+                root.pendingScopeRef
+                || root.historyService.selectedRef
+                || "ALL"
+            );
         }
     }
 

@@ -128,6 +128,7 @@ Scope {
                 "CHANGES/TRANSFER_HUNK",
                 "CHANGES/TRANSFER_LINE",
                 "CHANGES/TRANSFER_STAGED",
+                "CHANGES/TRANSFER_PARTIAL",
                 "CHANGES/TRANSFER_UNTRACKED"
             ].indexOf(kind) < 0)
             return null;
@@ -154,6 +155,7 @@ Scope {
                 || (
                     layer !== "worktree"
                     && layer !== "staged"
+                    && layer !== "partial"
                     && layer !== "untracked"
                 )) {
             return refuse("TRANSFER RECOVERY PAYLOAD IS INCOMPLETE");
@@ -178,6 +180,8 @@ Scope {
                 + (
                     layer === "staged"
                     ? " STAGED "
+                    : layer === "partial"
+                    ? " PARTIALLY STAGED "
                     : layer === "untracked"
                     ? " UNTRACKED "
                     : " "
@@ -1739,15 +1743,30 @@ Scope {
                 '    if [ "$layer" = "staged" ]; then',
                 '      git -C "$source" diff --quiet || { printf "REFUSED\\tSOURCE HAS UNSTAGED DRIFT AFTER STAGED TRANSFER\\n"; exit 111; }',
                 '      git -C "$destination" diff --quiet || { printf "REFUSED\\tDESTINATION HAS UNSTAGED DRIFT AFTER STAGED TRANSFER\\n"; exit 112; }',
+                '    elif [ "$layer" = "partial" ]; then',
+                '      :',
                 '    else',
                 '      git -C "$source" diff --cached --quiet || { printf "REFUSED\\tSOURCE HAS STAGED CHANGES\\n"; exit 111; }',
                 '      git -C "$destination" diff --cached --quiet || { printf "REFUSED\\tDESTINATION HAS STAGED CHANGES\\n"; exit 112; }',
                 '    fi',
                 '    patch="$(mktemp "${TMPDIR:-/tmp}/pa-transfer-undo.XXXXXX")" || { printf "REFUSED\\tRECOVERY PATCH TEMPFILE FAILED\\n"; exit 113; }',
-                '    trap \'rm -f "$patch"\' EXIT INT TERM',
+                '    partial_staged=""',
+                '    partial_worktree=""',
+                '    cleanup_transfer_undo() { rm -f "$patch"; [ -z "$partial_staged" ] || rm -f "$partial_staged"; [ -z "$partial_worktree" ] || rm -f "$partial_worktree"; }',
+                '    trap cleanup_transfer_undo EXIT INT TERM',
                 '    printf "%s" "$payload" | base64 -d >"$patch" 2>/dev/null || { printf "REFUSED\\tRECOVERY PATCH DECODE FAILED\\n"; exit 114; }',
                 '    actual_fingerprint="$(sha256sum "$patch" | awk "{print \\$1}")"',
                 '    [ "$actual_fingerprint" = "$expected_fingerprint" ] || { printf "REFUSED\\tRECOVERY PATCH FINGERPRINT MISMATCH\\n"; exit 115; }',
+                '    if [ "$layer" = "partial" ]; then',
+                '      partial_staged="$(mktemp "${TMPDIR:-/tmp}/pa-transfer-undo-staged.XXXXXX")" || { printf "REFUSED\\tPARTIAL STAGED RECOVERY TEMPFILE FAILED\\n"; exit 116; }',
+                '      partial_worktree="$(mktemp "${TMPDIR:-/tmp}/pa-transfer-undo-worktree.XXXXXX")" || { printf "REFUSED\\tPARTIAL WORKTREE RECOVERY TEMPFILE FAILED\\n"; exit 117; }',
+                '      staged64="$(sed -n "s/^STAGED64$(printf \'\\t\')//p" "$patch" | head -n1)"',
+                '      worktree64="$(sed -n "s/^WORKTREE64$(printf \'\\t\')//p" "$patch" | head -n1)"',
+                '      [ -n "$staged64" ] && [ -n "$worktree64" ] || { printf "REFUSED\\tPARTIAL RECOVERY BUNDLE IS INCOMPLETE\\n"; exit 118; }',
+                '      printf "%s" "$staged64" | base64 -d >"$partial_staged" 2>/dev/null || { printf "REFUSED\\tPARTIAL STAGED RECOVERY DECODE FAILED\\n"; exit 119; }',
+                '      printf "%s" "$worktree64" | base64 -d >"$partial_worktree" 2>/dev/null || { printf "REFUSED\\tPARTIAL WORKTREE RECOVERY DECODE FAILED\\n"; exit 120; }',
+                '      [ -s "$partial_staged" ] && [ -s "$partial_worktree" ] || { printf "REFUSED\\tPARTIAL RECOVERY PATCH IS EMPTY\\n"; exit 121; }',
+                '    fi',
                 '    if [ "$layer" = "staged" ]; then',
                 '      git -C "$destination" apply -R --check --index --binary --whitespace=nowarn "$patch" >/dev/null 2>&1 || { printf "REFUSED\\tDESTINATION NO LONGER CONTAINS EXACT STAGED TRANSFER\\n"; exit 116; }',
                 '      if [ "$mode" = "move" ]; then',
@@ -1762,6 +1781,39 @@ Scope {
                 '      else',
                 '        git -C "$destination" apply -R --index --binary --whitespace=nowarn "$patch" || { printf "REFUSED\\tSTAGED COPY TRANSFER REMOVE FAILED\\n"; exit 121; }',
                 '        printf "OK\\tUNDID STAGED COPY TRANSFER // DESTINATION STAGED CONTENT REMOVED\\n"',
+                '      fi',
+                '    elif [ "$layer" = "partial" ]; then',
+                '      git -C "$destination" apply -R --check --binary --whitespace=nowarn "$partial_worktree" >/dev/null 2>&1 || { printf "REFUSED\\tDESTINATION NO LONGER CONTAINS EXACT PARTIAL WORKTREE TRANSFER\\n"; exit 122; }',
+                '      if [ "$mode" = "move" ]; then',
+                '        git -C "$source" apply --check --index --binary --whitespace=nowarn "$partial_staged" >/dev/null 2>&1 || { printf "REFUSED\\tSOURCE CAN NO LONGER RECEIVE PARTIAL STAGED CONTENT\\n"; exit 123; }',
+                '        git -C "$source" apply --index --binary --whitespace=nowarn "$partial_staged" || { printf "REFUSED\\tSOURCE PARTIAL STAGED RESTORE FAILED\\n"; exit 124; }',
+                '        if ! git -C "$source" apply --binary --whitespace=nowarn "$partial_worktree"; then',
+                '          git -C "$source" apply -R --index --binary --whitespace=nowarn "$partial_staged" >/dev/null 2>&1 || { printf "REFUSED\\tSOURCE PARTIAL WORKTREE RESTORE FAILED // STAGED ROLLBACK FAILED\\n"; exit 125; }',
+                '          printf "REFUSED\\tSOURCE PARTIAL WORKTREE RESTORE FAILED // STAGED ROLLED BACK\\n"',
+                '          exit 126',
+                '        fi',
+                '        if ! git -C "$destination" apply -R --binary --whitespace=nowarn "$partial_worktree"; then',
+                '          git -C "$source" apply -R --binary --whitespace=nowarn "$partial_worktree" >/dev/null 2>&1 || { printf "REFUSED\\tDESTINATION PARTIAL WORKTREE REMOVE FAILED // SOURCE WORKTREE ROLLBACK FAILED\\n"; exit 127; }',
+                '          git -C "$source" apply -R --index --binary --whitespace=nowarn "$partial_staged" >/dev/null 2>&1 || { printf "REFUSED\\tDESTINATION PARTIAL WORKTREE REMOVE FAILED // SOURCE STAGED ROLLBACK FAILED\\n"; exit 128; }',
+                '          printf "REFUSED\\tDESTINATION PARTIAL WORKTREE REMOVE FAILED // SOURCE ROLLED BACK\\n"',
+                '          exit 129',
+                '        fi',
+                '        if ! git -C "$destination" apply -R --index --binary --whitespace=nowarn "$partial_staged"; then',
+                '          git -C "$destination" apply --binary --whitespace=nowarn "$partial_worktree" >/dev/null 2>&1 || { printf "REFUSED\\tDESTINATION PARTIAL STAGED REMOVE FAILED // DESTINATION WORKTREE ROLLBACK FAILED\\n"; exit 130; }',
+                '          git -C "$source" apply -R --binary --whitespace=nowarn "$partial_worktree" >/dev/null 2>&1 || { printf "REFUSED\\tDESTINATION PARTIAL STAGED REMOVE FAILED // SOURCE WORKTREE ROLLBACK FAILED\\n"; exit 131; }',
+                '          git -C "$source" apply -R --index --binary --whitespace=nowarn "$partial_staged" >/dev/null 2>&1 || { printf "REFUSED\\tDESTINATION PARTIAL STAGED REMOVE FAILED // SOURCE STAGED ROLLBACK FAILED\\n"; exit 132; }',
+                '          printf "REFUSED\\tDESTINATION PARTIAL STAGED REMOVE FAILED // SOURCE + DESTINATION ROLLED BACK\\n"',
+                '          exit 133',
+                '        fi',
+                '        printf "OK\\tUNDID PARTIALLY STAGED MOVE TRANSFER // TWO LAYERS RESTORED TO SOURCE\\n"',
+                '      else',
+                '        git -C "$destination" apply -R --binary --whitespace=nowarn "$partial_worktree" || { printf "REFUSED\\tPARTIAL COPY WORKTREE REMOVE FAILED\\n"; exit 134; }',
+                '        if ! git -C "$destination" apply -R --index --binary --whitespace=nowarn "$partial_staged"; then',
+                '          git -C "$destination" apply --binary --whitespace=nowarn "$partial_worktree" >/dev/null 2>&1 || { printf "REFUSED\\tPARTIAL COPY STAGED REMOVE FAILED // WORKTREE ROLLBACK FAILED\\n"; exit 135; }',
+                '          printf "REFUSED\\tPARTIAL COPY STAGED REMOVE FAILED // WORKTREE ROLLED BACK\\n"',
+                '          exit 136',
+                '        fi',
+                '        printf "OK\\tUNDID PARTIALLY STAGED COPY TRANSFER // DESTINATION TWO-LAYER CONTENT REMOVED\\n"',
                 '      fi',
                 '    else',
                 '      git -C "$destination" apply -R --check --binary --whitespace=nowarn "$patch" >/dev/null 2>&1 || { printf "REFUSED\\tDESTINATION NO LONGER CONTAINS EXACT TRANSFER\\n"; exit 116; }',

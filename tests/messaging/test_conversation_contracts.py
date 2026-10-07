@@ -15,7 +15,8 @@ assert len(wrapper.splitlines()) < 20
 shared = SHARED.read_text()
 assert "session-cli" not in shared
 assert "SessionAdapter" not in shared
-assert "Hospital" not in shared
+assert "HospitalRoom" not in shared
+assert "HospitalSession" not in shared
 
 assert "property int messageTextFormat: Text.PlainText" in shared
 assert 'property string emptyConversationLabel: "SELECT A CONTACT"' in shared

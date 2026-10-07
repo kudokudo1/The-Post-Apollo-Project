@@ -101,3 +101,71 @@ for relative in GIT_MINI_BUTTONS:
     assert "RectangularShadow {" not in block, f"{relative} reintroduced local MiniButton halo"
 
 print("Git MiniButton ActionButton migration: PASS")
+
+
+GIT_ACTIONBUTTON_BATCH2 = {
+    "widgets/GitBranchesView.qml": (
+        "component BranchButton: ActionButton {",
+        "height: 30",
+        "available: enabledAction",
+        "selected: selectedAction",
+        "pressedFillColor:",
+        "destructive ? Colors.red : Colors.orange",
+        "selectedFillColor: Colors.dark",
+        "hoverBorderWidth: 2",
+        "selectedBorderWidth: 2",
+        "unavailableOpacity: 1.0",
+        "unavailableContentOpacity: 0.34",
+        "contentGlowEnabled: false",
+        "softGlowEnabled: false",
+    ),
+    "widgets/GitInteractiveRebaseView.qml": (
+        "component RebaseButton: ActionButton {",
+        "height: 30",
+        "accentColor: accent",
+        "available: enabledAction",
+        "selected: selectedAction",
+        "idleFillColor: Colors.dark",
+        "hoverFillColor: Colors.black",
+        "unavailableOpacity: 0.34",
+        "labelPixelSize: 9",
+        "contentPadding: 8",
+        "contentGlowEnabled: false",
+        "softGlowEnabled: false",
+    ),
+    "widgets/GitChangeTransferView.qml": (
+        "component TransferButton: ActionButton {",
+        "height: 32",
+        "accentColor: accent",
+        "available: enabledAction",
+        "selected: selectedAction",
+        "idleFillColor: Colors.dark",
+        "hoverFillColor: Colors.black",
+        "unavailableOpacity: 0.34",
+        "labelPixelSize: 9",
+        "contentPadding: 8",
+        "contentGlowEnabled: false",
+        "softGlowEnabled: false",
+    ),
+}
+
+for relative, needles in GIT_ACTIONBUTTON_BATCH2.items():
+    source = (ROOT / relative).read_text(encoding="utf-8")
+    for needle in needles:
+        require(source, needle, f"preserve Git ActionButton batch-2 values in {relative}")
+
+    component_name = (
+        "BranchButton"
+        if "GitBranchesView" in relative
+        else "RebaseButton"
+        if "GitInteractiveRebaseView" in relative
+        else "TransferButton"
+    )
+    block = source[source.index(f"component {component_name}: ActionButton {{"):]
+    next_component = block.find("\n    component ", 1)
+    if next_component >= 0:
+        block = block[:next_component]
+    assert "MouseArea {" not in block, f"{relative} reintroduced local {component_name} MouseArea"
+    assert "RectangularShadow {" not in block, f"{relative} reintroduced local {component_name} halo"
+
+print("Git ActionButton batch 2: PASS")

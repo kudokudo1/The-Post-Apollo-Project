@@ -148,51 +148,51 @@ Rectangle {
         }
     }
 
-    component RebaseButton: Rectangle {
+    component RebaseButton: ActionButton {
         id: button
 
-        property string label: ""
         property bool enabledAction: true
         property bool selectedAction: false
         property color accent: Colors.cyan
 
-        signal triggered()
-
         height: 30
-        opacity: enabledAction ? 1.0 : 0.34
-        color:
-            selectedAction || mouse.containsMouse
-            ? Colors.black
-            : Colors.dark
-        border.width: 1
-        border.color:
-            selectedAction || mouse.containsMouse
-            ? accent
-            : Colors.cyan
 
-        GohuText {
-            anchors.centerIn: parent
-            width: parent.width - 8
-            horizontalAlignment: Text.AlignHCenter
-            text: button.label
-            font.pixelSize: 9
-            color: button.accent
-            elide: Text.ElideRight
-        }
+        accentColor: accent
+        available: enabledAction
+        interactive: enabledAction
+        selected: selectedAction
+        acceptedButtons: Qt.LeftButton
 
-        MouseArea {
-            id: mouse
+        idleFillColor: Colors.dark
+        hoverFillColor: Colors.black
+        pressedFillColor: Colors.black
+        selectedFillColor: Colors.black
 
-            anchors.fill: parent
-            enabled: button.enabledAction
-            hoverEnabled: true
-            cursorShape:
-                enabled
-                ? Qt.PointingHandCursor
-                : Qt.ArrowCursor
+        idleForegroundColor: accent
+        hoverForegroundColor: accent
+        pressedForegroundColor: accent
+        selectedForegroundColor: accent
 
-            onClicked: button.triggered()
-        }
+        idleBorderColor: Colors.cyan
+        hoverBorderColor: accent
+        pressedBorderColor: accent
+        selectedBorderColor: accent
+
+        idleBorderWidth: 1
+        hoverBorderWidth: 1
+        pressedBorderWidth: 1
+        selectedBorderWidth: 1
+
+        unavailableOpacity: 0.34
+
+        labelPixelSize: 9
+        labelHorizontalAlignment: Text.AlignHCenter
+        labelElide: Text.ElideRight
+        contentPadding: 8
+
+        contentGlowEnabled: false
+        softGlowEnabled: false
+        wideGlowEnabled: false
     }
 
     Column {

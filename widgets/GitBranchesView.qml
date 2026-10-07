@@ -1339,63 +1339,60 @@ Item {
         return "RESTACK";
     }
 
-    component BranchButton: Rectangle {
+    component BranchButton: ActionButton {
         id: button
 
-        property string label: ""
+        // Lossless adapter for the historical Git branch action grammar.
         property bool enabledAction: true
-        property bool destructive: false
         property bool selectedAction: false
-        signal triggered()
 
         height: 30
-        color:
-            !enabledAction
-            ? Colors.black
-            : mouse.pressed
-            ? destructive ? Colors.red : Colors.orange
-            : selectedAction
-            ? Colors.dark
-            : Colors.black
 
-        border.width:
-            enabledAction && (mouse.containsMouse || selectedAction)
-            ? 2
-            : 1
+        available: enabledAction
+        interactive: enabledAction
+        selected: selectedAction
+        acceptedButtons: Qt.LeftButton
 
-        border.color:
-            !enabledAction
-            ? Colors.cyan
-            : destructive
-            ? Colors.red
-            : selectedAction
-            ? Colors.magenta
-            : mouse.containsMouse
-            ? Colors.orange
-            : Colors.cyan
+        idleFillColor: Colors.black
+        hoverFillColor: Colors.black
+        pressedFillColor:
+            destructive ? Colors.red : Colors.orange
+        selectedFillColor: Colors.dark
+
+        idleForegroundColor:
+            destructive ? Colors.red : Colors.cyan
+        hoverForegroundColor: idleForegroundColor
+        pressedForegroundColor: Colors.black
+        selectedForegroundColor:
+            destructive ? Colors.red : Colors.magenta
+
+        idleBorderColor: Colors.cyan
+        hoverBorderColor: Colors.orange
+        pressedBorderColor:
+            destructive ? Colors.red : Colors.orange
+        selectedBorderColor:
+            destructive ? Colors.red : Colors.magenta
+
+        idleBorderWidth: 1
+        hoverBorderWidth: 2
+        pressedBorderWidth: 2
+        selectedBorderWidth: 2
+
+        // BranchButton historically keeps its shell fully visible when
+        // unavailable and only fades its content to 0.34.
+        unavailableOpacity: 1.0
+        unavailableContentOpacity: 0.34
+
+        contentGlowEnabled: false
+        softGlowEnabled: false
+        wideGlowEnabled: false
+        showLabel: false
 
         GohuText {
             anchors.centerIn: parent
             text: button.label
             font.pixelSize: 10
-            color:
-                mouse.pressed
-                ? Colors.black
-                : button.destructive
-                ? Colors.red
-                : button.selectedAction
-                ? Colors.magenta
-                : Colors.cyan
-            opacity: button.enabledAction ? 1.0 : 0.34
-        }
-
-        MouseArea {
-            id: mouse
-            anchors.fill: parent
-            enabled: button.enabledAction
-            hoverEnabled: true
-            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-            onClicked: button.triggered()
+            color: button.foregroundColor
         }
     }
 

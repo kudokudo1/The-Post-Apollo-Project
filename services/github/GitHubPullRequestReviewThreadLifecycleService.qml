@@ -18,7 +18,7 @@ Scope {
     property string replyBody: ""
     property var preflightThread: ({})
     property int preflightCommentCount: 0
-    property string createdReplyId: ""
+    property string createdReplyNodeId: ""
 
     property bool mutationSucceeded: false
     property bool evidenceVerified: false
@@ -174,7 +174,7 @@ Scope {
         replyBody = String(body || "");
         preflightThread = ({});
         preflightCommentCount = 0;
-        createdReplyId = "";
+        createdReplyNodeId = "";
         mutationSucceeded = false;
         evidenceVerified = false;
         evidence = ({});
@@ -404,14 +404,14 @@ Scope {
             : [];
 
         if (operation === "reply") {
-            if (!createdReplyId)
-                throw new Error("REPLY MUTATION DID NOT RETURN COMMENT ID");
+            if (!createdReplyNodeId)
+                throw new Error("REPLY MUTATION DID NOT RETURN COMMENT NODE ID");
 
             let found = false;
 
             for (let i = 0; i < comments.length; ++i) {
-                if (String((comments[i] || {}).fullDatabaseId || "")
-                        === createdReplyId) {
+                if (String((comments[i] || {}).id || "")
+                        === createdReplyNodeId) {
                     found = true;
                     break;
                 }
@@ -435,7 +435,7 @@ Scope {
             repository: repository,
             pullRequest: fresh.pullRequest,
             thread: thread,
-            createdReplyId: createdReplyId
+            createdReplyNodeId: createdReplyNodeId
         };
         evidenceVerified = true;
         busy = false;
@@ -518,11 +518,10 @@ Scope {
                 try {
                     const response =
                         JSON.parse(output || "{}");
-                    createdReplyId =
-                        normalizeCommentId(response.id);
+                    createdReplyNodeId = String(response.node_id || "");
 
-                    if (!createdReplyId)
-                        throw new Error("REPLY COMMENT ID MISSING");
+                    if (!createdReplyNodeId)
+                        throw new Error("REPLY COMMENT NODE ID MISSING");
                 } catch (replyError) {
                     mutationSucceeded = true;
                     finishUnverified(

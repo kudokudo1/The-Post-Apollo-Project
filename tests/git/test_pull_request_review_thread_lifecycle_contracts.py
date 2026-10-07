@@ -109,8 +109,10 @@ require(
 )
 
 # The mutation result is not trusted until the affected native thread is read
-# back. Replies verify the returned comment ID; state changes verify isResolved.
+# back. Replies verify the returned REST node_id against GraphQL comment.id;
+# state changes verify isResolved.
 for needle, label in (
+    ("REPLY MUTATION DID NOT RETURN COMMENT NODE ID", "reply node identity"),
     ("REPLY NOT VISIBLE AFTER MUTATION", "reply readback"),
     ("THREAD COMMENT COUNT DID NOT ADVANCE", "reply count readback"),
     ("RESOLVE NOT VISIBLE AFTER MUTATION", "resolve readback"),
@@ -119,6 +121,16 @@ for needle, label in (
 ):
     require(service, needle, label)
 
+require(
+    service,
+    "response.node_id",
+    "reply verification must use stable REST node_id",
+)
+require(
+    service,
+    "createdReplyNodeId",
+    "reply node identity must be first-class",
+)
 require(
     service,
     "signal threadChanged(",

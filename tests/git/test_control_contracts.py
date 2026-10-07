@@ -221,8 +221,18 @@ require(
 )
 require(
     "services/git/GitOperationJournalService.qml",
-    'status === "RUNNING"\n                    ? "INTERRUPTED"',
-    "unfinished operations must become interrupted after restart",
+    "const interrupted =",
+    "journal reload must classify interrupted ordinary mutations",
+)
+require(
+    "services/git/GitOperationJournalService.qml",
+    'status === "RUNNING"\n                && !durableRunning',
+    "ordinary RUNNING operations must still become interrupted after restart",
+)
+require(
+    "services/git/GitOperationJournalService.qml",
+    "Boolean(metadata.durableSession)",
+    "explicit durable sessions may remain RUNNING across UI restart",
 )
 require(
     "services/git/GitOperationJournalService.qml",

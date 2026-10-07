@@ -69,7 +69,8 @@ Scope {
             "reword",
             "squash",
             "fixup",
-            "drop"
+            "drop",
+            "edit"
         ].indexOf(String(value || "").toLowerCase()) >= 0;
     }
 
@@ -413,6 +414,16 @@ Scope {
         return true;
     }
 
+    function requiresPersistentSession() {
+        for (let i = 0; i < plan.length; ++i) {
+            if (String((plan[i] || {}).action || "").toLowerCase()
+                    === "edit")
+                return true;
+        }
+
+        return false;
+    }
+
     function planStillArmed() {
         return armed
             && armedBaseSha === String(baseSha || "")
@@ -436,6 +447,13 @@ Scope {
     function executeArmed() {
         if (previewBusy || executionBusy || !planStillArmed())
             return false;
+
+        if (requiresPersistentSession()) {
+            lastError =
+                "EDIT REQUIRES THE PERSISTENT REBASE SESSION ENGINE";
+            state = "REBASE // SESSION REQUIRED";
+            return false;
+        }
 
         if ((operationJournal && !snapshotService)
                 || (snapshotService && !operationJournal)) {

@@ -281,12 +281,8 @@ PanelWindow {
         readonly property color normalStateColor: active ? activeColor : Colors.cyan
 
         readonly property color stateColor: {
-            if (danger) {
-                if (pressed || hovered)
-                    return Colors.red;
-
-                return Colors.cyan;
-            }
+            if (danger)
+                return Colors.red;
 
             if (pressed)
                 return Colors.magenta;

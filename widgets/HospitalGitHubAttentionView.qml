@@ -10,12 +10,7 @@ Rectangle {
     property string stateFilter: "ALL"
     property int selectedIndex: -1
 
-    readonly property var visibleItems:
-        !attentionProvider
-        ? []
-        : stateFilter === "ALL"
-        ? attentionProvider.items
-        : attentionProvider.itemsForState(stateFilter)
+    readonly property var visibleItems: root.triageRows()
 
     readonly property var selectedItem:
         selectedIndex >= 0
@@ -30,6 +25,154 @@ Rectangle {
     color: Colors.dark
     border.width: 1
     border.color: Colors.red
+
+    function responsibilityFor(itemValue) {
+        const item = itemValue || {};
+
+        if (!responsibilityService)
+            return null;
+
+        return responsibilityService.contextFor(
+            String(item.repository || ""),
+            String(item.headRefName || "")
+        );
+    }
+
+    function attentionStatesFor(itemValue) {
+        const item = itemValue || {};
+        return Array.isArray(item.attentionStates)
+            ? item.attentionStates : [];
+    }
+
+    function filterMatches(itemValue) {
+        const item = itemValue || {};
+        const states = attentionStatesFor(item);
+        const filter = String(stateFilter || "ALL").toUpperCase();
+
+        if (filter === "ALL")
+            return true;
+        if (filter === "REVIEW")
+            return !!item.needsMyReview
+                || states.indexOf("NEEDS_REVIEW") >= 0;
+        if (filter === "OWNED") {
+            const context = responsibilityFor(item);
+            return !!context
+                && String(context.confidence || "") !== "UNMAPPED";
+        }
+        if (filter === "UNMAPPED") {
+            const context = responsibilityFor(item);
+            return !context
+                || String(context.confidence || "") === "UNMAPPED";
+        }
+
+        return states.indexOf(filter) >= 0
+            || String(item.primaryState || "") === filter;
+    }
+
+    function triageScore(itemValue) {
+        const item = itemValue || {};
+        const states = attentionStatesFor(item);
+        let score = 0;
+
+        if (states.indexOf("NEEDS_ME") >= 0)
+            score += 120;
+        if (states.indexOf("FAILED") >= 0)
+            score += 105;
+        if (states.indexOf("CHANGES_REQUESTED") >= 0)
+            score += 100;
+        if (states.indexOf("BLOCKED") >= 0)
+            score += 90;
+        if (states.indexOf("NEEDS_REVIEW") >= 0)
+            score += 82;
+        if (states.indexOf("READY") >= 0)
+            score += 72;
+        if (states.indexOf("PENDING_CHECKS") >= 0)
+            score += 50;
+        if (states.indexOf("WAITING_ON_REVIEWER") >= 0)
+            score += 42;
+        if (states.indexOf("WAITING") >= 0)
+            score += 35;
+
+        const context = responsibilityFor(item);
+        if (context) {
+            const confidence = String(context.confidence || "");
+            if (confidence === "EXACT")
+                score += 18;
+            else if (confidence === "STRONG")
+                score += 12;
+            else if (confidence !== "UNMAPPED")
+                score += 6;
+
+            if (String(context.roomTeam || "")
+                    === String(responsibilityService.currentRoomId || ""))
+                score += 16;
+        }
+
+        return score;
+    }
+
+    function triageReason(itemValue) {
+        const item = itemValue || {};
+        const states = attentionStatesFor(item);
+        const reasons = [];
+
+        for (const state of [
+            "NEEDS_ME",
+            "FAILED",
+            "CHANGES_REQUESTED",
+            "BLOCKED",
+            "NEEDS_REVIEW",
+            "READY",
+            "PENDING_CHECKS",
+            "WAITING_ON_REVIEWER",
+            "WAITING"
+        ]) {
+            if (states.indexOf(state) >= 0)
+                reasons.push(state.replace(/_/g, " "));
+        }
+
+        const context = responsibilityFor(item);
+        if (context
+                && String(context.confidence || "") !== "UNMAPPED") {
+            reasons.push(
+                "OWNER " + String(context.ownerLabel || "MAPPED")
+            );
+        } else {
+            reasons.push("OWNER UNMAPPED");
+        }
+
+        return reasons.join(" // ");
+    }
+
+    function triageRows() {
+        if (!attentionProvider)
+            return [];
+
+        const source =
+            Array.isArray(attentionProvider.items)
+            ? attentionProvider.items.slice()
+            : [];
+        const filtered = source.filter(function(item) {
+            return root.filterMatches(item);
+        });
+
+        filtered.sort(function(a, b) {
+            const scoreDiff =
+                root.triageScore(b) - root.triageScore(a);
+            if (scoreDiff !== 0)
+                return scoreDiff;
+
+            const updatedA = Date.parse(String((a || {}).updatedAt || "")) || 0;
+            const updatedB = Date.parse(String((b || {}).updatedAt || "")) || 0;
+            if (updatedA !== updatedB)
+                return updatedB - updatedA;
+
+            return Number((a || {}).number || 0)
+                - Number((b || {}).number || 0);
+        });
+
+        return filtered;
+    }
 
     function stateColor(value) {
         const state = String(value || "").toUpperCase();
@@ -185,12 +328,22 @@ Rectangle {
             spacing: 5
 
             Repeater {
-                model: ["ALL", "NEEDS_ME", "FAILED", "BLOCKED", "WAITING", "READY"]
+                model: [
+                    "ALL",
+                    "NEEDS_ME",
+                    "REVIEW",
+                    "FAILED",
+                    "BLOCKED",
+                    "WAITING",
+                    "READY",
+                    "OWNED",
+                    "UNMAPPED"
+                ]
 
                 delegate: AttnButton {
                     required property string modelData
 
-                    width: (parent.width - 25) / 6
+                    width: (parent.width - 40) / 9
                     label: modelData.replace("_", " ")
                     selectedAction: root.stateFilter === modelData
                     accent: root.stateColor(modelData)
@@ -246,7 +399,7 @@ Rectangle {
                 required property var modelData
 
                 width: ListView.view.width
-                height: 104
+                height: 118
                 color: Colors.black
                 border.width: 1
                 border.color:
@@ -281,6 +434,18 @@ Rectangle {
                             text: String(modelData.title || "UNTITLED")
                             font.pixelSize: 10
                             color: Colors.white
+                            elide: Text.ElideRight
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text:
+                                "TRIAGE "
+                                + String(root.triageScore(modelData))
+                                + " // "
+                                + root.triageReason(modelData)
+                            font.pixelSize: 8
+                            color: Colors.magenta
                             elide: Text.ElideRight
                         }
 

@@ -5231,9 +5231,13 @@ PanelWindow {
                                                                                     root.unregisterGitKeyboardControl(operationDial)
 
                                                                                 labelText: "OPERATION"
-                                                                                options: ["smoke", "shell-check"]
-                                                                                displayOptions: ["SMOKE", "SHELL"]
-                                                                                currentIndex: root.factoryTemplate === "shell-check" ? 1 : 0
+                                                                                options: ["smoke", "shell-check", "script-test"]
+                                                                                displayOptions: ["SMOKE", "SHELL", "SCRIPT"]
+                                                                                currentIndex: root.factoryTemplate === "shell-check"
+                                                                                              ? 1
+                                                                                              : root.factoryTemplate === "script-test"
+                                                                                                ? 2
+                                                                                                : 0
                                                                                 readoutText: root.factoryTemplate.toUpperCase()
 
                                                                                 onSelectionRequested: function(index, value) {
@@ -5363,7 +5367,9 @@ PanelWindow {
                                                                     spacing: 8
 
                                                                     Rectangle {
-                                                                        width: parent.width - 348
+                                                                        width: root.factoryTemplate === "script-test"
+                                                                               ? (parent.width - 356) / 2
+                                                                               : parent.width - 348
                                                                         height: 34
                                                                         color: Colors.black
                                                                         border.width: 1
@@ -5425,6 +5431,71 @@ PanelWindow {
                                                                         }
                                                                     }
 
+                                                                    Rectangle {
+                                                                        visible: root.factoryTemplate === "script-test"
+                                                                        width: (parent.width - 356) / 2
+                                                                        height: 34
+                                                                        color: Colors.black
+                                                                        border.width: 1
+                                                                        border.color: factoryScriptInput.activeFocus ? Colors.magenta : Colors.cyan
+
+                                                                        GohuText {
+                                                                            anchors {
+                                                                                left: parent.left
+                                                                                verticalCenter: parent.verticalCenter
+                                                                                leftMargin: 8
+                                                                            }
+
+                                                                            visible: factoryScriptInput.text.length === 0
+                                                                                     && !factoryScriptInput.activeFocus
+                                                                            text: "SCRIPT PATH // tests/test-*.sh"
+                                                                            font.pixelSize: 9
+                                                                            color: Colors.white
+                                                                            opacity: 0.45
+                                                                        }
+
+                                                                        TextInput {
+                                                                            id: factoryScriptInput
+
+                                                                            anchors {
+                                                                                fill: parent
+                                                                                margins: 6
+                                                                            }
+
+                                                                            activeFocusOnPress: true
+                                                                            selectByMouse: true
+                                                                            verticalAlignment: TextInput.AlignVCenter
+                                                                            clip: true
+                                                                            font.family: "GohuFont 11 Nerd Font Mono"
+                                                                            font.pixelSize: 10
+                                                                            color: Colors.white
+                                                                            selectionColor: Colors.magenta
+                                                                            selectedTextColor: Colors.black
+
+                                                                            onTextChanged: githubService.clearFactoryResult()
+
+                                                                            onAccepted: {
+                                                                                focus = false;
+                                                                                root.activeTextEditor = null;
+                                                                                root.restoreGitKeyboardFocus(false);
+                                                                            }
+
+                                                                            Keys.onEscapePressed: function(event) {
+                                                                                focus = false;
+                                                                                root.activeTextEditor = null;
+                                                                                root.restoreGitKeyboardFocus(false);
+                                                                                event.accepted = true;
+                                                                            }
+
+                                                                            onActiveFocusChanged: {
+                                                                                if (activeFocus)
+                                                                                    root.activeTextEditor = factoryScriptInput;
+                                                                                else if (root.activeTextEditor === factoryScriptInput)
+                                                                                    root.activeTextEditor = null;
+                                                                            }
+                                                                        }
+                                                                    }
+
                                                                     ActionButton {
                                                                         width: 148
                                                                         height: 34
@@ -5434,10 +5505,17 @@ PanelWindow {
                                                                         enabledAction: githubService.available
                                                                                        && !githubService.factoryBusy
                                                                                        && factoryNameInput.text.trim().length > 0
+                                                                                       && (
+                                                                                           root.factoryTemplate !== "script-test"
+                                                                                           || factoryScriptInput.text.trim().length > 0
+                                                                                       )
                                                                         onTriggered: githubService.previewWorkflow(
                                                                             root.factoryTemplate,
                                                                             factoryNameInput.text.trim(),
-                                                                            root.factoryTrigger
+                                                                            root.factoryTrigger,
+                                                                            root.factoryTemplate === "script-test"
+                                                                            ? factoryScriptInput.text.trim()
+                                                                            : ""
                                                                         )
                                                                     }
 
@@ -5470,10 +5548,18 @@ PanelWindow {
                                                                                        && githubService.factoryLastTemplate === root.factoryTemplate
                                                                                        && githubService.factoryLastTrigger === root.factoryTrigger
                                                                                        && githubService.factoryLastSlug === factoryNameInput.text.trim()
+                                                                                       && githubService.factoryLastScriptPath === (
+                                                                                           root.factoryTemplate === "script-test"
+                                                                                           ? factoryScriptInput.text.trim()
+                                                                                           : ""
+                                                                                       )
                                                                         onTriggered: githubService.installWorkflow(
                                                                             root.factoryTemplate,
                                                                             factoryNameInput.text.trim(),
-                                                                            root.factoryTrigger
+                                                                            root.factoryTrigger,
+                                                                            root.factoryTemplate === "script-test"
+                                                                            ? factoryScriptInput.text.trim()
+                                                                            : ""
                                                                         )
                                                                     }
                                                                 }

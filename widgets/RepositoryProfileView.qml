@@ -1205,9 +1205,13 @@ Item {
                             ManagerButton {
                                 width: 116
                                 height: 30
-                                label: "REVIEW"
+                                label:
+                                    root.profileService.reviewBusy
+                                    ? "READING"
+                                    : "REVIEW"
                                 enabledAction:
                                     !root.profileService.busy
+                                    && !root.profileService.reviewBusy
                                     && root.profileStore.queueCount > 0
                                     && root.queueMissingCount() === 0
 
@@ -1224,10 +1228,13 @@ Item {
                                 label:
                                     root.profileService.busy
                                     ? "APPLYING"
+                                    : root.profileService.reviewBusy
+                                    ? "WAIT FOR REVIEW"
                                     : "APPLY BATCH"
                                 primaryBlue: true
                                 enabledAction:
                                     !root.profileService.busy
+                                    && !root.profileService.reviewBusy
                                     && root.profileService.reviewReady
 
                                 onTriggered:
@@ -1255,8 +1262,12 @@ Item {
                                           )
                                         + " // REMOVE OR REFRESH"
                                       )
+                                    : root.profileService.reviewBusy
+                                    ? "READING CURRENT GITHUB STATE"
                                     : root.profileService.reviewReady
-                                    ? "REVIEWED // ARMED"
+                                    ? "PREFLIGHT CLEAN // ARMED"
+                                    : root.profileService.lastError
+                                    ? "PREFLIGHT / APPLY ERROR"
                                     : (
                                         String(
                                             root.profileService
@@ -1273,8 +1284,12 @@ Item {
                                 color:
                                     root.queueMissingCount() > 0
                                     ? Colors.red
+                                    : root.profileService.reviewBusy
+                                    ? Colors.cyan
                                     : root.profileService.reviewReady
                                     ? Colors.orange
+                                    : root.profileService.lastError
+                                    ? Colors.red
                                     : root.profileService
                                           .batchFailureCount > 0
                                     ? Colors.red
@@ -1303,7 +1318,8 @@ Item {
 
                                     width: parent.width
                                     text:
-                                        root.profileService.reviewReady
+                                        root.profileService.reviewBusy
+                                        || root.profileService.reviewReady
                                         ? root.profileService.reviewText
                                         : root.profileService.resultText
                                           + (

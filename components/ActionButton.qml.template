@@ -1,0 +1,35 @@
+import QtQuick
+import "../components"
+
+// Thin composition example only.
+// ActionButton.qml owns the reusable action state machine and visual shell.
+ActionButton {
+    id: action
+
+    width: 112
+    height: 30
+
+    label: "ACTION"
+    accentColor: Colors.cyan
+
+    // Availability is semantic and may fade as a whole...
+    available: true
+    unavailableOpacity: 0.34
+
+    // ...or use layer-specific fading instead:
+    // unavailableOpacity: 1.0
+    // unavailableFillOpacity: 0.05
+    // unavailableBorderOpacity: 0.42
+    // unavailableContentOpacity: 0.44
+    // unavailableContentGlowOpacity: 0.12
+    // unavailableSoftGlowOpacity: 0.06
+
+    // Selection is supplied by the owning keyboard/mode controller.
+    selected: false
+    keyboardSelected: false
+    suppressHover: false
+
+    onTriggered: {
+        // Run the action.
+    }
+}

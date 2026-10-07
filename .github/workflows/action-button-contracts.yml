@@ -1,0 +1,35 @@
+name: Action button contracts
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "components/ActionButton.qml"
+      - "components/ActionButton.qml.template"
+      - "components/qmldir"
+      - "tests/components/test_action_button_contracts.py"
+      - ".github/workflows/action-button-contracts.yml"
+  pull_request:
+    paths:
+      - "components/ActionButton.qml"
+      - "components/ActionButton.qml.template"
+      - "components/qmldir"
+      - "tests/components/test_action_button_contracts.py"
+      - ".github/workflows/action-button-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    name: Action button contracts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate reusable action-button contracts
+        run: python3 tests/components/test_action_button_contracts.py

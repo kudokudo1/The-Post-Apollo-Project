@@ -24,6 +24,7 @@ for needle in (
 assert "SafeDropShadow 1.0 SafeDropShadow.qml" in qmldir
 
 SURFACES = {
+    "components/ActionButton.qml": 1,
     "components/DockButton.qml": 1,
     "components/ConversationFeed.qml": 6,
     "components/NeonScrollBar.qml": 1,
@@ -73,3 +74,8 @@ scrollbar = (ROOT / "components" / "NeonScrollBar.qml").read_text(encoding="utf-
 assert "safeSource: handleLoader.item" in scrollbar
 assert "requestedVisible:" in scrollbar
 assert "root.dropHandleGlow" in scrollbar
+
+action_button = (ROOT / "components" / "ActionButton.qml").read_text(encoding="utf-8")
+assert "safeSource: actionButton.contentGlowSource" in action_button
+assert "readonly property point sourceOrigin:" in action_button
+assert "requestedVisible:" in action_button

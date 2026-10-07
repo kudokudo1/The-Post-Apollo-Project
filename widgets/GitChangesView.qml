@@ -55,6 +55,14 @@ Item {
             : ""
     }
 
+    GitContentRecoveryService {
+        id: contentRecoveryService
+        repositoryPath:
+            root.gitService
+            ? String(root.gitService.repoRoot || "")
+            : ""
+    }
+
     function fileTransferEligible() {
         const row = root.selectedFile || {};
 
@@ -2652,6 +2660,7 @@ Item {
 
         transferService: root.transferService
         branchWorkspaceService: root.branchWorkspaceService
+        contentRecoveryService: contentRecoveryService
         sourcePath:
             root.gitService
             ? String(root.gitService.repoRoot || "")
@@ -2678,6 +2687,7 @@ Item {
 
         lineTransferService: lineTransferService
         branchWorkspaceService: root.branchWorkspaceService
+        contentRecoveryService: contentRecoveryService
         sourcePath:
             root.gitService
             ? String(root.gitService.repoRoot || "")

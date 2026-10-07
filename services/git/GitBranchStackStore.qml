@@ -168,6 +168,61 @@ Scope {
         return setParent(branch, "");
     }
 
+    function renameBranch(oldName, newName) {
+        const repo = String(repositoryKey || "").trim();
+        const oldBranch = String(oldName || "").trim();
+        const newBranch = String(newName || "").trim();
+
+        if (!repo || !oldBranch || !newBranch || oldBranch === newBranch)
+            return false;
+
+        const next = [];
+        const seen = {};
+
+        for (let i = 0; i < relations.length; ++i) {
+            const row = relations[i] || {};
+            const sameRepo =
+                String(row.repository || "") === repo;
+            let branch = String(row.branch || "");
+            let parent = String(row.parent || "");
+
+            if (sameRepo && branch === oldBranch)
+                branch = newBranch;
+
+            if (sameRepo && parent === oldBranch)
+                parent = newBranch;
+
+            if (sameRepo && branch === parent)
+                parent = "";
+
+            const key =
+                String(row.repository || "")
+                + "\t"
+                + branch;
+
+            if (seen[key])
+                continue;
+
+            seen[key] = true;
+
+            if (parent) {
+                next.push({
+                    repository: String(row.repository || ""),
+                    branch: branch,
+                    parent: parent
+                });
+            }
+        }
+
+        relations = next;
+
+        if (trunkBranch === oldBranch)
+            trunkBranch = newBranch;
+
+        persist();
+        return true;
+    }
+
     function removeBranch(branch) {
         const repo = String(repositoryKey || "").trim();
         const target = String(branch || "").trim();

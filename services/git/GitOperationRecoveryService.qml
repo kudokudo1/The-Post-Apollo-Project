@@ -1242,7 +1242,7 @@ Scope {
                 '    previous_stash_sha="$d"',
                 '    expected_index_tree="$e"',
                 '    expected_worktree_hash="$f"',
-                '    IFS=$"\\t" read -r expected_untracked_hash restore_index_tree restore_worktree_hash restore_untracked_hash <<<"$g"',
+                '    IFS="$(printf "\\t")" read -r expected_untracked_hash restore_index_tree restore_worktree_hash restore_untracked_hash <<<"$g"',
                 '    ref="refs/heads/$branch"',
                 '    head_ref="$(git -C "$repo" symbolic-ref -q HEAD 2>/dev/null || true)"',
                 '    [ "$head_ref" = "$ref" ] || { printf "REFUSED\\tSTASH BRANCH IS NOT CURRENTLY CHECKED OUT\\n"; exit 150; }',

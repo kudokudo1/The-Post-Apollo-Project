@@ -99,6 +99,7 @@ Scope {
         const branch = String(room.branch || "").trim();
         const bedPath = String(room.bedPath || "").trim();
         const roomDoctorId = String(room.doctorId || "").trim();
+        const roomProviderId = String(room.providerId || "").trim();
         const assignmentId = String(room.assignmentId || "").trim();
 
         if (patientId) {
@@ -129,6 +130,11 @@ Scope {
         if (roomDoctorId) {
             args.push("--doctor-id");
             args.push(roomDoctorId);
+        }
+
+        if (roomProviderId) {
+            args.push("--provider-id");
+            args.push(roomProviderId);
         }
 
         if (assignmentId) {

@@ -15,7 +15,8 @@ Item {
     property string doctorId: ""
     property string providerId: ""
     property string assignmentId: ""
-    property string activeSessionId: ""
+
+    readonly property string activeSessionId: adapter.activeSessionId
 
     signal closeRequested()
 
@@ -60,7 +61,13 @@ Item {
                 || adapter.error)
             return "ERROR";
 
-        return root.activeSessionId ? "CONNECTED" : "ROOM CHAT";
+        if (adapter.creatingSession || adapter.sessionsLoading)
+            return "CONNECTING";
+
+        if (root.activeSessionId)
+            return "CONNECTED";
+
+        return root.providerId ? "READY TO CONNECT" : "ROOM CHAT";
     }
 
     function roomBinding() {
@@ -114,7 +121,9 @@ Item {
     HospitalRoomConversationAdapter {
         id: adapter
 
-        activeSessionId: root.activeSessionId
+        doctorId: root.doctorId
+        providerId: root.providerId
+        workingDirectory: root.bedPath
     }
 
     Timer {
@@ -136,6 +145,8 @@ Item {
         loading: adapter.messagesLoading
         error:
             adapter.bindError
+            || adapter.sessionError
+            || adapter.sessionsError
             || adapter.messagesError
             || (
                 root.roomId

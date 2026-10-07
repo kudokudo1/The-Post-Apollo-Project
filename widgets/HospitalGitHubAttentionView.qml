@@ -32,10 +32,7 @@ Rectangle {
         if (!responsibilityService)
             return null;
 
-        return responsibilityService.contextFor(
-            String(item.repository || ""),
-            String(item.headRefName || "")
-        );
+        return responsibilityService.contextForWorkItem(item);
     }
 
     function attentionStatesFor(itemValue) {
@@ -399,7 +396,7 @@ Rectangle {
                 required property var modelData
 
                 width: ListView.view.width
-                height: 118
+                height: 132
                 color: Colors.black
                 border.width: 1
                 border.color:
@@ -496,14 +493,10 @@ Rectangle {
                         }
 
                         GohuText {
+                            id: ownershipLine
                             width: parent.width
                             property var responsibility:
-                                root.responsibilityService
-                                ? root.responsibilityService.contextFor(
-                                    String(row.modelData.repository || ""),
-                                    String(row.modelData.headRefName || "")
-                                  )
-                                : null
+                                root.responsibilityFor(row.modelData)
                             text:
                                 !responsibility
                                 ? "OWNER // UNMAPPED"
@@ -534,6 +527,23 @@ Rectangle {
                                   && responsibility.confidence !== "UNMAPPED"
                                 ? Colors.blue
                                 : Colors.magenta
+                            elide: Text.ElideRight
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text:
+                                ownershipLine.responsibility
+                                && ownershipLine.responsibility.chain
+                                ? "CHAIN // "
+                                  + String(ownershipLine.responsibility.chain)
+                                : "CHAIN // NO DURABLE ROOM/SESSION EVIDENCE"
+                            font.pixelSize: 7
+                            color:
+                                ownershipLine.responsibility
+                                && ownershipLine.responsibility.blocker
+                                ? Colors.orange
+                                : Colors.cyan
                             elide: Text.ElideRight
                         }
                     }

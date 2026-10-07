@@ -14,7 +14,6 @@ DockButton {
     contentGlowSource: gitMark
 
     signal toggleRequested()
-    signal rightClicked()
 
     Row {
         id: gitMark
@@ -51,7 +50,4 @@ DockButton {
         dock.toggleRequested();
     }
 
-    onRightClicked: {
-        dock.rightClicked();
-    }
 }

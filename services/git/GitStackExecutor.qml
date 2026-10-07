@@ -15,6 +15,8 @@ Scope {
     required property var branchWorkspaceService
 
     property string repositoryPath: ""
+    property var operationJournal: null
+    property var snapshotService: null
 
     property bool armed: false
     property string armedFingerprint: ""
@@ -33,6 +35,13 @@ Scope {
     property int exitCode: -1
     property string stdoutText: ""
     property string stderrText: ""
+
+    property string pendingJournalId: ""
+    property string pendingSnapshotRequest: ""
+    property string snapshotPhase: ""
+    property var pendingExecutorArgs: []
+    property bool pendingExecutionSuccess: false
+    property string pendingExecutionDetail: ""
 
     signal executionFinished(bool success, var result)
 
@@ -157,6 +166,127 @@ Scope {
             + (stackPlanner.requiredCount === 1 ? "" : "S");
         armTimer.restart();
         return true;
+    }
+
+    function clearPendingExecution() {
+        pendingJournalId = "";
+        pendingSnapshotRequest = "";
+        snapshotPhase = "";
+        pendingExecutorArgs = [];
+        pendingExecutionSuccess = false;
+        pendingExecutionDetail = "";
+    }
+
+    function journalContext() {
+        const rows = requiredSteps(armedPlan);
+
+        return {
+            source: "GitStackExecutor",
+            startBranch: String(armedStartBranch || ""),
+            fingerprint: String(armedFingerprint || ""),
+            steps: rows.map(function(step) {
+                const row = step || {};
+
+                return {
+                    branch: String(row.branch || ""),
+                    parent: String(row.parent || ""),
+                    head: String(row.head || ""),
+                    parentHead: String(row.parentHead || ""),
+                    mergeBase: String(row.mergeBase || ""),
+                    status: String(row.status || "")
+                };
+            })
+        };
+    }
+
+    function failBeforeSnapshot(detail) {
+        const message =
+            "RESTACK BEFORE SNAPSHOT FAILED // "
+            + String(detail || "SNAPSHOT UNAVAILABLE");
+
+        running = false;
+        lastError = message;
+        stateText = "RESTACK // REFUSED";
+        disarm("SNAPSHOT FAILED");
+        clearPendingExecution();
+        executionFinished(false, lastResult);
+    }
+
+    function startPendingExecution() {
+        if (!running || !Array.isArray(pendingExecutorArgs)
+                || pendingExecutorArgs.length === 0)
+            return false;
+
+        stateText = "RESTACK // EXECUTING";
+        executorWatchdog.restart();
+        executorProcess.exec(pendingExecutorArgs);
+        return true;
+    }
+
+    function finalizeExecution(afterSnapshot, snapshotWarning) {
+        const warning = String(snapshotWarning || "");
+        const detail = String(pendingExecutionDetail || "");
+        const success = pendingExecutionSuccess;
+        const snapshot =
+            afterSnapshot
+            || {
+                snapshotVersion: 1,
+                repository: String(repositoryPath || ""),
+                capturedAt: new Date().toISOString(),
+                captureFailed: true,
+                recoveryClass: "EVIDENCE_ONLY",
+                recoveryReason:
+                    warning
+                    || "RESTACK AFTER SNAPSHOT UNAVAILABLE"
+            };
+
+        if (pendingJournalId && operationJournal) {
+            if (success)
+                operationJournal.completeOperation(
+                    pendingJournalId,
+                    snapshot,
+                    warning
+                    ? detail + " // " + warning
+                    : detail
+                );
+            else
+                operationJournal.failOperation(
+                    pendingJournalId,
+                    snapshot,
+                    warning
+                    ? detail + " // " + warning
+                    : detail
+                );
+        }
+
+        running = false;
+        executorWatchdog.stop();
+
+        if (!success) {
+            lastError =
+                detail
+                || "RESTACK FAILED";
+            if (warning)
+                lastError += " // " + warning;
+            stateText = "RESTACK // REFUSED";
+            disarm("EXECUTION FAILED");
+        } else {
+            stateText =
+                warning
+                ? "RESTACK // COMPLETE // SNAPSHOT WARNING"
+                : "RESTACK // COMPLETE";
+            lastError = warning;
+            disarm("COMPLETE");
+
+            if (branchWorkspaceService)
+                branchWorkspaceService.refresh();
+
+            if (stackPlanner)
+                stackPlanner.clear();
+        }
+
+        clearPendingExecution();
+        executionFinished(success, lastResult);
     }
 
     function executeArmed() {
@@ -327,8 +457,21 @@ Scope {
             args.push(String(step.status || ""));
         }
 
+        if ((operationJournal && !snapshotService)
+                || (snapshotService && !operationJournal)) {
+            lastError =
+                "RESTACK REFUSED // JOURNAL + SNAPSHOT SERVICES MUST BE PAIRED";
+            return false;
+        }
+
+        clearPendingExecution();
+        pendingExecutorArgs = args;
+
         running = true;
-        stateText = "RESTACK // EXECUTING";
+        stateText =
+            operationJournal && snapshotService
+            ? "RESTACK // SNAPSHOT BEFORE"
+            : "RESTACK // EXECUTING";
         lastError = "";
         lastResult = [];
 
@@ -340,8 +483,21 @@ Scope {
         stderrText = "";
 
         armTimer.stop();
-        executorWatchdog.restart();
-        executorProcess.exec(args);
+
+        if (!operationJournal && !snapshotService)
+            return startPendingExecution();
+
+        snapshotPhase = "BEFORE";
+        pendingSnapshotRequest = snapshotService.capture(
+            "STACK BEFORE // RESTACK",
+            journalContext()
+        );
+
+        if (!pendingSnapshotRequest) {
+            failBeforeSnapshot("SNAPSHOT SERVICE BUSY OR UNAVAILABLE");
+            return false;
+        }
+
         return true;
     }
 
@@ -393,37 +549,110 @@ Scope {
         if (!running || !stdoutSeen || !stderrSeen || !exitSeen)
             return;
 
-        running = false;
         executorWatchdog.stop();
-
         parseResult(stdoutText);
 
-        if (exitCode !== 0 || lastError) {
-            const detail = String(
+        pendingExecutionSuccess =
+            exitCode === 0
+            && !lastError;
+        pendingExecutionDetail =
+            pendingExecutionSuccess
+            ? (
+                lastResult.length > 0
+                ? String(lastResult.length) + " RESTACK RESULT ROWS"
+                : "RESTACK COMPLETE"
+              )
+            : String(
                 lastError
                 || stderrText
                 || stdoutText
                 || ("RESTACK EXIT " + exitCode)
-            ).trim();
+              ).trim();
 
-            lastError = detail || "RESTACK FAILED";
-            stateText = "RESTACK // REFUSED";
-            disarm("EXECUTION FAILED");
-            executionFinished(false, lastResult);
+        if (!operationJournal || !snapshotService) {
+            finalizeExecution(null, "");
             return;
         }
 
-        stateText = "RESTACK // COMPLETE";
-        lastError = "";
-        disarm("COMPLETE");
+        stateText = "RESTACK // SNAPSHOT AFTER";
+        snapshotPhase = "AFTER";
+        pendingSnapshotRequest = snapshotService.capture(
+            "STACK AFTER // RESTACK",
+            journalContext()
+        );
 
-        if (branchWorkspaceService)
-            branchWorkspaceService.refresh();
+        if (!pendingSnapshotRequest) {
+            finalizeExecution(
+                null,
+                "AFTER SNAPSHOT COULD NOT START"
+            );
+        }
+    }
 
-        if (stackPlanner)
-            stackPlanner.clear();
+    Connections {
+        target: root.snapshotService
+        enabled: root.snapshotService !== null
+        ignoreUnknownSignals: true
 
-        executionFinished(true, lastResult);
+        function onSnapshotReady(requestId, snapshot) {
+            if (String(requestId || "")
+                    !== String(root.pendingSnapshotRequest || ""))
+                return;
+
+            root.pendingSnapshotRequest = "";
+
+            if (root.snapshotPhase === "BEFORE") {
+                root.snapshotPhase = "";
+
+                root.pendingJournalId =
+                    root.operationJournal
+                    ? root.operationJournal.beginOperation(
+                        "STACK/RESTACK",
+                        snapshot,
+                        root.journalContext()
+                    )
+                    : "";
+
+                if (root.operationJournal
+                        && !root.pendingJournalId) {
+                    root.failBeforeSnapshot(
+                        "JOURNAL RECORD COULD NOT START"
+                    );
+                    return;
+                }
+
+                root.startPendingExecution();
+                return;
+            }
+
+            if (root.snapshotPhase === "AFTER") {
+                root.snapshotPhase = "";
+                root.finalizeExecution(snapshot, "");
+            }
+        }
+
+        function onSnapshotFailed(requestId, detail) {
+            if (String(requestId || "")
+                    !== String(root.pendingSnapshotRequest || ""))
+                return;
+
+            root.pendingSnapshotRequest = "";
+
+            if (root.snapshotPhase === "BEFORE") {
+                root.snapshotPhase = "";
+                root.failBeforeSnapshot(detail);
+                return;
+            }
+
+            if (root.snapshotPhase === "AFTER") {
+                root.snapshotPhase = "";
+                root.finalizeExecution(
+                    null,
+                    "AFTER SNAPSHOT FAILED // "
+                        + String(detail || "UNKNOWN ERROR")
+                );
+            }
+        }
     }
 
     Process {
@@ -472,11 +701,30 @@ Scope {
             if (!root.running)
                 return;
 
-            root.running = false;
-            root.lastError =
+            const detail =
                 "RESTACK EXECUTION TIMEOUT // VERIFY REPOSITORY STATE";
+
+            if (root.pendingJournalId && root.operationJournal) {
+                root.operationJournal.failOperation(
+                    root.pendingJournalId,
+                    {
+                        snapshotVersion: 1,
+                        repository: String(root.repositoryPath || ""),
+                        capturedAt: new Date().toISOString(),
+                        captureFailed: true,
+                        recoveryClass: "EVIDENCE_ONLY",
+                        recoveryReason:
+                            "RESTACK TIMEOUT // REPOSITORY STATE UNCERTAIN"
+                    },
+                    detail
+                );
+            }
+
+            root.running = false;
+            root.lastError = detail;
             root.stateText = "RESTACK // UNCERTAIN";
             root.disarm("TIMEOUT");
+            root.clearPendingExecution();
             root.executionFinished(false, root.lastResult);
         }
     }

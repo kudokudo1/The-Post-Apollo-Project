@@ -6,6 +6,7 @@ Rectangle {
 
     required property var foldService
     required property var splitService
+    required property var splitPatchService
     required property var absorbService
     property var historyService: null
     property var keyboardHost: null
@@ -138,6 +139,7 @@ Rectangle {
                 enabledAction:
                     !foldService.executionBusy
                     && !splitService.executionBusy
+                    && !splitPatchService.executionBusy
                     && !absorbService.executionBusy
                 onTriggered: root.mode = "fold"
             }
@@ -150,6 +152,7 @@ Rectangle {
                 enabledAction:
                     !foldService.executionBusy
                     && !splitService.executionBusy
+                    && !splitPatchService.executionBusy
                     && !absorbService.executionBusy
                 onTriggered: root.mode = "split"
             }
@@ -162,6 +165,7 @@ Rectangle {
                 enabledAction:
                     !foldService.executionBusy
                     && !splitService.executionBusy
+                    && !splitPatchService.executionBusy
                     && !absorbService.executionBusy
                 onTriggered: root.mode = "absorb"
             }
@@ -536,7 +540,7 @@ Rectangle {
         }
     }
 
-    GitHistorySplitView {
+    GitHistorySplitHubView {
         anchors {
             top: parent.top
             left: parent.left
@@ -551,7 +555,8 @@ Rectangle {
         visible: root.mode === "split"
         z: 1000
 
-        splitService: root.splitService
+        fileService: root.splitService
+        hunkService: root.splitPatchService
         historyService: root.historyService
         keyboardHost: root.keyboardHost
     }

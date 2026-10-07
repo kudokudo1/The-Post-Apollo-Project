@@ -44,6 +44,11 @@ require(
 )
 require(
     VIEW,
+    "required property var splitPatchService",
+    "Surgery surface must accept the hunk Split backend",
+)
+require(
+    VIEW,
     'label: "SPLIT"',
     "Split must be a live Surgery mode",
 )
@@ -54,10 +59,11 @@ require(
 )
 require_regex(
     VIEW,
-    r"GitHistorySplitView \{.*"
+    r"GitHistorySplitHubView \{.*"
     r'visible: root\.mode === "split".*'
-    r"splitService: root\.splitService",
-    "Surgery must host the Split panel without replacing Fold",
+    r"fileService: root\.splitService.*"
+    r"hunkService: root\.splitPatchService",
+    "Surgery must host the File/Hunk Split hub without replacing Fold",
 )
 require(
     VIEW,
@@ -149,6 +155,11 @@ require(
 )
 require(
     HISTORY,
+    "property var historySplitPatchService: null",
+    "HISTORY must accept the shared hunk Split service",
+)
+require(
+    HISTORY,
     "property var historyAbsorbService: null",
     "HISTORY must accept the shared Absorb service",
 )
@@ -158,6 +169,7 @@ require_regex(
     r'visible: root\.subMode === "surgery".*'
     r"foldService: root\.historyFoldService.*"
     r"splitService: root\.historySplitService.*"
+    r"splitPatchService: root\.historySplitPatchService.*"
     r"absorbService: root\.historyAbsorbService",
     "HISTORY must host Fold + Split + Absorb on the Surgery surface",
 )
@@ -180,6 +192,14 @@ require_regex(
 )
 require_regex(
     GITW,
+    r"GitHistorySplitPatchService \{.*"
+    r"id: historySplitPatchService.*"
+    r"operationJournal: operationJournalService.*"
+    r"snapshotService: repositorySnapshotService",
+    "GitW must host hunk Split with shared journal and snapshots",
+)
+require_regex(
+    GITW,
     r"GitHistoryAbsorbService \{.*"
     r"id: historyAbsorbService.*"
     r"operationJournal: operationJournalService.*"
@@ -191,6 +211,7 @@ require_regex(
     r"GitHistoryView \{.*"
     r"historyFoldService: historyFoldService.*"
     r"historySplitService: historySplitService.*"
+    r"historySplitPatchService: historySplitPatchService.*"
     r"historyAbsorbService: historyAbsorbService",
     "GitW must pass Fold + Split + Absorb into HISTORY",
 )

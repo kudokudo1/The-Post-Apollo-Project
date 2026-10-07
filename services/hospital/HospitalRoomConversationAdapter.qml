@@ -11,6 +11,18 @@ Scope {
 
     property string selectedConversationId: ""
     property string activeSessionId: ""
+    property string doctorId: ""
+    property string providerId: ""
+    property string workingDirectory: ""
+
+    property var roomSessions: []
+    property bool sessionsLoading: false
+    property string sessionsError: ""
+    property string sessionLookupRoomId: ""
+    property bool continueAfterSessionDiscovery: false
+    property string queuedSessionDiscoveryRoomId: ""
+    property bool queuedSessionContinue: false
+
     property var messages: []
     property bool messagesLoading: false
     property string messagesError: ""
@@ -19,6 +31,14 @@ Scope {
     property bool sending: false
     property string sendError: ""
     property int sendSuccessSerial: 0
+
+    property bool creatingSession: false
+    property string sessionError: ""
+    property var createdSessionResult: null
+    property string pendingTurnBody: ""
+    property string pendingTurnRoomId: ""
+    property string turnBody: ""
+    property var lastTurnResult: null
 
     property int messageLimit: 100
     property string operatorId: "operator"
@@ -31,6 +51,8 @@ Scope {
 
     signal messageSent
     signal roomBound(var room)
+    signal sessionResolved(string sessionId)
+    signal turnCompleted(var result)
 
     function pxArgs(args) {
         const suffix = Array.isArray(args) ? args : [];
@@ -76,7 +98,7 @@ Scope {
         const team = String(room.team || roomId).trim();
         const branch = String(room.branch || "").trim();
         const bedPath = String(room.bedPath || "").trim();
-        const doctorId = String(room.doctorId || "").trim();
+        const roomDoctorId = String(room.doctorId || "").trim();
         const assignmentId = String(room.assignmentId || "").trim();
 
         if (patientId) {
@@ -104,9 +126,9 @@ Scope {
             args.push(bedPath);
         }
 
-        if (doctorId) {
+        if (roomDoctorId) {
             args.push("--doctor-id");
-            args.push(doctorId);
+            args.push(roomDoctorId);
         }
 
         if (assignmentId) {
@@ -153,7 +175,9 @@ Scope {
 
         selectedConversationId = roomId;
         messages = [];
-        return refreshMessages();
+        refreshMessages();
+        discoverSession(roomId, false);
+        return true;
     }
 
     function refreshMessages() {
@@ -182,39 +206,170 @@ Scope {
         return true;
     }
 
+    function compatibleSession(rows) {
+        const source = Array.isArray(rows) ? rows : [];
+        const wantedProvider = String(providerId || "").trim();
+        const wantedDoctor = String(doctorId || "").trim();
+
+        for (let i = 0; i < source.length; ++i) {
+            const row = source[i] || {};
+            const status = String(row.status || "").toUpperCase();
+
+            if (status === "COMPLETE" || status === "FAILED")
+                continue;
+
+            if (wantedProvider
+                    && String(row.providerId || "") !== wantedProvider)
+                continue;
+
+            if (wantedDoctor
+                    && String(row.doctorId || "") !== wantedDoctor)
+                continue;
+
+            return row;
+        }
+
+        return null;
+    }
+
+    function discoverSession(roomIdValue, continueAfter) {
+        const roomId = String(roomIdValue || "").trim();
+
+        if (!roomId)
+            return false;
+
+        if (sessionsProcess.running || sessionsLoading) {
+            queuedSessionDiscoveryRoomId = roomId;
+            queuedSessionContinue =
+                queuedSessionContinue || !!continueAfter;
+            return false;
+        }
+
+        sessionsLoading = true;
+        sessionsError = "";
+        sessionLookupRoomId = roomId;
+        continueAfterSessionDiscovery = !!continueAfter;
+
+        sessionsProcess.exec(pxArgs([
+            "hospital",
+            "sessions",
+            "--room-id",
+            roomId,
+            "--json"
+        ]));
+        return true;
+    }
+
+    function runQueuedSessionDiscovery() {
+        const roomId = queuedSessionDiscoveryRoomId;
+        const shouldContinue = queuedSessionContinue;
+
+        queuedSessionDiscoveryRoomId = "";
+        queuedSessionContinue = false;
+
+        if (!roomId)
+            return;
+
+        Qt.callLater(function() {
+            adapter.discoverSession(roomId, shouldContinue);
+        });
+    }
+
+    function createSessionForPendingTurn() {
+        const roomId = String(pendingTurnRoomId || selectedConversationId || "").trim();
+        const provider = String(providerId || "").trim();
+        const doctor = String(doctorId || "").trim();
+        const cwd = String(workingDirectory || "").trim();
+
+        if (!roomId || !provider || !doctor || !cwd) {
+            sending = false;
+            sessionError =
+                "HOSPITAL DOCTOR SESSION // ROOM, DOCTOR, PROVIDER, AND BED REQUIRED";
+            sendError = sessionError;
+            pendingTurnBody = "";
+            pendingTurnRoomId = "";
+            return false;
+        }
+
+        if (sessionCreateProcess.running || creatingSession)
+            return false;
+
+        creatingSession = true;
+        sessionError = "";
+        createdSessionResult = null;
+
+        sessionCreateProcess.exec(pxArgs([
+            "agent",
+            "session-create",
+            "--room-id",
+            roomId,
+            "--doctor-id",
+            doctor,
+            "--provider-id",
+            provider,
+            "--working-directory",
+            cwd,
+            "--json"
+        ]));
+        return true;
+    }
+
+    function runPendingTurn() {
+        const sessionId = String(activeSessionId || "").trim();
+        const body = String(pendingTurnBody || "");
+        const cwd = String(workingDirectory || "").trim();
+
+        if (!sessionId || !body) {
+            sending = false;
+            sendError = "HOSPITAL DOCTOR TURN // SESSION OR MESSAGE MISSING";
+            return false;
+        }
+
+        if (turnProcess.running)
+            return false;
+
+        turnBody = body;
+        lastTurnResult = null;
+        sendError = "";
+
+        const args = [
+            "agent",
+            "turn",
+            sessionId,
+            "--prompt-json-stdin",
+            "--author-id",
+            String(operatorId || "operator"),
+            "--message-type",
+            "chat"
+        ];
+
+        if (cwd) {
+            args.push("--working-directory");
+            args.push(cwd);
+        }
+
+        args.push("--json");
+        turnProcess.exec(pxArgs(args));
+        return true;
+    }
+
     function sendMessage(conversationId, textValue) {
         const roomId = String(conversationId || "").trim();
         const body = String(textValue || "").trim();
 
-        if (!roomId || !body || sending || sendProcess.running)
+        if (!roomId || !body || sending || turnProcess.running)
             return false;
 
         sending = true;
         sendError = "";
+        sessionError = "";
+        pendingTurnRoomId = roomId;
+        pendingTurnBody = body;
 
-        const args = [
-            "hospital",
-            "message-append",
-            "--room-id",
-            roomId
-        ];
+        if (activeSessionId)
+            return runPendingTurn();
 
-        if (activeSessionId) {
-            args.push("--session-id");
-            args.push(String(activeSessionId));
-        }
-
-        args.push("--author-role");
-        args.push("operator");
-        args.push("--author-id");
-        args.push(String(operatorId || "operator"));
-        args.push("--direction");
-        args.push("outgoing");
-        args.push("--body");
-        args.push(body);
-        args.push("--json");
-
-        sendProcess.exec(pxArgs(args));
+        discoverSession(roomId, true);
         return true;
     }
 
@@ -223,6 +378,17 @@ Scope {
             refreshMessages();
         refresh();
     }
+
+    function resetResolvedSession() {
+        activeSessionId = "";
+        roomSessions = [];
+
+        if (selectedConversationId)
+            discoverSession(selectedConversationId, false);
+    }
+
+    onProviderIdChanged: resetResolvedSession()
+    onDoctorIdChanged: resetResolvedSession()
 
     Process {
         id: bindProcess
@@ -263,11 +429,12 @@ Scope {
                 adapter.roomBound(adapter.boundRoomResult);
                 adapter.refresh();
 
-                if (adapter.selectedConversationId === roomId)
+                if (adapter.selectedConversationId === roomId) {
                     adapter.refreshMessages();
+                    adapter.discoverSession(roomId, false);
+                }
             } else if (!adapter.bindError) {
-                adapter.bindError =
-                    "PX HOSPITAL ROOM BIND EXIT " + String(code);
+                adapter.bindError = "PX HOSPITAL ROOM BIND EXIT " + String(code);
             }
 
             adapter.runQueuedRoomBind();
@@ -308,6 +475,132 @@ Scope {
 
             if (Number(code) !== 0 && !adapter.error)
                 adapter.error = "PX HOSPITAL ROOMS EXIT " + String(code);
+        }
+    }
+
+    Process {
+        id: sessionsProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const result = JSON.parse(String(this.text || "[]"));
+
+                    if (!Array.isArray(result))
+                        throw new Error("PX Hospital sessions returned non-array data");
+
+                    adapter.roomSessions = result;
+                    adapter.sessionsError = "";
+
+                    if (adapter.sessionLookupRoomId
+                            === adapter.selectedConversationId) {
+                        const matched = adapter.compatibleSession(result);
+                        adapter.activeSessionId =
+                            matched ? String(matched.id || "") : "";
+
+                        if (adapter.activeSessionId)
+                            adapter.sessionResolved(adapter.activeSessionId);
+                    }
+                } catch (parseError) {
+                    adapter.sessionsError =
+                        "HOSPITAL DOCTOR SESSIONS // "
+                        + String(parseError);
+                }
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                const detail = String(this.text || "").trim();
+                if (detail)
+                    adapter.sessionsError = detail;
+            }
+        }
+
+        onExited: function(code, exitStatus) {
+            const shouldContinue = adapter.continueAfterSessionDiscovery;
+            adapter.sessionsLoading = false;
+            adapter.continueAfterSessionDiscovery = false;
+
+            if (Number(code) !== 0 && !adapter.sessionsError)
+                adapter.sessionsError =
+                    "PX HOSPITAL SESSIONS EXIT " + String(code);
+
+            if (Number(code) === 0
+                    && !adapter.sessionsError
+                    && shouldContinue
+                    && adapter.pendingTurnBody) {
+                if (adapter.activeSessionId)
+                    adapter.runPendingTurn();
+                else
+                    adapter.createSessionForPendingTurn();
+            } else if (shouldContinue && adapter.sessionsError) {
+                adapter.sending = false;
+                adapter.sendError = adapter.sessionsError;
+                adapter.pendingTurnBody = "";
+                adapter.pendingTurnRoomId = "";
+            }
+
+            adapter.runQueuedSessionDiscovery();
+        }
+    }
+
+    Process {
+        id: sessionCreateProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const body = String(this.text || "").trim();
+
+                if (!body)
+                    return;
+
+                try {
+                    adapter.createdSessionResult = JSON.parse(body);
+                } catch (parseError) {
+                    adapter.sessionError =
+                        "HOSPITAL DOCTOR SESSION CREATE // "
+                        + String(parseError);
+                }
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                const detail = String(this.text || "").trim();
+                if (detail)
+                    adapter.sessionError = detail;
+            }
+        }
+
+        onExited: function(code, exitStatus) {
+            adapter.creatingSession = false;
+
+            if (Number(code) === 0
+                    && !adapter.sessionError
+                    && adapter.createdSessionResult) {
+                adapter.activeSessionId =
+                    String(adapter.createdSessionResult.id || "");
+
+                if (!adapter.activeSessionId) {
+                    adapter.sessionError =
+                        "HOSPITAL DOCTOR SESSION CREATE // SESSION ID MISSING";
+                } else {
+                    adapter.sessionResolved(adapter.activeSessionId);
+                    adapter.runPendingTurn();
+                    return;
+                }
+            }
+
+            adapter.sending = false;
+
+            if (!adapter.sessionError)
+                adapter.sessionError =
+                    "PX HOSPITAL AGENT SESSION CREATE EXIT " + String(code);
+
+            adapter.sendError = adapter.sessionError;
+            adapter.pendingTurnBody = "";
+            adapter.pendingTurnRoomId = "";
         }
     }
 
@@ -355,7 +648,17 @@ Scope {
     }
 
     Process {
-        id: sendProcess
+        id: turnProcess
+
+        stdinEnabled: true
+
+        onStarted: {
+            turnProcess.write(
+                JSON.stringify({
+                    prompt: adapter.turnBody
+                }) + "\n"
+            );
+        }
 
         stdout: StdioCollector {
             onStreamFinished: {
@@ -365,10 +668,10 @@ Scope {
                     return;
 
                 try {
-                    JSON.parse(body);
+                    adapter.lastTurnResult = JSON.parse(body);
                 } catch (parseError) {
                     adapter.sendError =
-                        "HOSPITAL CONVERSATION SEND // "
+                        "HOSPITAL DOCTOR TURN // "
                         + String(parseError);
                 }
             }
@@ -385,15 +688,35 @@ Scope {
         onExited: function(code, exitStatus) {
             adapter.sending = false;
 
-            if (Number(code) === 0 && !adapter.sendError) {
+            if (Number(code) === 0
+                    && !adapter.sendError
+                    && adapter.lastTurnResult) {
                 adapter.sendSuccessSerial += 1;
                 adapter.messageSent();
+                adapter.turnCompleted(adapter.lastTurnResult);
+                adapter.pendingTurnBody = "";
+                adapter.pendingTurnRoomId = "";
+                adapter.turnBody = "";
                 adapter.maybeRefreshSelectedRoom();
+                adapter.discoverSession(
+                    adapter.selectedConversationId,
+                    false
+                );
                 return;
             }
 
             if (!adapter.sendError)
-                adapter.sendError = "PX HOSPITAL SEND EXIT " + String(code);
+                adapter.sendError =
+                    "PX HOSPITAL AGENT TURN EXIT " + String(code);
+
+            adapter.pendingTurnBody = "";
+            adapter.pendingTurnRoomId = "";
+            adapter.turnBody = "";
+            adapter.refreshMessages();
+            adapter.discoverSession(
+                adapter.selectedConversationId,
+                false
+            );
         }
     }
 

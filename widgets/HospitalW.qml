@@ -5512,6 +5512,18 @@ PanelWindow {
                     elide: Text.ElideRight
                 }
 
+                MetaValue {
+                    width: parent.width
+                    text:
+                        doctorRuntimeService.lastActivityText
+                        ? (
+                            "LATEST // "
+                            + doctorRuntimeService.lastActivityText
+                          )
+                        : "LATEST // NO PROVIDER ACTIVITY YET"
+                    elide: Text.ElideRight
+                }
+
                 Row {
                     width: parent.width
                     height: 34
@@ -6155,6 +6167,15 @@ PanelWindow {
                             doctorRuntimeService.operating
                             || doctorRuntimeService.cancelling
                             ? " // " + doctorRuntimeService.elapsedLabel
+                            : ""
+                        )
+                        + (
+                            doctorRuntimeService.operating
+                            && doctorRuntimeService.lastActivityText
+                            ? (
+                                " // "
+                                + doctorRuntimeService.lastActivityText
+                              )
                             : ""
                         )
                     font.pixelSize: 9

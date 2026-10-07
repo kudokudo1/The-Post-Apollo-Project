@@ -16,6 +16,9 @@ for needle in (
     'property int activePid: 0',
     'property int elapsedSeconds: 0',
     'property bool operating: false',
+    'property string lastActivityText: ""',
+    'property string lastActivityAt: ""',
+    'property string lastActivityType: ""',
     'property bool cancelling: false',
     'property bool quickRunning: false',
     'property string quickCommand: ""',
@@ -62,6 +65,8 @@ for needle in (
     'id: roomChatRuntimeHud',
     'doctorRuntimeService.elapsedLabel',
     'doctorRuntimeService.displayStatus',
+    'doctorRuntimeService.lastActivityText',
+    '"LATEST // "',
 ):
     assert needle in hospital, needle
 
@@ -84,6 +89,7 @@ for command in (
     "REPORT",
     "CHECKLIST",
     "NEXT",
+    "SUGGEST",
     "PAUSE",
 ):
     assert f'"{command}"' in quick, command

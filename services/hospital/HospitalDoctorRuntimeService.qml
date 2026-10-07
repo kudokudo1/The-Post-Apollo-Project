@@ -12,6 +12,9 @@ Scope {
     property string turnStartedAt: ""
     property int elapsedSeconds: 0
     property bool operating: false
+    property string lastActivityText: ""
+    property string lastActivityAt: ""
+    property string lastActivityType: ""
 
     property bool refreshing: false
     property bool cancelling: false
@@ -105,6 +108,9 @@ Scope {
         turnStartedAt = "";
         elapsedSeconds = 0;
         operating = false;
+        lastActivityText = "";
+        lastActivityAt = "";
+        lastActivityType = "";
         lastStatusPayload = null;
         lastError = "";
     }
@@ -112,6 +118,7 @@ Scope {
     function applyStatus(payload) {
         const data = payload || {};
         const session = data.session || {};
+        const activity = data.lastActivity || {};
 
         lastStatusPayload = data;
         status = String(
@@ -139,6 +146,9 @@ Scope {
                 status === "OPERATING"
                 && activePid > 0
             );
+        lastActivityText = String(activity.text || "");
+        lastActivityAt = String(activity.createdAt || "");
+        lastActivityType = String(activity.type || "");
     }
 
     function refresh() {

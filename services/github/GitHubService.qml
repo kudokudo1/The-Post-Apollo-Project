@@ -115,6 +115,7 @@ Scope {
     property string factoryLastTemplate: ""
     property string factoryLastTrigger: ""
     property string factoryLastSlug: ""
+    property string factoryLastScriptPath: ""
 
     property bool actionBusy: false
     property string actionKind: ""
@@ -843,6 +844,7 @@ Scope {
         factoryLastTemplate = "";
         factoryLastTrigger = "";
         factoryLastSlug = "";
+        factoryLastScriptPath = "";
     }
 
     function friendlyFactoryMessage(message) {
@@ -861,6 +863,9 @@ Scope {
         if (lower.indexOf("template and name required") >= 0)
             return "WORKFLOW FACTORY // choose an operation and give the workflow a name.";
 
+        if (lower.indexOf("script path") >= 0)
+            return "SCRIPT TEST // choose a safe repository-relative script path.";
+
         if (lower.indexOf("no github repository") >= 0)
             return "GITHUB CONNECTION // this repo is not connected to a GitHub repository.";
 
@@ -870,15 +875,15 @@ Scope {
         return raw;
     }
 
-    function previewWorkflow(templateId, slug, triggerId) {
-        runFactory("preview", templateId, slug, triggerId);
+    function previewWorkflow(templateId, slug, triggerId, scriptPath) {
+        runFactory("preview", templateId, slug, triggerId, scriptPath);
     }
 
-    function installWorkflow(templateId, slug, triggerId) {
-        runFactory("install", templateId, slug, triggerId);
+    function installWorkflow(templateId, slug, triggerId, scriptPath) {
+        runFactory("install", templateId, slug, triggerId, scriptPath);
     }
 
-    function runFactory(mode, templateId, slug, triggerId) {
+    function runFactory(mode, templateId, slug, triggerId, scriptPath) {
         if (factoryBusy)
             return;
 
@@ -891,6 +896,7 @@ Scope {
         const cleanTemplate = String(templateId || "").trim();
         const cleanSlug = String(slug || "").trim();
         const cleanTrigger = String(triggerId || "manual").trim();
+        const cleanScriptPath = String(scriptPath || "").trim();
 
         if (!cleanTemplate || !cleanSlug) {
             factoryValidationStatus = "ERROR";
@@ -901,6 +907,12 @@ Scope {
         if (!/^[a-z0-9][a-z0-9-]*$/.test(cleanSlug)) {
             factoryValidationStatus = "ERROR";
             factoryValidationMessage = "WORKFLOW NAME // use lowercase letters, numbers, and hyphens only. Example: t6-audit";
+            return;
+        }
+
+        if (cleanTemplate === "script-test" && !cleanScriptPath) {
+            factoryValidationStatus = "ERROR";
+            factoryValidationMessage = "SCRIPT TEST // choose a repository-relative script path.";
             return;
         }
 
@@ -923,17 +935,19 @@ Scope {
         factoryLastTemplate = cleanTemplate;
         factoryLastTrigger = cleanTrigger;
         factoryLastSlug = cleanSlug;
+        factoryLastScriptPath = cleanScriptPath;
 
         factoryProcess.exec([
             "bash",
             "-lc",
-            'exec "$HOME/.local/bin/px" create "$1" "$2" "$3" "$4" "$5" --json',
+            'extra="$6"; if [ -n "$extra" ]; then exec "$HOME/.local/bin/px" create "$1" "$2" "$3" "$4" "$5" "$extra" --json; else exec "$HOME/.local/bin/px" create "$1" "$2" "$3" "$4" "$5" --json; fi',
             "px-factory",
             repoSlug,
             cleanTemplate,
             cleanSlug,
             cleanTrigger,
-            mode === "install" ? "--install" : "--preview"
+            mode === "install" ? "--install" : "--preview",
+            cleanScriptPath ? "--script=" + cleanScriptPath : ""
         ]);
 
         factoryWatchdog.restart();

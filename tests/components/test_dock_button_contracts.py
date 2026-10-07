@@ -30,6 +30,8 @@ for needle, message in (
     ("signal rightClicked(var mouseEvent)", "right-click contract"),
     ("readonly property bool hovered:", "hover state contract"),
     ("readonly property bool pressed:", "pressed state contract"),
+    ("id: contentLayer", "content and content glow must share the legacy Git stacking plane"),
+    ("mapToItem(contentLayer, 0, 0)", "content glow geometry must be local to the content stacking plane"),
 ):
     require(COMPONENT, needle, message)
 
@@ -42,6 +44,7 @@ assert "signal rightClicked" not in GIT, "Git must inherit DockButton right-clic
 assert "onRightClicked:" not in GIT, "Git must not recursively re-emit the inherited right-click signal"
 require(TEMPLATE, "DockButton {", "future button template must use reusable component")
 require(TEMPLATE, "contentGlowSource: templateText", "template must demonstrate exact content glow targeting")
+require(COMPONENT, "z: 0\n\n        Item {\n            id: contentHost", "content layer must stay below the root-level front wash")
 
 for forbidden in ("RectangularShadow {", "DropShadow {", "MouseArea {"):
     assert forbidden not in GIT, f"Git should not duplicate DockButton internals: {forbidden}"

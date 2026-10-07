@@ -231,7 +231,7 @@ Scope {
                 root.submitAfterTranscription;
             const transcript =
                 String(transcriptionOut.text || "")
-                    .replace(/\\s+/g, " ")
+                    .replace(/\s+/g, " ")
                     .trim();
 
             root.submitAfterTranscription = false;

@@ -201,7 +201,6 @@ require(
 # until a recovery engine lands.
 require(
     "services/git/GitOperationJournalService.qml",
-    "services/git/GitOperationRecoveryService.qml",
     "function beginOperation(kind, beforeState, metadata)",
     "operation journal must record mutation start",
 )
@@ -425,6 +424,7 @@ focused_files = [
     "services/github/GitEvidenceProvider.qml",
     "services/github/WorkflowLibraryStore.qml",
     "services/git/GitOperationJournalService.qml",
+    "services/git/GitOperationRecoveryService.qml",
     "services/git/GitRepositorySnapshotService.qml",
     "services/git/GitRepositoryService.qml",
     "services/git/GitHistoryService.qml",

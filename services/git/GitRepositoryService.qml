@@ -250,7 +250,7 @@ Scope {
         refreshed();
     }
 
-    function runAction(operation, a, b, c) {
+    function runAction(operation, a, b, c, d) {
         const repo = String(repositoryPath || "").trim();
         const op = String(operation || "").trim();
 
@@ -278,6 +278,7 @@ Scope {
                 'a="$3"',
                 'b="$4"',
                 'c="$5"',
+                'd="$6"',
                 'if ! git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1; then',
                 '  printf "REFUSED\\tNOT A GIT WORKTREE\\n"',
                 '  exit 21',
@@ -409,20 +410,43 @@ Scope {
                 '    elif [ "$kind" = "attributes" ]; then file="$repo/.gitattributes";',
                 '    else printf "REFUSED\\tUNKNOWN PROJECT FILE\\n"; exit 36; fi',
                 '    touch "$file" || exit $?',
-                '    grep -Fqx "$value" "$file" 2>/dev/null || printf "%s\\n" "$value" >> "$file"',
-                '    printf "OK\\tAPPENDED %s // %s\\n" "$kind" "$value"',
+                '    if grep -Fqx "$value" "$file" 2>/dev/null; then',
+                '      printf "OK\\tLINE ALREADY EXISTS // %s\\n" "$value"',
+                '    else',
+                '      printf "%s\\n" "$value" >> "$file" || exit $?',
+                '      printf "OK\\tAPPENDED %s // %s\\n" "$kind" "$value"',
+                '    fi',
                 '    ;;',
                 '  remove-file-line)',
-                '    [ "$c" = "CONFIRM" ] || { printf "REFUSED\\tLINE REMOVE REQUIRES CONFIRMATION\\n"; exit 37; }',
-                '    kind="$a"; line="$b"',
+                '    kind="$a"; line="$b"; expected="$c"',
                 '    if [ "$kind" = "ignore" ]; then file="$repo/.gitignore";',
                 '    elif [ "$kind" = "attributes" ]; then file="$repo/.gitattributes";',
-                '    else printf "REFUSED\\tUNKNOWN PROJECT FILE\\n"; exit 38; fi',
-                '    [ -f "$file" ] || { printf "REFUSED\\tFILE NOT FOUND\\n"; exit 39; }',
+                '    else printf "REFUSED\\tUNKNOWN PROJECT FILE\\n"; exit 37; fi',
+                '    [ -f "$file" ] || { printf "REFUSED\\tFILE NOT FOUND\\n"; exit 38; }',
+                '    actual="$(sed -n "$' + '{line}p" "$file")"',
+                '    [ "$actual" = "$expected" ] || { printf "REFUSED\\tLINE CHANGED // REFRESH BEFORE REMOVING\\n"; exit 39; }',
                 '    tmp="$(mktemp)"',
-                '    awk -v n="$line" \'NR != n { print }\' "$file" > "$tmp" && cat "$tmp" > "$file"',
+                '    awk -v n="$line" \'NR != n { print }\' "$file" > "$tmp" && cat "$tmp" > "$file" || { rm -f "$tmp"; exit 40; }',
                 '    rm -f "$tmp"',
                 '    printf "OK\\tREMOVED %s LINE // %s\\n" "$kind" "$line"',
+                '    ;;',
+                '  replace-file-line)',
+                '    kind="$a"; line="$b"; expected="$c"; replacement="$d"',
+                '    [ -n "$replacement" ] || { printf "REFUSED\\tREPLACEMENT LINE REQUIRED\\n"; exit 41; }',
+                '    if [ "$kind" = "ignore" ]; then file="$repo/.gitignore";',
+                '    elif [ "$kind" = "attributes" ]; then file="$repo/.gitattributes";',
+                '    else printf "REFUSED\\tUNKNOWN PROJECT FILE\\n"; exit 42; fi',
+                '    [ -f "$file" ] || { printf "REFUSED\\tFILE NOT FOUND\\n"; exit 43; }',
+                '    actual="$(sed -n "$' + '{line}p" "$file")"',
+                '    [ "$actual" = "$expected" ] || { printf "REFUSED\\tLINE CHANGED // REFRESH BEFORE REPLACING\\n"; exit 44; }',
+                '    if [ "$replacement" != "$expected" ] && grep -Fqx "$replacement" "$file" 2>/dev/null; then',
+                '      printf "REFUSED\\tREPLACEMENT ALREADY EXISTS\\n"',
+                '      exit 45',
+                '    fi',
+                '    tmp="$(mktemp)"',
+                '    awk -v n="$line" -v v="$replacement" \'NR == n { print v; next } { print }\' "$file" > "$tmp" && cat "$tmp" > "$file" || { rm -f "$tmp"; exit 46; }',
+                '    rm -f "$tmp"',
+                '    printf "OK\\tREPLACED %s LINE // %s\\n" "$kind" "$line"',
                 '    ;;',
                 '  worktree-prune)',
                 '    git -C "$repo" worktree prune -v || exit $?',
@@ -461,7 +485,8 @@ Scope {
             op,
             String(a || ""),
             String(b || ""),
-            String(c || "")
+            String(c || ""),
+            String(d || "")
         ]);
 
         return true;
@@ -593,12 +618,35 @@ Scope {
         return runAction("append-file-line", kind, value, "");
     }
 
-    function removeProjectLine(kind, line, confirmed) {
+    function removeProjectLine(kind, line, expectedText, confirmed) {
+        if (!confirmed)
+            return false;
+
         return runAction(
             "remove-file-line",
             kind,
             String(line),
-            confirmed ? "CONFIRM" : ""
+            String(expectedText || ""),
+            ""
+        );
+    }
+
+    function replaceProjectLine(
+        kind,
+        line,
+        expectedText,
+        replacementText,
+        confirmed
+    ) {
+        if (!confirmed)
+            return false;
+
+        return runAction(
+            "replace-file-line",
+            kind,
+            String(line),
+            String(expectedText || ""),
+            String(replacementText || "")
         );
     }
 

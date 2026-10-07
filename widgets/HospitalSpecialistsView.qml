@@ -10,6 +10,8 @@ Item {
     property string filterMode: "ALL"
     property int selectedIndex: -1
 
+    signal specialistSelected(var specialist)
+
     readonly property var displayedSpecialists: {
         const source =
             root.registryService
@@ -56,6 +58,7 @@ Item {
             return false;
 
         selectedIndex = requested;
+        specialistSelected(selectedSpecialist);
         return true;
     }
 
@@ -78,6 +81,7 @@ Item {
                 continue;
 
             selectedIndex = i;
+            specialistSelected(selectedSpecialist);
             return true;
         }
 

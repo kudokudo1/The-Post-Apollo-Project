@@ -313,6 +313,90 @@ Scope {
         };
     }
 
+    function stashCreateRecoveryPlan(record) {
+        const row = record || {};
+        const metadata = row.metadata || {};
+
+        if (String(row.kind || "") !== "CHANGES/STASH")
+            return null;
+
+        const args =
+            Array.isArray(metadata.arguments)
+            ? metadata.arguments
+            : [];
+        const mode =
+            args.length > 1
+            ? String(args[1] || "all")
+            : "all";
+
+        if (mode !== "all")
+            return refuse(
+                "ONLY FULL STASH CREATION HAS EXACT AUTOMATIC UNDO"
+            );
+
+        if (String(row.recoveryClass || "") !== "CONTENT_RECOVERABLE"
+                || String((row.before || {}).recoveryClass || "")
+                   !== "CONTENT_RECOVERABLE"
+                || String((row.after || {}).recoveryClass || "")
+                   !== "CONTENT_RECOVERABLE") {
+            return refuse(
+                "STASH CREATION DOES NOT HAVE EXACT CONTENT RECOVERY"
+            );
+        }
+
+        const before = row.before || {};
+        const after = row.after || {};
+        const beforeWorking = before.workingState || {};
+        const afterWorking = after.workingState || {};
+        const beforeIndex = before.index || {};
+        const afterIndex = after.index || {};
+        const branch = String(before.branch || "");
+        const branchRef = "refs/heads/" + branch;
+        const head = String(before.head || "");
+        const stashSha = refSha(after, "refs/stash");
+        const previousStashSha = refSha(before, "refs/stash");
+
+        if (!branch
+                || !head
+                || String(after.branch || "") !== branch
+                || String(after.head || "") !== head
+                || refSha(before, branchRef) !== head
+                || refSha(after, branchRef) !== head
+                || !stashSha
+                || stashSha === previousStashSha
+                || !String(beforeIndex.tree || "")
+                || !String(afterIndex.tree || "")
+                || Number(afterWorking.stagedCount || 0) !== 0
+                || Number(afterWorking.unstagedCount || 0) !== 0
+                || Number(afterWorking.untrackedCount || 0) !== 0
+                || Number(afterWorking.conflictCount || 0) !== 0) {
+            return refuse(
+                "STASH CREATION CONTENT TRANSITION IS NOT EXACT"
+            );
+        }
+
+        return {
+            allowed: true,
+            strategy: "UNDO_STASH_CREATE_ALL",
+            branch: branch,
+            expectedHead: head,
+            stashSha: stashSha,
+            previousStashSha: previousStashSha,
+            expectedAfterIndexTree: String(afterIndex.tree || ""),
+            expectedAfterWorktreeHash:
+                String(afterWorking.worktreePatchHash || ""),
+            expectedAfterUntrackedHash:
+                String(afterWorking.untrackedListHash || ""),
+            restoreIndexTree: String(beforeIndex.tree || ""),
+            restoreWorktreeHash:
+                String(beforeWorking.worktreePatchHash || ""),
+            restoreUntrackedHash:
+                String(beforeWorking.untrackedListHash || ""),
+            summary:
+                "UNDO FULL STASH // RESTORE INDEX + WORKTREE + UNTRACKED"
+        };
+    }
+
     function preview(record) {
         const row = record || {};
         const kind = String(row.kind || "");
@@ -338,6 +422,10 @@ Scope {
         const commitPlan = commitRecoveryPlan(row);
         if (commitPlan)
             return commitPlan;
+
+        const stashPlan = stashCreateRecoveryPlan(row);
+        if (stashPlan)
+            return stashPlan;
 
         if (recoveryClass !== "REF_RECOVERABLE"
                 || String(before.recoveryClass || "") !== "REF_RECOVERABLE"
@@ -891,6 +979,21 @@ Scope {
             d = String(plan.expectedIndexTree || "");
             e = String(plan.expectedWorktreeHash || "");
             f = String(plan.expectedUntrackedHash || "");
+        } else if (strategy === "UNDO_STASH_CREATE_ALL") {
+            a = String(plan.branch || "");
+            b = String(plan.expectedHead || "");
+            c = String(plan.stashSha || "");
+            d = String(plan.previousStashSha || "");
+            e = String(plan.expectedAfterIndexTree || "");
+            f = String(plan.expectedAfterWorktreeHash || "");
+            g =
+                String(plan.expectedAfterUntrackedHash || "")
+                + "\t"
+                + String(plan.restoreIndexTree || "")
+                + "\t"
+                + String(plan.restoreWorktreeHash || "")
+                + "\t"
+                + String(plan.restoreUntrackedHash || "");
         } else if (strategy === "UNDO_ABSORB_STAGED") {
             a = String(plan.branch || "");
             b = String(plan.restoreSha || "");
@@ -925,7 +1028,7 @@ Scope {
                 '  printf "REFUSED\\tNOT A GIT WORKTREE\\n"',
                 '  exit 21',
                 'fi',
-                'if [ "$strategy" != "UNDO_TRANSFER_CONTENT" ] && [ "$strategy" != "UNDO_COMMIT_TO_STAGED" ]; then',
+                'if [ "$strategy" != "UNDO_TRANSFER_CONTENT" ] && [ "$strategy" != "UNDO_COMMIT_TO_STAGED" ] && [ "$strategy" != "UNDO_STASH_CREATE_ALL" ]; then',
                 '  while IFS= read -r wt; do',
                 '    [ -n "$wt" ] || continue',
                 '    if [ -n "$(git -C "$wt" status --porcelain=v1 --untracked-files=all 2>/dev/null)" ]; then',
@@ -1131,6 +1234,55 @@ Scope {
                 '    git -C "$repo" update-ref ORIG_HEAD "$expected" >/dev/null 2>&1 || true',
                 '    git -C "$repo" update-ref "$ref" "$restore" "$expected" || { printf "REFUSED\\tGUARDED COMMIT UNDO REF RESTORE FAILED\\n"; exit 149; }',
                 '    printf "OK\\tRESTORED PRE-COMMIT HEAD + STAGED CONTENT // %s\\n" "$branch"',
+                '    ;;',
+                '  UNDO_STASH_CREATE_ALL)',
+                '    branch="$a"',
+                '    expected_head="$b"',
+                '    stash_sha="$c"',
+                '    previous_stash_sha="$d"',
+                '    expected_index_tree="$e"',
+                '    expected_worktree_hash="$f"',
+                '    IFS="$(printf "\\t")" read -r expected_untracked_hash restore_index_tree restore_worktree_hash restore_untracked_hash <<<"$g"',
+                '    ref="refs/heads/$branch"',
+                '    head_ref="$(git -C "$repo" symbolic-ref -q HEAD 2>/dev/null || true)"',
+                '    [ "$head_ref" = "$ref" ] || { printf "REFUSED\\tSTASH BRANCH IS NOT CURRENTLY CHECKED OUT\\n"; exit 150; }',
+                '    actual_head="$(git -C "$repo" rev-parse HEAD 2>/dev/null || true)"',
+                '    [ "$actual_head" = "$expected_head" ] || { printf "REFUSED\\tHEAD CHANGED SINCE STASH CREATION\\n"; exit 151; }',
+                '    actual_stash="$(git -C "$repo" rev-parse -q --verify refs/stash 2>/dev/null || true)"',
+                '    [ "$actual_stash" = "$stash_sha" ] || { printf "REFUSED\\tSTASH STACK CHANGED SINCE CREATION\\n"; exit 152; }',
+                '    [ -z "$(git -C "$repo" ls-files -u 2>/dev/null)" ] || { printf "REFUSED\\tCURRENT INDEX HAS CONFLICTS\\n"; exit 153; }',
+                '    actual_index_tree="$(git -C "$repo" write-tree 2>/dev/null || true)"',
+                '    [ "$actual_index_tree" = "$expected_index_tree" ] || { printf "REFUSED\\tINDEX CHANGED SINCE STASH CREATION\\n"; exit 154; }',
+                '    actual_worktree_hash="$(git -C "$repo" diff --binary 2>/dev/null | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
+                '    [ "$actual_worktree_hash" = "$expected_worktree_hash" ] || { printf "REFUSED\\tWORKTREE CHANGED SINCE STASH CREATION\\n"; exit 155; }',
+                '    actual_untracked_hash="$(git -C "$repo" ls-files --others --exclude-standard -z 2>/dev/null | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
+                '    [ "$actual_untracked_hash" = "$expected_untracked_hash" ] || { printf "REFUSED\\tUNTRACKED SET CHANGED SINCE STASH CREATION\\n"; exit 156; }',
+                '    if ! git -C "$repo" stash pop --index "stash@{0}" >/dev/null 2>&1; then',
+                '      git -C "$repo" reset --hard "$expected_head" >/dev/null 2>&1 || true',
+                '      git -C "$repo" clean -fd >/dev/null 2>&1 || true',
+                '      printf "REFUSED\\tSTASH RESTORE FAILED // POST-STASH CLEAN STATE RESTORED\\n"',
+                '      exit 157',
+                '    fi',
+                '    restored_index_tree="$(git -C "$repo" write-tree 2>/dev/null || true)"',
+                '    restored_worktree_hash="$(git -C "$repo" diff --binary 2>/dev/null | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
+                '    restored_untracked_hash="$(git -C "$repo" ls-files --others --exclude-standard -z 2>/dev/null | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
+                '    if [ "$restored_index_tree" != "$restore_index_tree" ] || [ "$restored_worktree_hash" != "$restore_worktree_hash" ] || [ "$restored_untracked_hash" != "$restore_untracked_hash" ]; then',
+                '      git -C "$repo" reset --hard "$expected_head" >/dev/null 2>&1 || true',
+                '      git -C "$repo" clean -fd >/dev/null 2>&1 || true',
+                '      current_stash="$(git -C "$repo" rev-parse -q --verify refs/stash 2>/dev/null || true)"',
+                '      if [ "$current_stash" != "$stash_sha" ]; then git -C "$repo" stash store -m "Post-Apollo stash Undo rollback" "$stash_sha" >/dev/null 2>&1 || true; fi',
+                '      printf "REFUSED\\tSTASH RESTORE EVIDENCE MISMATCH // OPERATION ROLLED BACK\\n"',
+                '      exit 158',
+                '    fi',
+                '    current_stash="$(git -C "$repo" rev-parse -q --verify refs/stash 2>/dev/null || true)"',
+                '    [ "$current_stash" = "$previous_stash_sha" ] || {',
+                '      git -C "$repo" reset --hard "$expected_head" >/dev/null 2>&1 || true',
+                '      git -C "$repo" clean -fd >/dev/null 2>&1 || true',
+                '      git -C "$repo" stash store -m "Post-Apollo stash Undo rollback" "$stash_sha" >/dev/null 2>&1 || true',
+                '      printf "REFUSED\\tSTASH STACK DID NOT RETURN TO RECORDED PREVIOUS HEAD\\n"',
+                '      exit 159',
+                '    }',
+                '    printf "OK\\tRESTORED PRE-STASH INDEX + WORKTREE + UNTRACKED CONTENT // %s\\n" "$branch"',
                 '    ;;',
                 '  UNDO_ABSORB_STAGED)',
                 '    branch="$a"',

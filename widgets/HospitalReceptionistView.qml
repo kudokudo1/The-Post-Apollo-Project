@@ -397,7 +397,7 @@ Rectangle {
                     GohuText {
                         width: parent.width - inboxCount.width
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "FRONT DESK // RECENT + FAVORITES"
+                        text: "FRONT DESK // PRIORITY + RECENT"
                         font.pixelSize: 10
                         color: Colors.yellow
                     }
@@ -457,6 +457,11 @@ Rectangle {
                             readonly property bool pinned:
                                 occupied
                                 && root.receptionistService.isPinned(itemData)
+                            readonly property string attentionLevel:
+                                occupied
+                                ? root.receptionistService
+                                      .activityAttentionLabel(itemData)
+                                : ""
                             readonly property color attentionAccent:
                                 root.attentionColor(itemData)
 
@@ -533,13 +538,31 @@ Rectangle {
                                               )
                                             : detail;
 
-                                        return parent.parent.unread
-                                            ? "NEW // " + body
-                                            : body;
+                                        const parts = [
+                                            parent.parent.attentionLevel
+                                        ];
+
+                                        if (parent.parent.unread)
+                                            parts.push("NEW");
+
+                                        if (body)
+                                            parts.push(body);
+
+                                        return parts.join(" // ");
                                     }
                                     font.pixelSize: 7
-                                    color: Colors.white
-                                    opacity: 0.72
+                                    color:
+                                        parent.parent.attentionLevel
+                                            === "CRITICAL"
+                                        ? Colors.red
+                                        : parent.parent.attentionLevel
+                                            === "ACTION"
+                                        ? Colors.orange
+                                        : parent.parent.attentionLevel
+                                            === "NOTICE"
+                                        ? Colors.yellow
+                                        : Colors.white
+                                    opacity: 0.78
                                     elide: Text.ElideRight
                                 }
                             }

@@ -86,12 +86,12 @@ require_regex(
 )
 require_regex(
     CHANGES,
-    r"function transferEligible\(\).*"
+    r"function fileTransferEligible\(\).*"
     r"Boolean\(row\.unstaged\).*"
     r"!Boolean\(row\.staged\).*"
     r"!Boolean\(row\.untracked\).*"
     r"!Boolean\(row\.conflict\)",
-    "Changes must not offer first-slice transfer for unsupported file states",
+    "Changes must not offer whole-file transfer for unsupported file states",
 )
 require(
     CHANGES,

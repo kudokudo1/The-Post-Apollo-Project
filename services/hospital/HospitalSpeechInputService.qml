@@ -31,9 +31,16 @@ Scope {
         const minutes = Math.floor(total / 60);
         const seconds = total % 60;
 
-        return String(minutes).padStart(2, "0")
-            + ":"
-            + String(seconds).padStart(2, "0");
+        const minuteText =
+            minutes < 10
+            ? "0" + String(minutes)
+            : String(minutes);
+        const secondText =
+            seconds < 10
+            ? "0" + String(seconds)
+            : String(seconds);
+
+        return minuteText + ":" + secondText;
     }
 
     readonly property string audioPath:

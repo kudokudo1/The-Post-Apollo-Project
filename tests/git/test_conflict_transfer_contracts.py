@@ -90,7 +90,7 @@ def make_conflict_pair(root: Path):
     source = root / "source"
     destination = root / "destination"
     source.mkdir()
-    git(source, "init", "-q")
+    git(source, "init", "-q", "-b", "main")
     git(source, "config", "user.name", "Post Apollo Test")
     git(source, "config", "user.email", "test@example.invalid")
     (source / "sample.txt").write_text(
@@ -110,7 +110,7 @@ def make_conflict_pair(root: Path):
     git(source, "commit", "-qam", "theirs")
     theirs = git(source, "rev-parse", "HEAD").stdout.decode().strip()
 
-    git(source, "checkout", "-q", "master")
+    git(source, "checkout", "-q", "main")
     (source / "sample.txt").write_text(
         "alpha\nOURS\ngamma\n",
         encoding="utf-8",

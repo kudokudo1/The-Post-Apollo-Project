@@ -23,6 +23,21 @@ Scope {
     readonly property string currentBranch:
         gitService ? String(gitService.branch || "") : ""
 
+    readonly property string localRepository:
+        repositorySlugFromOrigin(
+            gitService ? String(gitService.origin || "") : ""
+        )
+
+    readonly property var liveDiagnostics:
+        diagnosticFacts(
+            currentHead,
+            inspectorEvidence(currentHead)
+        )
+    readonly property string diagnosticState:
+        String((liveDiagnostics || {}).state || "UNKNOWN")
+    readonly property string diagnosticSummary:
+        String((liveDiagnostics || {}).summary || "")
+
     property bool requestBusy: false
     property string requestSha: ""
     property string requestRunId: ""
@@ -48,6 +63,31 @@ Scope {
 
         const text = String(value);
         return text.length > 0 ? text : (fallback || "");
+    }
+
+    function repositorySlugFromOrigin(originValue) {
+        let value = textValue(originValue, "").trim();
+
+        if (!value
+                || value === "NOT CONNECTED"
+                || value === "NO ORIGIN")
+            return "";
+
+        if (value.indexOf("git@github.com:") === 0)
+            value = value.slice("git@github.com:".length);
+        else if (value.indexOf("ssh://git@github.com/") === 0)
+            value = value.slice("ssh://git@github.com/".length);
+        else if (value.indexOf("https://github.com/") === 0)
+            value = value.slice("https://github.com/".length);
+        else if (value.indexOf("http://github.com/") === 0)
+            value = value.slice("http://github.com/".length);
+        else
+            return "";
+
+        if (value.endsWith(".git"))
+            value = value.slice(0, -4);
+
+        return value;
     }
 
     function firstField(object, names, fallback) {
@@ -336,12 +376,136 @@ Scope {
         };
     }
 
+    function diagnosticFacts(targetSha, inspected) {
+        const target = textValue(targetSha, "");
+        const githubRepository = textValue(repository, "");
+        const checkoutRepository = textValue(localRepository, "");
+        const localOrigin =
+            gitService ? textValue(gitService.origin, "") : "";
+        const exactQuerySha =
+            githubService
+            ? textValue(githubService.evidenceRunsSha, "")
+            : "";
+        const inspectedSha =
+            inspected && inspected.run
+            ? textValue(inspected.run.headSha, "")
+            : "";
+        const pxState =
+            githubService
+            ? textValue(githubService.pxRuntimeState, "UNKNOWN")
+            : "UNAVAILABLE";
+
+        const repositoryMatchesLocalOrigin =
+            Boolean(githubRepository)
+            && Boolean(checkoutRepository)
+            && githubRepository === checkoutRepository;
+        const targetMatchesCurrentHead =
+            Boolean(target)
+            && Boolean(currentHead)
+            && target === currentHead;
+        const exactQueryMatches =
+            !target
+            || !exactQuerySha
+            || exactQuerySha === target;
+        const inspectedRunMatches =
+            !target
+            || !inspectedSha
+            || inspectedSha === target;
+
+        const issues = [];
+
+        if (!githubRepository)
+            issues.push("GITHUB REPOSITORY UNKNOWN");
+
+        if (!checkoutRepository)
+            issues.push("LOCAL ORIGIN NOT GITHUB");
+
+        if (githubRepository
+                && checkoutRepository
+                && !repositoryMatchesLocalOrigin)
+            issues.push("LOCAL ORIGIN != GITHUB REPOSITORY");
+
+        if (!target)
+            issues.push("TARGET SHA UNKNOWN");
+
+        if (!currentHead)
+            issues.push("LOCAL HEAD UNKNOWN");
+        else if (target && !targetMatchesCurrentHead)
+            issues.push("LOCAL HEAD MOVED");
+
+        if (!exactQueryMatches)
+            issues.push("EXACT QUERY SHA DRIFT");
+
+        if (!inspectedRunMatches)
+            issues.push("INSPECTED RUN SHA DRIFT");
+
+        if (pxState === "MISSING")
+            issues.push("PX MISSING");
+        else if (pxState === "STALE")
+            issues.push("PX STALE");
+        else if (pxState === "ERROR")
+            issues.push("PX IDENTITY ERROR");
+
+        let state = "READY";
+
+        if (!githubRepository
+                || !target
+                || !currentHead
+                || pxState === "MISSING"
+                || pxState === "ERROR") {
+            state = "ERROR";
+        } else if (checkoutRepository
+                && !repositoryMatchesLocalOrigin) {
+            state = "MISMATCH";
+        } else if (!exactQueryMatches
+                || !inspectedRunMatches) {
+            state = "MISMATCH";
+        } else if (!checkoutRepository
+                || !targetMatchesCurrentHead
+                || pxState === "STALE"
+                || pxState === "SOURCE_MISSING") {
+            state = "ATTENTION";
+        }
+
+        return {
+            state: state,
+            summary:
+                state
+                + (
+                    issues.length > 0
+                    ? " // " + issues.join(" + ")
+                    : " // EVIDENCE SEAMS ALIGNED"
+                  ),
+            issues: issues,
+            githubRepository: githubRepository,
+            localRepository: checkoutRepository,
+            localOrigin: localOrigin,
+            repositoryMatchesLocalOrigin:
+                repositoryMatchesLocalOrigin,
+            targetSha: target,
+            currentHead: currentHead,
+            targetMatchesCurrentHead:
+                targetMatchesCurrentHead,
+            exactQuerySha: exactQuerySha,
+            exactQueryMatches: exactQueryMatches,
+            inspectedRunSha: inspectedSha,
+            inspectedRunMatches: inspectedRunMatches,
+            pxRuntimeState: pxState,
+            pxRuntimeDetail:
+                githubService
+                ? textValue(githubService.pxRuntimeDetail, "")
+                : ""
+        };
+    }
+
     function buildEvidencePacket(sha) {
         const targetSha = textValue(sha, currentHead);
         const matchingRuns = runsForSha(targetSha);
         const inspected = inspectorEvidence(targetSha);
         const runSummary = summarizeRuns(matchingRuns);
         const staleness = stalenessFacts(targetSha, inspected);
+        const diagnostics =
+            diagnosticFacts(targetSha, inspected);
         const gitAvailable =
             gitService ? Boolean(gitService.available) : false;
         const githubAvailable =
@@ -394,6 +558,8 @@ Scope {
                 runSummary: runSummary,
                 staleness: staleness
             },
+
+            diagnostics: diagnostics,
 
             github: {
                 available: githubAvailable,

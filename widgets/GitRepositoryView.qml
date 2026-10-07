@@ -1748,99 +1748,109 @@ Item {
                             }
                         }
 
-                        Flickable {
-                            id: repositoryScroll7
-                            width: Math.max(0, parent.width - 8)
-                            height: Math.max(0, parent.height - y - 4)
+                        Item {
+                            id: projectFilesViewport
+
+                            width: parent.width
+                            height: Math.max(0, parent.height - 33)
                             clip: true
-                            contentWidth: width
-                            contentHeight: projectLineColumn.implicitHeight
-                            boundsBehavior: Flickable.StopAtBounds
 
-                            Column {
-                                id: projectLineColumn
-                                width: parent.width
-                                spacing: 2
+                            Flickable {
+                                id: repositoryScroll7
 
-                                Repeater {
-                                    model: root.projectLines()
+                                anchors {
+                                    fill: parent
+                                    rightMargin: 12
+                                    bottomMargin: 10
+                                }
+                                clip: true
+                                contentWidth: width
+                                contentHeight: projectLineColumn.implicitHeight
+                                boundsBehavior: Flickable.StopAtBounds
 
-                                    Rectangle {
-                                        id: projectLineRow
-                                        required property var modelData
+                                Column {
+                                    id: projectLineColumn
+                                    width: parent.width
+                                    spacing: 2
 
-                                        width: projectLineColumn.width
-                                        height: 28
-                                        color:
-                                            projectLineMouse.containsMouse
-                                            || root.selectedProjectLine
-                                               === Number(modelData.line || 0)
-                                            ? Colors.black
-                                            : "transparent"
-                                        border.width:
-                                            root.selectedProjectLine
-                                            === Number(modelData.line || 0)
-                                            ? 1 : 0
-                                        border.color: Colors.yellow
+                                    Repeater {
+                                        model: root.projectLines()
 
-                                        GohuText {
-                                            anchors {
-                                                left: parent.left
-                                                verticalCenter:
-                                                    parent.verticalCenter
-                                            }
-                                            width: 38
-                                            text:
-                                                String(
-                                                    projectLineRow.modelData.line
-                                                    || 0
-                                                )
-                                            font.pixelSize: 9
-                                            color: Colors.cyan
-                                        }
+                                        Rectangle {
+                                            id: projectLineRow
+                                            required property var modelData
 
-                                        GohuText {
-                                            anchors {
-                                                left: parent.left
-                                                right: parent.right
-                                                verticalCenter:
-                                                    parent.verticalCenter
-                                                leftMargin: 42
-                                            }
-                                            text:
-                                                String(
-                                                    projectLineRow.modelData.text
-                                                    || ""
-                                                )
-                                            font.pixelSize: 10
-                                            color: Colors.white
-                                            elide: Text.ElideRight
-                                        }
+                                            width: projectLineColumn.width
+                                            height: 28
+                                            color:
+                                                projectLineMouse.containsMouse
+                                                || root.selectedProjectLine
+                                                   === Number(modelData.line || 0)
+                                                ? Colors.black
+                                                : "transparent"
+                                            border.width:
+                                                root.selectedProjectLine
+                                                === Number(modelData.line || 0)
+                                                ? 1 : 0
+                                            border.color: Colors.yellow
 
-                                        MouseArea {
-                                            id: projectLineMouse
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked:
-                                                root.selectedProjectLine =
-                                                    Number(
+                                            GohuText {
+                                                anchors {
+                                                    left: parent.left
+                                                    verticalCenter:
+                                                        parent.verticalCenter
+                                                }
+                                                width: 38
+                                                text:
+                                                    String(
                                                         projectLineRow.modelData.line
-                                                        || -1
+                                                        || 0
                                                     )
+                                                font.pixelSize: 9
+                                                color: Colors.cyan
+                                            }
+
+                                            GohuText {
+                                                anchors {
+                                                    left: parent.left
+                                                    right: parent.right
+                                                    verticalCenter:
+                                                        parent.verticalCenter
+                                                    leftMargin: 42
+                                                }
+                                                text:
+                                                    String(
+                                                        projectLineRow.modelData.text
+                                                        || ""
+                                                    )
+                                                font.pixelSize: 10
+                                                color: Colors.white
+                                                elide: Text.ElideRight
+                                            }
+
+                                            MouseArea {
+                                                id: projectLineMouse
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked:
+                                                    root.selectedProjectLine =
+                                                        Number(
+                                                            projectLineRow.modelData.line
+                                                            || -1
+                                                        )
+                                            }
                                         }
                                     }
                                 }
+
+                                NeonScrollBar {
+                                    flickable: repositoryScroll7
+                                    starHandle: true
+                                    rightInset: 2
+                                }
                             }
-                        
-                            NeonScrollBar {
-                                flickable: repositoryScroll7
-                                starHandle: true
-                                topInset: 3
-                                bottomInset: 8
-                                rightInset: 5
-                            }
-}
+                        }
                     }
                 }
 

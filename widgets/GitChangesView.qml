@@ -7,7 +7,11 @@ Item {
 
     property var changesService: null
     property var gitService: null
+    property var transferService: null
+    property var branchWorkspaceService: null
     property var keyboardHost: null
+
+    property bool transferOpen: false
 
     property string subMode: "files"
     property string selectedPath: ""
@@ -30,6 +34,42 @@ Item {
     property bool stashRestoreIndex: false
 
     property string armedAction: ""
+
+    function transferEligible() {
+        const row = root.selectedFile || {};
+
+        return !!root.transferService
+            && !!root.branchWorkspaceService
+            && root.selectedPath.length > 0
+            && Boolean(row.unstaged)
+            && !Boolean(row.staged)
+            && !Boolean(row.untracked)
+            && !Boolean(row.conflict)
+            && !root.changesService.actionBusy
+            && !root.transferService.previewBusy
+            && !root.transferService.transferBusy;
+    }
+
+    function openTransfer() {
+        if (!root.transferEligible())
+            return false;
+
+        root.clearArm();
+        root.transferService.clearPreview();
+        root.transferOpen = true;
+
+        if (!root.branchWorkspaceService.refreshing)
+            root.branchWorkspaceService.refresh();
+
+        return true;
+    }
+
+    function closeTransfer() {
+        root.transferOpen = false;
+
+        if (root.transferService)
+            root.transferService.clearPreview();
+    }
 
     function focusPath(path) {
         root.pendingFocusPath = String(path || "");
@@ -957,7 +997,7 @@ Item {
                             spacing: 5
 
                             LabelText {
-                                width: parent.width - 455
+                                width: parent.width - 546
                                 anchors.verticalCenter: parent.verticalCenter
                                 text:
                                     root.selectedPath
@@ -1034,6 +1074,14 @@ Item {
                                             );
                                         }
                                     )
+                            }
+
+                            MiniButton {
+                                width: 86
+                                label: "TRANSFER"
+                                accent: Colors.blue
+                                enabledAction: root.transferEligible()
+                                onTriggered: root.openTransfer()
                             }
 
                             MiniButton {
@@ -2496,6 +2544,44 @@ Item {
                     elide: Text.ElideRight
                 }
             }
+        }
+    }
+
+    GitChangeTransferView {
+        id: changeTransferView
+
+        anchors.fill: parent
+        visible: root.transferOpen
+        z: 5000
+
+        transferService: root.transferService
+        branchWorkspaceService: root.branchWorkspaceService
+        sourcePath:
+            root.gitService
+            ? String(root.gitService.repoRoot || "")
+            : ""
+        filePath: root.selectedPath
+
+        onCloseRequested: root.closeTransfer()
+    }
+
+    Connections {
+        target: root.transferService
+        enabled: root.transferService !== null
+        ignoreUnknownSignals: true
+
+        function onTransferFinished(success, detail) {
+            if (!success)
+                return;
+
+            root.transferOpen = false;
+            root.clearArm();
+
+            if (root.changesService)
+                root.changesService.refresh();
+
+            if (root.branchWorkspaceService)
+                root.branchWorkspaceService.refresh();
         }
     }
 

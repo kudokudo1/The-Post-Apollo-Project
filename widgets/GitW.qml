@@ -1665,6 +1665,16 @@ PanelWindow {
             : ""
     }
 
+    GitChangeTransferService {
+        id: changeTransferService
+        operationJournal: operationJournalService
+        snapshotService: repositorySnapshotService
+        repositoryPath:
+            gitService.repoIsLocal
+            ? gitService.repoRoot
+            : ""
+    }
+
     GitRepositorySnapshotService {
         id: repositorySnapshotService
         repositoryPath:

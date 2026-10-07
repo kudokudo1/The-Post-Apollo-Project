@@ -57,8 +57,18 @@ require(
 )
 require(
     SESSION_VIEW,
-    'label:\n                            root.abortArmed\n                            ? "CONFIRM ABORT REBASE"\n                            : "ARM ABORT"',
-    "abort must use a two-step arm/confirm interaction",
+    "root.abortArmed",
+    "abort must keep an explicit armed state",
+)
+require(
+    SESSION_VIEW,
+    "CONFIRM ABORT REBASE",
+    "abort must require a second confirmation action",
+)
+require(
+    SESSION_VIEW,
+    "ARM ABORT",
+    "abort must begin in a non-destructive armed state",
 )
 require(
     SESSION_VIEW,

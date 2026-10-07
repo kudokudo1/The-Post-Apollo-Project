@@ -1775,6 +1775,7 @@ Scope {
             return false;
 
         const query = looseQuery(raw);
+        const explicitContextTime = activityTimeWindow(query);
         const asksContextStatus =
             query === "what's going on"
             || query === "whats going on"
@@ -1895,12 +1896,26 @@ Scope {
         append("OPERATOR", raw);
 
         if (asksContextStatus || asksContextProblem) {
+            const startEpoch =
+                explicitContextTime.active
+                ? explicitContextTime.startEpoch
+                : contextStartEpoch;
+            const endEpoch =
+                explicitContextTime.active
+                ? explicitContextTime.endEpoch
+                : contextEndEpoch;
+            const timeLabel =
+                explicitContextTime.active
+                ? explicitContextTime.label
+                : contextTimeLabel;
             let matches =
                 matchingActivity(
                     "",
                     false,
                     false,
-                    contextTarget
+                    contextTarget,
+                    startEpoch,
+                    endEpoch
                 );
 
             if (asksContextProblem) {
@@ -1916,7 +1931,10 @@ Scope {
                     contextTarget,
                     false,
                     false,
-                    asksContextProblem
+                    asksContextProblem,
+                    startEpoch,
+                    endEpoch,
+                    timeLabel
                 );
             }
 
@@ -1928,7 +1946,12 @@ Scope {
                         ? "IMPORTANT // "
                         : "RECENT // "
                     )
-                    + contextTarget,
+                    + contextTarget
+                    + (
+                        timeLabel
+                        ? " // " + timeLabel
+                        : ""
+                      ),
                     matches
                 )
             );
@@ -1949,7 +1972,9 @@ Scope {
                     "",
                     false,
                     false,
-                    contextTarget
+                    contextTarget,
+                    contextStartEpoch,
+                    contextEndEpoch
                 );
 
             if (matches.length > 0) {
@@ -1959,14 +1984,23 @@ Scope {
                     contextTarget,
                     false,
                     false,
-                    false
+                    false,
+                    contextStartEpoch,
+                    contextEndEpoch,
+                    contextTimeLabel
                 );
             }
 
             append(
                 "RECEPTION",
                 activityListResponse(
-                    "RECENT // " + contextTarget,
+                    "RECENT // "
+                    + contextTarget
+                    + (
+                        contextTimeLabel
+                        ? " // " + contextTimeLabel
+                        : ""
+                      ),
                     matches
                 )
             );
@@ -2328,7 +2362,7 @@ Scope {
         if (asksHelp) {
             append(
                 "RECEPTION",
-                "I understand recent activity, what changed, what went wrong, what needs attention, favorites, Room or team history, counts, and time windows like today, yesterday, this morning, this week, since Monday, or the last few hours. I can also find or show a team, then follow up with open this, take me there, favorite this, go back, or next one."
+                "I understand recent activity, what changed, what went wrong, what needs attention, favorites, Room or team history, counts, and time windows like today, yesterday, this morning, this week, since Monday, or the last 3 hours. I can also find or show a team, then follow up with open this, take me there, favorite this, go back, or next one."
             );
             return true;
         }

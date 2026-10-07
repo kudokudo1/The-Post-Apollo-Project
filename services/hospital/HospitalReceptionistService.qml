@@ -1008,23 +1008,68 @@ Scope {
         }
 
         const visible = [];
+        const visibleKeys = {};
 
+        function appendVisible(eventValue) {
+            const event = eventValue || {};
+            const key = root.eventKey(event);
+
+            if (!key || visibleKeys[key] || visible.length >= 5)
+                return false;
+
+            visibleKeys[key] = true;
+            visible.push(event);
+            return true;
+        }
+
+        // Favorites retain their explicit operator-selected order.
         for (let i = 0;
                 i < pinnedKeys.length && visible.length < 5;
                 ++i) {
-            const pinned = byKey[String(pinnedKeys[i] || "")];
+            const pinned =
+                byKey[String(pinnedKeys[i] || "")];
 
             if (pinned)
-                visible.push(pinned);
+                appendVisible(pinned);
         }
 
+        // Unread operator-attention items outrank ordinary recency, but only
+        // while they are genuinely new. Once read they return to normal
+        // recency unless the operator explicitly favorited them.
+        const priorityUnread =
+            ordered.filter(function(event) {
+                const row = event || {};
+
+                return !root.isPinned(row)
+                    && root.isUnread(row)
+                    && root.activityAttentionScore(row) >= 60;
+            });
+
+        priorityUnread.sort(function(a, b) {
+            const scoreDelta =
+                root.activityAttentionScore(b)
+                - root.activityAttentionScore(a);
+
+            if (scoreDelta !== 0)
+                return scoreDelta;
+
+            return root.eventEpoch(b) - root.eventEpoch(a);
+        });
+
+        for (let i = 0;
+                i < priorityUnread.length && visible.length < 5;
+                ++i)
+            appendVisible(priorityUnread[i]);
+
+        // Fill remaining desk slots with ordinary newest-first activity so
+        // NOTICE/ROUTINE events remain visible instead of being suppressed.
         for (let i = 0;
                 i < ordered.length && visible.length < 5;
                 ++i) {
             const event = ordered[i] || {};
 
             if (!isPinned(event))
-                visible.push(event);
+                appendVisible(event);
         }
 
         inbox = visible;

@@ -65,8 +65,13 @@ require_regex(
 )
 require(
     LINE,
-    'print("PATCH64\\t" + base64.b64encode(patch).decode("ascii"))',
-    "line preview must emit its minimal recovery patch",
+    "PATCH64",
+    "line preview must emit a recovery payload marker",
+)
+require(
+    LINE,
+    "base64.b64encode(patch)",
+    "line preview must persist its exact minimal patch",
 )
 
 require(

@@ -6,6 +6,7 @@ Rectangle {
 
     required property var fileService
     required property var hunkService
+    required property var lineService
     property var historyService: null
     property var keyboardHost: null
     property string mode: "file"
@@ -77,6 +78,7 @@ Rectangle {
             enabledAction:
                 !fileService.executionBusy
                 && !hunkService.executionBusy
+                && !lineService.executionBusy
             onTriggered: root.mode = "file"
         }
 
@@ -88,14 +90,20 @@ Rectangle {
             enabledAction:
                 !fileService.executionBusy
                 && !hunkService.executionBusy
+                && !lineService.executionBusy
             onTriggered: root.mode = "hunk"
         }
 
         ScopeButton {
             width: (parent.width - 12) / 3
-            label: "LINE // NEXT"
+            label: "LINE"
             accent: Colors.magenta
-            enabledAction: false
+            selectedAction: root.mode === "line"
+            enabledAction:
+                !fileService.executionBusy
+                && !hunkService.executionBusy
+                && !lineService.executionBusy
+            onTriggered: root.mode = "line"
         }
     }
 
@@ -133,6 +141,25 @@ Rectangle {
         visible: root.mode === "hunk"
 
         hunkService: root.hunkService
+        historyService: root.historyService
+        keyboardHost: root.keyboardHost
+    }
+
+    GitHistorySplitLineView {
+        anchors {
+            top: modeRow.bottom
+            left: parent.left
+            right: parent.right
+            bottom: parent.bottom
+            topMargin: 7
+            leftMargin: 8
+            rightMargin: 8
+            bottomMargin: 8
+        }
+
+        visible: root.mode === "line"
+
+        lineService: root.lineService
         historyService: root.historyService
         keyboardHost: root.keyboardHost
     }

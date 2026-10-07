@@ -180,10 +180,9 @@ def smoke_edit_continue():
         start_edit_rebase(repo, base, a)
         assert rebase_dir(repo) is not None
 
-        story = repo / "story.txt"
-        text = story.read_text(encoding="utf-8")
-        story.write_text(text.replace("alpha A", "alpha A edited"), encoding="utf-8")
-        git(repo, "add", "story.txt")
+        # Amend only metadata on the clean continuation path. Content edits
+        # are exercised separately below because they may legitimately make a
+        # later commit conflict.
         git(repo, "commit", "--amend", "-qm", "A edited")
 
         env = dict(os.environ)

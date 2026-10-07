@@ -59,13 +59,18 @@ Item {
     function fileTransferEligible() {
         const row = root.selectedFile || {};
 
+        const wholeFileCandidate =
+            Boolean(row.untracked)
+            || (
+                Boolean(row.unstaged)
+                && !Boolean(row.staged)
+              );
+
         return !!root.changesService
             && !!root.transferService
             && !!root.branchWorkspaceService
             && root.selectedPath.length > 0
-            && Boolean(row.unstaged)
-            && !Boolean(row.staged)
-            && !Boolean(row.untracked)
+            && wholeFileCandidate
             && !Boolean(row.conflict)
             && !root.changesService.actionBusy
             && !root.transferService.previewBusy
@@ -2661,6 +2666,10 @@ Item {
             ? String(root.gitService.repoRoot || "")
             : ""
         filePath: root.selectedPath
+        untrackedSource:
+            root.selectedFile
+            ? Boolean(root.selectedFile.untracked)
+            : false
         transferScope: root.transferScope
         hunkIndex: root.transferHunkIndex
         hunkSummary:

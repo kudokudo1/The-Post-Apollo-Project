@@ -127,7 +127,8 @@ Scope {
                 "CHANGES/TRANSFER",
                 "CHANGES/TRANSFER_HUNK",
                 "CHANGES/TRANSFER_LINE",
-                "CHANGES/TRANSFER_STAGED"
+                "CHANGES/TRANSFER_STAGED",
+                "CHANGES/TRANSFER_UNTRACKED"
             ].indexOf(kind) < 0)
             return null;
 
@@ -150,7 +151,11 @@ Scope {
                 || !patchBase64
                 || !fingerprint
                 || patchBytes <= 0
-                || (layer !== "worktree" && layer !== "staged")) {
+                || (
+                    layer !== "worktree"
+                    && layer !== "staged"
+                    && layer !== "untracked"
+                )) {
             return refuse("TRANSFER RECOVERY PAYLOAD IS INCOMPLETE");
         }
 
@@ -173,6 +178,8 @@ Scope {
                 + (
                     layer === "staged"
                     ? " STAGED "
+                    : layer === "untracked"
+                    ? " UNTRACKED "
                     : " "
                   )
                 + String(metadata.scope || "file").toUpperCase()

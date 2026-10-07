@@ -9,6 +9,7 @@ Rectangle {
 
     property string sourcePath: ""
     property string filePath: ""
+    property bool untrackedSource: false
     property string transferScope: "file"
     property int hunkIndex: -1
     property string hunkSummary: ""
@@ -111,6 +112,14 @@ Rectangle {
             );
         }
 
+        if (untrackedSource) {
+            return transferService.previewUntracked(
+                selectedDestinationPath,
+                [filePath],
+                transferMode
+            );
+        }
+
         return transferService.preview(
             selectedDestinationPath,
             [filePath],
@@ -128,6 +137,7 @@ Rectangle {
     }
 
     onFilePathChanged: invalidatePreview()
+    onUntrackedSourceChanged: invalidatePreview()
     onSourcePathChanged: invalidatePreview()
     onTransferScopeChanged: invalidatePreview()
     onHunkIndexChanged: invalidatePreview()
@@ -257,6 +267,12 @@ Rectangle {
                     ? (
                         "HUNK SLICE // WORKTREE HUNK ONLY // "
                         + "DESTINATION MUST BE A CLEAN EXISTING WORKTREE"
+                      )
+                    : root.untrackedSource
+                    ? (
+                        "UNTRACKED REGULAR FILE // "
+                        + "DESTINATION PATH MUST NOT EXIST // "
+                        + "DESTINATION WORKTREE MUST BE CLEAN"
                       )
                     : (
                         "TRACKED + UNSTAGED WHOLE FILE // "

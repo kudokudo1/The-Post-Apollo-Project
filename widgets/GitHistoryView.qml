@@ -2880,6 +2880,29 @@ Item {
                             }
                         }
 
+                        MiniButton {
+                            width: parent.width
+                            height: 30
+                            label:
+                                root.armedAction === "merge"
+                                ? "CONFIRM MERGE SELECTED INTO CURRENT"
+                                : "ARM MERGE SELECTED INTO CURRENT"
+                            accent: Colors.green
+                            enabledAction:
+                                root.historyService
+                                && root.historyService.selectedSha
+                                && !root.historyService.actionBusy
+                            onTriggered:
+                                root.armOrRun(
+                                    "merge",
+                                    function() {
+                                        root.historyService.mergeCommit(
+                                            root.historyService.selectedSha
+                                        );
+                                    }
+                                )
+                        }
+
                         Row {
                             width: parent.width
                             height: 30

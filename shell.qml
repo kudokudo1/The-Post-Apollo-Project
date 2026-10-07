@@ -20,6 +20,17 @@ import Qt5Compat.GraphicalEffects
 PanelWindow {
     id: shellRoot
 
+    // This shell is developed by multiple concurrent writers. Quickshell's
+    // automatic file watcher can reload partially-updated QML graphs while
+    // shader-backed items are being detached, which has repeatedly crashed
+    // QtQuick in QQuickShaderEffectSource::itemChange() on Qt 6.11.
+    //
+    // Keep the live shell stable while files change. Apply updates with an
+    // explicit process restart instead of in-process hot reload.
+    Component.onCompleted: {
+        Quickshell.watchFiles = false;
+    }
+
     // Hospital and Git may be open together, but exactly one owns the
     // shared keyboard vocabulary at a time.
     property string controlKeyboardOwner: ""

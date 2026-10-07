@@ -7,6 +7,9 @@ Item {
 
     required property var historyService
 
+    // Live Hospital teams are supplied by HospitalW so Reports can filter to
+    // rooms even before that room has produced a history event.
+    property var roomTeams: []
     property string teamFilter: ""
     property string stateFilter: ""
     property int selectedIndex: -1
@@ -24,26 +27,41 @@ Item {
         "REOPENED"
     ]
 
-    readonly property var teamOptions: {
-        const source =
+    function buildTeamOptions() {
+        const history =
             root.historyService
             && Array.isArray(root.historyService.events)
             ? root.historyService.events
             : [];
+        const live =
+            Array.isArray(root.roomTeams)
+            ? root.roomTeams
+            : [];
         const seen = {};
         const teams = [""];
 
-        for (let i = 0; i < source.length; ++i) {
-            const team = String((source[i] || {}).team || "");
+        function addTeam(value) {
+            const team =
+                String(value || "").trim();
 
-            if (team && !seen[team]) {
-                seen[team] = true;
-                teams.push(team);
-            }
+            if (!team || seen[team])
+                return;
+
+            seen[team] = true;
+            teams.push(team);
         }
+
+        for (let i = 0; i < live.length; ++i)
+            addTeam(live[i]);
+
+        for (let i = 0; i < history.length; ++i)
+            addTeam((history[i] || {}).team);
 
         return teams;
     }
+
+    readonly property var teamOptions:
+        buildTeamOptions()
 
     readonly property var filteredEvents: {
         const source =
@@ -210,8 +228,10 @@ Item {
     }
 
     function cycleTeam(delta) {
+        const options = buildTeamOptions();
+
         teamFilter =
-            cycleOption(teamOptions, teamFilter, delta);
+            cycleOption(options, teamFilter, delta);
         selectedIndex =
             filteredEvents.length > 0 ? 0 : -1;
     }

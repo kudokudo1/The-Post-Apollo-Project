@@ -659,6 +659,60 @@ Scope {
         };
     }
 
+    function cloneRecoveryPlan(record) {
+        const row = record || {};
+        const metadata = row.metadata || {};
+        const before = row.before || {};
+        const after = row.after || {};
+
+        if (String(row.kind || "") !== "CONTROL/CLONE")
+            return null;
+
+        const destinationPath =
+            String(
+                after.destinationPath
+                || metadata.destinationPath
+                || ""
+            );
+        const beforePath =
+            String(before.destinationPath || "");
+        const expectedHead = String(after.head || "");
+        const expectedBranch = String(after.branch || "");
+        const expectedOrigin = String(after.origin || "");
+        const expectedFingerprint =
+            String(after.filesystemFingerprint || "");
+
+        if (String(row.recoveryClass || "")
+                    !== "EXTERNAL_RECOVERABLE"
+                || String(before.recoveryClass || "")
+                    !== "EXTERNAL_RECOVERABLE"
+                || String(after.recoveryClass || "")
+                    !== "EXTERNAL_RECOVERABLE"
+                || !Boolean(before.destinationRequiredAbsent)
+                || !Boolean(after.cloneCreated)
+                || !destinationPath
+                || beforePath !== destinationPath
+                || !expectedHead
+                || !expectedFingerprint) {
+            return refuse(
+                "CLONE DOES NOT HAVE EXACT EXTERNAL RECOVERY EVIDENCE"
+            );
+        }
+
+        return {
+            allowed: true,
+            strategy: "DELETE_EXACT_CLONE",
+            destinationPath: destinationPath,
+            expectedHead: expectedHead,
+            expectedBranch: expectedBranch,
+            expectedOrigin: expectedOrigin,
+            expectedFingerprint: expectedFingerprint,
+            summary:
+                "UNDO CLONE // DELETE EXACT UNCHANGED CHECKOUT // "
+                + destinationPath
+        };
+    }
+
     function preview(record) {
         const row = record || {};
         const kind = String(row.kind || "");
@@ -672,6 +726,10 @@ Scope {
 
         if (String(row.undoState || "") === "UNDONE")
             return refuse("OPERATION IS ALREADY UNDONE");
+
+        const clonePlan = cloneRecoveryPlan(row);
+        if (clonePlan)
+            return clonePlan;
 
         const transferPlan = transferRecoveryPlan(row);
         if (transferPlan)

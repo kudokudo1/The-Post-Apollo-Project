@@ -22,6 +22,15 @@ Singleton {
     property bool historyEnabled: true
     property string historyStatus: "loading"
 
+    // Bound persistent history so rendering/search/filter cost cannot
+    // grow forever over the lifetime of the desktop session.
+    property int maxHistoryEntries: 300
+    property int notificationsRevision: 0
+
+    function markNotificationsChanged() {
+        notificationsRevision += 1;
+    }
+
     // ===== EXTERNAL NOTIFICATIONS ===============================
 
     NotificationServer {
@@ -181,6 +190,11 @@ Singleton {
         return normalTimeoutMs;
     }
 
+    function pruneHistory() {
+        while (notifications.count > maxHistoryEntries)
+            notifications.remove(0);
+    }
+
     function appendNotification(notification) {
         const entry = normalize(notification);
 
@@ -206,12 +220,15 @@ Singleton {
             replaceModelEntry(notifications, historyIndex, entry);
         }
 
+        pruneHistory();
+
         if (activeIndex === -1) {
             activeNotifications.append(entry);
         } else {
             replaceModelEntry(activeNotifications, activeIndex, entry);
         }
 
+        markNotificationsChanged();
         scheduleHistorySave();
     }
 
@@ -250,8 +267,10 @@ Singleton {
 
         const activeUpdated = updateModelNotification(activeNotifications, notificationId, changes);
 
-        if (historyUpdated)
+        if (historyUpdated) {
+            markNotificationsChanged();
             scheduleHistorySave();
+        }
 
         return historyUpdated || activeUpdated;
     }
@@ -386,6 +405,7 @@ Singleton {
         historySaveTimer.stop();
 
         notifications.clear();
+        markNotificationsChanged();
 
         historyStatus = "clearing";
 
@@ -407,7 +427,7 @@ Singleton {
         const raw = historyFile.text().trim();
 
         if (raw === "")
-            return;
+            return false;
 
         let document;
 
@@ -415,14 +435,28 @@ Singleton {
             document = JSON.parse(raw);
         } catch (error) {
             historyStatus = "parse-error";
-            return;
+            return false;
         }
 
         // Allows an old raw-array history file too.
-        const entries = Array.isArray(document) ? document : document.notifications || [];
+        const entries = Array.isArray(document) ? document : Array.isArray(document.notifications) ? document.notifications : [];
 
-        for (let i = 0; i < entries.length; i++) {
-            const entry = normalize(entries[i]);
+        // Work only with the newest retained slice. This prevents a very
+        // large legacy history file from inflating the live QML model before
+        // pruning can happen.
+        const retainedEntries = entries.slice();
+
+        retainedEntries.sort(function (a, b) {
+            const aTime = Number((a && (a.updatedAt || a.createdAt)) || 0);
+            const bTime = Number((b && (b.updatedAt || b.createdAt)) || 0);
+
+            return aTime - bTime;
+        });
+
+        const firstRetainedIndex = Math.max(0, retainedEntries.length - maxHistoryEntries);
+
+        for (let i = firstRetainedIndex; i < retainedEntries.length; i++) {
+            const entry = normalize(retainedEntries[i]);
 
             // Old history should not reopen as a popup.
             entry.expiresAt = 0;
@@ -445,6 +479,11 @@ Singleton {
                 }
             }
         }
+
+        pruneHistory();
+        markNotificationsChanged();
+
+        return entries.length > notifications.count;
     }
 
     FileView {
@@ -456,10 +495,13 @@ Singleton {
         printErrors: true
 
         onLoaded: {
-            root.loadHistory();
+            const historyWasTrimmed = root.loadHistory();
 
             root.historyReady = true;
             root.historyStatus = "ready";
+
+            if (historyWasTrimmed && root.historyEnabled)
+                root.saveHistory();
         }
 
         onLoadFailed: function (error) {

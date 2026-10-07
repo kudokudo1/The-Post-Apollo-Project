@@ -108,6 +108,44 @@ PanelWindow {
     property string searchQuery: ""
     property string activeFilter: "all"
 
+    // Keep the heavy ListView on an actually filtered model.
+    // Zero-height delegates force ListView to walk and construct large
+    // stretches of hidden history just to fill the viewport.
+    ListModel {
+        id: filteredNotifications
+    }
+
+    Timer {
+        id: filteredModelRefreshTimer
+
+        interval: 0
+        repeat: false
+
+        onTriggered: {
+            root.rebuildFilteredNotifications();
+        }
+    }
+
+    Connections {
+        target: NotificationsService
+
+        function onNotificationsRevisionChanged() {
+            root.scheduleFilteredModelRebuild();
+        }
+    }
+
+    onActiveFilterChanged: {
+        root.scheduleFilteredModelRebuild();
+    }
+
+    onSearchQueryChanged: {
+        root.scheduleFilteredModelRebuild();
+    }
+
+    Component.onCompleted: {
+        root.scheduleFilteredModelRebuild();
+    }
+
     // ===== APP-WIDE CARD STATE ==================================
     //
     // Temporary frontend state.
@@ -605,6 +643,34 @@ PanelWindow {
 
     // ===== SEARCH / FILTER ======================================
 
+    function scheduleFilteredModelRebuild() {
+        filteredModelRefreshTimer.restart();
+    }
+
+    function rebuildFilteredNotifications() {
+        filteredNotifications.clear();
+
+        for (var i = 0; i < NotificationsService.notifications.count; i++) {
+            var entry = NotificationsService.notifications.get(i);
+            var classification = root.classificationFor(entry.source, entry.sourceId, entry.category, entry.severity);
+
+            if (!root.notificationMatches(entry.source, entry.title, entry.message, entry.category, entry.severity, classification.group))
+                continue;
+
+            filteredNotifications.append({
+                "notificationId": String(entry.id || ""),
+                "source": String(entry.source || ""),
+                "sourceId": String(entry.sourceId || ""),
+                "title": String(entry.title || ""),
+                "message": String(entry.message || ""),
+                "appIcon": String(entry.appIcon || ""),
+                "category": String(entry.category || "generic"),
+                "severity": String(entry.severity || "normal")
+            });
+        }
+
+    }
+
     function notificationMatches(source, title, message, category, severity, filterGroup) {
         if (root.activeFilter !== "all" && root.activeFilter !== filterGroup)
             return false;
@@ -641,24 +707,29 @@ PanelWindow {
     // Dismiss is notification-specific.
     // Favorite / snooze / DND are app-wide.
 
-    function dismissNotification(historyIndex) {
-        if (historyIndex < 0 || historyIndex >= NotificationsService.notifications.count)
+    function dismissNotification(notificationId) {
+        var eventId = String(notificationId || "");
+
+        if (eventId === "")
             return;
 
-        var entry = NotificationsService.notifications.get(historyIndex);
-        var eventId = String(entry.id || "");
+        for (var historyIndex = NotificationsService.notifications.count - 1; historyIndex >= 0; historyIndex--) {
+            var entry = NotificationsService.notifications.get(historyIndex);
 
-        NotificationsService.notifications.remove(historyIndex);
-
-        if (eventId !== "") {
-            for (var i = NotificationsService.activeNotifications.count - 1; i >= 0; i--) {
-                var active = NotificationsService.activeNotifications.get(i);
-
-                if (String(active.id || "") === eventId)
-                    NotificationsService.activeNotifications.remove(i);
+            if (String(entry.id || "") === eventId) {
+                NotificationsService.notifications.remove(historyIndex);
+                break;
             }
         }
 
+        for (var i = NotificationsService.activeNotifications.count - 1; i >= 0; i--) {
+            var active = NotificationsService.activeNotifications.get(i);
+
+            if (String(active.id || "") === eventId)
+                NotificationsService.activeNotifications.remove(i);
+        }
+
+        NotificationsService.markNotificationsChanged();
         NotificationsService.scheduleHistorySave();
     }
 
@@ -1295,7 +1366,9 @@ PanelWindow {
 
                     boundsBehavior: Flickable.StopAtBounds
 
-                    model: NotificationsService.notifications
+                    model: filteredNotifications
+
+                    reuseItems: true
 
                     header: Item {
                         width: 1
@@ -1311,6 +1384,7 @@ PanelWindow {
                         id: notificationEntry
 
                         required property int index
+                        required property string notificationId
                         required property string source
                         required property string sourceId
                         required property string title
@@ -1336,17 +1410,10 @@ PanelWindow {
 
                         readonly property color sourceColor: notificationEntry.sharedAppState.favorite === true ? Colors.magenta : notificationEntry.baseColor
 
-                        readonly property bool matchesCurrentView: root.notificationMatches(notificationEntry.source, notificationEntry.title, notificationEntry.message, notificationEntry.category, notificationEntry.severity, notificationEntry.filterGroup)
-
                         readonly property url resolvedAppIcon: root.resolveAppIcon(notificationEntry.appIcon, notificationEntry.sourceId)
 
                         width: historyList.width
-
-                        // Include spacing inside delegate geometry so
-                        // filtered-out entries collapse completely.
-                        height: notificationEntry.matchesCurrentView ? root.cardHeight + root.cardSpacing : 0
-
-                        visible: notificationEntry.matchesCurrentView
+                        height: root.cardHeight + root.cardSpacing
 
                         // ===== SOFT CARD GLOW SOURCE =============
 
@@ -1680,7 +1747,7 @@ PanelWindow {
                                     danger: true
 
                                     onTriggered: {
-                                        root.dismissNotification(notificationEntry.index);
+                                        root.dismissNotification(notificationEntry.notificationId);
                                     }
                                 }
                             }

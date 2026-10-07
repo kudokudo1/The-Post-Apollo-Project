@@ -168,6 +168,106 @@ Scope {
         return setParent(branch, "");
     }
 
+    function attachCreatedBranch(anchorBranch, newBranch, position) {
+        const repo = String(repositoryKey || "").trim();
+        const anchor = String(anchorBranch || "").trim();
+        const created = String(newBranch || "").trim();
+        const mode = String(position || "").trim().toUpperCase();
+
+        if (!repo || !anchor || !created) {
+            relationRejected(
+                "CREATE STACK LINK REFUSED // REPOSITORY + BRANCHES REQUIRED"
+            );
+            return false;
+        }
+
+        if (anchor === created) {
+            relationRejected(
+                "CREATE STACK LINK REFUSED // BRANCH CANNOT PARENT ITSELF"
+            );
+            return false;
+        }
+
+        if (mode !== "ABOVE" && mode !== "BELOW") {
+            relationRejected(
+                "CREATE STACK LINK REFUSED // UNKNOWN POSITION"
+            );
+            return false;
+        }
+
+        const oldParent = parentOf(anchor);
+
+        if (mode === "BELOW" && !oldParent) {
+            relationRejected(
+                "CREATE STACK LINK REFUSED // "
+                + anchor
+                + " HAS NO STACK PARENT"
+            );
+            return false;
+        }
+
+        const next = [];
+        let anchorUpdated = false;
+
+        for (let i = 0; i < relations.length; ++i) {
+            const row = relations[i] || {};
+            const sameRepo =
+                String(row.repository || "") === repo;
+            const branch = String(row.branch || "");
+            const parent = String(row.parent || "");
+
+            // A successfully created Git branch must not inherit stale
+            // Post-Apollo stack metadata from a previously deleted branch.
+            if (sameRepo && branch === created)
+                continue;
+
+            if (mode === "BELOW"
+                    && sameRepo
+                    && branch === anchor) {
+                next.push({
+                    repository: repo,
+                    branch: anchor,
+                    parent: created
+                });
+                anchorUpdated = true;
+                continue;
+            }
+
+            next.push({
+                repository: String(row.repository || ""),
+                branch: branch,
+                parent: parent
+            });
+        }
+
+        if (mode === "ABOVE") {
+            next.push({
+                repository: repo,
+                branch: created,
+                parent: anchor
+            });
+        } else {
+            if (!anchorUpdated) {
+                relationRejected(
+                    "CREATE STACK LINK REFUSED // "
+                    + anchor
+                    + " RELATION DISAPPEARED"
+                );
+                return false;
+            }
+
+            next.push({
+                repository: repo,
+                branch: created,
+                parent: oldParent
+            });
+        }
+
+        relations = next;
+        persist();
+        return true;
+    }
+
     function renameBranch(oldName, newName) {
         const repo = String(repositoryKey || "").trim();
         const oldBranch = String(oldName || "").trim();

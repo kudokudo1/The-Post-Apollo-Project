@@ -1635,6 +1635,8 @@ PanelWindow {
 
     GitRepositoryService {
         id: repositoryService
+        operationJournal: operationJournalService
+        snapshotService: repositorySnapshotService
         repositoryPath:
             gitService.repoIsLocal
             ? gitService.repoRoot

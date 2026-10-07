@@ -2,14 +2,18 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SHARED = ROOT / "components" / "ConversationFeed.qml"
+QMLDIR = ROOT / "components" / "qmldir"
 WRAPPER = ROOT / "widgets" / "messanger" / "ChatFeed.qml"
 ADAPTER = ROOT / "services" / "hospital" / "HospitalRoomConversationAdapter.qml"
 ROOM_CHAT = ROOT / "widgets" / "HospitalRoomChatView.qml"
 
 assert SHARED.is_file(), SHARED
 
+qmldir = QMLDIR.read_text()
+assert "ConversationFeed 1.0 ConversationFeed.qml" in qmldir
+
 wrapper = WRAPPER.read_text()
-assert 'import "../../components"' in wrapper
+assert "import qs.components" in wrapper
 assert "ConversationFeed {" in wrapper
 assert "SessionAdapter" not in wrapper
 assert len(wrapper.splitlines()) < 20

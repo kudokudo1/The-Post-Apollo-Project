@@ -7,10 +7,63 @@ Item {
 
     required property var projectService
 
+    property string armedItemAction: ""
+    property string armedItemId: ""
+
     readonly property var scheduled:
         root.projectService.scheduledItems()
     readonly property var unscheduled:
         root.projectService.unscheduledItems()
+
+    function itemActionArmed(action, item) {
+        return root.armedItemAction === String(action || "")
+            && root.armedItemId
+               === root.projectService.itemId(item);
+    }
+
+    function armOrRunItem(action, item, callback) {
+        const id = root.projectService.itemId(item);
+
+        if (!id)
+            return;
+
+        if (root.itemActionArmed(action, item)) {
+            root.armedItemAction = "";
+            root.armedItemId = "";
+
+            if (callback)
+                callback();
+
+            return;
+        }
+
+        root.armedItemAction = String(action || "");
+        root.armedItemId = id;
+    }
+
+    function clearItemArm() {
+        root.armedItemAction = "";
+        root.armedItemId = "";
+    }
+
+    function openProjectItem(item) {
+        const url = root.projectService.itemUrl(item);
+
+        if (url)
+            Qt.openUrlExternally(url);
+    }
+
+    Connections {
+        target: root.projectService
+
+        function onMutationFinished(success, operation) {
+            root.clearItemArm();
+        }
+
+        function onProjectRefreshed() {
+            root.clearItemArm();
+        }
+    }
 
     component RoadAction: Rectangle {
         id: roadAction
@@ -255,7 +308,7 @@ Item {
                                 Item {
                                     id: timeline
 
-                                    width: parent.width - 270
+                                    width: parent.width - 325
                                     height: parent.height
 
                                     Repeater {
@@ -331,29 +384,62 @@ Item {
                                 }
 
                                 Row {
-                                    width: 84
+                                    width: 139
                                     height: parent.height
                                     spacing: 5
 
                                     RoadAction {
-                                        width: 55
+                                        width: 40
                                         anchors.verticalCenter: parent.verticalCenter
-                                        label: "ARCHIVE"
+                                        label: "OPEN"
+                                        enabledAction:
+                                            !!root.projectService.itemUrl(
+                                                roadRow.modelData
+                                            )
+                                        onTriggered:
+                                            root.openProjectItem(
+                                                roadRow.modelData
+                                            )
+                                    }
+
+                                    RoadAction {
+                                        width: 65
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        label:
+                                            root.itemActionArmed(
+                                                "archive",
+                                                roadRow.modelData
+                                            )
+                                            ? "CONFIRM"
+                                            : "ARCHIVE"
                                         enabledAction:
                                             !root.projectService.busy
                                             && !!root.projectService.itemId(
                                                 roadRow.modelData
                                             )
                                         onTriggered:
-                                            root.projectService.archiveItem(
-                                                roadRow.modelData
+                                            root.armOrRunItem(
+                                                "archive",
+                                                roadRow.modelData,
+                                                function() {
+                                                    root.projectService.archiveItem(
+                                                        roadRow.modelData,
+                                                        true
+                                                    );
+                                                }
                                             )
                                     }
 
                                     RoadAction {
                                         width: 24
                                         anchors.verticalCenter: parent.verticalCenter
-                                        label: "X"
+                                        label:
+                                            root.itemActionArmed(
+                                                "remove",
+                                                roadRow.modelData
+                                            )
+                                            ? "!"
+                                            : "X"
                                         destructive: true
                                         enabledAction:
                                             !root.projectService.busy
@@ -361,8 +447,15 @@ Item {
                                                 roadRow.modelData
                                             )
                                         onTriggered:
-                                            root.projectService.removeItem(
-                                                roadRow.modelData
+                                            root.armOrRunItem(
+                                                "remove",
+                                                roadRow.modelData,
+                                                function() {
+                                                    root.projectService.removeItem(
+                                                        roadRow.modelData,
+                                                        true
+                                                    );
+                                                }
                                             )
                                     }
                                 }
@@ -414,7 +507,7 @@ Item {
                                 }
 
                                 GohuText {
-                                    width: parent.width - 204
+                                    width: parent.width - 254
                                     anchors.verticalCenter: parent.verticalCenter
                                     text:
                                         root.projectService.itemTitle(
@@ -435,29 +528,62 @@ Item {
                                 }
 
                                 Row {
-                                    width: 104
+                                    width: 154
                                     height: parent.height
                                     spacing: 4
 
                                     RoadAction {
-                                        width: 72
+                                        width: 40
                                         anchors.verticalCenter: parent.verticalCenter
-                                        label: "ARCHIVE"
+                                        label: "OPEN"
+                                        enabledAction:
+                                            !!root.projectService.itemUrl(
+                                                unscheduledRow.modelData
+                                            )
+                                        onTriggered:
+                                            root.openProjectItem(
+                                                unscheduledRow.modelData
+                                            )
+                                    }
+
+                                    RoadAction {
+                                        width: 76
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        label:
+                                            root.itemActionArmed(
+                                                "archive",
+                                                unscheduledRow.modelData
+                                            )
+                                            ? "CONFIRM"
+                                            : "ARCHIVE"
                                         enabledAction:
                                             !root.projectService.busy
                                             && !!root.projectService.itemId(
                                                 unscheduledRow.modelData
                                             )
                                         onTriggered:
-                                            root.projectService.archiveItem(
-                                                unscheduledRow.modelData
+                                            root.armOrRunItem(
+                                                "archive",
+                                                unscheduledRow.modelData,
+                                                function() {
+                                                    root.projectService.archiveItem(
+                                                        unscheduledRow.modelData,
+                                                        true
+                                                    );
+                                                }
                                             )
                                     }
 
                                     RoadAction {
                                         width: 26
                                         anchors.verticalCenter: parent.verticalCenter
-                                        label: "X"
+                                        label:
+                                            root.itemActionArmed(
+                                                "remove",
+                                                unscheduledRow.modelData
+                                            )
+                                            ? "!"
+                                            : "X"
                                         destructive: true
                                         enabledAction:
                                             !root.projectService.busy
@@ -465,8 +591,15 @@ Item {
                                                 unscheduledRow.modelData
                                             )
                                         onTriggered:
-                                            root.projectService.removeItem(
-                                                unscheduledRow.modelData
+                                            root.armOrRunItem(
+                                                "remove",
+                                                unscheduledRow.modelData,
+                                                function() {
+                                                    root.projectService.removeItem(
+                                                        unscheduledRow.modelData,
+                                                        true
+                                                    );
+                                                }
                                             )
                                     }
                                 }

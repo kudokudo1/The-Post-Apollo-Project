@@ -353,6 +353,17 @@ Scope {
         const roomTeam = room ? String(room.team || "") : "";
         const responsibility =
             room ? String(room.responsibility || "") : "";
+        const durable = root.durableRoomFor(
+            room,
+            repository,
+            branch
+        );
+        const durableRoomId = durable
+            ? String(durable.id || durable.roomId || roomTeam)
+            : roomTeam;
+        const session = durableRoomId
+            ? root.activeSessionForRoom(durableRoomId)
+            : null;
         const specialistNames = specialists.map(function(row) {
             return String(row.name || row.id || "SPECIALIST");
         });
@@ -360,6 +371,8 @@ Scope {
         let ownerLabel = "UNMAPPED";
         if (specialistNames.length > 0)
             ownerLabel = specialistNames.join(", ");
+        else if (durable && durable.doctorId)
+            ownerLabel = String(durable.doctorId);
         else if (roomTeam)
             ownerLabel = roomTeam;
         else if (responsibility)
@@ -371,16 +384,38 @@ Scope {
             confidence: root.confidenceLabel(matched.score),
             score: matched.score,
             reasons: matched.reasons,
+            roomId: durableRoomId,
             roomTeam: roomTeam,
             roomResponsibility: responsibility,
-            roomBranch: room ? String(room.branch || "") : "",
+            roomBranch:
+                durable && durable.branch
+                ? String(durable.branch)
+                : room ? String(room.branch || "") : "",
             roomState: room ? String(room.state || "") : "",
             floorLabel: room ? String(room.floorLabel || "") : "",
+            bedPath:
+                durable ? String(durable.bedPath || "") : "",
+            doctorId:
+                session && session.doctorId
+                ? String(session.doctorId)
+                : durable ? String(durable.doctorId || "") : "",
+            providerId:
+                session && session.providerId
+                ? String(session.providerId)
+                : durable ? String(durable.providerId || "") : "",
+            sessionId:
+                session ? String(session.id || "") : "",
+            sessionStatus:
+                session ? String(session.status || "") : "",
+            activeProviderPid:
+                session ? Number(session.activeProviderPid || 0) : 0,
             specialists: specialists,
             specialistNames: specialistNames,
             ownerLabel: ownerLabel,
             assignmentId:
-                assignment ? String(assignment.id || "") : "",
+                assignment
+                ? String(assignment.id || "")
+                : durable ? String(durable.assignmentId || "") : "",
             assignmentTitle:
                 assignment ? String(assignment.title || "") : "",
             assignmentGoal:
@@ -393,4 +428,127 @@ Scope {
                 : []
         };
     }
+
+    function blockerForWorkItem(itemValue) {
+        const item = itemValue || {};
+
+        if (Boolean(item.failedChecks)
+                || Number(item.checkFailed || 0) > 0)
+            return "FAILED CHECKS";
+        if (Boolean(item.changesRequested))
+            return "CHANGES REQUESTED";
+        if (Boolean(item.mergeConflict))
+            return "MERGE CONFLICT";
+        if (Boolean(item.blocked))
+            return "BLOCKED";
+        if (Boolean(item.pendingChecks)
+                || Number(item.checkPending || 0) > 0)
+            return "CHECKS PENDING";
+        if (Boolean(item.waitingOnReviewer))
+            return "WAITING ON REVIEWER";
+        if (Boolean(item.needsMyReview))
+            return "NEEDS YOUR REVIEW";
+
+        const state = String(
+            item.primaryState || item.state || ""
+        ).toUpperCase();
+        if (state === "LOCKED")
+            return "MERGE QUEUE LOCKED";
+        if (state === "UNMERGEABLE")
+            return "UNMERGEABLE";
+        if (state === "AWAITING_CHECKS")
+            return "CHECKS PENDING";
+
+        return "";
+    }
+
+    function responsibilityChain(contextValue) {
+        const context = contextValue || {};
+        const parts = [];
+
+        if (context.workItemNumber)
+            parts.push(
+                String(context.workItemKind || "WORK").toUpperCase()
+                + " #" + String(context.workItemNumber)
+            );
+        if (context.roomTeam)
+            parts.push("ROOM " + String(context.roomTeam));
+        if (context.bedPath)
+            parts.push("BED " + String(context.bedPath));
+        if (context.doctorId)
+            parts.push("DOCTOR " + String(context.doctorId));
+        if (context.sessionId)
+            parts.push(
+                "SESSION " + String(context.sessionId)
+                + (
+                    context.sessionStatus
+                    ? " [" + String(context.sessionStatus) + "]"
+                    : ""
+                  )
+            );
+        if (context.assignmentId)
+            parts.push(
+                "ORDER "
+                + (
+                    context.assignmentTitle
+                    ? String(context.assignmentTitle)
+                    : "#" + String(context.assignmentId)
+                  )
+            );
+        if (context.blocker)
+            parts.push("WAITING // " + String(context.blocker));
+
+        return parts.join(" → ");
+    }
+
+    function contextForWorkItem(itemValue) {
+        const item = itemValue || {};
+        const repository = String(item.repository || "").trim();
+        const branch = String(
+            item.headRefName
+            || item.branch
+            || item.headBranch
+            || ""
+        ).trim();
+        const context = root.contextFor(repository, branch);
+
+        context.workItemKind = String(
+            item.kind || item.workItemKind || "pull_request"
+        );
+        context.workItemNumber = Number(
+            item.number || item.pullRequestNumber || 0
+        );
+        context.workItemTitle = String(item.title || "");
+        context.workItemUrl = String(item.url || "");
+        context.workItemHeadSha = String(
+            item.headSha || item.headRefOid || ""
+        );
+        context.workItemBaseBranch = String(
+            item.baseRefName || item.baseBranch || ""
+        );
+        context.attentionState = String(
+            item.primaryState || item.state || ""
+        );
+        context.attentionStates =
+            Array.isArray(item.attentionStates)
+            ? item.attentionStates.slice()
+            : [];
+        context.blocker = root.blockerForWorkItem(item);
+        context.evidence = {
+            checksPassed: Number(item.checkPassed || 0),
+            checksFailed: Number(item.checkFailed || 0),
+            checksPending: Number(item.checkPending || 0),
+            reviewDecision: String(item.reviewDecision || ""),
+            mergeState: String(
+                item.mergeStateStatus
+                || item.mergeable
+                || item.state
+                || ""
+            ),
+            headSha: context.workItemHeadSha
+        };
+        context.chain = root.responsibilityChain(context);
+        return context;
+    }
+
 }

@@ -10,6 +10,7 @@ Item {
     property var gitService: null
     property var transferService: null
     property var branchWorkspaceService: null
+    property var conflictEditorService: null
     property var keyboardHost: null
 
     property bool transferOpen: false
@@ -150,7 +151,6 @@ Item {
 
     function focusPath(path) {
         root.pendingFocusPath = String(path || "");
-        root.subMode = "files";
         root.applyPendingFocus();
     }
 
@@ -159,6 +159,20 @@ Item {
 
         if (!target || !root.changesService)
             return;
+
+        const conflicts = root.changesService.conflicts || [];
+
+        for (let i = 0; i < conflicts.length; ++i) {
+            const row = conflicts[i] || {};
+
+            if (String(row.path || "") !== target)
+                continue;
+
+            root.pendingFocusPath = "";
+            root.subMode = "conflicts";
+            root.selectFile(row);
+            return;
+        }
 
         const rows = root.changesService.files || [];
 
@@ -169,6 +183,7 @@ Item {
                 continue;
 
             root.pendingFocusPath = "";
+            root.subMode = "files";
             root.selectFile(row);
             return;
         }
@@ -254,6 +269,12 @@ Item {
             return;
 
         root.changesService.preview(root.selectedPath, root.diffMode);
+
+        if (root.subMode === "conflicts"
+                && root.conflictEditorService)
+            root.conflictEditorService.load(
+                root.selectedPath
+            );
 
         if (!Boolean(data.untracked)) {
             root.hunkMode = Boolean(data.unstaged)
@@ -2357,31 +2378,14 @@ Item {
                             }
                         }
 
-                        Flickable {
-                            id: changesScroll8
+                        GitConflictEditorView {
                             width: parent.width
                             height: parent.height - 118
-                            clip: true
-                            contentWidth: width
-                            contentHeight: conflictDiff.implicitHeight
-                            boundsBehavior: Flickable.StopAtBounds
 
-                            GohuText {
-                                id: conflictDiff
-                                width: parent.width
-                                text:
-                                    root.changesService
-                                    ? root.changesService.previewText
-                                    : "NO CHANGE SERVICE"
-                                font.pixelSize: 11
-                                color: Colors.white
-                                wrapMode: Text.WrapAnywhere
-                            }
-                        
-                            NeonScrollBar {
-                                flickable: changesScroll8
-                            }
-}
+                            conflictService:
+                                root.conflictEditorService
+                            keyboardHost: root.keyboardHost
+                        }
                     }
                 }
             }
@@ -2726,6 +2730,22 @@ Item {
 
             if (root.branchWorkspaceService)
                 root.branchWorkspaceService.refresh();
+        }
+    }
+
+    Connections {
+        target: root.conflictEditorService
+        enabled: root.conflictEditorService !== null
+        ignoreUnknownSignals: true
+
+        function onResultSaved(path, staged, success, detail) {
+            if (!success)
+                return;
+
+            root.clearArm();
+
+            if (root.changesService)
+                root.changesService.refresh();
         }
     }
 

@@ -1980,7 +1980,6 @@ Item {
                                     flickable: historyScroll7
                                     starHandle: true
                                     rightInset: 2
-                                    trackTopExtension: 33
                                 }
                             }
                         }

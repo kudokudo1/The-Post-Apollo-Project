@@ -40,7 +40,7 @@ Item {
             text: fanSafetyLock.unlocked ? "☍" : ""
             font.pixelSize: fanSafetyLock.unlocked ? 15 : 12
             color: Colors.omnitrix
-            layer.enabled: true
+            layer.enabled: Window.window !== null
             layer.effect: DropShadow {
                 radius: 4
                 samples: 5

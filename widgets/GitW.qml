@@ -824,8 +824,8 @@ PanelWindow {
                 detail = sha.slice(0, 10);
             else if (scopeRef && scopeRef !== "ALL")
                 detail = scopeRef
-                    .replace(/^refs\/heads\//, "")
-                    .replace(/^refs\/tags\//, "");
+                    .replace("refs/heads/", "")
+                    .replace("refs/tags/", "");
 
             return (
                 "HISTORY // "

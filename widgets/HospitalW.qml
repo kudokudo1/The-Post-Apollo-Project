@@ -4632,6 +4632,8 @@ PanelWindow {
             newCount: receptionistService.unreadCount
             recentCount: receptionistService.recentCount
             inbox: receptionistService.inbox
+            sharedContextActive: hospitalContextService.active
+            sharedContextLabel: hospitalContextService.label
 
             anchors {
                 left: parent.left

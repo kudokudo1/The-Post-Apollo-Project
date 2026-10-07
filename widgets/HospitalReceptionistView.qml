@@ -17,6 +17,8 @@ Rectangle {
     property int newCount: 0
     property int recentCount: 0
     property var inbox: []
+    property bool sharedContextActive: false
+    property string sharedContextLabel: ""
 
     signal routeRequested(string route)
     signal attentionActivated(var item)
@@ -738,8 +740,11 @@ Rectangle {
             width: parent.width
             height:
                 root.receptionistService.contextActive
+                || root.sharedContextActive
                 ? 36 : 0
-            visible: root.receptionistService.contextActive
+            visible:
+                root.receptionistService.contextActive
+                || root.sharedContextActive
             color: Colors.dark
             border.width: 1
             border.color: Colors.cyan
@@ -754,10 +759,13 @@ Rectangle {
                 }
 
                 text:
-                    "CONTEXT // "
+                    "LIVE CONTEXT // "
                     + String(
-                        root.receptionistService.contextLabel
-                        || "ACTIVITY"
+                        root.sharedContextActive
+                        && root.sharedContextLabel
+                        ? root.sharedContextLabel
+                        : root.receptionistService.contextLabel
+                          || "ACTIVITY"
                     )
                 font.pixelSize: 9
                 color: Colors.cyan
@@ -774,6 +782,8 @@ Rectangle {
                 }
 
                 spacing: 5
+                visible: root.receptionistService.contextActive
+                width: visible ? implicitWidth : 0
 
                 Rectangle {
                     id: contextOpen
@@ -834,9 +844,6 @@ Rectangle {
                         && contextThereMouse.enabled
                         ? Colors.magenta
                         : Colors.black
-                    opacity:
-                        root.receptionistService.contextCanThere
-                        ? 1.0 : 0.30
                     border.width:
                         contextThereMouse.containsMouse
                         && contextThereMouse.enabled
@@ -855,6 +862,9 @@ Rectangle {
                               && contextThereMouse.enabled
                             ? Colors.orange
                             : Colors.cyan
+                        opacity:
+                            root.receptionistService.contextCanThere
+                            ? 1.0 : 0.30
                     }
 
                     MouseArea {
@@ -944,9 +954,6 @@ Rectangle {
                         && contextBeforeMouse.enabled
                         ? Colors.magenta
                         : Colors.black
-                    opacity:
-                        root.receptionistService.contextCanBefore
-                        ? 1.0 : 0.30
                     border.width:
                         contextBeforeMouse.containsMouse
                         && contextBeforeMouse.enabled
@@ -965,6 +972,9 @@ Rectangle {
                               && contextBeforeMouse.enabled
                             ? Colors.orange
                             : Colors.cyan
+                        opacity:
+                            root.receptionistService.contextCanBefore
+                            ? 1.0 : 0.30
                     }
 
                     MouseArea {
@@ -1003,9 +1013,6 @@ Rectangle {
                         && contextNewerMouse.enabled
                         ? Colors.magenta
                         : Colors.black
-                    opacity:
-                        root.receptionistService.contextCanNewer
-                        ? 1.0 : 0.30
                     border.width:
                         contextNewerMouse.containsMouse
                         && contextNewerMouse.enabled
@@ -1024,6 +1031,9 @@ Rectangle {
                               && contextNewerMouse.enabled
                             ? Colors.orange
                             : Colors.cyan
+                        opacity:
+                            root.receptionistService.contextCanNewer
+                            ? 1.0 : 0.30
                     }
 
                     MouseArea {
@@ -1479,6 +1489,14 @@ Rectangle {
             Rectangle {
                 id: sendButton
 
+                readonly property bool enabledAction:
+                    root.speechInputService.recording
+                    || (
+                        !root.speechInputService.stopping
+                        && !root.speechInputService.transcribing
+                        && receptionInput.text.trim().length > 0
+                       )
+
                 width: 86
                 height: composer.height
                 color:
@@ -1501,7 +1519,9 @@ Rectangle {
                     z: -1
                     opacity:
                         sendMouse.containsMouse
-                        ? 0.48 : 0.30
+                        ? 0.48
+                        : sendButton.enabledAction
+                        ? 0.30 : 0.12
                     color:
                         root.speechInputService.recording
                         ? Colors.magenta
@@ -1509,15 +1529,6 @@ Rectangle {
                         ? Colors.orange
                         : Colors.green
                 }
-
-                opacity:
-                    root.speechInputService.recording
-                    || (
-                        !root.speechInputService.stopping
-                        && !root.speechInputService.transcribing
-                        && receptionInput.text.trim().length > 0
-                       )
-                    ? 1.0 : 0.48
 
                 GohuText {
                     anchors.centerIn: parent
@@ -1529,6 +1540,7 @@ Rectangle {
                         ? "..."
                         : "ASK"
                     font.pixelSize: 11
+                    opacity: sendButton.enabledAction ? 1.0 : 0.34
                     color:
                         root.speechInputService.recording
                         ? Colors.magenta
@@ -1541,13 +1553,7 @@ Rectangle {
                     id: sendMouse
 
                     anchors.fill: parent
-                    enabled:
-                        root.speechInputService.recording
-                        || (
-                            !root.speechInputService.stopping
-                            && !root.speechInputService.transcribing
-                            && receptionInput.text.trim().length > 0
-                           )
+                    enabled: sendButton.enabledAction
                     hoverEnabled: true
                     cursorShape:
                         enabled

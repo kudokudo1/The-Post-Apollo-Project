@@ -390,9 +390,6 @@ Rectangle {
                         : recipientMouse.containsMouse
                         ? Colors.orange
                         : stateColor
-                    opacity:
-                        String(modelData.presence || "") === "READY"
-                        ? 1.0 : 0.58
 
                     GohuText {
                         anchors.centerIn: parent
@@ -401,6 +398,9 @@ Rectangle {
                             + " // "
                             + parent.presence
                         font.pixelSize: 9
+                        opacity:
+                            String(parent.modelData.presence || "") === "READY"
+                            ? 1.0 : 0.48
                         color:
                             parent.index === root.selectedSpecialistIndex
                             ? Colors.magenta
@@ -704,7 +704,7 @@ Rectangle {
             topMargin: 8
         }
 
-        width: visible ? 62 : 0
+        width: visible ? 66 : 0
         height: 42
         color:
             voiceCancelMouse.pressed
@@ -755,6 +755,18 @@ Rectangle {
     Rectangle {
         id: sendButton
 
+        readonly property bool enabledAction:
+            root.selectedSpecialist
+            && String(root.selectedSpecialist.presence || "") === "READY"
+            && (
+                root.speechInputService.recording
+                || (
+                    !root.speechInputService.stopping
+                    && !root.speechInputService.transcribing
+                    && messageInput.text.trim().length > 0
+                   )
+               )
+
         anchors {
             right: parent.right
             top: transcriptFrame.bottom
@@ -762,7 +774,7 @@ Rectangle {
             topMargin: 8
         }
 
-        width: 82
+        width: 86
         height: 42
         color:
             sendMouse.pressed
@@ -783,7 +795,9 @@ Rectangle {
             z: -1
             opacity:
                 sendMouse.containsMouse
-                ? 0.48 : 0.28
+                ? 0.48
+                : sendButton.enabledAction
+                ? 0.28 : 0.12
             color:
                 root.speechInputService.recording
                 ? Colors.omnitrix
@@ -791,19 +805,6 @@ Rectangle {
                 ? Colors.orange
                 : Colors.green
         }
-
-        opacity:
-            root.selectedSpecialist
-            && String(root.selectedSpecialist.presence || "") === "READY"
-            && (
-                root.speechInputService.recording
-                || (
-                    !root.speechInputService.stopping
-                    && !root.speechInputService.transcribing
-                    && messageInput.text.trim().length > 0
-                   )
-               )
-            ? 1.0 : 0.48
 
         GohuText {
             anchors.centerIn: parent
@@ -813,6 +814,7 @@ Rectangle {
                 ? "..."
                 : "SEND"
             font.pixelSize: 11
+            opacity: sendButton.enabledAction ? 1.0 : 0.34
             color:
                 root.speechInputService.recording
                 ? Colors.omnitrix
@@ -825,17 +827,7 @@ Rectangle {
             id: sendMouse
 
             anchors.fill: parent
-            enabled:
-                root.selectedSpecialist
-                && String(root.selectedSpecialist.presence || "") === "READY"
-                && (
-                    root.speechInputService.recording
-                    || (
-                        !root.speechInputService.stopping
-                        && !root.speechInputService.transcribing
-                        && messageInput.text.trim().length > 0
-                       )
-                   )
+            enabled: sendButton.enabledAction
             hoverEnabled: true
             cursorShape:
                 enabled
@@ -872,7 +864,7 @@ Rectangle {
               )
             || root.intercomService.lastError
             || root.intercomService.lastStatus
-            || "READY // SEEDED INTERACTIVE SESSION"
+            || "READY // INTERCOM"
         font.pixelSize: 9
         color:
             root.speechInputService.lastError

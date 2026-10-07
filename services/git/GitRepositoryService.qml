@@ -588,6 +588,22 @@ Scope {
                 '    git -C "$repo" push "$a" ":refs/tags/$b" || exit $?',
                 '    printf "OK\\tDELETED REMOTE TAG // %s/%s\\n" "$a" "$b"',
                 '    ;;',
+                '  check-remote-tag)',
+                '    remote="$a"; tag="$b"',
+                '    [ -n "$remote" ] && [ -n "$tag" ] || { printf "REFUSED\\tREMOTE + TAG REQUIRED\\n"; exit 33; }',
+                '    local_target="$(git -C "$repo" rev-parse "refs/tags/$tag^{}" 2>/dev/null || true)"',
+                '    [ -n "$local_target" ] || { printf "REFUSED\\tLOCAL TAG NOT FOUND // %s\\n" "$tag"; exit 34; }',
+                '    remote_rows="$(git -C "$repo" ls-remote --tags "$remote" "refs/tags/$tag" "refs/tags/$tag^{}" 2>&1)"; rc=$?',
+                '    [ "$rc" -eq 0 ] || { printf "REFUSED\\tREMOTE TAG LOOKUP FAILED // %s\\n" "$remote_rows"; exit 35; }',
+                '    remote_target="$(printf "%s\\n" "$remote_rows" | grep -F "refs/tags/$tag^{}" | head -n1 | cut -f1)"',
+                '    [ -n "$remote_target" ] || remote_target="$(printf "%s\\n" "$remote_rows" | grep -F "refs/tags/$tag" | head -n1 | cut -f1)"',
+                '    state="MISSING"',
+                '    if [ -n "$remote_target" ]; then',
+                '      if [ "$remote_target" = "$local_target" ]; then state="MATCH"; else state="DIVERGED"; fi',
+                '    fi',
+                '    printf "TAGCHECK\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$remote" "$tag" "$state" "$local_target" "$remote_target"',
+                '    printf "OK\\tREMOTE TAG CHECK // %s/%s // %s\\n" "$remote" "$tag" "$state"',
+                '    ;;',
                 '  set-config)',
                 '    [ -n "$a" ] && [ -n "$b" ] || { printf "REFUSED\\tCONFIG KEY + VALUE REQUIRED\\n"; exit 32; }',
                 '    case "$a" in *[!A-Za-z0-9._-]*|"") printf "REFUSED\\tINVALID CONFIG KEY\\n"; exit 33 ;; esac',
@@ -786,7 +802,42 @@ Scope {
         );
     }
 
+    function clearTagRemoteCheck() {
+        tagRemoteCheckRemote = "";
+        tagRemoteCheckTag = "";
+        tagRemoteCheckState = "UNCHECKED";
+        tagRemoteLocalTarget = "";
+        tagRemoteTarget = "";
+    }
+
+    function checkRemoteTag(remote, tag) {
+        const remoteName = String(remote || "").trim();
+        const tagName = String(tag || "").trim();
+
+        if (!remoteName || !tagName)
+            return false;
+
+        tagRemoteCheckRemote = remoteName;
+        tagRemoteCheckTag = tagName;
+        tagRemoteCheckState = "CHECKING";
+        tagRemoteLocalTarget = "";
+        tagRemoteTarget = "";
+
+        if (!runAction(
+                "check-remote-tag",
+                remoteName,
+                tagName,
+                ""
+            )) {
+            tagRemoteCheckState = "ERROR";
+            return false;
+        }
+
+        return true;
+    }
+
     function pushTag(remote, tag) {
+        clearTagRemoteCheck();
         return runAction("push-tag", remote, tag, "");
     }
 
@@ -795,6 +846,7 @@ Scope {
     }
 
     function deleteRemoteTag(remote, tag, confirmed) {
+        clearTagRemoteCheck();
         return runAction(
             "delete-remote-tag",
             remote,
@@ -902,6 +954,27 @@ Scope {
         const lines = out.split("\n");
         let controlLine = "";
 
+        if (actionName === "CHECK-REMOTE-TAG") {
+            for (let i = 0; i < lines.length; ++i) {
+                const line = String(lines[i] || "");
+                if (line.indexOf("TAGCHECK\t") !== 0)
+                    continue;
+
+                const fields = line.split("\t");
+                tagRemoteCheckRemote =
+                    fields.length > 1 ? fields[1] : "";
+                tagRemoteCheckTag =
+                    fields.length > 2 ? fields[2] : "";
+                tagRemoteCheckState =
+                    fields.length > 3 ? fields[3] : "ERROR";
+                tagRemoteLocalTarget =
+                    fields.length > 4 ? fields[4] : "";
+                tagRemoteTarget =
+                    fields.length > 5 ? fields[5] : "";
+                break;
+            }
+        }
+
         for (let i = lines.length - 1; i >= 0; --i) {
             const line = String(lines[i] || "");
             if (line.indexOf("OK\t") === 0
@@ -934,6 +1007,9 @@ Scope {
             refresh();
             return;
         }
+
+        if (actionName === "CHECK-REMOTE-TAG")
+            tagRemoteCheckState = "ERROR";
 
         lastError = detail || (actionName + " FAILED");
         actionStatus = actionName + " // REFUSED";

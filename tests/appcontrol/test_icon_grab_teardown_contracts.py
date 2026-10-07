@@ -14,13 +14,15 @@ for icon in ("selectorAppIcon", "selectedAppIcon"):
 assert "function scheduleResample()" in text
 assert text.count("scheduleResample();") >= 6
 
-selector_source = text[text.index("id: selectorAppIcon"):text.index("id: selectorIconColorSampler")]
-assert "selectorAppIconBox.iconGrabResult = null;" not in selector_source
-assert 'selectorAppIconBox.samplingSource = "";' not in selector_source
+assert """onSourceChanged: {
+                                // Keep an in-flight grab alive until the Canvas
+                                // releases its temporary URL.
+                                selectorAppIconBox.verifiedSource = "";""" in text
 
-selected_source = text[text.index("id: selectedAppIcon"):text.index("id: selectedIconColorSampler")]
-assert "selectedAppIconBox.iconGrabResult = null;" not in selected_source
-assert 'selectedAppIconBox.samplingSource = "";' not in selected_source
+assert """onSourceChanged: {
+                                            // Preserve an in-flight grab until its Canvas
+                                            // consumer has released the temporary URL.
+                                            selectedAppIconBox.authoritativeSource = "";""" in text
 
 assert """source:
                                 selectorAppIcon.Window.window !== null

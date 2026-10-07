@@ -327,18 +327,24 @@ Scope {
                 errors += 1;
         }
 
+        const structuralErrors =
+            Math.max(
+                errors,
+                Number(exitCode) !== 0 ? 1 : 0
+            );
+
         fsckDanglingCount = dangling;
         fsckUnreachableCount = unreachable;
         fsckWarningCount = warnings;
-        fsckErrorCount = errors;
+        fsckErrorCount = structuralErrors;
 
-        if (Number(exitCode) !== 0 || errors > 0) {
+        if (structuralErrors > 0) {
             healthState = "FAIL";
             healthSummary =
                 "OBJECT GRAPH FAILED VERIFICATION // "
-                + String(errors)
+                + String(structuralErrors)
                 + " STRUCTURAL ERROR"
-                + (errors === 1 ? "" : "S");
+                + (structuralErrors === 1 ? "" : "S");
             healthRecommendation =
                 "Do not run cleanup as a first response. Preserve the repository, inspect the raw FSCK output, and compare against a known-good remote or backup before deleting objects.";
             return;

@@ -12,6 +12,8 @@ Item {
     property string projectCamera: "board"
     property string itemCreateMode: "work"
     property bool projectExpanded: false
+    property string armedItemAction: ""
+    property string armedItemId: ""
 
     signal projectExpandedRequested(bool expanded)
 
@@ -24,6 +26,44 @@ Item {
         itemCreateMode = next;
         itemTitleInput.text = "";
         itemBodyInput.text = "";
+    }
+
+    function itemActionArmed(action, item) {
+        return root.armedItemAction === String(action || "")
+            && root.armedItemId
+               === root.projectService.itemId(item);
+    }
+
+    function armOrRunItem(action, item, callback) {
+        const id = root.projectService.itemId(item);
+
+        if (!id)
+            return;
+
+        if (root.itemActionArmed(action, item)) {
+            root.armedItemAction = "";
+            root.armedItemId = "";
+
+            if (callback)
+                callback();
+
+            return;
+        }
+
+        root.armedItemAction = String(action || "");
+        root.armedItemId = id;
+    }
+
+    function clearItemArm() {
+        root.armedItemAction = "";
+        root.armedItemId = "";
+    }
+
+    function openProjectItem(item) {
+        const url = root.projectService.itemUrl(item);
+
+        if (url)
+            Qt.openUrlExternally(url);
     }
 
     function moveItem(item, delta) {
@@ -188,6 +228,8 @@ Item {
         target: root.projectService
 
         function onMutationFinished(success, operation) {
+            root.clearItemArm();
+
             if (!success)
                 return;
 
@@ -202,6 +244,8 @@ Item {
             }
         }
     }
+
+    onProjectCameraChanged: root.clearItemArm()
 
     onVisibleChanged: {
         if (visible
@@ -803,32 +847,72 @@ Item {
                                                         }
 
                                                         ActionButton {
-                                                            width: 57
+                                                            width: 42
                                                             height: 20
-                                                            label: "ARCHIVE"
+                                                            label: "OPEN"
+                                                            enabledAction:
+                                                                !!root.projectService.itemUrl(
+                                                                    itemCard.modelData
+                                                                )
+                                                            onTriggered:
+                                                                root.openProjectItem(
+                                                                    itemCard.modelData
+                                                                )
+                                                        }
+
+                                                        ActionButton {
+                                                            width: 70
+                                                            height: 20
+                                                            label:
+                                                                root.itemActionArmed(
+                                                                    "archive",
+                                                                    itemCard.modelData
+                                                                )
+                                                                ? "CONFIRM"
+                                                                : "ARCHIVE"
                                                             enabledAction:
                                                                 !root.projectService.busy
                                                                 && !!root.projectService.itemId(
                                                                     itemCard.modelData
                                                                 )
                                                             onTriggered:
-                                                                root.projectService.archiveItem(
-                                                                    itemCard.modelData
+                                                                root.armOrRunItem(
+                                                                    "archive",
+                                                                    itemCard.modelData,
+                                                                    function() {
+                                                                        root.projectService.archiveItem(
+                                                                            itemCard.modelData,
+                                                                            true
+                                                                        );
+                                                                    }
                                                                 )
                                                         }
 
                                                         ActionButton {
                                                             width: 24
                                                             height: 20
-                                                            label: "X"
+                                                            label:
+                                                                root.itemActionArmed(
+                                                                    "remove",
+                                                                    itemCard.modelData
+                                                                )
+                                                                ? "!"
+                                                                : "X"
                                                             enabledAction:
                                                                 !root.projectService.busy
                                                                 && !!root.projectService.itemId(
                                                                     itemCard.modelData
                                                                 )
                                                             onTriggered:
-                                                                root.projectService.removeItem(
-                                                                    itemCard.modelData
+                                                                root.armOrRunItem(
+                                                                    "remove",
+                                                                    itemCard.modelData,
+                                                                    function() {
+                                                                        root.projectService.removeItem(
+                                                                            itemCard.modelData,
+                                                                            true
+                                                                        );
+                                                                    }
                                                                 )
                                                         }
                                                     }

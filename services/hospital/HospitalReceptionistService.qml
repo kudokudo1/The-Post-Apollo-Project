@@ -1320,6 +1320,13 @@ Scope {
             return false;
 
         const query = raw.toLowerCase();
+        const asksContextDoing =
+            query === "what are they doing"
+            || query === "what're they doing"
+            || query === "whatre they doing"
+            || query === "what are they up to"
+            || query === "what're they up to"
+            || query === "whatre they up to";
         const goThere =
             query.indexOf("take me there") >= 0
             || query.indexOf("go there") >= 0
@@ -1384,7 +1391,8 @@ Scope {
             || query.indexOf("next event") >= 0
             || query.indexOf("newer one") >= 0;
 
-        if (!goThere
+        if (!asksContextDoing
+                && !goThere
                 && !openThat
                 && !favoriteThat
                 && !unfavoriteThat
@@ -1393,6 +1401,44 @@ Scope {
             return false;
 
         append("OPERATOR", raw);
+
+        if (asksContextDoing) {
+            if (!contextTarget) {
+                append(
+                    "RECEPTION",
+                    "NO ACTIVE TEAM CONTEXT // ASK ME ABOUT A ROOM OR TEAM FIRST"
+                );
+                return true;
+            }
+
+            const matches =
+                matchingActivity(
+                    "",
+                    false,
+                    false,
+                    contextTarget
+                );
+
+            if (matches.length > 0) {
+                rememberActivityContext(
+                    matches[0],
+                    "",
+                    contextTarget,
+                    false,
+                    false,
+                    false
+                );
+            }
+
+            append(
+                "RECEPTION",
+                activityListResponse(
+                    "RECENT // " + contextTarget,
+                    matches
+                )
+            );
+            return true;
+        }
 
         if (goThere && contextTarget)
             return contextAction("there");
@@ -1622,6 +1668,13 @@ Scope {
             return false;
 
         const query = raw.toLowerCase();
+        const targetHint = activityTargetFromQuery(raw);
+        const asksDoing =
+            !!targetHint
+            && (
+                query.indexOf(" doing") >= 0
+                || query.indexOf(" up to") >= 0
+            );
         const asksNew =
             query.indexOf("what's new") >= 0
             || query.indexOf("whats new") >= 0
@@ -1639,7 +1692,8 @@ Scope {
             || query.indexOf("starred") >= 0
             || query.indexOf("saved") >= 0;
         const asksRecent =
-            query.indexOf("recent") >= 0
+            asksDoing
+            || query.indexOf("recent") >= 0
             || query.indexOf("latest") >= 0
             || query.indexOf("what happened") >= 0
             || query.indexOf("what's happened") >= 0
@@ -1712,7 +1766,7 @@ Scope {
         }
 
         const source = activityQuerySource(query);
-        const target = activityTargetFromQuery(raw);
+        const target = targetHint;
         let matches =
             matchingActivity(
                 source,

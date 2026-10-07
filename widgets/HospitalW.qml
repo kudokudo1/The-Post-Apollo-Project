@@ -970,20 +970,20 @@ PanelWindow {
         return false;
     }
 
-    function requestReceptionSpecialistHandoff(
+    function executeReceptionSpecialistHandoff(
             modeValue,
+            specialistValue,
             operatorTextValue) {
         const mode =
             String(modeValue || "").trim().toLowerCase();
         const operatorText =
             String(operatorTextValue || "").trim();
-        const specialist =
-            root.specialistMentionedIn(operatorText);
+        const specialist = specialistValue || null;
 
         if (!specialist) {
             receptionistService.append(
                 "RECEPTION",
-                "HANDOFF // NAME A SPECIALIST FROM THE LIVE STAFF REGISTRY"
+                "HANDOFF // SPECIALIST NOT FOUND IN LIVE REGISTRY"
             );
             return false;
         }
@@ -1030,6 +1030,14 @@ PanelWindow {
             return true;
         }
 
+        if (mode !== "intercom") {
+            receptionistService.append(
+                "RECEPTION",
+                "HANDOFF // REFUSED UNKNOWN MODE"
+            );
+            return false;
+        }
+
         const channelType =
             hospitalContextService.team
             ? "ROOM"
@@ -1060,6 +1068,29 @@ PanelWindow {
             + hospitalContextService.label
         );
         return true;
+    }
+
+    function requestReceptionSpecialistHandoff(
+            modeValue,
+            operatorTextValue) {
+        const operatorText =
+            String(operatorTextValue || "").trim();
+        const specialist =
+            root.specialistMentionedIn(operatorText);
+
+        if (!specialist) {
+            receptionistService.append(
+                "RECEPTION",
+                "HANDOFF // NAME A SPECIALIST FROM THE LIVE STAFF REGISTRY"
+            );
+            return false;
+        }
+
+        return root.executeReceptionSpecialistHandoff(
+            modeValue,
+            specialist,
+            operatorText
+        );
     }
 
     function openReceptionReportEvent(itemValue) {
@@ -1628,10 +1659,17 @@ PanelWindow {
 
     HospitalReceptionistService {
         id: receptionistService
+        aiInterpretationEnabled: interpretationService.enabled
     }
 
     HospitalContextService {
         id: hospitalContextService
+    }
+
+    HospitalInterpretationService {
+        id: interpretationService
+        registryService: specialistRegistryService
+        contextService: hospitalContextService
     }
 
     HospitalSpeechInputService {
@@ -1759,6 +1797,75 @@ PanelWindow {
             root.requestReceptionSpecialistHandoff(
                 mode,
                 operatorText
+            );
+        }
+
+        function onInterpretationRequested(operatorText) {
+            interpretationService.interpret(
+                operatorText
+            );
+        }
+    }
+
+    Connections {
+        target: interpretationService
+
+        function onInterpretationFinished(success, detail) {
+            receptionistService.append(
+                "RECEPTION",
+                String(detail || "AI // NO RESULT")
+            );
+        }
+
+        function onSuggestionAccepted(suggestion) {
+            const row = suggestion || {};
+            const intent =
+                String(row.intent || "").toLowerCase();
+
+            if (intent === "route") {
+                const target =
+                    String(row.target || "").toLowerCase();
+
+                receptionistService.append(
+                    "RECEPTION",
+                    "AI ACCEPTED // ROUTE // "
+                    + target.toUpperCase()
+                );
+                root.handleReceptionRoute(target);
+                return;
+            }
+
+            if (intent === "handoff") {
+                const specialist =
+                    specialistRegistryService
+                        .specialistById(
+                            String(row.specialistId || "")
+                        );
+
+                receptionistService.append(
+                    "RECEPTION",
+                    "AI ACCEPTED // HANDOFF // "
+                    + String(row.mode || "").toUpperCase()
+                    + " // "
+                    + String(
+                        row.specialistName
+                        || row.specialistId
+                        || "SPECIALIST"
+                    ).toUpperCase()
+                );
+
+                root.executeReceptionSpecialistHandoff(
+                    row.mode,
+                    specialist,
+                    row.operatorText
+                );
+            }
+        }
+
+        function onSuggestionDismissed() {
+            receptionistService.append(
+                "RECEPTION",
+                "AI SUGGESTION // DISMISSED"
             );
         }
     }
@@ -4682,6 +4789,7 @@ PanelWindow {
             visible: root.operationsSurface === "reception"
             receptionistService: receptionistService
             speechInputService: speechInputService
+            interpretationService: interpretationService
             floorLabel: floorService.floorLabel
             roomLabel:
                 root.selectedRoomTeam

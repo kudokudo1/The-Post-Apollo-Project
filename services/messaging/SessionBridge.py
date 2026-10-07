@@ -557,12 +557,226 @@ def _read_with_fallback(command: str, conversation_id: str | None, limit: int) -
         ) from direct_error
 
 
-def _send(conversation_id: str, message: str) -> str:
-    result = _run_cli(
-        ["send", conversation_id, message],
-        _timeout("SESSION_BRIDGE_SEND_TIMEOUT", DEFAULT_SEND_TIMEOUT),
+def _cdp_port() -> int:
+    raw = os.environ.get("SESSION_CDP_PORT", "9222").strip()
+
+    try:
+        port = int(raw)
+    except ValueError as error:
+        raise BridgeError("invalid SESSION_CDP_PORT: %s" % raw) from error
+
+    if port <= 0 or port > 65535:
+        raise BridgeError("invalid SESSION_CDP_PORT: %s" % raw)
+
+    return port
+
+
+def _cdp_websocket_url() -> str:
+    import urllib.request
+
+    debug_url = "http://localhost:%d/json" % _cdp_port()
+
+    try:
+        with urllib.request.urlopen(
+            debug_url,
+            timeout=min(
+                4.0,
+                _timeout("SESSION_BRIDGE_SEND_TIMEOUT", DEFAULT_SEND_TIMEOUT),
+            ),
+        ) as response:
+            pages = json.loads(response.read())
+    except Exception as error:
+        raise BridgeError(
+            "cannot reach Session DevTools at %s: %s"
+            % (debug_url, error)
+        ) from error
+
+    if not isinstance(pages, list) or not pages:
+        raise BridgeError("Session DevTools returned no debuggable pages")
+
+    for page in pages:
+        if not isinstance(page, dict):
+            continue
+
+        if "background.html" in str(page.get("url") or ""):
+            websocket_url = str(page.get("webSocketDebuggerUrl") or "").strip()
+            if websocket_url:
+                return websocket_url
+
+    for page in pages:
+        if not isinstance(page, dict):
+            continue
+
+        websocket_url = str(page.get("webSocketDebuggerUrl") or "").strip()
+        if websocket_url:
+            return websocket_url
+
+    raise BridgeError("Session DevTools did not expose a WebSocket debugger URL")
+
+
+def _cdp_send_direct(conversation_id: str, message: str) -> str:
+    try:
+        import websocket
+    except ImportError as error:
+        raise BridgeError(
+            "websocket-client is not installed in this Python environment"
+        ) from error
+
+    websocket_url = _cdp_websocket_url()
+    timeout = _timeout("SESSION_BRIDGE_SEND_TIMEOUT", DEFAULT_SEND_TIMEOUT)
+
+    try:
+        connection = websocket.create_connection(
+            websocket_url,
+            timeout=timeout,
+            suppress_origin=True,
+        )
+    except Exception as error:
+        raise BridgeError(
+            "origin-safe CDP connection failed: %s" % _compact(str(error))
+        ) from error
+
+    expression = """
+(async function() {
+    const convo = window.getConversationController().get(%s);
+    if (!convo) {
+        throw new Error("Conversation not found");
+    }
+    await convo.sendMessage({ body: %s });
+    return true;
+})()
+""" % (json.dumps(conversation_id), json.dumps(message))
+
+    request_id = 1
+    request = {
+        "id": request_id,
+        "method": "Runtime.evaluate",
+        "params": {
+            "expression": expression,
+            "returnByValue": True,
+            "awaitPromise": True,
+        },
+    }
+
+    try:
+        connection.send(json.dumps(request))
+
+        while True:
+            raw = connection.recv()
+
+            try:
+                response = json.loads(raw)
+            except (TypeError, json.JSONDecodeError) as error:
+                raise BridgeError(
+                    "Session CDP returned invalid JSON: %s" % error
+                ) from error
+
+            if response.get("id") != request_id:
+                continue
+
+            if "error" in response:
+                raise BridgeError(
+                    "Session CDP error: %s" % response["error"]
+                )
+
+            result = response.get("result") or {}
+
+            if result.get("exceptionDetails"):
+                raise BridgeError(
+                    "Session send JavaScript failed: %s"
+                    % result["exceptionDetails"]
+                )
+
+            value = (result.get("result") or {}).get("value")
+
+            if value is not True:
+                raise BridgeError(
+                    "Session send returned unexpected result: %r" % value
+                )
+
+            return "sent"
+    except BridgeError:
+        raise
+    except Exception as error:
+        raise BridgeError(
+            "origin-safe CDP send failed: %s" % _compact(str(error))
+        ) from error
+    finally:
+        try:
+            connection.close()
+        except Exception:
+            pass
+
+
+def _cdp_send_child(conversation_id: str, message: str) -> str:
+    errors: list[str] = []
+
+    for candidate in _venv_python_candidates():
+        path = Path(candidate)
+
+        if not path.is_file() or not os.access(path, os.X_OK):
+            continue
+
+        try:
+            if path.resolve() == Path(sys.executable).resolve():
+                continue
+        except OSError:
+            pass
+
+        result = _run_process(
+            [
+                str(path),
+                str(Path(__file__).resolve()),
+                "--cdp-direct",
+                "send",
+                conversation_id,
+                message,
+            ],
+            _timeout("SESSION_BRIDGE_SEND_TIMEOUT", DEFAULT_SEND_TIMEOUT),
+        )
+
+        if result.returncode == 0:
+            return result.stdout.strip() or "sent"
+
+        errors.append(_compact(result.stderr) or _compact(result.stdout))
+
+    detail = " // ".join(error for error in errors if error)
+
+    raise BridgeError(
+        "origin-safe CDP fallback needs websocket-client"
+        + (": " + detail if detail else "")
     )
-    return result.stdout.strip()
+
+
+def _origin_safe_cdp_send(conversation_id: str, message: str) -> str:
+    try:
+        return _cdp_send_direct(conversation_id, message)
+    except BridgeError as error:
+        if "websocket-client is not installed" not in str(error):
+            raise
+
+        return _cdp_send_child(conversation_id, message)
+
+
+def _send(conversation_id: str, message: str) -> str:
+    cdp_error = ""
+
+    try:
+        return _origin_safe_cdp_send(conversation_id, message)
+    except BridgeError as error:
+        cdp_error = str(error)
+
+    try:
+        result = _run_cli(
+            ["send", conversation_id, message],
+            _timeout("SESSION_BRIDGE_SEND_TIMEOUT", DEFAULT_SEND_TIMEOUT),
+        )
+        return result.stdout.strip()
+    except BridgeError as cli_error:
+        raise BridgeError(
+            "origin-safe CDP send failed: %s; session-cli send failed: %s"
+            % (cdp_error, cli_error)
+        ) from cli_error
 
 
 def _health() -> dict[str, Any]:
@@ -595,6 +809,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Post-Apollo Session compatibility bridge")
     parser.add_argument("--json", action="store_true", dest="json_output")
     parser.add_argument("--direct", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--cdp-direct", action="store_true", help=argparse.SUPPRESS)
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -623,7 +838,11 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         if args.command == "send":
-            output = _send(args.conversation_id, args.message)
+            if args.cdp_direct:
+                output = _cdp_send_direct(args.conversation_id, args.message)
+            else:
+                output = _send(args.conversation_id, args.message)
+
             if output:
                 print(output)
             return 0

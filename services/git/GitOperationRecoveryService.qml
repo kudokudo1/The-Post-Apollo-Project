@@ -108,6 +108,69 @@ Scope {
         };
     }
 
+    function transferRecoveryPlan(record) {
+        const row = record || {};
+        const metadata = row.metadata || {};
+        const kind = String(row.kind || "");
+        const mode = String(metadata.mode || "").toLowerCase();
+        const sourcePath = String(metadata.sourcePath || "");
+        const destinationPath = String(metadata.destinationPath || "");
+        const sourceHead = String(metadata.sourceHead || "");
+        const destinationHead = String(metadata.destinationHead || "");
+        const patchBase64 = String(metadata.patchBase64 || "");
+        const fingerprint = String(metadata.fingerprint || "");
+        const patchBytes = Number(metadata.patchBytes || 0);
+
+        if ([
+                "CHANGES/TRANSFER",
+                "CHANGES/TRANSFER_HUNK",
+                "CHANGES/TRANSFER_LINE"
+            ].indexOf(kind) < 0)
+            return null;
+
+        if (String(row.recoveryClass || "") !== "CONTENT_RECOVERABLE"
+                || String((row.before || {}).recoveryClass || "")
+                    !== "CONTENT_RECOVERABLE"
+                || String((row.after || {}).recoveryClass || "")
+                    !== "CONTENT_RECOVERABLE") {
+            return refuse(
+                "TRANSFER DOES NOT HAVE DURABLE CONTENT RECOVERY"
+            );
+        }
+
+        if ((mode !== "copy" && mode !== "move")
+                || !sourcePath
+                || !destinationPath
+                || sourcePath === destinationPath
+                || !sourceHead
+                || !destinationHead
+                || !patchBase64
+                || !fingerprint
+                || patchBytes <= 0) {
+            return refuse("TRANSFER RECOVERY PAYLOAD IS INCOMPLETE");
+        }
+
+        return {
+            allowed: true,
+            strategy: "UNDO_TRANSFER_CONTENT",
+            mode: mode,
+            sourcePath: sourcePath,
+            destinationPath: destinationPath,
+            sourceHead: sourceHead,
+            destinationHead: destinationHead,
+            patchBase64: patchBase64,
+            fingerprint: fingerprint,
+            patchBytes: patchBytes,
+            scope: String(metadata.scope || "file"),
+            summary:
+                "UNDO "
+                + mode.toUpperCase()
+                + " "
+                + String(metadata.scope || "file").toUpperCase()
+                + " TRANSFER"
+        };
+    }
+
     function preview(record) {
         const row = record || {};
         const kind = String(row.kind || "");
@@ -121,6 +184,10 @@ Scope {
 
         if (String(row.undoState || "") === "UNDONE")
             return refuse("OPERATION IS ALREADY UNDONE");
+
+        const transferPlan = transferRecoveryPlan(row);
+        if (transferPlan)
+            return transferPlan;
 
         if (recoveryClass !== "REF_RECOVERABLE"
                 || String(before.recoveryClass || "") !== "REF_RECOVERABLE"
@@ -511,6 +578,9 @@ Scope {
         let b = "";
         let c = "";
         let d = "";
+        let e = "";
+        let f = "";
+        let g = "";
 
         if (strategy === "DELETE_CREATED_BRANCH") {
             a = String(plan.branch || "");
@@ -543,6 +613,14 @@ Scope {
             b = String(plan.branch || "");
             c = String(plan.expectedSha || "");
             d = plan.detached ? "1" : "0";
+        } else if (strategy === "UNDO_TRANSFER_CONTENT") {
+            a = String(plan.sourcePath || "");
+            b = String(plan.destinationPath || "");
+            c = String(plan.mode || "");
+            d = String(plan.patchBase64 || "");
+            e = String(plan.sourceHead || "");
+            f = String(plan.destinationHead || "");
+            g = String(plan.fingerprint || "");
         }
 
         recoveryProcess.exec([
@@ -555,17 +633,22 @@ Scope {
                 'b="$4"',
                 'c="$5"',
                 'd="$6"',
+                'e="$7"',
+                'f="$8"',
+                'g="$9"',
                 'if ! git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1; then',
                 '  printf "REFUSED\\tNOT A GIT WORKTREE\\n"',
                 '  exit 21',
                 'fi',
-                'while IFS= read -r wt; do',
-                '  [ -n "$wt" ] || continue',
-                '  if [ -n "$(git -C "$wt" status --porcelain=v1 --untracked-files=all 2>/dev/null)" ]; then',
-                '    printf "REFUSED\\tWORKTREE DIRTY // UNDO WILL NOT DISCARD CONTENT\\n"',
-                '    exit 22',
-                '  fi',
-                'done < <(git -C "$repo" worktree list --porcelain 2>/dev/null | sed -n "s/^worktree //p")',
+                'if [ "$strategy" != "UNDO_TRANSFER_CONTENT" ]; then',
+                '  while IFS= read -r wt; do',
+                '    [ -n "$wt" ] || continue',
+                '    if [ -n "$(git -C "$wt" status --porcelain=v1 --untracked-files=all 2>/dev/null)" ]; then',
+                '      printf "REFUSED\\tWORKTREE DIRTY // UNDO WILL NOT DISCARD CONTENT\\n"',
+                '      exit 22',
+                '    fi',
+                '  done < <(git -C "$repo" worktree list --porcelain 2>/dev/null | sed -n "s/^worktree //p")',
+                'fi',
                 'zeros="0000000000000000000000000000000000000000"',
                 'case "$strategy" in',
                 '  DELETE_CREATED_BRANCH)',
@@ -691,6 +774,56 @@ Scope {
                 '    fi',
                 '    printf "OK\\tRESTORED REMOVED WORKTREE // %s\\n" "$path"',
                 '    ;;',
+                '  UNDO_TRANSFER_CONTENT)',
+                '    source="$a"',
+                '    destination="$b"',
+                '    mode="$c"',
+                '    payload="$d"',
+                '    expected_source_head="$e"',
+                '    expected_destination_head="$f"',
+                '    expected_fingerprint="$g"',
+                '    [ "$mode" = "copy" ] || [ "$mode" = "move" ] || { printf "REFUSED\\tTRANSFER MODE INVALID\\n"; exit 101; }',
+                '    source="$(realpath "$source" 2>/dev/null || true)"',
+                '    destination="$(realpath "$destination" 2>/dev/null || true)"',
+                '    [ -n "$source" ] && [ -n "$destination" ] || { printf "REFUSED\\tTRANSFER WORKTREE PATH MISSING\\n"; exit 102; }',
+                '    [ "$source" != "$destination" ] || { printf "REFUSED\\tTRANSFER WORKTREES COLLAPSED TO SAME PATH\\n"; exit 103; }',
+                '    git -C "$source" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { printf "REFUSED\\tSOURCE WORKTREE MISSING\\n"; exit 104; }',
+                '    git -C "$destination" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { printf "REFUSED\\tDESTINATION WORKTREE MISSING\\n"; exit 105; }',
+                '    common_source="$(git -C "$source" rev-parse --git-common-dir 2>/dev/null || true)"',
+                '    common_destination="$(git -C "$destination" rev-parse --git-common-dir 2>/dev/null || true)"',
+                '    case "$common_source" in /*) ;; *) common_source="$source/$common_source" ;; esac',
+                '    case "$common_destination" in /*) ;; *) common_destination="$destination/$common_destination" ;; esac',
+                '    common_source="$(realpath "$common_source" 2>/dev/null || true)"',
+                '    common_destination="$(realpath "$common_destination" 2>/dev/null || true)"',
+                '    [ -n "$common_source" ] && [ "$common_source" = "$common_destination" ] || { printf "REFUSED\\tTRANSFER WORKTREES NO LONGER SHARE A REPOSITORY\\n"; exit 106; }',
+                '    actual_source_head="$(git -C "$source" rev-parse HEAD 2>/dev/null || true)"',
+                '    actual_destination_head="$(git -C "$destination" rev-parse HEAD 2>/dev/null || true)"',
+                '    [ "$actual_source_head" = "$expected_source_head" ] || { printf "REFUSED\\tSOURCE HEAD CHANGED SINCE TRANSFER\\n"; exit 107; }',
+                '    [ "$actual_destination_head" = "$expected_destination_head" ] || { printf "REFUSED\\tDESTINATION HEAD CHANGED SINCE TRANSFER\\n"; exit 108; }',
+                '    [ -z "$(git -C "$source" ls-files -u 2>/dev/null)" ] || { printf "REFUSED\\tSOURCE HAS CONFLICTS\\n"; exit 109; }',
+                '    [ -z "$(git -C "$destination" ls-files -u 2>/dev/null)" ] || { printf "REFUSED\\tDESTINATION HAS CONFLICTS\\n"; exit 110; }',
+                '    git -C "$source" diff --cached --quiet || { printf "REFUSED\\tSOURCE HAS STAGED CHANGES\\n"; exit 111; }',
+                '    git -C "$destination" diff --cached --quiet || { printf "REFUSED\\tDESTINATION HAS STAGED CHANGES\\n"; exit 112; }',
+                '    patch="$(mktemp "${TMPDIR:-/tmp}/pa-transfer-undo.XXXXXX")" || { printf "REFUSED\\tRECOVERY PATCH TEMPFILE FAILED\\n"; exit 113; }',
+                '    trap \'rm -f "$patch"\' EXIT INT TERM',
+                '    printf "%s" "$payload" | base64 -d >"$patch" 2>/dev/null || { printf "REFUSED\\tRECOVERY PATCH DECODE FAILED\\n"; exit 114; }',
+                '    actual_fingerprint="$(sha256sum "$patch" | awk "{print \\$1}")"',
+                '    [ "$actual_fingerprint" = "$expected_fingerprint" ] || { printf "REFUSED\\tRECOVERY PATCH FINGERPRINT MISMATCH\\n"; exit 115; }',
+                '    git -C "$destination" apply -R --check --binary --whitespace=nowarn "$patch" >/dev/null 2>&1 || { printf "REFUSED\\tDESTINATION NO LONGER CONTAINS EXACT TRANSFER\\n"; exit 116; }',
+                '    if [ "$mode" = "move" ]; then',
+                '      git -C "$source" apply --check --binary --whitespace=nowarn "$patch" >/dev/null 2>&1 || { printf "REFUSED\\tSOURCE CAN NO LONGER RECEIVE TRANSFERRED CONTENT\\n"; exit 117; }',
+                '      git -C "$source" apply --binary --whitespace=nowarn "$patch" || { printf "REFUSED\\tSOURCE RESTORE FAILED\\n"; exit 118; }',
+                '      if ! git -C "$destination" apply -R --binary --whitespace=nowarn "$patch"; then',
+                '        git -C "$source" apply -R --binary --whitespace=nowarn "$patch" >/dev/null 2>&1 || { printf "REFUSED\\tDESTINATION REMOVE FAILED // SOURCE ROLLBACK FAILED\\n"; exit 119; }',
+                '        printf "REFUSED\\tDESTINATION REMOVE FAILED // SOURCE ROLLED BACK\\n"',
+                '        exit 120',
+                '      fi',
+                '      printf "OK\\tUNDID MOVE TRANSFER // CONTENT RESTORED TO SOURCE\\n"',
+                '    else',
+                '      git -C "$destination" apply -R --binary --whitespace=nowarn "$patch" || { printf "REFUSED\\tCOPY TRANSFER REMOVE FAILED\\n"; exit 121; }',
+                '      printf "OK\\tUNDID COPY TRANSFER // DESTINATION CONTENT REMOVED\\n"',
+                '    fi',
+                '    ;;',
                 '  *)',
                 '    printf "REFUSED\\tUNKNOWN RECOVERY STRATEGY\\n"',
                 '    exit 100',
@@ -703,7 +836,10 @@ Scope {
             a,
             b,
             c,
-            d
+            d,
+            e,
+            f,
+            g
         ]);
 
         return true;
@@ -817,8 +953,13 @@ Scope {
             if (root.snapshotPhase === "BEFORE") {
                 root.snapshotPhase = "";
 
-                if (String((snapshot || {}).recoveryClass || "")
-                        !== "REF_RECOVERABLE") {
+                const strategy =
+                    String((root.pendingPlan || {}).strategy || "");
+                const snapshotClass =
+                    String((snapshot || {}).recoveryClass || "");
+
+                if (strategy !== "UNDO_TRANSFER_CONTENT"
+                        && snapshotClass !== "REF_RECOVERABLE") {
                     root.failBeforeSnapshot(
                         "CURRENT REPOSITORY STATE IS NOT CLEAN REF-RECOVERABLE"
                     );

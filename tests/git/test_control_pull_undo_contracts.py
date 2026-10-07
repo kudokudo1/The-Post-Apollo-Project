@@ -21,8 +21,8 @@ def require(path: str, needle: str, message: str) -> None:
 
 for needle, message in (
     ('pendingProcessAction === "pull"', "CONTROL journaling must preserve pull target metadata"),
-    ("pullMode: String(pullMode || "")", "pull journal metadata must preserve FF vs merge mode"),
-    ("localTarget: String(selectedLocalBranch || branch || "")", "pull journal metadata must preserve local target branch"),
+    ('pullMode: String(pullMode || "")', "pull journal metadata must preserve FF vs merge mode"),
+    ('localTarget: String(selectedLocalBranch || branch || "")', "pull journal metadata must preserve local target branch"),
     ('git -C "$repo" pull --ff-only', "CONTROL must expose checked-out FF pull"),
     ('git -C "$repo" pull --no-rebase', "CONTROL must expose checked-out merge pull"),
     ('git -C "$repo" branch -f "$local_target" "$target"', "CONTROL must expose background FF sync"),

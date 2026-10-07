@@ -1146,13 +1146,20 @@ Scope {
         const scope = String(previewScope || "file");
         const layer = String(previewLayer || "worktree");
         const hunkIndex = Number(previewHunkIndex);
+        const sourceOperation = String(previewSourceOperation || "");
+        const conflictFingerprint =
+            String(previewConflictFingerprint || "");
 
         if (!source
                 || !destination
                 || files.length === 0
                 || !fingerprint
                 || !sourceHead
-                || !destinationHead) {
+                || !destinationHead
+                || (
+                    layer === "conflict-result"
+                    && (!sourceOperation || !conflictFingerprint)
+                )) {
             finalizeTransfer(
                 null,
                 "TRANSFER PREVIEW IDENTITY LOST BEFORE EXECUTION"
@@ -1173,9 +1180,22 @@ Scope {
                 'scope="$7"',
                 'hunk_index="$8"',
                 'layer="$9"',
-                'shift 9',
+                'expected_conflict_fingerprint="${10}"',
+                'expected_source_operation="${11}"',
+                'shift 11',
                 'files=("$@")',
                 'refuse() { printf "REFUSED\\t%s\\n" "$1"; exit 1; }',
+                'active_state() {',
+                '  local repo="$1"',
+                '  local gitdir',
+                '  gitdir="$(git -C "$repo" rev-parse --git-dir 2>/dev/null)" || { printf "NONE"; return; }',
+                '  case "$gitdir" in /*) ;; *) gitdir="$repo/$gitdir" ;; esac',
+                '  if [ -f "$gitdir/MERGE_HEAD" ]; then printf "MERGE";',
+                '  elif [ -d "$gitdir/rebase-merge" ] || [ -d "$gitdir/rebase-apply" ]; then printf "REBASE";',
+                '  elif [ -f "$gitdir/CHERRY_PICK_HEAD" ]; then printf "CHERRY_PICK";',
+                '  elif [ -f "$gitdir/REVERT_HEAD" ]; then printf "REVERT";',
+                '  else printf "NONE"; fi',
+                '}',
                 'source="$(realpath "$source")" || refuse "SOURCE PATH CANNOT BE RESOLVED"',
                 'destination="$(realpath "$destination")" || refuse "DESTINATION PATH CANNOT BE RESOLVED"',
                 '[ "$source" != "$destination" ] || refuse "SOURCE AND DESTINATION ARE THE SAME WORKTREE"',
@@ -1197,6 +1217,16 @@ Scope {
                 '    [ "${status_line#?? }" != "$status_line" ] || refuse "SOURCE PATH IS NO LONGER UNTRACKED // $path"',
                 '    [ ! -e "$destination/$path" ] && [ ! -L "$destination/$path" ] || refuse "DESTINATION PATH APPEARED SINCE PREVIEW // $path"',
                 '  done',
+                'elif [ "$layer" = "conflict-result" ]; then',
+                '  [ "$mode" = "copy" ] || refuse "CONFLICT RESULT TRANSFER IS COPY-ONLY"',
+                '  [ "${#files[@]}" -eq 1 ] || refuse "CONFLICT RESULT TRANSFER REQUIRES EXACTLY ONE FILE"',
+                '  path="${files[0]}"',
+                '  stages="$(git -C "$source" ls-files -u -- "$path" 2>/dev/null)"',
+                '  [ -n "$stages" ] || refuse "SOURCE CONFLICT DISAPPEARED SINCE PREVIEW"',
+                '  actual_conflict_fingerprint="$(printf "%s\\n" "$stages" | sha256sum | awk "{print \\$1}")"',
+                '  [ "$actual_conflict_fingerprint" = "$expected_conflict_fingerprint" ] || refuse "SOURCE CONFLICT STAGES CHANGED SINCE PREVIEW"',
+                '  [ "$(active_state "$source")" = "$expected_source_operation" ] || refuse "SOURCE CONFLICT OPERATION CHANGED SINCE PREVIEW"',
+                '  [ -f "$source/$path" ] || refuse "CONFLICT RESULT FILE DISAPPEARED SINCE PREVIEW"',
                 'else',
                 '  for path in "${files[@]}"; do',
                 '    git -C "$source" ls-files --error-unmatch -- "$path" >/dev/null 2>&1 || refuse "SOURCE PATH NO LONGER TRACKED // $path"',
@@ -1217,6 +1247,8 @@ Scope {
                 '  git -C "$source" diff --quiet -- "${files[@]}"',
                 '  rc=$?',
                 '  [ "$rc" -eq 1 ] || refuse "SELECTED PARTIAL WORKTREE PATCH DISAPPEARED SINCE PREVIEW"',
+                'elif [ "$layer" = "conflict-result" ]; then',
+                '  :',
                 'else',
                 '  git -C "$source" diff --cached --quiet -- "${files[@]}"',
                 '  rc=$?',
@@ -1225,7 +1257,15 @@ Scope {
                 'patch="$(mktemp "${TMPDIR:-/tmp}/pa-transfer-exec.XXXXXX")" || refuse "TEMP PATCH CREATE FAILED"',
                 'partial_staged=""',
                 'partial_worktree=""',
-                'cleanup_transfer_patches() { rm -f "$patch"; [ -z "$partial_staged" ] || rm -f "$partial_staged"; [ -z "$partial_worktree" ] || rm -f "$partial_worktree"; }',
+                'conflict_tmp=""',
+                'conflict_rehearsal=""',
+                'cleanup_transfer_patches() {',
+                '  if [ -n "$conflict_rehearsal" ]; then git -C "$source" worktree remove --force "$conflict_rehearsal" >/dev/null 2>&1 || true; fi',
+                '  rm -f "$patch"',
+                '  [ -z "$partial_staged" ] || rm -f "$partial_staged"',
+                '  [ -z "$partial_worktree" ] || rm -f "$partial_worktree"',
+                '  [ -z "$conflict_tmp" ] || rm -rf "$conflict_tmp"',
+                '}',
                 'trap cleanup_transfer_patches EXIT INT TERM',
                 'if [ "$scope" = "hunk" ]; then',
                 '  [ "${#files[@]}" -eq 1 ] || refuse "HUNK TRANSFER REQUIRES EXACTLY ONE FILE"',
@@ -1268,6 +1308,14 @@ Scope {
                 '    [ -s "$partial_staged" ] || refuse "PARTIAL STAGED PATCH DISAPPEARED SINCE PREVIEW"',
                 '    [ -s "$partial_worktree" ] || refuse "PARTIAL WORKTREE PATCH DISAPPEARED SINCE PREVIEW"',
                 '    { printf "STAGED64\\t"; base64 -w0 "$partial_staged"; printf "\\nWORKTREE64\\t"; base64 -w0 "$partial_worktree"; printf "\\n"; } >"$patch"',
+                '  elif [ "$layer" = "conflict-result" ]; then',
+                '    path="${files[0]}"',
+                '    conflict_tmp="$(mktemp -d "${TMPDIR:-/tmp}/pa-conflict-result-exec.XXXXXX")" || refuse "CONFLICT RESULT TEMP DIRECTORY CREATE FAILED"',
+                '    conflict_rehearsal="$conflict_tmp/rehearsal"',
+                '    git -C "$source" worktree add --detach --quiet "$conflict_rehearsal" "$expected_destination_head" >/dev/null 2>&1 || refuse "CONFLICT RESULT REHEARSAL WORKTREE CREATE FAILED"',
+                '    mkdir -p "$conflict_rehearsal/$(dirname "$path")" || refuse "CONFLICT RESULT DIRECTORY CREATE FAILED"',
+                '    cp -- "$source/$path" "$conflict_rehearsal/$path" || refuse "CONFLICT RESULT COPY INTO REHEARSAL FAILED"',
+                '    git -C "$conflict_rehearsal" diff --binary --full-index -- "$path" >"$patch" || refuse "CONFLICT RESULT PATCH REGENERATION FAILED"',
                 '  elif [ "$layer" = "untracked" ]; then',
                 '    : >"$patch"',
                 '    for path in "${files[@]}"; do',
@@ -1298,8 +1346,13 @@ Scope {
                 '  else',
                 '    printf "OK\\tCOPIED STAGED %s FILE(S) // %s -> %s\\n" "${#files[@]}" "$source" "$destination"',
                 '  fi',
+                'elif [ "$layer" = "conflict-result" ]; then',
+                '  [ "$mode" = "copy" ] || refuse "CONFLICT RESULT TRANSFER IS COPY-ONLY"',
+                '  git -C "$destination" apply --check --binary "$patch" >/dev/null 2>&1 || refuse "CONFLICT RESULT NO LONGER APPLIES TO DESTINATION"',
+                '  git -C "$destination" apply --binary "$patch" || refuse "DESTINATION CONFLICT RESULT APPLY FAILED"',
+                '  printf "OK\\tCOPIED CONFLICT RESULT // SOURCE OPERATION + STAGES LEFT UNTOUCHED\\n"',
                 'elif [ "$layer" = "partial" ]; then',
-                '  partial_apply() {',
+                '  partial_apply() {
                 '    local repo="$1"',
                 '    git -C "$repo" apply --cached --binary "$partial_staged" || return 1',
                 '    if ! git -C "$repo" apply --binary "$partial_staged"; then',
@@ -1362,7 +1415,9 @@ Scope {
             destinationHead,
             scope,
             String(hunkIndex),
-            layer
+            layer,
+            conflictFingerprint,
+            sourceOperation
         ];
 
         for (let i = 0; i < files.length; ++i)

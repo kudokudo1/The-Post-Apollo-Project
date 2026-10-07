@@ -119,6 +119,7 @@ Scope {
 
     property bool actionBusy: false
     property string actionKind: ""
+    property string actionTarget: ""
     property string actionResult: "READY"
 
     property var batchStepResults: []
@@ -688,6 +689,7 @@ Scope {
 
         actionBusy = true;
         actionKind = kind;
+        actionTarget = cleanTarget;
         actionResult = kind.toUpperCase() + " // RUNNING";
         actionExitSeen = false;
         actionStdoutSeen = false;
@@ -700,7 +702,18 @@ Scope {
             remoteActionProcess.exec([
                 "bash",
                 "-lc",
-                'exec "$HOME/.local/bin/px" delete-workflow "$1" "$2"',
+                [
+                    'installed="$HOME/.local/bin/px"',
+                    'source="$HOME/.local/share/post-apollo-dev-runtime/bin/px"',
+                    'if [ -x "$installed" ] && "$installed" --help 2>/dev/null | grep -q "delete-workflow"; then',
+                    '  exec "$installed" delete-workflow "$1" "$2"',
+                    'fi',
+                    'if [ -f "$source" ] && bash "$source" --help 2>/dev/null | grep -q "delete-workflow"; then',
+                    '  exec bash "$source" delete-workflow "$1" "$2"',
+                    'fi',
+                    'printf "%s\\n" "PX DELETE-WORKFLOW UNAVAILABLE // UPDATE DEV EXPERIENCE RUNTIME" >&2',
+                    'exit 64'
+                ].join("\n"),
                 "px-delete-workflow",
                 repoSlug,
                 cleanTarget

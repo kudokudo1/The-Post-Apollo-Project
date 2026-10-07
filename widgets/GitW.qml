@@ -1650,8 +1650,17 @@ PanelWindow {
             : ""
     }
 
+    GitOperationJournalService {
+        id: operationJournalService
+        repositoryPath:
+            gitService.repoIsLocal
+            ? gitService.repoRoot
+            : ""
+    }
+
     GitBranchWorkspaceService {
         id: branchWorkspaceService
+        operationJournal: operationJournalService
         repositoryPath:
             gitService.repoIsLocal
             ? gitService.repoRoot

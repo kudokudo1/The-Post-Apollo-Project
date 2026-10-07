@@ -196,6 +196,65 @@ require(
     "branch map Canvas must resolve parent connectors",
 )
 
+# Universal operation journal foundation. Journal records must exist before
+# mutations, survive restarts, and remain truthful that Undo is not implemented
+# until a recovery engine lands.
+require(
+    "services/git/GitOperationJournalService.qml",
+    "function beginOperation(kind, beforeState, metadata)",
+    "operation journal must record mutation start",
+)
+require(
+    "services/git/GitOperationJournalService.qml",
+    "function completeOperation(operationId, afterState, detail)",
+    "operation journal must record successful after-state",
+)
+require(
+    "services/git/GitOperationJournalService.qml",
+    "function failOperation(operationId, afterState, detail)",
+    "operation journal must retain failed operations",
+)
+require(
+    "services/git/GitOperationJournalService.qml",
+    'status === "RUNNING"\n                    ? "INTERRUPTED"',
+    "unfinished operations must become interrupted after restart",
+)
+require(
+    "services/git/GitOperationJournalService.qml",
+    'undoState: "NOT_IMPLEMENTED"',
+    "journal must not claim Undo before recovery exists",
+)
+require(
+    "services/git/GitOperationJournalService.qml",
+    "atomicWrites: true",
+    "operation journal persistence must be atomic",
+)
+require_regex(
+    "services/git/GitBranchWorkspaceService.qml",
+    r"function runAction\(operation, a, b, c\).*operationJournal\.beginOperation\(.*actionProcess\.exec\(",
+    "branch/workspace mutations must journal before process execution",
+)
+require(
+    "services/git/GitBranchWorkspaceService.qml",
+    "operationJournal.completeOperation(",
+    "branch/workspace success must close the journal record",
+)
+require(
+    "services/git/GitBranchWorkspaceService.qml",
+    "operationJournal.failOperation(",
+    "branch/workspace failure must close the journal record",
+)
+require_regex(
+    "widgets/GitW.qml",
+    r"GitOperationJournalService \{.*id: operationJournalService.*GitBranchWorkspaceService \{.*operationJournal: operationJournalService",
+    "GitW must inject one shared journal into branch/workspace mutations",
+)
+require(
+    ".gitignore",
+    "git-operation-journal.json",
+    "local journal state must not dirty the Quickshell repository",
+)
+
 # Repository safety contracts.
 require(
     "services/git/GitRepositoryService.qml",
@@ -259,6 +318,7 @@ focused_files = [
     "services/github/GitHubProjectsService.qml",
     "services/github/GitEvidenceProvider.qml",
     "services/github/WorkflowLibraryStore.qml",
+    "services/git/GitOperationJournalService.qml",
     "services/git/GitRepositoryService.qml",
     "services/git/GitHistoryService.qml",
     "services/hospital/HospitalCertificationCoordinator.qml",

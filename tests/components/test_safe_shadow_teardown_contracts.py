@@ -26,7 +26,8 @@ assert "SafeDropShadow 1.0 SafeDropShadow.qml" in qmldir
 SURFACES = {
     "components/DockButton.qml": 1,
     "components/ConversationFeed.qml": 6,
-    "widgets/notifications/NotificationsHubW.qml": 14,
+    "components/NeonScrollBar.qml": 1,
+    "widgets/notifications/NotificationsHubW.qml": 13,
     "widgets/weather/StationHome.qml": 3,
 }
 
@@ -67,3 +68,8 @@ for relative in LAYER_SURFACES:
         )
 
 print("Shared graphical-effect teardown contracts: PASS")
+
+scrollbar = (ROOT / "components" / "NeonScrollBar.qml").read_text(encoding="utf-8")
+assert "safeSource: handleLoader.item" in scrollbar
+assert "requestedVisible:" in scrollbar
+assert "root.dropHandleGlow" in scrollbar

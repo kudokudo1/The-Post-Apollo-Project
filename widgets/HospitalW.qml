@@ -151,6 +151,19 @@ PanelWindow {
         return true;
     }
 
+    function openRoomCharts() {
+        if (!root.selectedRoomTeam)
+            return false;
+
+        root.leaveRoomControls();
+        root.leaveBedControls();
+        root.phoneMenuOpen = false;
+        root.intercomMenuOpen = false;
+        root.operationsSurface = "charts";
+        chartService.refreshAll();
+        return true;
+    }
+
     function openRoomChat() {
         if (!root.selectedRoomTeam || !floorService.bedPath)
             return false;
@@ -1882,6 +1895,14 @@ PanelWindow {
         id: roomReportService
 
         roomId: root.selectedRoomTeam
+    }
+
+    HospitalChartService {
+        id: chartService
+
+        patientId: floorService.floorId
+        roomId: root.selectedRoomTeam
+        sourceSessionId: roomChatView.activeSessionId
     }
 
     HospitalPhoneService {
@@ -5679,7 +5700,7 @@ PanelWindow {
                             spacing: 7
 
                             GohuText {
-                                width: parent.width - 122
+                                width: parent.width - 214
                                 anchors.verticalCenter: parent.verticalCenter
                                 text:
                                     latestCheckpointCard.checkpoint
@@ -5742,6 +5763,44 @@ PanelWindow {
                                     onClicked: root.openRoomReports()
                                 }
                             }
+
+                            Rectangle {
+                                id: roomChartButton
+
+                                width: 85
+                                height: 22
+                                anchors.verticalCenter: parent.verticalCenter
+                                color:
+                                    roomChartMouse.pressed
+                                    ? Colors.green
+                                    : Colors.black
+                                border.width: 1
+                                border.color: Colors.green
+
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    text:
+                                        "CHART // "
+                                        + String(
+                                            chartService.roomActiveCount
+                                            + chartService.patientActiveCount
+                                        )
+                                    font.pixelSize: 7
+                                    color:
+                                        roomChartMouse.pressed
+                                        ? Colors.black
+                                        : Colors.green
+                                }
+
+                                MouseArea {
+                                    id: roomChartMouse
+
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.openRoomCharts()
+                                }
+                            }
                         }
 
                         GohuText {
@@ -5775,10 +5834,12 @@ PanelWindow {
                         doctorRuntimeService.lastError.length > 0
                         || roomCheckpointService.lastError.length > 0
                         || roomReportService.lastError.length > 0
+                        || chartService.lastError.length > 0
                     text:
                         doctorRuntimeService.lastError
                         || roomCheckpointService.lastError
                         || roomReportService.lastError
+                        || chartService.lastError
                     font.pixelSize: 9
                     color: Colors.red
                     wrapMode: Text.Wrap
@@ -5793,6 +5854,28 @@ PanelWindow {
                         "SUPERVISED CONTROL // QUICK + STATUS + STOP"
                 }
             }
+        }
+
+        HospitalChartsView {
+            id: chartsView
+
+            z: 700
+            visible: root.operationsSurface === "charts"
+
+            chartService: chartService
+
+            anchors {
+                left: parent.left
+                right: parent.right
+                top: fixedTop.bottom
+                bottom: actionBay.top
+                leftMargin: 18
+                rightMargin: 18
+                topMargin: 8
+                bottomMargin: 10
+            }
+
+            onCloseRequested: root.showSurgery()
         }
 
         HospitalRoomReportsView {

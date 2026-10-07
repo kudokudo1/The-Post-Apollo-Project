@@ -137,6 +137,7 @@ Rectangle {
     }
 
     onFilePathChanged: invalidatePreview()
+    onUntrackedSourceChanged: invalidatePreview()
     onSourcePathChanged: invalidatePreview()
     onTransferScopeChanged: invalidatePreview()
     onHunkIndexChanged: invalidatePreview()

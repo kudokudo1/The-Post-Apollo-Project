@@ -1,0 +1,27 @@
+name: Weather Station Teardown Contracts
+
+on:
+  pull_request:
+    paths:
+      - "widgets/weather/**"
+      - "tests/weather/**"
+      - ".github/workflows/weather-teardown-contracts.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "widgets/weather/**"
+      - "tests/weather/**"
+      - ".github/workflows/weather-teardown-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Validate Weather Station effect teardown contracts
+        run: python3 tests/weather/test_shader_teardown_contracts.py

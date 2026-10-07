@@ -541,7 +541,7 @@ Scope {
 
         for (let i = 0; i < lines.length; ++i) {
             const line = String(lines[i] || "");
-            if (!line || line.indexOf("RROW\t") !== 0)
+            if (!line)
                 continue;
 
             const p = line.split("\t");

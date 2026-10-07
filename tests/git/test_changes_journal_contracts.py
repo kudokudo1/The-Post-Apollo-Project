@@ -33,12 +33,25 @@ require(
     "property var snapshotService: null",
     "Changes service must accept the shared snapshot service",
 )
-require_regex(
+require(
     SERVICE,
-    r"function journalSnapshot\(snapshot\).*"
-    r'out\.recoveryClass = "EVIDENCE_ONLY".*'
-    r"CHANGES CONTENT IS NOT YET PRESERVED FOR AUTOMATIC RECOVERY",
-    "Changes mutations must not claim automatic recovery before patch preservation exists",
+    'if (operation === "commit")',
+    "commit/amend must have an explicit content-recovery classification path",
+)
+require(
+    SERVICE,
+    'out.recoveryClass = "CONTENT_RECOVERABLE";',
+    "exact commit/amend transitions may advertise content recovery",
+)
+require(
+    SERVICE,
+    "commitSnapshotCanRecover(",
+    "commit/amend recovery must require exact before/after evidence",
+)
+require(
+    SERVICE,
+    "CHANGES CONTENT IS NOT YET PRESERVED FOR AUTOMATIC RECOVERY",
+    "non-commit Changes mutations must remain evidence-only until their content is preserved",
 )
 require_regex(
     SERVICE,

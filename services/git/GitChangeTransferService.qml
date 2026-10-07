@@ -28,10 +28,12 @@ Scope {
 
     property string pendingPreviewDestination: ""
     property string pendingPreviewScope: "file"
+    property string pendingPreviewLayer: "worktree"
     property int pendingPreviewHunkIndex: -1
     property string previewDestinationPath: ""
     property string previewMode: "move"
     property string previewScope: "file"
+    property string previewLayer: "worktree"
     property int previewHunkIndex: -1
     property var previewFiles: []
     property string previewFingerprint: ""
@@ -104,10 +106,12 @@ Scope {
     function clearPreview() {
         pendingPreviewDestination = "";
         pendingPreviewScope = "file";
+        pendingPreviewLayer = "worktree";
         pendingPreviewHunkIndex = -1;
         previewDestinationPath = "";
         previewMode = "move";
         previewScope = "file";
+        previewLayer = "worktree";
         previewHunkIndex = -1;
         previewFiles = [];
         previewFingerprint = "";
@@ -121,6 +125,9 @@ Scope {
     }
 
     function journalKind() {
+        if (previewLayer === "staged")
+            return "CHANGES/TRANSFER_STAGED";
+
         return previewScope === "hunk"
             ? "CHANGES/TRANSFER_HUNK"
             : "CHANGES/TRANSFER";
@@ -140,6 +147,7 @@ Scope {
                 ? "TRANSFER_HUNK"
                 : "TRANSFER",
             scope: String(previewScope || "file"),
+            layer: String(previewLayer || "worktree"),
             hunkIndex: Number(previewHunkIndex),
             mode: String(previewMode || "move"),
             sourcePath: String(repositoryPath || ""),

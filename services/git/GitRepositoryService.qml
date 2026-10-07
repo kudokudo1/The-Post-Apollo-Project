@@ -25,6 +25,25 @@ Scope {
     property string objectInfo: ""
     property string healthOutput: "RUN FSCK / GC / MAINTENANCE WHEN NEEDED"
 
+    property int looseObjectCount: 0
+    property int packedObjectCount: 0
+    property int packCount: 0
+    property int prunePackableCount: 0
+    property int garbageObjectCount: 0
+    property string looseObjectSize: "0 bytes"
+    property string packedObjectSize: "0 bytes"
+    property string garbageObjectSize: "0 bytes"
+
+    property string healthState: "UNVERIFIED"
+    property string healthSummary:
+        "OBJECT GRAPH HAS NOT BEEN VERIFIED IN THIS SESSION"
+    property string healthRecommendation:
+        "Run FSCK for an integrity check. GC and maintenance are cleanup/optimization actions, not integrity tests."
+    property int fsckDanglingCount: 0
+    property int fsckUnreachableCount: 0
+    property int fsckWarningCount: 0
+    property int fsckErrorCount: 0
+
     property bool inspectExitSeen: false
     property bool inspectStdoutSeen: false
     property bool inspectStderrSeen: false
@@ -225,6 +244,148 @@ Scope {
         ignoreLines = ignores;
         attributeLines = attrs;
         objectInfo = objects.join("\n");
+        parseObjectMetrics(objects);
+    }
+
+    function parseObjectMetrics(lines) {
+        const rows = Array.isArray(lines) ? lines : [];
+        const values = {};
+
+        for (let i = 0; i < rows.length; ++i) {
+            const raw = String(rows[i] || "");
+            const split = raw.indexOf(":");
+
+            if (split <= 0)
+                continue;
+
+            const key =
+                raw.slice(0, split).trim().toLowerCase();
+            const value =
+                raw.slice(split + 1).trim();
+
+            values[key] = value;
+        }
+
+        looseObjectCount = Number(values["count"] || 0);
+        packedObjectCount = Number(values["in-pack"] || 0);
+        packCount = Number(values["packs"] || 0);
+        prunePackableCount =
+            Number(values["prune-packable"] || 0);
+        garbageObjectCount =
+            Number(values["garbage"] || 0);
+
+        looseObjectSize =
+            String(values["size"] || "0 bytes");
+        packedObjectSize =
+            String(values["size-pack"] || "0 bytes");
+        garbageObjectSize =
+            String(values["size-garbage"] || "0 bytes");
+    }
+
+    function interpretFsck(text, exitCode) {
+        const raw = String(text || "");
+        const lines = raw.split("\n");
+
+        let dangling = 0;
+        let unreachable = 0;
+        let warnings = 0;
+        let errors = 0;
+
+        for (let i = 0; i < lines.length; ++i) {
+            const line = String(lines[i] || "").trim();
+            const lower = line.toLowerCase();
+
+            if (!line
+                    || line.indexOf("OK\t") === 0
+                    || line.indexOf("REFUSED\t") === 0)
+                continue;
+
+            if (lower.indexOf("dangling ") === 0) {
+                dangling += 1;
+                continue;
+            }
+
+            if (lower.indexOf("unreachable ") === 0) {
+                unreachable += 1;
+                continue;
+            }
+
+            if (lower.indexOf("warning:") === 0
+                    || lower.indexOf("notice:") === 0) {
+                warnings += 1;
+                continue;
+            }
+
+            if (lower.indexOf("error:") === 0
+                    || lower.indexOf("fatal:") === 0
+                    || lower.indexOf("broken link") >= 0
+                    || lower.indexOf("missing ") >= 0
+                    || lower.indexOf("corrupt") >= 0
+                    || lower.indexOf("hash mismatch") >= 0
+                    || lower.indexOf("invalid sha1") >= 0
+                    || lower.indexOf("bad object") >= 0)
+                errors += 1;
+        }
+
+        fsckDanglingCount = dangling;
+        fsckUnreachableCount = unreachable;
+        fsckWarningCount = warnings;
+        fsckErrorCount = errors;
+
+        if (Number(exitCode) !== 0 || errors > 0) {
+            healthState = "FAIL";
+            healthSummary =
+                "OBJECT GRAPH FAILED VERIFICATION // "
+                + String(errors)
+                + " STRUCTURAL ERROR"
+                + (errors === 1 ? "" : "S");
+            healthRecommendation =
+                "Do not run cleanup as a first response. Preserve the repository, inspect the raw FSCK output, and compare against a known-good remote or backup before deleting objects.";
+            return;
+        }
+
+        const recoverable = dangling + unreachable;
+
+        if (recoverable > 0) {
+            healthState = "RECOVERY";
+            healthSummary =
+                "OBJECT GRAPH VALID // "
+                + String(recoverable)
+                + " UNREFERENCED OBJECT"
+                + (recoverable === 1 ? "" : "S");
+            healthRecommendation =
+                "This is not corruption. Rewrites, rebases, resets, and amended commits can leave recoverable objects. Use HISTORY → REFLOG before GC if you may want them back.";
+            return;
+        }
+
+        if (warnings > 0) {
+            healthState = "WARNING";
+            healthSummary =
+                "OBJECT GRAPH VERIFIED // "
+                + String(warnings)
+                + " WARNING"
+                + (warnings === 1 ? "" : "S");
+            healthRecommendation =
+                "Read the raw FSCK warnings before cleanup. The graph verified, but Git reported conditions worth reviewing.";
+            return;
+        }
+
+        healthState = "PASS";
+        healthSummary = "OBJECT GRAPH VERIFIED // NO STRUCTURAL ERRORS";
+        healthRecommendation =
+            "No integrity problems were reported. GC --auto and maintenance are optional optimization steps, not repairs.";
+    }
+
+    function noteHealthAction(action, success) {
+        const name = String(action || "");
+
+        if (name === "GC-AUTO" && success) {
+            healthRecommendation =
+                "GC --auto completed. Existing FSCK integrity state is unchanged; run FSCK again if you want a post-cleanup verification.";
+        } else if (name === "MAINTENANCE" && success) {
+            healthRecommendation =
+                "Maintenance completed. Existing FSCK integrity state is unchanged; run FSCK again if you want a post-maintenance verification.";
+        }
     }
 
     function maybeFinishInspection() {
@@ -465,7 +626,7 @@ Scope {
                 '    printf "OK\\tUNLOCKED WORKTREE // %s\\n" "$a"',
                 '    ;;',
                 '  fsck)',
-                '    output="$(git -C "$repo" fsck --no-progress 2>&1)"; rc=$?',
+                '    output="$(git -C "$repo" fsck --full --no-progress 2>&1)"; rc=$?',
                 '    printf "%s\\n" "$output"',
                 '    [ "$rc" -eq 0 ] || exit "$rc"',
                 '    printf "OK\\tFSCK PASS\\n"',
@@ -713,7 +874,11 @@ Scope {
                 || actionName === "MAINTENANCE")
             healthOutput = out || err || detail;
 
+        if (actionName === "FSCK")
+            interpretFsck(out || err, actionExitCode);
+
         if (actionExitCode === 0 && kind === "OK") {
+            noteHealthAction(actionName, true);
             actionStatus = detail || (actionName + " // OK");
             lastError = "";
             actionFinished(actionName, true, detail || "OK");

@@ -1825,6 +1825,7 @@ Item {
                 Rectangle {
                     width: 470
                     height: parent.height
+                    clip: true
                     color: Colors.dark
                     border.width: 1
                     border.color: Colors.magenta
@@ -1873,16 +1874,12 @@ Item {
 
                             width: parent.width
                             height: Math.max(0, parent.height - 33)
-                            clip: true
+                            clip: false
 
                             Flickable {
                                 id: historyScroll7
 
-                                anchors {
-                                    fill: parent
-                                    rightMargin: 12
-                                    bottomMargin: 10
-                                }
+                                anchors.fill: parent
                                 clip: true
                                 contentWidth: width
                                 contentHeight: reflogColumn.implicitHeight
@@ -1983,6 +1980,7 @@ Item {
                                     flickable: historyScroll7
                                     starHandle: true
                                     rightInset: 2
+                                    trackTopExtension: 33
                                 }
                             }
                         }

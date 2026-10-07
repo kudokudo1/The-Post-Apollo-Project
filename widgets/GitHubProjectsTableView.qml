@@ -7,6 +7,9 @@ Item {
 
     required property var projectService
 
+    property string armedItemAction: ""
+    property string armedItemId: ""
+
     readonly property int titleWidth: 250
     readonly property int typeWidth: 70
     readonly property int repoWidth: 190
@@ -14,7 +17,7 @@ Item {
     readonly property int priorityWidth: 90
     readonly property int iterationWidth: 110
     readonly property int dateWidth: 92
-    readonly property int actionWidth: 104
+    readonly property int actionWidth: 154
     readonly property int totalWidth:
         titleWidth
         + typeWidth
@@ -24,6 +27,56 @@ Item {
         + iterationWidth
         + dateWidth * 2
         + actionWidth
+
+    function itemActionArmed(action, item) {
+        return root.armedItemAction === String(action || "")
+            && root.armedItemId
+               === root.projectService.itemId(item);
+    }
+
+    function armOrRunItem(action, item, callback) {
+        const id = root.projectService.itemId(item);
+
+        if (!id)
+            return;
+
+        if (root.itemActionArmed(action, item)) {
+            root.armedItemAction = "";
+            root.armedItemId = "";
+
+            if (callback)
+                callback();
+
+            return;
+        }
+
+        root.armedItemAction = String(action || "");
+        root.armedItemId = id;
+    }
+
+    function clearItemArm() {
+        root.armedItemAction = "";
+        root.armedItemId = "";
+    }
+
+    function openProjectItem(item) {
+        const url = root.projectService.itemUrl(item);
+
+        if (url)
+            Qt.openUrlExternally(url);
+    }
+
+    Connections {
+        target: root.projectService
+
+        function onMutationFinished(success, operation) {
+            root.clearItemArm();
+        }
+
+        function onProjectRefreshed() {
+            root.clearItemArm();
+        }
+    }
 
     component Cell: Rectangle {
         id: cell
@@ -291,22 +344,54 @@ Item {
                                     spacing: 4
 
                                     ItemAction {
-                                        width: 66
-                                        label: "ARCHIVE"
+                                        width: 40
+                                        label: "OPEN"
+                                        enabledAction:
+                                            !!root.projectService.itemUrl(
+                                                tableRow.modelData
+                                            )
+                                        onTriggered:
+                                            root.openProjectItem(
+                                                tableRow.modelData
+                                            )
+                                    }
+
+                                    ItemAction {
+                                        width: 76
+                                        label:
+                                            root.itemActionArmed(
+                                                "archive",
+                                                tableRow.modelData
+                                            )
+                                            ? "CONFIRM"
+                                            : "ARCHIVE"
                                         enabledAction:
                                             !root.projectService.busy
                                             && !!root.projectService.itemId(
                                                 tableRow.modelData
                                             )
                                         onTriggered:
-                                            root.projectService.archiveItem(
-                                                tableRow.modelData
+                                            root.armOrRunItem(
+                                                "archive",
+                                                tableRow.modelData,
+                                                function() {
+                                                    root.projectService.archiveItem(
+                                                        tableRow.modelData,
+                                                        true
+                                                    );
+                                                }
                                             )
                                     }
 
                                     ItemAction {
                                         width: 26
-                                        label: "X"
+                                        label:
+                                            root.itemActionArmed(
+                                                "remove",
+                                                tableRow.modelData
+                                            )
+                                            ? "!"
+                                            : "X"
                                         destructive: true
                                         enabledAction:
                                             !root.projectService.busy
@@ -314,8 +399,15 @@ Item {
                                                 tableRow.modelData
                                             )
                                         onTriggered:
-                                            root.projectService.removeItem(
-                                                tableRow.modelData
+                                            root.armOrRunItem(
+                                                "remove",
+                                                tableRow.modelData,
+                                                function() {
+                                                    root.projectService.removeItem(
+                                                        tableRow.modelData,
+                                                        true
+                                                    );
+                                                }
                                             )
                                     }
                                 }

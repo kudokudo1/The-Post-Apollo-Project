@@ -1720,6 +1720,8 @@ PanelWindow {
         id: stackExecutor
         stackPlanner: stackPlanner
         branchWorkspaceService: branchWorkspaceService
+        operationJournal: operationJournalService
+        snapshotService: repositorySnapshotService
         repositoryPath:
             gitService.repoIsLocal
             ? gitService.repoRoot

@@ -351,9 +351,7 @@ Item {
 
             root.managementMessage =
                 success
-                ? "OK // RESTACK COMPLETE // "
-                  + String((result || []).length)
-                  + " RESULT ROWS"
+                ? "OK // RESTACK COMPLETE"
                 : "REFUSED // "
                   + String(
                       root.stackExecutor.lastError
@@ -1123,7 +1121,9 @@ Item {
             return;
         }
 
-        root.managementMessage = root.stackExecutor.armStatus;
+        root.managementMessage =
+            "ARMED // "
+            + root.stackExecutor.armStatus;
     }
 
     function executeRestack() {
@@ -2368,6 +2368,12 @@ Item {
                                 height: 32
                                 label: "CLOSE"
                                 destructive: true
+                                enabledAction:
+                                    !(
+                                        root.managementMode === "restack"
+                                        && stackExecutor
+                                        && stackExecutor.running
+                                     )
                                 onTriggered: root.closeManager()
                             }
                         }

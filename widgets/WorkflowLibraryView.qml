@@ -1114,110 +1114,40 @@ Item {
                         }
                     }
 
-                    Rectangle {
+                    NeonScrollBar {
                         id: workflowScrollTrack
 
-                        anchors {
-                            right: parent.right
-                            top: parent.top
-                            bottom: parent.bottom
-                        }
+                        flickable: workflowFlick
 
-                        width: 9
-                        color: Colors.black
-                        border.width: 1
-                        border.color: Colors.orange
-                        opacity:
-                            workflowFlick.contentHeight > workflowFlick.height
-                            ? 1.0
-                            : 0.28
+                        x: parent.width - width
+                        y: 0
+                        height: parent.height
+                        z: 0
 
-                        readonly property real maxContentY:
-                            Math.max(
-                                0,
-                                workflowFlick.contentHeight - workflowFlick.height
-                            )
+                        barAreaWidth: 9
+                        railWidth: 9
+                        barHandleWidth: 5
+                        minimumHandleHeight: 26
+                        scrollThreshold: 0
+                        autoHide: false
 
-                        readonly property real thumbTravel:
-                            Math.max(0, height - workflowScrollThumb.height)
+                        railColor: Colors.black
+                        railOpacity: scrollable ? 1.0 : 0.28
+                        railRadius: 0
+                        railBorderWidth: 1
+                        railBorderColor: Colors.orange
+                        railGlowEnabled: false
 
-                        Rectangle {
-                            id: workflowScrollThumb
+                        handleColor: Colors.magenta
+                        handleOpacity: scrollable ? 0.92 : 0.0672
+                        barHandleRadius: 0
+                        handleBorderWidth: 0
+                        handleGlowEnabled: false
 
-                            x: 2
-                            width: parent.width - 4
-
-                            height:
-                                Math.max(
-                                    26,
-                                    parent.height
-                                    * Math.min(
-                                        1,
-                                        workflowFlick.height
-                                        / Math.max(workflowFlick.contentHeight, 1)
-                                    )
-                                )
-
-                            y:
-                                workflowScrollTrack.maxContentY > 0
-                                ? (
-                                      workflowFlick.contentY
-                                      / workflowScrollTrack.maxContentY
-                                  )
-                                  * workflowScrollTrack.thumbTravel
-                                : 0
-
-                            color: Colors.magenta
-                            opacity:
-                                workflowFlick.contentHeight > workflowFlick.height
-                                ? 0.92
-                                : 0.24
-                        }
-
-                        MouseArea {
-                            id: workflowScrollMouse
-
-                            anchors.fill: parent
-                            enabled:
-                                workflowFlick.contentHeight > workflowFlick.height
-
-                            property real dragOffset: 0
-
-                            onPressed: function(mouse) {
-                                if (mouse.y >= workflowScrollThumb.y
-                                        && mouse.y <= workflowScrollThumb.y
-                                                           + workflowScrollThumb.height) {
-                                    dragOffset = mouse.y - workflowScrollThumb.y;
-                                } else {
-                                    dragOffset = workflowScrollThumb.height / 2;
-                                    updateScroll(mouse.y);
-                                }
-                            }
-
-                            onPositionChanged: function(mouse) {
-                                if (pressed)
-                                    updateScroll(mouse.y);
-                            }
-
-                            function updateScroll(pointerY) {
-                                const travel = workflowScrollTrack.thumbTravel;
-
-                                if (travel <= 0)
-                                    return;
-
-                                const thumbY = Math.max(
-                                    0,
-                                    Math.min(
-                                        travel,
-                                        pointerY - dragOffset
-                                    )
-                                );
-
-                                workflowFlick.contentY =
-                                    (thumbY / travel)
-                                    * workflowScrollTrack.maxContentY;
-                            }
-                        }
+                        interactive: scrollable
+                        preserveDragOffset: true
+                        wheelEnabled: false
+                        pointerCursorShape: Qt.ArrowCursor
                     }
                 }
             }

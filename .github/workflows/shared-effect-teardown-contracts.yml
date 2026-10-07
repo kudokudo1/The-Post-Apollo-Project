@@ -5,6 +5,7 @@ on:
     paths:
       - "components/SafeDropShadow.qml"
       - "components/DockButton.qml"
+      - "components/NeonScrollBar.qml"
       - "components/ConversationFeed.qml"
       - "widgets/GitW.qml"
       - "components/qmldir"
@@ -18,6 +19,7 @@ on:
     paths:
       - "components/SafeDropShadow.qml"
       - "components/DockButton.qml"
+      - "components/NeonScrollBar.qml"
       - "components/ConversationFeed.qml"
       - "widgets/GitW.qml"
       - "components/qmldir"

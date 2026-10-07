@@ -979,46 +979,36 @@ Item {
                 }
             }
 
-            Rectangle {
+            NeonScrollBar {
                 id: scrollTrack
 
-                width: 4
-                anchors {
-                    top: parent.top
-                    bottom: parent.bottom
-                    right: parent.right
-                    margins: 5
-                }
+                flickable: sourceList
 
-                color: Colors.dark
-                visible: sourceList.contentHeight > sourceList.height
+                x: parent.width - width - 5
+                y: 5
+                height: Math.max(0, parent.height - 10)
+                z: 0
 
-                Rectangle {
-                    width: parent.width
-                    height:
-                        Math.max(
-                            18,
-                            parent.height
-                            * sourceList.height
-                            / Math.max(
-                                sourceList.height,
-                                sourceList.contentHeight
-                            )
-                        )
-                    y:
-                        (
-                            parent.height - height
-                        )
-                        * (
-                            sourceList.contentY
-                            / Math.max(
-                                1,
-                                sourceList.contentHeight
-                                - sourceList.height
-                            )
-                          )
-                    color: Colors.magenta
-                }
+                barAreaWidth: 4
+                railWidth: 4
+                barHandleWidth: 4
+                minimumHandleHeight: 18
+                scrollThreshold: 0
+
+                railColor: Colors.dark
+                railOpacity: 1.0
+                railRadius: 0
+                railGlowEnabled: false
+
+                handleColor: Colors.magenta
+                barHandleRadius: 0
+                handleBorderWidth: 0
+                handleGlowEnabled: false
+
+                interactive: false
+                wheelEnabled: false
+
+                visible: scrollable
             }
         }
     }

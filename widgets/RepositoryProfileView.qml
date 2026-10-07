@@ -617,56 +617,38 @@ Item {
                                 }
                             }
 
-                            Rectangle {
+                            NeonScrollBar {
                                 id: catalogScrollTrack
 
-                                width: 5
-                                anchors {
-                                    top: parent.top
-                                    bottom: parent.bottom
-                                    right: parent.right
-                                }
+                                flickable: catalogScroll
 
-                                color: Colors.black
-                                border.width: 1
-                                border.color: Colors.dark
+                                x: parent.width - width
+                                y: 0
+                                height: parent.height
+                                z: 0
 
-                                Rectangle {
-                                    width: parent.width
-                                    height:
-                                        catalogScroll.contentHeight <= 0
-                                        ? parent.height
-                                        : Math.max(
-                                            18,
-                                            parent.height
-                                            * Math.min(
-                                                1,
-                                                catalogScroll.height
-                                                / catalogScroll.contentHeight
-                                            )
-                                          )
-                                    y:
-                                        catalogScroll.contentHeight
-                                        <= catalogScroll.height
-                                        ? 0
-                                        : (
-                                            parent.height - height
-                                          )
-                                          * (
-                                              catalogScroll.contentY
-                                              / Math.max(
-                                                  1,
-                                                  catalogScroll.contentHeight
-                                                  - catalogScroll.height
-                                              )
-                                            )
-                                    color: Colors.magenta
-                                    opacity:
-                                        catalogScroll.contentHeight
-                                        > catalogScroll.height
-                                        ? 0.82
-                                        : 0.30
-                                }
+                                barAreaWidth: 5
+                                railWidth: 5
+                                barHandleWidth: 5
+                                minimumHandleHeight: 18
+                                scrollThreshold: 0
+                                autoHide: false
+
+                                railColor: Colors.black
+                                railOpacity: 1.0
+                                railRadius: 0
+                                railBorderWidth: 1
+                                railBorderColor: Colors.dark
+                                railGlowEnabled: false
+
+                                handleColor: Colors.magenta
+                                handleOpacity: scrollable ? 0.82 : 0.30
+                                barHandleRadius: 0
+                                handleBorderWidth: 0
+                                handleGlowEnabled: false
+
+                                interactive: false
+                                wheelEnabled: false
                             }
                         }
                     }

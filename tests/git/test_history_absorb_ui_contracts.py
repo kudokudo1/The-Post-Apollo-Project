@@ -98,7 +98,7 @@ require(
 require_regex(
     SURGERY,
     r"GitHistoryAbsorbView \{.*"
-    r'visible: root\.surgeryMode === "absorb".*'
+    r'visible: root\.mode === "absorb".*'
     r"absorbService: root\.absorbService",
     "Surgery must host Absorb without replacing Fold",
 )

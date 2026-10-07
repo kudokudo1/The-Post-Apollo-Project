@@ -25,6 +25,11 @@ Singleton {
     // Bound persistent history so rendering/search/filter cost cannot
     // grow forever over the lifetime of the desktop session.
     property int maxHistoryEntries: 300
+    property int notificationsRevision: 0
+
+    function markNotificationsChanged() {
+        notificationsRevision += 1;
+    }
 
     // ===== EXTERNAL NOTIFICATIONS ===============================
 
@@ -223,6 +228,7 @@ Singleton {
             replaceModelEntry(activeNotifications, activeIndex, entry);
         }
 
+        markNotificationsChanged();
         scheduleHistorySave();
     }
 
@@ -261,8 +267,10 @@ Singleton {
 
         const activeUpdated = updateModelNotification(activeNotifications, notificationId, changes);
 
-        if (historyUpdated)
+        if (historyUpdated) {
+            markNotificationsChanged();
             scheduleHistorySave();
+        }
 
         return historyUpdated || activeUpdated;
     }
@@ -397,6 +405,7 @@ Singleton {
         historySaveTimer.stop();
 
         notifications.clear();
+        markNotificationsChanged();
 
         historyStatus = "clearing";
 
@@ -472,6 +481,7 @@ Singleton {
         }
 
         pruneHistory();
+        markNotificationsChanged();
 
         return entries.length > notifications.count;
     }

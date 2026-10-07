@@ -19,6 +19,7 @@ def require(path: str, needle: str, message: str) -> None:
 
 
 for kind in (
+    "HISTORY/MERGE",
     "HISTORY/CHERRY-PICK",
     "HISTORY/REVERT",
     "HISTORY/RESET",
@@ -119,6 +120,36 @@ def guarded_restore_branch(repo: Path, branch: str, before: str, after: str):
     assert git(repo, "status", "--porcelain=v1").stdout == b""
 
 
+def smoke_fast_forward_merge_undo():
+    with tempfile.TemporaryDirectory(prefix="pa-history-merge-ff-") as tmp:
+        repo, before, branch = make_repo(Path(tmp))
+        git(repo, "switch", "-qc", "donor")
+        donor = commit_file(repo, "donor.txt", "donor\n", "donor")
+        git(repo, "switch", "-q", branch)
+        git(repo, "merge", "--no-edit", donor)
+        after = git(repo, "rev-parse", "HEAD").stdout.decode().strip()
+        assert after == donor
+        guarded_restore_branch(repo, branch, before, after)
+        assert not (repo / "donor.txt").exists()
+
+
+def smoke_merge_commit_undo():
+    with tempfile.TemporaryDirectory(prefix="pa-history-merge-commit-") as tmp:
+        repo, base, branch = make_repo(Path(tmp))
+        git(repo, "switch", "-qc", "donor")
+        donor = commit_file(repo, "donor.txt", "donor\n", "donor")
+        git(repo, "switch", "-q", branch)
+        before = commit_file(repo, "local.txt", "local\n", "local")
+        git(repo, "merge", "--no-edit", donor)
+        after = git(repo, "rev-parse", "HEAD").stdout.decode().strip()
+        parents = git(repo, "show", "-s", "--format=%P", after).stdout.decode().split()
+        assert len(parents) == 2
+        assert base in git(repo, "merge-base", before, donor).stdout.decode()
+        guarded_restore_branch(repo, branch, before, after)
+        assert (repo / "local.txt").read_text(encoding="utf-8") == "local\n"
+        assert not (repo / "donor.txt").exists()
+
+
 def smoke_cherry_pick_undo():
     with tempfile.TemporaryDirectory(prefix="pa-history-cherry-") as tmp:
         repo, before, branch = make_repo(Path(tmp))
@@ -198,6 +229,8 @@ def smoke_detach_switch_back():
         assert git(repo, "rev-parse", "HEAD").stdout.decode().strip() == later
 
 
+smoke_fast_forward_merge_undo()
+smoke_merge_commit_undo()
 smoke_cherry_pick_undo()
 smoke_revert_undo()
 smoke_hard_reset_undo()

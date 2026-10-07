@@ -4725,6 +4725,8 @@ PanelWindow {
 
                         changesService: changesService
                         gitService: gitService
+                        transferService: changeTransferService
+                        branchWorkspaceService: branchWorkspaceService
                         keyboardHost: root
 
                         onHistoryRequested: function(path) {

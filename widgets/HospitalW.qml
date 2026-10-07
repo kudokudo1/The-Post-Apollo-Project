@@ -130,6 +130,20 @@ PanelWindow {
         root.operationsSurface = "quick";
         doctorRuntimeService.refresh();
         roomCheckpointService.refresh();
+        roomReportService.refresh();
+        return true;
+    }
+
+    function openRoomReports() {
+        if (!root.selectedRoomTeam)
+            return false;
+
+        root.leaveRoomControls();
+        root.leaveBedControls();
+        root.phoneMenuOpen = false;
+        root.intercomMenuOpen = false;
+        root.operationsSurface = "roomReports";
+        roomReportService.refresh();
         return true;
     }
 
@@ -1769,6 +1783,7 @@ PanelWindow {
         onQuickCompleted: function(command, result) {
             roomChatView.refresh();
             roomCheckpointService.refresh();
+            roomReportService.refresh();
         }
 
         onTurnCancelled: function(result) {
@@ -1778,6 +1793,12 @@ PanelWindow {
 
     HospitalRoomCheckpointService {
         id: roomCheckpointService
+
+        roomId: root.selectedRoomTeam
+    }
+
+    HospitalRoomReportService {
+        id: roomReportService
 
         roomId: root.selectedRoomTeam
     }
@@ -5479,31 +5500,75 @@ PanelWindow {
                         }
                         spacing: 4
 
-                        GohuText {
+                        Row {
                             width: parent.width
-                            text:
-                                latestCheckpointCard.checkpoint
-                                ? (
-                                    "LATEST CHECKPOINT // "
-                                    + String(
-                                        latestCheckpointCard
-                                            .checkpoint.kind
-                                        || "PROGRESS"
+                            height: 24
+                            spacing: 7
+
+                            GohuText {
+                                width: parent.width - 122
+                                anchors.verticalCenter: parent.verticalCenter
+                                text:
+                                    latestCheckpointCard.checkpoint
+                                    ? (
+                                        "LATEST CHECKPOINT // "
+                                        + String(
+                                            latestCheckpointCard
+                                                .checkpoint.kind
+                                            || "PROGRESS"
+                                          )
+                                        + " // "
+                                        + String(
+                                            latestCheckpointCard
+                                                .checkpoint.createdAt
+                                            || ""
+                                          )
                                       )
-                                    + " // "
-                                    + String(
-                                        latestCheckpointCard
-                                            .checkpoint.createdAt
-                                        || ""
-                                      )
-                                  )
-                                : "NO CHECKPOINT // USE REPORT"
-                            font.pixelSize: 9
-                            color:
-                                latestCheckpointCard.checkpoint
-                                ? Colors.magenta
-                                : Colors.blue
-                            elide: Text.ElideRight
+                                    : "NO CHECKPOINT // USE REPORT"
+                                font.pixelSize: 9
+                                color:
+                                    latestCheckpointCard.checkpoint
+                                    ? Colors.magenta
+                                    : Colors.blue
+                                elide: Text.ElideRight
+                            }
+
+                            Rectangle {
+                                id: roomReportsButton
+
+                                width: 115
+                                height: 22
+                                anchors.verticalCenter: parent.verticalCenter
+                                color:
+                                    roomReportsMouse.pressed
+                                    ? Colors.magenta
+                                    : Colors.black
+                                border.width: 1
+                                border.color: Colors.magenta
+
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    text:
+                                        "ROOM REPORTS // "
+                                        + String(
+                                            roomReportService.reportCount
+                                        )
+                                    font.pixelSize: 7
+                                    color:
+                                        roomReportsMouse.pressed
+                                        ? Colors.black
+                                        : Colors.magenta
+                                }
+
+                                MouseArea {
+                                    id: roomReportsMouse
+
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.openRoomReports()
+                                }
+                            }
                         }
 
                         GohuText {
@@ -5536,9 +5601,11 @@ PanelWindow {
                     visible:
                         doctorRuntimeService.lastError.length > 0
                         || roomCheckpointService.lastError.length > 0
+                        || roomReportService.lastError.length > 0
                     text:
                         doctorRuntimeService.lastError
                         || roomCheckpointService.lastError
+                        || roomReportService.lastError
                     font.pixelSize: 9
                     color: Colors.red
                     wrapMode: Text.Wrap
@@ -5553,6 +5620,29 @@ PanelWindow {
                         "SUPERVISED CONTROL // QUICK + STATUS + STOP"
                 }
             }
+        }
+
+        HospitalRoomReportsView {
+            id: roomReportsView
+
+            z: 700
+            visible: root.operationsSurface === "roomReports"
+
+            reportService: roomReportService
+
+            anchors {
+                left: parent.left
+                right: parent.right
+                top: fixedTop.bottom
+                bottom: actionBay.top
+                leftMargin: 18
+                rightMargin: 18
+                topMargin: 8
+                bottomMargin: 10
+            }
+
+            onCloseRequested: root.showSurgery()
+            onChatRequested: root.openRoomChat()
         }
 
         HospitalRoomChatView {

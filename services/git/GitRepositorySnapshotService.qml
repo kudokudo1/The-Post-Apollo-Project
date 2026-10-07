@@ -72,6 +72,7 @@ Scope {
                 'head_ref="$(git -C "$repo" symbolic-ref -q HEAD 2>/dev/null || true)"',
                 'printf "IDENTITY\\t%s\\t%s\\t%s\\n" "$branch" "$head" "$head_ref"',
                 'git -C "$repo" for-each-ref --format="REF%09%(refname)%09%(objectname)%09%(objecttype)" refs/heads refs/tags refs/remotes 2>/dev/null',
+                'git -C "$repo" for-each-ref --format="UPSTREAM%09%(refname:short)%09%(upstream:short)" refs/heads 2>/dev/null',
                 'index_tree="$(git -C "$repo" write-tree 2>/dev/null || true)"',
                 'index_path="$(git -C "$repo" rev-parse --git-path index 2>/dev/null || true)"',
                 'case "$index_path" in /*) ;; "") ;; *) index_path="$repo/$index_path" ;; esac',
@@ -118,6 +119,7 @@ Scope {
 
     function parseSnapshot(text) {
         const refs = [];
+        const branchUpstreams = [];
         const worktrees = [];
         const lines = String(text || "").split("\n");
 
@@ -167,6 +169,15 @@ Scope {
                     ref: p.length > 1 ? p[1] : "",
                     sha: p.length > 2 ? p[2] : "",
                     objectType: p.length > 3 ? p[3] : ""
+                });
+                continue;
+            }
+
+            if (line.indexOf("UPSTREAM\t") === 0) {
+                const p = line.split("\t");
+                branchUpstreams.push({
+                    branch: p.length > 1 ? p[1] : "",
+                    upstream: p.length > 2 ? p[2] : ""
                 });
                 continue;
             }
@@ -259,6 +270,7 @@ Scope {
             head: head,
             headRef: headRef,
             refs: refs,
+            branchUpstreams: branchUpstreams,
 
             index: {
                 tree: indexTree,

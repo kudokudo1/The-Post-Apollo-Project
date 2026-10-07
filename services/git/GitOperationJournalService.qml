@@ -235,6 +235,30 @@ Scope {
             persist();
     }
 
+    function markUndoResult(
+            operationId,
+            undoOperationId,
+            success,
+            detail) {
+        const index = entryIndex(operationId);
+
+        if (index < 0)
+            return false;
+
+        const next = entries.slice();
+        const record = cloneValue(next[index] || {}) || {};
+
+        record.undoState = success ? "UNDONE" : "UNDO_FAILED";
+        record.undoOperationId = String(undoOperationId || "");
+        record.undoDetail = String(detail || "");
+        record.undoneAt = success ? nowIso() : "";
+
+        next[index] = record;
+        entries = next;
+        persist();
+        return true;
+    }
+
     function persist() {
         journalFile.setText(JSON.stringify({
             schemaVersion: schemaVersion,

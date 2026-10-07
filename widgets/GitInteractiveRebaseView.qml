@@ -23,6 +23,14 @@ Rectangle {
             || rebaseSessionService.state === "UNCERTAIN"
         )
 
+    onVisibleChanged: {
+        if (visible
+                && rebaseSessionService
+                && !rebaseSessionService.busy
+                && !rebaseSessionService.refreshing)
+            rebaseSessionService.refresh();
+    }
+
     color: Colors.dark
     border.width: 1
     border.color: Colors.magenta

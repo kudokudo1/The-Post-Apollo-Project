@@ -6,6 +6,7 @@ Rectangle {
 
     required property var foldService
     required property var splitService
+    required property var absorbService
     property var historyService: null
     property var keyboardHost: null
     property string mode: "fold"
@@ -137,6 +138,7 @@ Rectangle {
                 enabledAction:
                     !foldService.executionBusy
                     && !splitService.executionBusy
+                    && !absorbService.executionBusy
                 onTriggered: root.mode = "fold"
             }
 
@@ -148,14 +150,20 @@ Rectangle {
                 enabledAction:
                     !foldService.executionBusy
                     && !splitService.executionBusy
+                    && !absorbService.executionBusy
                 onTriggered: root.mode = "split"
             }
 
             SurgeryButton {
                 width: (parent.width - 12) / 3
-                label: "ABSORB // NEXT"
+                label: "ABSORB"
                 accent: Colors.magenta
-                enabledAction: false
+                selectedAction: root.mode === "absorb"
+                enabledAction:
+                    !foldService.executionBusy
+                    && !splitService.executionBusy
+                    && !absorbService.executionBusy
+                onTriggered: root.mode = "absorb"
             }
         }
 
@@ -544,6 +552,26 @@ Rectangle {
         z: 1000
 
         splitService: root.splitService
+        historyService: root.historyService
+        keyboardHost: root.keyboardHost
+    }
+
+    GitHistoryAbsorbView {
+        anchors {
+            top: parent.top
+            left: parent.left
+            right: parent.right
+            bottom: parent.bottom
+            topMargin: 45
+            leftMargin: 8
+            rightMargin: 8
+            bottomMargin: 8
+        }
+
+        visible: root.mode === "absorb"
+        z: 1000
+
+        absorbService: root.absorbService
         historyService: root.historyService
         keyboardHost: root.keyboardHost
     }

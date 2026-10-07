@@ -14,6 +14,72 @@ def require(text: str, needle: str, message: str) -> None:
     assert needle in text, f"{message}: missing {needle!r}"
 
 
+def component_block(source: str, name: str) -> str:
+    marker = f"component {name}:"
+    start = source.index(marker)
+    brace = source.index("{", start)
+    depth = 0
+    quote = None
+    escaped = False
+    line_comment = False
+    block_comment = False
+
+    i = brace
+    while i < len(source):
+        char = source[i]
+        nxt = source[i + 1] if i + 1 < len(source) else ""
+
+        if line_comment:
+            if char == "\n":
+                line_comment = False
+            i += 1
+            continue
+
+        if block_comment:
+            if char == "*" and nxt == "/":
+                block_comment = False
+                i += 2
+                continue
+            i += 1
+            continue
+
+        if quote is not None:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == quote:
+                quote = None
+            i += 1
+            continue
+
+        if char == "/" and nxt == "/":
+            line_comment = True
+            i += 2
+            continue
+
+        if char == "/" and nxt == "*":
+            block_comment = True
+            i += 2
+            continue
+
+        if char in ('"', "'"):
+            quote = char
+            i += 1
+            continue
+
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return source[start:i + 1]
+
+        i += 1
+
+    raise AssertionError(f"unterminated QML component {name}")
+
+
 # Protect capabilities and semantics rather than fossilizing the current
 # historical style numbers. Defaults can be intentionally synchronized later.
 for needle, message in (
@@ -93,10 +159,7 @@ for relative in GIT_MINI_BUTTONS:
         require(source, needle, f"preserve Git MiniButton values in {relative}")
 
     # The adapter may contain content, but must not rebuild the button engine.
-    block = source[source.index("component MiniButton: ActionButton {"):]
-    next_component = block.find("\n    component ", 1)
-    if next_component >= 0:
-        block = block[:next_component]
+    block = component_block(source, "MiniButton")
     assert "MouseArea {" not in block, f"{relative} reintroduced local MiniButton MouseArea"
     assert "RectangularShadow {" not in block, f"{relative} reintroduced local MiniButton halo"
 
@@ -161,10 +224,7 @@ for relative, needles in GIT_ACTIONBUTTON_BATCH2.items():
         if "GitInteractiveRebaseView" in relative
         else "TransferButton"
     )
-    block = source[source.index(f"component {component_name}: ActionButton {{"):]
-    next_component = block.find("\n    component ", 1)
-    if next_component >= 0:
-        block = block[:next_component]
+    block = component_block(source, component_name)
     assert "MouseArea {" not in block, f"{relative} reintroduced local {component_name} MouseArea"
     assert "RectangularShadow {" not in block, f"{relative} reintroduced local {component_name} halo"
 

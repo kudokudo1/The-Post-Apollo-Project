@@ -1,0 +1,29 @@
+name: Quickshell Reload Safety
+
+on:
+  pull_request:
+    paths:
+      - "shell.qml"
+      - "scripts/restart_quickshell_safe.sh"
+      - "tests/components/test_reload_safety_contracts.py"
+      - ".github/workflows/quickshell-reload-safety.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "shell.qml"
+      - "scripts/restart_quickshell_safe.sh"
+      - "tests/components/test_reload_safety_contracts.py"
+      - ".github/workflows/quickshell-reload-safety.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Validate crash-safe reload policy
+        run: python3 tests/components/test_reload_safety_contracts.py

@@ -284,7 +284,7 @@ PanelWindow {
 
                     font.pixelSize: 20
 
-                    layer.enabled: selectedIndex === 1 || (!keyboardActive && lockMouse.containsMouse)
+                    layer.enabled: Window.window !== null && (selectedIndex === 1 || (!keyboardActive && lockMouse.containsMouse))
 
                     layer.effect: DropShadow {
                         color: Colors.orange
@@ -351,7 +351,7 @@ PanelWindow {
 
                     font.pixelSize: 20
 
-                    layer.enabled: selectedIndex === 2 || (!keyboardActive && logoutMouse.containsMouse)
+                    layer.enabled: Window.window !== null && (selectedIndex === 2 || (!keyboardActive && logoutMouse.containsMouse))
 
                     layer.effect: DropShadow {
                         color: Colors.orange
@@ -417,7 +417,7 @@ PanelWindow {
 
                     font.pixelSize: 20
 
-                    layer.enabled: selectedIndex === 3 || (!keyboardActive && rebootMouse.containsMouse)
+                    layer.enabled: Window.window !== null && (selectedIndex === 3 || (!keyboardActive && rebootMouse.containsMouse))
 
                     layer.effect: DropShadow {
                         color: Colors.orange
@@ -483,7 +483,7 @@ PanelWindow {
 
                     font.pixelSize: 20
 
-                    layer.enabled: selectedIndex === 4 || shutdownMouse.containsMouse
+                    layer.enabled: Window.window !== null && (selectedIndex === 4 || shutdownMouse.containsMouse)
 
                     layer.effect: DropShadow {
                         color: Colors.orange
@@ -615,7 +615,7 @@ PanelWindow {
                 font.pixelSize: 22
                 anchors.centerIn: parent
 
-                layer.enabled: cancelshutdownMouse.containsMouse
+                layer.enabled: Window.window !== null && (cancelshutdownMouse.containsMouse)
 
                 layer.effect: DropShadow {
                     color: Colors.orange
@@ -677,7 +677,7 @@ PanelWindow {
                 font.pixelSize: 20
                 anchors.centerIn: parent
 
-                layer.enabled: confirmshutdownMouse.containsMouse
+                layer.enabled: Window.window !== null && (confirmshutdownMouse.containsMouse)
 
                 layer.effect: DropShadow {
                     color: Colors.orange
@@ -768,7 +768,7 @@ PanelWindow {
 
                 anchors.centerIn: parent
 
-                layer.enabled: cancelrebootMouse.containsMouse
+                layer.enabled: Window.window !== null && (cancelrebootMouse.containsMouse)
 
                 layer.effect: DropShadow {
                     color: Colors.orange
@@ -831,7 +831,7 @@ PanelWindow {
 
                 anchors.centerIn: parent
 
-                layer.enabled: confirmrebootMouse.containsMouse
+                layer.enabled: Window.window !== null && (confirmrebootMouse.containsMouse)
 
                 layer.effect: DropShadow {
                     color: Colors.orange

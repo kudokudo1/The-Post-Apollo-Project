@@ -41,8 +41,13 @@ def require_regex(path: str, pattern: str, label: str) -> None:
 
 def no_conflict_markers(path: str) -> None:
     text = read(path)
-    for marker in ("<<<<<<<", "=======", ">>>>>>>"):
-        if marker in text:
+    marker_patterns = (
+        ("<<<<<<<", r"^<<<<<<<(?: .*)?\\r?$"),
+        ("=======", r"^=======\\r?$"),
+        (">>>>>>>", r"^>>>>>>>(?: .*)?\\r?$"),
+    )
+    for marker, pattern in marker_patterns:
+        if re.search(pattern, text, re.MULTILINE):
             errors.append(f"merge conflict marker {marker!r} in {path}")
 
 

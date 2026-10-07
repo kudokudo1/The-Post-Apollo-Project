@@ -40,6 +40,13 @@ for needle, message in (
     require(TRANSFER, needle, message)
 
 for needle, message in (
+    ("'      partial_apply() {',", "partial Undo shell helper must remain a valid QML command-array string"),
+    ("'      partial_remove() {',", "partial Undo removal helper must remain a valid QML command-array string"),
+):
+    require(RECOVERY, needle, message)
+
+
+for needle, message in (
     ('"CHANGES/TRANSFER_PARTIAL"', "Undo planner must recognize partial transfer"),
     ('layer !== "partial"', "Undo planner must accept the partial layer"),
     ('? " PARTIALLY STAGED "', "Undo summary must identify partial content"),

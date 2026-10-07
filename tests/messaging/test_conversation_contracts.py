@@ -63,3 +63,26 @@ assert 'emptyConversationLabel: "SELECT A ROOM"' in room_chat
 assert "adapter.sendMessage(conversationId, text)" in room_chat
 
 print("hospital room chat view contract: PASS")
+
+
+adapter = ADAPTER.read_text()
+assert "function bindRoom(roomValue)" in adapter
+assert '"room-bind"' in adapter
+assert "property bool bindingRoom:" in adapter
+assert "property var queuedRoomBinding:" in adapter
+assert "signal roomBound(var room)" in adapter
+
+room_chat = ROOM_CHAT.read_text()
+for field in (
+    'property string repository: ""',
+    'property string patientId: ""',
+    'property string team: ""',
+    'property string branch: ""',
+    'property string bedPath: ""',
+    'property string assignmentId: ""',
+):
+    assert field in room_chat, field
+assert "function roomBinding()" in room_chat
+assert "adapter.bindRoom(root.roomBinding())" in room_chat
+
+print("hospital room binding contract: PASS")

@@ -10,8 +10,49 @@ Rectangle {
     required property var phoneService
 
     property string workingDirectory: ""
+    property string focusedSpecialistId: ""
 
     signal callLaunched(var specialist)
+
+    function focusSpecialistId(value) {
+        const wanted = String(value || "").trim();
+        const rows =
+            root.registryService
+            && Array.isArray(root.registryService.specialists)
+            ? root.registryService.specialists
+            : [];
+
+        if (!wanted)
+            return false;
+
+        for (let i = 0; i < rows.length; ++i) {
+            const row = rows[i] || {};
+
+            if (String(row.id || "") !== wanted)
+                continue;
+
+            focusedSpecialistId = wanted;
+            Qt.callLater(function() {
+                const target = i * 56;
+                phoneStaffList.contentY =
+                    Math.max(
+                        0,
+                        Math.min(
+                            target,
+                            Math.max(
+                                0,
+                                phoneStaffList.contentHeight
+                                - phoneStaffList.height
+                            )
+                        )
+                    );
+            });
+            return true;
+        }
+
+        focusedSpecialistId = "";
+        return false;
+    }
 
     readonly property int listHeight:
         Math.min(
@@ -113,6 +154,9 @@ Rectangle {
                     readonly property bool ready:
                         !!modelData.callable
                         && presence === "READY"
+                    readonly property bool focused:
+                        String(modelData.id || "")
+                        === root.focusedSpecialistId
                     readonly property color presenceColor:
                         presence === "READY"
                         ? Colors.green
@@ -123,14 +167,19 @@ Rectangle {
                     width: phoneStaffColumn.width
                     height: 52
                     color:
-                        phoneSpecialistMouse.pressed
+                        focused
+                        ? Colors.yellow
+                        : phoneSpecialistMouse.pressed
                         ? Colors.orange
                         : Colors.dark
                     border.width:
-                        phoneSpecialistMouse.containsMouse
+                        focused
+                        || phoneSpecialistMouse.containsMouse
                         ? 2 : 1
                     border.color:
-                        phoneSpecialistMouse.containsMouse
+                        focused
+                        ? Colors.magenta
+                        : phoneSpecialistMouse.containsMouse
                         ? Colors.orange
                         : presenceColor
                     opacity: ready ? 1.0 : 0.58

@@ -26,6 +26,10 @@ Rectangle {
     readonly property string selectedSpecialistId:
         selectedSpecialist ? String(selectedSpecialist.id || "") : ""
     readonly property string channelLabel: {
+        if (focusedChannelLabel
+                && focusedChannelType === channelType)
+            return focusedChannelLabel;
+
         if (channelType === "ROOM")
             return String(roomLabel || "NO ROOM");
 
@@ -39,12 +43,71 @@ Rectangle {
 
         return "HOSPITAL WIDE";
     }
+    property string focusedChannelType: ""
+    property string focusedChannelLabel: ""
+
     readonly property var currentMessages:
         intercomService.messagesFor(
             channelType,
-            channelLabel,
+            (
+                focusedChannelLabel
+                && focusedChannelType === channelType
+                ? focusedChannelLabel
+                : channelLabel
+            ),
             selectedSpecialistId
         )
+
+    function focusSpecialistId(value) {
+        const wanted = String(value || "").trim();
+        const rows =
+            root.registryService
+            && Array.isArray(root.registryService.specialists)
+            ? root.registryService.specialists
+            : [];
+
+        if (!wanted)
+            return false;
+
+        for (let i = 0; i < rows.length; ++i) {
+            if (String((rows[i] || {}).id || "") !== wanted)
+                continue;
+
+            selectedSpecialistIndex = i;
+            return true;
+        }
+
+        return false;
+    }
+
+    function focusActivityContext(
+            specialistIdValue,
+            channelTypeValue,
+            channelLabelValue) {
+        const type =
+            String(channelTypeValue || "").trim().toUpperCase();
+        const label =
+            String(channelLabelValue || "").trim();
+
+        focusSpecialistId(specialistIdValue);
+
+        const modeIndex = channelModes.indexOf(type);
+
+        if (modeIndex >= 0)
+            channelIndex = modeIndex;
+
+        focusedChannelType =
+            modeIndex >= 0 ? type : "";
+        focusedChannelLabel =
+            modeIndex >= 0 ? label : "";
+
+        return selectedSpecialist !== null;
+    }
+
+    function clearFocusedChannel() {
+        focusedChannelType = "";
+        focusedChannelLabel = "";
+    }
 
     function sendCurrent() {
         const specialist = selectedSpecialist;
@@ -229,7 +292,10 @@ Rectangle {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
 
-                    onClicked: root.channelIndex = parent.index
+                    onClicked: {
+                        root.clearFocusedChannel();
+                        root.channelIndex = parent.index;
+                    }
                 }
             }
         }
@@ -493,6 +559,14 @@ Rectangle {
                 root.sendCurrent();
                 event.accepted = true;
             }
+
+            Keys.onEscapePressed: function(event) {
+                if (!root.speechInputService.busy)
+                    return;
+
+                root.speechInputService.cancel();
+                event.accepted = true;
+            }
         }
 
         GohuText {
@@ -505,7 +579,10 @@ Rectangle {
             visible: messageInput.text.length === 0
             text:
                 root.speechInputService.recording
-                ? "LISTENING..."
+                ? (
+                    "LISTENING "
+                    + root.speechInputService.recordingElapsedLabel
+                  )
                 : root.speechInputService.stopping
                   || root.speechInputService.transcribing
                 ? "TRANSCRIBING..."
@@ -527,9 +604,9 @@ Rectangle {
         id: micButton
 
         anchors {
-            right: sendButton.left
+            right: voiceCancelButton.left
             top: transcriptFrame.bottom
-            rightMargin: 6
+            rightMargin: voiceCancelButton.visible ? 6 : 0
             topMargin: 8
         }
 
@@ -612,6 +689,65 @@ Rectangle {
                     root.speechInputService.stopRecording(false);
                 else
                     root.speechInputService.startRecording();
+            }
+        }
+    }
+
+    Rectangle {
+        id: voiceCancelButton
+
+        visible: root.speechInputService.busy
+        anchors {
+            right: sendButton.left
+            top: transcriptFrame.bottom
+            rightMargin: visible ? 6 : 0
+            topMargin: 8
+        }
+
+        width: visible ? 62 : 0
+        height: 42
+        color:
+            voiceCancelMouse.pressed
+            ? Colors.black
+            : Colors.dark
+        border.width:
+            voiceCancelMouse.containsMouse ? 2 : 1
+        border.color: Colors.red
+
+        RectangularShadow {
+            anchors.fill: parent
+            spread: 4
+            z: -1
+            opacity:
+                voiceCancelMouse.containsMouse
+                ? 0.48 : 0.28
+            color: Colors.red
+        }
+
+        GohuText {
+            anchors.centerIn: parent
+            text: "CANCEL"
+            font.pixelSize: 9
+            color:
+                voiceCancelMouse.containsMouse
+                ? Colors.orange
+                : Colors.red
+        }
+
+        MouseArea {
+            id: voiceCancelMouse
+
+            anchors.fill: parent
+            enabled: root.speechInputService.busy
+            hoverEnabled: true
+            cursorShape:
+                enabled
+                ? Qt.PointingHandCursor
+                : Qt.ArrowCursor
+
+            onClicked: {
+                root.speechInputService.cancel();
+                messageInput.forceActiveFocus();
             }
         }
     }
@@ -725,7 +861,10 @@ Rectangle {
             root.speechInputService.lastError
             || (
                 root.speechInputService.recording
-                ? "VOICE // LISTENING"
+                ? (
+                    "VOICE // LISTENING // "
+                    + root.speechInputService.recordingElapsedLabel
+                  )
                 : root.speechInputService.stopping
                   || root.speechInputService.transcribing
                 ? "VOICE // TRANSCRIBING"

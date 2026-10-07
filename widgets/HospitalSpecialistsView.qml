@@ -10,6 +10,8 @@ Item {
     property string filterMode: "ALL"
     property int selectedIndex: -1
 
+    signal specialistSelected(var specialist)
+
     readonly property var displayedSpecialists: {
         const source =
             root.registryService
@@ -56,7 +58,34 @@ Item {
             return false;
 
         selectedIndex = requested;
+        specialistSelected(selectedSpecialist);
         return true;
+    }
+
+    function selectSpecialistById(value) {
+        const wanted = String(value || "").trim();
+
+        if (!wanted)
+            return false;
+
+        filterMode = "ALL";
+
+        const rows =
+            root.registryService
+            && Array.isArray(root.registryService.specialists)
+            ? root.registryService.specialists
+            : [];
+
+        for (let i = 0; i < rows.length; ++i) {
+            if (String((rows[i] || {}).id || "") !== wanted)
+                continue;
+
+            selectedIndex = i;
+            specialistSelected(selectedSpecialist);
+            return true;
+        }
+
+        return false;
     }
 
     onDisplayedSpecialistsChanged: {

@@ -15,6 +15,8 @@ Scope {
     property bool recorderCancelled: false
     property bool transcriberCancelled: false
     property string audioFileName: "hospital-reception-voice.wav"
+    property double recordingStartedAt: 0
+    property int recordingElapsedSeconds: 0
 
     readonly property bool recording:
         voiceState === "recording"
@@ -24,6 +26,22 @@ Scope {
         voiceState === "transcribing"
     readonly property bool busy:
         recording || stopping || transcribing
+    readonly property string recordingElapsedLabel: {
+        const total = Math.max(0, Number(recordingElapsedSeconds || 0));
+        const minutes = Math.floor(total / 60);
+        const seconds = total % 60;
+
+        const minuteText =
+            minutes < 10
+            ? "0" + String(minutes)
+            : String(minutes);
+        const secondText =
+            seconds < 10
+            ? "0" + String(seconds)
+            : String(seconds);
+
+        return minuteText + ":" + secondText;
+    }
 
     readonly property string audioPath:
         Quickshell.cachePath(audioFileName)
@@ -82,6 +100,9 @@ Scope {
         submitAfterTranscription = false;
         stopRequested = false;
         recorderCancelled = false;
+        recordingStartedAt = Date.now();
+        recordingElapsedSeconds = 0;
+        recordingClock.restart();
         voiceState = "recording";
 
         recordProcess.command = [
@@ -105,6 +126,7 @@ Scope {
 
         submitAfterTranscription = Boolean(submitAfter);
         stopRequested = true;
+        recordingClock.stop();
         voiceState = "stopping";
         recordProcess.running = false;
         return true;
@@ -125,6 +147,9 @@ Scope {
     function cancel() {
         submitAfterTranscription = false;
         stopRequested = false;
+        recordingClock.stop();
+        recordingStartedAt = 0;
+        recordingElapsedSeconds = 0;
 
         if (recordProcess.running) {
             recorderCancelled = true;
@@ -142,6 +167,28 @@ Scope {
     }
 
     Component.onCompleted: probe()
+
+    Timer {
+        id: recordingClock
+        interval: 1000
+        repeat: true
+
+        onTriggered: {
+            if (!root.recording || root.recordingStartedAt <= 0) {
+                stop();
+                return;
+            }
+
+            root.recordingElapsedSeconds =
+                Math.max(
+                    0,
+                    Math.floor(
+                        (Date.now() - root.recordingStartedAt)
+                        / 1000
+                    )
+                );
+        }
+    }
 
     Process {
         id: probeProcess
@@ -195,6 +242,9 @@ Scope {
                 const detail =
                     root.compactError(recordErr.text);
 
+                root.recordingClock.stop();
+                root.recordingStartedAt = 0;
+                root.recordingElapsedSeconds = 0;
                 root.voiceState =
                     root.backendReady
                     ? "idle"
@@ -236,6 +286,8 @@ Scope {
                     .trim();
 
             root.submitAfterTranscription = false;
+            root.recordingStartedAt = 0;
+            root.recordingElapsedSeconds = 0;
             root.voiceState =
                 root.backendReady
                 ? "idle"

@@ -12,7 +12,7 @@ QtObject {
 
     signal callLaunched(var specialist)
 
-    function callSpecialist(record, workingDirectory) {
+    function callSpecialist(record, workingDirectory, contextPrompt) {
         const specialist = record || {};
         const id = String(specialist.id || "").trim();
         const name = String(
@@ -31,6 +31,7 @@ QtObject {
             || ""
         ).trim();
         const cwd = String(workingDirectory || "").trim();
+        const prompt = String(contextPrompt || "").trim();
 
         lastError = "";
 
@@ -59,23 +60,25 @@ QtObject {
             return false;
         }
 
-        Quickshell.execDetached([
-            "bash",
-            "-lc",
-            [
-                'repo="$1"',
-                'cmd="$2"',
-                'if [ -z "$repo" ]; then repo="$HOME"; fi',
-                'cd "$repo" 2>/dev/null || cd "$HOME" || exit 1',
-                'exec kitty --directory "$PWD" bash -lc \'exec "$1"\' hospital-specialist "$cmd"'
-            ].join("\n"),
-            "hospital-phone",
-            cwd,
-            command
-        ]);
+        const launchArgs = ["kitty"];
+
+        if (cwd) {
+            launchArgs.push("--directory");
+            launchArgs.push(cwd);
+        }
+
+        launchArgs.push(command);
+
+        if (prompt)
+            launchArgs.push(prompt);
+
+        Quickshell.execDetached(launchArgs);
 
         lastDialedId = id;
-        lastStatus = "CALL LAUNCHED // " + name;
+        lastStatus =
+            "CALL LAUNCHED // "
+            + name
+            + (prompt ? " // CONTEXT ATTACHED" : "");
         lastError = "";
         callLaunched(specialist);
         return true;

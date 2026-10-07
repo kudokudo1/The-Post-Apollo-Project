@@ -1139,8 +1139,12 @@ Rectangle {
                 width:
                     composer.width
                     - micButton.width
+                    - voiceCancelButton.width
                     - sendButton.width
-                    - (composer.spacing * 2)
+                    - (
+                        composer.spacing
+                        * (voiceCancelButton.visible ? 3 : 2)
+                      )
                 height: composer.height
                 color: Colors.dark
                 border.width: receptionInput.activeFocus ? 2 : 1
@@ -1278,6 +1282,14 @@ Rectangle {
                         root.submitReceptionInput();
                         event.accepted = true;
                     }
+
+                    Keys.onEscapePressed: function(event) {
+                        if (!root.speechInputService.busy)
+                            return;
+
+                        root.speechInputService.cancel();
+                        event.accepted = true;
+                    }
                 }
 
                 GohuText {
@@ -1290,7 +1302,10 @@ Rectangle {
                     visible: receptionInput.text.length === 0
                     text:
                         root.speechInputService.recording
-                        ? "LISTENING..."
+                        ? (
+                            "LISTENING "
+                            + root.speechInputService.recordingElapsedLabel
+                          )
                         : root.speechInputService.stopping
                           || root.speechInputService.transcribing
                         ? "TRANSCRIBING..."
@@ -1402,6 +1417,61 @@ Rectangle {
                             root.speechInputService.stopRecording(false);
                         else
                             root.speechInputService.startRecording();
+                    }
+                }
+            }
+
+            Rectangle {
+                id: voiceCancelButton
+
+                visible: root.speechInputService.busy
+                width: visible ? 66 : 0
+                height: composer.height
+                color:
+                    voiceCancelMouse.pressed
+                    ? Colors.black
+                    : Colors.dark
+                border.width:
+                    voiceCancelMouse.containsMouse ? 2 : 1
+                border.color:
+                    root.speechInputService.busy
+                    ? Colors.red
+                    : Colors.dark
+
+                RectangularShadow {
+                    anchors.fill: parent
+                    spread: 4
+                    z: -1
+                    opacity:
+                        voiceCancelMouse.containsMouse
+                        ? 0.48 : 0.28
+                    color: Colors.red
+                }
+
+                GohuText {
+                    anchors.centerIn: parent
+                    text: "CANCEL"
+                    font.pixelSize: 9
+                    color:
+                        voiceCancelMouse.containsMouse
+                        ? Colors.orange
+                        : Colors.red
+                }
+
+                MouseArea {
+                    id: voiceCancelMouse
+
+                    anchors.fill: parent
+                    enabled: root.speechInputService.busy
+                    hoverEnabled: true
+                    cursorShape:
+                        enabled
+                        ? Qt.PointingHandCursor
+                        : Qt.ArrowCursor
+
+                    onClicked: {
+                        root.speechInputService.cancel();
+                        receptionInput.forceActiveFocus();
                     }
                 }
             }

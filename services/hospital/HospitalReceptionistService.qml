@@ -15,6 +15,7 @@ Scope {
     signal routeRequested(string route)
     signal activityActionRequested(var item)
     signal teamNavigationRequested(string team)
+    signal specialistHandoffRequested(string mode, string operatorText)
 
     property var inbox: []
     property var activityEvents: []
@@ -27,6 +28,9 @@ Scope {
     property int guaranteedRecentEvents: 250
     property int reportArchiveBackfillLimit: 250
     property int passiveDuplicateWindowMs: 120000
+    // Session-local guard for destructive archive pruning. Selective cleanup
+    // is previewed first and requires an explicit confirmation.
+    property var pendingArchiveCleanupSpec: null
 
     readonly property int archiveCount:
         activityEvents.length
@@ -199,6 +203,31 @@ Scope {
         return Number.isFinite(parsed) ? parsed : 0;
     }
 
+    function isoDayRange(value) {
+        const raw = String(value || "").trim();
+        const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+        if (!match)
+            return null;
+
+        const year = Number(match[1]);
+        const month = Number(match[2]) - 1;
+        const day = Number(match[3]);
+        const start = new Date(year, month, day);
+
+        if (start.getFullYear() !== year
+                || start.getMonth() !== month
+                || start.getDate() !== day)
+            return null;
+
+        return {
+            label: raw,
+            startEpoch: start.getTime(),
+            endEpoch:
+                new Date(year, month, day + 1).getTime()
+        };
+    }
+
     function activityTimeWindow(queryValue) {
         const query = looseQuery(queryValue);
         const now = new Date();
@@ -206,6 +235,7 @@ Scope {
         const todayStart = localDayStart(now);
         const oneHour = 60 * 60 * 1000;
         const oneDay = 24 * oneHour;
+        const oneWeek = 7 * oneDay;
 
         function result(label, start, end) {
             return {
@@ -214,6 +244,108 @@ Scope {
                 startEpoch: Number(start || 0),
                 endEpoch: Number(end || 0)
             };
+        }
+
+        const dateRangeMatch =
+            query.match(
+                /\b(?:from|between)\s+(\d{4}-\d{2}-\d{2})\s+(?:to|and)\s+(\d{4}-\d{2}-\d{2})\b/
+            );
+
+        if (dateRangeMatch && dateRangeMatch.length > 2) {
+            const first = isoDayRange(dateRangeMatch[1]);
+            const second = isoDayRange(dateRangeMatch[2]);
+
+            if (first && second) {
+                return result(
+                    "FROM " + dateRangeMatch[1]
+                    + " TO " + dateRangeMatch[2],
+                    Math.min(first.startEpoch, second.startEpoch),
+                    Math.max(first.endEpoch, second.endEpoch)
+                );
+            }
+        }
+
+        const onDateMatch =
+            query.match(/\b(?:on|for)\s+(\d{4}-\d{2}-\d{2})\b/);
+
+        if (onDateMatch && onDateMatch.length > 1) {
+            const dayRange = isoDayRange(onDateMatch[1]);
+
+            if (dayRange)
+                return result(
+                    "ON " + onDateMatch[1],
+                    dayRange.startEpoch,
+                    dayRange.endEpoch
+                );
+        }
+
+        const sinceDateMatch =
+            query.match(/\bsince\s+(\d{4}-\d{2}-\d{2})\b/);
+
+        if (sinceDateMatch && sinceDateMatch.length > 1) {
+            const dayRange = isoDayRange(sinceDateMatch[1]);
+
+            if (dayRange)
+                return result(
+                    "SINCE " + sinceDateMatch[1],
+                    dayRange.startEpoch,
+                    nowEpoch + 1
+                );
+        }
+
+        const beforeDateMatch =
+            query.match(/\bbefore\s+(\d{4}-\d{2}-\d{2})\b/);
+
+        if (beforeDateMatch && beforeDateMatch.length > 1) {
+            const dayRange = isoDayRange(beforeDateMatch[1]);
+
+            if (dayRange)
+                return result(
+                    "BEFORE " + beforeDateMatch[1],
+                    0,
+                    dayRange.startEpoch
+                );
+        }
+
+        if (query.indexOf("last week") >= 0) {
+            const day = now.getDay();
+            const daysSinceMonday = day === 0 ? 6 : day - 1;
+            const thisWeekStart =
+                todayStart - (daysSinceMonday * oneDay);
+
+            return result(
+                "LAST WEEK",
+                thisWeekStart - oneWeek,
+                thisWeekStart
+            );
+        }
+
+        if (query.indexOf("this month") >= 0) {
+            return result(
+                "THIS MONTH",
+                new Date(
+                    now.getFullYear(),
+                    now.getMonth(),
+                    1
+                ).getTime(),
+                nowEpoch + 1
+            );
+        }
+
+        if (query.indexOf("last month") >= 0) {
+            return result(
+                "LAST MONTH",
+                new Date(
+                    now.getFullYear(),
+                    now.getMonth() - 1,
+                    1
+                ).getTime(),
+                new Date(
+                    now.getFullYear(),
+                    now.getMonth(),
+                    1
+                ).getTime()
+            );
         }
 
         if (query.indexOf("yesterday") >= 0) {
@@ -333,7 +465,7 @@ Scope {
 
         const relativeMatch =
             query.match(
-                /\b(?:last|past)\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|twenty|thirty)\s+(hour|hours|day|days)\b/
+                /\b(?:last|past)\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|twenty|thirty)\s+(hour|hours|day|days|week|weeks)\b/
             );
 
         if (relativeMatch && relativeMatch.length > 2) {
@@ -342,18 +474,23 @@ Scope {
             const scale =
                 unit.indexOf("hour") === 0
                 ? oneHour
+                : unit.indexOf("week") === 0
+                ? oneWeek
                 : oneDay;
 
             if (amount > 0) {
+                const unitLabel =
+                    unit.indexOf("hour") === 0
+                    ? amount === 1 ? "HOUR" : "HOURS"
+                    : unit.indexOf("week") === 0
+                    ? amount === 1 ? "WEEK" : "WEEKS"
+                    : amount === 1 ? "DAY" : "DAYS";
+
                 return result(
                     "LAST "
                     + String(amount)
                     + " "
-                    + (
-                        unit.indexOf("hour") === 0
-                        ? amount === 1 ? "HOUR" : "HOURS"
-                        : amount === 1 ? "DAY" : "DAYS"
-                      ),
+                    + unitLabel,
                     nowEpoch - (amount * scale),
                     nowEpoch + 1
                 );
@@ -617,9 +754,13 @@ Scope {
             || !String(event.title || "").trim();
     }
 
-    function archiveStats() {
+    function archiveStats(eventsValue) {
+        const events =
+            Array.isArray(eventsValue)
+            ? eventsValue
+            : activityEvents;
         const stats = {
-            total: activityEvents.length,
+            total: events.length,
             favorites: 0,
             reports: 0,
             important: 0,
@@ -627,8 +768,8 @@ Scope {
             passive: 0
         };
 
-        for (let i = 0; i < activityEvents.length; ++i) {
-            const event = activityEvents[i] || {};
+        for (let i = 0; i < events.length; ++i) {
+            const event = events[i] || {};
             const source =
                 String(event.source || "").toLowerCase();
 
@@ -656,10 +797,15 @@ Scope {
         return date.toLocaleString();
     }
 
-    function archiveStatsResponse() {
-        const stats = archiveStats();
+    function archiveStatsResponse(eventsValue, labelValue) {
+        const events =
+            Array.isArray(eventsValue)
+            ? eventsValue
+            : activityEvents;
+        const stats = archiveStats(events);
+        const label = String(labelValue || "ARCHIVE");
         const parts = [
-            "ARCHIVE",
+            label,
             String(stats.total) + " / " + String(maxActivityEvents),
             "FAVORITES " + String(stats.favorites),
             "REPORTS " + String(stats.reports),
@@ -667,15 +813,22 @@ Scope {
             "COMMS " + String(stats.communications)
         ];
 
-        if (archiveOldestAt)
-            parts.push(
-                "OLDEST " + archiveDateLabel(archiveOldestAt)
-            );
+        if (events.length > 0) {
+            const ordered = events.slice().sort(function(a, b) {
+                return root.eventEpoch(a) - root.eventEpoch(b);
+            });
+            const oldest = ordered[0] || {};
+            const newest = ordered[ordered.length - 1] || {};
 
-        if (archiveNewestAt)
             parts.push(
-                "NEWEST " + archiveDateLabel(archiveNewestAt)
+                "OLDEST "
+                + archiveDateLabel(oldest.recordedAt)
             );
+            parts.push(
+                "NEWEST "
+                + archiveDateLabel(newest.recordedAt)
+            );
+        }
 
         return parts.join(" // ");
     }
@@ -806,6 +959,209 @@ Scope {
         ].join(" // ");
     }
 
+    function archiveCleanupWindow(queryValue) {
+        const query = looseQuery(queryValue);
+        const nowEpoch = Date.now();
+        const oneHour = 60 * 60 * 1000;
+        const oneDay = 24 * oneHour;
+        const oneWeek = 7 * oneDay;
+        const olderMatch =
+            query.match(
+                /\bolder\s+than\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|twenty|thirty)\s+(hour|hours|day|days|week|weeks)\b/
+            );
+
+        if (olderMatch && olderMatch.length > 2) {
+            const amount = numberWordValue(olderMatch[1]);
+            const unit = String(olderMatch[2] || "").toLowerCase();
+            const scale =
+                unit.indexOf("hour") === 0
+                ? oneHour
+                : unit.indexOf("week") === 0
+                ? oneWeek
+                : oneDay;
+
+            if (amount > 0) {
+                return {
+                    active: true,
+                    label:
+                        "OLDER THAN "
+                        + String(amount)
+                        + " "
+                        + (
+                            unit.indexOf("hour") === 0
+                            ? amount === 1 ? "HOUR" : "HOURS"
+                            : unit.indexOf("week") === 0
+                            ? amount === 1 ? "WEEK" : "WEEKS"
+                            : amount === 1 ? "DAY" : "DAYS"
+                          ),
+                    startEpoch: 0,
+                    endEpoch: nowEpoch - (amount * scale)
+                };
+            }
+        }
+
+        return activityTimeWindow(query);
+    }
+
+    function archiveCleanupSpec(textValue) {
+        const query = looseQuery(textValue);
+        const source = activityQuerySource(query);
+        const target = activityTargetFromQuery(query);
+        const window = archiveCleanupWindow(query);
+        const attention = activityAttentionQuery(query);
+
+        return {
+            active:
+                source.length > 0
+                || target.length > 0
+                || window.active
+                || attention.active,
+            source: source,
+            target: target,
+            startEpoch: Number(window.startEpoch || 0),
+            endEpoch: Number(window.endEpoch || 0),
+            timeLabel: String(window.label || ""),
+            attentionMode:
+                String(attention.mode || "").toLowerCase()
+        };
+    }
+
+    function archiveCleanupSpecLabel(specValue) {
+        const spec = specValue || {};
+        const parts = [];
+
+        if (spec.source)
+            parts.push(String(spec.source).toUpperCase());
+        if (spec.target)
+            parts.push(String(spec.target).toUpperCase());
+        if (spec.timeLabel)
+            parts.push(String(spec.timeLabel));
+        if (spec.attentionMode)
+            parts.push(attentionModeLabel(spec.attentionMode));
+
+        return parts.length > 0
+            ? parts.join(" // ")
+            : "ALL SAFE PASSIVE NOISE";
+    }
+
+    function archiveEventMatchesCleanupSpec(eventValue, specValue) {
+        const event = eventValue || {};
+        const spec = specValue || {};
+
+        if (spec.source
+                && String(event.source || "").toLowerCase()
+                   !== String(spec.source).toLowerCase())
+            return false;
+
+        if (spec.target
+                && !eventMatchesTarget(event, spec.target))
+            return false;
+
+        if (!eventInTimeWindow(
+                event,
+                spec.startEpoch,
+                spec.endEpoch))
+            return false;
+
+        if (spec.attentionMode
+                && !eventMatchesAttentionMode(
+                    event,
+                    spec.attentionMode))
+            return false;
+
+        return true;
+    }
+
+    function previewArchiveSelectionCleanup(specValue) {
+        const spec = specValue || {};
+        let removable = 0;
+        let protectedCount = 0;
+
+        for (let i = 0; i < activityEvents.length; ++i) {
+            const event = activityEvents[i] || {};
+
+            if (!archiveEventMatchesCleanupSpec(event, spec))
+                continue;
+
+            if (archiveProtected(event))
+                protectedCount += 1;
+            else
+                removable += 1;
+        }
+
+        return {
+            before: activityEvents.length,
+            removable: removable,
+            protectedCount: protectedCount
+        };
+    }
+
+    function applyArchiveSelectionCleanup(specValue) {
+        const spec = specValue || {};
+        const before = activityEvents.length;
+        const next = [];
+        let removed = 0;
+        let protectedCount = 0;
+
+        for (let i = 0; i < activityEvents.length; ++i) {
+            const event = activityEvents[i] || {};
+
+            if (!archiveEventMatchesCleanupSpec(event, spec)) {
+                next.push(event);
+                continue;
+            }
+
+            if (archiveProtected(event)) {
+                protectedCount += 1;
+                next.push(event);
+                continue;
+            }
+
+            removed += 1;
+        }
+
+        activityEvents = next;
+        activityAdapter.events = next.slice();
+        cleanPinnedKeys();
+        refreshVisibleInbox();
+
+        if (contextEventKey && !contextEvent())
+            clearActivityContext();
+
+        return {
+            before: before,
+            after: next.length,
+            removed: removed,
+            protectedCount: protectedCount
+        };
+    }
+
+    function archiveSelectionPreviewResponse(specValue) {
+        const spec = specValue || {};
+        const preview = previewArchiveSelectionCleanup(spec);
+
+        return [
+            "ARCHIVE CLEANUP PREVIEW",
+            archiveCleanupSpecLabel(spec),
+            "REMOVE " + String(preview.removable || 0),
+            "PROTECTED " + String(preview.protectedCount || 0),
+            "CONFIRM WITH: CONFIRM ARCHIVE CLEANUP"
+        ].join(" // ");
+    }
+
+    function archiveSelectionCleanupResponse(specValue, resultValue) {
+        const result = resultValue || {};
+
+        return [
+            "ARCHIVE CLEANUP",
+            archiveCleanupSpecLabel(specValue),
+            "BEFORE " + String(result.before || 0),
+            "AFTER " + String(result.after || 0),
+            "REMOVED " + String(result.removed || 0),
+            "PROTECTED " + String(result.protectedCount || 0)
+        ].join(" // ");
+    }
+
     function answerArchiveMaintenance(textValue) {
         const raw = String(textValue || "").trim();
 
@@ -826,6 +1182,14 @@ Scope {
             || query.indexOf("compact") >= 0;
         const asksCleanup =
             mentionsArchive && hasCleanupVerb;
+        const asksConfirm =
+            mentionsArchive
+            && query.indexOf("confirm") >= 0
+            && hasCleanupVerb;
+        const asksCancel =
+            mentionsArchive
+            && query.indexOf("cancel") >= 0
+            && hasCleanupVerb;
         const asksStats =
             mentionsArchive
             && (
@@ -844,7 +1208,50 @@ Scope {
 
         append("OPERATOR", raw);
 
+        if (asksCancel) {
+            pendingArchiveCleanupSpec = null;
+            append(
+                "RECEPTION",
+                "ARCHIVE CLEANUP // CANCELLED"
+            );
+            return true;
+        }
+
+        if (asksConfirm) {
+            const pending = pendingArchiveCleanupSpec;
+
+            if (!pending) {
+                append(
+                    "RECEPTION",
+                    "ARCHIVE CLEANUP // NOTHING ARMED"
+                );
+                return true;
+            }
+
+            pendingArchiveCleanupSpec = null;
+            append(
+                "RECEPTION",
+                archiveSelectionCleanupResponse(
+                    pending,
+                    applyArchiveSelectionCleanup(pending)
+                )
+            );
+            return true;
+        }
+
         if (asksCleanup) {
+            const spec = archiveCleanupSpec(query);
+
+            if (spec.active) {
+                pendingArchiveCleanupSpec = spec;
+                append(
+                    "RECEPTION",
+                    archiveSelectionPreviewResponse(spec)
+                );
+                return true;
+            }
+
+            pendingArchiveCleanupSpec = null;
             append(
                 "RECEPTION",
                 archiveCleanupResponse(cleanArchive())
@@ -852,7 +1259,44 @@ Scope {
             return true;
         }
 
-        append("RECEPTION", archiveStatsResponse());
+        const source = activityQuerySource(query);
+        const target = activityTargetFromQuery(query);
+        const window = activityTimeWindow(query);
+        const attention = activityAttentionQuery(query);
+        let matches =
+            matchingActivity(
+                source,
+                false,
+                false,
+                target,
+                window.startEpoch,
+                window.endEpoch
+            );
+
+        matches =
+            filterActivityByAttention(
+                matches,
+                attention.mode
+            );
+
+        const labels = ["ARCHIVE"];
+
+        if (source)
+            labels.push(source.toUpperCase());
+        if (target)
+            labels.push(target);
+        if (window.active)
+            labels.push(window.label);
+        if (attention.active)
+            labels.push(attention.label);
+
+        append(
+            "RECEPTION",
+            archiveStatsResponse(
+                matches,
+                labels.join(" // ")
+            )
+        );
         return true;
     }
 
@@ -3123,7 +3567,7 @@ Scope {
         if (asksHelp) {
             append(
                 "RECEPTION",
-                "I understand recent activity, archive history, archive status and cleanup, oldest or earliest activity, critical/action/notice/routine attention levels, ranked priorities like top three or what should I look at first, what changed, what went wrong, what needs attention, favorites, Room or team history, counts, and time windows like today, yesterday, this morning, this week, since Monday, or the last 3 hours. I can also find or show a team, then follow up with open this, take me there, favorite this, go back, or next one."
+                "I understand recent activity, archive history, archive status and cleanup, oldest or earliest activity, critical/action/notice/routine attention levels, ranked priorities like top three or what should I look at first, what changed, what went wrong, what needs attention, favorites, Room or team history, counts, and time windows like today, yesterday, this morning, this week, last week, this month, last month, the last 3 hours, the last 2 weeks, since 2026-10-01, on 2026-10-01, or from 2026-10-01 to 2026-10-05. Selective archive cleanup is previewed first; say confirm archive cleanup to execute it or cancel archive cleanup to abort. I can also find or show a team, then follow up with open this, take me there, favorite this, go back, or next one. When a live context is selected, you can say call Codex about this, message Hermes about this, or name another registered specialist."
             );
             return true;
         }
@@ -3309,6 +3753,38 @@ Scope {
         return true;
     }
 
+    function specialistHandoffIntent(textValue) {
+        const query = looseQuery(textValue);
+        const refersToContext =
+            query.indexOf("about this") >= 0
+            || query.indexOf("about that") >= 0
+            || query.indexOf("about it") >= 0
+            || query.indexOf("regarding this") >= 0
+            || query.indexOf("regarding that") >= 0
+            || query.indexOf("with this context") >= 0
+            || query.indexOf("send this to") >= 0
+            || query.indexOf("send that to") >= 0;
+
+        if (!refersToContext)
+            return "";
+
+        if (query.indexOf("call") >= 0
+                || query.indexOf("dial") >= 0
+                || query.indexOf("phone") >= 0)
+            return "phone";
+
+        if (query.indexOf("intercom") >= 0
+                || query.indexOf("message") >= 0
+                || query.indexOf("send this to") >= 0
+                || query.indexOf("send that to") >= 0
+                || query.indexOf("talk to") >= 0
+                || query.indexOf("tell ") >= 0
+                || query.indexOf("ask ") >= 0)
+            return "intercom";
+
+        return "";
+    }
+
     function request(route, operatorText) {
         const target = String(route || "").toLowerCase();
 
@@ -3350,6 +3826,20 @@ Scope {
 
         const query = looseQuery(raw);
 
+        if (pendingArchiveCleanupSpec) {
+            const maintenanceQuery = socialQuery(raw);
+            const keepsCleanupArm =
+                maintenanceQuery.indexOf("archive") >= 0
+                && maintenanceQuery.indexOf("cleanup") >= 0
+                && (
+                    maintenanceQuery.indexOf("confirm") >= 0
+                    || maintenanceQuery.indexOf("cancel") >= 0
+                   );
+
+            if (!keepsCleanupArm)
+                pendingArchiveCleanupSpec = null;
+        }
+
         if (answerSocial(raw))
             return true;
 
@@ -3364,6 +3854,18 @@ Scope {
 
         if (answerActivityQuestion(raw))
             return true;
+
+        const handoffMode =
+            specialistHandoffIntent(raw);
+
+        if (handoffMode) {
+            append("OPERATOR", raw);
+            specialistHandoffRequested(
+                handoffMode,
+                raw
+            );
+            return true;
+        }
 
         if (query.indexOf("intercom") >= 0
                 || query.indexOf("message") >= 0

@@ -3,9 +3,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SERVICE = ROOT / "services" / "hospital" / "HospitalDoctorRuntimeService.qml"
 HOSPITAL = ROOT / "widgets" / "HospitalW.qml"
+CHECKPOINTS = ROOT / "services" / "hospital" / "HospitalRoomCheckpointService.qml"
 
 assert SERVICE.is_file(), SERVICE
 assert HOSPITAL.is_file(), HOSPITAL
+assert CHECKPOINTS.is_file(), CHECKPOINTS
 
 service = SERVICE.read_text()
 for needle in (
@@ -88,3 +90,33 @@ assert 'onQuickCompleted: function(command, result)' in hospital
 assert 'roomChatView.refresh();' in hospital
 
 print("hospital Doctor runtime supervision contracts: PASS")
+
+
+checkpoint_service = CHECKPOINTS.read_text()
+for needle in (
+    'property string roomId: ""',
+    'property var checkpoints: []',
+    'readonly property var latestCheckpoint:',
+    'function refresh()',
+    '"checkpoints",',
+    '"--limit",',
+    '"20",',
+    '.local/share/post-apollo-dev-runtime/bin/px',
+):
+    assert needle in checkpoint_service, needle
+
+assert "Quickshell.execDetached" not in checkpoint_service
+
+for needle in (
+    'HospitalRoomCheckpointService {',
+    'id: roomCheckpointService',
+    'roomId: root.selectedRoomTeam',
+    'roomCheckpointService.refresh();',
+    'id: latestCheckpointCard',
+    '"NO CHECKPOINT // USE REPORT"',
+    'latestCheckpointCard.checkpoint.body',
+    'roomCheckpointService.lastError',
+):
+    assert needle in hospital, needle
+
+print("hospital Room checkpoint view contracts: PASS")

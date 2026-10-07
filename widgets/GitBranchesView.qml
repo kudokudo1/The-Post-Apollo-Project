@@ -3291,7 +3291,7 @@ Item {
 
                             Rectangle {
                                 width: parent.width
-                                height: 196
+                                height: 148
                                 color: Colors.black
                                 border.width: 1
                                 border.color:

@@ -182,7 +182,6 @@ Rectangle {
                         : phoneSpecialistMouse.containsMouse
                         ? Colors.orange
                         : presenceColor
-                    opacity: ready ? 1.0 : 0.58
 
                     Column {
                         anchors {
@@ -194,6 +193,7 @@ Rectangle {
                         }
 
                         spacing: 3
+                        opacity: phoneSpecialistRow.ready ? 1.0 : 0.46
 
                         GohuText {
                             width: parent.width
@@ -237,6 +237,7 @@ Rectangle {
 
                         width: 82
                         horizontalAlignment: Text.AlignRight
+                        opacity: phoneSpecialistRow.ready ? 1.0 : 0.52
                         text:
                             phoneSpecialistRow.ready
                             ? (

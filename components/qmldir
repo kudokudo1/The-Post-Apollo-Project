@@ -14,3 +14,4 @@ ModeActuator 1.0 ModeActuator.qml
 
 NeonScrollBar 1.0 NeonScrollBar.qml
 DockButton 1.0 DockButton.qml
+SafeDropShadow 1.0 SafeDropShadow.qml

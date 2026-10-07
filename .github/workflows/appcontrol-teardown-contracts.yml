@@ -1,0 +1,27 @@
+name: AppControl Teardown Contracts
+
+on:
+  pull_request:
+    paths:
+      - "widgets/AppControlW.qml"
+      - "tests/appcontrol/**"
+      - ".github/workflows/appcontrol-teardown-contracts.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "widgets/AppControlW.qml"
+      - "tests/appcontrol/**"
+      - ".github/workflows/appcontrol-teardown-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Validate AppControl teardown contracts
+        run: python3 tests/appcontrol/test_icon_grab_teardown_contracts.py

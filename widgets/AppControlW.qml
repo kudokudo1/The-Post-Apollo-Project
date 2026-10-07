@@ -14819,10 +14819,21 @@ PanelWindow {
                                 === appControlWindow.systemModeIndex
                                 && !!sourceItem._systemRecord)
 
+                        function scheduleResample() {
+                            Qt.callLater(function() {
+                                if (selectorAppIconBox.Window.window !== null)
+                                    selectorAppIconBox.sampleRenderedIcon();
+                            });
+                        }
+
                         function sampleRenderedIcon() {
                             const sourceKey = selectorAppIcon.source.toString();
 
-                            if (!sourceKey || selectorAppIcon.status !== Image.Ready)
+                            if (!sourceKey
+                                    || selectorAppIcon.status !== Image.Ready
+                                    || selectorAppIcon.Window.window === null
+                                    || !selectorAppIcon.visible
+                                    || !selectorAppIconBox.visible)
                                 return;
 
                             // Verify each rendered source once per delegate.
@@ -14836,18 +14847,26 @@ PanelWindow {
                             samplingSource = sourceKey;
 
                             Qt.callLater(function() {
-                                if (selectorAppIcon.source.toString() !== sourceKey
+                                if (selectorAppIcon.Window.window === null
+                                        || !selectorAppIcon.visible
+                                        || !selectorAppIconBox.visible
+                                        || selectorAppIcon.source.toString() !== sourceKey
                                         || selectorAppIcon.status !== Image.Ready) {
                                     selectorAppIconBox.samplingSource = "";
+                                    selectorAppIconBox.scheduleResample();
                                     return;
                                 }
 
                                 const started =
                                     selectorAppIcon.grabToImage(
                                         function(result) {
-                                            if (selectorAppIcon.source.toString()
-                                                    !== sourceKey) {
+                                            if (selectorAppIcon.Window.window === null
+                                                    || !selectorAppIcon.visible
+                                                    || !selectorAppIconBox.visible
+                                                    || selectorAppIcon.source.toString()
+                                                       !== sourceKey) {
                                                 selectorAppIconBox.samplingSource = "";
+                                                selectorAppIconBox.scheduleResample();
                                                 return;
                                             }
 
@@ -14865,8 +14884,10 @@ PanelWindow {
                                         Qt.size(52, 52)
                                     );
 
-                                if (!started)
+                                if (!started) {
                                     selectorAppIconBox.samplingSource = "";
+                                    selectorAppIconBox.scheduleResample();
+                                }
                             });
                         }
 
@@ -14919,11 +14940,12 @@ PanelWindow {
                             smooth: false
 
                             onSourceChanged: {
-                                selectorAppIconBox.iconGrabResult = null;
-                                selectorAppIconBox.samplingSource = "";
+                                // Keep an in-flight grab alive until the Canvas
+                                // releases its temporary URL.
                                 selectorAppIconBox.verifiedSource = "";
 
-                                if (status === Image.Ready)
+                                if (status === Image.Ready
+                                        && selectorAppIconBox.samplingSource === "")
                                     selectorAppIconBox.sampleRenderedIcon();
                             }
 
@@ -15276,19 +15298,32 @@ PanelWindow {
                                 const finishedSource = sampleSource;
 
                                 Qt.callLater(function() {
-                                    selectorIconColorSampler.unloadImage(
-                                        finishedSource
-                                    );
+                                    if (selectorIconColorSampler.Window.window !== null
+                                            && finishedSource
+                                            && selectorIconColorSampler.isImageLoaded(
+                                                   finishedSource
+                                               )) {
+                                        selectorIconColorSampler.unloadImage(
+                                            finishedSource
+                                        );
+                                    }
+
                                     selectorIconColorSampler.sampleSource = "";
                                     selectorAppIconBox.iconGrabResult = null;
                                     selectorAppIconBox.samplingSource = "";
+                                    selectorAppIconBox.scheduleResample();
                                 });
                             }
                         }
 
                         DropShadow {
                             anchors.fill: selectorAppIcon
-                            source: selectorAppIcon
+                            source:
+                                selectorAppIcon.Window.window !== null
+                                ? selectorAppIcon : null
+                            visible:
+                                source !== null
+                                && selectorAppIcon.status === Image.Ready
 
                             horizontalOffset: 0
                             verticalOffset: 0
@@ -20125,10 +20160,21 @@ PanelWindow {
                                         || selectedAppIdentity.showingThermal
                                         || selectedAppIdentity.showingSystem
 
+                                    function scheduleResample() {
+                                        Qt.callLater(function() {
+                                            if (selectedAppIconBox.Window.window !== null)
+                                                selectedAppIconBox.sampleRenderedIcon();
+                                        });
+                                    }
+
                                     function sampleRenderedIcon() {
                                         const sourceKey = selectedAppIcon.source.toString();
 
-                                        if (!sourceKey || selectedAppIcon.status !== Image.Ready)
+                                        if (!sourceKey
+                                                || selectedAppIcon.status !== Image.Ready
+                                                || selectedAppIcon.Window.window === null
+                                                || !selectedAppIcon.visible
+                                                || !selectedAppIconBox.visible)
                                             return;
 
                                         if (authoritativeSource === sourceKey
@@ -20138,18 +20184,26 @@ PanelWindow {
                                         samplingSource = sourceKey;
 
                                         Qt.callLater(function() {
-                                            if (selectedAppIcon.source.toString() !== sourceKey
+                                            if (selectedAppIcon.Window.window === null
+                                                    || !selectedAppIcon.visible
+                                                    || !selectedAppIconBox.visible
+                                                    || selectedAppIcon.source.toString() !== sourceKey
                                                     || selectedAppIcon.status !== Image.Ready) {
                                                 selectedAppIconBox.samplingSource = "";
+                                                selectedAppIconBox.scheduleResample();
                                                 return;
                                             }
 
                                             const started =
                                                 selectedAppIcon.grabToImage(
                                                     function(result) {
-                                                        if (selectedAppIcon.source.toString()
-                                                                !== sourceKey) {
+                                                        if (selectedAppIcon.Window.window === null
+                                                                || !selectedAppIcon.visible
+                                                                || !selectedAppIconBox.visible
+                                                                || selectedAppIcon.source.toString()
+                                                                   !== sourceKey) {
                                                             selectedAppIconBox.samplingSource = "";
+                                                            selectedAppIconBox.scheduleResample();
                                                             return;
                                                         }
 
@@ -20165,8 +20219,10 @@ PanelWindow {
                                                     Qt.size(18, 18)
                                                 );
 
-                                            if (!started)
+                                            if (!started) {
                                                 selectedAppIconBox.samplingSource = "";
+                                                selectedAppIconBox.scheduleResample();
+                                            }
                                         });
                                     }
 
@@ -20209,11 +20265,12 @@ PanelWindow {
                                         smooth: false
 
                                         onSourceChanged: {
-                                            selectedAppIconBox.iconGrabResult = null;
-                                            selectedAppIconBox.samplingSource = "";
+                                            // Preserve an in-flight grab until its Canvas
+                                            // consumer has released the temporary URL.
                                             selectedAppIconBox.authoritativeSource = "";
 
-                                            if (status === Image.Ready)
+                                            if (status === Image.Ready
+                                                    && selectedAppIconBox.samplingSource === "")
                                                 selectedAppIconBox.sampleRenderedIcon();
                                         }
 
@@ -20463,19 +20520,32 @@ PanelWindow {
                                             const finishedSource = sampleSource;
 
                                             Qt.callLater(function() {
-                                                selectedIconColorSampler.unloadImage(
-                                                    finishedSource
-                                                );
+                                                if (selectedIconColorSampler.Window.window !== null
+                                                        && finishedSource
+                                                        && selectedIconColorSampler.isImageLoaded(
+                                                               finishedSource
+                                                           )) {
+                                                    selectedIconColorSampler.unloadImage(
+                                                        finishedSource
+                                                    );
+                                                }
+
                                                 selectedIconColorSampler.sampleSource = "";
                                                 selectedAppIconBox.iconGrabResult = null;
                                                 selectedAppIconBox.samplingSource = "";
+                                                selectedAppIconBox.scheduleResample();
                                             });
                                         }
                                     }
 
                                     DropShadow {
                                         anchors.fill: selectedAppIcon
-                                        source: selectedAppIcon
+                                        source:
+                                            selectedAppIcon.Window.window !== null
+                                            ? selectedAppIcon : null
+                                        visible:
+                                            source !== null
+                                            && selectedAppIcon.status === Image.Ready
 
                                         horizontalOffset: 0
                                         verticalOffset: 0

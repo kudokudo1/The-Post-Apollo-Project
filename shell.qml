@@ -232,6 +232,14 @@ PanelWindow {
                 onKeyboardOwnershipRequested:
                     shellRoot.controlKeyboardOwner = "hospital"
 
+                onGithubPullRequestRequested: function(repository, number) {
+                    gitWindow.openGithubPullRequest(
+                        repository,
+                        number
+                    );
+                    shellRoot.controlKeyboardOwner = "git";
+                }
+
                 onMenuOpenChanged: {
                     if (!menuOpen
                             && shellRoot.controlKeyboardOwner === "hospital") {

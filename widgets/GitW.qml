@@ -23,6 +23,8 @@ PanelWindow {
     property bool issueControlOpen: false
     property bool issueCreateMode: false
     property var selectedIssue: null
+    property string pendingGithubPullRepository: ""
+    property int pendingGithubPullNumber: 0
     property bool projectsExpanded: false
     property string factoryTemplate: "smoke"
     property string factoryTrigger: "manual"
@@ -1539,6 +1541,77 @@ PanelWindow {
         }
     }
 
+    function clearPendingGithubPullNavigation() {
+        root.pendingGithubPullRepository = "";
+        root.pendingGithubPullNumber = 0;
+    }
+
+    function resolvePendingGithubPullRequest() {
+        const repository =
+            String(root.pendingGithubPullRepository || "").trim();
+        const number = Number(root.pendingGithubPullNumber || 0);
+
+        if (!repository || number <= 0)
+            return false;
+
+        if (String(gitService.repoRemoteSlug || "").toLowerCase()
+                !== repository.toLowerCase())
+            return false;
+
+        const rows =
+            Array.isArray(githubWorkItemsService.pulls)
+            ? githubWorkItemsService.pulls
+            : [];
+
+        for (let i = 0; i < rows.length; ++i) {
+            if (githubWorkItemsService.rowNumber(rows[i]) === number) {
+                root.clearPendingGithubPullNavigation();
+                return root.openPullRequestControl(rows[i]);
+            }
+        }
+
+        return false;
+    }
+
+    function continueGithubPullNavigation() {
+        const repository =
+            String(root.pendingGithubPullRepository || "").trim();
+
+        if (!repository)
+            return false;
+
+        const index = gitService.repoIndexOfSlug(repository);
+
+        if (index < 0) {
+            if (!gitService.discoveringRepos)
+                gitService.discoverRepos();
+
+            return false;
+        }
+
+        gitService.selectRepo(index);
+        root.showGithubPage();
+        root.showGithubPulls();
+        return true;
+    }
+
+    function openGithubPullRequest(repository, number) {
+        const slug = String(repository || "").trim();
+        const pr = Number(number || 0);
+
+        if (!/^[^/\s]+\/[^/\s]+$/.test(slug)
+                || !Number.isFinite(pr)
+                || pr <= 0)
+            return false;
+
+        root.pendingGithubPullRepository = slug;
+        root.pendingGithubPullNumber = Math.floor(pr);
+        root.open();
+        root.showGithubPage();
+        root.continueGithubPullNavigation();
+        return true;
+    }
+
     function githubStateText() {
         if (root.githubView === "issues")
             return githubWorkItemsService.issuesStateText;
@@ -1975,6 +2048,7 @@ PanelWindow {
 
         function onPullsRefreshed() {
             root.refreshSelectedPullRequest();
+            root.resolvePendingGithubPullRequest();
         }
     }
 
@@ -1997,6 +2071,11 @@ PanelWindow {
 
     Connections {
         target: gitService
+
+        function onRepositoriesChanged() {
+            if (root.pendingGithubPullRepository)
+                root.continueGithubPullNavigation();
+        }
 
         function onRepoRemoteSlugChanged() {
             root.pullRequestControlOpen = false;

@@ -15,6 +15,7 @@ PanelWindow {
     property bool keyboardActive: true
     property bool keyboardLock: false
     signal keyboardOwnershipRequested()
+    signal githubPullRequestRequested(string repository, int number)
 
     property string selectedCommitSha: ""
     property string selectedRoomTeam: ""
@@ -1556,6 +1557,52 @@ PanelWindow {
             specialistRegistryService.refreshPresence();
     }
 
+    function attentionRepositories() {
+        const rows = attentionCatalogGitService.repoModel;
+        const seen = {};
+        const out = [];
+
+        for (let i = 0; i < rows.count; ++i) {
+            const slug = String(rows.get(i).remoteSlug || "").trim();
+
+            if (!slug || seen[slug.toLowerCase()])
+                continue;
+
+            seen[slug.toLowerCase()] = true;
+            out.push(slug);
+        }
+
+        return out;
+    }
+
+    function refreshGithubAttention() {
+        if (githubAttentionProvider.busy)
+            return false;
+
+        if (attentionCatalogGitService.discoveringRepos)
+            return false;
+
+        if (attentionCatalogGitService.repoCount <= 0) {
+            attentionCatalogGitService.discoverRepos();
+            return true;
+        }
+
+        const repositories = root.attentionRepositories();
+
+        githubAttentionProvider.setRepositories(repositories);
+        return githubAttentionProvider.refresh(repositories);
+    }
+
+    function openAttention() {
+        receptionistService.endVisit();
+        root.leaveRoomControls();
+        root.leaveBedControls();
+        root.phoneMenuOpen = false;
+        root.intercomMenuOpen = false;
+        root.operationsSurface = "attention";
+        root.refreshGithubAttention();
+    }
+
     function resolvePendingRoundsRoom() {
         const team = String(root.pendingRoundsRoomTeam || "");
 
@@ -1880,6 +1927,35 @@ PanelWindow {
         id: hospitalEvidenceGitService
         repoPath: patientService.repoRoot
         repoLabel: "HOSPITAL PATIENT"
+    }
+
+    GitService {
+        id: attentionCatalogGitService
+        preferredRepoQuery: "taskbars-post-apollo"
+    }
+
+    GitHubAttentionProvider {
+        id: githubAttentionProvider
+    }
+
+    Connections {
+        target: attentionCatalogGitService
+
+        function onRepositoriesChanged() {
+            if (root.operationsSurface === "attention")
+                root.refreshGithubAttention();
+        }
+    }
+
+    Timer {
+        id: attentionRefreshTimer
+        interval: 300000
+        repeat: true
+        running:
+            root.menuOpen
+            && root.operationsSurface === "attention"
+
+        onTriggered: root.refreshGithubAttention()
     }
 
     HospitalService {
@@ -3034,42 +3110,49 @@ PanelWindow {
                 spacing: 10
 
                 HospitalModeTab {
-                    width: (parent.width - 50) / 6
+                    width: (parent.width - 60) / 7
                     label: "RECEPTION"
                     selected: root.operationsSurface === "reception"
                     onTriggered: root.openReception()
                 }
 
                 HospitalModeTab {
-                    width: (parent.width - 50) / 6
+                    width: (parent.width - 60) / 7
                     label: "SURGERY"
                     selected: !root.operationsOpen
                     onTriggered: root.showSurgery()
                 }
 
                 HospitalModeTab {
-                    width: (parent.width - 50) / 6
+                    width: (parent.width - 60) / 7
+                    label: "ATTENTION"
+                    selected: root.operationsSurface === "attention"
+                    onTriggered: root.openAttention()
+                }
+
+                HospitalModeTab {
+                    width: (parent.width - 60) / 7
                     label: "ARCHIVE"
                     selected: root.operationsSurface === "archive"
                     onTriggered: root.openArchive()
                 }
 
                 HospitalModeTab {
-                    width: (parent.width - 50) / 6
+                    width: (parent.width - 60) / 7
                     label: "REPORTS"
                     selected: root.operationsSurface === "reports"
                     onTriggered: root.openReports()
                 }
 
                 HospitalModeTab {
-                    width: (parent.width - 50) / 6
+                    width: (parent.width - 60) / 7
                     label: "ROUNDS"
                     selected: root.operationsSurface === "rounds"
                     onTriggered: root.openRounds()
                 }
 
                 HospitalModeTab {
-                    width: (parent.width - 50) / 6
+                    width: (parent.width - 60) / 7
                     label: "STAFF"
                     selected: root.operationsSurface === "staff"
                     onTriggered: root.openStaff()
@@ -3091,6 +3174,8 @@ PanelWindow {
                     ? Colors.cyan
                     : root.operationsSurface === "reports"
                     ? Colors.magenta
+                    : root.operationsSurface === "attention"
+                    ? Colors.red
                     : root.operationsSurface === "staff"
                     ? Colors.orange
                     : Colors.cyan
@@ -3107,6 +3192,8 @@ PanelWindow {
                         ? Colors.cyan
                         : root.operationsSurface === "reports"
                         ? Colors.magenta
+                        : root.operationsSurface === "attention"
+                        ? Colors.red
                         : root.operationsSurface === "staff"
                         ? Colors.orange
                         : Colors.cyan
@@ -3129,6 +3216,8 @@ PanelWindow {
                             ? "ARCHIVE // HISTORY"
                             : root.operationsSurface === "reports"
                             ? "REPORTS // CONTEXT"
+                            : root.operationsSurface === "attention"
+                            ? "ATTENTION // GITHUB"
                             : root.operationsSurface === "staff"
                             ? "STAFF // PRESENCE"
                             : "ROUNDS // HOSPITAL-WIDE"
@@ -3140,6 +3229,8 @@ PanelWindow {
                             ? Colors.cyan
                             : root.operationsSurface === "reports"
                             ? Colors.magenta
+                            : root.operationsSurface === "attention"
+                            ? Colors.red
                             : root.operationsSurface === "staff"
                             ? Colors.orange
                             : Colors.cyan
@@ -3206,6 +3297,29 @@ PanelWindow {
                                     ? certificationCoordinator
                                         .historyService.events.length
                                     : 0
+                                  )
+                              )
+                            : root.operationsSurface === "attention"
+                            ? (
+                                "REPOSITORIES "
+                                + String(
+                                    githubAttentionProvider.repositoryCount
+                                  )
+                                + "  //  ITEMS "
+                                + String(
+                                    githubAttentionProvider.itemCount
+                                  )
+                                + "  //  NEEDS ME "
+                                + String(
+                                    githubAttentionProvider.requestedFromMeCount
+                                  )
+                                + "  //  FAILED "
+                                + String(
+                                    githubAttentionProvider.failedCount
+                                  )
+                                + "  //  READY "
+                                + String(
+                                    githubAttentionProvider.readyCount
                                   )
                               )
                             : root.operationsSurface === "staff"
@@ -6078,6 +6192,34 @@ PanelWindow {
                     ""
                 );
                 root.activateReceptionActivity(event);
+            }
+        }
+
+        HospitalGitHubAttentionView {
+            id: githubAttentionView
+
+            z: 700
+            visible: root.operationsSurface === "attention"
+            attentionProvider: githubAttentionProvider
+
+            anchors {
+                left: parent.left
+                right: parent.right
+                top: fixedTop.bottom
+                bottom: actionBay.top
+                leftMargin: 18
+                rightMargin: 18
+                topMargin: 8
+                bottomMargin: 10
+            }
+
+            onCloseRequested: root.showSurgery()
+
+            onPullRequestRequested: function(repository, number) {
+                root.githubPullRequestRequested(
+                    repository,
+                    number
+                );
             }
         }
 

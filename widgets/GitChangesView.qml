@@ -38,7 +38,8 @@ Item {
     function transferEligible() {
         const row = root.selectedFile || {};
 
-        return !!root.transferService
+        return !!root.changesService
+            && !!root.transferService
             && !!root.branchWorkspaceService
             && root.selectedPath.length > 0
             && Boolean(row.unstaged)

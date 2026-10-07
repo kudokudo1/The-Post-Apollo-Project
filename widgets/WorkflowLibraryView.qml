@@ -30,6 +30,19 @@ Item {
         root.armedSetName = "";
     }
 
+    function batchStateColor(stateValue) {
+        const state = String(stateValue || "");
+
+        if (state === "OK")
+            return Colors.cyan;
+        if (state === "FAILED" || state === "UNCERTAIN")
+            return Colors.red;
+        if (state === "SKIPPED")
+            return Colors.orange;
+
+        return Colors.white;
+    }
+
     Connections {
         target: root.libraryStore
 
@@ -233,6 +246,112 @@ Item {
                             : Colors.cyan
                     }
 
+                    Rectangle {
+                        id: procedureReport
+
+                        width: parent.width
+                        height:
+                            visible
+                            ? 86
+                            : 0
+                        visible:
+                            root.githubService.batchStepResults.length > 0
+
+                        color: Colors.black
+                        border.width: 1
+                        border.color:
+                            root.githubService.batchStepFailureCount > 0
+                            ? Colors.red
+                            : Colors.cyan
+
+                        Column {
+                            anchors {
+                                fill: parent
+                                margins: 5
+                            }
+                            spacing: 3
+
+                            GohuText {
+                                width: parent.width
+                                text:
+                                    (
+                                        root.libraryStore.activeProcedureName
+                                        || "PROCEDURE"
+                                    )
+                                    + " // "
+                                    + (
+                                        root.githubService.batchRepository
+                                        || root.libraryStore.repoSlug
+                                    )
+                                    + " // REF "
+                                    + (
+                                        root.githubService.batchRef
+                                        || "DEFAULT"
+                                    )
+                                font.pixelSize: 8
+                                color: Colors.magenta
+                                elide: Text.ElideMiddle
+                            }
+
+                            Flickable {
+                                width: parent.width
+                                height: parent.height - 22
+                                clip: true
+                                contentWidth: width
+                                contentHeight:
+                                    procedureStepColumn.implicitHeight
+                                boundsBehavior:
+                                    Flickable.StopAtBounds
+
+                                Column {
+                                    id: procedureStepColumn
+                                    width: parent.width
+                                    spacing: 2
+
+                                    Repeater {
+                                        model:
+                                            root.githubService
+                                                .batchStepResults
+
+                                        GohuText {
+                                            required property int index
+                                            required property var modelData
+
+                                            width:
+                                                procedureStepColumn.width
+                                            text:
+                                                String(index + 1)
+                                                + " // "
+                                                + String(
+                                                    modelData.state
+                                                    || "UNKNOWN"
+                                                  )
+                                                + " // "
+                                                + String(
+                                                    modelData.workflow
+                                                    || ""
+                                                  )
+                                                + (
+                                                    modelData.detail
+                                                    ? " // "
+                                                      + String(
+                                                          modelData.detail
+                                                        )
+                                                    : ""
+                                                  )
+                                            font.pixelSize: 7
+                                            color:
+                                                root.batchStateColor(
+                                                    modelData.state
+                                                )
+                                            elide: Text.ElideMiddle
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     Row {
                         width: parent.width
                         height: 28
@@ -327,7 +446,14 @@ Item {
 
                     Flickable {
                         width: parent.width
-                        height: parent.height - 126
+                        height:
+                            parent.height
+                            - 126
+                            - (
+                                procedureReport.visible
+                                ? procedureReport.height + 6
+                                : 0
+                              )
 
                         clip: true
                         contentWidth: width

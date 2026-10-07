@@ -6,6 +6,8 @@ Scope {
     id: root
 
     property string repositoryPath: ""
+    property var operationJournal: null
+    property var snapshotService: null
 
     property bool refreshing: false
     property bool detailBusy: false
@@ -33,6 +35,14 @@ Scope {
     property string actionName: ""
     property string actionStatus: "READY"
     property string lastError: ""
+
+    property string pendingJournalId: ""
+    property string pendingSnapshotRequest: ""
+    property string snapshotPhase: ""
+    property string pendingOperation: ""
+    property var pendingArguments: []
+    property bool pendingActionSuccess: false
+    property string pendingActionDetail: ""
 
     property bool queryBusy: false
     property var queryRows: []
@@ -837,24 +847,59 @@ Scope {
             lastError = value;
     }
 
-    function runAction(operation, a, b, c) {
+    function shouldJournalOperation(operation) {
+        return String(operation || "") !== "copy-sha";
+    }
+
+    function clearPendingMutation() {
+        pendingJournalId = "";
+        pendingSnapshotRequest = "";
+        snapshotPhase = "";
+        pendingOperation = "";
+        pendingArguments = [];
+        pendingActionSuccess = false;
+        pendingActionDetail = "";
+    }
+
+    function mutationContext() {
+        return {
+            source: "GitHistoryService",
+            operation: String(pendingOperation || ""),
+            arguments: pendingArguments.slice()
+        };
+    }
+
+    function failBeforeSnapshot(detail) {
+        const action = String(actionName || pendingOperation || "ACTION");
+        const message =
+            "BEFORE SNAPSHOT FAILED // "
+            + String(detail || "SNAPSHOT UNAVAILABLE");
+
+        actionBusy = false;
+        actionStatus = action + " // REFUSED";
+        lastError = message;
+        clearPendingMutation();
+        actionFinished(action, false, message);
+    }
+
+    function executePendingAction() {
         const repo = String(repositoryPath || "").trim();
-        const op = String(operation || "").trim();
+        const op = String(pendingOperation || "").trim();
+        const args =
+            Array.isArray(pendingArguments)
+            ? pendingArguments
+            : [];
+        const a = args.length > 0 ? String(args[0] || "") : "";
+        const b = args.length > 1 ? String(args[1] || "") : "";
+        const c = args.length > 2 ? String(args[2] || "") : "";
 
-        if (!repo || !op || actionBusy || refreshing)
+        if (!repo || !op) {
+            finalizeMutation(
+                null,
+                "PENDING HISTORY MUTATION IDENTITY LOST BEFORE EXECUTION"
+            );
             return false;
-
-        actionBusy = true;
-        actionName = op.toUpperCase();
-        actionStatus = actionName + " // RUNNING";
-        lastError = "";
-
-        actionExitSeen = false;
-        actionStdoutSeen = false;
-        actionStderrSeen = false;
-        actionExitCode = -1;
-        actionStdoutText = "";
-        actionStderrText = "";
+        }
 
         actionProcess.exec([
             "bash",
@@ -930,10 +975,68 @@ Scope {
             "git-history-action",
             repo,
             op,
+            a,
+            b,
+            c
+        ]);
+
+        return true;
+    }
+
+    function runAction(operation, a, b, c) {
+        const repo = String(repositoryPath || "").trim();
+        const op = String(operation || "").trim();
+
+        if (!repo || !op || actionBusy || refreshing)
+            return false;
+
+        if (shouldJournalOperation(op)
+                && ((operationJournal && !snapshotService)
+                    || (snapshotService && !operationJournal))) {
+            lastError = "JOURNAL + SNAPSHOT SERVICES MUST BE PAIRED";
+            return false;
+        }
+
+        clearPendingMutation();
+
+        pendingOperation = op;
+        pendingArguments = [
             String(a || ""),
             String(b || ""),
             String(c || "")
-        ]);
+        ];
+
+        actionBusy = true;
+        actionName = op.toUpperCase();
+        actionStatus =
+            shouldJournalOperation(op)
+            && operationJournal
+            && snapshotService
+            ? actionName + " // SNAPSHOT BEFORE"
+            : actionName + " // RUNNING";
+        lastError = "";
+
+        actionExitSeen = false;
+        actionStdoutSeen = false;
+        actionStderrSeen = false;
+        actionExitCode = -1;
+        actionStdoutText = "";
+        actionStderrText = "";
+
+        if (!shouldJournalOperation(op)
+                || (!operationJournal && !snapshotService))
+            return executePendingAction();
+
+        snapshotPhase = "BEFORE";
+        pendingSnapshotRequest = snapshotService.capture(
+            "HISTORY BEFORE // " + actionName,
+            mutationContext()
+        );
+
+        if (!pendingSnapshotRequest) {
+            failBeforeSnapshot("SNAPSHOT SERVICE BUSY OR UNAVAILABLE");
+            return false;
+        }
 
         return true;
     }
@@ -971,14 +1074,79 @@ Scope {
         return runAction("copy-sha", sha, "", "");
     }
 
+    function finalizeMutation(afterSnapshot, snapshotWarning) {
+        const action = String(actionName || pendingOperation || "ACTION");
+        const detail = String(pendingActionDetail || "");
+        const warning = String(snapshotWarning || "");
+        const snapshot =
+            afterSnapshot
+            || {
+                snapshotVersion: 1,
+                repository: String(repositoryPath || ""),
+                capturedAt: new Date().toISOString(),
+                captureFailed: true,
+                recoveryClass: "EVIDENCE_ONLY",
+                recoveryReason:
+                    warning
+                    || "AFTER SNAPSHOT UNAVAILABLE"
+            };
+
+        if (pendingJournalId && operationJournal) {
+            if (pendingActionSuccess)
+                operationJournal.completeOperation(
+                    pendingJournalId,
+                    snapshot,
+                    warning
+                    ? detail + " // " + warning
+                    : detail
+                );
+            else
+                operationJournal.failOperation(
+                    pendingJournalId,
+                    snapshot,
+                    warning
+                    ? detail + " // " + warning
+                    : detail
+                );
+        }
+
+        actionBusy = false;
+
+        if (pendingActionSuccess) {
+            actionStatus =
+                detail
+                || (action + " // OK");
+            if (warning)
+                actionStatus += " // SNAPSHOT WARNING";
+            lastError = warning;
+        } else {
+            lastError = detail || (action + " FAILED");
+            if (warning)
+                lastError += " // " + warning;
+            actionStatus = action + " // REFUSED";
+        }
+
+        const success = pendingActionSuccess;
+        const finalDetail =
+            warning
+            ? (detail || (success ? "OK" : "FAILED"))
+                + " // "
+                + warning
+            : (detail || (success ? "OK" : "FAILED"));
+
+        clearPendingMutation();
+        actionFinished(action, success, finalDetail);
+
+        if (success)
+            refresh(selectedRef, selectedMode);
+    }
+
     function maybeFinishAction() {
         if (!actionBusy
                 || !actionExitSeen
                 || !actionStdoutSeen
                 || !actionStderrSeen)
             return;
-
-        actionBusy = false;
 
         const out = String(actionStdoutText || "").trim();
         const err = String(actionStderrText || "").trim();
@@ -1001,17 +1169,107 @@ Scope {
             ? p.slice(1).join("\t")
             : String(err || out || ("EXIT " + actionExitCode)).trim();
 
-        if (actionExitCode === 0 && kind === "OK") {
-            actionStatus = detail || (actionName + " // OK");
-            lastError = "";
-            actionFinished(actionName, true, detail || "OK");
-            refresh(selectedRef, selectedMode);
+        pendingActionSuccess =
+            actionExitCode === 0
+            && kind === "OK";
+        pendingActionDetail =
+            detail
+            || (
+                pendingActionSuccess
+                ? "OK"
+                : (actionName + " FAILED")
+            );
+
+        if (!shouldJournalOperation(pendingOperation)
+                || !operationJournal
+                || !snapshotService) {
+            finalizeMutation(null, "");
             return;
         }
 
-        lastError = detail || (actionName + " FAILED");
-        actionStatus = actionName + " // REFUSED";
-        actionFinished(actionName, false, lastError);
+        actionStatus = actionName + " // SNAPSHOT AFTER";
+        snapshotPhase = "AFTER";
+        pendingSnapshotRequest = snapshotService.capture(
+            "HISTORY AFTER // " + actionName,
+            mutationContext()
+        );
+
+        if (!pendingSnapshotRequest) {
+            finalizeMutation(
+                null,
+                "AFTER SNAPSHOT COULD NOT START"
+            );
+        }
+    }
+
+    Connections {
+        target: root.snapshotService
+        enabled: root.snapshotService !== null
+        ignoreUnknownSignals: true
+
+        function onSnapshotReady(requestId, snapshot) {
+            if (String(requestId || "")
+                    !== String(root.pendingSnapshotRequest || ""))
+                return;
+
+            root.pendingSnapshotRequest = "";
+
+            if (root.snapshotPhase === "BEFORE") {
+                root.snapshotPhase = "";
+
+                root.pendingJournalId =
+                    root.operationJournal
+                    ? root.operationJournal.beginOperation(
+                        "HISTORY/"
+                            + String(root.pendingOperation || "")
+                                .toUpperCase(),
+                        snapshot,
+                        root.mutationContext()
+                    )
+                    : "";
+
+                if (root.operationJournal
+                        && !root.pendingJournalId) {
+                    root.failBeforeSnapshot(
+                        "JOURNAL RECORD COULD NOT START"
+                    );
+                    return;
+                }
+
+                root.actionStatus =
+                    root.actionName + " // RUNNING";
+                root.executePendingAction();
+                return;
+            }
+
+            if (root.snapshotPhase === "AFTER") {
+                root.snapshotPhase = "";
+                root.finalizeMutation(snapshot, "");
+            }
+        }
+
+        function onSnapshotFailed(requestId, detail) {
+            if (String(requestId || "")
+                    !== String(root.pendingSnapshotRequest || ""))
+                return;
+
+            root.pendingSnapshotRequest = "";
+
+            if (root.snapshotPhase === "BEFORE") {
+                root.snapshotPhase = "";
+                root.failBeforeSnapshot(detail);
+                return;
+            }
+
+            if (root.snapshotPhase === "AFTER") {
+                root.snapshotPhase = "";
+                root.finalizeMutation(
+                    null,
+                    "AFTER SNAPSHOT FAILED // "
+                        + String(detail || "UNKNOWN ERROR")
+                );
+            }
+        }
     }
 
     Process {

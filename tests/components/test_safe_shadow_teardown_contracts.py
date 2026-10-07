@@ -47,4 +47,23 @@ assert "readonly property point sourceOrigin: sourceAttached" in dock
 assert "? dockButton.contentGlowSource.mapToItem(contentLayer, 0, 0)" in dock
 assert "requestedVisible: dockButton.contentGlowEnabled" in dock
 
+LAYER_SURFACES = (
+    "widgets/GitW.qml",
+    "components/ConversationFeed.qml",
+)
+
+for relative in LAYER_SURFACES:
+    text = (ROOT / relative).read_text(encoding="utf-8")
+    assert "layer.effect: DropShadow {" in text, (
+        f"{relative} must remain covered while it owns layer-backed shadows"
+    )
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("layer.enabled:"):
+            continue
+        assert "Window.window !== null" in stripped, (
+            f"{relative} layer effect gate is missing window teardown guard: "
+            f"{stripped}"
+        )
+
 print("Shared graphical-effect teardown contracts: PASS")

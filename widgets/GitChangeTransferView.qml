@@ -6,6 +6,7 @@ Rectangle {
 
     required property var transferService
     required property var branchWorkspaceService
+    required property var contentRecoveryService
 
     property string sourcePath: ""
     property string filePath: ""
@@ -14,6 +15,7 @@ Rectangle {
     property string hunkSummary: ""
     property string selectedDestinationPath: ""
     property string transferMode: "move"
+    property bool preservePending: false
 
     signal closeRequested()
 
@@ -120,17 +122,58 @@ Rectangle {
 
     function executeTransfer() {
         if (!transferService
+                || !contentRecoveryService
                 || !previewMatchesSelection
-                || transferService.transferBusy)
+                || transferService.transferBusy
+                || contentRecoveryService.busy
+                || preservePending)
             return false;
 
-        return transferService.execute();
+        preservePending = true;
+
+        const started = contentRecoveryService.capture(
+            transferScope,
+            filePath,
+            transferScope === "hunk" ? hunkIndex : -1,
+            -1,
+            String(transferService.previewFingerprint || "")
+        );
+
+        if (!started)
+            preservePending = false;
+
+        return started;
     }
 
     onFilePathChanged: invalidatePreview()
     onSourcePathChanged: invalidatePreview()
     onTransferScopeChanged: invalidatePreview()
     onHunkIndexChanged: invalidatePreview()
+
+    Connections {
+        target: contentRecoveryService
+        ignoreUnknownSignals: true
+
+        function onArtifactReady(fingerprint, artifactPath, bytes) {
+            if (!root.preservePending)
+                return;
+
+            const expected =
+                String(root.transferService.previewFingerprint || "");
+
+            root.preservePending = false;
+
+            if (!expected || String(fingerprint || "") !== expected)
+                return;
+
+            root.transferService.execute();
+        }
+
+        function onArtifactFailed(detail) {
+            if (root.preservePending)
+                root.preservePending = false;
+        }
+    }
 
     Connections {
         target: branchWorkspaceService
@@ -636,7 +679,10 @@ Rectangle {
                             width: (parent.width - 6) / 2
                             height: 36
                             label:
-                                transferService.transferBusy
+                                root.preservePending
+                                || contentRecoveryService.busy
+                                ? "PRESERVING"
+                                : transferService.transferBusy
                                 ? "TRANSFERRING"
                                 : root.previewMatchesSelection
                                 ? "EXECUTE "
@@ -647,6 +693,8 @@ Rectangle {
                                 root.previewMatchesSelection
                                 && !transferService.previewBusy
                                 && !transferService.transferBusy
+                                && !contentRecoveryService.busy
+                                && !root.preservePending
                             onTriggered: root.executeTransfer()
                         }
                     }

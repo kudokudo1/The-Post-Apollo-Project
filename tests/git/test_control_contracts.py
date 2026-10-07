@@ -201,6 +201,7 @@ require(
 # until a recovery engine lands.
 require(
     "services/git/GitOperationJournalService.qml",
+    "services/git/GitOperationRecoveryService.qml",
     "function beginOperation(kind, beforeState, metadata)",
     "operation journal must record mutation start",
 )
@@ -310,6 +311,54 @@ require(
     ".gitignore",
     "git-operation-journal.json",
     "local journal state must not dirty the Quickshell repository",
+)
+
+# Guarded operation recovery starts narrow: only exact clean ref
+# transitions with explicit inverse strategies may execute.
+require(
+    "services/git/GitOperationRecoveryService.qml",
+    "function preview(record)",
+    "operation recovery must expose a non-mutating preview",
+)
+require(
+    "services/git/GitOperationRecoveryService.qml",
+    'strategy: "DELETE_CREATED_BRANCH"',
+    "branch creation must have an explicit inverse strategy",
+)
+require(
+    "services/git/GitOperationRecoveryService.qml",
+    'strategy: "RENAME_BRANCH_BACK"',
+    "branch rename must have an explicit inverse strategy",
+)
+require(
+    "services/git/GitOperationRecoveryService.qml",
+    'recoveryClass !== "REF_RECOVERABLE"',
+    "recovery must refuse evidence-only operations",
+)
+require(
+    "services/git/GitOperationRecoveryService.qml",
+    'WORKTREE DIRTY // UNDO WILL NOT DISCARD CONTENT',
+    "recovery must refuse dirty worktrees",
+)
+require(
+    "services/git/GitOperationRecoveryService.qml",
+    'git -C "$repo" update-ref -d "$ref" "$expected"',
+    "created-branch Undo must use expected-SHA guarded deletion",
+)
+require(
+    "services/git/GitOperationRecoveryService.qml",
+    'BRANCH MOVED SINCE RECORDED OPERATION',
+    "recovery must refuse stale branch state",
+)
+require(
+    "services/git/GitOperationRecoveryService.qml",
+    'UNDO STRATEGY NOT IMPLEMENTED FOR ',
+    "unsupported operations must be refused rather than approximated",
+)
+require_regex(
+    "widgets/GitW.qml",
+    r"GitOperationRecoveryService \{.*id: operationRecoveryService.*repositoryPath:",
+    "GitW must own the shared recovery backend",
 )
 
 # Repository safety contracts.

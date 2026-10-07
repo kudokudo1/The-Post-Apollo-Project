@@ -64,17 +64,6 @@ Scope {
         return null;
     }
 
-    function worktreeForPath(path) {
-        const needle = String(path || "");
-
-        for (let i = 0; i < worktrees.length; ++i) {
-            if (String((worktrees[i] || {}).path || "") === needle)
-                return worktrees[i];
-        }
-
-        return null;
-    }
-
     function branchIsOccupied(name) {
         return worktreeForBranch(name) !== null;
     }

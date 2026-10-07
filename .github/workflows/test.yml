@@ -2,13 +2,37 @@ name: "PX / test"
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "services/git/**"
+      - "services/github/**"
+      - "services/hospital/HospitalCertificationCoordinator.qml"
+      - "services/hospital/HospitalInterpretationService.qml"
+      - "widgets/Git*.qml"
+      - "widgets/RepositoryProfileView.qml"
+      - "widgets/WorkflowLibraryView.qml"
+      - "tests/git/**"
+      - ".github/workflows/test.yml"
+  pull_request:
+    paths:
+      - "services/git/**"
+      - "services/github/**"
+      - "services/hospital/HospitalCertificationCoordinator.qml"
+      - "services/hospital/HospitalInterpretationService.qml"
+      - "widgets/Git*.qml"
+      - "widgets/RepositoryProfileView.qml"
+      - "widgets/WorkflowLibraryView.qml"
+      - "tests/git/**"
+      - ".github/workflows/test.yml"
 
 permissions:
   contents: read
 
 jobs:
   smoke:
-    name: Repository smoke test
+    name: Git control contracts
     runs-on: ubuntu-latest
 
     steps:
@@ -21,3 +45,6 @@ jobs:
           echo "ref=$GITHUB_REF"
           echo "sha=$GITHUB_SHA"
           echo "PX workflow is alive."
+
+      - name: Validate Git control contracts
+        run: python3 tests/git/test_control_contracts.py

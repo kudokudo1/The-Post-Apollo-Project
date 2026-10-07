@@ -1607,6 +1607,7 @@ Item {
                     
                         NeonScrollBar {
                             flickable: repositoryScroll6
+                            starHandle: true
                         }
 }
                 }
@@ -1749,8 +1750,8 @@ Item {
 
                         Flickable {
                             id: repositoryScroll7
-                            width: parent.width
-                            height: parent.height - 34
+                            width: Math.max(0, parent.width - 8)
+                            height: Math.max(0, parent.height - y - 4)
                             clip: true
                             contentWidth: width
                             contentHeight: projectLineColumn.implicitHeight
@@ -1834,6 +1835,7 @@ Item {
                         
                             NeonScrollBar {
                                 flickable: repositoryScroll7
+                                starHandle: true
                             }
 }
                     }

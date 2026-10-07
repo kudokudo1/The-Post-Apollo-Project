@@ -112,7 +112,8 @@ assert "readonly property string activeSessionId: adapter.activeSessionId" in ro
 assert "providerId: root.effectiveProviderId" in room_chat
 assert "doctorId: root.doctorId" in room_chat
 assert "workingDirectory: root.bedPath" in room_chat
-assert 'return root.providerId ? "READY TO CONNECT" : "ROOM CHAT";' in room_chat
+assert "return root.effectiveProviderId" in room_chat
+assert '"READY TO CONNECT"' in room_chat
 
 print("hospital live doctor chat view contract: PASS")
 

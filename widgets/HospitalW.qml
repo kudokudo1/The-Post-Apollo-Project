@@ -37,9 +37,15 @@ PanelWindow {
     property int pendingRoundsFloorIndex: -1
     property string pendingReceptionTeam: ""
     property var pendingReceptionRoundsSelection: null
+    property string selectedDoctorId: ""
+    property string selectedProviderId: ""
 
     readonly property bool operationsOpen:
         root.operationsSurface.length > 0
+    readonly property var selectedDoctor:
+        doctorService.doctorById(root.selectedDoctorId)
+    readonly property var selectedProvider:
+        providerService.providerById(root.selectedProviderId)
     readonly property var selectedRoomData:
         auditService.roomFor(selectedRoomTeam)
     readonly property string selectedRoomBranch: {
@@ -64,6 +70,86 @@ PanelWindow {
         && !roomService.integrating
         && !roomService.postOpRunning
         && !roomService.armed
+
+    function defaultDoctorIdForRoom() {
+        const team = String(root.selectedRoomTeam || "").trim();
+
+        if (!team)
+            return "";
+
+        return "doctor-"
+            + team.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    }
+
+    function firstAvailableProviderId() {
+        const rows =
+            Array.isArray(providerService.providers)
+            ? providerService.providers
+            : [];
+
+        for (let i = 0; i < rows.length; ++i) {
+            const row = rows[i] || {};
+            if (row.available && row.id)
+                return String(row.id);
+        }
+
+        return "";
+    }
+
+    function syncRoomAISelection() {
+        const room = root.selectedRoomData || {};
+        const roomDoctor = String(room.doctorId || "").trim();
+        const roomProvider = String(room.providerId || "").trim();
+
+        root.selectedDoctorId =
+            roomDoctor || root.defaultDoctorIdForRoom();
+
+        if (roomProvider
+                && (!providerService.loaded
+                    || (providerService.providerById(roomProvider) || {}).available)) {
+            root.selectedProviderId = roomProvider;
+            return;
+        }
+
+        if (!root.selectedProviderId
+                || !(providerService.providerById(
+                    root.selectedProviderId
+                ) || {}).available)
+            root.selectedProviderId = root.firstAvailableProviderId();
+    }
+
+    function openRoomChat() {
+        if (!root.selectedRoomTeam || !floorService.bedPath)
+            return false;
+
+        root.leaveRoomControls();
+        root.leaveBedControls();
+        root.phoneMenuOpen = false;
+        root.intercomMenuOpen = false;
+        root.operationsSurface = "chat";
+        root.syncRoomAISelection();
+        return true;
+    }
+
+    function openRoomDoctor() {
+        if (!root.selectedRoomTeam)
+            return false;
+
+        root.leaveRoomControls();
+        root.leaveBedControls();
+        root.phoneMenuOpen = false;
+        root.intercomMenuOpen = false;
+        root.operationsSurface = "doctor";
+        root.syncRoomAISelection();
+
+        if (!doctorService.refreshing)
+            doctorService.refresh();
+
+        if (!providerService.refreshing)
+            providerService.refresh();
+
+        return true;
+    }
 
     function toggleCommitSelection(sha) {
         const candidate = String(sha || "");
@@ -599,6 +685,7 @@ PanelWindow {
         root.leaveBedControls();
         roomService.clearResult();
         certificationCoordinator.bindRoom(roomService);
+        root.syncRoomAISelection();
         root.scheduleRoomEntryAudit(root.selectedRoomTeam);
     }
 
@@ -1645,6 +1732,18 @@ PanelWindow {
 
     HospitalSpecialistRegistryService {
         id: specialistRegistryService
+    }
+
+    HospitalDoctorService {
+        id: doctorService
+
+        onDoctorsRefreshed: root.syncRoomAISelection()
+    }
+
+    HospitalProviderService {
+        id: providerService
+
+        onProvidersRefreshed: root.syncRoomAISelection()
     }
 
     HospitalPhoneService {
@@ -4004,6 +4103,129 @@ PanelWindow {
 
 
                         Row {
+                            id: roomAiDock
+
+                            width: parent.width
+                            height: 26
+                            spacing: 6
+
+                            Repeater {
+                                model: ["QUICK", "CHAT", "DOCTOR"]
+
+                                Rectangle {
+                                    id: roomAiButton
+
+                                    required property string modelData
+                                    readonly property bool selectedAction:
+                                        (modelData === "CHAT"
+                                            && root.operationsSurface === "chat")
+                                        || (modelData === "DOCTOR"
+                                            && root.operationsSurface === "doctor")
+                                    readonly property bool enabledAction:
+                                        root.selectedRoomTeam.length > 0
+                                        && (
+                                            modelData !== "QUICK"
+                                            ? true
+                                            : false
+                                        )
+                                        && (
+                                            modelData !== "CHAT"
+                                            || floorService.bedPath.length > 0
+                                        )
+
+                                    width:
+                                        (
+                                            roomAiDock.width
+                                            - roomAiDock.spacing * 2
+                                        ) / 3
+                                    height: parent.height
+
+                                    color:
+                                        roomAiMouse.pressed
+                                        ? Colors.orange
+                                        : selectedAction
+                                        ? Colors.magenta
+                                        : Colors.black
+                                    border.width: 1
+                                    border.color:
+                                        roomAiMouse.containsMouse
+                                        ? Colors.orange
+                                        : selectedAction
+                                        ? Colors.magenta
+                                        : modelData === "DOCTOR"
+                                        ? Colors.green
+                                        : modelData === "CHAT"
+                                        ? Colors.cyan
+                                        : Colors.blue
+                                    opacity:
+                                        roomAiButton.enabledAction
+                                        ? 1.0 : 0.42
+
+                                    RectangularShadow {
+                                        anchors.fill: parent
+                                        z: -1
+                                        spread: selectedAction ? 4 : 2
+                                        opacity:
+                                            roomAiButton.enabledAction
+                                            ? selectedAction ? 0.40 : 0.18
+                                            : 0.08
+                                        color:
+                                            modelData === "DOCTOR"
+                                            ? Colors.green
+                                            : modelData === "CHAT"
+                                            ? Colors.cyan
+                                            : Colors.blue
+                                    }
+
+                                    GohuText {
+                                        anchors.centerIn: parent
+                                        text:
+                                            roomAiButton.modelData === "DOCTOR"
+                                            && root.selectedProviderId
+                                            ? "DOCTOR // "
+                                                + root.selectedProviderId
+                                                    .toUpperCase()
+                                            : roomAiButton.modelData === "QUICK"
+                                            ? "QUICK // NEXT"
+                                            : roomAiButton.modelData
+                                        font.pixelSize: 8
+                                        color:
+                                            roomAiMouse.pressed
+                                            ? Colors.black
+                                            : roomAiButton.modelData === "DOCTOR"
+                                            ? Colors.green
+                                            : roomAiButton.modelData === "CHAT"
+                                            ? Colors.cyan
+                                            : Colors.blue
+                                        elide: Text.ElideRight
+                                    }
+
+                                    MouseArea {
+                                        id: roomAiMouse
+
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        enabled: roomAiButton.enabledAction
+                                        cursorShape:
+                                            enabled
+                                            ? Qt.PointingHandCursor
+                                            : Qt.ArrowCursor
+
+                                        onClicked: {
+                                            if (roomAiButton.modelData === "CHAT") {
+                                                root.openRoomChat();
+                                                return;
+                                            }
+
+                                            if (roomAiButton.modelData === "DOCTOR")
+                                                root.openRoomDoctor();
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Row {
                             id: roomInspectActions
 
                             width: parent.width
@@ -4790,6 +5012,234 @@ PanelWindow {
 
             onCallLaunched:
                 root.phoneMenuOpen = false
+        }
+
+        HospitalRoomChatView {
+            id: roomChatView
+
+            z: 700
+            visible: root.operationsSurface === "chat"
+
+            roomId: root.selectedRoomTeam
+            repository: githubService.repoSlug
+            patientId: floorService.floorId
+            patientLabel: floorService.floorLabel
+            team: root.selectedRoomTeam
+            branch: root.selectedRoomBranch
+            bedPath: floorService.bedPath
+            doctorId: root.selectedDoctorId
+            providerId: root.selectedProviderId
+
+            anchors {
+                left: parent.left
+                right: parent.right
+                top: fixedTop.bottom
+                bottom: actionBay.top
+                leftMargin: 18
+                rightMargin: 18
+                topMargin: 8
+                bottomMargin: 10
+            }
+
+            onCloseRequested: root.showSurgery()
+        }
+
+        Rectangle {
+            id: roomDoctorView
+
+            z: 700
+            visible: root.operationsSurface === "doctor"
+
+            anchors {
+                left: parent.left
+                right: parent.right
+                top: fixedTop.bottom
+                bottom: actionBay.top
+                leftMargin: 18
+                rightMargin: 18
+                topMargin: 8
+                bottomMargin: 10
+            }
+
+            color: Colors.dark
+            border.width: 1
+            border.color: Colors.green
+
+            RectangularShadow {
+                anchors.fill: parent
+                z: -1
+                spread: 4
+                opacity: 0.28
+                color: Colors.green
+            }
+
+            Column {
+                anchors {
+                    fill: parent
+                    margins: 14
+                }
+                spacing: 10
+
+                SectionLabel {
+                    width: parent.width
+                    text:
+                        "DOCTOR // "
+                        + (
+                            root.selectedRoomTeam
+                            ? root.selectedRoomTeam
+                            : "NO ROOM"
+                        )
+                }
+
+                GohuText {
+                    width: parent.width
+                    text:
+                        root.selectedDoctorId
+                        ? "WORKER // " + root.selectedDoctorId
+                        : "WORKER // UNASSIGNED"
+                    font.pixelSize: 10
+                    color: Colors.orange
+                    elide: Text.ElideRight
+                }
+
+                MetaLabel {
+                    width: parent.width
+                    text: "PROVIDER"
+                }
+
+                Repeater {
+                    model:
+                        Array.isArray(providerService.providers)
+                        ? providerService.providers
+                        : []
+
+                    Rectangle {
+                        required property var modelData
+
+                        width: parent.width
+                        height: 34
+                        color:
+                            providerMouse.pressed
+                            ? Colors.green
+                            : String(modelData.id || "")
+                                === root.selectedProviderId
+                            ? Colors.magenta
+                            : Colors.black
+                        border.width:
+                            String(modelData.id || "")
+                                === root.selectedProviderId
+                            ? 2 : 1
+                        border.color:
+                            modelData.available
+                            ? Colors.green
+                            : Colors.red
+                        opacity: modelData.available ? 1.0 : 0.44
+
+                        Row {
+                            anchors {
+                                fill: parent
+                                leftMargin: 10
+                                rightMargin: 10
+                            }
+                            spacing: 8
+
+                            GohuText {
+                                width: parent.width - 118
+                                anchors.verticalCenter: parent.verticalCenter
+                                text:
+                                    String(
+                                        modelData.name
+                                        || modelData.id
+                                        || "PROVIDER"
+                                    )
+                                font.pixelSize: 10
+                                color:
+                                    modelData.available
+                                    ? Colors.green
+                                    : Colors.red
+                                elide: Text.ElideRight
+                            }
+
+                            MetaValue {
+                                width: 110
+                                anchors.verticalCenter: parent.verticalCenter
+                                text:
+                                    modelData.available
+                                    ? "READY"
+                                    : "UNAVAILABLE"
+                                horizontalAlignment: Text.AlignRight
+                            }
+                        }
+
+                        MouseArea {
+                            id: providerMouse
+
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            enabled: !!modelData.available
+                            cursorShape:
+                                enabled
+                                ? Qt.PointingHandCursor
+                                : Qt.ArrowCursor
+
+                            onClicked: {
+                                root.selectedProviderId =
+                                    String(modelData.id || "");
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width: parent.width
+                    height: 34
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.cyan
+
+                    GohuText {
+                        anchors.centerIn: parent
+                        text:
+                            root.selectedProviderId
+                            ? "USE "
+                                + root.selectedProviderId.toUpperCase()
+                                + " // OPEN CHAT"
+                            : "SELECT A READY PROVIDER"
+                        font.pixelSize: 9
+                        color: Colors.cyan
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        enabled: !!root.selectedProviderId
+                        cursorShape:
+                            enabled
+                            ? Qt.PointingHandCursor
+                            : Qt.ArrowCursor
+                        onClicked: root.openRoomChat()
+                    }
+                }
+
+                GohuText {
+                    width: parent.width
+                    text:
+                        providerService.lastError
+                        || doctorService.lastError
+                        || (
+                            providerService.readyCount > 0
+                            ? String(providerService.readyCount)
+                                + " PROVIDER(S) READY"
+                            : "NO AI PROVIDER READY"
+                        )
+                    font.pixelSize: 9
+                    color:
+                        providerService.lastError
+                        || doctorService.lastError
+                        ? Colors.red
+                        : Colors.cyan
+                    wrapMode: Text.Wrap
+                }
+            }
         }
 
         HospitalReceptionistView {

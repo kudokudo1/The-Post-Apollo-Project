@@ -209,7 +209,6 @@ Scope {
             'patch = "".join(difflib.unified_diff(base, target, fromfile="a/" + path, tofile="b/" + path, n=3)).encode("utf-8", "surrogateescape")',
             'if not patch: refuse("NO LINE PATCH PRODUCED")',
             'fingerprint = hashlib.sha256(patch).hexdigest()',
-            'check = git(destination, "apply", "--check", "--whitespace=nowarn", "-")',
             'check = run(["git", "-C", destination, "apply", "--check", "--whitespace=nowarn", "-"], data=patch)',
             'if check.returncode: refuse("LINE DOES NOT APPLY CLEANLY TO DESTINATION")',
             'if mode == "move":',

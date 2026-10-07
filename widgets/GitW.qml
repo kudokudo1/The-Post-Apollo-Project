@@ -1666,6 +1666,14 @@ PanelWindow {
             : ""
     }
 
+    GitOperationRecoveryService {
+        id: operationRecoveryService
+        repositoryPath:
+            gitService.repoIsLocal
+            ? gitService.repoRoot
+            : ""
+    }
+
     GitBranchWorkspaceService {
         id: branchWorkspaceService
         operationJournal: operationJournalService

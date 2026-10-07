@@ -294,6 +294,7 @@ Scope {
 
         pendingPreviewDestination = destination;
         pendingPreviewScope = "file";
+        pendingPreviewLayer = "worktree";
         pendingPreviewHunkIndex = -1;
         previewBusy = true;
         status = "TRANSFER // PREVIEWING";
@@ -554,6 +555,7 @@ Scope {
 
         pendingPreviewDestination = destination;
         pendingPreviewScope = "hunk";
+        pendingPreviewLayer = "worktree";
         pendingPreviewHunkIndex = index;
         previewBusy = true;
         status = "HUNK TRANSFER // PREVIEWING";
@@ -628,6 +630,7 @@ Scope {
         previewMode = normalizedMode(header[8]);
         previewDestinationPath = String(pendingPreviewDestination || "");
         previewScope = String(pendingPreviewScope || "file");
+        previewLayer = String(pendingPreviewLayer || "worktree");
         previewHunkIndex =
             previewScope === "hunk"
             ? Number(pendingPreviewHunkIndex)
@@ -635,6 +638,7 @@ Scope {
         previewFiles = files;
         pendingPreviewDestination = "";
         pendingPreviewScope = "file";
+        pendingPreviewLayer = "worktree";
         pendingPreviewHunkIndex = -1;
         lastError = "";
         status =
@@ -652,6 +656,7 @@ Scope {
             destinationHead: previewDestinationHead,
             mode: previewMode,
             scope: previewScope,
+            layer: previewLayer,
             hunkIndex: previewHunkIndex,
             files: previewFiles.slice(),
             fingerprint: previewFingerprint,

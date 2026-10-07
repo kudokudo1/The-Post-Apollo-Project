@@ -342,6 +342,11 @@ Rectangle {
             id: contentHost
             anchors.fill: parent
 
+            opacity:
+                actionButton.available
+                ? 1.0
+                : actionButton.unavailableContentOpacity
+
             GohuText {
                 id: labelText
 
@@ -359,10 +364,6 @@ Rectangle {
                 elide: actionButton.labelElide
 
                 color: actionButton.foregroundColor
-                opacity:
-                    actionButton.available
-                    ? 1.0
-                    : actionButton.unavailableContentOpacity
             }
         }
 

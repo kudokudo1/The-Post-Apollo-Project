@@ -2,6 +2,7 @@
 """Static contracts for the reusable ActionButton control."""
 
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parents[2]
 COMPONENT = (ROOT / "components/ActionButton.qml").read_text(encoding="utf-8")
@@ -29,6 +30,7 @@ for needle, message in (
     ("property real unavailableFillOpacity:", "layered fill availability fade"),
     ("property real unavailableBorderOpacity:", "layered border availability fade"),
     ("property real unavailableContentOpacity:", "layered content availability fade"),
+    ("id: contentHost", "custom content host"),
     ("property real unavailableContentGlowOpacity:", "layered content-glow availability fade"),
     ("property real unavailableSoftGlowOpacity:", "layered halo availability fade"),
     ("property real unavailableWideGlowOpacity:", "layered wide-halo availability fade"),
@@ -53,6 +55,8 @@ require(QMLDIR, "ActionButton 1.0 ActionButton.qml", "component registration")
 require(TEMPLATE, "ActionButton {", "template must compose the real component")
 require(TEMPLATE, "available: true", "template must teach semantic availability")
 require(TEMPLATE, "unavailableFillOpacity:", "template must document layered availability")
-assert "DropShadow {" not in COMPONENT, "ActionButton must not use an unguarded direct DropShadow"
+assert not re.search(r"(?m)^\s*DropShadow\s*\{", COMPONENT), (
+    "ActionButton must not use an unguarded direct DropShadow"
+)
 
 print("Action button contracts: PASS")

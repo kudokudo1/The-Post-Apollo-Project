@@ -9,8 +9,13 @@ import Quickshell.Services.Pipewire
 Rectangle {
     id: volumebarDock
 
+    property int contentEdgePadding: 2
+
     implicitHeight: 50
-    implicitWidth: 130
+    // Keep the established 130px baseline, but grow when a wider state
+    // (notably MUTE / NOT READY) needs more room. This preserves the
+    // existing typography while guaranteeing a small edge buffer.
+    implicitWidth: Math.max(130, Math.ceil(root.implicitWidth) + (contentEdgePadding * 2))
 
     color: Colors.black
 

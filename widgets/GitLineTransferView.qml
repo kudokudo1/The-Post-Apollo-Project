@@ -6,6 +6,7 @@ Rectangle {
 
     required property var lineTransferService
     required property var branchWorkspaceService
+    required property var contentRecoveryService
 
     property string sourcePath: ""
     property string filePath: ""
@@ -14,6 +15,7 @@ Rectangle {
     property string lineSummary: ""
     property string selectedDestinationPath: ""
     property string transferMode: "move"
+    property bool preservePending: false
 
     signal closeRequested()
 
@@ -110,17 +112,58 @@ Rectangle {
 
     function executeTransfer() {
         if (!lineTransferService
+                || !contentRecoveryService
                 || !previewMatchesSelection
-                || lineTransferService.transferBusy)
+                || lineTransferService.transferBusy
+                || contentRecoveryService.busy
+                || preservePending)
             return false;
 
-        return lineTransferService.execute();
+        preservePending = true;
+
+        const started = contentRecoveryService.capture(
+            "line",
+            filePath,
+            hunkIndex,
+            lineIndex,
+            String(lineTransferService.fingerprint || "")
+        );
+
+        if (!started)
+            preservePending = false;
+
+        return started;
     }
 
     onFilePathChanged: invalidatePreview()
     onHunkIndexChanged: invalidatePreview()
     onLineIndexChanged: invalidatePreview()
     onSourcePathChanged: invalidatePreview()
+
+    Connections {
+        target: contentRecoveryService
+        ignoreUnknownSignals: true
+
+        function onArtifactReady(fingerprint, artifactPath, bytes) {
+            if (!root.preservePending)
+                return;
+
+            const expected =
+                String(root.lineTransferService.fingerprint || "");
+
+            root.preservePending = false;
+
+            if (!expected || String(fingerprint || "") !== expected)
+                return;
+
+            root.lineTransferService.execute();
+        }
+
+        function onArtifactFailed(detail) {
+            if (root.preservePending)
+                root.preservePending = false;
+        }
+    }
 
     Connections {
         target: branchWorkspaceService
@@ -611,7 +654,10 @@ Rectangle {
                             width: (parent.width - 6) / 2
                             height: 36
                             label:
-                                lineTransferService.transferBusy
+                                root.preservePending
+                                || contentRecoveryService.busy
+                                ? "PRESERVING"
+                                : lineTransferService.transferBusy
                                 ? "TRANSFERRING"
                                 : root.previewMatchesSelection
                                 ? "EXECUTE "
@@ -622,6 +668,8 @@ Rectangle {
                                 root.previewMatchesSelection
                                 && !lineTransferService.previewBusy
                                 && !lineTransferService.transferBusy
+                                && !contentRecoveryService.busy
+                                && !root.preservePending
                             onTriggered: root.executeTransfer()
                         }
                     }

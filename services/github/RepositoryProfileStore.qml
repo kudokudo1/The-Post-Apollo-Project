@@ -57,10 +57,15 @@ Scope {
         return -1;
     }
 
-    function saveSet(name, draft) {
+    function saveSet(name, draft, confirmedOverwrite) {
         const clean = String(name || "").trim();
 
         if (!clean || queue.length === 0)
+            return false;
+
+        const existing = setIndex(clean);
+
+        if (existing >= 0 && !confirmedOverwrite)
             return false;
 
         const source = draft || {};
@@ -78,7 +83,6 @@ Scope {
         };
 
         const next = savedSets.slice();
-        const existing = setIndex(clean);
 
         if (existing >= 0)
             next[existing] = record;
@@ -100,19 +104,20 @@ Scope {
         setLoaded(record);
     }
 
-    function deleteSet(record) {
-        if (!record)
-            return;
+    function deleteSet(record, confirmed) {
+        if (!record || !confirmed)
+            return false;
 
         const index = setIndex(String(record.name || ""));
 
         if (index < 0)
-            return;
+            return false;
 
         const next = savedSets.slice();
         next.splice(index, 1);
         savedSets = next;
         persistSets();
+        return true;
     }
 
     function loadSetsFromDisk() {

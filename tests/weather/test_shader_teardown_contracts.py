@@ -11,19 +11,18 @@ text = STATION.read_text(encoding="utf-8")
 
 for band in ("spaceBand", "skyBand", "groundBand"):
     pattern = re.compile(
-        rf"""DropShadow\s*\{{.*?
+        rf"""SafeDropShadow\s*\{{.*?
         anchors\.fill:\s*{band}.*?
-        source:\s*
-        {band}\.Window\.window\s*!==\s*null\s*
-        \?\s*{band}\s*
-        :\s*null.*?
-        visible:\s*source\s*!==\s*null
+        safeSource:\s*{band}
         """,
         re.S | re.X,
     )
     assert pattern.search(text), (
-        f"{band} shadow must disconnect its ShaderEffect source "
-        "when the source item leaves its window"
+        f"{band} shadow must use the shared teardown-safe source wrapper"
     )
+
+assert not re.search(r"(?m)^\s*DropShadow\s*\{", text), (
+    "Weather Station must not regress to direct DropShadow sources"
+)
 
 print("Weather Station shader teardown contracts: PASS")

@@ -138,6 +138,10 @@ Rectangle {
         function onAssignmentStatusChanged(assignment) {
             root.editorOpen = false;
         }
+
+        function onOrchestrationFinished(result) {
+            root.editorOpen = false;
+        }
     }
 
     component OrderButton: Rectangle {
@@ -245,7 +249,7 @@ Rectangle {
                 spacing: 7
 
                 Column {
-                    width: parent.width - 298
+                    width: parent.width - 383
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 2
 
@@ -292,6 +296,19 @@ Rectangle {
                     accent: Colors.cyan
                     enabledAction: !assignmentService.loading
                     onTriggered: assignmentService.refresh()
+                }
+
+                OrderButton {
+                    width: 78
+                    label:
+                        assignmentService.orchestrating
+                        ? "STARTING"
+                        : "START READY"
+                    accent: Colors.magenta
+                    enabledAction:
+                        !assignmentService.orchestrating
+                        && !assignmentService.writing
+                    onTriggered: assignmentService.startAllReady()
                 }
 
                 OrderButton {

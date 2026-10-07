@@ -264,7 +264,10 @@ Scope {
             || kind === "HISTORY/FOLD_COMMITS"
             || kind === "HISTORY/SPLIT_COMMIT"
             || kind === "HISTORY/SPLIT_COMMIT_HUNK"
-            || kind === "HISTORY/SPLIT_COMMIT_LINE";
+            || kind === "HISTORY/SPLIT_COMMIT_LINE"
+            || kind === "HISTORY/CHERRY-PICK"
+            || kind === "HISTORY/REVERT"
+            || kind === "HISTORY/RESET";
 
         if (historyRewrite) {
             const beforeBranch = String(before.branch || "");
@@ -307,7 +310,65 @@ Scope {
             };
         }
 
-        if (kind === "BRANCH_WORKSPACE/CREATE") {
+        if (kind === "HISTORY/DETACH") {
+            const previousBranch = String(before.branch || "");
+            const afterBranch = String(after.branch || "");
+            const previousRef = "refs/heads/" + previousBranch;
+            const previousSha = refSha(before, previousRef);
+            const afterPreviousSha = refSha(after, previousRef);
+            const detachedSha = String(after.head || "");
+            const targetSha = argument(row, 0);
+
+            if (!previousBranch
+                    || afterBranch
+                    || !previousSha
+                    || afterPreviousSha !== previousSha
+                    || String(before.head || "") !== previousSha
+                    || !detachedSha
+                    || (targetSha && detachedSha !== targetSha)) {
+                return refuse(
+                    "DETACH TRANSITION IS NOT EXACT"
+                );
+            }
+
+            return {
+                allowed: true,
+                strategy: "SWITCH_BACK_FROM_DETACHED",
+                previousBranch: previousBranch,
+                expectedPreviousSha: previousSha,
+                expectedDetachedSha: detachedSha,
+                summary:
+                    "SWITCH BACK FROM DETACHED "
+                    + detachedSha.slice(0, 12)
+                    + " TO "
+                    + previousBranch
+            };
+        }
+
+        if (kind === "HISTORY/TAG") {
+            const name = argument(row, 0);
+            const ref = "refs/tags/" + name;
+            const beforeSha = refSha(before, ref);
+            const afterSha = refSha(after, ref);
+
+            if (!name || beforeSha || !afterSha)
+                return refuse("TAG CREATE REF TRANSITION IS NOT EXACT");
+
+            return {
+                allowed: true,
+                strategy: "DELETE_CREATED_TAG",
+                tag: name,
+                expectedSha: afterSha,
+                summary:
+                    "DELETE CREATED TAG "
+                    + name
+                    + " @ "
+                    + afterSha.slice(0, 12)
+            };
+        }
+
+        if (kind === "BRANCH_WORKSPACE/CREATE"
+                || kind === "HISTORY/BRANCH") {
             const name = argument(row, 0);
             const ref = "refs/heads/" + name;
             const beforeSha = refSha(before, ref);
@@ -697,6 +758,13 @@ Scope {
         if (strategy === "DELETE_CREATED_BRANCH") {
             a = String(plan.branch || "");
             c = String(plan.expectedSha || "");
+        } else if (strategy === "DELETE_CREATED_TAG") {
+            a = String(plan.tag || "");
+            c = String(plan.expectedSha || "");
+        } else if (strategy === "SWITCH_BACK_FROM_DETACHED") {
+            a = String(plan.previousBranch || "");
+            b = String(plan.expectedPreviousSha || "");
+            c = String(plan.expectedDetachedSha || "");
         } else if (strategy === "RENAME_BRANCH_BACK") {
             a = String(plan.oldName || "");
             b = String(plan.newName || "");
@@ -788,6 +856,33 @@ Scope {
                 '    fi',
                 '    git -C "$repo" update-ref -d "$ref" "$expected" || { printf "REFUSED\\tGUARDED REF DELETE FAILED\\n"; exit 34; }',
                 '    printf "OK\\tDELETED CREATED BRANCH // %s\\n" "$branch"',
+                '    ;;',
+                '  DELETE_CREATED_TAG)',
+                '    tag="$a"',
+                '    expected="$c"',
+                '    ref="refs/tags/$tag"',
+                '    actual="$(git -C "$repo" rev-parse -q --verify "$ref" 2>/dev/null || true)"',
+                '    [ "$actual" = "$expected" ] || { printf "REFUSED\\tTAG MOVED SINCE RECORDED OPERATION\\n"; exit 35; }',
+                '    git -C "$repo" update-ref -d "$ref" "$expected" || { printf "REFUSED\\tGUARDED TAG DELETE FAILED\\n"; exit 36; }',
+                '    printf "OK\\tDELETED CREATED TAG // %s\\n" "$tag"',
+                '    ;;',
+                '  SWITCH_BACK_FROM_DETACHED)',
+                '    previous="$a"',
+                '    expected_previous="$b"',
+                '    expected_detached="$c"',
+                '    previous_ref="refs/heads/$previous"',
+                '    current_ref="$(git -C "$repo" symbolic-ref -q HEAD 2>/dev/null || true)"',
+                '    [ -z "$current_ref" ] || { printf "REFUSED\\tHEAD IS NO LONGER DETACHED\\n"; exit 37; }',
+                '    actual_head="$(git -C "$repo" rev-parse HEAD 2>/dev/null || true)"',
+                '    [ "$actual_head" = "$expected_detached" ] || { printf "REFUSED\\tDETACHED HEAD MOVED SINCE OPERATION\\n"; exit 38; }',
+                '    actual_previous="$(git -C "$repo" rev-parse -q --verify "$previous_ref" 2>/dev/null || true)"',
+                '    [ "$actual_previous" = "$expected_previous" ] || { printf "REFUSED\\tPREVIOUS BRANCH MOVED SINCE DETACH\\n"; exit 39; }',
+                '    if git -C "$repo" worktree list --porcelain 2>/dev/null | grep -Fqx "branch $previous_ref"; then',
+                '      printf "REFUSED\\tPREVIOUS BRANCH IS CHECKED OUT ELSEWHERE\\n"',
+                '      exit 40',
+                '    fi',
+                '    git -C "$repo" switch "$previous" >/dev/null 2>&1 || { printf "REFUSED\\tSWITCH BACK FROM DETACHED FAILED\\n"; exit 41; }',
+                '    printf "OK\\tSWITCHED BACK FROM DETACHED // %s\\n" "$previous"',
                 '    ;;',
                 '  RENAME_BRANCH_BACK)',
                 '    old="$a"',

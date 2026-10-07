@@ -152,7 +152,7 @@ property alias loadSlider: thermalLoadSlider
                                     font.pixelSize: 10
                                     color: modelData.accent
 
-                                    layer.enabled: true
+                                    layer.enabled: Window.window !== null
                                     layer.effect: DropShadow {
                                         horizontalOffset: 0
                                         verticalOffset: 0
@@ -188,7 +188,7 @@ property alias loadSlider: thermalLoadSlider
                                         font.pixelSize: 16
                                         color: modelData.accent
 
-                                        layer.enabled: true
+                                        layer.enabled: Window.window !== null
                                         layer.effect: DropShadow {
                                             radius: 7
                                             samples: 5
@@ -217,7 +217,7 @@ property alias loadSlider: thermalLoadSlider
                                         color: modelData.accent
                                         opacity: 0.82
 
-                                        layer.enabled: true
+                                        layer.enabled: Window.window !== null
                                         layer.effect: DropShadow {
                                             radius: 4
                                             samples: 5
@@ -238,7 +238,7 @@ property alias loadSlider: thermalLoadSlider
                                         color: modelData.accent
                                         elide: Text.ElideRight
 
-                                        layer.enabled: true
+                                        layer.enabled: Window.window !== null
                                         layer.effect: DropShadow {
                                             radius: 7
                                             samples: 5
@@ -271,7 +271,7 @@ property alias loadSlider: thermalLoadSlider
                                     font.pixelSize: 13
                                     color: modelData.accent
 
-                                    layer.enabled: true
+                                    layer.enabled: Window.window !== null
                                     layer.effect: DropShadow {
                                         radius: 5
                                         samples: 5
@@ -398,7 +398,7 @@ property alias loadSlider: thermalLoadSlider
                     width: Math.max(0, parent.trackSpan * thermalLoadSlider.activePercent() / 100.0)
                     color: thermalController.thermalAccent(thermalMonitorBody.currentSensor)
                     opacity: 0.50
-                    layer.enabled: true
+                    layer.enabled: Window.window !== null
                     layer.effect: DropShadow {
                         radius: 6
                         samples: 5
@@ -467,7 +467,7 @@ property alias loadSlider: thermalLoadSlider
                     text: "THERMAL LOAD"
                     font.pixelSize: 10
                     color: Colors.white
-                    layer.enabled: true
+                    layer.enabled: Window.window !== null
                     layer.effect: DropShadow {
                         radius: 5
                         samples: 5
@@ -700,7 +700,7 @@ property alias loadSlider: thermalLoadSlider
                                     ? Colors.orange
                                     : modelData.accent
 
-                                layer.enabled: !fanControlMouse.pressed
+                                layer.enabled: Window.window !== null && (!fanControlMouse.pressed)
                                 layer.effect: DropShadow {
                                     radius: 5
                                     samples: 5
@@ -825,7 +825,7 @@ property alias loadSlider: thermalLoadSlider
                             font.pixelSize: 12
                             color: Colors.orange
 
-                            layer.enabled: true
+                            layer.enabled: Window.window !== null
                             layer.effect: DropShadow {
                                 radius: 4
                                 samples: 5
@@ -857,7 +857,7 @@ property alias loadSlider: thermalLoadSlider
                             horizontalAlignment: Text.AlignRight
                             elide: Text.ElideRight
 
-                            layer.enabled: true
+                            layer.enabled: Window.window !== null
                             layer.effect: DropShadow {
                                 radius: 4
                                 samples: 5
@@ -880,7 +880,7 @@ property alias loadSlider: thermalLoadSlider
                 color: Colors.orange
                 wrapMode: Text.Wrap
 
-                layer.enabled: true
+                layer.enabled: Window.window !== null
                 layer.effect: DropShadow {
                     radius: 5
                     samples: 5

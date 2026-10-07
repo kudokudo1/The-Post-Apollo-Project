@@ -257,7 +257,6 @@ require(
 
 # Repository safety contracts.
 require(
-    "services/git/GitOperationJournalService.qml",
     "services/git/GitRepositoryService.qml",
     "LINE CHANGED // REFRESH BEFORE REMOVING",
     "project-file removal must verify exact selected text",
@@ -319,6 +318,7 @@ focused_files = [
     "services/github/GitHubProjectsService.qml",
     "services/github/GitEvidenceProvider.qml",
     "services/github/WorkflowLibraryStore.qml",
+    "services/git/GitOperationJournalService.qml",
     "services/git/GitRepositoryService.qml",
     "services/git/GitHistoryService.qml",
     "services/hospital/HospitalCertificationCoordinator.qml",

@@ -26,6 +26,7 @@ Scope {
     property int maxActivityEvents: 2000
     property int guaranteedRecentEvents: 250
     property int reportArchiveBackfillLimit: 250
+    property int passiveDuplicateWindowMs: 120000
 
     readonly property int archiveCount:
         activityEvents.length
@@ -549,6 +550,300 @@ Scope {
         return !!key && pinnedKeys.indexOf(key) >= 0;
     }
 
+    function archiveProtected(eventValue) {
+        const event = eventValue || {};
+        const source =
+            String(event.source || "").toLowerCase();
+
+        if (isPinned(event))
+            return true;
+
+        if (source === "reports"
+                || source === "phone"
+                || source === "intercom")
+            return true;
+
+        return isProblemActivity(event);
+    }
+
+    function passiveArchiveFingerprint(eventValue) {
+        const event = eventValue || {};
+        const source =
+            String(event.source || "").toLowerCase();
+
+        if (source !== "rounds" && source !== "staff")
+            return "";
+
+        if (archiveProtected(event))
+            return "";
+
+        const context = event.context || {};
+        const room = context.room || {};
+        const specialist =
+            String(context.specialistId || "");
+        const team =
+            String(
+                context.team
+                || room.team
+                || room.branch
+                || ""
+            ).toUpperCase();
+
+        return [
+            source,
+            String(event.kind || ""),
+            String(event.title || ""),
+            String(event.detail || ""),
+            team,
+            specialist
+        ].join("::");
+    }
+
+    function archiveEventIsMalformed(eventValue) {
+        const event = eventValue || {};
+
+        if (archiveProtected(event))
+            return false;
+
+        return !eventKey(event)
+            || eventEpoch(event) <= 0
+            || !String(event.source || "").trim()
+            || !String(event.title || "").trim();
+    }
+
+    function archiveStats() {
+        const stats = {
+            total: activityEvents.length,
+            favorites: 0,
+            reports: 0,
+            important: 0,
+            communications: 0,
+            passive: 0
+        };
+
+        for (let i = 0; i < activityEvents.length; ++i) {
+            const event = activityEvents[i] || {};
+            const source =
+                String(event.source || "").toLowerCase();
+
+            if (isPinned(event))
+                stats.favorites += 1;
+            if (source === "reports")
+                stats.reports += 1;
+            if (isProblemActivity(event))
+                stats.important += 1;
+            if (source === "phone" || source === "intercom")
+                stats.communications += 1;
+            if (source === "rounds" || source === "staff")
+                stats.passive += 1;
+        }
+
+        return stats;
+    }
+
+    function archiveDateLabel(recordedAtValue) {
+        const date = new Date(String(recordedAtValue || ""));
+
+        if (Number.isNaN(date.getTime()))
+            return "UNKNOWN";
+
+        return date.toLocaleString();
+    }
+
+    function archiveStatsResponse() {
+        const stats = archiveStats();
+        const parts = [
+            "ARCHIVE",
+            String(stats.total) + " / " + String(maxActivityEvents),
+            "FAVORITES " + String(stats.favorites),
+            "REPORTS " + String(stats.reports),
+            "IMPORTANT " + String(stats.important),
+            "COMMS " + String(stats.communications)
+        ];
+
+        if (archiveOldestAt)
+            parts.push(
+                "OLDEST " + archiveDateLabel(archiveOldestAt)
+            );
+
+        if (archiveNewestAt)
+            parts.push(
+                "NEWEST " + archiveDateLabel(archiveNewestAt)
+            );
+
+        return parts.join(" // ");
+    }
+
+    function hasRecentPassiveDuplicate(eventValue) {
+        const event = eventValue || {};
+        const fingerprint =
+            passiveArchiveFingerprint(event);
+
+        if (!fingerprint)
+            return false;
+
+        const epoch = eventEpoch(event);
+
+        if (epoch <= 0)
+            return false;
+
+        for (let i = activityEvents.length - 1; i >= 0; --i) {
+            const existing = activityEvents[i] || {};
+            const existingEpoch = eventEpoch(existing);
+
+            if (existingEpoch <= 0)
+                continue;
+
+            if (epoch - existingEpoch > passiveDuplicateWindowMs)
+                break;
+
+            if (passiveArchiveFingerprint(existing) === fingerprint)
+                return true;
+        }
+
+        return false;
+    }
+
+    function cleanArchive() {
+        const source =
+            Array.isArray(activityEvents)
+            ? activityEvents.slice()
+            : [];
+        const kept = [];
+        const fingerprintIndex = {};
+        let malformedRemoved = 0;
+        let duplicateRemoved = 0;
+
+        source.sort(function(a, b) {
+            return root.eventEpoch(a) - root.eventEpoch(b);
+        });
+
+        for (let i = 0; i < source.length; ++i) {
+            const event = source[i] || {};
+
+            if (archiveEventIsMalformed(event)) {
+                malformedRemoved += 1;
+                continue;
+            }
+
+            const fingerprint =
+                passiveArchiveFingerprint(event);
+
+            if (fingerprint) {
+                const previousIndex =
+                    Object.prototype.hasOwnProperty.call(
+                        fingerprintIndex,
+                        fingerprint
+                    )
+                    ? Number(fingerprintIndex[fingerprint])
+                    : -1;
+
+                if (previousIndex >= 0) {
+                    const previous =
+                        kept[previousIndex] || {};
+                    const delta =
+                        eventEpoch(event) - eventEpoch(previous);
+
+                    if (delta >= 0
+                            && delta <= passiveDuplicateWindowMs) {
+                        // Keep the newest copy of harmless repeated READY /
+                        // CLEAR-style passive state noise.
+                        kept[previousIndex] = event;
+                        duplicateRemoved += 1;
+                        continue;
+                    }
+                }
+
+                fingerprintIndex[fingerprint] = kept.length;
+            }
+
+            kept.push(event);
+        }
+
+        const compacted = trimActivityEvents(kept);
+        const capacityRemoved =
+            Math.max(0, kept.length - compacted.length);
+        const removed =
+            malformedRemoved
+            + duplicateRemoved
+            + capacityRemoved;
+
+        activityEvents = compacted;
+        activityAdapter.events = compacted.slice();
+        cleanPinnedKeys();
+        refreshVisibleInbox();
+
+        if (contextEventKey && !contextEvent())
+            clearActivityContext();
+
+        return {
+            before: source.length,
+            after: compacted.length,
+            removed: removed,
+            malformed: malformedRemoved,
+            duplicates: duplicateRemoved,
+            capacity: capacityRemoved
+        };
+    }
+
+    function archiveCleanupResponse(resultValue) {
+        const result = resultValue || {};
+
+        return [
+            "ARCHIVE CLEAN",
+            "BEFORE " + String(result.before || 0),
+            "AFTER " + String(result.after || 0),
+            "REMOVED " + String(result.removed || 0),
+            "DUPLICATES " + String(result.duplicates || 0),
+            "MALFORMED " + String(result.malformed || 0),
+            "CAPACITY " + String(result.capacity || 0)
+        ].join(" // ");
+    }
+
+    function answerArchiveMaintenance(textValue) {
+        const raw = String(textValue || "").trim();
+
+        if (!raw)
+            return false;
+
+        const query = looseQuery(raw);
+        const asksCleanup =
+            query === "clean archive"
+            || query === "cleanup archive"
+            || query === "clean up archive"
+            || query === "prune archive"
+            || query === "compact archive"
+            || query === "archive cleanup"
+            || query === "archive clean"
+            || query === "archive prune";
+        const asksStats =
+            query === "archive status"
+            || query === "archive stats"
+            || query === "archive size"
+            || query === "archive depth"
+            || query === "archive capacity"
+            || query === "archive health"
+            || query.indexOf("how big is the archive") >= 0
+            || query.indexOf("how big is my archive") >= 0
+            || query.indexOf("how full is the archive") >= 0;
+
+        if (!asksCleanup && !asksStats)
+            return false;
+
+        append("OPERATOR", raw);
+
+        if (asksCleanup) {
+            append(
+                "RECEPTION",
+                archiveCleanupResponse(cleanArchive())
+            );
+            return true;
+        }
+
+        append("RECEPTION", archiveStatsResponse());
+        return true;
+    }
+
     function archivePriority(eventValue) {
         const event = eventValue || {};
         const source =
@@ -820,6 +1115,9 @@ Scope {
             route: route,
             context: item.context || {}
         };
+
+        if (hasRecentPassiveDuplicate(event))
+            return false;
 
         let next = activityEvents.concat([event]);
 
@@ -1133,7 +1431,9 @@ Scope {
         "hour", "hours", "day", "days", "past",
         "monday", "tuesday", "wednesday", "thursday",
         "friday", "saturday", "sunday",
-        "archive", "archives", "earliest", "oldest", "first"
+        "archive", "archives", "earliest", "oldest", "first",
+        "clean", "cleanup", "prune", "compact", "size", "depth",
+        "capacity", "health", "duplicate", "duplicates"
     ]
 
     function editDistanceOneOrLess(leftValue, rightValue) {
@@ -2426,7 +2726,7 @@ Scope {
         if (asksHelp) {
             append(
                 "RECEPTION",
-                "I understand recent activity, archive history, oldest or earliest activity, what changed, what went wrong, what needs attention, favorites, Room or team history, counts, and time windows like today, yesterday, this morning, this week, since Monday, or the last 3 hours. I can also find or show a team, then follow up with open this, take me there, favorite this, go back, or next one."
+                "I understand recent activity, archive history, archive status and cleanup, oldest or earliest activity, what changed, what went wrong, what needs attention, favorites, Room or team history, counts, and time windows like today, yesterday, this morning, this week, since Monday, or the last 3 hours. I can also find or show a team, then follow up with open this, take me there, favorite this, go back, or next one."
             );
             return true;
         }
@@ -2633,6 +2933,9 @@ Scope {
             return true;
 
         if (answerActivityAction(raw))
+            return true;
+
+        if (answerArchiveMaintenance(raw))
             return true;
 
         if (answerActivityQuestion(raw))

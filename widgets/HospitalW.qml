@@ -6147,6 +6147,10 @@ PanelWindow {
             bedPath: floorService.bedPath
             doctorId: root.selectedDoctorId
             providerId: root.selectedProviderId
+            assignmentId:
+                assignmentService.activeAssignment
+                ? String(assignmentService.activeAssignment.id || "")
+                : ""
 
             anchors {
                 left: parent.left
@@ -6160,6 +6164,31 @@ PanelWindow {
             }
 
             onCloseRequested: root.showSurgery()
+
+            onRichActionRequested: function(action, value, message) {
+                const route = String(action || "").toUpperCase();
+                const target = String(value || "").trim();
+
+                if (route === "OPEN_DIFF") {
+                    root.showSurgery();
+                    roomService.runInspection("diff");
+                    return;
+                }
+
+                if (route === "OPEN_REPORT") {
+                    root.openRoomReports();
+                    return;
+                }
+
+                if (route === "OPEN_ROOM") {
+                    const roomIndex = root.roomIndexOfTeam(target);
+                    if (roomIndex < 0)
+                        return;
+
+                    root.selectRoomIndex(roomIndex);
+                    Qt.callLater(root.openRoomChat);
+                }
+            }
         }
 
         Rectangle {

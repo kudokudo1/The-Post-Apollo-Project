@@ -41,6 +41,7 @@ Item {
     }
 
     signal closeRequested()
+    signal richActionRequested(string action, string value, var message)
 
     readonly property var conversation: {
         const rows =
@@ -140,6 +141,11 @@ Item {
     onDoctorIdChanged: scheduleRoomBinding()
     onAssignmentIdChanged: scheduleRoomBinding()
 
+    HospitalChatActionService {
+        id: chatActionService
+        bedPath: root.bedPath
+    }
+
     HospitalRoomConversationAdapter {
         id: adapter
 
@@ -181,6 +187,7 @@ Item {
         sendSuccessSerial: adapter.sendSuccessSerial
 
         messageTextFormat: Text.MarkdownText
+        richMessageActions: true
         emptyConversationLabel: "SELECT A ROOM"
         composerPlaceholder:
             root.doctorId
@@ -189,6 +196,28 @@ Item {
 
         onSendRequested: function(conversationId, text) {
             adapter.sendMessage(conversationId, text);
+        }
+
+        onMessageActionRequested: function(action, message, value) {
+            let resolvedAction = String(action || "").toUpperCase();
+            let resolvedValue = String(value || "");
+
+            if (resolvedAction === "LINK") {
+                const routed = chatActionService.classifyLink(resolvedValue);
+                resolvedAction = String(routed.action || "UNKNOWN");
+                resolvedValue = String(routed.value || "");
+            }
+
+            if (chatActionService.handleLocal(
+                    resolvedAction,
+                    resolvedValue))
+                return;
+
+            root.richActionRequested(
+                resolvedAction,
+                resolvedValue,
+                message
+            );
         }
 
         onComposerEscapeRequested: root.closeRequested()

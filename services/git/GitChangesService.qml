@@ -32,6 +32,7 @@ Scope {
     property int upstreamBehind: 0
     property string headSha: ""
     property string headSubject: ""
+    property var headTrailers: []
     property int stagedInsertions: 0
     property int stagedDeletions: 0
     property int stagedBinaryFiles: 0
@@ -159,6 +160,7 @@ Scope {
             upstreamBehind = 0;
             headSha = "";
             headSubject = "";
+            headTrailers = [];
             stagedInsertions = 0;
             stagedDeletions = 0;
             stagedBinaryFiles = 0;
@@ -213,6 +215,11 @@ Scope {
                 'else',
                 '  printf "HEAD\\t\\tNO COMMITS YET\\n"',
                 'fi',
+                'if git -C "$repo" rev-parse --verify HEAD >/dev/null 2>&1; then',
+                '  git -C "$repo" log -1 --format=%B HEAD | git interpret-trailers --parse | while IFS= read -r trailer; do',
+                '    [ -n "$trailer" ] && printf "HEADTRAILER\\t%s\\n" "$trailer"',
+                '  done',
+                'fi',
                 "git -C \"$repo\" diff --cached --numstat 2>/dev/null | awk 'BEGIN{a=0;d=0;b=0} $1==\"-\" || $2==\"-\" {b++; next} {a+=$1; d+=$2} END{printf \"STAGEDSTAT\\\\t%d\\\\t%d\\\\t%d\\\\n\",a,d,b}'",
                 'sign_default="$(git -C "$repo" config --bool commit.gpgSign 2>/dev/null || true)"',
                 'sign_key="$(git -C "$repo" config user.signingkey 2>/dev/null || true)"',
@@ -253,6 +260,7 @@ Scope {
         let behind = 0;
         let nextHeadSha = "";
         let nextHeadSubject = "";
+        const nextHeadTrailers = [];
         let insertions = 0;
         let deletions = 0;
         let binaryFiles = 0;
@@ -297,6 +305,13 @@ Scope {
                 nextHeadSha = p.length > 1 ? p[1] : "";
                 nextHeadSubject =
                     p.length > 2 ? p.slice(2).join("\t") : "";
+                continue;
+            }
+
+            if (line.indexOf("HEADTRAILER\t") === 0) {
+                const trailer = line.slice(12).trim();
+                if (trailer)
+                    nextHeadTrailers.push(trailer);
                 continue;
             }
 
@@ -408,6 +423,7 @@ Scope {
         upstreamBehind = behind;
         headSha = nextHeadSha;
         headSubject = nextHeadSubject;
+        headTrailers = nextHeadTrailers;
         stagedInsertions = insertions;
         stagedDeletions = deletions;
         stagedBinaryFiles = binaryFiles;

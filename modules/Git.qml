@@ -10,7 +10,7 @@ Rectangle {
     implicitWidth: Math.max(118, gitMark.implicitWidth + 18)
     implicitHeight: 50
 
-    color: Colors.black
+    color: dock.menuOpen ? Colors.yellow : Colors.black
 
     property bool menuOpen: false
 
@@ -33,7 +33,7 @@ Rectangle {
                 text: ""
                 font.pixelSize: 38
                 anchors.verticalCenter: parent.verticalCenter
-                color: Colors.white
+                color: dock.menuOpen ? Colors.magenta : Colors.white
                 opacity: 1.0
 
                 transform: Scale {
@@ -48,7 +48,7 @@ Rectangle {
                 text: "≽(•⩊•マ≼"
                 font.pixelSize: 16
                 anchors.verticalCenter: parent.verticalCenter
-                color: Colors.yellow
+                color: dock.menuOpen ? Colors.magenta : Colors.yellow
             }
         }
 
@@ -59,7 +59,7 @@ Rectangle {
             verticalOffset: 0
             radius: dock.menuOpen || mouse.containsMouse || mouse.pressed ? 18 : 14
             samples: dock.menuOpen || mouse.containsMouse || mouse.pressed ? 21 : 15
-            color: Colors.orange
+            color: dock.menuOpen ? Colors.magenta : Colors.orange
             opacity: dock.menuOpen
                      ? 1.0
                      : mouse.pressed

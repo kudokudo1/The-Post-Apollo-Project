@@ -11,6 +11,7 @@ Item {
     implicitHeight: appmenuButton.implicitHeight
 
     property var appControlWindow
+    readonly property bool menuOpen: appControlWindow && appControlWindow.menuOpen
 
     Rectangle {
         id: appmenuButton
@@ -18,7 +19,7 @@ Item {
         implicitWidth: 65
         implicitHeight: 50
 
-        color: Colors.black
+        color: appmenuRoot.menuOpen ? Colors.yellow : Colors.black
 
         Item {
             id: appmenuIconContainer
@@ -35,7 +36,7 @@ Item {
                 font.pixelSize: 19
                 font.weight: 700
 
-                color: Colors.white
+                color: appmenuRoot.menuOpen ? Colors.magenta : Colors.white
             }
 
             DropShadow {
@@ -53,7 +54,7 @@ Item {
 
                 opacity: appmenuMouse.pressed ? 1.0 : appmenuMouse.containsMouse ? 0.8 : 0.6
 
-                color: appmenuMouse.pressed ? Colors.magenta : appmenuMouse.containsMouse ? Colors.orange : Colors.cyan
+                color: appmenuRoot.menuOpen ? Colors.magenta : appmenuMouse.pressed ? Colors.magenta : appmenuMouse.containsMouse ? Colors.orange : Colors.cyan
 
                 transparentBorder: true
             }
@@ -93,7 +94,7 @@ Item {
 
         opacity: appmenuMouse.pressed ? 0.6 : appmenuMouse.containsMouse ? 0.5 : 0.4
 
-        color: appmenuMouse.pressed ? Colors.magenta : appmenuMouse.containsMouse ? Colors.orange : Colors.cyan
+        color: appmenuRoot.menuOpen ? Colors.magenta : appmenuMouse.pressed ? Colors.magenta : appmenuMouse.containsMouse ? Colors.orange : Colors.cyan
     }
 
     RectangularShadow {
@@ -106,6 +107,6 @@ Item {
 
         opacity: appmenuMouse.pressed ? 0.12 : appmenuMouse.containsMouse ? 0.09 : 0.07
 
-        color: appmenuMouse.pressed ? Colors.magenta : appmenuMouse.containsMouse ? Colors.orange : Colors.cyan
+        color: appmenuRoot.menuOpen ? Colors.magenta : appmenuMouse.pressed ? Colors.magenta : appmenuMouse.containsMouse ? Colors.orange : Colors.cyan
     }
 }

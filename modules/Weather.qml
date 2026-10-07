@@ -7,11 +7,12 @@ import Qt5Compat.GraphicalEffects
 Rectangle {
     id: weatherDock
     property var weatherStationWindow: null
+    readonly property bool menuOpen: weatherStationWindow && weatherStationWindow.menuOpen
 
     implicitHeight: 50
     implicitWidth: 90
 
-    color: Colors.black
+    color: weatherDock.menuOpen ? Colors.yellow : Colors.black
 
     signal weatherClicked
 
@@ -34,7 +35,7 @@ Rectangle {
 
             font.pixelSize: 20
 
-            color: Colors.orange
+            color: weatherDock.menuOpen ? Colors.magenta : Colors.orange
         }
 
         DropShadow {
@@ -53,7 +54,7 @@ Rectangle {
 
             opacity: weatherMouse.pressed ? 1.0 : weatherMouse.containsMouse ? 0.8 : 0.6
 
-            color: Colors.orange
+            color: weatherDock.menuOpen ? Colors.magenta : Colors.orange
 
             transparentBorder: true
         }
@@ -91,7 +92,7 @@ Rectangle {
 
         opacity: weatherMouse.pressed ? 0.6 : weatherMouse.containsMouse ? 0.5 : 0.4
 
-        color: Colors.orange
+        color: weatherDock.menuOpen ? Colors.magenta : Colors.orange
     }
 
     RectangularShadow {
@@ -104,6 +105,6 @@ Rectangle {
 
         opacity: weatherMouse.pressed ? 0.12 : weatherMouse.containsMouse ? 0.09 : 0.07
 
-        color: Colors.orange
+        color: weatherDock.menuOpen ? Colors.magenta : Colors.orange
     }
 }

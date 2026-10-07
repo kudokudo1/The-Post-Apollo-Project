@@ -8,11 +8,12 @@ Rectangle {
     id: sessionsDock
 
     property var messagingWindow
+    readonly property bool menuOpen: messagingWindow && messagingWindow.menuOpen
 
     implicitHeight: 50
     implicitWidth: 25
 
-    color: Colors.black
+    color: sessionsDock.menuOpen ? Colors.yellow : Colors.black
     radius: 0
 
     // ============================================================
@@ -39,6 +40,13 @@ Rectangle {
             smooth: false
         }
 
+        ColorOverlay {
+            anchors.fill: sessionsIcon
+            source: sessionsIcon
+            color: Colors.magenta
+            visible: sessionsDock.menuOpen
+        }
+
         DropShadow {
             id: sessionsTextGlow
 
@@ -55,7 +63,7 @@ Rectangle {
 
             opacity: sessionsMouse.pressed ? 1.0 : sessionsMouse.containsMouse ? 0.8 : 0.6
 
-            color: Colors.omnitrix
+            color: sessionsDock.menuOpen ? Colors.magenta : Colors.omnitrix
 
             transparentBorder: true
         }
@@ -137,7 +145,7 @@ Rectangle {
 
         opacity: sessionsMouse.pressed ? 0.6 : sessionsMouse.containsMouse ? 0.5 : 0.4
 
-        color: Colors.omnitrix
+        color: sessionsDock.menuOpen ? Colors.magenta : Colors.omnitrix
     }
 
     // ============================================================
@@ -155,6 +163,6 @@ Rectangle {
 
         opacity: sessionsMouse.pressed ? 0.11 : sessionsMouse.containsMouse ? 0.10 : 0.07
 
-        color: Colors.omnitrix
+        color: sessionsDock.menuOpen ? Colors.magenta : Colors.omnitrix
     }
 }

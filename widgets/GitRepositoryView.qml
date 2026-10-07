@@ -1048,7 +1048,7 @@ Item {
                                         required property var modelData
 
                                         width: remoteColumn.width
-                                        height: 58
+                                        height: 70
                                         color:
                                             remoteMouse.containsMouse
                                             || root.selectedRemoteIndex === index
@@ -1101,6 +1101,24 @@ Item {
                                                 font.pixelSize: 9
                                                 color: Colors.cyan
                                                 elide: Text.ElideMiddle
+                                            }
+
+                                            GohuText {
+                                                width: parent.width
+                                                text:
+                                                    "HEAD // "
+                                                    + String(
+                                                        remoteRow.modelData.defaultBranch
+                                                        || "UNKNOWN"
+                                                      )
+                                                    + " // PRUNE "
+                                                    + String(
+                                                        remoteRow.modelData.prune
+                                                        || "default"
+                                                      ).toUpperCase()
+                                                font.pixelSize: 8
+                                                color: Colors.orange
+                                                elide: Text.ElideRight
                                             }
                                         }
 
@@ -1367,6 +1385,111 @@ Item {
 
                         Rectangle {
                             width: parent.width
+                            height: 82
+                            color: Colors.dark
+                            border.width: 1
+                            border.color: Colors.magenta
+
+                            Column {
+                                anchors {
+                                    fill: parent
+                                    margins: 7
+                                }
+                                spacing: 4
+
+                                GohuText {
+                                    width: parent.width
+                                    text:
+                                        root.selectedRemoteName
+                                        ? "REMOTE INTELLIGENCE // "
+                                          + root.selectedRemoteName
+                                        : "REMOTE INTELLIGENCE // SELECT REMOTE"
+                                    font.pixelSize: 10
+                                    color: Colors.magenta
+                                    elide: Text.ElideRight
+                                }
+
+                                GohuText {
+                                    width: parent.width
+                                    text: {
+                                        const row =
+                                            root.selectedRemoteRow();
+
+                                        if (!row)
+                                            return "HEAD UNKNOWN // 0 TRACKING REFS // 0 LOCAL UPSTREAMS";
+
+                                        return (
+                                            "HEAD "
+                                            + String(
+                                                row.defaultBranch
+                                                || "UNKNOWN"
+                                              )
+                                            + " // "
+                                            + String(
+                                                root.remoteBranchRows().length
+                                              )
+                                            + " TRACKING REFS // "
+                                            + String(
+                                                root.remoteUpstreamCount(
+                                                    root.selectedRemoteName
+                                                )
+                                              )
+                                            + " LOCAL UPSTREAMS"
+                                        );
+                                    }
+                                    font.pixelSize: 9
+                                    color: Colors.cyan
+                                    elide: Text.ElideRight
+                                }
+
+                                GohuText {
+                                    width: parent.width
+                                    text: {
+                                        const row =
+                                            root.selectedRemoteRow();
+
+                                        if (!row)
+                                            return "NO REMOTE SELECTED";
+
+                                        return (
+                                            root.remoteTransportLabel(row)
+                                            + " // PRUNE "
+                                            + String(
+                                                row.prune || "default"
+                                              ).toUpperCase()
+                                            + " // NEWEST TIP "
+                                            + root.ageLabel(
+                                                root.remoteNewestEpoch(
+                                                    root.selectedRemoteName
+                                                )
+                                              )
+                                            + " // OLDEST TIP "
+                                            + root.ageLabel(
+                                                root.remoteOldestEpoch(
+                                                    root.selectedRemoteName
+                                                )
+                                              )
+                                        );
+                                    }
+                                    font.pixelSize: 9
+                                    color: Colors.white
+                                    elide: Text.ElideRight
+                                }
+
+                                GohuText {
+                                    width: parent.width
+                                    text:
+                                        "TIP ages describe remote-tracking commit activity, not time since last fetch."
+                                    font.pixelSize: 8
+                                    color: Colors.white
+                                    opacity: 0.48
+                                    elide: Text.ElideRight
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            width: parent.width
                             height: 1
                             color: Colors.cyan
                             opacity: 0.22
@@ -1384,7 +1507,7 @@ Item {
                         Flickable {
                             id: repositoryScroll2
                             width: parent.width
-                            height: parent.height - 190
+                            height: parent.height - 277
                             clip: true
                             contentWidth: width
                             contentHeight: remoteBranchColumn.implicitHeight
@@ -1432,6 +1555,10 @@ Item {
                                                 + String(
                                                     remoteBranchRow.modelData.shortSha
                                                     || ""
+                                                )
+                                                + " // "
+                                                + root.ageLabel(
+                                                    remoteBranchRow.modelData.epoch
                                                 )
                                             font.pixelSize: 10
                                             color: Colors.white

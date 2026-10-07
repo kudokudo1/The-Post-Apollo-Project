@@ -5,9 +5,31 @@ Rectangle {
     id: root
 
     required property var rebaseService
+    required property var rebaseSessionService
     property var keyboardHost: null
 
     property int selectedIndex: -1
+
+    signal openChangesRequested(string path)
+
+    readonly property bool sessionVisible:
+        rebaseSessionService
+        && (
+            rebaseSessionService.active
+            || rebaseSessionService.busy
+            || rebaseSessionService.state === "CONFLICT"
+            || rebaseSessionService.state === "PAUSED_EDIT"
+            || rebaseSessionService.state === "PAUSED"
+            || rebaseSessionService.state === "UNCERTAIN"
+        )
+
+    onVisibleChanged: {
+        if (visible
+                && rebaseSessionService
+                && !rebaseSessionService.busy
+                && !rebaseSessionService.refreshing)
+            rebaseSessionService.refresh();
+    }
 
     color: Colors.dark
     border.width: 1
@@ -32,7 +54,8 @@ Rectangle {
             "reword",
             "squash",
             "fixup",
-            "drop"
+            "drop",
+            "edit"
         ];
         const current = actions.indexOf(String(row.action || "pick"));
         const start = current >= 0 ? current : 0;
@@ -602,9 +625,9 @@ Rectangle {
                             anchors.margins: 7
                             text:
                                 "AVAILABLE // PICK · REWORD · SQUASH · "
-                                + "FIXUP · DROP\n"
-                                + "EDIT / PAUSE / LIVE CONFLICT SESSION "
-                                + "IS NOT IMPLEMENTED YET"
+                                + "FIXUP · DROP · EDIT\n"
+                                + "EDIT STARTS A DURABLE LIVE REBASE SESSION "
+                                + "WITH CONTINUE / SKIP / ABORT"
                             font.pixelSize: 8
                             color: Colors.orange
                             wrapMode: Text.Wrap
@@ -636,15 +659,36 @@ Rectangle {
                         width: parent.width
                         height: 38
                         label:
-                            rebaseService.executionBusy
+                            rebaseSessionService.busy
+                            ? "STARTING / RECONCILING SESSION"
+                            : rebaseService.executionBusy
                             ? "REHEARSING / EXECUTING"
+                            : rebaseService.requiresPersistentSession()
+                            ? "START PERSISTENT REBASE"
                             : "EXECUTE REHEARSED REBASE"
-                        accent: Colors.red
+                        accent:
+                            rebaseService.requiresPersistentSession()
+                            ? Colors.magenta
+                            : Colors.red
                         enabledAction:
                             rebaseService.armed
+                            && !root.sessionVisible
                             && !rebaseService.previewBusy
                             && !rebaseService.executionBusy
-                        onTriggered: rebaseService.executeArmed()
+                            && !rebaseSessionService.busy
+                        onTriggered: {
+                            if (rebaseService.requiresPersistentSession()) {
+                                rebaseSessionService.start(
+                                    rebaseService.armedBaseSha,
+                                    rebaseService.armedBranch,
+                                    rebaseService.armedHeadSha,
+                                    rebaseService.plan
+                                );
+                                return;
+                            }
+
+                            rebaseService.executeArmed();
+                        }
                     }
                 }
             }
@@ -682,6 +726,19 @@ Rectangle {
                     : Colors.cyan
                 elide: Text.ElideRight
             }
+        }
+    }
+
+    GitInteractiveRebaseSessionView {
+        anchors.fill: parent
+        visible: root.sessionVisible
+        z: 5000
+
+        sessionService: root.rebaseSessionService
+        keyboardHost: root.keyboardHost
+
+        onOpenChangesRequested: function(path) {
+            root.openChangesRequested(path);
         }
     }
 }

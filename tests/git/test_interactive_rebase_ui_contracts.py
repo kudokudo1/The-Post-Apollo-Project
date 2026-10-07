@@ -40,7 +40,7 @@ require(
     "property var keyboardOwner: null",
     "rebase EditorBox must preserve HISTORY keyboard ownership",
 )
-for action in ("pick", "reword", "squash", "fixup", "drop"):
+for action in ("pick", "reword", "squash", "fixup", "drop", "edit"):
     require(
         VIEW,
         f'"{action}"',
@@ -92,8 +92,28 @@ require_regex(
 )
 require(
     VIEW,
-    "EDIT / PAUSE / LIVE CONFLICT SESSION",
-    "unsupported persistent rewrite-session features must be visible as unavailable",
+    "required property var rebaseSessionService",
+    "rebase UI must accept the persistent session controller",
+)
+require(
+    VIEW,
+    "START PERSISTENT REBASE",
+    "edit plans must expose persistent-session execution",
+)
+require(
+    VIEW,
+    "rebaseService.requiresPersistentSession()",
+    "rebase UI must distinguish one-shot from persistent plans",
+)
+require(
+    VIEW,
+    "rebaseSessionService.start(",
+    "persistent plans must delegate to the session controller",
+)
+require(
+    VIEW,
+    "EDIT STARTS A DURABLE LIVE REBASE SESSION",
+    "UI must describe live edit-session behavior truthfully",
 )
 require(
     VIEW,
@@ -120,6 +140,18 @@ require(
     "property var interactiveRebaseService: null",
     "HISTORY must accept the shared rebase service",
 )
+require(
+    HISTORY,
+    "property var interactiveRebaseSessionService: null",
+    "HISTORY must accept the persistent rebase session service",
+)
+require_regex(
+    HISTORY,
+    r"GitInteractiveRebaseView \{.*"
+    r"rebaseSessionService:\s*"
+    r"root\.interactiveRebaseSessionService",
+    "HISTORY must pass the persistent session controller into REBASE",
+)
 
 require_regex(
     GITW,
@@ -131,9 +163,19 @@ require_regex(
 )
 require_regex(
     GITW,
+    r"GitInteractiveRebaseSessionService \{.*"
+    r"id: interactiveRebaseSessionService.*"
+    r"operationJournal: operationJournalService.*"
+    r"snapshotService: repositorySnapshotService",
+    "GitW must instantiate persistent rebase sessions with shared evidence services",
+)
+require_regex(
+    GITW,
     r"GitHistoryView \{.*"
-    r"interactiveRebaseService: interactiveRebaseService",
-    "GitW must pass the shared rebase engine into HISTORY",
+    r"interactiveRebaseService: interactiveRebaseService.*"
+    r"interactiveRebaseSessionService:\s*"
+    r"interactiveRebaseSessionService",
+    "GitW must pass both rebase engines into HISTORY",
 )
 
 print("Git interactive rebase UI contracts: PASS")

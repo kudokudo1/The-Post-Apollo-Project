@@ -8,6 +8,7 @@ Rectangle {
 
     required property var receptionistService
     required property var speechInputService
+    required property var interpretationService
 
     property string floorLabel: "NO FLOOR"
     property string roomLabel: "NO ROOM"
@@ -267,6 +268,91 @@ Rectangle {
 
                     spacing: 7
 
+                    Rectangle {
+                        id: aiToggleButton
+
+                        readonly property bool enabledAction:
+                            root.interpretationService.interpreterReady
+                            && !root.interpretationService.busy
+
+                        width: 42
+                        height: 36
+                        color:
+                            root.interpretationService.enabled
+                            ? Colors.yellow
+                            : aiToggleMouse.pressed
+                            ? Colors.black
+                            : Colors.dark
+                        border.width:
+                            root.interpretationService.enabled
+                            || aiToggleMouse.containsMouse
+                            ? 2 : 1
+                        border.color:
+                            !root.interpretationService.interpreterReady
+                            ? Colors.red
+                            : root.interpretationService.enabled
+                            ? Colors.magenta
+                            : aiToggleMouse.containsMouse
+                            ? Colors.orange
+                            : Colors.cyan
+
+                        RectangularShadow {
+                            anchors.fill: parent
+                            spread: 4
+                            z: -1
+                            opacity:
+                                root.interpretationService.enabled
+                                ? 0.42
+                                : aiToggleButton.enabledAction
+                                ? 0.20 : 0.08
+                            color:
+                                root.interpretationService.enabled
+                                ? Colors.magenta
+                                : root.interpretationService.interpreterReady
+                                ? Colors.cyan
+                                : Colors.red
+                        }
+
+                        GohuText {
+                            anchors.centerIn: parent
+                            text:
+                                root.interpretationService.busy
+                                ? "..."
+                                : "AI"
+                            font.pixelSize: 10
+                            color:
+                                root.interpretationService.enabled
+                                ? Colors.magenta
+                                : aiToggleMouse.containsMouse
+                                  && aiToggleButton.enabledAction
+                                ? Colors.orange
+                                : root.interpretationService.interpreterReady
+                                ? Colors.cyan
+                                : Colors.red
+                            opacity:
+                                aiToggleButton.enabledAction
+                                || root.interpretationService.enabled
+                                ? 1.0 : 0.42
+                        }
+
+                        MouseArea {
+                            id: aiToggleMouse
+
+                            anchors.fill: parent
+                            enabled: aiToggleButton.enabledAction
+                            hoverEnabled: true
+                            cursorShape:
+                                enabled
+                                ? Qt.PointingHandCursor
+                                : Qt.ArrowCursor
+
+                            onClicked:
+                                root.interpretationService.setEnabled(
+                                    !root.interpretationService.enabled
+                                )
+                        }
+                    }
+
                     Repeater {
                         model: [
                             { label: "☎︎", route: "phone", color: Colors.green },
@@ -418,8 +504,14 @@ Rectangle {
                         },
                         {
                             label: "AUTHORITY",
-                            value: "ROUTE + EXPLAIN + INITIATE",
-                            accent: Colors.magenta,
+                            value:
+                                root.interpretationService.enabled
+                                ? "AI SUGGEST + HUMAN ACCEPT"
+                                : "ROUTE + EXPLAIN + INITIATE",
+                            accent:
+                                root.interpretationService.enabled
+                                ? Colors.orange
+                                : Colors.magenta,
                             weight: 0.38
                         }
                     ]
@@ -1065,6 +1157,180 @@ Rectangle {
         }
 
         Rectangle {
+            id: aiSuggestionStrip
+
+            width: parent.width
+            height:
+                root.interpretationService.busy
+                || root.interpretationService.hasSuggestion
+                ? 44 : 0
+            visible:
+                root.interpretationService.busy
+                || root.interpretationService.hasSuggestion
+            color: Colors.dark
+            border.width: 1
+            border.color:
+                root.interpretationService.busy
+                ? Colors.orange
+                : Colors.magenta
+
+            RectangularShadow {
+                anchors.fill: parent
+                spread: 3
+                z: -1
+                opacity: 0.24
+                color:
+                    root.interpretationService.busy
+                    ? Colors.orange
+                    : Colors.magenta
+            }
+
+            GohuText {
+                anchors {
+                    left: parent.left
+                    right: aiReviewActions.left
+                    verticalCenter: parent.verticalCenter
+                    leftMargin: 9
+                    rightMargin: 9
+                }
+
+                text:
+                    root.interpretationService.busy
+                    ? "AI // HERMES // INTERPRETING // NO ACTION YET"
+                    : (
+                        "AI SUGGESTION // "
+                        + root.interpretationService.suggestionLabel
+                        + " // "
+                        + String(
+                            Math.round(
+                                Number(
+                                    (
+                                        root.interpretationService
+                                            .pendingSuggestion
+                                        || {}
+                                    ).confidence
+                                    || 0
+                                ) * 100
+                            )
+                          )
+                        + "%"
+                        + (
+                            String(
+                                (
+                                    root.interpretationService
+                                        .pendingSuggestion
+                                    || {}
+                                ).reason
+                                || ""
+                            )
+                            ? " // "
+                              + String(
+                                  (
+                                      root.interpretationService
+                                          .pendingSuggestion
+                                      || {}
+                                  ).reason
+                                )
+                            : ""
+                          )
+                      )
+                font.pixelSize: 9
+                color:
+                    root.interpretationService.busy
+                    ? Colors.orange
+                    : Colors.magenta
+                elide: Text.ElideRight
+            }
+
+            Row {
+                id: aiReviewActions
+
+                anchors {
+                    right: parent.right
+                    verticalCenter: parent.verticalCenter
+                    rightMargin: 7
+                }
+
+                spacing: 5
+                visible:
+                    root.interpretationService.hasSuggestion
+                width: visible ? implicitWidth : 0
+
+                Rectangle {
+                    width: 62
+                    height: 28
+                    color:
+                        aiAcceptMouse.pressed
+                        ? Colors.black
+                        : Colors.dark
+                    border.width:
+                        aiAcceptMouse.containsMouse ? 2 : 1
+                    border.color:
+                        aiAcceptMouse.containsMouse
+                        ? Colors.orange
+                        : Colors.green
+
+                    GohuText {
+                        anchors.centerIn: parent
+                        text: "ACCEPT"
+                        font.pixelSize: 8
+                        color:
+                            aiAcceptMouse.containsMouse
+                            ? Colors.orange
+                            : Colors.green
+                    }
+
+                    MouseArea {
+                        id: aiAcceptMouse
+
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked:
+                            root.interpretationService
+                                .acceptSuggestion()
+                    }
+                }
+
+                Rectangle {
+                    width: 62
+                    height: 28
+                    color:
+                        aiDismissMouse.pressed
+                        ? Colors.black
+                        : Colors.dark
+                    border.width:
+                        aiDismissMouse.containsMouse ? 2 : 1
+                    border.color:
+                        aiDismissMouse.containsMouse
+                        ? Colors.orange
+                        : Colors.red
+
+                    GohuText {
+                        anchors.centerIn: parent
+                        text: "DISMISS"
+                        font.pixelSize: 8
+                        color:
+                            aiDismissMouse.containsMouse
+                            ? Colors.orange
+                            : Colors.red
+                    }
+
+                    MouseArea {
+                        id: aiDismissMouse
+
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked:
+                            root.interpretationService
+                                .dismissSuggestion()
+                    }
+                }
+            }
+        }
+
+        Rectangle {
             id: transcriptFrame
 
             width: parent.width
@@ -1076,10 +1342,15 @@ Rectangle {
                     - statusStrip.height
                     - inboxFrame.height
                     - contextStrip.height
+                    - aiSuggestionStrip.height
                     - composer.height
                     - 61
                     - (
                         contextStrip.visible
+                        ? 9 : 0
+                      )
+                    - (
+                        aiSuggestionStrip.visible
                         ? 9 : 0
                       )
                 )

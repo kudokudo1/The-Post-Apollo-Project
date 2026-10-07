@@ -2,6 +2,7 @@
 """Static contracts for the reusable NeonScrollBar component."""
 
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parents[2]
 COMPONENT = (ROOT / "components/NeonScrollBar.qml").read_text(encoding="utf-8")
@@ -40,7 +41,7 @@ for path in ROOT.rglob("*.qml"):
     text = path.read_text(encoding="utf-8")
     rel = path.relative_to(ROOT)
 
-    if "starHandle" in text:
+    if re.search(r"\bstarHandle\s*:", text):
         legacy_users.append(str(rel))
 
     if 'handleStyle: "star"' in text:

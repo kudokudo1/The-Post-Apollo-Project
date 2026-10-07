@@ -533,6 +533,104 @@ Scope {
         return common;
     }
 
+    function controlPullRecoveryPlan(record) {
+        const row = record || {};
+        const metadata = row.metadata || {};
+
+        if (String(row.kind || "") !== "CONTROL/PULL")
+            return null;
+
+        if (String(row.recoveryClass || "") !== "REF_RECOVERABLE"
+                || String((row.before || {}).recoveryClass || "")
+                   !== "REF_RECOVERABLE"
+                || String((row.after || {}).recoveryClass || "")
+                   !== "REF_RECOVERABLE") {
+            return refuse(
+                "PULL DOES NOT HAVE CLEAN REF-RECOVERABLE EVIDENCE"
+            );
+        }
+
+        const before = row.before || {};
+        const after = row.after || {};
+        const localTarget = String(metadata.localTarget || "");
+        const pullMode = String(metadata.pullMode || "");
+        const targetRef = "refs/heads/" + localTarget;
+        const beforeSha = refSha(before, targetRef);
+        const afterSha = refSha(after, targetRef);
+        const beforeBranch = String(before.branch || "");
+        const afterBranch = String(after.branch || "");
+        const beforeHead = String(before.head || "");
+        const afterHead = String(after.head || "");
+
+        if (!localTarget
+                || !beforeSha
+                || !afterSha
+                || beforeSha === afterSha) {
+            return refuse(
+                "PULL DID NOT RECORD AN EXACT LOCAL BRANCH TRANSITION"
+            );
+        }
+
+        if (beforeBranch === localTarget) {
+            if (afterBranch !== localTarget
+                    || beforeHead !== beforeSha
+                    || afterHead !== afterSha) {
+                return refuse(
+                    "CHECKED-OUT PULL HEAD TRANSITION IS NOT EXACT"
+                );
+            }
+
+            return {
+                allowed: true,
+                strategy: "RESTORE_PULLED_BRANCH",
+                branch: localTarget,
+                restoreSha: beforeSha,
+                expectedSha: afterSha,
+                pullMode: pullMode,
+                target: String(metadata.target || ""),
+                summary:
+                    "UNDO "
+                    + (pullMode === "merge" ? "MERGE" : "FF")
+                    + " PULL // RESTORE "
+                    + localTarget
+                    + " TO "
+                    + beforeSha.slice(0, 12)
+                    + " // KEEP FETCHED REMOTE REFS"
+            };
+        }
+
+        if (pullMode !== "ff-only")
+            return refuse(
+                "BACKGROUND MERGE PULL IS NOT A SUPPORTED SUCCESS STATE"
+            );
+
+        if (!beforeBranch
+                || afterBranch !== beforeBranch
+                || !beforeHead
+                || afterHead !== beforeHead) {
+            return refuse(
+                "BACKGROUND PULL CHANGED THE CHECKED-OUT HEAD"
+            );
+        }
+
+        return {
+            allowed: true,
+            strategy: "RESTORE_BACKGROUND_PULL_REF",
+            branch: localTarget,
+            restoreSha: beforeSha,
+            expectedSha: afterSha,
+            currentBranch: beforeBranch,
+            expectedCurrentHead: beforeHead,
+            target: String(metadata.target || ""),
+            summary:
+                "UNDO BACKGROUND FF PULL // RESTORE "
+                + localTarget
+                + " TO "
+                + beforeSha.slice(0, 12)
+                + " // KEEP FETCHED REMOTE REFS"
+        };
+    }
+
     function preview(record) {
         const row = record || {};
         const kind = String(row.kind || "");
@@ -566,6 +664,10 @@ Scope {
         const stashMutationPlan = stashMutationRecoveryPlan(row);
         if (stashMutationPlan)
             return stashMutationPlan;
+
+        const pullPlan = controlPullRecoveryPlan(row);
+        if (pullPlan)
+            return pullPlan;
 
         if (recoveryClass !== "REF_RECOVERABLE"
                 || String(before.recoveryClass || "") !== "REF_RECOVERABLE"
@@ -1108,6 +1210,16 @@ Scope {
             b = String(plan.branch || "");
             c = String(plan.expectedSha || "");
             d = plan.detached ? "1" : "0";
+        } else if (strategy === "RESTORE_PULLED_BRANCH") {
+            a = String(plan.branch || "");
+            b = String(plan.restoreSha || "");
+            c = String(plan.expectedSha || "");
+        } else if (strategy === "RESTORE_BACKGROUND_PULL_REF") {
+            a = String(plan.branch || "");
+            b = String(plan.restoreSha || "");
+            c = String(plan.expectedSha || "");
+            d = String(plan.currentBranch || "");
+            e = String(plan.expectedCurrentHead || "");
         } else if (strategy === "RESTORE_REWRITTEN_BRANCH") {
             a = String(plan.branch || "");
             b = String(plan.restoreSha || "");
@@ -1347,6 +1459,48 @@ Scope {
                 '      git -C "$repo" worktree add "$path" "$branch" >/dev/null 2>&1 || { printf "REFUSED\\tWORKTREE RESTORE FAILED\\n"; exit 96; }',
                 '    fi',
                 '    printf "OK\\tRESTORED REMOVED WORKTREE // %s\\n" "$path"',
+                '    ;;',
+                '  RESTORE_PULLED_BRANCH)',
+                '    branch="$a"',
+                '    restore="$b"',
+                '    expected="$c"',
+                '    ref="refs/heads/$branch"',
+                '    head_ref="$(git -C "$repo" symbolic-ref -q HEAD 2>/dev/null || true)"',
+                '    [ "$head_ref" = "$ref" ] || { printf "REFUSED\\tPULLED BRANCH IS NOT CURRENTLY CHECKED OUT\\n"; exit 179; }',
+                '    actual="$(git -C "$repo" rev-parse -q --verify "$ref" 2>/dev/null || true)"',
+                '    [ "$actual" = "$expected" ] || { printf "REFUSED\\tPULLED BRANCH MOVED SINCE OPERATION\\n"; exit 180; }',
+                '    git -C "$repo" cat-file -e "$restore^{commit}" 2>/dev/null || { printf "REFUSED\\tPRE-PULL COMMIT MISSING\\n"; exit 181; }',
+                '    git -C "$repo" update-ref ORIG_HEAD "$expected" >/dev/null 2>&1 || true',
+                '    git -C "$repo" update-ref "$ref" "$restore" "$expected" || { printf "REFUSED\\tGUARDED PULL REF RESTORE FAILED\\n"; exit 182; }',
+                '    if ! git -C "$repo" reset --hard "$restore" >/dev/null 2>&1; then',
+                '      git -C "$repo" update-ref "$ref" "$expected" "$restore" >/dev/null 2>&1 || { printf "REFUSED\\tPULL WORKTREE REALIGN FAILED // REF ROLLBACK FAILED\\n"; exit 183; }',
+                '      git -C "$repo" reset --hard "$expected" >/dev/null 2>&1 || true',
+                '      printf "REFUSED\\tPULL WORKTREE REALIGN FAILED // REF ROLLED BACK\\n"',
+                '      exit 184',
+                '    fi',
+                '    printf "OK\\tRESTORED PRE-PULL LOCAL BRANCH // FETCHED REMOTE REFS RETAINED // %s\\n" "$branch"',
+                '    ;;',
+                '  RESTORE_BACKGROUND_PULL_REF)',
+                '    branch="$a"',
+                '    restore="$b"',
+                '    expected="$c"',
+                '    current_branch="$d"',
+                '    expected_current_head="$e"',
+                '    ref="refs/heads/$branch"',
+                '    current_ref="refs/heads/$current_branch"',
+                '    head_ref="$(git -C "$repo" symbolic-ref -q HEAD 2>/dev/null || true)"',
+                '    [ "$head_ref" = "$current_ref" ] || { printf "REFUSED\\tCHECKED-OUT BRANCH CHANGED SINCE BACKGROUND PULL\\n"; exit 185; }',
+                '    actual_current_head="$(git -C "$repo" rev-parse HEAD 2>/dev/null || true)"',
+                '    [ "$actual_current_head" = "$expected_current_head" ] || { printf "REFUSED\\tCHECKED-OUT HEAD MOVED SINCE BACKGROUND PULL\\n"; exit 186; }',
+                '    actual="$(git -C "$repo" rev-parse -q --verify "$ref" 2>/dev/null || true)"',
+                '    [ "$actual" = "$expected" ] || { printf "REFUSED\\tBACKGROUND PULL TARGET MOVED SINCE OPERATION\\n"; exit 187; }',
+                '    git -C "$repo" cat-file -e "$restore^{commit}" 2>/dev/null || { printf "REFUSED\\tPRE-PULL TARGET COMMIT MISSING\\n"; exit 188; }',
+                '    if git -C "$repo" worktree list --porcelain 2>/dev/null | grep -Fqx "branch $ref"; then',
+                '      printf "REFUSED\\tBACKGROUND PULL TARGET IS NOW CHECKED OUT IN A WORKTREE\\n"',
+                '      exit 189',
+                '    fi',
+                '    git -C "$repo" update-ref "$ref" "$restore" "$expected" || { printf "REFUSED\\tGUARDED BACKGROUND PULL REF RESTORE FAILED\\n"; exit 190; }',
+                '    printf "OK\\tRESTORED PRE-PULL BACKGROUND BRANCH // FETCHED REMOTE REFS RETAINED // %s\\n" "$branch"',
                 '    ;;',
                 '  RESTORE_REWRITTEN_BRANCH)',
                 '    branch="$a"',

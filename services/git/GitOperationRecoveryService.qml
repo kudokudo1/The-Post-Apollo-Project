@@ -120,11 +120,14 @@ Scope {
         const patchBase64 = String(metadata.patchBase64 || "");
         const fingerprint = String(metadata.fingerprint || "");
         const patchBytes = Number(metadata.patchBytes || 0);
+        const layer =
+            String(metadata.layer || "worktree").toLowerCase();
 
         if ([
                 "CHANGES/TRANSFER",
                 "CHANGES/TRANSFER_HUNK",
-                "CHANGES/TRANSFER_LINE"
+                "CHANGES/TRANSFER_LINE",
+                "CHANGES/TRANSFER_STAGED"
             ].indexOf(kind) < 0)
             return null;
 
@@ -146,7 +149,8 @@ Scope {
                 || !destinationHead
                 || !patchBase64
                 || !fingerprint
-                || patchBytes <= 0) {
+                || patchBytes <= 0
+                || (layer !== "worktree" && layer !== "staged")) {
             return refuse("TRANSFER RECOVERY PAYLOAD IS INCOMPLETE");
         }
 
@@ -154,6 +158,7 @@ Scope {
             allowed: true,
             strategy: "UNDO_TRANSFER_CONTENT",
             mode: mode,
+            layer: layer,
             sourcePath: sourcePath,
             destinationPath: destinationPath,
             sourceHead: sourceHead,
@@ -165,7 +170,11 @@ Scope {
             summary:
                 "UNDO "
                 + mode.toUpperCase()
-                + " "
+                + (
+                    layer === "staged"
+                    ? " STAGED "
+                    : " "
+                  )
                 + String(metadata.scope || "file").toUpperCase()
                 + " TRANSFER"
         };
@@ -1275,7 +1284,10 @@ Scope {
         } else if (strategy === "UNDO_TRANSFER_CONTENT") {
             a = String(plan.sourcePath || "");
             b = String(plan.destinationPath || "");
-            c = String(plan.mode || "");
+            c =
+                String(plan.mode || "")
+                + "\t"
+                + String(plan.layer || "worktree");
             d = String(plan.patchBase64 || "");
             e = String(plan.sourceHead || "");
             f = String(plan.destinationHead || "");

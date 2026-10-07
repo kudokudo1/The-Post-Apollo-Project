@@ -106,6 +106,16 @@ require(
     "signal mutationFinished(",
     "service must expose mutation/evidence completion",
 )
+require(
+    service,
+    "const timedOutPhase = root.phase;",
+    "timeout routing must preserve the phase that timed out",
+)
+require(
+    service,
+    'if (timedOutPhase === "PREVIEW")',
+    "preview timeout must stay on the preview-failure path",
+)
 
 # This backend owns GitHub merge-queue mutation only. No local Git surgery,
 # Hospital interpretation, or shared UI integration belongs here.

@@ -916,6 +916,20 @@ Scope {
                 'fi',
                 'dirty="$(git -C "$repo" status --porcelain=v1 2>/dev/null)"',
                 'case "$op" in',
+                '  merge)',
+                '    [ -n "$a" ] || { printf "REFUSED\\tMERGE TARGET REQUIRED\\n"; exit 70; }',
+                '    [ -z "$dirty" ] || { printf "REFUSED\\tWORKTREE DIRTY // COMMIT OR STASH FIRST\\n"; exit 71; }',
+                '    current="$(git -C "$repo" branch --show-current 2>/dev/null || true)"',
+                '    [ -n "$current" ] || { printf "REFUSED\\tMERGE REQUIRES A CHECKED-OUT BRANCH\\n"; exit 72; }',
+                '    target="$(git -C "$repo" rev-parse --verify "$a^{commit}" 2>/dev/null || true)"',
+                '    [ -n "$target" ] || { printf "REFUSED\\tMERGE TARGET IS NOT A COMMIT\\n"; exit 73; }',
+                '    if git -C "$repo" merge-base --is-ancestor "$target" HEAD >/dev/null 2>&1; then',
+                '      printf "REFUSED\\tTARGET ALREADY MERGED // %s\\n" "$target"',
+                '      exit 74',
+                '    fi',
+                '    GIT_EDITOR=true git -C "$repo" merge --no-edit "$target" || exit $?',
+                '    printf "OK\\tMERGED // %s INTO %s\\n" "$target" "$current"',
+                '    ;;',
                 '  cherry-pick)',
                 '    [ -n "$a" ] || { printf "REFUSED\\tCOMMIT REQUIRED\\n"; exit 22; }',
                 '    [ -z "$dirty" ] || { printf "REFUSED\\tWORKTREE DIRTY // COMMIT OR STASH FIRST\\n"; exit 23; }',
@@ -1039,6 +1053,10 @@ Scope {
         }
 
         return true;
+    }
+
+    function mergeCommit(sha) {
+        return runAction("merge", sha, "", "");
     }
 
     function cherryPick(sha) {

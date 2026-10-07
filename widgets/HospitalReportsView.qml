@@ -114,6 +114,86 @@ Item {
         return String(packet.reason || details.reason || "");
     }
 
+    function ensureSelectedVisible(indexValue) {
+        const index = Number(indexValue);
+
+        if (index < 0)
+            return;
+
+        Qt.callLater(function() {
+            const itemHeight = 92;
+            const spacing = 5;
+            const top = index * (itemHeight + spacing);
+            const bottom = top + itemHeight;
+            const viewportTop = reportList.contentY;
+            const viewportBottom =
+                viewportTop + reportList.height;
+
+            if (top < viewportTop)
+                reportList.contentY = top;
+            else if (bottom > viewportBottom)
+                reportList.contentY = Math.max(
+                    0,
+                    bottom - reportList.height
+                );
+        });
+    }
+
+    function selectEventIdentity(identityValue) {
+        const identity = identityValue || {};
+        const team =
+            String(identity.team || "");
+        const eventType =
+            String(identity.eventType || "");
+        const recordedAt =
+            String(identity.recordedAt || "");
+        const state =
+            String(identity.state || "");
+
+        teamFilter = team;
+        stateFilter = "";
+
+        let fallbackIndex = -1;
+
+        for (let i = 0; i < filteredEvents.length; ++i) {
+            const event = filteredEvents[i] || {};
+
+            if (team
+                    && String(event.team || "") !== team)
+                continue;
+
+            if (eventType
+                    && String(event.eventType || "") !== eventType)
+                continue;
+
+            if (state
+                    && String(event.state || "") !== state
+                    && fallbackIndex < 0)
+                fallbackIndex = i;
+
+            if (recordedAt
+                    && String(event.recordedAt || "") === recordedAt) {
+                selectedIndex = i;
+                ensureSelectedVisible(i);
+                return true;
+            }
+
+            if (fallbackIndex < 0)
+                fallbackIndex = i;
+        }
+
+        if (fallbackIndex >= 0) {
+            selectedIndex = fallbackIndex;
+            ensureSelectedVisible(fallbackIndex);
+            return !recordedAt;
+        }
+
+        selectedIndex =
+            filteredEvents.length > 0 ? 0 : -1;
+        ensureSelectedVisible(selectedIndex);
+        return false;
+    }
+
     function cycleOption(options, current, delta) {
         if (!Array.isArray(options) || options.length === 0)
             return "";

@@ -163,6 +163,132 @@ Item {
             root.stashMode = "all";
     }
 
+    function shortCommitSha(value) {
+        const sha = String(value || "");
+        return sha.length > 8 ? sha.slice(0, 8) : sha;
+    }
+
+    function commitPayloadText() {
+        if (!root.changesService)
+            return "NO CHANGE SERVICE";
+
+        let text =
+            String(root.changesService.stagedCount)
+            + " FILE"
+            + (root.changesService.stagedCount === 1 ? "" : "S")
+            + " // +"
+            + String(root.changesService.stagedInsertions)
+            + " -"
+            + String(root.changesService.stagedDeletions);
+
+        if (root.changesService.stagedBinaryFiles > 0)
+            text +=
+                " // "
+                + String(root.changesService.stagedBinaryFiles)
+                + " BIN";
+
+        if (root.changesService.conflictCount > 0)
+            text +=
+                " // "
+                + String(root.changesService.conflictCount)
+                + " CONFLICT";
+
+        return text;
+    }
+
+    function commitTargetText() {
+        if (!root.changesService)
+            return "NO TARGET";
+
+        if (root.commitAmend) {
+            return (
+                "AMEND "
+                + (
+                    root.shortCommitSha(
+                        root.changesService.headSha
+                    )
+                    || "NO HEAD"
+                  )
+                + (
+                    root.changesService.headSubject
+                    ? " // " + root.changesService.headSubject
+                    : ""
+                  )
+            );
+        }
+
+        const branch =
+            String(
+                root.changesService.currentBranch
+                || (
+                    root.gitService
+                    ? root.gitService.branch
+                    : ""
+                   )
+                || "DETACHED"
+            );
+        const upstream =
+            String(root.changesService.upstreamBranch || "");
+
+        if (!upstream)
+            return branch + " // NO UPSTREAM";
+
+        return (
+            branch
+            + " // "
+            + upstream
+            + " // +"
+            + String(root.changesService.upstreamAhead)
+            + " -"
+            + String(root.changesService.upstreamBehind)
+        );
+    }
+
+    function commitSigningText() {
+        if (!root.changesService)
+            return "UNKNOWN";
+
+        let state =
+            root.commitSign
+            ? "FORCED ON"
+            : root.changesService.signingDefault
+            ? "CONFIG ON"
+            : "OFF";
+
+        state +=
+            " // "
+            + String(
+                root.changesService.signingFormat
+                || "openpgp"
+              ).toUpperCase();
+
+        const key = String(root.changesService.signingKey || "");
+        if (key)
+            state += " // " + key.slice(Math.max(0, key.length - 12));
+
+        return state;
+    }
+
+    function commitPolicyText() {
+        if (!root.changesService)
+            return "UNKNOWN";
+
+        const hooks = root.changesService.commitHooks || [];
+        let text =
+            root.commitNoVerify
+            ? "NO VERIFY // "
+            : "HOOKS // ";
+
+        text += hooks.length > 0
+            ? hooks.join(" • ")
+            : "NONE";
+
+        if (root.changesService.commitTemplate)
+            text += " // TEMPLATE";
+
+        return text;
+    }
+
     component LabelText: GohuText {
         font.pixelSize: 12
         color: Colors.cyan
@@ -171,6 +297,46 @@ Item {
     component SectionLabel: GohuText {
         font.pixelSize: 14
         color: Colors.magenta
+    }
+
+    component CommitFact: Rectangle {
+        id: fact
+
+        property string label: ""
+        property string value: ""
+        property color accent: Colors.cyan
+
+        height: 30
+        color: Colors.black
+        border.width: 1
+        border.color: fact.accent
+        clip: true
+
+        Row {
+            anchors {
+                fill: parent
+                leftMargin: 7
+                rightMargin: 7
+            }
+            spacing: 6
+
+            GohuText {
+                width: Math.min(58, implicitWidth)
+                anchors.verticalCenter: parent.verticalCenter
+                text: fact.label
+                font.pixelSize: 9
+                color: fact.accent
+            }
+
+            GohuText {
+                width: parent.width - 64
+                anchors.verticalCenter: parent.verticalCenter
+                text: fact.value
+                font.pixelSize: 9
+                color: Colors.white
+                elide: Text.ElideMiddle
+            }
+        }
     }
 
     component MiniButton: Rectangle {
@@ -401,7 +567,7 @@ Item {
 
         Item {
             width: parent.width
-            height: parent.height - 174
+            height: parent.height - 210
 
             // ===== FILES =================================================
             Row {
@@ -1949,7 +2115,7 @@ Item {
 
         Rectangle {
             width: parent.width
-            height: 96
+            height: 132
             color: Colors.dark
             border.width: 1
             border.color:
@@ -1964,6 +2130,63 @@ Item {
                     margins: 7
                 }
                 spacing: 5
+
+                Row {
+                    width: parent.width
+                    height: 30
+                    spacing: 6
+
+                    CommitFact {
+                        width: (parent.width - 18) / 4
+                        label: "PAYLOAD"
+                        value: root.commitPayloadText()
+                        accent:
+                            root.changesService
+                            && root.changesService.conflictCount > 0
+                            ? Colors.red
+                            : root.changesService
+                              && root.changesService.stagedCount > 0
+                            ? Colors.green
+                            : Colors.cyan
+                    }
+
+                    CommitFact {
+                        width: (parent.width - 18) / 4
+                        label: "TARGET"
+                        value: root.commitTargetText()
+                        accent:
+                            root.commitAmend
+                            ? Colors.orange
+                            : Colors.cyan
+                    }
+
+                    CommitFact {
+                        width: (parent.width - 18) / 4
+                        label: "SIGN"
+                        value: root.commitSigningText()
+                        accent:
+                            root.commitSign
+                            || (
+                                root.changesService
+                                && root.changesService.signingDefault
+                               )
+                            ? Colors.magenta
+                            : Colors.cyan
+                    }
+
+                    CommitFact {
+                        width: (parent.width - 18) / 4
+                        label: "POLICY"
+                        value: root.commitPolicyText()
+                        accent:
+                            root.commitNoVerify
+                            ? Colors.red
+                            : root.changesService
+                              && root.changesService.commitHooks.length > 0
+                            ? Colors.orange
+                            : Colors.cyan
+                    }
+                }
 
                 Row {
                     width: parent.width
@@ -2034,6 +2257,7 @@ Item {
                         enabledAction:
                             root.changesService
                             && !root.changesService.actionBusy
+                            && root.changesService.conflictCount === 0
                             && (
                                 root.commitAmend
                                 || root.commitAllowEmpty

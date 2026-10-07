@@ -89,18 +89,6 @@ Scope {
 
     readonly property int changedCount: files.length
 
-    function fileAt(index) {
-        if (index < 0 || index >= files.length)
-            return null;
-        return files[index];
-    }
-
-    function stashAt(index) {
-        if (index < 0 || index >= stashes.length)
-            return null;
-        return stashes[index];
-    }
-
     function hunkAt(index) {
         if (index < 0 || index >= hunks.length)
             return null;

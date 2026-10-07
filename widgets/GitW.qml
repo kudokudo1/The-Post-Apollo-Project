@@ -1650,6 +1650,14 @@ PanelWindow {
             : ""
     }
 
+    GitRepositorySnapshotService {
+        id: repositorySnapshotService
+        repositoryPath:
+            gitService.repoIsLocal
+            ? gitService.repoRoot
+            : ""
+    }
+
     GitOperationJournalService {
         id: operationJournalService
         repositoryPath:
@@ -1661,6 +1669,7 @@ PanelWindow {
     GitBranchWorkspaceService {
         id: branchWorkspaceService
         operationJournal: operationJournalService
+        snapshotService: repositorySnapshotService
         repositoryPath:
             gitService.repoIsLocal
             ? gitService.repoRoot

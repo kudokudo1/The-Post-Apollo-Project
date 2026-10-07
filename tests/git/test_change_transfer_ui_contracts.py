@@ -77,6 +77,11 @@ require(
 )
 require(
     VIEW,
+    "transferService.previewPartial(",
+    "partially staged whole-file preview must use the dedicated two-layer backend path",
+)
+require(
+    VIEW,
     "transferService.execute()",
     "execution must delegate to the guarded transfer backend",
 )
@@ -84,9 +89,10 @@ require_regex(
     VIEW,
     r"readonly property string effectiveLayer:.*"
     r'untrackedSource.*\? "untracked".*'
+    r'transferLayer.*\? "partial".*'
     r'transferLayer.*\? "staged".*'
     r': "worktree"',
-    "transfer view must resolve worktree/staged/untracked content layers",
+    "transfer view must resolve worktree/staged/partial/untracked content layers",
 )
 require_regex(
     VIEW,
@@ -121,6 +127,14 @@ require_regex(
 )
 require_regex(
     CHANGES,
+    r"function partialFileTransferEligible\(\).*"
+    r"Boolean\(row\.staged\).*"
+    r"Boolean\(row\.unstaged\).*"
+    r"!Boolean\(row\.untracked\)",
+    "partially staged whole-file transfer must preserve both tracked content layers",
+)
+require_regex(
+    CHANGES,
     r"function untrackedFileTransferEligible\(\).*"
     r"Boolean\(row\.untracked\)",
     "untracked whole-file transfer must remain reachable",
@@ -130,6 +144,7 @@ require_regex(
     r"function fileTransferEligible\(\).*"
     r"worktreeFileTransferEligible\(\).*"
     r"stagedFileTransferEligible\(\).*"
+    r"partialFileTransferEligible\(\).*"
     r"untrackedFileTransferEligible\(\)",
     "whole-file Transfer must admit each supported content layer",
 )
@@ -170,10 +185,12 @@ require_regex(
     r'requested !== "file".*'
     r'untrackedFileTransferEligible\(\).*'
     r'\? "untracked".*'
+    r'partialFileTransferEligible\(\).*'
+    r'\? "partial".*'
     r'stagedFileTransferEligible\(\).*'
     r'\? "staged".*'
     r': "worktree"',
-    "opening Transfer must select worktree, staged, or untracked content explicitly",
+    "opening Transfer must select worktree, staged, partial, or untracked content explicitly",
 )
 require_regex(
     CHANGES,

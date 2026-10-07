@@ -1355,7 +1355,7 @@ Scope {
                 '  git -C "$destination" apply --binary "$patch" || refuse "DESTINATION CONFLICT RESULT APPLY FAILED"',
                 '  printf "OK\\tCOPIED CONFLICT RESULT // SOURCE OPERATION + STAGES LEFT UNTOUCHED\\n"',
                 'elif [ "$layer" = "partial" ]; then',
-                '  partial_apply() {
+                '  partial_apply() {',
                 '    local repo="$1"',
                 '    git -C "$repo" apply --cached --binary "$partial_staged" || return 1',
                 '    if ! git -C "$repo" apply --binary "$partial_staged"; then',

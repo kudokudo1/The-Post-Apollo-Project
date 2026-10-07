@@ -28,10 +28,12 @@ Scope {
 
     property string pendingPreviewDestination: ""
     property string pendingPreviewScope: "file"
+    property string pendingPreviewLayer: "worktree"
     property int pendingPreviewHunkIndex: -1
     property string previewDestinationPath: ""
     property string previewMode: "move"
     property string previewScope: "file"
+    property string previewLayer: "worktree"
     property int previewHunkIndex: -1
     property var previewFiles: []
     property string previewFingerprint: ""
@@ -104,10 +106,12 @@ Scope {
     function clearPreview() {
         pendingPreviewDestination = "";
         pendingPreviewScope = "file";
+        pendingPreviewLayer = "worktree";
         pendingPreviewHunkIndex = -1;
         previewDestinationPath = "";
         previewMode = "move";
         previewScope = "file";
+        previewLayer = "worktree";
         previewHunkIndex = -1;
         previewFiles = [];
         previewFingerprint = "";
@@ -121,6 +125,9 @@ Scope {
     }
 
     function journalKind() {
+        if (previewLayer === "staged")
+            return "CHANGES/TRANSFER_STAGED";
+
         return previewScope === "hunk"
             ? "CHANGES/TRANSFER_HUNK"
             : "CHANGES/TRANSFER";
@@ -140,6 +147,7 @@ Scope {
                 ? "TRANSFER_HUNK"
                 : "TRANSFER",
             scope: String(previewScope || "file"),
+            layer: String(previewLayer || "worktree"),
             hunkIndex: Number(previewHunkIndex),
             mode: String(previewMode || "move"),
             sourcePath: String(repositoryPath || ""),
@@ -286,9 +294,127 @@ Scope {
 
         pendingPreviewDestination = destination;
         pendingPreviewScope = "file";
+        pendingPreviewLayer = "worktree";
         pendingPreviewHunkIndex = -1;
         previewBusy = true;
         status = "TRANSFER // PREVIEWING";
+        previewExitSeen = false;
+        previewStdoutSeen = false;
+        previewStderrSeen = false;
+        previewExitCode = -1;
+        previewStdoutText = "";
+        previewStderrText = "";
+
+        previewProcess.exec(args);
+        return true;
+    }
+
+    function previewStaged(destinationPath, files, mode) {
+        if (previewBusy || transferBusy)
+            return false;
+
+        const source = String(repositoryPath || "").trim();
+        const destination = String(destinationPath || "").trim();
+        const selected = normalizedFiles(files);
+        const transferMode = normalizedMode(mode);
+
+        clearPreview();
+        lastError = "";
+
+        if (!source || !destination || selected.length === 0) {
+            lastError =
+                !source
+                ? "STAGED TRANSFER PREVIEW // NO SOURCE REPOSITORY"
+                : !destination
+                ? "STAGED TRANSFER PREVIEW // NO DESTINATION WORKTREE"
+                : "STAGED TRANSFER PREVIEW // NO FILES SELECTED";
+            status = lastError;
+            previewFailed(lastError);
+            return false;
+        }
+
+        const args = [
+            "bash",
+            "-lc",
+            [
+                'source="$1"',
+                'destination="$2"',
+                'mode="$3"',
+                'shift 3',
+                'files=("$@")',
+                'refuse() { printf "REFUSED\\t%s\\n" "$1"; exit 1; }',
+                'is_git_worktree() { git -C "$1" rev-parse --is-inside-work-tree >/dev/null 2>&1; }',
+                'absolute_common() {',
+                '  dir="$(git -C "$1" rev-parse --git-common-dir 2>/dev/null)" || return 1',
+                '  case "$dir" in /*) ;; *) dir="$1/$dir" ;; esac',
+                '  realpath "$dir" 2>/dev/null',
+                '}',
+                'active_state() {',
+                '  repo="$1"',
+                '  gitdir="$(git -C "$repo" rev-parse --git-dir 2>/dev/null)" || return 0',
+                '  case "$gitdir" in /*) ;; *) gitdir="$repo/$gitdir" ;; esac',
+                '  if [ -f "$gitdir/MERGE_HEAD" ]; then printf "MERGE";',
+                '  elif [ -d "$gitdir/rebase-merge" ] || [ -d "$gitdir/rebase-apply" ]; then printf "REBASE";',
+                '  elif [ -f "$gitdir/CHERRY_PICK_HEAD" ]; then printf "CHERRY_PICK";',
+                '  elif [ -f "$gitdir/REVERT_HEAD" ]; then printf "REVERT";',
+                '  else printf "NONE"; fi',
+                '}',
+                'is_git_worktree "$source" || refuse "SOURCE IS NOT A GIT WORKTREE"',
+                'is_git_worktree "$destination" || refuse "DESTINATION IS NOT A GIT WORKTREE"',
+                'source="$(realpath "$source")" || refuse "SOURCE PATH CANNOT BE RESOLVED"',
+                'destination="$(realpath "$destination")" || refuse "DESTINATION PATH CANNOT BE RESOLVED"',
+                '[ "$source" != "$destination" ] || refuse "SOURCE AND DESTINATION ARE THE SAME WORKTREE"',
+                'src_common="$(absolute_common "$source")" || refuse "SOURCE COMMON GIT DIR UNAVAILABLE"',
+                'dst_common="$(absolute_common "$destination")" || refuse "DESTINATION COMMON GIT DIR UNAVAILABLE"',
+                '[ "$src_common" = "$dst_common" ] || refuse "DESTINATION BELONGS TO A DIFFERENT REPOSITORY"',
+                'src_branch="$(git -C "$source" branch --show-current 2>/dev/null || true)"',
+                'dst_branch="$(git -C "$destination" branch --show-current 2>/dev/null || true)"',
+                'src_head="$(git -C "$source" rev-parse HEAD 2>/dev/null || true)"',
+                'dst_head="$(git -C "$destination" rev-parse HEAD 2>/dev/null || true)"',
+                '[ -n "$src_branch" ] || refuse "SOURCE WORKTREE IS DETACHED"',
+                '[ -n "$dst_branch" ] || refuse "DESTINATION WORKTREE IS DETACHED"',
+                '[ "$src_branch" != "$dst_branch" ] || refuse "SOURCE AND DESTINATION USE THE SAME BRANCH"',
+                '[ "$(active_state "$source")" = "NONE" ] || refuse "SOURCE HAS AN ACTIVE GIT OPERATION"',
+                '[ "$(active_state "$destination")" = "NONE" ] || refuse "DESTINATION HAS AN ACTIVE GIT OPERATION"',
+                '[ -z "$(git -C "$destination" status --porcelain=v1 --untracked-files=all 2>/dev/null)" ] || refuse "DESTINATION WORKTREE IS NOT CLEAN"',
+                'for path in "$@"; do',
+                '  git -C "$source" ls-files --error-unmatch -- "$path" >/dev/null 2>&1 || refuse "UNTRACKED OR UNKNOWN SOURCE PATH // $path"',
+                '  [ -z "$(git -C "$source" ls-files -u -- "$path" 2>/dev/null)" ] || refuse "CONFLICTED SOURCE PATH // $path"',
+                'done',
+                'git -C "$source" diff --cached --quiet -- "$@"',
+                'rc=$?',
+                '[ "$rc" -eq 1 ] || { [ "$rc" -eq 0 ] && refuse "SELECTED PATHS HAVE NO STAGED CHANGES"; refuse "STAGED DIFF CHECK FAILED"; }',
+                'git -C "$source" diff --quiet -- "$@"',
+                'rc=$?',
+                '[ "$rc" -eq 0 ] || { [ "$rc" -eq 1 ] && refuse "SELECTED PATH HAS UNSTAGED CHANGES // PARTIALLY STAGED TRANSFER IS NOT IMPLEMENTED"; refuse "WORKTREE DIFF CHECK FAILED"; }',
+                'patch="$(mktemp /tmp/pa-staged-transfer-preview.XXXXXX)" || refuse "TEMP PATCH CREATE FAILED"',
+                'trap \'rm -f "$patch"\' EXIT INT TERM',
+                'git -C "$source" diff --cached --binary --full-index -- "$@" >"$patch" || refuse "STAGED PATCH GENERATION FAILED"',
+                '[ -s "$patch" ] || refuse "STAGED PATCH IS EMPTY"',
+                'git -C "$destination" apply --check --index --binary "$patch" >/dev/null 2>&1 || refuse "STAGED PATCH DOES NOT APPLY CLEANLY TO DESTINATION INDEX"',
+                'if [ "$mode" = "move" ]; then git -C "$source" apply -R --check --index --binary "$patch" >/dev/null 2>&1 || refuse "SOURCE STAGED PATCH CANNOT BE REMOVED CLEANLY"; fi',
+                'fingerprint="$(sha256sum "$patch" | awk "{print \\$1}")"',
+                'bytes="$(wc -c <"$patch" | tr -d " ")"',
+                'lines="$(wc -l <"$patch" | tr -d " ")"',
+                'if [ "$bytes" -le "524288" ]; then printf "PATCH64\\t"; base64 -w0 "$patch"; printf "\\n"; fi',
+                'printf "PREVIEW\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$fingerprint" "$bytes" "$lines" "$src_branch" "$dst_branch" "$src_head" "$dst_head" "$mode"',
+                'for path in "$@"; do printf "FILE\\t%s\\n" "$path"; done'
+            ].join("\n"),
+            "git-staged-change-transfer-preview",
+            source,
+            destination,
+            transferMode
+        ];
+
+        for (let i = 0; i < selected.length; ++i)
+            args.push(selected[i]);
+
+        pendingPreviewDestination = destination;
+        pendingPreviewScope = "file";
+        pendingPreviewLayer = "staged";
+        pendingPreviewHunkIndex = -1;
+        previewBusy = true;
+        status = "TRANSFER // PREVIEWING STAGED";
         previewExitSeen = false;
         previewStdoutSeen = false;
         previewStderrSeen = false;
@@ -429,6 +555,7 @@ Scope {
 
         pendingPreviewDestination = destination;
         pendingPreviewScope = "hunk";
+        pendingPreviewLayer = "worktree";
         pendingPreviewHunkIndex = index;
         previewBusy = true;
         status = "HUNK TRANSFER // PREVIEWING";
@@ -503,6 +630,7 @@ Scope {
         previewMode = normalizedMode(header[8]);
         previewDestinationPath = String(pendingPreviewDestination || "");
         previewScope = String(pendingPreviewScope || "file");
+        previewLayer = String(pendingPreviewLayer || "worktree");
         previewHunkIndex =
             previewScope === "hunk"
             ? Number(pendingPreviewHunkIndex)
@@ -510,6 +638,7 @@ Scope {
         previewFiles = files;
         pendingPreviewDestination = "";
         pendingPreviewScope = "file";
+        pendingPreviewLayer = "worktree";
         pendingPreviewHunkIndex = -1;
         lastError = "";
         status =
@@ -527,6 +656,7 @@ Scope {
             destinationHead: previewDestinationHead,
             mode: previewMode,
             scope: previewScope,
+            layer: previewLayer,
             hunkIndex: previewHunkIndex,
             files: previewFiles.slice(),
             fingerprint: previewFingerprint,
@@ -605,6 +735,7 @@ Scope {
         const sourceHead = String(previewSourceHead || "");
         const destinationHead = String(previewDestinationHead || "");
         const scope = String(previewScope || "file");
+        const layer = String(previewLayer || "worktree");
         const hunkIndex = Number(previewHunkIndex);
 
         if (!source
@@ -632,7 +763,8 @@ Scope {
                 'expected_destination_head="$6"',
                 'scope="$7"',
                 'hunk_index="$8"',
-                'shift 8',
+                'layer="$9"',
+                'shift 9',
                 'files=("$@")',
                 'refuse() { printf "REFUSED\\t%s\\n" "$1"; exit 1; }',
                 'source="$(realpath "$source")" || refuse "SOURCE PATH CANNOT BE RESOLVED"',
@@ -652,9 +784,18 @@ Scope {
                 '  git -C "$source" ls-files --error-unmatch -- "$path" >/dev/null 2>&1 || refuse "SOURCE PATH NO LONGER TRACKED // $path"',
                 '  [ -z "$(git -C "$source" ls-files -u -- "$path" 2>/dev/null)" ] || refuse "SOURCE PATH BECAME CONFLICTED // $path"',
                 'done',
-                'git -C "$source" diff --cached --quiet -- "${files[@]}"',
-                'rc=$?',
-                '[ "$rc" -eq 0 ] || refuse "SELECTED PATH STAGING CHANGED SINCE PREVIEW"',
+                'if [ "$layer" = "staged" ]; then',
+                '  git -C "$source" diff --quiet -- "${files[@]}"',
+                '  rc=$?',
+                '  [ "$rc" -eq 0 ] || refuse "SELECTED PATH BECAME PARTIALLY STAGED SINCE PREVIEW"',
+                '  git -C "$source" diff --cached --quiet -- "${files[@]}"',
+                '  rc=$?',
+                '  [ "$rc" -eq 1 ] || refuse "SELECTED STAGED PATCH DISAPPEARED SINCE PREVIEW"',
+                'else',
+                '  git -C "$source" diff --cached --quiet -- "${files[@]}"',
+                '  rc=$?',
+                '  [ "$rc" -eq 0 ] || refuse "SELECTED PATH STAGING CHANGED SINCE PREVIEW"',
+                'fi',
                 'patch="$(mktemp "${TMPDIR:-/tmp}/pa-transfer-exec.XXXXXX")" || refuse "TEMP PATCH CREATE FAILED"',
                 'trap \'rm -f "$patch"\' EXIT INT TERM',
                 'if [ "$scope" = "hunk" ]; then',
@@ -688,25 +829,47 @@ Scope {
                 '  rc=$?',
                 '  [ "$rc" -eq 0 ] || refuse "HUNK PATCH REGENERATION FAILED"',
                 'else',
-                '  git -C "$source" diff --binary --full-index -- "${files[@]}" >"$patch" || refuse "PATCH REGENERATION FAILED"',
+                '  if [ "$layer" = "staged" ]; then',
+                '    git -C "$source" diff --cached --binary --full-index -- "${files[@]}" >"$patch" || refuse "STAGED PATCH REGENERATION FAILED"',
+                '  else',
+                '    git -C "$source" diff --binary --full-index -- "${files[@]}" >"$patch" || refuse "PATCH REGENERATION FAILED"',
+                '  fi',
                 'fi',
                 '[ -s "$patch" ] || refuse "SOURCE PATCH DISAPPEARED SINCE PREVIEW"',
                 'actual="$(sha256sum "$patch" | awk "{print \\$1}")"',
                 '[ "$actual" = "$expected" ] || refuse "SOURCE CHANGES DIFFER FROM PREVIEW"',
-                'git -C "$destination" apply --check --binary "$patch" >/dev/null 2>&1 || refuse "PATCH NO LONGER APPLIES TO DESTINATION"',
-                'git -C "$destination" apply --binary "$patch" || refuse "DESTINATION APPLY FAILED"',
-                'if [ "$mode" = "move" ]; then',
-                '  if ! git -C "$source" apply -R --check --binary "$patch" >/dev/null 2>&1; then',
-                '    git -C "$destination" apply -R --binary "$patch" >/dev/null 2>&1 || { printf "REFUSED\\tSOURCE REMOVE CHECK FAILED // DESTINATION ROLLBACK FAILED\\n"; exit 8; }',
-                '    refuse "SOURCE REMOVE CHECK FAILED // DESTINATION ROLLED BACK"',
+                'if [ "$layer" = "staged" ]; then',
+                '  git -C "$destination" apply --check --index --binary "$patch" >/dev/null 2>&1 || refuse "STAGED PATCH NO LONGER APPLIES TO DESTINATION INDEX"',
+                '  git -C "$destination" apply --index --binary "$patch" || refuse "DESTINATION STAGED APPLY FAILED"',
+                '  if [ "$mode" = "move" ]; then',
+                '    if ! git -C "$source" apply -R --check --index --binary "$patch" >/dev/null 2>&1; then',
+                '      git -C "$destination" apply -R --index --binary "$patch" >/dev/null 2>&1 || { printf "REFUSED\\tSOURCE STAGED REMOVE CHECK FAILED // DESTINATION ROLLBACK FAILED\\n"; exit 8; }',
+                '      refuse "SOURCE STAGED REMOVE CHECK FAILED // DESTINATION ROLLED BACK"',
+                '    fi',
+                '    if ! git -C "$source" apply -R --index --binary "$patch"; then',
+                '      git -C "$destination" apply -R --index --binary "$patch" >/dev/null 2>&1 || { printf "REFUSED\\tSOURCE STAGED REMOVE FAILED // DESTINATION ROLLBACK FAILED\\n"; exit 9; }',
+                '      refuse "SOURCE STAGED REMOVE FAILED // DESTINATION ROLLED BACK"',
+                '    fi',
+                '    printf "OK\\tMOVED STAGED %s FILE(S) // %s -> %s\\n" "${#files[@]}" "$source" "$destination"',
+                '  else',
+                '    printf "OK\\tCOPIED STAGED %s FILE(S) // %s -> %s\\n" "${#files[@]}" "$source" "$destination"',
                 '  fi',
-                '  if ! git -C "$source" apply -R --binary "$patch"; then',
-                '    git -C "$destination" apply -R --binary "$patch" >/dev/null 2>&1 || { printf "REFUSED\\tSOURCE REMOVE FAILED // DESTINATION ROLLBACK FAILED\\n"; exit 9; }',
-                '    refuse "SOURCE REMOVE FAILED // DESTINATION ROLLED BACK"',
-                '  fi',
-                '  printf "OK\\tMOVED %s FILE(S) // %s -> %s\\n" "${#files[@]}" "$source" "$destination"',
                 'else',
-                '  printf "OK\\tCOPIED %s FILE(S) // %s -> %s\\n" "${#files[@]}" "$source" "$destination"',
+                '  git -C "$destination" apply --check --binary "$patch" >/dev/null 2>&1 || refuse "PATCH NO LONGER APPLIES TO DESTINATION"',
+                '  git -C "$destination" apply --binary "$patch" || refuse "DESTINATION APPLY FAILED"',
+                '  if [ "$mode" = "move" ]; then',
+                '    if ! git -C "$source" apply -R --check --binary "$patch" >/dev/null 2>&1; then',
+                '      git -C "$destination" apply -R --binary "$patch" >/dev/null 2>&1 || { printf "REFUSED\\tSOURCE REMOVE CHECK FAILED // DESTINATION ROLLBACK FAILED\\n"; exit 8; }',
+                '      refuse "SOURCE REMOVE CHECK FAILED // DESTINATION ROLLED BACK"',
+                '    fi',
+                '    if ! git -C "$source" apply -R --binary "$patch"; then',
+                '      git -C "$destination" apply -R --binary "$patch" >/dev/null 2>&1 || { printf "REFUSED\\tSOURCE REMOVE FAILED // DESTINATION ROLLBACK FAILED\\n"; exit 9; }',
+                '      refuse "SOURCE REMOVE FAILED // DESTINATION ROLLED BACK"',
+                '    fi',
+                '    printf "OK\\tMOVED %s FILE(S) // %s -> %s\\n" "${#files[@]}" "$source" "$destination"',
+                '  else',
+                '    printf "OK\\tCOPIED %s FILE(S) // %s -> %s\\n" "${#files[@]}" "$source" "$destination"',
+                '  fi',
                 'fi'
             ].join("\n"),
             "git-change-transfer-execute",
@@ -717,7 +880,8 @@ Scope {
             sourceHead,
             destinationHead,
             scope,
-            String(hunkIndex)
+            String(hunkIndex),
+            layer
         ];
 
         for (let i = 0; i < files.length; ++i)

@@ -8,6 +8,9 @@ Item {
     property int minimumHandleHeight: 24
     property int wheelStep: 42
     property bool starHandle: false
+    property int topInset: 0
+    property int bottomInset: 0
+    property int rightInset: 2
 
     parent:
         flickable && flickable.parent
@@ -17,7 +20,12 @@ Item {
     width: starHandle ? 16 : 10
     height:
         flickable
-        ? flickable.height
+        ? Math.max(
+            0,
+            flickable.height
+            - root.topInset
+            - root.bottomInset
+          )
         : 0
 
     x:
@@ -25,12 +33,12 @@ Item {
         ? flickable.x
           + flickable.width
           - width
-          - 2
+          - root.rightInset
         : 0
 
     y:
         flickable
-        ? flickable.y
+        ? flickable.y + root.topInset
         : 0
 
     z: 1000

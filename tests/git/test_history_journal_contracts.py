@@ -84,9 +84,9 @@ for operation in (
     "branch",
     "tag",
 ):
-    require(
+    require_regex(
         SERVICE,
-        f"return runAction(\"{operation}\"",
+        rf'return\s+runAction\(\s*"{re.escape(operation)}"',
         f"{operation} must flow through the History action seam",
     )
 

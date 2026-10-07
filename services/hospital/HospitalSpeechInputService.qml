@@ -14,6 +14,7 @@ Scope {
     property bool stopRequested: false
     property bool recorderCancelled: false
     property bool transcriberCancelled: false
+    property string audioFileName: "hospital-reception-voice.wav"
 
     readonly property bool recording:
         voiceState === "recording"
@@ -25,7 +26,7 @@ Scope {
         recording || stopping || transcribing
 
     readonly property string audioPath:
-        Quickshell.cachePath("hospital-reception-voice.wav")
+        Quickshell.cachePath(audioFileName)
     readonly property string helperPath:
         Quickshell.shellPath("scripts/hospital-reception-stt.sh")
 

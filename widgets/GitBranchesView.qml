@@ -395,7 +395,7 @@ Item {
         if (editMode === "NAME")
             editMode = "UP";
         else if (editMode === "UP")
-            editMode = "PARENT";
+            editMode = root.selectedIsTrunk ? "NAME" : "PARENT";
         else
             editMode = "NAME";
 
@@ -429,6 +429,10 @@ Item {
         root.managementMode = "edit";
         root.managementMessage = "";
         root.managementArm = "";
+
+        if (root.selectedIsTrunk && root.editMode === "PARENT")
+            root.editMode = "NAME";
+
         root.syncManagementEditors();
 
         Qt.callLater(function() {

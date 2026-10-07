@@ -5222,6 +5222,7 @@ PanelWindow {
 
                 GohuText {
                     width: parent.width
+                    height: Math.min(implicitHeight, 58)
                     text:
                         providerService.lastError
                         || doctorService.lastError
@@ -5238,6 +5239,9 @@ PanelWindow {
                         ? Colors.red
                         : Colors.cyan
                     wrapMode: Text.Wrap
+                    maximumLineCount: 4
+                    elide: Text.ElideRight
+                    clip: true
                 }
             }
         }

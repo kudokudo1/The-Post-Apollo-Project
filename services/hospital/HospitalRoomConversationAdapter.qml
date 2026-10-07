@@ -59,9 +59,42 @@ Scope {
         return [
             "bash",
             "-lc",
-            'exec "$HOME/.local/bin/px" "$@"',
+            'px="$HOME/.local/share/post-apollo-dev-runtime/bin/px"; '
+                + '[ -x "$px" ] || px="$HOME/.local/bin/px"; '
+                + 'exec "$px" "$@"',
             "hospital-room-conversation"
         ].concat(suffix);
+    }
+
+    function compactPxError(value, context) {
+        const detail = String(value || "").trim();
+
+        if (!detail)
+            return "";
+
+        const lower = detail.toLowerCase();
+
+        if (lower.indexOf("unknown command hospital") >= 0
+                || lower.indexOf("unknown command agent") >= 0
+                || lower.indexOf("post-apollo px control bus") >= 0)
+            return "PX RUNTIME OUT OF DATE // UPDATE POST-APOLLO DEV EXPERIENCE";
+
+        const rows = detail.split("\n").map(function(row) {
+            return String(row || "").trim();
+        }).filter(function(row) {
+            return row.length > 0;
+        });
+
+        let message =
+            rows.length > 0
+            ? rows[rows.length - 1]
+            : detail;
+
+        if (message.length > 240)
+            message = message.slice(0, 237) + "...";
+
+        const prefix = String(context || "").trim();
+        return prefix ? prefix + " // " + message : message;
     }
 
     function bindRoom(roomValue) {
@@ -403,9 +436,10 @@ Scope {
                 try {
                     adapter.boundRoomResult = JSON.parse(body);
                 } catch (parseError) {
-                    adapter.bindError =
-                        "HOSPITAL ROOM BIND // "
-                        + String(parseError);
+                    adapter.bindError = adapter.compactPxError(
+                        body || parseError,
+                        "HOSPITAL ROOM BIND"
+                    );
                 }
             }
         }
@@ -414,7 +448,10 @@ Scope {
             onStreamFinished: {
                 const detail = String(this.text || "").trim();
                 if (detail)
-                    adapter.bindError = detail;
+                    adapter.bindError = adapter.compactPxError(
+                        detail,
+                        "HOSPITAL ROOM BIND"
+                    );
             }
         }
 
@@ -446,8 +483,10 @@ Scope {
 
         stdout: StdioCollector {
             onStreamFinished: {
+                const body = String(this.text || "").trim();
+
                 try {
-                    const result = JSON.parse(String(this.text || "[]"));
+                    const result = JSON.parse(body || "[]");
 
                     if (!Array.isArray(result))
                         throw new Error("PX Hospital rooms returned non-array data");
@@ -455,9 +494,10 @@ Scope {
                     adapter.conversations = result;
                     adapter.error = "";
                 } catch (parseError) {
-                    adapter.error =
-                        "HOSPITAL CONVERSATION ROOMS // "
-                        + String(parseError);
+                    adapter.error = adapter.compactPxError(
+                        body || parseError,
+                        "HOSPITAL CONVERSATION ROOMS"
+                    );
                 }
             }
         }
@@ -466,7 +506,10 @@ Scope {
             onStreamFinished: {
                 const detail = String(this.text || "").trim();
                 if (detail)
-                    adapter.error = detail;
+                    adapter.error = adapter.compactPxError(
+                        detail,
+                        "HOSPITAL CONVERSATION"
+                    );
             }
         }
 
@@ -483,8 +526,10 @@ Scope {
 
         stdout: StdioCollector {
             onStreamFinished: {
+                const body = String(this.text || "").trim();
+
                 try {
-                    const result = JSON.parse(String(this.text || "[]"));
+                    const result = JSON.parse(body || "[]");
 
                     if (!Array.isArray(result))
                         throw new Error("PX Hospital sessions returned non-array data");
@@ -502,9 +547,10 @@ Scope {
                             adapter.sessionResolved(adapter.activeSessionId);
                     }
                 } catch (parseError) {
-                    adapter.sessionsError =
-                        "HOSPITAL DOCTOR SESSIONS // "
-                        + String(parseError);
+                    adapter.sessionsError = adapter.compactPxError(
+                        body || parseError,
+                        "HOSPITAL DOCTOR SESSIONS"
+                    );
                 }
             }
         }
@@ -513,7 +559,10 @@ Scope {
             onStreamFinished: {
                 const detail = String(this.text || "").trim();
                 if (detail)
-                    adapter.sessionsError = detail;
+                    adapter.sessionsError = adapter.compactPxError(
+                        detail,
+                        "HOSPITAL DOCTOR SESSIONS"
+                    );
             }
         }
 
@@ -558,9 +607,10 @@ Scope {
                 try {
                     adapter.createdSessionResult = JSON.parse(body);
                 } catch (parseError) {
-                    adapter.sessionError =
-                        "HOSPITAL DOCTOR SESSION CREATE // "
-                        + String(parseError);
+                    adapter.sessionError = adapter.compactPxError(
+                        body || parseError,
+                        "HOSPITAL DOCTOR SESSION CREATE"
+                    );
                 }
             }
         }
@@ -569,7 +619,10 @@ Scope {
             onStreamFinished: {
                 const detail = String(this.text || "").trim();
                 if (detail)
-                    adapter.sessionError = detail;
+                    adapter.sessionError = adapter.compactPxError(
+                        detail,
+                        "HOSPITAL DOCTOR SESSION"
+                    );
             }
         }
 
@@ -609,8 +662,10 @@ Scope {
 
         stdout: StdioCollector {
             onStreamFinished: {
+                const body = String(this.text || "").trim();
+
                 try {
-                    const result = JSON.parse(String(this.text || "[]"));
+                    const result = JSON.parse(body || "[]");
 
                     if (!Array.isArray(result))
                         throw new Error("PX Hospital messages returned non-array data");
@@ -618,9 +673,10 @@ Scope {
                     adapter.messages = result;
                     adapter.messagesError = "";
                 } catch (parseError) {
-                    adapter.messagesError =
-                        "HOSPITAL CONVERSATION MESSAGES // "
-                        + String(parseError);
+                    adapter.messagesError = adapter.compactPxError(
+                        body || parseError,
+                        "HOSPITAL CONVERSATION MESSAGES"
+                    );
                 }
             }
         }
@@ -629,7 +685,10 @@ Scope {
             onStreamFinished: {
                 const detail = String(this.text || "").trim();
                 if (detail)
-                    adapter.messagesError = detail;
+                    adapter.messagesError = adapter.compactPxError(
+                        detail,
+                        "HOSPITAL CONVERSATION MESSAGES"
+                    );
             }
         }
 
@@ -670,9 +729,10 @@ Scope {
                 try {
                     adapter.lastTurnResult = JSON.parse(body);
                 } catch (parseError) {
-                    adapter.sendError =
-                        "HOSPITAL DOCTOR TURN // "
-                        + String(parseError);
+                    adapter.sendError = adapter.compactPxError(
+                        body || parseError,
+                        "HOSPITAL DOCTOR TURN"
+                    );
                 }
             }
         }
@@ -681,7 +741,10 @@ Scope {
             onStreamFinished: {
                 const detail = String(this.text || "").trim();
                 if (detail)
-                    adapter.sendError = detail;
+                    adapter.sendError = adapter.compactPxError(
+                        detail,
+                        "HOSPITAL DOCTOR TURN"
+                    );
             }
         }
 

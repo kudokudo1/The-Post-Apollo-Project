@@ -990,9 +990,13 @@ PanelWindow {
 
     function activateReceptionActivity(item) {
         const row = item || {};
-        const kind = String(row.kind || "");
-        const source = String(row.source || "");
+        const kind =
+            String(row.kind || "").toLowerCase();
+        const source =
+            String(row.source || "").toLowerCase();
         const context = row.context || {};
+        const specialistId =
+            String(context.specialistId || "").trim();
 
         if (source === "reports") {
             root.openReceptionReportEvent(row);
@@ -1011,18 +1015,58 @@ PanelWindow {
 
         if (kind === "staff") {
             root.openStaff();
+
+            if (specialistId) {
+                Qt.callLater(function() {
+                    if (specialistsView.selectSpecialistById(
+                            specialistId))
+                        return;
+
+                    receptionistService.append(
+                        "RECEPTION",
+                        "STAFF // "
+                        + specialistId
+                        + " // NOT FOUND IN LIVE REGISTRY"
+                    );
+                });
+            }
             return;
         }
 
         if (source === "phone") {
             if (!root.phoneMenuOpen)
                 root.togglePhoneMenu();
+
+            if (specialistId
+                    && !phoneDropdown.focusSpecialistId(
+                        specialistId))
+                receptionistService.append(
+                    "RECEPTION",
+                    "PHONE // "
+                    + specialistId
+                    + " // NOT FOUND IN LIVE REGISTRY"
+                );
             return;
         }
 
         if (source === "intercom") {
             if (!root.intercomMenuOpen)
                 root.toggleIntercomMenu();
+
+            const focused =
+                intercomDropdown.focusActivityContext(
+                    specialistId,
+                    context.channelType,
+                    context.channelLabel
+                );
+
+            if (specialistId && !focused)
+                receptionistService.append(
+                    "RECEPTION",
+                    "INTERCOM // "
+                    + specialistId
+                    + " // NOT FOUND IN LIVE REGISTRY"
+                );
             return;
         }
 

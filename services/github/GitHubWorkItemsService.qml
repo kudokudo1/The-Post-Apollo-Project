@@ -103,9 +103,19 @@ Scope {
 
     function pullCheckContexts(row) {
         const source = row || {};
+        const evidence = source.checkEvidence || [];
+
+        if (source.checkEvidenceLoaded
+                && evidence
+                && evidence.length !== undefined
+                && evidence.length > 0)
+            return evidence;
+
         const direct = source.checkContexts || [];
 
-        if (direct && direct.length !== undefined)
+        if (direct
+                && direct.length !== undefined
+                && direct.length > 0)
             return direct;
 
         const rollup = pullStatusCheckRollup(source);
@@ -391,8 +401,26 @@ Scope {
     }
 
     function pullReviewNodes(row) {
-        const nodes = (((row || {}).reviews || {}).nodes || []);
+        const source = row || {};
+        const evidence = source.reviewEvidence || [];
+
+        if (source.reviewEvidenceLoaded
+                && Array.isArray(evidence))
+            return evidence;
+
+        const nodes = ((source.reviews || {}).nodes || []);
         return Array.isArray(nodes) ? nodes : [];
+    }
+
+    function pullReviewRequestCount(row) {
+        const source = row || {};
+
+        if (source.reviewRequestEvidenceLoaded)
+            return Number(source.reviewRequestCount || 0);
+
+        return Number(
+            ((source.reviewRequests || {}).totalCount) || 0
+        );
     }
 
     function pullApprovalCount(row) {
@@ -435,13 +463,17 @@ Scope {
         if (pullApprovalCount(source) > 0)
             return "APPROVED";
 
-        const requestCount = Number(
-            ((source.reviewRequests || {}).totalCount) || 0
-        );
+        const requestCount =
+            pullReviewRequestCount(source);
 
-        return requestCount > 0
-            ? "REVIEW_REQUIRED"
-            : "NONE";
+        if (requestCount > 0)
+            return "REVIEW_REQUIRED";
+
+        if (String(source.reviewEvidenceError || "").trim()
+                || String(source.reviewRequestError || "").trim())
+            return "ERROR";
+
+        return "NONE";
     }
 
     function pullReviewSummary(row) {
@@ -454,6 +486,9 @@ Scope {
 
         if (state === "REVIEW_REQUIRED")
             return "REQUIRED // " + countText;
+
+        if (state === "ERROR")
+            return "ERROR // REVIEW EVIDENCE";
 
         return state + " // " + countText;
     }
@@ -548,14 +583,41 @@ Scope {
                 'rows="$(gh api graphql -F owner="$owner" -F name="$name" -f query="$query" --jq ".data.repository.pullRequests.nodes")" || exit $?',
                 "rows=\"$(printf \"%s\" \"$rows\" | jq -c '[.[] | . + {checkState:(.commits.nodes[0].commit.statusCheckRollup.state // \"\"),checkContexts:(.commits.nodes[0].commit.statusCheckRollup.contexts.nodes // [])}]')\"",
                 'tmpdir="$(mktemp -d)"',
-                'printf "%s" "$rows" | jq -c ".[] | select(.commits.nodes[0].commit.statusCheckRollup == null)" > "$tmpdir/fallback.ndjson"',
+                'printf "%s" "$rows" | jq -c ".[] | select((((.checkContexts // []) | length) == 0) or ((.state == \"OPEN\") and ((.reviewDecision // \"\") == \"\") and (((.reviews.nodes // []) | length) == 0)))" > "$tmpdir/fallback.ndjson"',
                 'while IFS= read -r row; do',
                 '  number="$(printf "%s" "$row" | jq -r ".number")"',
                 '  sha="$(printf "%s" "$row" | jq -r ".headRefOid")"',
+                '  need_checks="$(printf "%s" "$row" | jq -r "(((.checkContexts // []) | length) == 0)")"',
+                '  need_reviews="$(printf "%s" "$row" | jq -r "((.state == \"OPEN\") and ((.reviewDecision // \"\") == \"\") and (((.reviews.nodes // []) | length) == 0))")"',
                 '  (',
+                '    check_evidence="[]"',
+                '    check_error=""',
+                '    suites="[]"',
                 '    suite_error=""',
-                '    suites="$(gh api -H "Accept: application/vnd.github+json" "repos/$repo/commits/$sha/check-suites?per_page=100" --jq "[.check_suites[]? | {status:(.status // \\\"\\\"),conclusion:(.conclusion // \\\"\\\")}]" 2>"$tmpdir/suites-$number.err")" || { suites="[]"; suite_error="$(tr "\\n" " " < "$tmpdir/suites-$number.err")"; }',
-                "    jq -nc --argjson number \"$number\" --argjson suites \"$suites\" --arg suiteError \"$suite_error\" '{number:$number,checkSuites:$suites,suiteError:$suiteError}' > \"$tmpdir/detail-$number.json\"",
+                '    review_evidence="[]"',
+                '    review_error=""',
+                '    review_request_count=0',
+                '    review_request_error=""',
+                '    if [ "$need_checks" = "true" ]; then',
+                '      runs_ok=1',
+                '      statuses_ok=1',
+                '      suites_ok=1',
+                '      runs="$(gh api -H "Accept: application/vnd.github+json" "repos/$repo/commits/$sha/check-runs?per_page=100" --jq "[.check_runs[]? | {__typename:\"CheckRun\",name:(.name // \"\"),status:(.status // \"\"),conclusion:(.conclusion // \"\")}]" 2>/dev/null)" || { runs="[]"; runs_ok=0; }',
+                '      statuses="$(gh api -H "Accept: application/vnd.github+json" "repos/$repo/commits/$sha/status" --jq "[.statuses[]? | {__typename:\"StatusContext\",context:(.context // \"\"),state:(.state // \"\")}]" 2>/dev/null)" || { statuses="[]"; statuses_ok=0; }',
+                '      suites="$(gh api -H "Accept: application/vnd.github+json" "repos/$repo/commits/$sha/check-suites?per_page=100" --jq "[.check_suites[]? | {status:(.status // \"\"),conclusion:(.conclusion // \"\")}]" 2>/dev/null)" || { suites="[]"; suites_ok=0; }',
+                '      check_evidence="$(jq -nc --argjson runs "$runs" --argjson statuses "$statuses" "$runs + $statuses")"',
+                '      [ "$runs_ok" -eq 1 ] || [ "$statuses_ok" -eq 1 ] || check_error="DIRECT CHECK EVIDENCE LOOKUP FAILED"',
+                '      [ "$suites_ok" -eq 1 ] || suite_error="CHECK SUITE LOOKUP FAILED"',
+                '    fi',
+                '    if [ "$need_reviews" = "true" ]; then',
+                '      reviews_ok=1',
+                '      requests_ok=1',
+                '      review_evidence="$(gh api -H "Accept: application/vnd.github+json" "repos/$repo/pulls/$number/reviews?per_page=100" --jq "[.[]? | {state:(.state // \"\"),author:{login:(.user.login // \"\")}}]" 2>/dev/null)" || { review_evidence="[]"; reviews_ok=0; }',
+                '      review_request_count="$(gh api -H "Accept: application/vnd.github+json" "repos/$repo/pulls/$number/requested_reviewers" --jq "((.users // []) | length) + ((.teams // []) | length)" 2>/dev/null)" || { review_request_count=0; requests_ok=0; }',
+                '      [ "$reviews_ok" -eq 1 ] || review_error="REVIEW LOOKUP FAILED"',
+                '      [ "$requests_ok" -eq 1 ] || review_request_error="REVIEW REQUEST LOOKUP FAILED"',
+                '    fi',
+                '    jq -nc --argjson number "$number" --argjson checkEvidence "$check_evidence" --argjson checkEvidenceLoaded "$need_checks" --arg checkEvidenceError "$check_error" --argjson checkSuites "$suites" --arg suiteError "$suite_error" --argjson reviewEvidence "$review_evidence" --argjson reviewEvidenceLoaded "$need_reviews" --arg reviewEvidenceError "$review_error" --argjson reviewRequestCount "$review_request_count" --argjson reviewRequestEvidenceLoaded "$need_reviews" --arg reviewRequestError "$review_request_error" "{number:\$number,checkEvidence:\$checkEvidence,checkEvidenceLoaded:\$checkEvidenceLoaded,checkEvidenceError:\$checkEvidenceError,checkSuites:\$checkSuites,suiteError:\$suiteError,reviewEvidence:\$reviewEvidence,reviewEvidenceLoaded:\$reviewEvidenceLoaded,reviewEvidenceError:\$reviewEvidenceError,reviewRequestCount:\$reviewRequestCount,reviewRequestEvidenceLoaded:\$reviewRequestEvidenceLoaded,reviewRequestError:\$reviewRequestError}" > "$tmpdir/detail-$number.json"',
                 '  ) &',
                 '  while [ "$(jobs -rp | wc -l)" -ge 8 ]; do',
                 '    wait -n || true',
@@ -566,7 +628,7 @@ Scope {
                 'if ls "$tmpdir"/detail-*.json >/dev/null 2>&1; then',
                 '  details_json="$(jq -s "." "$tmpdir"/detail-*.json)"',
                 'fi',
-                "jq -nc --argjson rows \"$rows\" --argjson details \"$details_json\" '$rows | map(. as $row | (($details | map(select(.number == $row.number)) | first) // {checkSuites:[],suiteError:\"\"}) as $detail | $row + {checkSuites:$detail.checkSuites,suiteError:$detail.suiteError})'",
+                "jq -nc --argjson rows "$rows" --argjson details "$details_json" '$rows | map(. as $row | (($details | map(select(.number == $row.number)) | first) // {checkEvidence:[],checkEvidenceLoaded:false,checkEvidenceError:"",checkSuites:[],suiteError:"",reviewEvidence:[],reviewEvidenceLoaded:false,reviewEvidenceError:"",reviewRequestCount:0,reviewRequestEvidenceLoaded:false,reviewRequestError:""}) as $detail | $row + $detail)'",
                 'rm -rf "$tmpdir"'
             ].join("\n"),
             "pa-github-pulls-graphql",

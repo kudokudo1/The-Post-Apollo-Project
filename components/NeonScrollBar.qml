@@ -11,6 +11,7 @@ Item {
     property int topInset: 0
     property int bottomInset: 0
     property int rightInset: 2
+    property int trackTopExtension: 0
 
     parent:
         flickable && flickable.parent
@@ -130,6 +131,7 @@ Item {
             top: parent.top
             bottom: parent.bottom
             horizontalCenter: parent.horizontalCenter
+            topMargin: -root.trackTopExtension
         }
 
         radius: 1

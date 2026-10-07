@@ -1,0 +1,37 @@
+name: "Dock button contracts"
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "components/DockButton.qml"
+      - "components/Basicbutton.qml.template"
+      - "components/qmldir"
+      - "modules/Git.qml"
+      - "tests/components/test_dock_button_contracts.py"
+      - ".github/workflows/dock-button-contracts.yml"
+  pull_request:
+    paths:
+      - "components/DockButton.qml"
+      - "components/Basicbutton.qml.template"
+      - "components/qmldir"
+      - "modules/Git.qml"
+      - "tests/components/test_dock_button_contracts.py"
+      - ".github/workflows/dock-button-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    name: Dock button contracts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate reusable dock button contracts
+        run: python3 tests/components/test_dock_button_contracts.py

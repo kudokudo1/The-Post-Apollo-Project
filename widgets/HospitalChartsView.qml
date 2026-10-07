@@ -11,6 +11,23 @@ Item {
     property int selectedIndex: -1
     property bool editorOpen: false
     property string editorMode: "NEW"
+    property bool suggestionPanelOpen: false
+    property int selectedSuggestionIndex: -1
+    property string suggestionDecisionNote: ""
+
+    readonly property var sourceSuggestions:
+        scopeMode === "PATIENT"
+        ? chartService.patientSuggestions
+        : chartService.roomSuggestions
+
+    readonly property var selectedSuggestion: {
+        const rows = Array.isArray(sourceSuggestions)
+            ? sourceSuggestions : [];
+        if (selectedSuggestionIndex < 0
+                || selectedSuggestionIndex >= rows.length)
+            return null;
+        return rows[selectedSuggestionIndex] || null;
+    }
 
     readonly property var sourceEntries:
         scopeMode === "PATIENT"
@@ -53,6 +70,42 @@ Item {
 
     function resetSelection() {
         selectedIndex = displayEntries.length > 0 ? 0 : -1;
+    }
+
+    function resetSuggestionSelection() {
+        const rows = Array.isArray(sourceSuggestions)
+            ? sourceSuggestions : [];
+        selectedSuggestionIndex = rows.length > 0 ? 0 : -1;
+        suggestionDecisionNote = "";
+    }
+
+    function openSuggestionPanel() {
+        editorOpen = false;
+        suggestionPanelOpen = true;
+        resetSuggestionSelection();
+        chartService.refreshSuggestions();
+    }
+
+    function closeSuggestionPanel() {
+        suggestionPanelOpen = false;
+        suggestionDecisionNote = "";
+    }
+
+    function promoteSelectedSuggestion() {
+        if (!selectedSuggestion)
+            return false;
+        return chartService.promoteSuggestion(
+            String(selectedSuggestion.id || "")
+        );
+    }
+
+    function rejectSelectedSuggestion() {
+        if (!selectedSuggestion)
+            return false;
+        return chartService.rejectSuggestion(
+            String(selectedSuggestion.id || ""),
+            suggestionDecisionNote
+        );
     }
 
     function openEditor(modeValue) {
@@ -102,6 +155,7 @@ Item {
     onScopeModeChanged: {
         editorOpen = false;
         resetSelection();
+        resetSuggestionSelection();
     }
 
     onStatusFilterChanged: {
@@ -129,6 +183,24 @@ Item {
 
         function onEntryStatusChanged(entry) {
             root.editorOpen = false;
+        }
+
+        function onSuggestionsRefreshed() {
+            if (root.suggestionPanelOpen)
+                root.resetSuggestionSelection();
+        }
+
+        function onSuggestionDecision(operation, result) {
+            root.suggestionDecisionNote = "";
+            chartService.refreshAll();
+
+            if (String(operation || "") === "PROMOTE") {
+                root.suggestionPanelOpen = false;
+                root.statusFilter = "ACTIVE";
+                root.resetSelection();
+            } else {
+                Qt.callLater(root.resetSuggestionSelection);
+            }
         }
     }
 
@@ -194,7 +266,7 @@ Item {
                 spacing: 6
 
                 GohuText {
-                    width: Math.max(150, parent.width - 536)
+                    width: Math.max(150, parent.width - 638)
                     anchors.verticalCenter: parent.verticalCenter
                     text:
                         "HOSPITAL CHART // "
@@ -246,6 +318,23 @@ Item {
                         onTriggered:
                             root.statusFilter = modelData
                     }
+                }
+
+                ChartButton {
+                    width: 96
+                    anchors.verticalCenter: parent.verticalCenter
+                    label:
+                        "SUGGEST "
+                        + String(chartService.pendingSuggestionCount)
+                    accent: Colors.magenta
+                    selectedAction: root.suggestionPanelOpen
+                    enabledAction:
+                        !chartService.suggestionWriting
+                        && (
+                            chartService.patientId.length > 0
+                            || chartService.roomId.length > 0
+                        )
+                    onTriggered: root.openSuggestionPanel()
                 }
 
                 ChartButton {
@@ -788,4 +877,431 @@ Item {
             }
         }
     }
+
+    Rectangle {
+        id: suggestionOverlay
+        z: 900
+        anchors.fill: parent
+        visible: root.suggestionPanelOpen
+        color: Colors.dark
+        border.width: 2
+        border.color: Colors.magenta
+
+        Column {
+            anchors {
+                fill: parent
+                margins: 10
+            }
+            spacing: 8
+
+            Rectangle {
+                width: parent.width
+                height: 42
+                color: Colors.black
+                border.width: 1
+                border.color: Colors.magenta
+
+                Row {
+                    anchors {
+                        fill: parent
+                        margins: 7
+                    }
+                    spacing: 6
+
+                    GohuText {
+                        width: Math.max(120, parent.width - 420)
+                        anchors.verticalCenter: parent.verticalCenter
+                        text:
+                            "MEMORY SUGGESTIONS // "
+                            + root.scopeMode
+                            + " // PENDING "
+                            + String(
+                                Array.isArray(root.sourceSuggestions)
+                                ? root.sourceSuggestions.length
+                                : 0
+                              )
+                        font.pixelSize: 11
+                        color: Colors.magenta
+                        elide: Text.ElideRight
+                    }
+
+                    Repeater {
+                        model: ["PATIENT", "ROOM"]
+
+                        ChartButton {
+                            required property string modelData
+                            width: 82
+                            anchors.verticalCenter: parent.verticalCenter
+                            label: modelData
+                            accent:
+                                modelData === "PATIENT"
+                                ? Colors.cyan : Colors.green
+                            selectedAction:
+                                root.scopeMode === modelData
+                            enabledAction:
+                                modelData === "PATIENT"
+                                ? chartService.patientId.length > 0
+                                : chartService.roomId.length > 0
+                            onTriggered:
+                                root.scopeMode = modelData
+                        }
+                    }
+
+                    ChartButton {
+                        width: 78
+                        anchors.verticalCenter: parent.verticalCenter
+                        label:
+                            chartService.patientSuggestionLoading
+                            || chartService.roomSuggestionLoading
+                            ? "READING" : "REFRESH"
+                        accent: Colors.blue
+                        enabledAction:
+                            !chartService.patientSuggestionLoading
+                            && !chartService.roomSuggestionLoading
+                            && !chartService.suggestionWriting
+                        onTriggered: chartService.refreshSuggestions()
+                    }
+
+                    ChartButton {
+                        width: 68
+                        anchors.verticalCenter: parent.verticalCenter
+                        label: "BACK"
+                        accent: Colors.orange
+                        enabledAction: !chartService.suggestionWriting
+                        onTriggered: root.closeSuggestionPanel()
+                    }
+                }
+            }
+
+            Row {
+                width: parent.width
+                height: parent.height - 50
+                spacing: 8
+
+                Rectangle {
+                    width: Math.max(280, parent.width * 0.36)
+                    height: parent.height
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.magenta
+
+                    ListView {
+                        id: suggestionList
+                        anchors {
+                            fill: parent
+                            margins: 7
+                        }
+                        spacing: 6
+                        clip: true
+                        model: root.sourceSuggestions
+
+                        delegate: Rectangle {
+                            required property var modelData
+                            required property int index
+
+                            width: suggestionList.width
+                            height: 94
+                            color:
+                                root.selectedSuggestionIndex === index
+                                ? Colors.dark : Colors.black
+                            border.width:
+                                root.selectedSuggestionIndex === index
+                                ? 2 : 1
+                            border.color:
+                                root.selectedSuggestionIndex === index
+                                ? Colors.orange : Colors.magenta
+
+                            Column {
+                                anchors {
+                                    fill: parent
+                                    margins: 7
+                                }
+                                spacing: 3
+
+                                GohuText {
+                                    width: parent.width
+                                    text:
+                                        "#"
+                                        + String(modelData.id || "?")
+                                        + " // P"
+                                        + String(modelData.priority || 0)
+                                        + " // "
+                                        + String(modelData.kind || "NOTE")
+                                    font.pixelSize: 8
+                                    color: Colors.magenta
+                                    elide: Text.ElideRight
+                                }
+
+                                GohuText {
+                                    width: parent.width
+                                    text:
+                                        String(
+                                            modelData.title
+                                            || "(UNTITLED SUGGESTION)"
+                                        )
+                                    font.pixelSize: 10
+                                    color: Colors.white
+                                    elide: Text.ElideRight
+                                }
+
+                                GohuText {
+                                    width: parent.width
+                                    text:
+                                        "DR "
+                                        + String(modelData.doctorId || "?")
+                                        + " // "
+                                        + String(modelData.providerId || "?")
+                                    font.pixelSize: 8
+                                    color: Colors.cyan
+                                    elide: Text.ElideRight
+                                }
+
+                                GohuText {
+                                    width: parent.width
+                                    text: String(modelData.body || "")
+                                    font.pixelSize: 8
+                                    color: Colors.blue
+                                    elide: Text.ElideRight
+                                }
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked:
+                                    root.selectedSuggestionIndex = index
+                            }
+                        }
+
+                        GohuText {
+                            anchors.centerIn: parent
+                            visible:
+                                !chartService.patientSuggestionLoading
+                                && !chartService.roomSuggestionLoading
+                                && (
+                                    !Array.isArray(root.sourceSuggestions)
+                                    || root.sourceSuggestions.length === 0
+                                )
+                            text:
+                                "NO PENDING "
+                                + root.scopeMode
+                                + " MEMORY SUGGESTIONS"
+                            font.pixelSize: 9
+                            color: Colors.magenta
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width:
+                        parent.width
+                        - Math.max(280, parent.width * 0.36)
+                        - parent.spacing
+                    height: parent.height
+                    color: Colors.black
+                    border.width: 1
+                    border.color:
+                        root.selectedSuggestion
+                        ? Colors.magenta : Colors.blue
+
+                    Column {
+                        anchors {
+                            fill: parent
+                            margins: 10
+                        }
+                        spacing: 7
+
+                        GohuText {
+                            width: parent.width
+                            text:
+                                root.selectedSuggestion
+                                ? (
+                                    "DOCTOR MEMORY PROPOSAL // #"
+                                    + String(root.selectedSuggestion.id)
+                                    + " // "
+                                    + String(root.selectedSuggestion.scope)
+                                  )
+                                : "DOCTOR MEMORY PROPOSAL // NONE SELECTED"
+                            font.pixelSize: 12
+                            color: Colors.magenta
+                            elide: Text.ElideRight
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            visible: root.selectedSuggestion !== null
+                            text:
+                                root.selectedSuggestion
+                                ? (
+                                    "P"
+                                    + String(root.selectedSuggestion.priority || 0)
+                                    + " // "
+                                    + String(root.selectedSuggestion.kind || "NOTE")
+                                    + " // "
+                                    + String(
+                                        root.selectedSuggestion.title
+                                        || "(UNTITLED)"
+                                      )
+                                  )
+                                : ""
+                            font.pixelSize: 9
+                            color: Colors.cyan
+                            elide: Text.ElideRight
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            visible: root.selectedSuggestion !== null
+                            text:
+                                root.selectedSuggestion
+                                ? (
+                                    "DOCTOR // "
+                                    + String(root.selectedSuggestion.doctorId || "-")
+                                    + " // PROVIDER // "
+                                    + String(root.selectedSuggestion.providerId || "-")
+                                  )
+                                : ""
+                            font.pixelSize: 8
+                            color: Colors.green
+                            elide: Text.ElideRight
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            visible: root.selectedSuggestion !== null
+                            text:
+                                root.selectedSuggestion
+                                ? (
+                                    "PROVENANCE // ROOM "
+                                    + String(root.selectedSuggestion.sourceRoomId || "-")
+                                    + " // SESSION "
+                                    + String(root.selectedSuggestion.sourceSessionId || "-")
+                                    + " // MSG "
+                                    + String(root.selectedSuggestion.sourceMessageId || "-")
+                                    + " // REPORT "
+                                    + String(root.selectedSuggestion.sourceReportId || "-")
+                                    + " // CHECKPOINT "
+                                    + String(root.selectedSuggestion.sourceCheckpointId || "-")
+                                  )
+                                : ""
+                            font.pixelSize: 8
+                            color: Colors.orange
+                            elide: Text.ElideRight
+                        }
+
+                        Flickable {
+                            width: parent.width
+                            height: Math.max(120, parent.height - 238)
+                            clip: true
+                            contentWidth: width
+                            contentHeight: suggestionBody.implicitHeight
+
+                            GohuText {
+                                id: suggestionBody
+                                width: parent.width
+                                text:
+                                    root.selectedSuggestion
+                                    ? String(root.selectedSuggestion.body || "")
+                                    : ""
+                                font.pixelSize: 10
+                                color: Colors.white
+                                wrapMode: Text.Wrap
+                            }
+
+                            NeonScrollBar {
+                                flickable: parent
+                            }
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 54
+                            color: Colors.dark
+                            border.width: 1
+                            border.color:
+                                suggestionNote.activeFocus
+                                ? Colors.orange : Colors.blue
+
+                            TextEdit {
+                                id: suggestionNote
+                                anchors {
+                                    fill: parent
+                                    margins: 6
+                                }
+                                text: root.suggestionDecisionNote
+                                color: Colors.white
+                                font.family:
+                                    "GohuFont 11 Nerd Font Mono"
+                                font.pixelSize: 9
+                                wrapMode: TextEdit.Wrap
+                                selectByMouse: true
+                                onTextChanged:
+                                    root.suggestionDecisionNote = text
+                            }
+                        }
+
+                        Row {
+                            width: parent.width
+                            height: 28
+                            spacing: 6
+
+                            GohuText {
+                                width: parent.width - 188
+                                anchors.verticalCenter:
+                                    parent.verticalCenter
+                                text:
+                                    "OPERATOR DECISION NOTE // OPTIONAL"
+                                font.pixelSize: 8
+                                color: Colors.blue
+                            }
+
+                            ChartButton {
+                                width: 88
+                                height: parent.height
+                                label:
+                                    chartService.suggestionWriting
+                                    && chartService.pendingSuggestionOperation
+                                       === "PROMOTE"
+                                    ? "PROMOTING" : "PROMOTE"
+                                accent: Colors.green
+                                enabledAction:
+                                    root.selectedSuggestion !== null
+                                    && !chartService.suggestionWriting
+                                onTriggered:
+                                    root.promoteSelectedSuggestion()
+                            }
+
+                            ChartButton {
+                                width: 88
+                                height: parent.height
+                                label:
+                                    chartService.suggestionWriting
+                                    && chartService.pendingSuggestionOperation
+                                       === "REJECT"
+                                    ? "REJECTING" : "REJECT"
+                                accent: Colors.red
+                                enabledAction:
+                                    root.selectedSuggestion !== null
+                                    && !chartService.suggestionWriting
+                                onTriggered:
+                                    root.rejectSelectedSuggestion()
+                            }
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            visible: chartService.lastError.length > 0
+                            text: chartService.lastError
+                            font.pixelSize: 8
+                            color: Colors.red
+                            wrapMode: Text.Wrap
+                            maximumLineCount: 3
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
+            }
+        }
+    }
+
 }

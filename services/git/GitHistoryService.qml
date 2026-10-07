@@ -47,6 +47,15 @@ Scope {
     property bool reflogBusy: false
     property var reflogRows: []
     property string reflogStatus: "READY"
+    property string reflogHeadSha: ""
+    property string reflogBranch: ""
+
+    readonly property int reflogRecoveryCount:
+        reflogRows.filter(function(row) {
+            const item = row || {};
+            return !Boolean(item.reachable)
+                && !Boolean(item.isHead);
+        }).length
 
     property var activeLanes: []
 
@@ -503,7 +512,19 @@ Scope {
             "-lc",
             [
                 'repo="$1"',
-                'git -C "$repo" reflog --all -n 200 --date=iso --format="RROW%x09%H%x09%gD%x09%gs"'
+                'reachable="$(mktemp)"',
+                'trap \'rm -f "$reachable"\' EXIT',
+                'git -C "$repo" rev-list --all > "$reachable" 2>/dev/null || true',
+                'head_sha="$(git -C "$repo" rev-parse HEAD 2>/dev/null || true)"',
+                'branch="$(git -C "$repo" branch --show-current 2>/dev/null || true)"',
+                'printf "RHEAD\\t%s\\t%s\\n" "$head_sha" "$branch"',
+                'git -C "$repo" reflog --all -n 200 --date=iso --format="%H%x09%gD%x09%gs" | while IFS="$(printf "\\t")" read -r sha selector subject; do',
+                '  reachable_now=0',
+                '  is_head=0',
+                '  [ -n "$sha" ] && grep -Fxq "$sha" "$reachable" && reachable_now=1',
+                '  [ -n "$sha" ] && [ "$sha" = "$head_sha" ] && is_head=1',
+                '  printf "RROW\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$sha" "$selector" "$reachable_now" "$is_head" "$subject"',
+                'done'
             ].join("\n"),
             "git-history-reflog",
             repo
@@ -514,6 +535,8 @@ Scope {
 
     function parseReflog(text) {
         const out = [];
+        let nextHeadSha = "";
+        let nextBranch = "";
         const lines = String(text || "").split("\n");
 
         for (let i = 0; i < lines.length; ++i) {
@@ -522,20 +545,41 @@ Scope {
                 continue;
 
             const p = line.split("\t");
+            const kind = p.length > 0 ? p[0] : "";
+
+            if (kind === "RHEAD") {
+                nextHeadSha = p.length > 1 ? p[1] : "";
+                nextBranch = p.length > 2 ? p.slice(2).join("\t") : "";
+                continue;
+            }
+
+            if (kind !== "RROW")
+                continue;
+
             const sha = p.length > 1 ? p[1] : "";
 
             out.push({
                 sha: sha,
                 shortSha: sha.slice(0, 8),
                 selector: p.length > 2 ? p[2] : "",
-                subject:
+                reachable:
                     p.length > 3
-                    ? p.slice(3).join("\t")
+                    ? p[3] === "1"
+                    : false,
+                isHead:
+                    p.length > 4
+                    ? p[4] === "1"
+                    : false,
+                subject:
+                    p.length > 5
+                    ? p.slice(5).join("\t")
                     : ""
             });
         }
 
         reflogRows = out;
+        reflogHeadSha = nextHeadSha;
+        reflogBranch = nextBranch;
     }
 
     function maybeFinishReflog() {
@@ -563,7 +607,9 @@ Scope {
         reflogStatus =
             "REFLOG // "
             + String(reflogRows.length)
-            + " ENTRIES";
+            + " ENTRIES // "
+            + String(reflogRecoveryCount)
+            + " RECOVERY";
     }
 
     function showCommit(sha) {

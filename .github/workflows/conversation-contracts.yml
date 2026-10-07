@@ -28,4 +28,4 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Validate shared conversation contracts
-        run: python3 -m pytest -q tests/messaging/test_conversation_contracts.py
+        run: python3 tests/messaging/test_conversation_contracts.py

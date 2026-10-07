@@ -27,8 +27,12 @@ Scope {
     property string lastError: ""
 
     property string pendingPreviewDestination: ""
+    property string pendingPreviewScope: "file"
+    property int pendingPreviewHunkIndex: -1
     property string previewDestinationPath: ""
     property string previewMode: "move"
+    property string previewScope: "file"
+    property int previewHunkIndex: -1
     property var previewFiles: []
     property string previewFingerprint: ""
     property string previewSourceBranch: ""
@@ -97,8 +101,12 @@ Scope {
 
     function clearPreview() {
         pendingPreviewDestination = "";
+        pendingPreviewScope = "file";
+        pendingPreviewHunkIndex = -1;
         previewDestinationPath = "";
         previewMode = "move";
+        previewScope = "file";
+        previewHunkIndex = -1;
         previewFiles = [];
         previewFingerprint = "";
         previewSourceBranch = "";
@@ -109,10 +117,21 @@ Scope {
         previewPatchLines = 0;
     }
 
+    function journalKind() {
+        return previewScope === "hunk"
+            ? "CHANGES/TRANSFER_HUNK"
+            : "CHANGES/TRANSFER";
+    }
+
     function transferContext() {
         return {
             source: "GitChangeTransferService",
-            operation: "TRANSFER",
+            operation:
+                previewScope === "hunk"
+                ? "TRANSFER_HUNK"
+                : "TRANSFER",
+            scope: String(previewScope || "file"),
+            hunkIndex: Number(previewHunkIndex),
             mode: String(previewMode || "move"),
             sourcePath: String(repositoryPath || ""),
             destinationPath: String(previewDestinationPath || ""),
@@ -240,8 +259,152 @@ Scope {
             args.push(selected[i]);
 
         pendingPreviewDestination = destination;
+        pendingPreviewScope = "file";
+        pendingPreviewHunkIndex = -1;
         previewBusy = true;
         status = "TRANSFER // PREVIEWING";
+        previewExitSeen = false;
+        previewStdoutSeen = false;
+        previewStderrSeen = false;
+        previewExitCode = -1;
+        previewStdoutText = "";
+        previewStderrText = "";
+
+        previewProcess.exec(args);
+        return true;
+    }
+
+    function previewHunk(destinationPath, path, hunkIndex, mode) {
+        if (previewBusy || transferBusy)
+            return false;
+
+        const source = String(repositoryPath || "").trim();
+        const destination = String(destinationPath || "").trim();
+        const target = String(path || "").trim();
+        const index = Number(hunkIndex);
+        const transferMode = normalizedMode(mode);
+
+        clearPreview();
+        lastError = "";
+
+        if (!source
+                || !destination
+                || !target
+                || !Number.isInteger(index)
+                || index < 0) {
+            lastError =
+                !source
+                ? "HUNK TRANSFER PREVIEW // NO SOURCE REPOSITORY"
+                : !destination
+                ? "HUNK TRANSFER PREVIEW // NO DESTINATION WORKTREE"
+                : !target
+                ? "HUNK TRANSFER PREVIEW // NO FILE SELECTED"
+                : "HUNK TRANSFER PREVIEW // INVALID HUNK";
+            status = lastError;
+            previewFailed(lastError);
+            return false;
+        }
+
+        const args = [
+            "bash",
+            "-lc",
+            [
+                'source="$1"',
+                'destination="$2"',
+                'mode="$3"',
+                'path="$4"',
+                'hunk_index="$5"',
+                'refuse() { printf "REFUSED\\t%s\\n" "$1"; exit 1; }',
+                'is_git_worktree() { git -C "$1" rev-parse --is-inside-work-tree >/dev/null 2>&1; }',
+                'absolute_common() {',
+                '  dir="$(git -C "$1" rev-parse --git-common-dir 2>/dev/null)" || return 1',
+                '  case "$dir" in /*) ;; *) dir="$1/$dir" ;; esac',
+                '  realpath "$dir" 2>/dev/null',
+                '}',
+                'active_state() {',
+                '  repo="$1"',
+                '  gitdir="$(git -C "$repo" rev-parse --git-dir 2>/dev/null)" || return 0',
+                '  case "$gitdir" in /*) ;; *) gitdir="$repo/$gitdir" ;; esac',
+                '  if [ -f "$gitdir/MERGE_HEAD" ]; then printf "MERGE";',
+                '  elif [ -d "$gitdir/rebase-merge" ] || [ -d "$gitdir/rebase-apply" ]; then printf "REBASE";',
+                '  elif [ -f "$gitdir/CHERRY_PICK_HEAD" ]; then printf "CHERRY_PICK";',
+                '  elif [ -f "$gitdir/REVERT_HEAD" ]; then printf "REVERT";',
+                '  else printf "NONE"; fi',
+                '}',
+                'is_git_worktree "$source" || refuse "SOURCE IS NOT A GIT WORKTREE"',
+                'is_git_worktree "$destination" || refuse "DESTINATION IS NOT A GIT WORKTREE"',
+                'source="$(realpath "$source")" || refuse "SOURCE PATH CANNOT BE RESOLVED"',
+                'destination="$(realpath "$destination")" || refuse "DESTINATION PATH CANNOT BE RESOLVED"',
+                '[ "$source" != "$destination" ] || refuse "SOURCE AND DESTINATION ARE THE SAME WORKTREE"',
+                'src_common="$(absolute_common "$source")" || refuse "SOURCE COMMON GIT DIR UNAVAILABLE"',
+                'dst_common="$(absolute_common "$destination")" || refuse "DESTINATION COMMON GIT DIR UNAVAILABLE"',
+                '[ "$src_common" = "$dst_common" ] || refuse "DESTINATION BELONGS TO A DIFFERENT REPOSITORY"',
+                'src_branch="$(git -C "$source" branch --show-current 2>/dev/null || true)"',
+                'dst_branch="$(git -C "$destination" branch --show-current 2>/dev/null || true)"',
+                'src_head="$(git -C "$source" rev-parse HEAD 2>/dev/null || true)"',
+                'dst_head="$(git -C "$destination" rev-parse HEAD 2>/dev/null || true)"',
+                '[ -n "$src_branch" ] || refuse "SOURCE WORKTREE IS DETACHED"',
+                '[ -n "$dst_branch" ] || refuse "DESTINATION WORKTREE IS DETACHED"',
+                '[ "$src_branch" != "$dst_branch" ] || refuse "SOURCE AND DESTINATION USE THE SAME BRANCH"',
+                '[ "$(active_state "$source")" = "NONE" ] || refuse "SOURCE HAS AN ACTIVE GIT OPERATION"',
+                '[ "$(active_state "$destination")" = "NONE" ] || refuse "DESTINATION HAS AN ACTIVE GIT OPERATION"',
+                '[ -z "$(git -C "$destination" status --porcelain=v1 --untracked-files=all 2>/dev/null)" ] || refuse "DESTINATION WORKTREE IS NOT CLEAN"',
+                'git -C "$source" ls-files --error-unmatch -- "$path" >/dev/null 2>&1 || refuse "UNTRACKED OR UNKNOWN SOURCE PATH // $path"',
+                '[ -z "$(git -C "$source" ls-files -u -- "$path" 2>/dev/null)" ] || refuse "CONFLICTED SOURCE PATH // $path"',
+                'git -C "$source" diff --cached --quiet -- "$path"',
+                'rc=$?',
+                '[ "$rc" -eq 0 ] || { [ "$rc" -eq 1 ] && refuse "SELECTED PATH HAS STAGED CHANGES"; refuse "STAGED DIFF CHECK FAILED"; }',
+                'patch="$(mktemp "${TMPDIR:-/tmp}/pa-hunk-transfer-preview.XXXXXX")" || refuse "TEMP PATCH CREATE FAILED"',
+                'trap \'rm -f "$patch"\' EXIT INT TERM',
+                'python3 - "$source" "$path" "$hunk_index" "$patch" <<\'PY\'',
+                'import subprocess, sys',
+                'repo, path, idx_text, output = sys.argv[1:5]',
+                'try:',
+                '    idx = int(idx_text)',
+                'except ValueError:',
+                '    print("INVALID HUNK INDEX", file=sys.stderr); sys.exit(41)',
+                'proc = subprocess.run(["git", "-C", repo, "diff", "--no-ext-diff", "--binary", "--", path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)',
+                'if proc.returncode != 0:',
+                '    sys.stderr.buffer.write(proc.stderr); sys.exit(proc.returncode)',
+                'lines = proc.stdout.decode("utf-8", "surrogateescape").splitlines(True)',
+                'header, hunks, current = [], [], None',
+                'for line in lines:',
+                '    if line.startswith("@@"):',
+                '        if current is not None: hunks.append(current)',
+                '        current = [line]',
+                '    elif current is None:',
+                '        header.append(line)',
+                '    else:',
+                '        current.append(line)',
+                'if current is not None: hunks.append(current)',
+                'if idx < 0 or idx >= len(hunks):',
+                '    print("HUNK NOT FOUND", file=sys.stderr); sys.exit(42)',
+                'patch = "".join(header + hunks[idx]).encode("utf-8", "surrogateescape")',
+                'with open(output, "wb") as handle: handle.write(patch)',
+                'PY',
+                'rc=$?',
+                '[ "$rc" -eq 0 ] || refuse "HUNK PATCH GENERATION FAILED"',
+                '[ -s "$patch" ] || refuse "HUNK PATCH IS EMPTY"',
+                'git -C "$destination" apply --check --binary "$patch" >/dev/null 2>&1 || refuse "HUNK DOES NOT APPLY CLEANLY TO DESTINATION"',
+                'fingerprint="$(sha256sum "$patch" | awk "{print \\$1}")"',
+                'bytes="$(wc -c <"$patch" | tr -d " ")"',
+                'lines="$(wc -l <"$patch" | tr -d " ")"',
+                'printf "PREVIEW\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$fingerprint" "$bytes" "$lines" "$src_branch" "$dst_branch" "$src_head" "$dst_head" "$mode"',
+                'printf "FILE\\t%s\\n" "$path"'
+            ].join("\n"),
+            "git-change-hunk-transfer-preview",
+            source,
+            destination,
+            transferMode,
+            target,
+            String(index)
+        ];
+
+        pendingPreviewDestination = destination;
+        pendingPreviewScope = "hunk";
+        pendingPreviewHunkIndex = index;
+        previewBusy = true;
+        status = "HUNK TRANSFER // PREVIEWING";
         previewExitSeen = false;
         previewStdoutSeen = false;
         previewStderrSeen = false;
@@ -308,8 +471,15 @@ Scope {
         previewDestinationHead = String(header[7] || "");
         previewMode = normalizedMode(header[8]);
         previewDestinationPath = String(pendingPreviewDestination || "");
+        previewScope = String(pendingPreviewScope || "file");
+        previewHunkIndex =
+            previewScope === "hunk"
+            ? Number(pendingPreviewHunkIndex)
+            : -1;
         previewFiles = files;
         pendingPreviewDestination = "";
+        pendingPreviewScope = "file";
+        pendingPreviewHunkIndex = -1;
         lastError = "";
         status =
             "TRANSFER // PREVIEW READY // "
@@ -325,6 +495,8 @@ Scope {
             sourceHead: previewSourceHead,
             destinationHead: previewDestinationHead,
             mode: previewMode,
+            scope: previewScope,
+            hunkIndex: previewHunkIndex,
             files: previewFiles.slice(),
             fingerprint: previewFingerprint,
             patchBytes: previewPatchBytes,
@@ -397,6 +569,8 @@ Scope {
         const fingerprint = String(previewFingerprint || "");
         const sourceHead = String(previewSourceHead || "");
         const destinationHead = String(previewDestinationHead || "");
+        const scope = String(previewScope || "file");
+        const hunkIndex = Number(previewHunkIndex);
 
         if (!source
                 || !destination
@@ -421,7 +595,9 @@ Scope {
                 'expected="$4"',
                 'expected_source_head="$5"',
                 'expected_destination_head="$6"',
-                'shift 6',
+                'scope="$7"',
+                'hunk_index="$8"',
+                'shift 8',
                 'files=("$@")',
                 'refuse() { printf "REFUSED\\t%s\\n" "$1"; exit 1; }',
                 'source="$(realpath "$source")" || refuse "SOURCE PATH CANNOT BE RESOLVED"',
@@ -446,7 +622,39 @@ Scope {
                 '[ "$rc" -eq 0 ] || refuse "SELECTED PATH STAGING CHANGED SINCE PREVIEW"',
                 'patch="$(mktemp "${TMPDIR:-/tmp}/pa-transfer-exec.XXXXXX")" || refuse "TEMP PATCH CREATE FAILED"',
                 'trap \'rm -f "$patch"\' EXIT INT TERM',
-                'git -C "$source" diff --binary --full-index -- "${files[@]}" >"$patch" || refuse "PATCH REGENERATION FAILED"',
+                'if [ "$scope" = "hunk" ]; then',
+                '  [ "${#files[@]}" -eq 1 ] || refuse "HUNK TRANSFER REQUIRES EXACTLY ONE FILE"',
+                '  python3 - "$source" "${files[0]}" "$hunk_index" "$patch" <<\'PY\'',
+                'import subprocess, sys',
+                'repo, path, idx_text, output = sys.argv[1:5]',
+                'try:',
+                '    idx = int(idx_text)',
+                'except ValueError:',
+                '    print("INVALID HUNK INDEX", file=sys.stderr); sys.exit(43)',
+                'proc = subprocess.run(["git", "-C", repo, "diff", "--no-ext-diff", "--binary", "--", path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)',
+                'if proc.returncode != 0:',
+                '    sys.stderr.buffer.write(proc.stderr); sys.exit(proc.returncode)',
+                'lines = proc.stdout.decode("utf-8", "surrogateescape").splitlines(True)',
+                'header, hunks, current = [], [], None',
+                'for line in lines:',
+                '    if line.startswith("@@"):',
+                '        if current is not None: hunks.append(current)',
+                '        current = [line]',
+                '    elif current is None:',
+                '        header.append(line)',
+                '    else:',
+                '        current.append(line)',
+                'if current is not None: hunks.append(current)',
+                'if idx < 0 or idx >= len(hunks):',
+                '    print("HUNK NOT FOUND", file=sys.stderr); sys.exit(44)',
+                'patch = "".join(header + hunks[idx]).encode("utf-8", "surrogateescape")',
+                'with open(output, "wb") as handle: handle.write(patch)',
+                'PY',
+                '  rc=$?',
+                '  [ "$rc" -eq 0 ] || refuse "HUNK PATCH REGENERATION FAILED"',
+                'else',
+                '  git -C "$source" diff --binary --full-index -- "${files[@]}" >"$patch" || refuse "PATCH REGENERATION FAILED"',
+                'fi',
                 '[ -s "$patch" ] || refuse "SOURCE PATCH DISAPPEARED SINCE PREVIEW"',
                 'actual="$(sha256sum "$patch" | awk "{print \\$1}")"',
                 '[ "$actual" = "$expected" ] || refuse "SOURCE CHANGES DIFFER FROM PREVIEW"',
@@ -472,7 +680,9 @@ Scope {
             mode,
             fingerprint,
             sourceHead,
-            destinationHead
+            destinationHead,
+            scope,
+            String(hunkIndex)
         ];
 
         for (let i = 0; i < files.length; ++i)
@@ -629,7 +839,7 @@ Scope {
                 root.pendingJournalId =
                     root.operationJournal
                     ? root.operationJournal.beginOperation(
-                        "CHANGES/TRANSFER",
+                        root.journalKind(),
                         beforeSnapshot,
                         root.transferContext()
                     )

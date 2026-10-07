@@ -442,15 +442,15 @@ Scope {
         inspectorWatchdog.stop();
     }
 
-    function runWorkflow(workflowPath) {
-        runRemoteAction("run", workflowPath);
+    function runWorkflow(workflowPath, ref) {
+        runRemoteAction("run", workflowPath, ref);
     }
 
     function deleteWorkflow(workflowPath) {
         runRemoteAction("delete-workflow", workflowPath);
     }
 
-    function runWorkflowBatch(workflowPaths) {
+    function runWorkflowBatch(workflowPaths, ref) {
         if (actionBusy || refreshing)
             return;
 
@@ -480,12 +480,15 @@ Scope {
         actionStdoutText = "";
         actionStderrText = "";
 
+        const cleanRef = String(ref || "").trim();
+
         const args = [
             "bash",
             "-lc",
-            'repo="$1"; shift; for workflow in "$@"; do "$HOME/.local/bin/px" run "$repo" "$workflow" || exit $?; done',
+            'repo="$1"; ref="$2"; shift 2; for workflow in "$@"; do "$HOME/.local/bin/px" run "$repo" "$workflow" "$ref" || exit $?; done',
             "px-batch",
-            repoSlug
+            repoSlug,
+            cleanRef
         ];
 
         for (let i = 0; i < targets.length; ++i)
@@ -496,14 +499,14 @@ Scope {
     }
 
     function rerunRun(runId) {
-        runRemoteAction("rerun", String(runId || ""));
+        runRemoteAction("rerun", String(runId || ""), "");
     }
 
     function cancelRun(runId) {
-        runRemoteAction("cancel", String(runId || ""));
+        runRemoteAction("cancel", String(runId || ""), "");
     }
 
-    function runRemoteAction(kind, target) {
+    function runRemoteAction(kind, target, ref) {
         if (actionBusy || refreshing)
             return;
 
@@ -551,6 +554,16 @@ Scope {
                 "github-delete-workflow",
                 repoSlug,
                 cleanTarget
+            ]);
+        } else if (kind === "run") {
+            remoteActionProcess.exec([
+                "bash",
+                "-lc",
+                'exec "$HOME/.local/bin/px" run "$1" "$2" "$3"',
+                "px-action",
+                repoSlug,
+                cleanTarget,
+                String(ref || "").trim()
             ]);
         } else {
             remoteActionProcess.exec([

@@ -119,6 +119,22 @@ Scope {
     property bool actionBusy: false
     property string actionKind: ""
     property string actionResult: "READY"
+
+    property var batchStepResults: []
+    property string batchRepository: ""
+    property string batchRef: ""
+    readonly property int batchStepSuccessCount:
+        batchStepResults.filter(function(row) {
+            return String((row || {}).state || "") === "OK";
+        }).length
+    readonly property int batchStepFailureCount:
+        batchStepResults.filter(function(row) {
+            return String((row || {}).state || "") === "FAILED";
+        }).length
+    readonly property int batchStepSkippedCount:
+        batchStepResults.filter(function(row) {
+            return String((row || {}).state || "") === "SKIPPED";
+        }).length
     property bool actionExitSeen: false
     property bool actionStdoutSeen: false
     property bool actionStderrSeen: false
@@ -586,6 +602,9 @@ Scope {
         actionBusy = true;
         actionKind = "batch";
         actionResult = "QUEUE // DISPATCHING " + String(targets.length);
+        batchStepResults = [];
+        batchRepository = repoSlug;
+        batchRef = String(ref || "").trim();
         actionExitSeen = false;
         actionStdoutSeen = false;
         actionStderrSeen = false;
@@ -598,7 +617,30 @@ Scope {
         const args = [
             "bash",
             "-lc",
-            'repo="$1"; ref="$2"; shift 2; for workflow in "$@"; do "$HOME/.local/bin/px" run "$repo" "$workflow" "$ref" || exit $?; done',
+            [
+                'repo="$1"',
+                'ref="$2"',
+                'shift 2',
+                'overall=0',
+                'blocked=0',
+                'for workflow in "$@"; do',
+                '  if [ "$blocked" -ne 0 ]; then',
+                '    printf "PXSTEP\\tSKIPPED\\t%s\\tBLOCKED BY PRIOR FAILURE\\n" "$workflow"',
+                '    continue',
+                '  fi',
+                '  printf "PXSTEP\\tRUNNING\\t%s\\t\\n" "$workflow"',
+                '  "$HOME/.local/bin/px" run "$repo" "$workflow" "$ref"',
+                '  rc=$?',
+                '  if [ "$rc" -eq 0 ]; then',
+                '    printf "PXSTEP\\tOK\\t%s\\t\\n" "$workflow"',
+                '  else',
+                '    printf "PXSTEP\\tFAILED\\t%s\\tRC %s\\n" "$workflow" "$rc"',
+                '    overall="$rc"',
+                '    blocked=1',
+                '  fi',
+                'done',
+                'exit "$overall"'
+            ].join("\n"),
             "px-batch",
             repoSlug,
             cleanRef
@@ -687,6 +729,56 @@ Scope {
         actionWatchdog.restart();
     }
 
+    function parseBatchStepResults(text) {
+        const lines = String(text || "").split("\n");
+        const rows = [];
+        const running = ({});
+
+        for (let i = 0; i < lines.length; ++i) {
+            const line = String(lines[i] || "");
+
+            if (line.indexOf("PXSTEP\t") !== 0)
+                continue;
+
+            const fields = line.split("\t");
+            const state = String(fields[1] || "");
+            const workflow = String(fields[2] || "");
+            const detail =
+                fields.length > 3
+                ? fields.slice(3).join("\t")
+                : "";
+
+            if (!workflow)
+                continue;
+
+            if (state === "RUNNING") {
+                running[workflow] = true;
+                continue;
+            }
+
+            rows.push({
+                index: rows.length,
+                workflow: workflow,
+                state: state,
+                detail: detail
+            });
+
+            delete running[workflow];
+        }
+
+        const stillRunning = Object.keys(running);
+        for (let i = 0; i < stillRunning.length; ++i) {
+            rows.push({
+                index: rows.length,
+                workflow: stillRunning[i],
+                state: "UNCERTAIN",
+                detail: "NO TERMINAL STEP RESULT"
+            });
+        }
+
+        batchStepResults = rows;
+    }
+
     function maybeFinishRemoteAction() {
         if (!actionBusy)
             return;
@@ -697,10 +789,21 @@ Scope {
         actionBusy = false;
         actionWatchdog.stop();
 
+        if (actionKind === "batch")
+            parseBatchStepResults(actionStdoutText);
+
         if (actionExitCode === 0) {
             actionResult =
                 actionKind === "batch"
-                ? "QUEUE // DISPATCHED"
+                ? (
+                    "QUEUE // "
+                    + String(batchStepSuccessCount)
+                    + " OK // "
+                    + String(batchStepFailureCount)
+                    + " FAILED // "
+                    + String(batchStepSkippedCount)
+                    + " SKIPPED"
+                  )
                 : actionKind === "delete-workflow"
                 ? "WORKFLOW // DELETED"
                 : actionKind.toUpperCase() + " // OK";
@@ -709,7 +812,19 @@ Scope {
         }
 
         const error = String(actionStderrText || actionStdoutText || "PX ACTION FAILED").trim();
-        actionResult = "ERROR // " + error;
+
+        actionResult =
+            actionKind === "batch"
+            ? (
+                "QUEUE // "
+                + String(batchStepSuccessCount)
+                + " OK // "
+                + String(batchStepFailureCount)
+                + " FAILED // "
+                + String(batchStepSkippedCount)
+                + " SKIPPED"
+              )
+            : "ERROR // " + error;
     }
 
     function clearFactoryResult() {

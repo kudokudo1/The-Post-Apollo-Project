@@ -131,42 +131,52 @@ Rectangle {
     signal hoverEntered()
     signal hoverExited()
 
+    // Keep artwork and its content glow on the same local stacking plane.
+    // This matches the original Git button: the root-level wide wash (z: 1)
+    // is intentionally painted over both the mark and its neon content glow.
     Item {
-        id: contentHost
+        id: contentLayer
 
         anchors.fill: parent
         z: 0
-    }
 
-    DropShadow {
-        readonly property point sourceOrigin: dockButton.contentGlowSource
-                                              ? dockButton.contentGlowSource.mapToItem(dockButton, 0, 0)
-                                              : Qt.point(0, 0)
+        Item {
+            id: contentHost
 
-        x: sourceOrigin.x
-        y: sourceOrigin.y
-        width: dockButton.contentGlowSource ? dockButton.contentGlowSource.width : 0
-        height: dockButton.contentGlowSource ? dockButton.contentGlowSource.height : 0
+            anchors.fill: parent
+            z: 0
+        }
 
-        source: dockButton.contentGlowSource
+        DropShadow {
+            readonly property point sourceOrigin: dockButton.contentGlowSource
+                                                  ? dockButton.contentGlowSource.mapToItem(contentLayer, 0, 0)
+                                                  : Qt.point(0, 0)
 
-        horizontalOffset: 0
-        verticalOffset: 0
+            x: sourceOrigin.x
+            y: sourceOrigin.y
+            width: dockButton.contentGlowSource ? dockButton.contentGlowSource.width : 0
+            height: dockButton.contentGlowSource ? dockButton.contentGlowSource.height : 0
 
-        radius: dockButton.energized
-                ? dockButton.contentGlowActiveRadius
-                : dockButton.contentGlowIdleRadius
+            source: dockButton.contentGlowSource
 
-        samples: dockButton.energized
-                 ? dockButton.contentGlowActiveSamples
-                 : dockButton.contentGlowIdleSamples
+            horizontalOffset: 0
+            verticalOffset: 0
 
-        z: 2
-        visible: dockButton.contentGlowEnabled
-        opacity: dockButton.contentGlowOpacity
-        color: dockButton.contentGlowColor
+            radius: dockButton.energized
+                    ? dockButton.contentGlowActiveRadius
+                    : dockButton.contentGlowIdleRadius
 
-        transparentBorder: true
+            samples: dockButton.energized
+                     ? dockButton.contentGlowActiveSamples
+                     : dockButton.contentGlowIdleSamples
+
+            z: 2
+            visible: dockButton.contentGlowEnabled
+            opacity: dockButton.contentGlowOpacity
+            color: dockButton.contentGlowColor
+
+            transparentBorder: true
+        }
     }
 
     MouseArea {

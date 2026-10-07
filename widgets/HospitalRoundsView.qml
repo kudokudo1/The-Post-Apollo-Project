@@ -53,6 +53,98 @@ Item {
         return Colors.cyan;
     }
 
+    function roomMatchesIdentity(roomValue, identityValue) {
+        const room = roomValue || {};
+        const identity = identityValue || {};
+        const wantedTeam =
+            String(identity.team || "").toUpperCase();
+        const wantedRepository =
+            String(identity.repository || "");
+        const wantedFloor =
+            Number(identity.floorIndex);
+
+        if (wantedTeam
+                && String(
+                    room.team || room.branch || ""
+                ).toUpperCase() !== wantedTeam)
+            return false;
+
+        if (wantedRepository
+                && String(room.repository || "")
+                   !== wantedRepository)
+            return false;
+
+        if (Number.isFinite(wantedFloor)
+                && wantedFloor >= 0
+                && Number(room.floorIndex) !== wantedFloor)
+            return false;
+
+        return !!wantedTeam || !!wantedRepository;
+    }
+
+    function ensureSelectedVisible(indexValue) {
+        const index = Number(indexValue);
+
+        if (index < 0)
+            return;
+
+        Qt.callLater(function() {
+            const itemHeight = 96;
+            const spacing = 5;
+            const top = index * (itemHeight + spacing);
+            const bottom = top + itemHeight;
+            const viewportTop = roomBoard.contentY;
+            const viewportBottom =
+                viewportTop + roomBoard.height;
+
+            if (top < viewportTop)
+                roomBoard.contentY = top;
+            else if (bottom > viewportBottom)
+                roomBoard.contentY = Math.max(
+                    0,
+                    bottom - roomBoard.height
+                );
+        });
+    }
+
+    function selectRoomIdentity(identityValue) {
+        const identity = identityValue || {};
+        const rooms =
+            root.roundsService
+            && Array.isArray(root.roundsService.rooms)
+            ? root.roundsService.rooms
+            : [];
+        let match = null;
+
+        for (let i = 0; i < rooms.length; ++i) {
+            const room = rooms[i] || {};
+
+            if (roomMatchesIdentity(room, identity)) {
+                match = room;
+                break;
+            }
+        }
+
+        if (!match)
+            return false;
+
+        if (filterMode !== "ALL"
+                && Number(match.attentionRank || 0) <= 0)
+            filterMode = "ALL";
+
+        for (let i = 0; i < displayedRooms.length; ++i) {
+            if (roomMatchesIdentity(
+                    displayedRooms[i] || {},
+                    identity)) {
+                selectedIndex = i;
+                ensureSelectedVisible(i);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     function selectRoom(index) {
         const requested = Number(index);
 

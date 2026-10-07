@@ -733,23 +733,53 @@ Scope {
         return addExistingItem(cleanUrl, "pull");
     }
 
-    function containsItemUrl(url) {
-        const needle = String(url || "").trim();
+    function canonicalItemUrl(url) {
+        let value = String(url || "").trim();
+
+        if (!value)
+            return "";
+
+        const hash = value.indexOf("#");
+        if (hash >= 0)
+            value = value.slice(0, hash);
+
+        const query = value.indexOf("?");
+        if (query >= 0)
+            value = value.slice(0, query);
+
+        while (value.length > 0
+                && value.charAt(value.length - 1) === "/")
+            value = value.slice(0, -1);
+
+        return value;
+    }
+
+    function itemByUrl(url) {
+        const needle = canonicalItemUrl(url);
 
         if (!needle)
-            return false;
+            return null;
 
         for (let i = 0; i < items.length; ++i) {
-            if (itemUrl(items[i]) === needle)
-                return true;
+            if (canonicalItemUrl(itemUrl(items[i])) === needle)
+                return items[i];
         }
 
-        return false;
+        return null;
+    }
+
+    function containsItemUrl(url) {
+        return itemByUrl(url) !== null;
+    }
+
+    function itemStatusByUrl(url) {
+        const row = itemByUrl(url);
+        return row ? itemStatus(row) : "";
     }
 
     function addExistingItem(url, kind) {
         const number = selectedNumber();
-        const cleanUrl = String(url || "").trim();
+        const cleanUrl = canonicalItemUrl(url);
         const cleanKind = String(kind || "item").toLowerCase();
         const operationName =
             cleanKind === "pull"
@@ -762,6 +792,12 @@ Scope {
             lastError =
                 "ADD TO PROJECT UNAVAILABLE // "
                 + (!number ? "PROJECT NOT SELECTED" : "ITEM URL MISSING");
+            stateText = lastError;
+            return false;
+        }
+
+        if (containsItemUrl(cleanUrl)) {
+            lastError = "ADD TO PROJECT REFUSED // ITEM ALREADY PRESENT";
             stateText = lastError;
             return false;
         }
@@ -789,9 +825,16 @@ Scope {
         return String((item || {}).id || "");
     }
 
-    function archiveItem(item) {
+    function archiveItem(item, confirmed) {
         const number = selectedNumber();
         const id = itemId(item);
+
+        if (!confirmed) {
+            lastError =
+                "ARCHIVE REFUSED // EXPLICIT CONFIRMATION REQUIRED";
+            stateText = lastError;
+            return false;
+        }
 
         if (!number || !id) {
             lastError = "ARCHIVE UNAVAILABLE // PROJECT ITEM ID MISSING";
@@ -814,9 +857,16 @@ Scope {
         );
     }
 
-    function removeItem(item) {
+    function removeItem(item, confirmed) {
         const number = selectedNumber();
         const id = itemId(item);
+
+        if (!confirmed) {
+            lastError =
+                "REMOVE REFUSED // EXPLICIT CONFIRMATION REQUIRED";
+            stateText = lastError;
+            return false;
+        }
 
         if (!number || !id) {
             lastError = "REMOVE UNAVAILABLE // PROJECT ITEM ID MISSING";

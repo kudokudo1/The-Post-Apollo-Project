@@ -1258,7 +1258,13 @@ Scope {
         let f = "";
         let g = "";
 
-        if (strategy === "DELETE_CREATED_BRANCH") {
+        if (strategy === "DELETE_EXACT_CLONE") {
+            a = String(plan.destinationPath || "");
+            b = String(plan.expectedHead || "");
+            c = String(plan.expectedBranch || "");
+            d = String(plan.expectedOrigin || "");
+            e = String(plan.expectedFingerprint || "");
+        } else if (strategy === "DELETE_CREATED_BRANCH") {
             a = String(plan.branch || "");
             c = String(plan.expectedSha || "");
         } else if (strategy === "DELETE_CREATED_TAG") {

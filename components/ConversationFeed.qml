@@ -21,6 +21,15 @@ Rectangle {
 
     property int pendingSendSerial: -1
 
+    // Host-level presentation knobs keep this surface transport-agnostic.
+    // Sessions keeps the plain-text defaults; Hospital can opt into
+    // Markdown/richer rendering without forking the conversation shell.
+    property int messageTextFormat: Text.PlainText
+    property string emptyConversationLabel: "SELECT A CONTACT"
+    property string composerPlaceholder: "MESSAGE..."
+    property string sendLabel: "SEND"
+    property string sendingLabel: "SENDING"
+
     // Discord mode keeps this panel's shell underneath Vesktop:
     // the 0.85 background and cyan OUTER frame remain, while all inner
     // chat/header/composer contents disappear.
@@ -338,7 +347,7 @@ Rectangle {
                     text: modelData.body || ""
 
                     wrapMode: Text.Wrap
-                    textFormat: Text.PlainText
+                    textFormat: chatFeed.messageTextFormat
 
                     font.family: "GohuFont 11 Nerd Font Mono"
 
@@ -363,7 +372,7 @@ Rectangle {
 
         z: 3
 
-        text: "SELECT A CONTACT"
+        text: chatFeed.emptyConversationLabel
 
         font.family: "GohuFont 11 Nerd Font Mono"
 
@@ -585,7 +594,7 @@ Rectangle {
 
             visible: messageInput.text.length === 0 && !messageInput.activeFocus
 
-            text: "MESSAGE..."
+            text: chatFeed.composerPlaceholder
 
             font.family: "GohuFont 11 Nerd Font Mono"
 
@@ -634,7 +643,7 @@ Rectangle {
 
                 anchors.centerIn: parent
 
-                text: chatFeed.sending ? "SENDING" : "SEND"
+                text: chatFeed.sending ? chatFeed.sendingLabel : chatFeed.sendLabel
 
                 font.family: "GohuFont 11 Nerd Font Mono"
 

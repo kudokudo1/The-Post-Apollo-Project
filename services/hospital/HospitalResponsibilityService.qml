@@ -262,6 +262,57 @@ Scope {
         return out;
     }
 
+    function durableRoomFor(roomValue, repositoryValue, branchValue) {
+        const room = roomValue || {};
+        const roomId = String(room.id || room.roomId || room.team || "").trim();
+        const repository = root.normalized(repositoryValue || room.repository);
+        const branch = root.normalized(branchValue || room.branch);
+        const rows = Array.isArray(durableRooms) ? durableRooms : [];
+
+        for (let i = 0; i < rows.length; ++i) {
+            const candidate = rows[i] || {};
+            const candidateId =
+                String(candidate.id || candidate.roomId || candidate.team || "").trim();
+
+            if (roomId && candidateId === roomId)
+                return candidate;
+        }
+
+        for (let i = 0; i < rows.length; ++i) {
+            const candidate = rows[i] || {};
+            if (repository
+                    && root.normalized(candidate.repository) === repository
+                    && branch
+                    && root.normalized(candidate.branch) === branch)
+                return candidate;
+        }
+
+        return null;
+    }
+
+    function activeSessionForRoom(roomIdValue) {
+        const roomId = String(roomIdValue || "").trim();
+        const rows = Array.isArray(durableSessions)
+            ? durableSessions : [];
+        let fallback = null;
+
+        for (let i = 0; i < rows.length; ++i) {
+            const session = rows[i] || {};
+            if (String(session.roomId || "") !== roomId)
+                continue;
+
+            if (!fallback)
+                fallback = session;
+
+            const status = String(session.status || "").toUpperCase();
+            if (!session.endedAt
+                    && ["COMPLETE", "FAILED"].indexOf(status) < 0)
+                return session;
+        }
+
+        return fallback;
+    }
+
     function activeAssignmentForRoom(roomValue) {
         const room = roomValue || {};
         const team = String(room.team || "").trim();

@@ -22,6 +22,9 @@ Item {
     property string projectFileKind: "ignore"
     property int selectedProjectLine: -1
     property string armedAction: ""
+    property string configCategory: "all"
+    property string configFilterText: ""
+    property string selectedConfigKey: ""
 
     function selectRemote(index, row) {
         const data = row || {};
@@ -73,6 +76,207 @@ Item {
         return root.projectFileKind === "attributes"
             ? root.repositoryService.attributeLines
             : root.repositoryService.ignoreLines;
+    }
+
+    function configCategoryForKey(keyValue) {
+        const key = String(keyValue || "").trim().toLowerCase();
+
+        if (!key)
+            return "other";
+
+        if (key.indexOf("user.") === 0
+                || key.indexOf("author.") === 0
+                || key.indexOf("committer.") === 0
+                || key.indexOf("gpg.") === 0
+                || key === "commit.gpgsign")
+            return "identity";
+
+        if (key.indexOf("remote.") === 0
+                || key.indexOf("fetch.") === 0
+                || key.indexOf("push.") === 0
+                || key.indexOf("pull.") === 0
+                || key.indexOf("url.") === 0
+                || key.indexOf("http.") === 0)
+            return "sync";
+
+        if (key.indexOf("branch.") === 0
+                || key.indexOf("checkout.") === 0
+                || key.indexOf("worktree.") === 0
+                || key === "init.defaultbranch")
+            return "branch";
+
+        if (key.indexOf("diff.") === 0
+                || key.indexOf("merge.") === 0
+                || key.indexOf("rebase.") === 0
+                || key.indexOf("rerere.") === 0
+                || key.indexOf("log.") === 0
+                || key.indexOf("blame.") === 0
+                || key.indexOf("color.") === 0)
+            return "history";
+
+        if (key.indexOf("core.") === 0
+                || key.indexOf("extensions.") === 0
+                || key.indexOf("gc.") === 0
+                || key.indexOf("maintenance.") === 0
+                || key.indexOf("submodule.") === 0
+                || key.indexOf("lfs.") === 0)
+            return "repo";
+
+        return "other";
+    }
+
+    function configCategoryLabel(categoryValue) {
+        const category = String(categoryValue || "other");
+
+        if (category === "identity")
+            return "IDENTITY";
+        if (category === "sync")
+            return "SYNC";
+        if (category === "branch")
+            return "BRANCH";
+        if (category === "history")
+            return "HISTORY";
+        if (category === "repo")
+            return "REPO";
+        if (category === "all")
+            return "ALL";
+        return "OTHER";
+    }
+
+    function configCategoryColor(categoryValue) {
+        const category = String(categoryValue || "other");
+
+        if (category === "identity")
+            return Colors.magenta;
+        if (category === "sync")
+            return Colors.cyan;
+        if (category === "branch")
+            return Colors.green;
+        if (category === "history")
+            return Colors.orange;
+        if (category === "repo")
+            return Colors.yellow;
+        if (category === "all")
+            return Colors.green;
+        return Colors.blue;
+    }
+
+    function configRowsForView() {
+        if (!root.repositoryService)
+            return [];
+
+        const source = root.repositoryService.configRows || [];
+        const category = String(root.configCategory || "all");
+        const needle =
+            String(root.configFilterText || "")
+            .trim()
+            .toLowerCase();
+        const out = [];
+
+        for (let i = 0; i < source.length; ++i) {
+            const row = source[i] || {};
+            const rowCategory =
+                root.configCategoryForKey(row.key);
+
+            if (category !== "all"
+                    && rowCategory !== category)
+                continue;
+
+            if (needle) {
+                const haystack = (
+                    String(row.key || "")
+                    + " "
+                    + String(row.value || "")
+                ).toLowerCase();
+
+                if (haystack.indexOf(needle) < 0)
+                    continue;
+            }
+
+            out.push({
+                key: String(row.key || ""),
+                value: String(row.value || ""),
+                category: rowCategory
+            });
+        }
+
+        const order = {
+            identity: 0,
+            sync: 1,
+            branch: 2,
+            history: 3,
+            repo: 4,
+            other: 5
+        };
+
+        out.sort(function(a, b) {
+            const ca = order[a.category] !== undefined
+                ? order[a.category]
+                : 99;
+            const cb = order[b.category] !== undefined
+                ? order[b.category]
+                : 99;
+
+            if (ca !== cb)
+                return ca - cb;
+
+            return String(a.key || "").localeCompare(
+                String(b.key || "")
+            );
+        });
+
+        return out;
+    }
+
+    function configKeyExists(keyValue) {
+        if (!root.repositoryService)
+            return false;
+
+        const key = String(keyValue || "").trim();
+        const rows = root.repositoryService.configRows || [];
+
+        for (let i = 0; i < rows.length; ++i) {
+            if (String(rows[i].key || "") === key)
+                return true;
+        }
+
+        return false;
+    }
+
+    function configGuidance(keyValue) {
+        const key = String(keyValue || "").trim();
+        const category = root.configCategoryForKey(key);
+
+        if (!key)
+            return "Select an existing key or type a new repo-local override.";
+
+        if (key.indexOf("remote.") === 0)
+            return "Remote transport keys are editable here, but REMOTES is the clearer surface for URLs, refspecs, fetch, prune, and remote HEAD.";
+
+        if (key.indexOf("branch.") === 0)
+            return "Branch tracking keys live in .git/config. BRANCHES is usually the clearer surface for upstream and stack relationships.";
+
+        if (category === "identity")
+            return "Repository-local identity/signing overrides apply only to this repository. Global identity remains untouched.";
+
+        if (category === "sync")
+            return "Controls this repository's fetch, pull, push, URL, or transport behavior.";
+
+        if (category === "history")
+            return "Controls diff, merge, rebase, rerere, log, blame, or display behavior for this repository.";
+
+        if (category === "repo")
+            return "Controls repository mechanics such as core behavior, extensions, maintenance, submodules, or LFS.";
+
+        return "This editor writes only the repository-local .git/config scope.";
+    }
+
+    function selectConfigRow(row) {
+        const data = row || {};
+        root.selectedConfigKey = String(data.key || "");
+        configKeyInput.text = root.selectedConfigKey;
+        configValueInput.text = String(data.value || "");
+        root.armedAction = "";
     }
 
     function cycleTagMode() {
@@ -1515,105 +1719,263 @@ Item {
                 visible: root.subMode === "config"
 
                 Rectangle {
-                    width: 520
+                    width: 560
                     height: parent.height
                     color: Colors.dark
                     border.width: 1
                     border.color: Colors.green
 
-                    Flickable {
-                        id: repositoryScroll6
+                    Column {
                         anchors {
                             fill: parent
                             margins: 7
                         }
-                        clip: true
-                        contentWidth: width
-                        contentHeight: configColumn.implicitHeight
-                        boundsBehavior: Flickable.StopAtBounds
+                        spacing: 5
 
-                        Column {
-                            id: configColumn
+                        Row {
                             width: parent.width
-                            spacing: 2
+                            height: 24
+                            spacing: 5
+
+                            GohuText {
+                                width: parent.width - 146
+                                anchors.verticalCenter:
+                                    parent.verticalCenter
+                                text:
+                                    "LOCAL CONFIG // "
+                                    + String(
+                                        root.configRowsForView().length
+                                      )
+                                    + " SHOWN / "
+                                    + String(
+                                        root.repositoryService
+                                        ? root.repositoryService.configRows.length
+                                        : 0
+                                      )
+                                font.pixelSize: 11
+                                color: Colors.green
+                                elide: Text.ElideRight
+                            }
+
+                            GohuText {
+                                width: 140
+                                anchors.verticalCenter:
+                                    parent.verticalCenter
+                                text:
+                                    root.configCategoryLabel(
+                                        root.configCategory
+                                    )
+                                horizontalAlignment:
+                                    Text.AlignRight
+                                font.pixelSize: 10
+                                color:
+                                    root.configCategoryColor(
+                                        root.configCategory
+                                    )
+                            }
+                        }
+
+                        Row {
+                            width: parent.width
+                            height: 28
+                            spacing: 4
 
                             Repeater {
-                                model:
-                                    root.repositoryService
-                                    ? root.repositoryService.configRows
-                                    : []
+                                model: [
+                                    { key: "all", label: "ALL" },
+                                    { key: "identity", label: "IDENTITY" },
+                                    { key: "sync", label: "SYNC" },
+                                    { key: "branch", label: "BRANCH" },
+                                    { key: "history", label: "HISTORY" },
+                                    { key: "repo", label: "REPO" },
+                                    { key: "other", label: "OTHER" }
+                                ]
 
-                                Rectangle {
-                                    id: configRow
+                                MiniButton {
                                     required property var modelData
-
-                                    width: configColumn.width
-                                    height: 30
-                                    color:
-                                        configMouse.containsMouse
-                                        ? Colors.black
-                                        : "transparent"
-
-                                    GohuText {
-                                        anchors {
-                                            left: parent.left
-                                            verticalCenter:
-                                                parent.verticalCenter
-                                        }
-                                        width: 205
-                                        text:
-                                            String(configRow.modelData.key || "")
-                                        font.pixelSize: 10
-                                        color: Colors.green
-                                        elide: Text.ElideRight
-                                    }
-
-                                    GohuText {
-                                        anchors {
-                                            left: parent.left
-                                            right: parent.right
-                                            verticalCenter:
-                                                parent.verticalCenter
-                                            leftMargin: 212
-                                        }
-                                        text:
-                                            String(
-                                                configRow.modelData.value || ""
-                                            )
-                                        font.pixelSize: 10
-                                        color: Colors.white
-                                        elide: Text.ElideRight
-                                    }
-
-                                    MouseArea {
-                                        id: configMouse
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            configKeyInput.text =
-                                                String(
-                                                    configRow.modelData.key || ""
-                                                );
-                                            configValueInput.text =
-                                                String(
-                                                    configRow.modelData.value || ""
-                                                );
-                                        }
+                                    width:
+                                        (
+                                            parent.width
+                                            - parent.spacing * 6
+                                        ) / 7
+                                    height: 28
+                                    label: modelData.label
+                                    accent:
+                                        root.configCategoryColor(
+                                            modelData.key
+                                        )
+                                    selected:
+                                        root.configCategory
+                                        === modelData.key
+                                    onTriggered: {
+                                        root.configCategory =
+                                            modelData.key;
+                                        root.armedAction = "";
                                     }
                                 }
                             }
                         }
-                    
-                        NeonScrollBar {
-                            flickable: repositoryScroll6
-                            starHandle: true
+
+                        EditorBox {
+                            id: configFilterInput
+                            width: parent.width
+                            placeholder:
+                                "FILTER CONFIG // KEY OR VALUE"
+                            accent: Colors.cyan
+                            keyboardOwner: root.keyboardHost
+                            onTextChanged:
+                                root.configFilterText = text
                         }
-}
+
+                        Flickable {
+                            id: repositoryScroll6
+                            width: parent.width
+                            height:
+                                Math.max(
+                                    0,
+                                    parent.height - 97
+                                )
+                            clip: true
+                            contentWidth: width
+                            contentHeight:
+                                configColumn.implicitHeight
+                            boundsBehavior:
+                                Flickable.StopAtBounds
+
+                            Column {
+                                id: configColumn
+                                width: parent.width
+                                spacing: 2
+
+                                GohuText {
+                                    visible:
+                                        root.configRowsForView().length
+                                        === 0
+                                    width: parent.width
+                                    topPadding: 24
+                                    text:
+                                        root.configFilterText
+                                        ? "NO CONFIG MATCHES"
+                                        : "NO CONFIG IN THIS CATEGORY"
+                                    horizontalAlignment:
+                                        Text.AlignHCenter
+                                    font.pixelSize: 11
+                                    color: Colors.cyan
+                                }
+
+                                Repeater {
+                                    model:
+                                        root.configRowsForView()
+
+                                    Rectangle {
+                                        id: configRow
+                                        required property var modelData
+
+                                        width: configColumn.width
+                                        height: 34
+                                        color:
+                                            configMouse.containsMouse
+                                            || root.selectedConfigKey
+                                               === String(
+                                                   modelData.key
+                                                   || ""
+                                               )
+                                            ? Colors.black
+                                            : "transparent"
+                                        border.width:
+                                            root.selectedConfigKey
+                                            === String(
+                                                modelData.key
+                                                || ""
+                                            )
+                                            ? 1
+                                            : 0
+                                        border.color:
+                                            root.configCategoryColor(
+                                                modelData.category
+                                            )
+
+                                        GohuText {
+                                            anchors {
+                                                left: parent.left
+                                                verticalCenter:
+                                                    parent.verticalCenter
+                                            }
+                                            width: 74
+                                            text:
+                                                root.configCategoryLabel(
+                                                    configRow.modelData.category
+                                                )
+                                            font.pixelSize: 8
+                                            color:
+                                                root.configCategoryColor(
+                                                    configRow.modelData.category
+                                                )
+                                            elide: Text.ElideRight
+                                        }
+
+                                        GohuText {
+                                            anchors {
+                                                left: parent.left
+                                                verticalCenter:
+                                                    parent.verticalCenter
+                                                leftMargin: 80
+                                            }
+                                            width: 205
+                                            text:
+                                                String(
+                                                    configRow.modelData.key
+                                                    || ""
+                                                )
+                                            font.pixelSize: 10
+                                            color: Colors.green
+                                            elide: Text.ElideRight
+                                        }
+
+                                        GohuText {
+                                            anchors {
+                                                left: parent.left
+                                                right: parent.right
+                                                verticalCenter:
+                                                    parent.verticalCenter
+                                                leftMargin: 292
+                                                rightMargin: 8
+                                            }
+                                            text:
+                                                String(
+                                                    configRow.modelData.value
+                                                    || ""
+                                                )
+                                            font.pixelSize: 10
+                                            color: Colors.white
+                                            elide: Text.ElideRight
+                                        }
+
+                                        MouseArea {
+                                            id: configMouse
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape:
+                                                Qt.PointingHandCursor
+                                            onClicked:
+                                                root.selectConfigRow(
+                                                    configRow.modelData
+                                                )
+                                        }
+                                    }
+                                }
+                            }
+
+                            NeonScrollBar {
+                                flickable: repositoryScroll6
+                                starHandle: true
+                            }
+                        }
+                    }
                 }
 
                 Rectangle {
-                    width: parent.width - 528
+                    width: parent.width - 568
                     height: parent.height
                     color: Colors.black
                     border.width: 1
@@ -1627,15 +1989,94 @@ Item {
                         spacing: 7
 
                         SectionLabel {
-                            text: "REPO-LOCAL CONFIG"
+                            text:
+                                root.selectedConfigKey
+                                ? "EDIT // "
+                                  + root.selectedConfigKey
+                                : "REPO-LOCAL CONFIG EDITOR"
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 76
+                            color: Colors.dark
+                            border.width: 1
+                            border.color:
+                                root.configCategoryColor(
+                                    root.configCategoryForKey(
+                                        configKeyInput.text
+                                    )
+                                )
+
+                            Column {
+                                anchors {
+                                    fill: parent
+                                    margins: 7
+                                }
+                                spacing: 4
+
+                                GohuText {
+                                    width: parent.width
+                                    text:
+                                        "CATEGORY // "
+                                        + root.configCategoryLabel(
+                                            root.configCategoryForKey(
+                                                configKeyInput.text
+                                            )
+                                        )
+                                        + " // "
+                                        + (
+                                            root.configKeyExists(
+                                                configKeyInput.text
+                                            )
+                                            ? "LOCAL OVERRIDE"
+                                            : "NEW LOCAL KEY"
+                                          )
+                                    font.pixelSize: 10
+                                    color:
+                                        root.configCategoryColor(
+                                            root.configCategoryForKey(
+                                                configKeyInput.text
+                                            )
+                                        )
+                                    elide: Text.ElideRight
+                                }
+
+                                GohuText {
+                                    width: parent.width
+                                    text:
+                                        "SCOPE // .git/config ONLY"
+                                    font.pixelSize: 9
+                                    color: Colors.cyan
+                                }
+
+                                GohuText {
+                                    width: parent.width
+                                    text:
+                                        root.configGuidance(
+                                            configKeyInput.text
+                                        )
+                                    font.pixelSize: 8
+                                    color: Colors.white
+                                    opacity: 0.62
+                                    wrapMode: Text.WordWrap
+                                    elide: Text.ElideRight
+                                }
+                            }
                         }
 
                         EditorBox {
                             id: configKeyInput
                             width: parent.width
-                            placeholder: "KEY // user.name / pull.ff / fetch.prune"
+                            placeholder:
+                                "KEY // user.name / pull.ff / fetch.prune"
                             accent: Colors.green
                             keyboardOwner: root.keyboardHost
+                            onTextChanged: {
+                                if (text !== root.selectedConfigKey)
+                                    root.selectedConfigKey = "";
+                                root.armedAction = "";
+                            }
                         }
 
                         EditorBox {
@@ -1644,33 +2085,47 @@ Item {
                             placeholder: "VALUE"
                             accent: Colors.cyan
                             keyboardOwner: root.keyboardHost
+                            onTextChanged:
+                                root.armedAction = ""
                         }
 
                         MiniButton {
                             width: parent.width
-                            label: "SET / REPLACE LOCAL CONFIG"
+                            label:
+                                root.configKeyExists(
+                                    configKeyInput.text
+                                )
+                                ? "SET / REPLACE LOCAL CONFIG"
+                                : "CREATE LOCAL CONFIG KEY"
                             accent: Colors.green
                             enabledAction:
                                 root.repositoryService
+                                && !root.repositoryService.actionBusy
                                 && configKeyInput.text.trim().length > 0
                                 && configValueInput.text.trim().length > 0
-                            onTriggered:
+                            onTriggered: {
+                                root.selectedConfigKey =
+                                    configKeyInput.text.trim();
                                 root.repositoryService.setConfig(
                                     configKeyInput.text.trim(),
                                     configValueInput.text
-                                )
+                                );
+                            }
                         }
 
                         MiniButton {
                             width: parent.width
                             label:
                                 root.armedAction === "unset-config"
-                                ? "CONFIRM UNSET"
+                                ? "CONFIRM UNSET LOCAL KEY"
                                 : "UNSET LOCAL CONFIG KEY"
                             accent: Colors.red
                             enabledAction:
                                 root.repositoryService
-                                && configKeyInput.text.trim().length > 0
+                                && !root.repositoryService.actionBusy
+                                && root.configKeyExists(
+                                    configKeyInput.text
+                                )
                             onTriggered:
                                 root.armOrRun(
                                     "unset-config",
@@ -1678,6 +2133,7 @@ Item {
                                         root.repositoryService.unsetConfig(
                                             configKeyInput.text.trim()
                                         );
+                                        root.selectedConfigKey = "";
                                     }
                                 )
                         }
@@ -1685,8 +2141,7 @@ Item {
                         GohuText {
                             width: parent.width
                             text:
-                                "This editor is deliberately repo-local. "
-                                + "Global identity/credentials remain outside this surface."
+                                "Global identity, credentials, and system configuration remain outside this surface. Selecting a row edits only its repository-local override."
                             font.pixelSize: 10
                             color: Colors.white
                             opacity: 0.50

@@ -16,7 +16,9 @@ Scope {
     signal activityActionRequested(var item)
     signal teamNavigationRequested(string team)
     signal specialistHandoffRequested(string mode, string operatorText)
+    signal interpretationRequested(string operatorText)
 
+    property bool aiInterpretationEnabled: false
     property var inbox: []
     property var activityEvents: []
     property var subjectStates: ({})
@@ -3610,7 +3612,7 @@ Scope {
         if (asksHelp) {
             append(
                 "RECEPTION",
-                "I understand recent activity, archive history, archive status and cleanup, oldest or earliest activity, critical/action/notice/routine attention levels, ranked priorities like top three or what should I look at first, what changed, what went wrong, what needs attention, favorites, Room or team history, counts, and time windows like today, yesterday, this morning, this week, last week, this month, last month, the last 3 hours, the last 2 weeks, since 2026-10-01, on 2026-10-01, or from 2026-10-01 to 2026-10-05. Selective archive cleanup is previewed first; say confirm archive cleanup to execute it or cancel archive cleanup to abort. I can also find or show a team, then follow up with open this, take me there, favorite this, go back, or next one. When a live context is selected, you can say call Codex about this, message Hermes about this, or name another registered specialist."
+                "I understand recent activity, archive history, archive status and cleanup, oldest or earliest activity, critical/action/notice/routine attention levels, ranked priorities like top three or what should I look at first, what changed, what went wrong, what needs attention, favorites, Room or team history, counts, and time windows like today, yesterday, this morning, this week, last week, this month, last month, the last 3 hours, the last 2 weeks, since 2026-10-01, on 2026-10-01, or from 2026-10-01 to 2026-10-05. Selective archive cleanup is previewed first; say confirm archive cleanup to execute it or cancel archive cleanup to abort. I can also find or show a team, then follow up with open this, take me there, favorite this, go back, or next one. When a live context is selected, you can say call Codex about this, message Hermes about this, or name another registered specialist. AI interpretation can be enabled from the front desk; it only suggests a validated route or specialist handoff and requires review before execution."
             );
             return true;
         }
@@ -3951,10 +3953,20 @@ Scope {
                 || query.indexOf("patient") >= 0)
             return request("surgery", raw);
 
+        if (aiInterpretationEnabled) {
+            append("OPERATOR", raw);
+            append(
+                "RECEPTION",
+                "AI INTERPRETATION // REQUESTED // REVIEW REQUIRED"
+            );
+            interpretationRequested(raw);
+            return true;
+        }
+
         append("OPERATOR", raw);
         append(
             "RECEPTION",
-            "I don't have authority to improvise that action. Ask for Surgery, Reports, Rounds, Staff, Phone, or Intercom."
+            "I don't have authority to improvise that action. Ask for Surgery, Archive, Reports, Rounds, Staff, Phone, or Intercom."
         );
         return false;
     }

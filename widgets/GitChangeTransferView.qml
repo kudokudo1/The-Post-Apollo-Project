@@ -147,7 +147,7 @@ Rectangle {
         newDestinationBranchEditor.text = "";
         newDestinationPathEditor.text = "";
         Qt.callLater(function() {
-            newDestinationBranchEditor.forceActiveFocus();
+            newDestinationBranchEditor.focusEditor();
         });
     }
 
@@ -341,6 +341,10 @@ Rectangle {
 
         property alias text: editor.text
         property string placeholder: ""
+
+        function focusEditor() {
+            editor.forceActiveFocus();
+        }
 
         height: 28
         color: Colors.dark

@@ -18,6 +18,7 @@ Rectangle {
     property string pullRequestHeadSha: ""
     property string pullRequestBaseRef: ""
     property string pullRequestHeadRef: ""
+    property bool externallyManagedTarget: false
 
     property string mode: "control"
     property string armedAction: ""
@@ -74,6 +75,9 @@ Rectangle {
         const row = ((value || {}).pullRequest) || {};
 
         if (Number(row.number || 0) !== pullRequestNumber)
+            return;
+
+        if (externallyManagedTarget)
             return;
 
         if (row.title !== undefined)

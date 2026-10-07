@@ -67,6 +67,21 @@ for needle, label in (
 ):
     require(GITW, needle, label)
 
+require(
+    CONTROL,
+    "property bool externallyManagedTarget: false",
+    "PR control must support host-managed target bindings",
+)
+require(
+    CONTROL,
+    "if (externallyManagedTarget)",
+    "PR evidence sync must preserve host bindings",
+)
+require(
+    GITW,
+    "externallyManagedTarget: true",
+    "GitW must opt the PR control into host-managed target state",
+)
 require(CONTROL, "signal closeRequested()", "PR control needs a close/back signal")
 require(CONTROL, 'label: "← PULLS"', "PR control needs visible return navigation")
 require(

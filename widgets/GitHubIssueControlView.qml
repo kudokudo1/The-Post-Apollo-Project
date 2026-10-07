@@ -10,6 +10,7 @@ Rectangle {
     property int issueNumber: 0
     property string issueTitle: ""
     property string issueState: "OPEN"
+    property bool externallyManagedTarget: false
 
     property string armedAction: ""
     property string closeReason: "completed"
@@ -58,7 +59,7 @@ Rectangle {
                 return;
             }
 
-            if (evidenceVerified) {
+            if (evidenceVerified && !root.externallyManagedTarget) {
                 const row = ((evidence || {}).issue) || {};
 
                 if (row.state !== undefined)

@@ -41,6 +41,22 @@ for needle, label in (
 ):
     require(GITW, needle, label)
 
+require(
+    VIEW,
+    "property bool externallyManagedTarget: false",
+    "Issue control must support host-managed target bindings",
+)
+require(
+    VIEW,
+    "evidenceVerified && !root.externallyManagedTarget",
+    "Issue evidence sync must preserve host bindings",
+)
+require(
+    GITW,
+    "externallyManagedTarget: true",
+    "GitW must opt control surfaces into host-managed target state",
+)
+
 for needle, label in (
     ("createIssue(", "Issue creation"),
     ("editIssue(", "Issue edits"),

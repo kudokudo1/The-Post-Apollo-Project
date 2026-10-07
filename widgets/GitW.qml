@@ -6232,6 +6232,7 @@ PanelWindow {
 
                                 lifecycleService:
                                     githubIssueLifecycleService
+                                externallyManagedTarget: true
                                 repositorySlug: gitService.repoRemoteSlug
                                 createMode: root.issueCreateMode
                                 issueNumber:
@@ -6303,6 +6304,7 @@ PanelWindow {
                                     githubPullRequestReviewThreadProvider
                                 threadLifecycleService:
                                     githubPullRequestReviewThreadLifecycleService
+                                externallyManagedTarget: true
 
                                 repositorySlug: gitService.repoRemoteSlug
                                 pullRequestNumber:

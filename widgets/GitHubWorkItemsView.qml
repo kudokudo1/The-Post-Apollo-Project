@@ -626,7 +626,7 @@ Item {
                         : ""
 
                     width: sourceList.width
-                    height: root.isPulls ? 132 : 104
+                    height: 132
                     color: Colors.dark
                     border.width: 1
                     border.color:

@@ -8,6 +8,7 @@ Rectangle {
 
     required property var registryService
     required property var intercomService
+    required property var speechInputService
 
     property string workingDirectory: ""
     property string floorLabel: "NO FLOOR"
@@ -70,8 +71,64 @@ Rectangle {
         return true;
     }
 
+    function sendCurrentVoiceAware() {
+        if (speechInputService.recording)
+            return speechInputService.stopRecording(true);
+
+        if (speechInputService.stopping
+                || speechInputService.transcribing)
+            return false;
+
+        return sendCurrent();
+    }
+
+    function acceptVoiceTranscript(
+            textValue,
+            submitRequested) {
+        const spoken =
+            String(textValue || "").trim();
+
+        if (!spoken)
+            return false;
+
+        const existing =
+            String(messageInput.text || "").trim();
+
+        messageInput.text =
+            existing
+            ? existing + " " + spoken
+            : spoken;
+        messageInput.cursorPosition =
+            messageInput.text.length;
+        messageInput.forceActiveFocus();
+
+        if (submitRequested) {
+            Qt.callLater(function() {
+                root.sendCurrent();
+            });
+        }
+
+        return true;
+    }
+
+    Connections {
+        target: root.speechInputService
+
+        function onTranscriptionReady(
+                text,
+                submitRequested) {
+            root.acceptVoiceTranscript(
+                text,
+                submitRequested
+            );
+        }
+    }
+
     onVisibleChanged: {
         if (!visible) {
+            if (speechInputService.busy)
+                speechInputService.cancel();
+
             messageInput.focus = false;
             typingChanged(false);
             return;
@@ -383,7 +440,7 @@ Rectangle {
 
         anchors {
             left: parent.left
-            right: sendButton.left
+            right: micButton.left
             top: transcriptFrame.bottom
             leftMargin: 8
             rightMargin: 6
@@ -413,11 +470,26 @@ Rectangle {
             selectionColor: Colors.magenta
             selectedTextColor: Colors.black
             font.pixelSize: 11
+            enabled:
+                !root.speechInputService.stopping
+                && !root.speechInputService.transcribing
 
             onActiveFocusChanged:
                 root.typingChanged(activeFocus)
 
             Keys.onReturnPressed: function(event) {
+                if (root.speechInputService.recording) {
+                    root.speechInputService.stopRecording(true);
+                    event.accepted = true;
+                    return;
+                }
+
+                if (root.speechInputService.stopping
+                        || root.speechInputService.transcribing) {
+                    event.accepted = true;
+                    return;
+                }
+
                 root.sendCurrent();
                 event.accepted = true;
             }
@@ -431,10 +503,100 @@ Rectangle {
             }
 
             visible: messageInput.text.length === 0
-            text: "MESSAGE SPECIALIST..."
+            text:
+                root.speechInputService.recording
+                ? "LISTENING..."
+                : root.speechInputService.stopping
+                  || root.speechInputService.transcribing
+                ? "TRANSCRIBING..."
+                : "MESSAGE SPECIALIST..."
             font.pixelSize: 10
-            color: Colors.white
-            opacity: 0.38
+            color:
+                root.speechInputService.recording
+                ? Colors.magenta
+                : root.speechInputService.transcribing
+                ? Colors.orange
+                : Colors.white
+            opacity:
+                root.speechInputService.busy
+                ? 0.82 : 0.38
+        }
+    }
+
+    Rectangle {
+        id: micButton
+
+        anchors {
+            right: sendButton.left
+            top: transcriptFrame.bottom
+            rightMargin: 6
+            topMargin: 8
+        }
+
+        width: 42
+        height: 42
+        color:
+            micMouse.pressed
+            ? Colors.black
+            : Colors.dark
+        border.width:
+            root.speechInputService.recording
+            || micMouse.containsMouse
+            ? 2 : 1
+        border.color:
+            root.speechInputService.recording
+            ? Colors.magenta
+            : root.speechInputService.stopping
+              || root.speechInputService.transcribing
+            ? Colors.orange
+            : micMouse.containsMouse
+            ? Colors.orange
+            : root.speechInputService.backendReady
+            ? Colors.cyan
+            : Colors.magenta
+        opacity:
+            root.speechInputService.stopping
+            || root.speechInputService.transcribing
+            ? 0.55
+            : root.speechInputService.backendReady
+            ? 1.0 : 0.48
+
+        GohuText {
+            anchors.centerIn: parent
+            anchors.verticalCenterOffset: 1
+            text: "🎙︎"
+            font.pixelSize: 22
+            color:
+                root.speechInputService.recording
+                ? Colors.magenta
+                : micMouse.containsMouse
+                ? Colors.orange
+                : root.speechInputService.backendReady
+                ? Colors.cyan
+                : Colors.magenta
+        }
+
+        MouseArea {
+            id: micMouse
+
+            anchors.fill: parent
+            enabled:
+                !root.speechInputService.stopping
+                && !root.speechInputService.transcribing
+            hoverEnabled: true
+            cursorShape:
+                enabled
+                ? Qt.PointingHandCursor
+                : Qt.ArrowCursor
+
+            onClicked: {
+                messageInput.forceActiveFocus();
+
+                if (root.speechInputService.recording)
+                    root.speechInputService.stopRecording(false);
+                else
+                    root.speechInputService.startRecording();
+            }
         }
     }
 
@@ -457,21 +619,36 @@ Rectangle {
         border.width:
             sendMouse.containsMouse ? 2 : 1
         border.color:
-            sendMouse.containsMouse
+            root.speechInputService.recording
+            ? Colors.magenta
+            : sendMouse.containsMouse
             ? Colors.orange
             : Colors.green
         opacity:
             root.selectedSpecialist
             && String(root.selectedSpecialist.presence || "") === "READY"
-            && messageInput.text.trim().length > 0
+            && (
+                root.speechInputService.recording
+                || (
+                    !root.speechInputService.stopping
+                    && !root.speechInputService.transcribing
+                    && messageInput.text.trim().length > 0
+                   )
+               )
             ? 1.0 : 0.48
 
         GohuText {
             anchors.centerIn: parent
-            text: "SEND"
+            text:
+                root.speechInputService.stopping
+                  || root.speechInputService.transcribing
+                ? "..."
+                : "SEND"
             font.pixelSize: 11
             color:
-                sendMouse.containsMouse
+                root.speechInputService.recording
+                ? Colors.magenta
+                : sendMouse.containsMouse
                 ? Colors.orange
                 : Colors.green
         }
@@ -483,14 +660,21 @@ Rectangle {
             enabled:
                 root.selectedSpecialist
                 && String(root.selectedSpecialist.presence || "") === "READY"
-                && messageInput.text.trim().length > 0
+                && (
+                    root.speechInputService.recording
+                    || (
+                        !root.speechInputService.stopping
+                        && !root.speechInputService.transcribing
+                        && messageInput.text.trim().length > 0
+                       )
+                   )
             hoverEnabled: true
             cursorShape:
                 enabled
                 ? Qt.PointingHandCursor
                 : Qt.ArrowCursor
 
-            onClicked: root.sendCurrent()
+            onClicked: root.sendCurrentVoiceAware()
         }
     }
 
@@ -506,13 +690,28 @@ Rectangle {
 
         height: 20
         text:
-            root.intercomService.lastError
+            root.speechInputService.lastError
+            || (
+                root.speechInputService.recording
+                ? "VOICE // LISTENING"
+                : root.speechInputService.stopping
+                  || root.speechInputService.transcribing
+                ? "VOICE // TRANSCRIBING"
+                : ""
+              )
+            || root.intercomService.lastError
             || root.intercomService.lastStatus
             || "READY // SEEDED INTERACTIVE SESSION"
         font.pixelSize: 9
         color:
-            root.intercomService.lastError
+            root.speechInputService.lastError
+            || root.intercomService.lastError
             ? Colors.red
+            : root.speechInputService.recording
+            ? Colors.magenta
+            : root.speechInputService.stopping
+              || root.speechInputService.transcribing
+            ? Colors.orange
             : root.intercomService.lastStatus
             ? Colors.green
             : Colors.cyan

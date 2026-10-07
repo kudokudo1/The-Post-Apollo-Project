@@ -112,14 +112,20 @@ def creation_patch(source: Path, path: str) -> bytes:
     return proc.stdout
 
 
-def apply(repo: Path, patch: bytes, reverse=False, check_only=False):
+def apply(
+    repo: Path,
+    patch: bytes,
+    reverse=False,
+    check_only=False,
+    check=True,
+):
     args = ["apply"]
     if reverse:
         args.append("-R")
     if check_only:
         args.append("--check")
     args.extend(["--binary", "-"])
-    return git(repo, *args, input_bytes=patch)
+    return git(repo, *args, input_bytes=patch, check=check)
 
 
 def smoke_copy_and_undo():

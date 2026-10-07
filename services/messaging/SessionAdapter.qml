@@ -5,7 +5,35 @@ import Quickshell.Io
 Item {
     id: adapter
 
-    property string cliPath: "/var/home/mapple/.local/share/session-cli-venv/bin/session-cli"
+    property string pythonPath: "/usr/bin/python3"
+    readonly property string bridgePath: Quickshell.shellPath("services/messaging/SessionBridge.py")
+
+    property string backendMode: "PROBING"
+    property string backendDetail: ""
+
+    property string conversationStderr: ""
+    property string messageStderr: ""
+    property string sendStderr: ""
+    property string healthStderr: ""
+
+    function bridgeCommand(args) {
+        return [pythonPath, bridgePath].concat(args || []);
+    }
+
+    function compactProcessError(value, context) {
+        const detail = String(value || "").trim();
+
+        if (detail === "")
+            return context + " failed";
+
+        const lines = detail.split("\n").filter(function (line) {
+            return line.trim() !== "";
+        });
+
+        const last = lines.length > 0 ? lines[lines.length - 1].trim() : detail;
+
+        return context + ": " + last;
+    }
 
     // ---------------------------------------------------------
     // CONVERSATIONS
@@ -46,7 +74,9 @@ Item {
 
         loading = true;
         error = "";
+        conversationStderr = "";
 
+        conversationProcess.command = bridgeCommand(["--json", "list"]);
         conversationProcess.running = true;
     }
 
@@ -75,8 +105,15 @@ Item {
             messagesLoading = true;
 
         messagesError = "";
+        messageStderr = "";
 
-        messageProcess.command = [cliPath, "--json", "messages", "--limit", "100", selectedConversationId];
+        messageProcess.command = bridgeCommand([
+            "--json",
+            "messages",
+            "--limit",
+            "100",
+            selectedConversationId
+        ]);
 
         messageProcess.running = true;
     }
@@ -95,12 +132,69 @@ Item {
 
         sending = true;
         sendError = "";
+        sendStderr = "";
 
-        sendProcess.command = [cliPath, "send", conversationId, trimmed];
+        sendProcess.command = bridgeCommand([
+            "send",
+            conversationId,
+            trimmed
+        ]);
 
         sendProcess.running = true;
 
         return true;
+    }
+
+    // ---------------------------------------------------------
+    // BACKEND HEALTH
+    // ---------------------------------------------------------
+
+    Process {
+        id: healthProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const body = String(text || "").trim();
+
+                if (body === "")
+                    return;
+
+                try {
+                    const result = JSON.parse(body);
+
+                    adapter.backendMode = String(result.mode || "READY");
+                    adapter.backendDetail = String(result.detail || "");
+
+                    console.log(
+                        "SessionAdapter backend:",
+                        adapter.backendMode,
+                        adapter.backendDetail
+                    );
+                } catch (e) {
+                    adapter.backendMode = "ERROR";
+                    adapter.backendDetail = "Session bridge health JSON error: " + e;
+                }
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                adapter.healthStderr = String(text || "").trim();
+
+                if (adapter.healthStderr !== "")
+                    console.log("Session bridge health:", adapter.healthStderr);
+            }
+        }
+
+        onExited: function (exitCode, exitStatus) {
+            if (exitCode !== 0) {
+                adapter.backendMode = "ERROR";
+                adapter.backendDetail = adapter.compactProcessError(
+                    adapter.healthStderr,
+                    "SESSION BACKEND"
+                );
+            }
+        }
     }
 
     // ---------------------------------------------------------
@@ -109,8 +203,6 @@ Item {
 
     Process {
         id: conversationProcess
-
-        command: [adapter.cliPath, "--json", "list"]
 
         stdout: StdioCollector {
             onStreamFinished: {
@@ -135,17 +227,21 @@ Item {
 
         stderr: StdioCollector {
             onStreamFinished: {
-                if (text.trim() !== "") {
-                    console.log("Session conversation error:", text);
-                }
+                adapter.conversationStderr = String(text || "").trim();
+
+                if (adapter.conversationStderr !== "")
+                    console.log("Session conversation error:", adapter.conversationStderr);
             }
         }
 
         onExited: function (exitCode, exitStatus) {
             adapter.loading = false;
 
-            if (exitCode !== 0 && adapter.error === "") {
-                adapter.error = "session-cli list exited with code " + exitCode;
+            if (exitCode !== 0) {
+                adapter.error = adapter.compactProcessError(
+                    adapter.conversationStderr,
+                    "SESSION LIST"
+                );
             }
         }
     }
@@ -167,14 +263,14 @@ Item {
                     }
 
                     /*
-                     * session-cli gives us newest -> oldest.
+                     * The bridge normalizes direction/type and preserves
+                     * session-cli's newest -> oldest ordering.
                      *
                      * The chat UI wants oldest -> newest.
                      */
                     const sorted = result.slice().sort(function (a, b) {
-                        const aTime = a.sent_at || a.received_at || 0;
-
-                        const bTime = b.sent_at || b.received_at || 0;
+                        const aTime = a.sent_at || a.received_at || a.timestamp || 0;
+                        const bTime = b.sent_at || b.received_at || b.timestamp || 0;
 
                         return aTime - bTime;
                     });
@@ -182,7 +278,15 @@ Item {
                     adapter.messages = sorted;
                     adapter.messagesError = "";
 
-                    console.log("SessionAdapter:", sorted.length, "message(s), newest:", sorted.length > 0 ? sorted[sorted.length - 1].sent_at : "none");
+                    console.log(
+                        "SessionAdapter:",
+                        sorted.length,
+                        "message(s), newest:",
+                        sorted.length > 0
+                            ? (sorted[sorted.length - 1].sent_at
+                               || sorted[sorted.length - 1].timestamp)
+                            : "none"
+                    );
                 } catch (e) {
                     adapter.messagesError = "Session message JSON error: " + e;
 
@@ -193,17 +297,21 @@ Item {
 
         stderr: StdioCollector {
             onStreamFinished: {
-                if (text.trim() !== "") {
-                    console.log("Session message error:", text);
-                }
+                adapter.messageStderr = String(text || "").trim();
+
+                if (adapter.messageStderr !== "")
+                    console.log("Session message error:", adapter.messageStderr);
             }
         }
 
         onExited: function (exitCode, exitStatus) {
             adapter.messagesLoading = false;
 
-            if (exitCode !== 0 && adapter.messagesError === "") {
-                adapter.messagesError = "session-cli messages exited with code " + exitCode;
+            if (exitCode !== 0) {
+                adapter.messagesError = adapter.compactProcessError(
+                    adapter.messageStderr,
+                    "SESSION MESSAGES"
+                );
             }
 
             if (adapter.messageRefreshPending) {
@@ -222,18 +330,18 @@ Item {
 
         stdout: StdioCollector {
             onStreamFinished: {
-                if (text.trim() !== "") {
-                    console.log("Session send:", text.trim());
+                if (String(text || "").trim() !== "") {
+                    console.log("Session send:", String(text).trim());
                 }
             }
         }
 
         stderr: StdioCollector {
             onStreamFinished: {
-                if (text.trim() !== "") {
-                    console.log("Session send error:", text.trim());
+                adapter.sendStderr = String(text || "").trim();
 
-                    adapter.sendError = text.trim();
+                if (adapter.sendStderr !== "") {
+                    console.log("Session send error:", adapter.sendStderr);
                 }
             }
         }
@@ -253,9 +361,10 @@ Item {
                 adapter.refreshMessages();
                 adapter.refresh();
             } else {
-                if (adapter.sendError === "") {
-                    adapter.sendError = "session-cli send exited with code " + exitCode;
-                }
+                adapter.sendError = adapter.compactProcessError(
+                    adapter.sendStderr,
+                    "SESSION SEND"
+                );
 
                 console.log("SessionAdapter:", adapter.sendError);
             }
@@ -284,5 +393,11 @@ Item {
         onTriggered: adapter.refreshMessages()
     }
 
-    Component.onCompleted: adapter.refresh()
+    Component.onCompleted: {
+        healthStderr = "";
+        healthProcess.command = bridgeCommand(["--json", "health"]);
+        healthProcess.running = true;
+
+        adapter.refresh();
+    }
 }

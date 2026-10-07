@@ -21,7 +21,24 @@ Scope {
     property var subjectStates: ({})
     property bool activityHydrated: false
     property var pendingActivities: []
-    property int maxActivityEvents: 100
+    // activityEvents is Reception's persistent searchable archive. The desk
+    // still projects only five recent/favorite items into inbox.
+    property int maxActivityEvents: 2000
+    property int guaranteedRecentEvents: 250
+
+    readonly property int archiveCount:
+        activityEvents.length
+    readonly property string archiveOldestAt:
+        activityEvents.length > 0
+        ? String((activityEvents[0] || {}).recordedAt || "")
+        : ""
+    readonly property string archiveNewestAt:
+        activityEvents.length > 0
+        ? String(
+            (activityEvents[activityEvents.length - 1] || {}).recordedAt
+            || ""
+          )
+        : ""
 
     property string lastReadAt: ""
     property bool visitActive: false
@@ -97,7 +114,7 @@ Scope {
         adapter: JsonAdapter {
             id: activityAdapter
 
-            property int schemaVersion: 1
+            property int schemaVersion: 2
             property var events: []
             property var subjects: ({})
             property string lastReadAt: ""
@@ -531,6 +548,30 @@ Scope {
         return !!key && pinnedKeys.indexOf(key) >= 0;
     }
 
+    function archivePriority(eventValue) {
+        const event = eventValue || {};
+        const source =
+            String(event.source || "").toLowerCase();
+
+        if (isPinned(event))
+            return 1000;
+
+        // Reports are evidence-bearing Hospital history. Keep them deep even
+        // though Reports remains the authoritative evidence surface.
+        if (source === "reports")
+            return 700;
+
+        if (isProblemActivity(event))
+            return 600;
+
+        // Human communication is generally more meaningful than old passive
+        // status snapshots when archive space eventually gets tight.
+        if (source === "phone" || source === "intercom")
+            return 400;
+
+        return 100;
+    }
+
     function trimActivityEvents(eventsValue) {
         const source =
             Array.isArray(eventsValue)
@@ -541,24 +582,34 @@ Scope {
             return root.eventEpoch(a) - root.eventEpoch(b);
         });
 
-        const pinned = [];
-        const unpinned = [];
+        if (source.length <= maxActivityEvents)
+            return source;
 
-        for (let i = 0; i < source.length; ++i) {
-            if (isPinned(source[i] || {}))
-                pinned.push(source[i]);
-            else
-                unpinned.push(source[i]);
-        }
-
-        const unpinnedBudget =
-            Math.max(0, maxActivityEvents - pinned.length);
-        const kept =
-            pinned.concat(
-                unpinned.slice(
-                    Math.max(0, unpinned.length - unpinnedBudget)
-                )
+        const recentCount =
+            Math.min(
+                guaranteedRecentEvents,
+                maxActivityEvents,
+                source.length
             );
+        const recentStart = source.length - recentCount;
+        const recent = source.slice(recentStart);
+        const older = source.slice(0, recentStart);
+        const olderBudget =
+            Math.max(0, maxActivityEvents - recent.length);
+
+        older.sort(function(a, b) {
+            const priorityDelta =
+                root.archivePriority(b)
+                - root.archivePriority(a);
+
+            if (priorityDelta !== 0)
+                return priorityDelta;
+
+            return root.eventEpoch(b) - root.eventEpoch(a);
+        });
+
+        const kept =
+            older.slice(0, olderBudget).concat(recent);
 
         kept.sort(function(a, b) {
             return root.eventEpoch(a) - root.eventEpoch(b);
@@ -753,7 +804,7 @@ Scope {
             return false;
 
         const event = {
-            schemaVersion: 1,
+            schemaVersion: 2,
             key: key,
             recordedAt: recordedAt,
             timeLabel:
@@ -1080,7 +1131,8 @@ Scope {
         "today", "yesterday", "tonight", "week", "since",
         "hour", "hours", "day", "days", "past",
         "monday", "tuesday", "wednesday", "thursday",
-        "friday", "saturday", "sunday"
+        "friday", "saturday", "sunday",
+        "archive", "archives", "earliest", "oldest", "first"
     ]
 
     function editDistanceOneOrLess(leftValue, rightValue) {
@@ -2342,6 +2394,15 @@ Scope {
             query.indexOf("how many") >= 0
             || query.indexOf("count ") >= 0
             || query.indexOf("count?") >= 0;
+        const asksArchive =
+            query.indexOf("archive") >= 0
+            || query.indexOf("deep history") >= 0
+            || query.indexOf("older history") >= 0;
+        const asksOldest =
+            query.indexOf("oldest") >= 0
+            || query.indexOf("earliest") >= 0
+            || query.indexOf("first activity") >= 0
+            || query.indexOf("first thing") >= 0;
         const asksHelp =
             query.indexOf("what do you know") >= 0
             || query.indexOf("what can you tell me") >= 0
@@ -2353,6 +2414,8 @@ Scope {
                 && !asksProblems
                 && !asksWhen
                 && !asksCount
+                && !asksArchive
+                && !asksOldest
                 && !asksHelp
                 && !timeWindow.active)
             return false;
@@ -2362,7 +2425,7 @@ Scope {
         if (asksHelp) {
             append(
                 "RECEPTION",
-                "I understand recent activity, what changed, what went wrong, what needs attention, favorites, Room or team history, counts, and time windows like today, yesterday, this morning, this week, since Monday, or the last 3 hours. I can also find or show a team, then follow up with open this, take me there, favorite this, go back, or next one."
+                "I understand recent activity, archive history, oldest or earliest activity, what changed, what went wrong, what needs attention, favorites, Room or team history, counts, and time windows like today, yesterday, this morning, this week, since Monday, or the last 3 hours. I can also find or show a team, then follow up with open this, take me there, favorite this, go back, or next one."
             );
             return true;
         }
@@ -2393,6 +2456,8 @@ Scope {
             label = "IMPORTANT";
         else if (asksNew)
             label = "NEW SINCE LAST VISIT";
+        else if (asksArchive || asksOldest)
+            label = "ARCHIVE";
         else
             label = "RECENT";
 
@@ -2410,6 +2475,40 @@ Scope {
             append(
                 "RECEPTION",
                 activityCountResponse(label, matches)
+            );
+            return true;
+        }
+
+        if (asksOldest) {
+            const oldest =
+                matches.length > 0
+                ? matches[matches.length - 1]
+                : null;
+
+            if (oldest) {
+                rememberActivityContext(
+                    oldest,
+                    source,
+                    target,
+                    asksNew,
+                    asksFavorites,
+                    asksProblems,
+                    timeWindow.startEpoch,
+                    timeWindow.endEpoch,
+                    timeWindow.label
+                );
+            } else {
+                clearActivityContext();
+            }
+
+            append(
+                "RECEPTION",
+                oldest
+                ? activityListResponse(
+                    label + " // OLDEST",
+                    [oldest]
+                  )
+                : label + " // NONE RECORDED"
             );
             return true;
         }

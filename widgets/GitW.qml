@@ -3014,11 +3014,7 @@ PanelWindow {
                 Item {
                     id: gitLocalPage
 
-                    anchors {
-                        fill: parent
-                        leftMargin: 46
-                        rightMargin: 46
-                    }
+                    anchors.fill: parent
                     visible: root.activePage === "git"
 
                     Rectangle {

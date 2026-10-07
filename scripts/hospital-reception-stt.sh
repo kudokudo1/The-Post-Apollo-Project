@@ -35,7 +35,30 @@ find_backend() {
         return
     fi
 
-    command -v whisper-cli 2>/dev/null
+    local detected
+    detected="$(command -v whisper-cli 2>/dev/null || true)"
+
+    if [[ -n "$detected" ]]; then
+        printf '%s\n' "$detected"
+        return 0
+    fi
+
+    local candidates=(
+        "$HOME/.local/bin/whisper-cli"
+        "$HOME/Projects/whisper.cpp/build/bin/whisper-cli"
+        "/usr/local/bin/whisper-cli"
+        "/usr/bin/whisper-cli"
+    )
+
+    local candidate
+    for candidate in "${candidates[@]}"; do
+        if [[ -x "$candidate" ]]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+
+    return 1
 }
 
 backend="$(find_backend || true)"

@@ -20,8 +20,10 @@ Scope {
     property var assignments: []
     property bool loading: false
     property bool writing: false
+    property bool orchestrating: false
     property string lastError: ""
     property var lastWriteResult: null
+    property var lastOrchestrationResult: null
     property string pendingOperation: ""
 
     readonly property int assignmentCount: assignments.length
@@ -38,6 +40,7 @@ Scope {
     signal assignmentSaved(var assignment)
     signal assignmentActivated(var result)
     signal assignmentStatusChanged(var assignment)
+    signal orchestrationFinished(var result)
 
     function pxArgs(args) {
         const suffix = Array.isArray(args) ? args : [];
@@ -239,6 +242,23 @@ Scope {
         return true;
     }
 
+    function startAllReady() {
+        if (orchestrating || orchestrationProcess.running || writing)
+            return false;
+
+        orchestrating = true;
+        lastOrchestrationResult = null;
+        lastError = "";
+        orchestrationProcess.exec(pxArgs([
+            "agent",
+            "orchestrate-ready",
+            "--max-workers",
+            "8",
+            "--json"
+        ]));
+        return true;
+    }
+
     function setAssignmentStatus(assignmentIdValue, statusValue) {
         const id = String(assignmentIdValue || "").trim();
         const status = String(statusValue || "").trim().toUpperCase();
@@ -309,6 +329,46 @@ Scope {
             if (Number(code) !== 0 && !root.lastError)
                 root.lastError = "PX HOSPITAL ASSIGNMENTS EXIT " + String(code);
             root.assignmentsRefreshed();
+        }
+    }
+
+    Process {
+        id: orchestrationProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const body = String(this.text || "").trim();
+                if (!body)
+                    return;
+
+                try {
+                    root.lastOrchestrationResult = JSON.parse(body);
+                    root.lastError = "";
+                } catch (error) {
+                    root.lastOrchestrationResult = null;
+                    root.lastError = root.compactPxError(body || error);
+                }
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                const detail = String(this.text || "").trim();
+                if (detail)
+                    root.lastError = root.compactPxError(detail);
+            }
+        }
+
+        onExited: function(code, exitStatus) {
+            root.orchestrating = false;
+            if (Number(code) !== 0 && !root.lastError)
+                root.lastError =
+                    "PX HOSPITAL ORCHESTRATION EXIT " + String(code);
+
+            if (Number(code) === 0 && root.lastOrchestrationResult)
+                root.orchestrationFinished(root.lastOrchestrationResult);
+
+            Qt.callLater(root.refresh);
         }
     }
 

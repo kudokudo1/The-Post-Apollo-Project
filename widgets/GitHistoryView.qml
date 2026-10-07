@@ -491,6 +491,25 @@ Item {
         root.historyService.showCommit(sha);
     }
 
+    function compareReflogWithHead() {
+        if (!root.historyService
+                || !root.selectedReflogSha
+                || !root.historyService.reflogHeadSha
+                || root.selectedReflogSha
+                   === root.historyService.reflogHeadSha)
+            return;
+
+        root.historyService.compareA =
+            root.historyService.reflogHeadSha;
+        root.historyService.compareB =
+            root.selectedReflogSha;
+        root.subMode = "compare";
+        root.historyService.compareCommits(
+            root.historyService.compareA,
+            root.historyService.compareB
+        );
+    }
+
     function openQueryResultInLog() {
         if (!root.historyService || !root.selectedQuerySha)
             return;
@@ -2504,6 +2523,22 @@ Item {
                             }
                         }
 
+                        MiniButton {
+                            width: parent.width
+                            height: 30
+                            label: "COMPARE WITH LIVE HEAD"
+                            accent: Colors.orange
+                            enabledAction:
+                                root.selectedReflogSha.length > 0
+                                && root.historyService
+                                && root.historyService.reflogHeadSha
+                                && root.selectedReflogSha
+                                   !== root.historyService.reflogHeadSha
+                                && !root.historyService.diffBusy
+                            onTriggered:
+                                root.compareReflogWithHead()
+                        }
+
                         Flickable {
                             id: historyScroll8
 
@@ -3139,6 +3174,17 @@ Item {
 
         function onReflogRowsChanged() {
             root.reconcileSelectedReflog();
+        }
+
+        function onActionFinished(action, success, detail) {
+            if (!success)
+                return;
+
+            if (String(action || "") === "BRANCH"
+                    && root.subMode === "reflog") {
+                recoveryBranchInput.text = "";
+                root.historyService.loadReflog();
+            }
         }
     }
 

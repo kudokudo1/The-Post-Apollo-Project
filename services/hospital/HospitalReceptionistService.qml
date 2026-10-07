@@ -1320,6 +1320,37 @@ Scope {
             return false;
 
         const query = raw.toLowerCase();
+        const asksContextStatus =
+            query === "what's going on"
+            || query === "whats going on"
+            || query === "what is going on"
+            || query === "what's happening"
+            || query === "whats happening"
+            || query === "what is happening"
+            || query === "what's happening here"
+            || query === "whats happening here"
+            || query === "what is happening here"
+            || query.indexOf("tell me what's happening") >= 0
+            || query.indexOf("tell me what is happening") >= 0
+            || query.indexOf("can you tell me what's happening") >= 0
+            || query.indexOf("can you tell me what is happening") >= 0;
+        const asksContextProblem =
+            query.indexOf("what's the holdup") >= 0
+            || query.indexOf("whats the holdup") >= 0
+            || query.indexOf("what is the holdup") >= 0
+            || query.indexOf("what's holding us up") >= 0
+            || query.indexOf("whats holding us up") >= 0
+            || query.indexOf("what is holding us up") >= 0
+            || query.indexOf("what's holding things up") >= 0
+            || query.indexOf("what is holding things up") >= 0
+            || query.indexOf("what's the problem here") >= 0
+            || query.indexOf("whats the problem here") >= 0
+            || query.indexOf("what is the problem here") >= 0
+            || query === "what's the problem"
+            || query === "whats the problem"
+            || query === "what is the problem"
+            || query.indexOf("what's blocking us") >= 0
+            || query.indexOf("what is blocking us") >= 0;
         const asksContextDoing =
             query === "what are they doing"
             || query === "what're they doing"
@@ -1391,7 +1422,9 @@ Scope {
             || query.indexOf("next event") >= 0
             || query.indexOf("newer one") >= 0;
 
-        if (!asksContextDoing
+        if (!asksContextStatus
+                && !asksContextProblem
+                && !asksContextDoing
                 && !goThere
                 && !openThat
                 && !favoriteThat
@@ -1400,7 +1433,52 @@ Scope {
                 && !newerThanThat)
             return false;
 
+        if ((asksContextStatus || asksContextProblem)
+                && !contextTarget)
+            return false;
+
         append("OPERATOR", raw);
+
+        if (asksContextStatus || asksContextProblem) {
+            let matches =
+                matchingActivity(
+                    "",
+                    false,
+                    false,
+                    contextTarget
+                );
+
+            if (asksContextProblem) {
+                matches = matches.filter(function(event) {
+                    return root.isProblemActivity(event || {});
+                });
+            }
+
+            if (matches.length > 0) {
+                rememberActivityContext(
+                    matches[0],
+                    "",
+                    contextTarget,
+                    false,
+                    false,
+                    asksContextProblem
+                );
+            }
+
+            append(
+                "RECEPTION",
+                activityListResponse(
+                    (
+                        asksContextProblem
+                        ? "IMPORTANT // "
+                        : "RECENT // "
+                    )
+                    + contextTarget,
+                    matches
+                )
+            );
+            return true;
+        }
 
         if (asksContextDoing) {
             if (!contextTarget) {
@@ -1704,6 +1782,13 @@ Scope {
             || query.indexOf("what is going on") >= 0
             || query.indexOf("what's going on") >= 0
             || query.indexOf("whats going on") >= 0
+            || query.indexOf("what is happening") >= 0
+            || query.indexOf("what's happening") >= 0
+            || query.indexOf("whats happening") >= 0
+            || query.indexOf("tell me what's happening") >= 0
+            || query.indexOf("tell me what is happening") >= 0
+            || query.indexOf("can you tell me what's happening") >= 0
+            || query.indexOf("can you tell me what is happening") >= 0
             || query.indexOf("catch me up") >= 0
             || query.indexOf("update me") >= 0
             || query.indexOf("give me an update") >= 0
@@ -1726,6 +1811,15 @@ Scope {
             || query.indexOf("what failed") >= 0
             || query.indexOf("what needs attention") >= 0
             || query.indexOf("needs attention") >= 0
+            || query.indexOf("holdup") >= 0
+            || query.indexOf("hold up") >= 0
+            || query.indexOf("holding us up") >= 0
+            || query.indexOf("holding things up") >= 0
+            || query.indexOf("what's the problem") >= 0
+            || query.indexOf("whats the problem") >= 0
+            || query.indexOf("what is the problem") >= 0
+            || query.indexOf("blocking us") >= 0
+            || query.indexOf("blocking things") >= 0
             || query.indexOf("what needs me") >= 0
             || query.indexOf("what should i check") >= 0
             || query.indexOf("what should i look at") >= 0

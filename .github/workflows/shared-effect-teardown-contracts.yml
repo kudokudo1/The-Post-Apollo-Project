@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "components/SafeDropShadow.qml"
+      - "components/ActionButton.qml"
       - "components/DockButton.qml"
       - "components/NeonScrollBar.qml"
       - "components/ConversationFeed.qml"
@@ -18,6 +19,7 @@ on:
       - main
     paths:
       - "components/SafeDropShadow.qml"
+      - "components/ActionButton.qml"
       - "components/DockButton.qml"
       - "components/NeonScrollBar.qml"
       - "components/ConversationFeed.qml"

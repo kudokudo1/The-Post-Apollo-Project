@@ -135,21 +135,6 @@ Scope {
         return remoteBranchRows.get(index);
     }
 
-    function commitAt(index) {
-        if (index < 0 || index >= topologyRows.count)
-            return null;
-        return topologyRows.get(index);
-    }
-
-    function indexOfSha(sha) {
-        const needle = String(sha || "");
-        for (let i = 0; i < topologyRows.count; ++i) {
-            if (String(topologyRows.get(i).sha) === needle)
-                return i;
-        }
-        return -1;
-    }
-
     function repoIndexOfPath(pathValue) {
         const needle = String(pathValue || "");
         for (let i = 0; i < repoRows.count; ++i) {
@@ -661,24 +646,6 @@ Scope {
             "SELECTED LOCAL TARGET // " + selectedLocalBranch
             + "\nNo checkout occurred. Working files were not changed.";
         return true;
-    }
-
-    function cycleLocal(delta) {
-        if (localBranchRows.count <= 0 || actionBusy || refreshing)
-            return;
-
-        let index = selectedLocalIndex;
-
-        if (index < 0)
-            index = localIndexOf(branch);
-
-        if (index < 0)
-            index = 0;
-        else
-            index = (index + Number(delta || 0) + localBranchRows.count)
-                    % localBranchRows.count;
-
-        selectLocal(index);
     }
 
     function selectLocalText(query) {

@@ -1,0 +1,26 @@
+name: LABELS // SYNC
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "scripts/sync_labels.py"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  sync:
+    name: Sync canonical Post-Apollo labels
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Sync labels
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python scripts/sync_labels.py

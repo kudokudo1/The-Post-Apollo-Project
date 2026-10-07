@@ -132,6 +132,29 @@ require(
     "PR review requests need direct evidence fallback",
 )
 
+# Work-item inbox keyboard continuity includes the search editor and keeps
+# dynamic row actions reachable while the ListView scrolls.
+require_regex(
+    "widgets/GitHubWorkItemsView.qml",
+    r"component SearchField: Rectangle \{.*registerGitKeyboardControl\(field\).*onTriggered:\s*editor\.forceActiveFocus\(\)",
+    "work-item search must participate in shared keyboard routing",
+)
+require(
+    "widgets/GitHubWorkItemsView.qml",
+    "sourceList.positionViewAtIndex(",
+    "work-item keyboard selection must keep its row visible",
+)
+require(
+    "widgets/GitHubWorkItemsView.qml",
+    "cacheBuffer: Math.max(height, 416)",
+    "work-item list must keep nearby row controls instantiated for keyboard navigation",
+)
+require(
+    "widgets/GitHubWorkItemsView.qml",
+    "keyboardListIndex: sourceRow.index",
+    "work-item row actions must identify their ListView row",
+)
+
 # Project item destructive actions are guarded at the backend, not only UI.
 require(
     "services/github/GitHubProjectsService.qml",

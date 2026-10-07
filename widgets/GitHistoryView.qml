@@ -778,50 +778,56 @@ Item {
         color: Colors.magenta
     }
 
-    component MiniButton: Rectangle {
+    component MiniButton: ActionButton {
         id: button
 
-        property string label: ""
+        // Temporary lossless Git adapter. These are preserved historical
+        // values, not canonical ActionButton policy; they can be synchronized
+        // later once the user chooses the desired final look.
         property color accent: Colors.cyan
         property bool enabledAction: true
-        property bool selected: false
-        signal triggered()
 
         height: 28
-        color:
-            mouse.pressed
-            ? accent
-            : selected
-            ? Colors.dark
-            : mouse.containsMouse
-            ? Colors.dark
-            : Colors.black
-        border.width: selected ? 2 : 1
-        border.color: accent
-        opacity: enabledAction ? 1.0 : 0.26
+
+        accentColor: accent
+        available: enabledAction
+        interactive: enabledAction
+        acceptedButtons: Qt.LeftButton
+
+        idleFillColor: Colors.black
+        hoverFillColor: Colors.dark
+        pressedFillColor: accent
+        selectedFillColor: Colors.dark
+
+        idleForegroundColor: accent
+        hoverForegroundColor: accent
+        pressedForegroundColor: Colors.black
+        selectedForegroundColor: Colors.white
+
+        idleBorderColor: accent
+        hoverBorderColor: accent
+        pressedBorderColor: accent
+        selectedBorderColor: accent
+
+        idleBorderWidth: 1
+        hoverBorderWidth: 1
+        pressedBorderWidth: 1
+        selectedBorderWidth: 2
+
+        unavailableOpacity: 0.26
+
+        // The original Git MiniButton family is intentionally flat.
+        contentGlowEnabled: false
+        softGlowEnabled: false
+        wideGlowEnabled: false
+
+        showLabel: false
 
         GohuText {
             anchors.centerIn: parent
             text: button.label
             font.pixelSize: 10
-            color:
-                mouse.pressed
-                ? Colors.black
-                : selected
-                ? Colors.white
-                : button.accent
-        }
-
-        MouseArea {
-            id: mouse
-            anchors.fill: parent
-            enabled: button.enabledAction
-            hoverEnabled: true
-            cursorShape:
-                enabled
-                ? Qt.PointingHandCursor
-                : Qt.ArrowCursor
-            onClicked: button.triggered()
+            color: button.foregroundColor
         }
     }
 

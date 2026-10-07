@@ -108,6 +108,9 @@ PanelWindow {
     property string searchQuery: ""
     property string activeFilter: "all"
 
+    property string pendingClearAllKey: ""
+    property string pendingClearAllSource: ""
+
     // Keep the heavy ListView on an actually filtered model.
     // Zero-height delegates force ListView to walk and construct large
     // stretches of hidden history just to fill the viewport.
@@ -759,6 +762,24 @@ PanelWindow {
         NotificationsService.scheduleHistorySave();
     }
 
+    function requestClearAllForApp(appKey, source) {
+        root.pendingClearAllKey = String(appKey || "");
+        root.pendingClearAllSource = String(source || appKey || "");
+    }
+
+    function cancelClearAll() {
+        root.pendingClearAllKey = "";
+        root.pendingClearAllSource = "";
+    }
+
+    function confirmClearAll() {
+        if (root.pendingClearAllKey === "")
+            return;
+
+        NotificationsService.clearNotificationsForSource(root.pendingClearAllKey);
+        root.cancelClearAll();
+    }
+
     // ===== APP NAVIGATION =======================================
     //
     // These actions are intentionally limited to:
@@ -1359,6 +1380,127 @@ PanelWindow {
                     border.color: Colors.cyan
 
                     opacity: 0.18
+                }
+            }
+
+            // ===== CLEAR-ALL CONFIRMATION ========================
+
+            Item {
+                id: clearAllConfirmOverlay
+
+                anchors.fill: parent
+
+                visible: root.pendingClearAllKey !== ""
+
+                z: 100
+
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.AllButtons
+                }
+
+                Rectangle {
+                    id: clearAllConfirmBox
+
+                    anchors.centerIn: parent
+
+                    width: Math.min(parent.width - 40, 360)
+                    height: 152
+
+                    color: Colors.dark
+
+                    border.width: 2
+                    border.color: Colors.red
+
+                    DropShadow {
+                        anchors.fill: parent
+                        source: parent
+                        horizontalOffset: 0
+                        verticalOffset: 0
+                        radius: 18
+                        samples: 21
+                        color: Colors.red
+                        opacity: 0.62
+                        z: -1
+                        transparentBorder: true
+                    }
+
+                    GlowText {
+                        anchors {
+                            top: parent.top
+                            left: parent.left
+                            right: parent.right
+                        }
+
+                        anchors.topMargin: 18
+                        anchors.leftMargin: 14
+                        anchors.rightMargin: 14
+
+                        height: 26
+
+                        text: "CLEAR ALL NOTIFICATIONS?"
+                        pixelSize: 15
+                        textColor: Colors.red
+                        glowColor: Colors.red
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+
+                    GohuText {
+                        anchors {
+                            top: parent.top
+                            left: parent.left
+                            right: parent.right
+                        }
+
+                        anchors.topMargin: 54
+                        anchors.leftMargin: 18
+                        anchors.rightMargin: 18
+
+                        height: 22
+
+                        text: root.pendingClearAllSource
+                        font.pixelSize: 11
+                        color: Colors.white
+                        horizontalAlignment: Text.AlignHCenter
+                        elide: Text.ElideRight
+                    }
+
+                    Row {
+                        anchors {
+                            bottom: parent.bottom
+                            horizontalCenter: parent.horizontalCenter
+                        }
+
+                        anchors.bottomMargin: 18
+
+                        spacing: 12
+
+                        MiniButton {
+                            width: 92
+                            height: 32
+
+                            label: "NO"
+                            labelPixelSize: 11
+
+                            onTriggered: {
+                                root.cancelClearAll();
+                            }
+                        }
+
+                        MiniButton {
+                            width: 92
+                            height: 32
+
+                            label: "YES"
+                            labelPixelSize: 11
+
+                            danger: true
+
+                            onTriggered: {
+                                root.confirmClearAll();
+                            }
+                        }
+                    }
                 }
             }
 
@@ -2086,6 +2228,22 @@ PanelWindow {
 
                                     onTriggered: {
                                         NotificationsService.toggleDnd(notificationEntry.appKey, notificationEntry.sourceId, notificationEntry.source);
+                                    }
+                                }
+
+                                MiniButton {
+                                    width: 108
+                                    height: 28
+
+                                    label: "CLEAR ALL"
+
+                                    labelPixelSize: 9
+
+                                    active: false
+                                    danger: true
+
+                                    onTriggered: {
+                                        root.requestClearAllForApp(notificationEntry.appKey, notificationEntry.source);
                                     }
                                 }
 

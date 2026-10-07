@@ -314,7 +314,7 @@ Rectangle {
                         font.pixelSize: 8
                         color: Colors.cyan
 
-                        layer.enabled: true
+                        layer.enabled: Window.window !== null
 
                         layer.effect: DropShadow {
                             horizontalOffset: 0
@@ -563,7 +563,7 @@ Rectangle {
                 }
             }
 
-            layer.enabled: true
+            layer.enabled: Window.window !== null
 
             layer.effect: DropShadow {
                 anchors.fill: networkIconRow
@@ -618,7 +618,7 @@ Rectangle {
 
                 elide: Text.ElideNone
 
-                layer.enabled: true
+                layer.enabled: Window.window !== null
 
                 layer.effect: DropShadow {
                     horizontalOffset: 0
@@ -671,7 +671,7 @@ Rectangle {
                     // Center the actual text inside the column.
                     horizontalAlignment: Text.AlignHCenter
 
-                    layer.enabled: true
+                    layer.enabled: Window.window !== null
 
                     layer.effect: DropShadow {
                         horizontalOffset: 0
@@ -698,7 +698,7 @@ Rectangle {
                     // Center the actual text inside the column.
                     horizontalAlignment: Text.AlignHCenter
 
-                    layer.enabled: true
+                    layer.enabled: Window.window !== null
 
                     layer.effect: DropShadow {
                         horizontalOffset: 0

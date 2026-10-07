@@ -566,6 +566,11 @@ Item {
     }
 
     function closeManager() {
+        if (root.managementMode === "restack"
+                && root.stackExecutor
+                && root.stackExecutor.armed)
+            root.stackExecutor.disarm("PANEL CLOSED");
+
         root.managementMode = "";
         root.managementMessage = "";
         root.managementArm = "";
@@ -3177,6 +3182,364 @@ Item {
                         Column {
                             width: parent.width
                             spacing: 8
+                            visible: root.managementMode === "restack"
+
+                            Rectangle {
+                                width: parent.width
+                                height: 86
+                                color: Colors.dark
+                                border.width: 1
+                                border.color:
+                                    stackExecutor && stackExecutor.armed
+                                    ? Colors.orange
+                                    : stackPlanner
+                                      && stackPlanner.invalidCount > 0
+                                    ? Colors.red
+                                    : Colors.cyan
+
+                                Column {
+                                    anchors {
+                                        fill: parent
+                                        margins: 7
+                                    }
+                                    spacing: 4
+
+                                    FactRow {
+                                        label: "STAGE"
+                                        value: root.restackStageText()
+                                        valueColor:
+                                            stackExecutor
+                                            && stackExecutor.running
+                                            ? Colors.orange
+                                            : stackExecutor
+                                              && stackExecutor.armed
+                                            ? Colors.orange
+                                            : Colors.cyan
+                                    }
+
+                                    FactRow {
+                                        label: "PLAN"
+                                        value:
+                                            stackPlanner
+                                            ? (
+                                                String(
+                                                    stackPlanner.stepCount
+                                                  )
+                                                + " STEPS // "
+                                                + String(
+                                                    stackPlanner.requiredCount
+                                                  )
+                                                + " MOVE // "
+                                                + String(
+                                                    stackPlanner.invalidCount
+                                                  )
+                                                + " INVALID"
+                                              )
+                                            : "NOT CONNECTED"
+                                        valueColor:
+                                            stackPlanner
+                                            && stackPlanner.invalidCount > 0
+                                            ? Colors.red
+                                            : stackPlanner
+                                              && stackPlanner.requiredCount > 0
+                                            ? Colors.orange
+                                            : Colors.green
+                                    }
+
+                                    GohuText {
+                                        width: parent.width
+                                        text:
+                                            root.restackOccupiedBranch()
+                                            ? (
+                                                "BLOCKED // "
+                                                + root.restackOccupiedBranch()
+                                                + " IS CHECKED OUT IN A WORKTREE"
+                                              )
+                                            : stackExecutor
+                                              && stackExecutor.lastError
+                                            ? stackExecutor.lastError
+                                            : stackPlanner
+                                              && stackPlanner.lastError
+                                            ? stackPlanner.lastError
+                                            : "Preview is read-only. ARM freezes the exact preview. EXECUTE rewrites only that frozen plan."
+                                        font.pixelSize: 8
+                                        color:
+                                            root.restackOccupiedBranch()
+                                            || (
+                                                stackExecutor
+                                                && stackExecutor.lastError
+                                               )
+                                            || (
+                                                stackPlanner
+                                                && stackPlanner.lastError
+                                               )
+                                            ? Colors.red
+                                            : Colors.white
+                                        opacity:
+                                            root.restackOccupiedBranch()
+                                            || (
+                                                stackExecutor
+                                                && stackExecutor.lastError
+                                               )
+                                            || (
+                                                stackPlanner
+                                                && stackPlanner.lastError
+                                               )
+                                            ? 1.0
+                                            : 0.62
+                                        elide: Text.ElideRight
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                width: parent.width
+                                height: 196
+                                color: Colors.black
+                                border.width: 1
+                                border.color:
+                                    stackPlanner
+                                    && stackPlanner.invalidCount > 0
+                                    ? Colors.red
+                                    : Colors.orange
+                                clip: true
+
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    visible:
+                                        !stackPlanner
+                                        || (
+                                            !stackPlanner.busy
+                                            && stackPlanner.plan.length === 0
+                                           )
+                                    text:
+                                        stackPlanner
+                                        && stackPlanner.startBranch
+                                        === root.selectedBranch
+                                        ? "NO MOVES IN PREVIEW"
+                                        : "PRESS PREVIEW TO INSPECT THE STACK"
+                                    font.pixelSize: 10
+                                    color: Colors.cyan
+                                    opacity: 0.62
+                                }
+
+                                Flickable {
+                                    id: restackPlanFlick
+
+                                    anchors {
+                                        fill: parent
+                                        margins: 5
+                                        rightMargin: 14
+                                    }
+
+                                    visible:
+                                        stackPlanner
+                                        && stackPlanner.plan.length > 0
+                                    clip: true
+                                    contentWidth: width
+                                    contentHeight:
+                                        restackPlanRows.implicitHeight
+                                    boundsBehavior: Flickable.StopAtBounds
+
+                                    Column {
+                                        id: restackPlanRows
+                                        width: parent.width
+                                        spacing: 3
+
+                                        Repeater {
+                                            model:
+                                                stackPlanner
+                                                ? stackPlanner.plan
+                                                : []
+
+                                            Rectangle {
+                                                required property var modelData
+
+                                                width: restackPlanRows.width
+                                                height: 42
+                                                color: Colors.dark
+                                                border.width: 1
+                                                border.color:
+                                                    String(
+                                                        modelData.status
+                                                        || ""
+                                                    )
+                                                    === "RESTACK_REQUIRED"
+                                                    ? Colors.orange
+                                                    : String(
+                                                        modelData.status
+                                                        || ""
+                                                      )
+                                                      === "UP_TO_DATE"
+                                                    ? Colors.cyan
+                                                    : Colors.red
+
+                                                Column {
+                                                    anchors {
+                                                        fill: parent
+                                                        margins: 5
+                                                    }
+                                                    spacing: 2
+
+                                                    GohuText {
+                                                        width: parent.width
+                                                        text:
+                                                            String(
+                                                                modelData.branch
+                                                                || ""
+                                                            )
+                                                            + " → "
+                                                            + String(
+                                                                modelData.parent
+                                                                || ""
+                                                            )
+                                                        font.pixelSize: 10
+                                                        color: Colors.white
+                                                        elide: Text.ElideMiddle
+                                                    }
+
+                                                    GohuText {
+                                                        width: parent.width
+                                                        text:
+                                                            String(
+                                                                modelData.status
+                                                                || ""
+                                                            )
+                                                            + " // "
+                                                            + String(
+                                                                Number(
+                                                                    modelData.uniqueCommits
+                                                                    || 0
+                                                                )
+                                                              )
+                                                            + " COMMITS // BASE "
+                                                            + root.shortSha(
+                                                                modelData.mergeBase
+                                                              )
+                                                        font.pixelSize: 8
+                                                        color:
+                                                            String(
+                                                                modelData.status
+                                                                || ""
+                                                            )
+                                                            === "RESTACK_REQUIRED"
+                                                            ? Colors.orange
+                                                            : String(
+                                                                modelData.status
+                                                                || ""
+                                                              )
+                                                              === "UP_TO_DATE"
+                                                            ? Colors.cyan
+                                                            : Colors.red
+                                                        elide: Text.ElideMiddle
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                NeonScrollBar {
+                                    flickable: restackPlanFlick
+                                    starHandle: true
+                                }
+                            }
+
+                            Row {
+                                width: parent.width
+                                height: 34
+                                spacing: 6
+
+                                BranchButton {
+                                    width: (parent.width - 6) / 2
+                                    height: 34
+                                    label:
+                                        stackPlanner && stackPlanner.busy
+                                        ? "READING"
+                                        : "PREVIEW"
+                                    enabledAction:
+                                        stackPlanner
+                                        && stackExecutor
+                                        && !stackPlanner.busy
+                                        && !stackExecutor.running
+                                    onTriggered: root.previewRestack()
+                                }
+
+                                BranchButton {
+                                    width: (parent.width - 6) / 2
+                                    height: 34
+                                    label:
+                                        stackExecutor
+                                        && stackExecutor.armed
+                                        ? "ARMED ✓"
+                                        : "ARM"
+                                    selectedAction:
+                                        stackExecutor
+                                        && stackExecutor.armed
+                                    enabledAction:
+                                        stackPlanner
+                                        && stackExecutor
+                                        && !stackPlanner.busy
+                                        && !stackExecutor.running
+                                        && !stackExecutor.armed
+                                        && stackPlanner.startBranch
+                                           === root.selectedBranch
+                                        && stackPlanner.executable
+                                        && stackPlanner.requiredCount > 0
+                                        && root.restackOccupiedBranch().length
+                                           === 0
+                                    onTriggered: root.armRestack()
+                                }
+                            }
+
+                            Row {
+                                width: parent.width
+                                height: 36
+                                spacing: 6
+
+                                BranchButton {
+                                    width: (parent.width - 6) / 2
+                                    height: 36
+                                    label:
+                                        stackExecutor
+                                        && stackExecutor.running
+                                        ? "EXECUTING"
+                                        : "EXECUTE"
+                                    destructive: true
+                                    enabledAction:
+                                        stackExecutor
+                                        && stackExecutor.armed
+                                        && !stackExecutor.running
+                                    onTriggered: root.executeRestack()
+                                }
+
+                                BranchButton {
+                                    width: (parent.width - 6) / 2
+                                    height: 36
+                                    label: "DISARM"
+                                    destructive: true
+                                    enabledAction:
+                                        stackExecutor
+                                        && stackExecutor.armed
+                                        && !stackExecutor.running
+                                    onTriggered: root.disarmRestack()
+                                }
+                            }
+
+                            GohuText {
+                                width: parent.width
+                                text:
+                                    "EXECUTE rebases required branches in temporary detached worktrees first, then updates branch refs together only if every rebase succeeds."
+                                font.pixelSize: 9
+                                color: Colors.white
+                                opacity: 0.62
+                                wrapMode: Text.WordWrap
+                            }
+                        }
+
+                        Column {
+                            width: parent.width
+                            spacing: 8
                             visible: root.managementMode === "delete"
 
                             FactRow {
@@ -3302,6 +3665,8 @@ Item {
                                             ? "WORKSPACE IS ATTACHED TO THE SELECTED BRANCH"
                                             : "WORKSPACE CREATION DOES NOT MOVE THE CURRENT CHECKOUT"
                                           )
+                                        : root.managementMode === "restack"
+                                        ? "RESTACK REQUIRES PREVIEW → ARM → EXECUTE"
                                         : "EDIT CHANGES ONLY THE SELECTED LOCAL BRANCH"
                                        )
                                 font.pixelSize: 9

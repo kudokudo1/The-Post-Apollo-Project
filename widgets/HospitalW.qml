@@ -2395,7 +2395,7 @@ PanelWindow {
                 ? Colors.orange
                 : Colors.cyan
 
-            layer.enabled: !modeTab.pressed
+            layer.enabled: Window.window !== null && (!modeTab.pressed)
             layer.effect: DropShadow {
                 radius: 10
                 samples: 11
@@ -2428,7 +2428,7 @@ PanelWindow {
         font.pixelSize: 12
         color: Colors.magenta
 
-        layer.enabled: true
+        layer.enabled: Window.window !== null
         layer.effect: DropShadow {
             radius: 6
             samples: 7
@@ -2442,7 +2442,7 @@ PanelWindow {
         font.pixelSize: 10
         color: Colors.cyan
 
-        layer.enabled: true
+        layer.enabled: Window.window !== null
         layer.effect: DropShadow {
             radius: 4
             samples: 5
@@ -2457,7 +2457,7 @@ PanelWindow {
         color: Colors.white
         elide: Text.ElideRight
 
-        layer.enabled: true
+        layer.enabled: Window.window !== null
         layer.effect: DropShadow {
             radius: 5
             samples: 7
@@ -2471,7 +2471,7 @@ PanelWindow {
         font.pixelSize: 10
         color: Colors.orange
 
-        layer.enabled: true
+        layer.enabled: Window.window !== null
         layer.effect: DropShadow {
             radius: 5
             samples: 7
@@ -2486,7 +2486,7 @@ PanelWindow {
         color: Colors.cyan
         elide: Text.ElideRight
 
-        layer.enabled: true
+        layer.enabled: Window.window !== null
         layer.effect: DropShadow {
             radius: 5
             samples: 7
@@ -2501,7 +2501,7 @@ PanelWindow {
         color: Colors.blue
         elide: Text.ElideRight
 
-        layer.enabled: true
+        layer.enabled: Window.window !== null
         layer.effect: DropShadow {
             radius: 7
             samples: 9
@@ -2562,7 +2562,7 @@ PanelWindow {
             color: Colors.orange
             elide: Text.ElideRight
 
-            layer.enabled: true
+            layer.enabled: Window.window !== null
             layer.effect: DropShadow {
                 radius: 5
                 samples: 7
@@ -2587,7 +2587,7 @@ PanelWindow {
             color: Colors.cyan
             elide: Text.ElideRight
 
-            layer.enabled: true
+            layer.enabled: Window.window !== null
             layer.effect: DropShadow {
                 radius: 5
                 samples: 7
@@ -2613,7 +2613,7 @@ PanelWindow {
             color: roomRow.stateColor
             opacity: roomRow.telemetryState === "WAITING" ? 0.58 : 1.0
 
-            layer.enabled: true
+            layer.enabled: Window.window !== null
             layer.effect: DropShadow {
                 radius: 5
                 samples: 7
@@ -2803,7 +2803,7 @@ PanelWindow {
                     font.pixelSize: 20
                     color: Colors.magenta
 
-                    layer.enabled: true
+                    layer.enabled: Window.window !== null
                     layer.effect: DropShadow {
                         radius: 8
                         samples: 9
@@ -2834,7 +2834,7 @@ PanelWindow {
                     font.pixelSize: 10
                     color: Colors.cyan
 
-                    layer.enabled: true
+                    layer.enabled: Window.window !== null
                     layer.effect: DropShadow {
                         radius: 6
                         samples: 7
@@ -2911,7 +2911,7 @@ PanelWindow {
                                 ? Colors.orange
                                 : Colors.omnitrix
 
-                            layer.enabled: !intercomMouse.pressed
+                            layer.enabled: Window.window !== null && (!intercomMouse.pressed)
                             layer.effect: DropShadow {
                                 radius: 7
                                 samples: 9
@@ -2993,7 +2993,7 @@ PanelWindow {
                                 ? Colors.orange
                                 : Colors.green
 
-                            layer.enabled: !phoneMouse.pressed
+                            layer.enabled: Window.window !== null && (!phoneMouse.pressed)
                             layer.effect: DropShadow {
                                 radius: 7
                                 samples: 9
@@ -3116,7 +3116,7 @@ PanelWindow {
                                 ? Colors.cyan
                                 : Colors.red
 
-                            layer.enabled: true
+                            layer.enabled: Window.window !== null
                             layer.effect: DropShadow {
                                 radius: 10
                                 samples: 11
@@ -3170,7 +3170,7 @@ PanelWindow {
                             font.pixelSize: 31
                             color: Colors.red
 
-                            layer.enabled: true
+                            layer.enabled: Window.window !== null
                             layer.effect: DropShadow {
                                 radius: 7
                                 samples: 9
@@ -3889,7 +3889,7 @@ PanelWindow {
                                 color: bedPane.roomAccent
                                 elide: Text.ElideRight
 
-                                layer.enabled: true
+                                layer.enabled: Window.window !== null
                                 layer.effect: DropShadow {
                                     radius: 7
                                     samples: 9
@@ -3944,7 +3944,7 @@ PanelWindow {
                                 elide: Text.ElideRight
                                 color: cleanState ? Colors.orange : Colors.white
 
-                                layer.enabled: true
+                                layer.enabled: Window.window !== null
                                 layer.effect: DropShadow {
                                     radius: worktreeValue.cleanState ? 9 : 7
                                     samples: worktreeValue.cleanState ? 13 : 9
@@ -4057,7 +4057,7 @@ PanelWindow {
                                     ? Colors.orange
                                     : Colors.cyan
 
-                                layer.enabled: true
+                                layer.enabled: Window.window !== null
                                 layer.effect: DropShadow {
                                     radius: moveBedButton.liveConfirm ? 9 : 5
                                     samples: moveBedButton.liveConfirm ? 13 : 7
@@ -4306,7 +4306,7 @@ PanelWindow {
                                 color: presenceColor
                                 elide: Text.ElideRight
 
-                                layer.enabled: true
+                                layer.enabled: Window.window !== null
                                 layer.effect: DropShadow {
                                     radius: 6
                                     samples: 7
@@ -6732,7 +6732,7 @@ PanelWindow {
                         color: refreshMouse.containsMouse ? Colors.orange : Colors.cyan
                         opacity: patientService.refreshing ? 0.55 : 1.0
 
-                        layer.enabled: true
+                        layer.enabled: Window.window !== null
                         layer.effect: DropShadow {
                             radius: 5
                             samples: 7
@@ -6774,7 +6774,7 @@ PanelWindow {
                                : Colors.cyan
                         opacity: auditService.visibleRunning ? 0.60 : 1.0
 
-                        layer.enabled: true
+                        layer.enabled: Window.window !== null
                         layer.effect: DropShadow {
                             radius: 5
                             samples: 7
@@ -6817,7 +6817,7 @@ PanelWindow {
                                : Colors.cyan
                         opacity: githubService.refreshing ? 0.60 : 1.0
 
-                        layer.enabled: true
+                        layer.enabled: Window.window !== null
                         layer.effect: DropShadow {
                             radius: 5
                             samples: 7
@@ -6890,7 +6890,7 @@ PanelWindow {
                     font.pixelSize: 8
                     color: Colors.magenta
 
-                    layer.enabled: true
+                    layer.enabled: Window.window !== null
                     layer.effect: DropShadow {
                         radius: 8
                         samples: 7

@@ -58,9 +58,9 @@ for service in (TRANSFER, LINE):
         "transfer journal metadata must carry the exact accepted patch",
     )
 
-require(
+require_regex(
     TRANSFER,
-    'printf "PATCH64\\t"',
+    r'printf "PATCH64\\\\t"',
     "whole-file/hunk preview must emit a bounded recovery payload",
 )
 require(

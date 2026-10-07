@@ -69,7 +69,7 @@ suggestions = SUGGESTIONS.read_text()
 for needle in (
     'required property var chartService',
     'DOCTORS PROPOSE // OPERATOR PROMOTES',
-    'label: "PROMOTE TO CHART"',
+    '"PROMOTE TO CHART"',
     'label: "REJECT"',
     'chartService.promoteSuggestion(',
     'chartService.rejectSuggestion(',

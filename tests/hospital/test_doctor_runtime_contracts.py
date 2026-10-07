@@ -15,13 +15,18 @@ for needle in (
     'property int elapsedSeconds: 0',
     'property bool operating: false',
     'property bool cancelling: false',
+    'property bool quickRunning: false',
+    'property string quickCommand: ""',
+    'property var lastQuickResult: null',
     'readonly property string displayStatus:',
     'readonly property string elapsedLabel:',
     'function refresh()',
     'function cancel(reasonValue)',
+    'function quick(commandValue)',
     '"agent",',
     '"status",',
     '"cancel",',
+    '"quick",',
     'interval: root.operating ? 1000 : 3000',
     '.local/share/post-apollo-dev-runtime/bin/px',
 ):
@@ -63,5 +68,23 @@ quick = hospital[quick_start:chat_start]
 assert 'model: ["STATUS", "CHAT", "STOP"]' in quick
 assert 'doctorRuntimeService.refresh();' in quick
 assert 'doctorRuntimeService.cancel("OPERATOR")' in quick
+
+for command in (
+    "CONTINUE",
+    "REPORT",
+    "CHECKLIST",
+    "NEXT",
+    "PAUSE",
+):
+    assert f'"{command}"' in quick, command
+
+assert 'id: semanticQuickActions' in quick
+assert 'doctorRuntimeService.quick(' in quick
+assert 'doctorRuntimeService.cancel("PAUSE")' in quick
+assert 'doctorRuntimeService.quickRunning' in quick
+assert 'doctorRuntimeService.quickCommand' in quick
+
+assert 'onQuickCompleted: function(command, result)' in hospital
+assert 'roomChatView.refresh();' in hospital
 
 print("hospital Doctor runtime supervision contracts: PASS")

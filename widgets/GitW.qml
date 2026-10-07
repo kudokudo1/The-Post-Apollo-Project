@@ -1018,6 +1018,13 @@ PanelWindow {
         branchWorkspaceService.refresh();
     }
 
+    function showGitOperations() {
+        root.clearGitNavigation();
+        root.localTargetMenuOpen = false;
+        root.remoteTargetMenuOpen = false;
+        root.gitView = "operations";
+    }
+
     function openHistoryForBranch(branchName) {
         const branch = String(branchName || "").trim();
 
@@ -4703,6 +4710,25 @@ PanelWindow {
                         }
                     }
 
+                    GitOperationsView {
+                        id: gitOperationsView
+
+                        anchors {
+                            top: parent.top
+                            left: parent.left
+                            right: parent.right
+                            bottom: gitModeButtonRow.top
+                            topMargin: root.gitCanGoBack ? 34 : 0
+                            bottomMargin: 8
+                        }
+
+                        visible: root.gitView === "operations"
+
+                        operationJournal: operationJournalService
+                        recoveryService: operationRecoveryService
+                        keyboardHost: root
+                    }
+
                     GitBranchesView {
                         id: gitBranchesView
 
@@ -4781,6 +4807,12 @@ PanelWindow {
                                     key: "repository",
                                     symbol: "◇",
                                     available: true
+                                },
+                                {
+                                    name: "OPERATIONS",
+                                    key: "operations",
+                                    symbol: "↶",
+                                    available: true
                                 }
                             ]
 
@@ -4802,9 +4834,9 @@ PanelWindow {
                                 width:
                                     (
                                         gitModeButtonRow.width
-                                        - gitModeButtonRow.spacing * 4
+                                        - gitModeButtonRow.spacing * 5
                                     )
-                                    / 5
+                                    / 6
                                 height: parent.height
 
                                 color:
@@ -4890,6 +4922,11 @@ PanelWindow {
                                             === "repository"
                                         )
                                             root.showGitRepository();
+                                        else if (
+                                            gitModeButton.modelData.key
+                                            === "operations"
+                                        )
+                                            root.showGitOperations();
                                     }
                                 }
                             }

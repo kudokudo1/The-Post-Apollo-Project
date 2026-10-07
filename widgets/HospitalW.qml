@@ -4408,6 +4408,39 @@ PanelWindow {
             z: 700
             visible: root.operationsSurface === "reports"
             historyService: certificationCoordinator.historyService
+            roomTeams: {
+                const seen = {};
+                const teams = [];
+                const liveRounds =
+                    Array.isArray(roundsService.rooms)
+                    ? roundsService.rooms
+                    : [];
+                const currentRooms =
+                    Array.isArray(auditService.rooms)
+                    ? auditService.rooms
+                    : [];
+
+                function addRows(rows) {
+                    for (let i = 0; i < rows.length; ++i) {
+                        const row = rows[i] || {};
+                        const team =
+                            String(
+                                row.team
+                                || row.branch
+                                || ""
+                            ).trim();
+
+                        if (team && !seen[team]) {
+                            seen[team] = true;
+                            teams.push(team);
+                        }
+                    }
+                }
+
+                addRows(liveRounds);
+                addRows(currentRooms);
+                return teams;
+            }
 
             anchors {
                 left: parent.left
@@ -4692,8 +4725,8 @@ PanelWindow {
                 hospitalScroll.contentHeight
                 > hospitalScroll.height
 
-            opacity: 1.0
-            visible: true
+            opacity: 0.0
+            visible: false
             z: 300
 
             property real maxContentY:

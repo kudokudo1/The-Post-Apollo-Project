@@ -2817,7 +2817,7 @@ Item {
 
                             NeonScrollBar {
                                 flickable: repositoryScroll6
-                                starHandle: true
+                                handleStyle: "star"
                             }
                         }
                     }
@@ -3248,7 +3248,7 @@ Item {
 
                                 NeonScrollBar {
                                     flickable: repositoryScroll7
-                                    starHandle: true
+                                    handleStyle: "star"
                                     rightInset: 2
                                     trackTopExtension: 33
                                 }
@@ -4047,7 +4047,7 @@ Item {
 
                             NeonScrollBar {
                                 flickable: repositoryScroll10
-                                starHandle: true
+                                handleStyle: "star"
                             }
                         }
                     }

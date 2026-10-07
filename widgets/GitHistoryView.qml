@@ -1447,7 +1447,7 @@ Item {
 
                         NeonScrollBar {
                             flickable: historyScroll1
-                            starHandle: true
+                            handleStyle: "star"
                         }
 }
                 }
@@ -2354,7 +2354,7 @@ Item {
 
                                 NeonScrollBar {
                                     flickable: historyScroll7
-                                    starHandle: true
+                                    handleStyle: "star"
                                     rightInset: 2
                                 }
                             }

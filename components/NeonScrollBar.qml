@@ -4,21 +4,86 @@ import QtQuick.Effects
 Item {
     id: root
 
+    // Scroll target.
     property var flickable: null
+
+    // Geometry.
+    property int barAreaWidth: 10
+    property int starAreaWidth: 16
+    property int railWidth: 3
+    property int barHandleWidth: 7
     property int minimumHandleHeight: 24
-    property int wheelStep: 42
-    property bool starHandle: false
+    property int starHandleSize: 14
+
     property int topInset: 0
     property int bottomInset: 0
     property int rightInset: 2
     property int trackTopExtension: 0
+
+    // One component, switchable handle form.
+    // Unknown values intentionally fall back to the normal bar.
+    property string handleStyle: "bar"
+    readonly property bool starStyle:
+        String(root.handleStyle || "").toLowerCase() === "star"
+
+    // Interaction.
+    property int wheelStep: 42
+    property bool interactive: true
+    property bool wheelEnabled: true
+    property bool clickToJump: true
+    property bool autoHide: true
+    property real scrollThreshold: 1
+
+    // Rail appearance.
+    property color railColor: Colors.cyan
+    property real railOpacity: 0.82
+    property real railRadius: 1
+    property int railBorderWidth: 0
+    property color railBorderColor: railColor
+    property bool railGlowEnabled: true
+    property real railGlowSpread: 2
+    property real railGlowOpacity: 0.24
+
+    // Handle appearance.
+    property color handleColor: Colors.magenta
+    property real handleOpacity: 1.0
+    property real barHandleRadius: 2
+    property int handleBorderWidth: 1
+    property color handleBorderColor: handleColor
+    property bool handleGlowEnabled: true
+
+    // Normal bar glow.
+    property real barGlowIdleSpread: 2
+    property real barGlowHoverSpread: 4
+    property real barGlowIdleOpacity: 0.42
+    property real barGlowHoverOpacity: 0.60
+
+    // Star glow.
+    property real starGlowIdleSpread: 3
+    property real starGlowHoverSpread: 5
+    property real starGlowIdleOpacity: 0.52
+    property real starGlowHoverOpacity: 0.72
+
+    // Star geometry.
+    property real starOuterRadius: starHandleSize * 0.443
+    property real starInnerRadius: starHandleSize * 0.20
+    property real starLineWidth: 1
+
+    // Optional overlay for semantic markers/ticks/activity points.
+    property Component railDecoration: null
+
+    property alias railItem: rail
+    property alias handleItem: handleLoader
 
     parent:
         flickable && flickable.parent
         ? flickable.parent
         : null
 
-    width: starHandle ? 16 : 10
+    width: root.starStyle
+           ? root.starAreaWidth
+           : root.barAreaWidth
+
     height:
         flickable
         ? Math.max(
@@ -44,9 +109,14 @@ Item {
 
     z: 1000
 
+    readonly property bool scrollable:
+        flickable
+        && flickable.contentHeight
+           > flickable.height + root.scrollThreshold
+
     visible:
         flickable
-        && flickable.contentHeight > flickable.height + 1
+        && (!root.autoHide || root.scrollable)
 
     readonly property real maxContentY:
         flickable
@@ -83,9 +153,15 @@ Item {
     }
 
     function activeHandleExtent() {
-        return root.starHandle
-            ? 14
+        return root.starStyle
+            ? root.starHandleSize
             : root.normalHandleHeight();
+    }
+
+    function activeHandleWidth() {
+        return root.starStyle
+            ? root.starHandleSize
+            : root.barHandleWidth;
     }
 
     function handleY() {
@@ -99,7 +175,7 @@ Item {
     }
 
     function scrollTo(mouseY) {
-        if (!flickable)
+        if (!flickable || !root.interactive)
             return;
 
         const extent = root.activeHandleExtent();
@@ -126,7 +202,8 @@ Item {
     Rectangle {
         id: rail
 
-        width: 3
+        width: root.railWidth
+
         anchors {
             top: parent.top
             bottom: parent.bottom
@@ -134,112 +211,162 @@ Item {
             topMargin: -root.trackTopExtension
         }
 
-        radius: 1
-        color: Colors.cyan
-        opacity: 0.82
+        radius: root.railRadius
+        color: root.railColor
+        opacity: root.railOpacity
+
+        border.width: root.railBorderWidth
+        border.color: root.railBorderColor
 
         RectangularShadow {
             anchors.fill: parent
             z: -1
-            spread: 2
-            opacity: 0.24
-            color: Colors.cyan
+
+            visible: root.railGlowEnabled
+            spread: root.railGlowSpread
+            opacity: root.railGlowOpacity
+            color: root.railColor
+        }
+
+        Loader {
+            anchors.fill: parent
+            z: 4
+
+            active: root.railDecoration !== null
+            sourceComponent: root.railDecoration
         }
     }
 
-    Rectangle {
-        id: normalHandle
+    Loader {
+        id: handleLoader
 
-        visible: !root.starHandle
+        width: root.activeHandleWidth()
+        height: root.activeHandleExtent()
 
-        width: 7
-        height: root.normalHandleHeight()
         x: (root.width - width) / 2
         y: root.handleY()
-        radius: 2
-        color: Colors.magenta
-        border.width: 1
-        border.color: Colors.magenta
 
-        RectangularShadow {
-            anchors.fill: parent
-            z: -1
-            spread: handleMouse.containsMouse ? 4 : 2
-            opacity:
-                handleMouse.containsMouse
-                ? 0.60
-                : 0.42
-            color: Colors.magenta
-        }
+        sourceComponent:
+            root.starStyle
+            ? starHandleComponent
+            : barHandleComponent
     }
 
-    Item {
-        id: starHandleItem
+    Component {
+        id: barHandleComponent
 
-        visible: root.starHandle
-
-        width: 14
-        height: 14
-        x: (root.width - width) / 2
-        y: root.handleY()
-
-        Canvas {
-            id: starCanvas
-
+        Rectangle {
             anchors.fill: parent
-            antialiasing: true
 
-            onPaint: {
-                const ctx = getContext("2d");
-                ctx.reset();
-                ctx.clearRect(0, 0, width, height);
+            radius: root.barHandleRadius
+            color: root.handleColor
+            opacity: root.handleOpacity
 
-                const cx = width / 2;
-                const cy = height / 2;
-                const outer = 6.2;
-                const inner = 2.8;
+            border.width: root.handleBorderWidth
+            border.color: root.handleBorderColor
 
-                ctx.beginPath();
+            RectangularShadow {
+                anchors.fill: parent
+                z: -1
 
-                for (let i = 0; i < 10; ++i) {
-                    const radius =
-                        i % 2 === 0
-                        ? outer
-                        : inner;
-                    const angle =
-                        -Math.PI / 2
-                        + i * Math.PI / 5;
-                    const px =
-                        cx + Math.cos(angle) * radius;
-                    const py =
-                        cy + Math.sin(angle) * radius;
+                visible: root.handleGlowEnabled
 
-                    if (i === 0)
-                        ctx.moveTo(px, py);
-                    else
-                        ctx.lineTo(px, py);
-                }
+                spread:
+                    handleMouse.containsMouse
+                    ? root.barGlowHoverSpread
+                    : root.barGlowIdleSpread
 
-                ctx.closePath();
-                ctx.fillStyle =
-                    Colors.magenta.toString();
-                ctx.strokeStyle =
-                    Colors.magenta.toString();
-                ctx.lineWidth = 1;
-                ctx.fill();
-                ctx.stroke();
+                opacity:
+                    handleMouse.containsMouse
+                    ? root.barGlowHoverOpacity
+                    : root.barGlowIdleOpacity
+
+                color: root.handleColor
             }
         }
+    }
 
-        RectangularShadow {
+    Component {
+        id: starHandleComponent
+
+        Item {
             anchors.fill: parent
-            z: -1
-            spread: handleMouse.containsMouse ? 5 : 3
-            opacity:
-                handleMouse.containsMouse
-                ? 0.72
-                : 0.52
-            color: Colors.magenta
+            opacity: root.handleOpacity
+
+            Canvas {
+                id: starCanvas
+
+                property color paintColor: root.handleColor
+                property real paintOuterRadius: root.starOuterRadius
+                property real paintInnerRadius: root.starInnerRadius
+                property real paintLineWidth: root.starLineWidth
+
+                anchors.fill: parent
+                antialiasing: true
+
+                onPaintColorChanged: requestPaint()
+                onPaintOuterRadiusChanged: requestPaint()
+                onPaintInnerRadiusChanged: requestPaint()
+                onPaintLineWidthChanged: requestPaint()
+                onWidthChanged: requestPaint()
+                onHeightChanged: requestPaint()
+
+                onPaint: {
+                    const ctx = getContext("2d");
+                    ctx.reset();
+                    ctx.clearRect(0, 0, width, height);
+
+                    const cx = width / 2;
+                    const cy = height / 2;
+
+                    ctx.beginPath();
+
+                    for (let i = 0; i < 10; ++i) {
+                        const radius =
+                            i % 2 === 0
+                            ? paintOuterRadius
+                            : paintInnerRadius;
+                        const angle =
+                            -Math.PI / 2
+                            + i * Math.PI / 5;
+                        const px =
+                            cx + Math.cos(angle) * radius;
+                        const py =
+                            cy + Math.sin(angle) * radius;
+
+                        if (i === 0)
+                            ctx.moveTo(px, py);
+                        else
+                            ctx.lineTo(px, py);
+                    }
+
+                    ctx.closePath();
+                    ctx.fillStyle = paintColor.toString();
+                    ctx.strokeStyle = paintColor.toString();
+                    ctx.lineWidth = paintLineWidth;
+                    ctx.fill();
+                    ctx.stroke();
+                }
+            }
+
+            RectangularShadow {
+                anchors.fill: parent
+                z: -1
+
+                visible: root.handleGlowEnabled
+
+                spread:
+                    handleMouse.containsMouse
+                    ? root.starGlowHoverSpread
+                    : root.starGlowIdleSpread
+
+                opacity:
+                    handleMouse.containsMouse
+                    ? root.starGlowHoverOpacity
+                    : root.starGlowIdleOpacity
+
+                color: root.handleColor
+            }
         }
     }
 
@@ -247,11 +374,17 @@ Item {
         id: handleMouse
 
         anchors.fill: parent
+
+        enabled: root.interactive
         hoverEnabled: true
-        cursorShape: Qt.PointingHandCursor
+        cursorShape:
+            root.interactive
+            ? Qt.PointingHandCursor
+            : Qt.ArrowCursor
 
         onPressed: function(mouse) {
-            root.scrollTo(mouse.y);
+            if (root.clickToJump)
+                root.scrollTo(mouse.y);
         }
 
         onPositionChanged: function(mouse) {
@@ -260,8 +393,10 @@ Item {
         }
 
         onWheel: function(wheel) {
-            if (!root.flickable)
+            if (!root.flickable || !root.wheelEnabled) {
+                wheel.accepted = false;
                 return;
+            }
 
             const step =
                 wheel.angleDelta.y > 0

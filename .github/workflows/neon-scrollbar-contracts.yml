@@ -1,0 +1,39 @@
+name: "Neon scrollbar contracts"
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "components/NeonScrollBar.qml"
+      - "widgets/GitBranchesView.qml"
+      - "widgets/GitHistoryView.qml"
+      - "widgets/GitRepositoryView.qml"
+      - "widgets/HospitalArchiveView.qml"
+      - "tests/components/test_neon_scrollbar_contracts.py"
+      - ".github/workflows/neon-scrollbar-contracts.yml"
+  pull_request:
+    paths:
+      - "components/NeonScrollBar.qml"
+      - "widgets/GitBranchesView.qml"
+      - "widgets/GitHistoryView.qml"
+      - "widgets/GitRepositoryView.qml"
+      - "widgets/HospitalArchiveView.qml"
+      - "tests/components/test_neon_scrollbar_contracts.py"
+      - ".github/workflows/neon-scrollbar-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    name: Neon scrollbar contracts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate reusable scrollbar contracts
+        run: python3 tests/components/test_neon_scrollbar_contracts.py

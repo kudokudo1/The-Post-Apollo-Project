@@ -3629,7 +3629,7 @@ Item {
 
                                 NeonScrollBar {
                                     flickable: restackPlanFlick
-                                    starHandle: true
+                                    handleStyle: "star"
                                 }
                             }
 
@@ -4001,7 +4001,7 @@ Item {
 
                                 NeonScrollBar {
                                     flickable: submitPlanFlick
-                                    starHandle: true
+                                    handleStyle: "star"
                                 }
                             }
 

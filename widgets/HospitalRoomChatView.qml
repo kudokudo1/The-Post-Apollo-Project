@@ -18,6 +18,28 @@ Item {
 
     readonly property string activeSessionId: adapter.activeSessionId
 
+    readonly property var displayMessages: {
+        const source =
+            Array.isArray(adapter.messages)
+            ? adapter.messages
+            : [];
+        const rows = source.slice();
+
+        if (adapter.sending && adapter.liveStreamText) {
+            rows.push({
+                id:
+                    "live-doctor-stream-"
+                    + String(adapter.activeSessionId || ""),
+                direction: "incoming",
+                messageType: "provider_stream",
+                transient: true,
+                body: "LIVE // " + adapter.liveStreamText
+            });
+        }
+
+        return rows;
+    }
+
     signal closeRequested()
 
     readonly property var conversation: {
@@ -50,7 +72,7 @@ Item {
             return "BINDING";
 
         if (adapter.sending)
-            return "SENDING";
+            return adapter.liveStreamText ? "STREAMING" : "SENDING";
 
         if (adapter.messagesLoading || adapter.loading)
             return "LOADING";
@@ -141,7 +163,7 @@ Item {
         anchors.fill: parent
 
         conversation: root.conversation
-        messages: root.roomId ? adapter.messages : []
+        messages: root.roomId ? root.displayMessages : []
         loading: adapter.messagesLoading
         error:
             adapter.bindError

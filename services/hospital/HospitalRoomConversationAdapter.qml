@@ -40,6 +40,12 @@ Scope {
     property string turnBody: ""
     property var lastTurnResult: null
 
+    property var liveStreamEvents: []
+    property string liveStreamText: ""
+    property string liveStreamError: ""
+    property bool liveStreamLoading: false
+    property string liveStreamSessionId: ""
+
     property int messageLimit: 100
     property string operatorId: "operator"
 
@@ -386,6 +392,87 @@ Scope {
         return true;
     }
 
+    function clearLiveStream() {
+        liveStreamEvents = [];
+        liveStreamText = "";
+        liveStreamError = "";
+        liveStreamLoading = false;
+        liveStreamSessionId = "";
+    }
+
+    function rebuildLiveStream(rows) {
+        const source = Array.isArray(rows) ? rows : [];
+        let turnStart = -1;
+
+        for (let i = source.length - 1; i >= 0; --i) {
+            if (String((source[i] || {}).type || "") === "turn.started") {
+                turnStart = i;
+                break;
+            }
+        }
+
+        if (turnStart < 0) {
+            liveStreamEvents = [];
+            liveStreamText = "";
+            return false;
+        }
+
+        const streamRows = [];
+        const parts = [];
+
+        for (let i = turnStart + 1; i < source.length; ++i) {
+            const row = source[i] || {};
+            const eventType = String(row.type || "");
+
+            if (eventType !== "provider.stream")
+                continue;
+
+            const payload = row.payload || {};
+            const streamName = String(payload.stream || "");
+
+            if (streamName && streamName !== "stdout")
+                continue;
+
+            const text = String(payload.text || "").trim();
+            if (!text)
+                continue;
+
+            streamRows.push(row);
+
+            if (parts.length === 0 || parts[parts.length - 1] !== text)
+                parts.push(text);
+        }
+
+        let preview = parts.join("\n");
+        if (preview.length > 8000)
+            preview = preview.slice(preview.length - 8000);
+
+        liveStreamEvents = streamRows;
+        liveStreamText = preview;
+        return streamRows.length > 0;
+    }
+
+    function refreshLiveStream() {
+        const id = String(activeSessionId || "").trim();
+
+        if (!sending || !id || liveStreamProcess.running || liveStreamLoading)
+            return false;
+
+        liveStreamLoading = true;
+        liveStreamError = "";
+        liveStreamSessionId = id;
+
+        liveStreamProcess.exec(pxArgs([
+            "hospital",
+            "events",
+            id,
+            "--limit",
+            "160",
+            "--json"
+        ]));
+        return true;
+    }
+
     function sendMessage(conversationId, textValue) {
         const roomId = String(conversationId || "").trim();
         const body = String(textValue || "").trim();
@@ -393,6 +480,7 @@ Scope {
         if (!roomId || !body || sending || turnProcess.running)
             return false;
 
+        clearLiveStream();
         sending = true;
         sendError = "";
         sessionError = "";
@@ -707,6 +795,75 @@ Scope {
     }
 
     Process {
+        id: liveStreamProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const body = String(this.text || "").trim();
+
+                if (!body)
+                    return;
+
+                try {
+                    const result = JSON.parse(body);
+
+                    if (!Array.isArray(result))
+                        throw new Error("PX Hospital events returned non-array data");
+
+                    if (adapter.sending
+                            && adapter.liveStreamSessionId
+                                === adapter.activeSessionId) {
+                        adapter.rebuildLiveStream(result);
+                        adapter.liveStreamError = "";
+                    }
+                } catch (parseError) {
+                    adapter.liveStreamError = adapter.compactPxError(
+                        body || parseError,
+                        "HOSPITAL DOCTOR STREAM"
+                    );
+                }
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                const detail = String(this.text || "").trim();
+
+                if (detail)
+                    adapter.liveStreamError = adapter.compactPxError(
+                        detail,
+                        "HOSPITAL DOCTOR STREAM"
+                    );
+            }
+        }
+
+        onExited: function(code, exitStatus) {
+            adapter.liveStreamLoading = false;
+
+            if (Number(code) !== 0 && !adapter.liveStreamError)
+                adapter.liveStreamError =
+                    "PX HOSPITAL EVENTS EXIT " + String(code);
+        }
+    }
+
+    Timer {
+        id: liveStreamTimer
+
+        interval: 350
+        repeat: true
+        running:
+            adapter.sending
+            && adapter.activeSessionId.length > 0
+
+        onRunningChanged: {
+            if (running)
+                Qt.callLater(adapter.refreshLiveStream);
+        }
+
+        onTriggered: adapter.refreshLiveStream()
+    }
+
+    Process {
         id: turnProcess
 
         stdinEnabled: true
@@ -750,6 +907,7 @@ Scope {
 
         onExited: function(code, exitStatus) {
             adapter.sending = false;
+            adapter.liveStreamLoading = false;
 
             if (Number(code) === 0
                     && !adapter.sendError

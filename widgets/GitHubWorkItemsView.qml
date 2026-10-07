@@ -11,7 +11,9 @@ Item {
 
     property string kind: "issues"
     property string stateFilter: "all"
+    property string projectFilter: "all"
     property string searchText: ""
+    property string armedProjectRemoveUrl: ""
 
     readonly property bool isPulls: kind === "pulls"
     readonly property var sourceRows:
@@ -32,6 +34,8 @@ Item {
     function filteredRows() {
         const rows = Array.isArray(sourceRows) ? sourceRows : [];
         const state = String(stateFilter || "all").toLowerCase();
+        const projectMode =
+            String(projectFilter || "all").toLowerCase();
         const query = String(searchText || "").trim().toLowerCase();
         const out = [];
 
@@ -48,6 +52,17 @@ Item {
             if (state === "closed" && !closedLike)
                 continue;
 
+            const itemUrl = workService.rowUrl(row);
+            const inProject =
+                projectService.selectedNumber() > 0
+                && projectService.containsItemUrl(itemUrl);
+
+            if (projectMode === "in" && !inProject)
+                continue;
+
+            if (projectMode === "out" && inProject)
+                continue;
+
             if (query) {
                 const haystack = [
                     workService.rowNumber(row),
@@ -56,7 +71,10 @@ Item {
                     workService.rowState(row),
                     isPulls
                     ? workService.pullBranches(row)
-                    : workService.issueLabels(row).join(" ")
+                    : workService.issueLabels(row).join(" "),
+                    inProject
+                    ? projectService.itemStatusByUrl(itemUrl)
+                    : ""
                 ].join(" ").toLowerCase();
 
                 if (haystack.indexOf(query) < 0)
@@ -70,6 +88,8 @@ Item {
     }
 
     function refresh() {
+        armedProjectRemoveUrl = "";
+
         if (isPulls)
             workService.refreshPulls(gitService.repoRemoteSlug);
         else
@@ -78,6 +98,29 @@ Item {
         if (!projectService.busy
                 && projectService.projects.length === 0)
             projectService.refreshProjects();
+        else if (!projectService.busy
+                && projectService.selectedNumber() > 0)
+            projectService.refreshSelectedProject();
+    }
+
+    function stepProjectStatus(url, delta) {
+        armedProjectRemoveUrl = "";
+        projectService.moveItemStatusByUrl(url, delta);
+    }
+
+    function removeFromProject(url) {
+        const clean = String(url || "");
+
+        if (!clean)
+            return;
+
+        if (armedProjectRemoveUrl !== clean) {
+            armedProjectRemoveUrl = clean;
+            return;
+        }
+
+        armedProjectRemoveUrl = "";
+        projectService.removeItemByUrl(clean, true);
     }
 
     component ViewButton: Rectangle {
@@ -306,9 +349,81 @@ Item {
             }
         }
 
+        Row {
+            width: parent.width
+            height: 28
+            spacing: 6
+
+            GohuText {
+                width: 96
+                anchors.verticalCenter: parent.verticalCenter
+                text: "PROJECT FILTER"
+                font.pixelSize: 8
+                color: Colors.magenta
+            }
+
+            ViewButton {
+                width: 62
+                height: parent.height
+                label: "ALL"
+                selectedAction: root.projectFilter === "all"
+                onTriggered: {
+                    root.projectFilter = "all";
+                    root.armedProjectRemoveUrl = "";
+                }
+            }
+
+            ViewButton {
+                width: 88
+                height: parent.height
+                label: "IN PROJECT"
+                selectedAction: root.projectFilter === "in"
+                enabledAction:
+                    root.projectService.selectedNumber() > 0
+                onTriggered: {
+                    root.projectFilter = "in";
+                    root.armedProjectRemoveUrl = "";
+                }
+            }
+
+            ViewButton {
+                width: 92
+                height: parent.height
+                label: "OUTSIDE"
+                selectedAction: root.projectFilter === "out"
+                enabledAction:
+                    root.projectService.selectedNumber() > 0
+                onTriggered: {
+                    root.projectFilter = "out";
+                    root.armedProjectRemoveUrl = "";
+                }
+            }
+
+            GohuText {
+                width: parent.width - 356
+                anchors.verticalCenter: parent.verticalCenter
+                horizontalAlignment: Text.AlignRight
+                text:
+                    root.projectService.selectedNumber() > 0
+                    ? (
+                        "#"
+                        + String(root.projectService.selectedNumber())
+                        + " // "
+                        + root.projectService.selectedTitle()
+                      )
+                    : "NO PROJECT SELECTED"
+                font.pixelSize: 8
+                color:
+                    root.projectService.selectedNumber() > 0
+                    ? Colors.cyan
+                    : Colors.orange
+                elide: Text.ElideLeft
+            }
+        }
+
         Rectangle {
             width: parent.width
-            height: parent.height - 98
+            height: parent.height - 134
             color: Colors.black
             border.width: 1
             border.color: root.lastError ? Colors.red : Colors.cyan
@@ -358,7 +473,7 @@ Item {
                         : ""
 
                     width: sourceList.width
-                    height: root.isPulls ? 86 : 68
+                    height: 104
                     color: Colors.dark
                     border.width: 1
                     border.color:
@@ -563,7 +678,7 @@ Item {
                             rightMargin: 7
                         }
 
-                        width: 116
+                        width: 126
                         spacing: 5
 
                         ViewButton {
@@ -571,27 +686,80 @@ Item {
                             height: 25
                             label: "OPEN"
                             enabledAction: !!sourceRow.itemUrl
-                            onTriggered:
-                                Qt.openUrlExternally(sourceRow.itemUrl)
+                            onTriggered: {
+                                root.armedProjectRemoveUrl = "";
+                                Qt.openUrlExternally(sourceRow.itemUrl);
+                            }
                         }
 
                         ViewButton {
+                            visible: !sourceRow.alreadyAdded
                             width: parent.width
                             height: 25
-                            label:
-                                sourceRow.alreadyAdded
-                                ? "IN PROJECT"
-                                : "ADD TO PROJECT"
-                            primaryBlue: !sourceRow.alreadyAdded
+                            label: "ADD TO PROJECT"
+                            primaryBlue: true
                             enabledAction:
                                 !root.projectService.busy
                                 && root.projectService.selectedNumber() > 0
                                 && !!sourceRow.itemUrl
-                                && !sourceRow.alreadyAdded
-                            onTriggered:
+                            onTriggered: {
+                                root.armedProjectRemoveUrl = "";
                                 root.projectService.addExistingItem(
                                     sourceRow.itemUrl,
                                     root.isPulls ? "pull" : "issue"
+                                );
+                            }
+                        }
+
+                        Row {
+                            visible: sourceRow.alreadyAdded
+                            width: parent.width
+                            height: 25
+                            spacing: 4
+
+                            ViewButton {
+                                width: (parent.width - 4) / 2
+                                height: parent.height
+                                label: "◀ STATUS"
+                                enabledAction:
+                                    !root.projectService.busy
+                                    && root.projectService.statusOptions().length > 0
+                                onTriggered:
+                                    root.stepProjectStatus(
+                                        sourceRow.itemUrl,
+                                        -1
+                                    )
+                            }
+
+                            ViewButton {
+                                width: (parent.width - 4) / 2
+                                height: parent.height
+                                label: "STATUS ▶"
+                                enabledAction:
+                                    !root.projectService.busy
+                                    && root.projectService.statusOptions().length > 0
+                                onTriggered:
+                                    root.stepProjectStatus(
+                                        sourceRow.itemUrl,
+                                        1
+                                    )
+                            }
+                        }
+
+                        ViewButton {
+                            visible: sourceRow.alreadyAdded
+                            width: parent.width
+                            height: 25
+                            label:
+                                root.armedProjectRemoveUrl
+                                === sourceRow.itemUrl
+                                ? "CONFIRM REMOVE"
+                                : "REMOVE PROJECT"
+                            enabledAction:
+                                !root.projectService.busy
+                            onTriggered:
+                                root.removeFromProject(
+                                    sourceRow.itemUrl
                                 )
                         }
                     }

@@ -479,6 +479,38 @@ Singleton {
         return historyUpdated || activeUpdated;
     }
 
+    function clearNotificationsForSource(appKey) {
+        const key = String(appKey || "").trim().toLowerCase();
+
+        if (key === "")
+            return 0;
+
+        let removed = 0;
+
+        for (let i = notifications.count - 1; i >= 0; i--) {
+            const entry = notifications.get(i);
+
+            if (sourceKey(entry.sourceId, entry.source) === key) {
+                notifications.remove(i);
+                removed += 1;
+            }
+        }
+
+        for (let i = activeNotifications.count - 1; i >= 0; i--) {
+            const entry = activeNotifications.get(i);
+
+            if (sourceKey(entry.sourceId, entry.source) === key)
+                activeNotifications.remove(i);
+        }
+
+        if (removed > 0) {
+            markNotificationsChanged();
+            scheduleHistorySave();
+        }
+
+        return removed;
+    }
+
     // ===== HISTORY SERIALIZE ====================================
 
     function toPlainValue(value) {

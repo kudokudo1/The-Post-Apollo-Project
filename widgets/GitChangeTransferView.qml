@@ -16,6 +16,10 @@ Rectangle {
     property string hunkSummary: ""
     property string selectedDestinationPath: ""
     property string transferMode: "move"
+    property bool createDestinationOpen: false
+    property string pendingCreatedDestinationPath: ""
+    property string pendingCreatedDestinationBranch: ""
+    property string createDestinationMessage: ""
 
     signal closeRequested()
 
@@ -121,6 +125,85 @@ Rectangle {
         invalidatePreview();
     }
 
+    function defaultDestinationPath(branchName) {
+        const source = String(root.sourcePath || "").trim();
+        const branch =
+            String(branchName || "").trim().split("/").join("-");
+
+        if (!source || !branch)
+            return "";
+
+        return source + "-wt-" + branch;
+    }
+
+    function openCreateDestination() {
+        root.createDestinationOpen = !root.createDestinationOpen;
+        root.createDestinationMessage = "";
+        root.invalidatePreview();
+
+        if (!root.createDestinationOpen)
+            return;
+
+        newDestinationBranchEditor.text = "";
+        newDestinationPathEditor.text = "";
+        Qt.callLater(function() {
+            newDestinationBranchEditor.forceActiveFocus();
+        });
+    }
+
+    function createDestination() {
+        if (!root.branchWorkspaceService
+                || root.branchWorkspaceService.actionBusy
+                || root.branchWorkspaceService.refreshing
+                || root.transferService.previewBusy
+                || root.transferService.transferBusy)
+            return false;
+
+        const branch =
+            String(newDestinationBranchEditor.text || "").trim();
+        const enteredPath =
+            String(newDestinationPathEditor.text || "").trim();
+        const path =
+            enteredPath || root.defaultDestinationPath(branch);
+
+        if (!branch) {
+            root.createDestinationMessage =
+                "REFUSED // NEW BRANCH NAME REQUIRED";
+            return false;
+        }
+
+        if (!path) {
+            root.createDestinationMessage =
+                "REFUSED // DESTINATION PATH REQUIRED";
+            return false;
+        }
+
+        if (root.branchWorkspaceService.branchForName(branch)) {
+            root.createDestinationMessage =
+                "REFUSED // LOCAL BRANCH ALREADY EXISTS";
+            return false;
+        }
+
+        root.pendingCreatedDestinationBranch = branch;
+        root.pendingCreatedDestinationPath = path;
+        root.createDestinationMessage =
+            "CREATING // " + branch;
+
+        if (!root.branchWorkspaceService.createWorktree(
+                path,
+                branch,
+                "HEAD"
+            )) {
+            root.pendingCreatedDestinationBranch = "";
+            root.pendingCreatedDestinationPath = "";
+            root.createDestinationMessage =
+                "REFUSED // BRANCH CORE BUSY";
+            return false;
+        }
+
+        return true;
+    }
+
     function requestPreview() {
         if (!transferService
                 || !destinationEligible
@@ -201,11 +284,101 @@ Rectangle {
         target: branchWorkspaceService
         ignoreUnknownSignals: true
 
+        function onActionFinished(action, success, detail) {
+            if (String(action || "") !== "NEW-WORKTREE"
+                    || !root.pendingCreatedDestinationPath)
+                return;
+
+            root.createDestinationMessage =
+                success
+                ? "OK // DESTINATION CREATED // SELECTING"
+                : "REFUSED // " + String(detail || "CREATE FAILED");
+
+            if (!success) {
+                root.pendingCreatedDestinationBranch = "";
+                root.pendingCreatedDestinationPath = "";
+            }
+        }
+
         function onRefreshed() {
+            if (root.pendingCreatedDestinationPath) {
+                const createdPath =
+                    String(root.pendingCreatedDestinationPath || "");
+                const rows =
+                    Array.isArray(branchWorkspaceService.worktrees)
+                    ? branchWorkspaceService.worktrees
+                    : [];
+                let found = false;
+
+                for (let i = 0; i < rows.length; ++i) {
+                    if (String((rows[i] || {}).path || "")
+                            === createdPath) {
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (found) {
+                    root.chooseDestination(createdPath);
+                    root.createDestinationMessage =
+                        "OK // NEW DESTINATION SELECTED // PREVIEW REQUIRED";
+                    root.pendingCreatedDestinationBranch = "";
+                    root.pendingCreatedDestinationPath = "";
+                    root.createDestinationOpen = false;
+                    return;
+                }
+            }
+
             const selected = root.selectedWorktree;
 
             if (!selected)
                 root.selectedDestinationPath = "";
+        }
+    }
+
+    component DestinationEditor: Rectangle {
+        id: editorBox
+
+        property alias text: editor.text
+        property string placeholder: ""
+
+        height: 28
+        color: Colors.dark
+        border.width: 1
+        border.color:
+            editor.activeFocus
+            ? Colors.orange
+            : Colors.cyan
+
+        TextInput {
+            id: editor
+
+            anchors {
+                fill: parent
+                leftMargin: 7
+                rightMargin: 7
+            }
+
+            verticalAlignment: Text.AlignVCenter
+            color: Colors.white
+            selectionColor: Colors.magenta
+            selectedTextColor: Colors.black
+            font.family: "GohuFont 11 Nerd Font Mono"
+            font.pixelSize: 9
+            clip: true
+        }
+
+        GohuText {
+            anchors {
+                left: parent.left
+                verticalCenter: parent.verticalCenter
+                leftMargin: 7
+            }
+            visible: editor.text.length === 0
+            text: editorBox.placeholder
+            font.pixelSize: 8
+            color: Colors.white
+            opacity: 0.34
         }
     }
 
@@ -387,13 +560,33 @@ Rectangle {
                         spacing: 6
 
                         GohuText {
-                            width: parent.width - 100
+                            width: parent.width - 194
                             anchors.verticalCenter: parent.verticalCenter
                             text:
                                 "DESTINATION WORKTREE // "
                                 + String(root.candidates.length)
                             font.pixelSize: 10
                             color: Colors.cyan
+                        }
+
+                        TransferButton {
+                            width: 88
+                            height: 30
+                            label:
+                                root.createDestinationOpen
+                                ? "CANCEL"
+                                : "NEW"
+                            accent:
+                                root.createDestinationOpen
+                                ? Colors.red
+                                : Colors.orange
+                            enabledAction:
+                                branchWorkspaceService
+                                && !branchWorkspaceService.actionBusy
+                                && !transferService.previewBusy
+                                && !transferService.transferBusy
+                            onTriggered:
+                                root.openCreateDestination()
                         }
 
                         TransferButton {
@@ -414,11 +607,88 @@ Rectangle {
                         }
                     }
 
+                    Rectangle {
+                        width: parent.width
+                        height: root.createDestinationOpen ? 104 : 0
+                        visible: root.createDestinationOpen
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: Colors.orange
+                        clip: true
+
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 6
+                            spacing: 5
+
+                            Row {
+                                width: parent.width
+                                height: 28
+                                spacing: 5
+
+                                DestinationEditor {
+                                    id: newDestinationBranchEditor
+                                    width: 150
+                                    placeholder: "NEW BRANCH"
+                                }
+
+                                DestinationEditor {
+                                    id: newDestinationPathEditor
+                                    width: parent.width - 237
+                                    placeholder:
+                                        root.defaultDestinationPath(
+                                            newDestinationBranchEditor.text
+                                        )
+                                        || "PATH // AUTO FROM BRANCH"
+                                }
+
+                                TransferButton {
+                                    width: 77
+                                    height: 28
+                                    label:
+                                        branchWorkspaceService.actionBusy
+                                        ? "CREATING"
+                                        : "CREATE"
+                                    accent: Colors.orange
+                                    enabledAction:
+                                        newDestinationBranchEditor.text.length > 0
+                                        && !branchWorkspaceService.actionBusy
+                                        && !branchWorkspaceService.refreshing
+                                        && !transferService.previewBusy
+                                        && !transferService.transferBusy
+                                    onTriggered: root.createDestination()
+                                }
+                            }
+
+                            GohuText {
+                                width: parent.width
+                                text:
+                                    root.createDestinationMessage
+                                    || (
+                                        "CREATE FROM SOURCE HEAD // "
+                                        + "SEPARATE GUARDED OPERATION // "
+                                        + "PREVIEW STILL REQUIRED"
+                                       )
+                                font.pixelSize: 8
+                                color:
+                                    root.createDestinationMessage.indexOf(
+                                        "REFUSED"
+                                    ) === 0
+                                    ? Colors.red
+                                    : Colors.cyan
+                                wrapMode: Text.Wrap
+                            }
+                        }
+                    }
+
                     Flickable {
                         id: worktreeScroll
 
                         width: parent.width
-                        height: parent.height - 35
+                        height:
+                            parent.height
+                            - 35
+                            - (root.createDestinationOpen ? 109 : 0)
                         clip: true
                         contentWidth: width
                         contentHeight: worktreeColumn.implicitHeight
@@ -437,7 +707,7 @@ Rectangle {
                                 horizontalAlignment: Text.AlignHCenter
                                 text:
                                     "NO OTHER WORKTREES // "
-                                    + "CREATE ONE IN BRANCHES"
+                                    + "USE NEW TO CREATE ONE HERE"
                                 font.pixelSize: 10
                                 color: Colors.orange
                             }

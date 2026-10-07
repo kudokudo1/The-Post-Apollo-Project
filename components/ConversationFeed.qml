@@ -194,10 +194,9 @@ Rectangle {
             radius: 0
         }
 
-        DropShadow {
+        SafeDropShadow {
             anchors.fill: headerLine
-            source: headerLine
-
+            safeSource: headerLine
             horizontalOffset: 0
             verticalOffset: 0
 
@@ -383,11 +382,10 @@ Rectangle {
         color: Colors.cyan
     }
 
-    DropShadow {
+    SafeDropShadow {
         anchors.fill: emptyText
 
-        source: emptyText
-
+        safeSource: emptyText
         horizontalOffset: 0
         verticalOffset: 0
 
@@ -423,11 +421,10 @@ Rectangle {
         color: Colors.orange
     }
 
-    DropShadow {
+    SafeDropShadow {
         anchors.fill: loadingText
 
-        source: loadingText
-
+        safeSource: loadingText
         horizontalOffset: 0
         verticalOffset: 0
 
@@ -473,11 +470,10 @@ Rectangle {
         color: Colors.red
     }
 
-    DropShadow {
+    SafeDropShadow {
         anchors.fill: errorText
 
-        source: errorText
-
+        safeSource: errorText
         horizontalOffset: 0
         verticalOffset: 0
 
@@ -658,11 +654,10 @@ Rectangle {
                 color: sendButton.isPressed ? Colors.black : sendButton.isHovered ? Colors.orange : sendButton.canSend ? Colors.orange : Colors.cyan
             }
 
-            DropShadow {
+            SafeDropShadow {
                 anchors.fill: sendText
 
-                source: sendText
-
+                safeSource: sendText
                 horizontalOffset: 0
                 verticalOffset: 0
 
@@ -753,11 +748,10 @@ Rectangle {
         color: Colors.red
     }
 
-    DropShadow {
+    SafeDropShadow {
         anchors.fill: sendErrorText
 
-        source: sendErrorText
-
+        safeSource: sendErrorText
         horizontalOffset: 0
         verticalOffset: 0
 

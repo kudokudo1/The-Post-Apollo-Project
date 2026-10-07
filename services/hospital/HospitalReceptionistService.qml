@@ -55,6 +55,9 @@ Scope {
     property var pinnedKeys: []
     property int pinnedCount: 0
     property int maxPinnedEvents: 5
+    property string lastArchiveExportStatus: ""
+    readonly property string archiveExportPath:
+        Quickshell.dataPath("hospital-reception-export.json")
 
     // Session-local conversational reference. This is intentionally not
     // persisted: Reception remembers "that" only inside the live session.
@@ -118,6 +121,15 @@ Scope {
     }
 
     FileView {
+        id: archiveExportFile
+
+        path: root.archiveExportPath
+        blockWrites: true
+        atomicWrites: true
+        printErrors: false
+    }
+
+    FileView {
         id: activityFile
 
         path: Quickshell.dataPath("hospital-reception.json")
@@ -136,6 +148,37 @@ Scope {
         onAdapterUpdated: writeAdapter()
         onLoaded: root.hydrateActivity()
         onLoadFailed: root.hydrateActivity()
+    }
+
+    function exportArchive(eventsValue, labelValue) {
+        const rows =
+            Array.isArray(eventsValue)
+            ? eventsValue.slice()
+            : activityEvents.slice();
+        const label =
+            String(labelValue || "HOSPITAL RECEPTION ARCHIVE");
+
+        try {
+            archiveExportFile.setText(
+                JSON.stringify({
+                    schemaVersion: 1,
+                    exportedAt: nowIso(),
+                    label: label,
+                    count: rows.length,
+                    events: rows
+                }, null, 2)
+            );
+            lastArchiveExportStatus =
+                "EXPORTED "
+                + String(rows.length)
+                + " EVENTS // "
+                + archiveExportPath;
+            return true;
+        } catch (error) {
+            lastArchiveExportStatus =
+                "EXPORT FAILED // " + String(error);
+            return false;
+        }
     }
 
     function nowIso() {

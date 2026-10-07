@@ -59,7 +59,7 @@ Scope {
         for (let i = 0; i < source.length; ++i) {
             const slug = repositorySlug(source[i]);
 
-            if (!/^[^/\\s]+\\/[^/\\s]+$/.test(slug))
+            if (!/^[^/\s]+\/[^/\s]+$/.test(slug))
                 continue;
 
             const key = slug.toLowerCase();

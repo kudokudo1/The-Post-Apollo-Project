@@ -113,7 +113,7 @@ Rectangle {
                 border.width: 1
                 border.color: Colors.cyan
 
-                layer.enabled: visible
+                layer.enabled: Window.window !== null && (visible)
 
                 layer.effect: DropShadow {
                     color: Colors.cyan
@@ -157,7 +157,7 @@ Rectangle {
 
                 color: Colors.cyan
 
-                layer.enabled: true
+                layer.enabled: Window.window !== null
 
                 layer.effect: DropShadow {
                     color: Colors.cyan

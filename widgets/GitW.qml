@@ -1668,6 +1668,8 @@ PanelWindow {
 
     GitOperationRecoveryService {
         id: operationRecoveryService
+        operationJournal: operationJournalService
+        snapshotService: repositorySnapshotService
         repositoryPath:
             gitService.repoIsLocal
             ? gitService.repoRoot

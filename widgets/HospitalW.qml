@@ -4554,12 +4554,22 @@ PanelWindow {
                                       ? certificationCoordinator.lastError
                                       : roomService.summary
                                     )
+                                  + " // EVIDENCE "
+                                  + certificationCoordinator
+                                        .evidenceDiagnosticState
                                 : roomService.summary
                             font.pixelSize: 9
                             color:
                                 certificationCoordinator.lastError
                                 || roomService.lastError
+                                || certificationCoordinator
+                                      .evidenceDiagnosticState === "MISMATCH"
+                                || certificationCoordinator
+                                      .evidenceDiagnosticState === "ERROR"
                                 ? Colors.red
+                                : certificationCoordinator
+                                      .evidenceDiagnosticState === "ATTENTION"
+                                ? Colors.orange
                                 : roomService.postOpStatus === "POST_OP_CLEAN"
                                 ? Colors.cyan
                                 : roomService.postOpRunning

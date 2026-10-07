@@ -243,11 +243,10 @@ PanelWindow {
             verticalAlignment: Text.AlignVCenter
         }
 
-        DropShadow {
+        SafeDropShadow {
             anchors.fill: glowLabel
 
-            source: glowLabel
-
+            safeSource: glowLabel
             horizontalOffset: 0
             verticalOffset: 0
 
@@ -356,11 +355,10 @@ PanelWindow {
             }
         }
 
-        DropShadow {
+        SafeDropShadow {
             anchors.fill: miniButtonText
 
-            source: miniButtonText
-
+            safeSource: miniButtonText
             horizontalOffset: 0
             verticalOffset: 0
 
@@ -374,11 +372,10 @@ PanelWindow {
             transparentBorder: true
         }
 
-        DropShadow {
+        SafeDropShadow {
             anchors.fill: miniButton
 
-            source: miniButton
-
+            safeSource: miniButton
             horizontalOffset: 0
             verticalOffset: 0
 
@@ -443,11 +440,10 @@ PanelWindow {
             color: filterButton.active ? Colors.orange : filterButton.pressed ? Colors.black : filterButton.accentColor
         }
 
-        DropShadow {
+        SafeDropShadow {
             anchors.fill: filterLabel
 
-            source: filterLabel
-
+            safeSource: filterLabel
             horizontalOffset: 0
             verticalOffset: 0
 
@@ -462,11 +458,10 @@ PanelWindow {
             transparentBorder: true
         }
 
-        DropShadow {
+        SafeDropShadow {
             anchors.fill: filterButton
 
-            source: filterButton
-
+            safeSource: filterButton
             horizontalOffset: 0
             verticalOffset: 0
 
@@ -868,11 +863,10 @@ PanelWindow {
             z: -2
         }
 
-        DropShadow {
+        SafeDropShadow {
             anchors.fill: frameGlowSource
 
-            source: frameGlowSource
-
+            safeSource: frameGlowSource
             horizontalOffset: 0
             verticalOffset: 0
 
@@ -1017,11 +1011,10 @@ PanelWindow {
                     border.width: 1
                     border.color: searchInput.activeFocus ? Colors.orange : searchMouse.containsMouse ? Colors.cyan : Colors.cyan
 
-                    DropShadow {
+                    SafeDropShadow {
                         anchors.fill: parent
 
-                        source: searchBox
-
+                        safeSource: searchBox
                         horizontalOffset: 0
                         verticalOffset: 0
 
@@ -1085,11 +1078,10 @@ PanelWindow {
                         }
                     }
 
-                    DropShadow {
+                    SafeDropShadow {
                         anchors.fill: searchInput
 
-                        source: searchInput
-
+                        safeSource: searchInput
                         horizontalOffset: 0
                         verticalOffset: 0
 
@@ -1226,11 +1218,10 @@ PanelWindow {
                     color: Colors.cyan
                 }
 
-                DropShadow {
+                SafeDropShadow {
                     anchors.fill: headerLine
 
-                    source: headerLine
-
+                    safeSource: headerLine
                     horizontalOffset: 0
                     verticalOffset: 0
 
@@ -1299,11 +1290,10 @@ PanelWindow {
                     color: Colors.cyan
                 }
 
-                DropShadow {
+                SafeDropShadow {
                     anchors.fill: controlBayTopLine
 
-                    source: controlBayTopLine
-
+                    safeSource: controlBayTopLine
                     horizontalOffset: 0
                     verticalOffset: 0
 
@@ -1412,9 +1402,9 @@ PanelWindow {
                     border.width: 2
                     border.color: Colors.red
 
-                    DropShadow {
+                    SafeDropShadow {
                         anchors.fill: parent
-                        source: parent
+                        safeSource: parent
                         horizontalOffset: 0
                         verticalOffset: 0
                         radius: 18
@@ -1932,11 +1922,10 @@ PanelWindow {
                             z: -3
                         }
 
-                        DropShadow {
+                        SafeDropShadow {
                             anchors.fill: cardGlowSource
 
-                            source: cardGlowSource
-
+                            safeSource: cardGlowSource
                             horizontalOffset: 0
                             verticalOffset: 0
 
@@ -2020,11 +2009,10 @@ PanelWindow {
                                 z: 1
                             }
 
-                            DropShadow {
+                            SafeDropShadow {
                                 anchors.fill: accentRail
 
-                                source: accentRail
-
+                                safeSource: accentRail
                                 horizontalOffset: 0
                                 verticalOffset: 0
 
@@ -2435,11 +2423,10 @@ PanelWindow {
                         color: Colors.magenta
                     }
 
-                    DropShadow {
+                    SafeDropShadow {
                         anchors.fill: scrollThumb
 
-                        source: scrollThumb
-
+                        safeSource: scrollThumb
                         horizontalOffset: 0
                         verticalOffset: 0
 

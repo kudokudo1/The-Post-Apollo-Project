@@ -174,7 +174,7 @@ Rectangle {
 
                             color: appButton.isPressed ? Colors.black : appButton.isHovered ? Colors.orange : appButton.isSelected ? Colors.orange : Colors.cyan
 
-                            layer.enabled: appButton.isSelected || appButton.isHovered
+                            layer.enabled: Window.window !== null && (appButton.isSelected || appButton.isHovered)
 
                             layer.effect: DropShadow {
                                 color: Colors.orange

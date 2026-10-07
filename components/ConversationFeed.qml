@@ -16,6 +16,7 @@ Rectangle {
     property int sendSuccessSerial: 0
 
     signal sendRequested(string conversationId, string text)
+    signal messageActionRequested(string action, var message, string value)
 
     signal composerEscapeRequested
 
@@ -29,6 +30,45 @@ Rectangle {
     property string composerPlaceholder: "MESSAGE..."
     property string sendLabel: "SEND"
     property string sendingLabel: "SENDING"
+    property bool richMessageActions: false
+
+    function firstCodeBlock(value) {
+        const text = String(value || "");
+        const match = /\`\`\`[^\n]*\n([\s\S]*?)\`\`\`/.exec(text);
+        return match ? String(match[1] || "").trim() : "";
+    }
+
+    function firstFileReference(value) {
+        const text = String(value || "");
+        const match = /(?:^|[\s\`(])((?:\.\.?\/|\/)?[A-Za-z0-9_.@+-]+(?:\/[A-Za-z0-9_.@+-]+)*\.(?:qml|js|mjs|ts|tsx|jsx|py|sh|bash|zsh|fish|md|json|jsonc|yaml|yml|toml|ini|conf|css|scss|html|c|cc|cpp|h|hpp|rs|go|java|kt|sql))(?=$|[\s\`):,;])/i.exec(text);
+        return match ? String(match[1] || "") : "";
+    }
+
+    function actionModel(message) {
+        if (!richMessageActions)
+            return [];
+
+        const body = String((message || {}).body || "");
+        if (!body)
+            return [];
+
+        const out = [
+            { label: "COPY", action: "COPY", value: body }
+        ];
+        const code = firstCodeBlock(body);
+        const file = firstFileReference(body);
+
+        if (code)
+            out.push({ label: "COPY CODE", action: "COPY_CODE", value: code });
+
+        if (file)
+            out.push({ label: "OPEN FILE", action: "OPEN_FILE", value: file });
+
+        if (String((message || {}).direction || "") !== "outgoing")
+            out.push({ label: "OPEN DIFF", action: "OPEN_DIFF", value: "" });
+
+        return out;
+    }
 
     // Discord mode keeps this panel's shell underneath Vesktop:
     // the 0.85 background and cyan OUTER frame remain, while all inner
@@ -274,10 +314,17 @@ Rectangle {
             width: messageList.width
 
             property bool outgoing: modelData.direction === "outgoing"
+            property var richActions: chatFeed.actionModel(modelData)
 
             property real maxBubbleWidth: messageList.width * 0.72
 
-            property real desiredWidth: Math.min(maxBubbleWidth, Math.max(120, messageMeasure.implicitWidth + 24))
+            property real desiredWidth: Math.min(
+                maxBubbleWidth,
+                Math.max(
+                    richActions.length > 0 ? 330 : 120,
+                    messageMeasure.implicitWidth + 24
+                )
+            )
 
             height: messageBubble.height + 4
 
@@ -300,7 +347,10 @@ Rectangle {
 
                 width: messageDelegate.desiredWidth
 
-                height: messageText.implicitHeight + 24
+                height:
+                    messageText.implicitHeight
+                    + 24
+                    + (messageDelegate.richActions.length > 0 ? 30 : 0)
 
                 anchors.right: messageDelegate.outgoing ? parent.right : undefined
 
@@ -355,6 +405,78 @@ Rectangle {
                     font.pixelSize: 14
 
                     color: messageDelegate.outgoing ? Colors.orange : Colors.cyan
+
+                    onLinkActivated: function(link) {
+                        chatFeed.messageActionRequested(
+                            "LINK",
+                            messageDelegate.modelData,
+                            String(link || "")
+                        );
+                    }
+                }
+
+                Row {
+                    id: richActionRow
+
+                    visible: messageDelegate.richActions.length > 0
+                    x: 12
+                    y: messageText.y + messageText.implicitHeight + 7
+                    height: visible ? 20 : 0
+                    spacing: 6
+
+                    Repeater {
+                        model: messageDelegate.richActions
+
+                        Rectangle {
+                            required property var modelData
+
+                            width: Math.max(
+                                54,
+                                richActionLabel.implicitWidth + 14
+                            )
+                            height: 18
+                            color:
+                                richActionMouse.pressed
+                                ? Colors.magenta
+                                : richActionMouse.containsMouse
+                                ? Colors.yellow
+                                : Colors.black
+                            border.width: 1
+                            border.color:
+                                messageDelegate.outgoing
+                                ? Colors.orange
+                                : Colors.cyan
+
+                            Text {
+                                id: richActionLabel
+                                anchors.centerIn: parent
+                                text: String(parent.modelData.label || "")
+                                font.family: "GohuFont 11 Nerd Font Mono"
+                                font.pixelSize: 8
+                                color:
+                                    richActionMouse.pressed
+                                    ? Colors.black
+                                    : richActionMouse.containsMouse
+                                    ? Colors.orange
+                                    : messageDelegate.outgoing
+                                    ? Colors.orange
+                                    : Colors.cyan
+                            }
+
+                            MouseArea {
+                                id: richActionMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+
+                                onClicked: chatFeed.messageActionRequested(
+                                    String(parent.modelData.action || ""),
+                                    messageDelegate.modelData,
+                                    String(parent.modelData.value || "")
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

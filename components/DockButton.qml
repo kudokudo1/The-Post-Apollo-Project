@@ -8,7 +8,6 @@ Rectangle {
 
     // Arbitrary module artwork lives inside the reusable visual shell.
     default property alias contentData: contentHost.data
-    property alias contentItem: contentHost
 
     property bool open: false
     property bool interactive: true
@@ -63,6 +62,10 @@ Rectangle {
     property bool contentGlowEnabled: true
     property bool softGlowEnabled: true
     property bool wideGlowEnabled: true
+
+    // Optional exact artwork source for the content glow. Consumers with
+    // composite/custom marks should point this at the mark itself.
+    property Item contentGlowSource: contentHost
 
     readonly property bool hovered: interactive && mouse.containsMouse
     readonly property bool pressed: interactive && mouse.pressed
@@ -136,8 +139,16 @@ Rectangle {
     }
 
     DropShadow {
-        anchors.fill: contentHost
-        source: contentHost
+        readonly property point sourceOrigin: dockButton.contentGlowSource
+                                              ? dockButton.contentGlowSource.mapToItem(dockButton, 0, 0)
+                                              : Qt.point(0, 0)
+
+        x: sourceOrigin.x
+        y: sourceOrigin.y
+        width: dockButton.contentGlowSource ? dockButton.contentGlowSource.width : 0
+        height: dockButton.contentGlowSource ? dockButton.contentGlowSource.height : 0
+
+        source: dockButton.contentGlowSource
 
         horizontalOffset: 0
         verticalOffset: 0

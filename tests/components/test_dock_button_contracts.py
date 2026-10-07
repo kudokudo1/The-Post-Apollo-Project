@@ -17,6 +17,7 @@ def require(text: str, needle: str, message: str) -> None:
 for needle, message in (
     ("default property alias contentData: contentHost.data", "custom module artwork slot"),
     ("property bool open: false", "persistent open state"),
+    ("property Item contentGlowSource: contentHost", "exact custom artwork glow source"),
     ("property color openFillColor: Colors.yellow", "canonical yellow open fill"),
     ("property color openForegroundColor: Colors.magenta", "canonical magenta open foreground"),
     ("property color openGlowColor: Colors.magenta", "canonical magenta open glow"),
@@ -35,9 +36,11 @@ for needle, message in (
 require(QMLDIR, "DockButton 1.0 DockButton.qml", "component registration")
 require(GIT, "DockButton {", "Git must prove the reusable component")
 require(GIT, "open: menuOpen", "Git open state must drive the component")
+require(GIT, "contentGlowSource: gitMark", "Git glow must stay attached to the exact mark")
 require(GIT, "onLeftClicked:", "Git must use component left-click behavior")
 require(GIT, "onRightClicked:", "Git must use component right-click behavior")
 require(TEMPLATE, "DockButton {", "future button template must use reusable component")
+require(TEMPLATE, "contentGlowSource: templateText", "template must demonstrate exact content glow targeting")
 
 for forbidden in ("RectangularShadow {", "DropShadow {", "MouseArea {"):
     assert forbidden not in GIT, f"Git should not duplicate DockButton internals: {forbidden}"

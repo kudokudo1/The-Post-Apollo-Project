@@ -11,6 +11,7 @@ DockButton {
     property bool menuOpen: false
 
     open: menuOpen
+    contentGlowSource: gitMark
 
     signal toggleRequested()
     signal rightClicked()

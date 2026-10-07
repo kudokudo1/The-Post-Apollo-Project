@@ -11,7 +11,10 @@ DockButton {
     // Bind this to the associated window/menu.
     // open: someWindow.menuOpen
 
+    contentGlowSource: templateText
+
     GohuText {
+        id: templateText
         anchors.centerIn: parent
 
         text: "-⋆♱⋆-"

@@ -26,6 +26,10 @@ Rectangle {
     readonly property string selectedSpecialistId:
         selectedSpecialist ? String(selectedSpecialist.id || "") : ""
     readonly property string channelLabel: {
+        if (focusedChannelLabel
+                && focusedChannelType === channelType)
+            return focusedChannelLabel;
+
         if (channelType === "ROOM")
             return String(roomLabel || "NO ROOM");
 
@@ -39,12 +43,71 @@ Rectangle {
 
         return "HOSPITAL WIDE";
     }
+    property string focusedChannelType: ""
+    property string focusedChannelLabel: ""
+
     readonly property var currentMessages:
         intercomService.messagesFor(
             channelType,
-            channelLabel,
+            (
+                focusedChannelLabel
+                && focusedChannelType === channelType
+                ? focusedChannelLabel
+                : channelLabel
+            ),
             selectedSpecialistId
         )
+
+    function focusSpecialistId(value) {
+        const wanted = String(value || "").trim();
+        const rows =
+            root.registryService
+            && Array.isArray(root.registryService.specialists)
+            ? root.registryService.specialists
+            : [];
+
+        if (!wanted)
+            return false;
+
+        for (let i = 0; i < rows.length; ++i) {
+            if (String((rows[i] || {}).id || "") !== wanted)
+                continue;
+
+            selectedSpecialistIndex = i;
+            return true;
+        }
+
+        return false;
+    }
+
+    function focusActivityContext(
+            specialistIdValue,
+            channelTypeValue,
+            channelLabelValue) {
+        const type =
+            String(channelTypeValue || "").trim().toUpperCase();
+        const label =
+            String(channelLabelValue || "").trim();
+
+        focusSpecialistId(specialistIdValue);
+
+        const modeIndex = channelModes.indexOf(type);
+
+        if (modeIndex >= 0)
+            channelIndex = modeIndex;
+
+        focusedChannelType =
+            modeIndex >= 0 ? type : "";
+        focusedChannelLabel =
+            modeIndex >= 0 ? label : "";
+
+        return selectedSpecialist !== null;
+    }
+
+    function clearFocusedChannel() {
+        focusedChannelType = "";
+        focusedChannelLabel = "";
+    }
 
     function sendCurrent() {
         const specialist = selectedSpecialist;
@@ -229,7 +292,10 @@ Rectangle {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
 
-                    onClicked: root.channelIndex = parent.index
+                    onClicked: {
+                        root.clearFocusedChannel();
+                        root.channelIndex = parent.index;
+                    }
                 }
             }
         }

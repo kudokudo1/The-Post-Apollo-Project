@@ -544,14 +544,8 @@ Scope {
             remoteActionProcess.exec([
                 "bash",
                 "-lc",
-                [
-                    'workflow_sha="$(gh api "repos/$1/contents/$2" --jq ".sha")" || exit $?',
-                    '[ -n "$workflow_sha" ] || { printf "WORKFLOW SHA MISSING\\n" >&2; exit 1; }',
-                    'exec gh api --method DELETE "repos/$1/contents/$2"',
-                    '  -f "message=Delete workflow $2"',
-                    '  -f "sha=$workflow_sha"'
-                ].join(" \\\n"),
-                "github-delete-workflow",
+                'exec "$HOME/.local/bin/px" delete-workflow "$1" "$2"',
+                "px-delete-workflow",
                 repoSlug,
                 cleanTarget
             ]);

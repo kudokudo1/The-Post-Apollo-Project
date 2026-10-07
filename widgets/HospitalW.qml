@@ -135,6 +135,7 @@ PanelWindow {
         doctorRuntimeService.refresh();
         roomCheckpointService.refresh();
         roomReportService.refresh();
+        assignmentService.refresh();
         return true;
     }
 
@@ -174,6 +175,19 @@ PanelWindow {
         root.intercomMenuOpen = false;
         root.operationsSurface = "chartSuggestions";
         chartService.refreshSuggestions();
+        return true;
+    }
+
+    function openRoomAssignments() {
+        if (!root.selectedRoomTeam)
+            return false;
+
+        root.leaveRoomControls();
+        root.leaveBedControls();
+        root.phoneMenuOpen = false;
+        root.intercomMenuOpen = false;
+        root.operationsSurface = "assignments";
+        assignmentService.refresh();
         return true;
     }
 
@@ -1919,6 +1933,12 @@ PanelWindow {
         patientId: floorService.floorId
         roomId: root.selectedRoomTeam
         sourceSessionId: roomChatView.activeSessionId
+    }
+
+    HospitalAssignmentService {
+        id: assignmentService
+
+        roomId: root.selectedRoomTeam
     }
 
     HospitalPhoneService {
@@ -5717,7 +5737,7 @@ PanelWindow {
                             spacing: 7
 
                             GohuText {
-                                width: parent.width - 310
+                                width: parent.width - 402
                                 anchors.verticalCenter: parent.verticalCenter
                                 text:
                                     latestCheckpointCard.checkpoint
@@ -5856,6 +5876,49 @@ PanelWindow {
                                         root.openRoomChartSuggestions()
                                 }
                             }
+
+                            Rectangle {
+                                id: roomOrdersButton
+
+                                width: 85
+                                height: 22
+                                anchors.verticalCenter: parent.verticalCenter
+                                color:
+                                    roomOrdersMouse.pressed
+                                    ? Colors.cyan
+                                    : Colors.black
+                                border.width: 1
+                                border.color:
+                                    assignmentService.activeAssignment
+                                    ? Colors.green
+                                    : Colors.cyan
+
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    text:
+                                        "ORDERS // "
+                                        + String(
+                                            assignmentService.assignmentCount
+                                        )
+                                    font.pixelSize: 7
+                                    color:
+                                        roomOrdersMouse.pressed
+                                        ? Colors.black
+                                        : assignmentService.activeAssignment
+                                        ? Colors.green
+                                        : Colors.cyan
+                                }
+
+                                MouseArea {
+                                    id: roomOrdersMouse
+
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked:
+                                        root.openRoomAssignments()
+                                }
+                            }
                         }
 
                         GohuText {
@@ -5890,11 +5953,13 @@ PanelWindow {
                         || roomCheckpointService.lastError.length > 0
                         || roomReportService.lastError.length > 0
                         || chartService.lastError.length > 0
+                        || assignmentService.lastError.length > 0
                     text:
                         doctorRuntimeService.lastError
                         || roomCheckpointService.lastError
                         || roomReportService.lastError
                         || chartService.lastError
+                        || assignmentService.lastError
                     font.pixelSize: 9
                     color: Colors.red
                     wrapMode: Text.Wrap
@@ -5941,6 +6006,29 @@ PanelWindow {
                 root.operationsSurface === "chartSuggestions"
 
             chartService: chartService
+
+            anchors {
+                left: parent.left
+                right: parent.right
+                top: fixedTop.bottom
+                bottom: actionBay.top
+                leftMargin: 18
+                rightMargin: 18
+                topMargin: 8
+                bottomMargin: 10
+            }
+
+            onCloseRequested: root.openRoomQuick()
+        }
+
+        HospitalAssignmentsView {
+            id: assignmentsView
+
+            z: 700
+            visible:
+                root.operationsSurface === "assignments"
+
+            assignmentService: assignmentService
 
             anchors {
                 left: parent.left

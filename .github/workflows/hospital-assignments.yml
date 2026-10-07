@@ -1,0 +1,33 @@
+name: Hospital Assignments
+
+on:
+  pull_request:
+    paths:
+      - "services/hospital/HospitalAssignmentService.qml"
+      - "widgets/HospitalAssignmentsView.qml"
+      - "widgets/HospitalW.qml"
+      - "tests/hospital/test_assignment_manager_contracts.py"
+      - ".github/workflows/hospital-assignments.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "services/hospital/HospitalAssignmentService.qml"
+      - "widgets/HospitalAssignmentsView.qml"
+      - "widgets/HospitalW.qml"
+      - "tests/hospital/test_assignment_manager_contracts.py"
+      - ".github/workflows/hospital-assignments.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate durable Assignment and Orders contracts
+        run: python3 tests/hospital/test_assignment_manager_contracts.py

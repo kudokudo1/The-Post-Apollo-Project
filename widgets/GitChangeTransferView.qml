@@ -53,11 +53,17 @@ Rectangle {
     readonly property string effectiveLayer:
         untrackedSource
         ? "untracked"
+        : String(transferLayer || "worktree").toLowerCase() === "conflict-result"
+        ? "conflict-result"
         : String(transferLayer || "worktree").toLowerCase() === "partial"
         ? "partial"
         : String(transferLayer || "worktree").toLowerCase() === "staged"
         ? "staged"
         : "worktree"
+
+    readonly property bool conflictResultLayer:
+        transferScope === "file"
+        && effectiveLayer === "conflict-result"
 
     readonly property bool stagedLayer:
         transferScope === "file"
@@ -99,10 +105,14 @@ Rectangle {
     }
 
     function chooseMode(mode) {
-        const next =
+        const requested =
             String(mode || "").toLowerCase() === "copy"
             ? "copy"
             : "move";
+        const next =
+            root.conflictResultLayer
+            ? "copy"
+            : requested;
 
         if (transferMode === next)
             return;
@@ -125,6 +135,14 @@ Rectangle {
                 filePath,
                 hunkIndex,
                 transferMode
+            );
+        }
+
+        if (root.effectiveLayer === "conflict-result") {
+            return transferService.previewConflictResult(
+                selectedDestinationPath,
+                filePath,
+                "copy"
             );
         }
 
@@ -172,7 +190,11 @@ Rectangle {
     onUntrackedSourceChanged: invalidatePreview()
     onSourcePathChanged: invalidatePreview()
     onTransferScopeChanged: invalidatePreview()
-    onTransferLayerChanged: invalidatePreview()
+    onTransferLayerChanged: {
+        if (root.conflictResultLayer)
+            root.transferMode = "copy";
+        invalidatePreview();
+    }
     onHunkIndexChanged: invalidatePreview()
 
     Connections {
@@ -254,6 +276,8 @@ Rectangle {
                         root.transferScope === "hunk"
                         ? "TRANSFER // HUNK "
                             + String(root.hunkIndex + 1)
+                        : root.effectiveLayer === "conflict-result"
+                        ? "TRANSFER // CONFLICT RESULT COPY"
                         : root.effectiveLayer === "untracked"
                         ? "TRANSFER // UNTRACKED WHOLE FILE"
                         : root.effectiveLayer === "partial"
@@ -306,6 +330,12 @@ Rectangle {
                     ? (
                         "HUNK SLICE // WORKTREE HUNK ONLY // "
                         + "DESTINATION MUST BE A CLEAN EXISTING WORKTREE"
+                      )
+                    : root.effectiveLayer === "conflict-result"
+                    ? (
+                        "COPY CURRENT CONFLICT RESULT ONLY // "
+                        + "BASE / OURS / THEIRS STAY WITH SOURCE OPERATION // "
+                        + "MOVE IS REFUSED"
                       )
                     : root.effectiveLayer === "untracked"
                     ? (
@@ -571,7 +601,8 @@ Rectangle {
                             accent: Colors.orange
                             selectedAction: root.transferMode === "move"
                             enabledAction:
-                                !transferService.previewBusy
+                                !root.conflictResultLayer
+                                && !transferService.previewBusy
                                 && !transferService.transferBusy
                             onTriggered: root.chooseMode("move")
                         }

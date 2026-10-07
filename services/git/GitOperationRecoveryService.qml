@@ -129,6 +129,7 @@ Scope {
                 "CHANGES/TRANSFER_LINE",
                 "CHANGES/TRANSFER_STAGED",
                 "CHANGES/TRANSFER_PARTIAL",
+                "CHANGES/TRANSFER_CONFLICT_RESULT",
                 "CHANGES/TRANSFER_UNTRACKED"
             ].indexOf(kind) < 0)
             return null;
@@ -156,7 +157,12 @@ Scope {
                     layer !== "worktree"
                     && layer !== "staged"
                     && layer !== "partial"
+                    && layer !== "conflict-result"
                     && layer !== "untracked"
+                )
+                || (
+                    layer === "conflict-result"
+                    && mode !== "copy"
                 )) {
             return refuse("TRANSFER RECOVERY PAYLOAD IS INCOMPLETE");
         }
@@ -182,6 +188,8 @@ Scope {
                     ? " STAGED "
                     : layer === "partial"
                     ? " PARTIALLY STAGED "
+                    : layer === "conflict-result"
+                    ? " CONFLICT RESULT "
                     : layer === "untracked"
                     ? " UNTRACKED "
                     : " "
@@ -1736,11 +1744,15 @@ Scope {
                 '    [ -n "$common_source" ] && [ "$common_source" = "$common_destination" ] || { printf "REFUSED\\tTRANSFER WORKTREES NO LONGER SHARE A REPOSITORY\\n"; exit 106; }',
                 '    actual_source_head="$(git -C "$source" rev-parse HEAD 2>/dev/null || true)"',
                 '    actual_destination_head="$(git -C "$destination" rev-parse HEAD 2>/dev/null || true)"',
-                '    [ "$actual_source_head" = "$expected_source_head" ] || { printf "REFUSED\\tSOURCE HEAD CHANGED SINCE TRANSFER\\n"; exit 107; }',
+                '    if [ "$layer" != "conflict-result" ]; then',
+                '      [ "$actual_source_head" = "$expected_source_head" ] || { printf "REFUSED\\tSOURCE HEAD CHANGED SINCE TRANSFER\\n"; exit 107; }',
+                '      [ -z "$(git -C "$source" ls-files -u 2>/dev/null)" ] || { printf "REFUSED\\tSOURCE HAS CONFLICTS\\n"; exit 109; }',
+                '    fi',
                 '    [ "$actual_destination_head" = "$expected_destination_head" ] || { printf "REFUSED\\tDESTINATION HEAD CHANGED SINCE TRANSFER\\n"; exit 108; }',
-                '    [ -z "$(git -C "$source" ls-files -u 2>/dev/null)" ] || { printf "REFUSED\\tSOURCE HAS CONFLICTS\\n"; exit 109; }',
                 '    [ -z "$(git -C "$destination" ls-files -u 2>/dev/null)" ] || { printf "REFUSED\\tDESTINATION HAS CONFLICTS\\n"; exit 110; }',
-                '    if [ "$layer" = "staged" ]; then',
+                '    if [ "$layer" = "conflict-result" ]; then',
+                '      git -C "$destination" diff --cached --quiet || { printf "REFUSED\\tDESTINATION HAS STAGED DRIFT AFTER CONFLICT RESULT COPY\\n"; exit 111; }',
+                '    elif [ "$layer" = "staged" ]; then',
                 '      git -C "$source" diff --quiet || { printf "REFUSED\\tSOURCE HAS UNSTAGED DRIFT AFTER STAGED TRANSFER\\n"; exit 111; }',
                 '      git -C "$destination" diff --quiet || { printf "REFUSED\\tDESTINATION HAS UNSTAGED DRIFT AFTER STAGED TRANSFER\\n"; exit 112; }',
                 '    elif [ "$layer" = "partial" ]; then',
@@ -1782,8 +1794,12 @@ Scope {
                 '        git -C "$destination" apply -R --index --binary --whitespace=nowarn "$patch" || { printf "REFUSED\\tSTAGED COPY TRANSFER REMOVE FAILED\\n"; exit 121; }',
                 '        printf "OK\\tUNDID STAGED COPY TRANSFER // DESTINATION STAGED CONTENT REMOVED\\n"',
                 '      fi',
+                '    elif [ "$layer" = "conflict-result" ]; then',
+                '      git -C "$destination" apply -R --check --binary --whitespace=nowarn "$patch" >/dev/null 2>&1 || { printf "REFUSED\\tDESTINATION NO LONGER CONTAINS EXACT CONFLICT RESULT COPY\\n"; exit 122; }',
+                '      git -C "$destination" apply -R --binary --whitespace=nowarn "$patch" || { printf "REFUSED\\tCONFLICT RESULT COPY REMOVE FAILED\\n"; exit 123; }',
+                '      printf "OK\\tUNDID CONFLICT RESULT COPY // SOURCE CONFLICT LEFT UNTOUCHED\\n"',
                 '    elif [ "$layer" = "partial" ]; then',
-                '      partial_apply() {',
+                '      partial_apply() {
                 '        local repo="$1"',
                 '        git -C "$repo" apply --cached --binary --whitespace=nowarn "$partial_staged" || return 1',
                 '        if ! git -C "$repo" apply --binary --whitespace=nowarn "$partial_staged"; then',

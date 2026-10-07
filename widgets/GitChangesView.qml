@@ -104,12 +104,26 @@ Item {
             && Boolean(row.untracked);
     }
 
+    function conflictFileTransferEligible() {
+        const row = root.selectedFile || {};
+
+        return !!root.changesService
+            && !!root.transferService
+            && !!root.branchWorkspaceService
+            && root.selectedPath.length > 0
+            && Boolean(row.conflict)
+            && !root.changesService.actionBusy
+            && !root.transferService.previewBusy
+            && !root.transferService.transferBusy;
+    }
+
     function fileTransferEligible() {
         const wholeFileCandidate =
             root.worktreeFileTransferEligible()
             || root.stagedFileTransferEligible()
             || root.partialFileTransferEligible()
-            || root.untrackedFileTransferEligible();
+            || root.untrackedFileTransferEligible()
+            || root.conflictFileTransferEligible();
 
         return wholeFileCandidate;
     }
@@ -167,6 +181,8 @@ Item {
         root.transferLayer =
             requested !== "file"
             ? "worktree"
+            : root.conflictFileTransferEligible()
+            ? "conflict-result"
             : root.untrackedFileTransferEligible()
             ? "untracked"
             : root.partialFileTransferEligible()

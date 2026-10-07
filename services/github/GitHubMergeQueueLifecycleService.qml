@@ -380,22 +380,31 @@ Scope {
         interval: 120000
         repeat: false
         onTriggered: {
-            const mutated = root.phase === "VERIFYING" && root.mutationSucceeded;
+            const timedOutPhase = root.phase;
+            const mutated =
+                timedOutPhase === "VERIFYING"
+                && root.mutationSucceeded;
+
             if (worker.running)
                 worker.running = false;
 
             if (mutated) {
                 root.finishUnverified("MERGE QUEUE MUTATED // EVIDENCE TIMEOUT");
-            } else {
-                root.busy = false;
-                root.phase = "READY";
-                root.lastError = "MERGE QUEUE " + root.operation.toUpperCase() + " TIMEOUT";
-                root.status = "MERGE QUEUE // TIMEOUT";
-                if (root.operation === "enqueue" || root.operation === "dequeue")
-                    root.mutationFinished(false, false, root.operation, ({}));
-                else
-                    root.previewFailed(root.lastError);
+                return;
             }
+
+            root.busy = false;
+            root.phase = "READY";
+            root.lastError =
+                "MERGE QUEUE "
+                + root.operation.toUpperCase()
+                + " TIMEOUT";
+            root.status = "MERGE QUEUE // TIMEOUT";
+
+            if (timedOutPhase === "PREVIEW")
+                root.previewFailed(root.lastError);
+            else
+                root.mutationFinished(false, false, root.operation, ({}));
         }
     }
 }

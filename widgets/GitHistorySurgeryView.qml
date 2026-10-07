@@ -5,8 +5,10 @@ Rectangle {
     id: root
 
     required property var foldService
+    required property var absorbService
     property var historyService: null
     property var keyboardHost: null
+    property string surgeryMode: "fold"
 
     color: Colors.dark
     border.width: 1
@@ -131,7 +133,8 @@ Rectangle {
                 width: (parent.width - 12) / 3
                 label: "FOLD"
                 accent: Colors.red
-                selectedAction: true
+                selectedAction: root.surgeryMode === "fold"
+                onTriggered: root.surgeryMode = "fold"
             }
 
             SurgeryButton {
@@ -143,9 +146,10 @@ Rectangle {
 
             SurgeryButton {
                 width: (parent.width - 12) / 3
-                label: "ABSORB // NEXT"
+                label: "ABSORB"
                 accent: Colors.magenta
-                enabledAction: false
+                selectedAction: root.surgeryMode === "absorb"
+                onTriggered: root.surgeryMode = "absorb"
             }
         }
 
@@ -516,6 +520,26 @@ Rectangle {
                 elide: Text.ElideRight
             }
         }
+    }
+
+    GitHistoryAbsorbView {
+        anchors {
+            left: parent.left
+            right: parent.right
+            top: parent.top
+            bottom: parent.bottom
+            leftMargin: 8
+            rightMargin: 8
+            topMargin: 45
+            bottomMargin: 8
+        }
+
+        z: 4000
+        visible: root.surgeryMode === "absorb"
+
+        absorbService: root.absorbService
+        historyService: root.historyService
+        keyboardHost: root.keyboardHost
     }
 
     Connections {

@@ -1744,7 +1744,7 @@ Scope {
             repoRemoteSlug,
             repoLabel,
             repoRemoteUrl
-        ]);
+        ];
 
         if (shouldJournalProcessAction(processAction)
                 && ((operationJournal && !snapshotService)

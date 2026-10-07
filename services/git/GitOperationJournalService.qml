@@ -97,6 +97,26 @@ Scope {
         return operationId;
     }
 
+    function completedRecoveryClass(previous, afterState) {
+        const beforeClass =
+            String((previous || {}).recoveryClass || "EVIDENCE_ONLY");
+        const afterClass =
+            String(
+                (afterState || {}).recoveryClass
+                || "EVIDENCE_ONLY"
+            );
+
+        if (beforeClass === "REF_RECOVERABLE"
+                && afterClass === "REF_RECOVERABLE")
+            return "REF_RECOVERABLE";
+
+        if (beforeClass === "CONTENT_RECOVERABLE"
+                && afterClass === "CONTENT_RECOVERABLE")
+            return "CONTENT_RECOVERABLE";
+
+        return "EVIDENCE_ONLY";
+    }
+
     function completeOperation(operationId, afterState, detail) {
         const index = entryIndex(operationId);
 
@@ -117,25 +137,8 @@ Scope {
             after: cloneValue(afterState),
             metadata: cloneValue(previous.metadata || {}),
             detail: String(detail || ""),
-            recoveryClass: {
-                const beforeClass =
-                    String(previous.recoveryClass || "EVIDENCE_ONLY");
-                const afterClass =
-                    String(
-                        (afterState || {}).recoveryClass
-                        || "EVIDENCE_ONLY"
-                    );
-
-                if (beforeClass === "REF_RECOVERABLE"
-                        && afterClass === "REF_RECOVERABLE")
-                    return "REF_RECOVERABLE";
-
-                if (beforeClass === "CONTENT_RECOVERABLE"
-                        && afterClass === "CONTENT_RECOVERABLE")
-                    return "CONTENT_RECOVERABLE";
-
-                return "EVIDENCE_ONLY";
-            },
+            recoveryClass:
+                completedRecoveryClass(previous, afterState),
             undoState: "NOT_IMPLEMENTED"
         };
 

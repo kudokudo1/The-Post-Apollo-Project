@@ -10,6 +10,7 @@ Item {
     property var interactiveRebaseService: null
     property var interactiveRebaseSessionService: null
     property var historyFoldService: null
+    property var historySplitService: null
     property var keyboardHost: null
 
     property string subMode: "log"
@@ -2775,6 +2776,7 @@ Item {
                 visible: root.subMode === "surgery"
 
                 foldService: root.historyFoldService
+                splitService: root.historySplitService
                 historyService: root.historyService
                 keyboardHost: root.keyboardHost
             }

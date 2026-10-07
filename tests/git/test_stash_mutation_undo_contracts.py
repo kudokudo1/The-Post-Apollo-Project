@@ -213,7 +213,18 @@ def smoke_non_top_is_not_exact():
     with tempfile.TemporaryDirectory(prefix="pa-stash-nontop-") as tmp:
         repo = make_repo(Path(tmp))
         first = make_top_stash(repo)
-        second = make_top_stash(repo)
+
+        (repo / "tracked.txt").write_text(
+            "second stash tracked payload\n",
+            encoding="utf-8",
+        )
+        git(repo, "add", "tracked.txt")
+        (repo / "second-extra.txt").write_text(
+            "second stash untracked payload\n",
+            encoding="utf-8",
+        )
+        git(repo, "stash", "push", "-u", "-m", "second top")
+        second = stash_sha(repo)
         assert first != second
         refs = (
             git(repo, "stash", "list", "--format=%gd")

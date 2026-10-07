@@ -25,6 +25,9 @@ Item {
     property string pendingRenameOld: ""
     property string pendingRenameNew: ""
     property string pendingDeleteBranch: ""
+    property string pendingCreateName: ""
+    property string pendingCreateAnchor: ""
+    property string pendingCreateMode: ""
 
     readonly property var selectedBranchData:
         branchWorkspaceService && selectedBranch
@@ -139,7 +142,8 @@ Item {
             if (kind !== "RENAME"
                     && kind !== "SET-UPSTREAM"
                     && kind !== "CLEAR-UPSTREAM"
-                    && kind !== "DELETE")
+                    && kind !== "DELETE"
+                    && kind !== "CREATE")
                 return;
 
             root.managementMessage =
@@ -176,6 +180,31 @@ Item {
                 root.selectedBranch = "";
                 root.selectedSha = "";
                 root.pendingDeleteBranch = "";
+                root.managementMode = "";
+                root.managementArm = "";
+                return;
+            }
+
+            if (kind === "CREATE") {
+                let linked = true;
+
+                if (root.branchStackStore)
+                    linked = root.branchStackStore.attachCreatedBranch(
+                        root.pendingCreateAnchor,
+                        root.pendingCreateName,
+                        root.pendingCreateMode
+                    );
+
+                root.pendingFocusBranch = root.pendingCreateName;
+                root.pendingFocusSha = "";
+                root.managementMessage =
+                    linked
+                    ? "OK // CREATED + STACK LINKED"
+                    : "CREATED // STACK LINK REFUSED";
+
+                root.pendingCreateName = "";
+                root.pendingCreateAnchor = "";
+                root.pendingCreateMode = "";
                 root.managementMode = "";
                 root.managementArm = "";
                 return;
@@ -329,6 +358,20 @@ Item {
         deleteConfirmEditor.text = "";
     }
 
+    function openNewManager() {
+        if (!root.selectedBranch || !root.branchWorkspaceService)
+            return;
+
+        root.managementMode = "new";
+        root.managementMessage = "";
+        root.managementArm = "";
+        newBranchEditor.text = "";
+
+        Qt.callLater(function() {
+            newBranchEditor.focusEditor();
+        });
+    }
+
     function closeManager() {
         root.managementMode = "";
         root.managementMessage = "";
@@ -337,6 +380,88 @@ Item {
         if (root.keyboardHost
                 && root.keyboardHost.activeTextEditor)
             root.keyboardHost.activeTextEditor = null;
+    }
+
+    function newBranchBlockReason() {
+        if (!root.selectedBranch)
+            return "SELECT A BRANCH";
+
+        if (!root.branchWorkspaceService)
+            return "BRANCH CORE NOT CONNECTED";
+
+        if (root.branchWorkspaceService.actionBusy
+                || root.branchWorkspaceService.refreshing)
+            return "BRANCH CORE BUSY";
+
+        if (root.newBranchMode === "BELOW"
+                && !root.selectedStackParent)
+            return "BELOW NEEDS AN EXISTING STACK PARENT";
+
+        return "";
+    }
+
+    function newBranchStartPoint() {
+        if (root.newBranchMode === "BELOW")
+            return root.selectedStackParent;
+
+        return root.selectedBranch;
+    }
+
+    function newBranchPreview(nameValue) {
+        const name = String(nameValue || "").trim() || "NEW";
+
+        if (root.newBranchMode === "BELOW") {
+            return (
+                (root.selectedStackParent || "NO PARENT")
+                + " → "
+                + name
+                + " → "
+                + root.selectedBranch
+            );
+        }
+
+        return root.selectedBranch + " → " + name;
+    }
+
+    function applyCreateBranch() {
+        if (!root.branchWorkspaceService || !root.selectedBranch)
+            return;
+
+        const blocked = root.newBranchBlockReason();
+
+        if (blocked) {
+            root.managementMessage = "REFUSED // " + blocked;
+            return;
+        }
+
+        const name = String(newBranchEditor.text || "").trim();
+
+        if (!name) {
+            root.managementMessage = "REFUSED // BRANCH NAME REQUIRED";
+            return;
+        }
+
+        if (root.branchWorkspaceService.branchForName(name)) {
+            root.managementMessage =
+                "REFUSED // LOCAL BRANCH ALREADY EXISTS";
+            return;
+        }
+
+        root.pendingCreateName = name;
+        root.pendingCreateAnchor = root.selectedBranch;
+        root.pendingCreateMode = root.newBranchMode;
+        root.pendingFocusBranch = name;
+        root.pendingFocusSha = "";
+
+        if (!root.branchWorkspaceService.createBranch(
+                name,
+                root.newBranchStartPoint()
+            )) {
+            root.pendingCreateName = "";
+            root.pendingCreateAnchor = "";
+            root.pendingCreateMode = "";
+            root.managementMessage = "REFUSED // BRANCH CORE BUSY";
+        }
     }
 
     function deleteBlockReason(forceDelete) {
@@ -468,13 +593,7 @@ Item {
     }
 
     function triggerNewBranchMode() {
-        if (!selectedBranch)
-            return;
-
-        if (newBranchMode === "ABOVE")
-            stackAboveRequested(selectedBranch);
-        else
-            stackBelowRequested(selectedBranch);
+        root.openNewManager();
     }
 
     function triggerRestackActuator() {
@@ -1384,8 +1503,16 @@ Item {
                             width: (inspector.width - 26) / 2
                             actionLabel: "NEW"
                             modeLabel: root.newBranchMode
-                            enabledAction: false
-                            modeEnabled: root.selectedBranch.length > 0
+                            enabledAction:
+                                root.selectedBranch.length > 0
+                                && branchWorkspaceService
+                                && !branchWorkspaceService.actionBusy
+                                && !branchWorkspaceService.refreshing
+                            modeEnabled:
+                                root.selectedBranch.length > 0
+                                && branchWorkspaceService
+                                && !branchWorkspaceService.actionBusy
+                                && !branchWorkspaceService.refreshing
                             onTriggered: root.triggerNewBranchMode()
                             onModeTriggered: root.cycleNewBranchMode()
                         }

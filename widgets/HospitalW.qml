@@ -118,6 +118,20 @@ PanelWindow {
             root.selectedProviderId = root.firstAvailableProviderId();
     }
 
+    function openRoomQuick() {
+        if (!root.selectedRoomTeam
+                || !roomChatView.activeSessionId)
+            return false;
+
+        root.leaveRoomControls();
+        root.leaveBedControls();
+        root.phoneMenuOpen = false;
+        root.intercomMenuOpen = false;
+        root.operationsSurface = "quick";
+        doctorRuntimeService.refresh();
+        return true;
+    }
+
     function openRoomChat() {
         if (!root.selectedRoomTeam || !floorService.bedPath)
             return false;
@@ -1744,6 +1758,12 @@ PanelWindow {
         id: providerService
 
         onProvidersRefreshed: root.syncRoomAISelection()
+    }
+
+    HospitalDoctorRuntimeService {
+        id: doctorRuntimeService
+
+        sessionId: roomChatView.activeSessionId
     }
 
     HospitalPhoneService {
@@ -4105,19 +4125,30 @@ PanelWindow {
                         Row {
                             id: roomAiDock
 
+                            readonly property bool stopVisible:
+                                doctorRuntimeService.operating
+                                || doctorRuntimeService.cancelling
+                            readonly property int buttonCount:
+                                stopVisible ? 4 : 3
+
                             width: parent.width
                             height: 26
                             spacing: 6
 
                             Repeater {
-                                model: ["QUICK", "CHAT", "DOCTOR"]
+                                model:
+                                    roomAiDock.stopVisible
+                                    ? ["QUICK", "CHAT", "DOCTOR", "STOP"]
+                                    : ["QUICK", "CHAT", "DOCTOR"]
 
                                 Rectangle {
                                     id: roomAiButton
 
                                     required property string modelData
                                     readonly property bool selectedAction:
-                                        (modelData === "CHAT"
+                                        (modelData === "QUICK"
+                                            && root.operationsSurface === "quick")
+                                        || (modelData === "CHAT"
                                             && root.operationsSurface === "chat")
                                         || (modelData === "DOCTOR"
                                             && root.operationsSurface === "doctor")
@@ -4125,19 +4156,26 @@ PanelWindow {
                                         root.selectedRoomTeam.length > 0
                                         && (
                                             modelData !== "QUICK"
-                                            ? true
-                                            : false
+                                            || roomChatView.activeSessionId.length > 0
                                         )
                                         && (
                                             modelData !== "CHAT"
                                             || floorService.bedPath.length > 0
                                         )
+                                        && (
+                                            modelData !== "STOP"
+                                            || (
+                                                doctorRuntimeService.operating
+                                                && !doctorRuntimeService.cancelling
+                                            )
+                                        )
 
                                     width:
                                         (
                                             roomAiDock.width
-                                            - roomAiDock.spacing * 2
-                                        ) / 3
+                                            - roomAiDock.spacing
+                                              * (roomAiDock.buttonCount - 1)
+                                        ) / roomAiDock.buttonCount
                                     height: parent.height
 
                                     color:
@@ -4152,6 +4190,8 @@ PanelWindow {
                                         ? Colors.orange
                                         : selectedAction
                                         ? Colors.magenta
+                                        : modelData === "STOP"
+                                        ? Colors.red
                                         : modelData === "DOCTOR"
                                         ? Colors.green
                                         : modelData === "CHAT"
@@ -4170,7 +4210,9 @@ PanelWindow {
                                             ? selectedAction ? 0.40 : 0.18
                                             : 0.08
                                         color:
-                                            modelData === "DOCTOR"
+                                            modelData === "STOP"
+                                            ? Colors.red
+                                            : modelData === "DOCTOR"
                                             ? Colors.green
                                             : modelData === "CHAT"
                                             ? Colors.cyan
@@ -4186,12 +4228,23 @@ PanelWindow {
                                                 + root.selectedProviderId
                                                     .toUpperCase()
                                             : roomAiButton.modelData === "QUICK"
-                                            ? "QUICK // NEXT"
+                                            ? (
+                                                "QUICK // "
+                                                + doctorRuntimeService.displayStatus
+                                              )
+                                            : roomAiButton.modelData === "STOP"
+                                            ? (
+                                                doctorRuntimeService.cancelling
+                                                ? "STOPPING"
+                                                : "STOP"
+                                              )
                                             : roomAiButton.modelData
                                         font.pixelSize: 8
                                         color:
                                             roomAiMouse.pressed
                                             ? Colors.black
+                                            : roomAiButton.modelData === "STOP"
+                                            ? Colors.red
                                             : roomAiButton.modelData === "DOCTOR"
                                             ? Colors.green
                                             : roomAiButton.modelData === "CHAT"
@@ -4212,13 +4265,23 @@ PanelWindow {
                                             : Qt.ArrowCursor
 
                                         onClicked: {
+                                            if (roomAiButton.modelData === "QUICK") {
+                                                root.openRoomQuick();
+                                                return;
+                                            }
+
                                             if (roomAiButton.modelData === "CHAT") {
                                                 root.openRoomChat();
                                                 return;
                                             }
 
-                                            if (roomAiButton.modelData === "DOCTOR")
+                                            if (roomAiButton.modelData === "DOCTOR") {
                                                 root.openRoomDoctor();
+                                                return;
+                                            }
+
+                                            if (roomAiButton.modelData === "STOP")
+                                                doctorRuntimeService.cancel("OPERATOR");
                                         }
                                     }
                                 }

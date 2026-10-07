@@ -301,6 +301,67 @@ Item {
         }
     }
 
+    Connections {
+        target: root.stackPlanner
+        enabled: root.stackPlanner !== null
+        ignoreUnknownSignals: true
+
+        function onPlanned(plan) {
+            if (root.managementMode !== "restack")
+                return;
+
+            if (root.stackPlanner.lastError) {
+                root.managementMessage =
+                    "REFUSED // " + root.stackPlanner.lastError;
+                return;
+            }
+
+            if (root.stackPlanner.invalidCount > 0) {
+                root.managementMessage =
+                    "REFUSED // PREVIEW HAS "
+                    + String(root.stackPlanner.invalidCount)
+                    + " INVALID STEP"
+                    + (root.stackPlanner.invalidCount === 1 ? "" : "S");
+                return;
+            }
+
+            if (root.stackPlanner.requiredCount > 0) {
+                root.managementMessage =
+                    "PREVIEW READY // "
+                    + String(root.stackPlanner.requiredCount)
+                    + " MOVE"
+                    + (root.stackPlanner.requiredCount === 1 ? "" : "S")
+                    + " REQUIRED";
+                return;
+            }
+
+            root.managementMessage =
+                "PREVIEW READY // STACK ALREADY UP TO DATE";
+        }
+    }
+
+    Connections {
+        target: root.stackExecutor
+        enabled: root.stackExecutor !== null
+        ignoreUnknownSignals: true
+
+        function onExecutionFinished(success, result) {
+            if (root.managementMode !== "restack")
+                return;
+
+            root.managementMessage =
+                success
+                ? "OK // RESTACK COMPLETE // "
+                  + String((result || []).length)
+                  + " RESULT ROWS"
+                : "REFUSED // "
+                  + String(
+                      root.stackExecutor.lastError
+                      || "RESTACK FAILED"
+                    );
+        }
+    }
+
     function focusContext(branchName, sha) {
         root.pendingFocusBranch = String(branchName || "");
         root.pendingFocusSha = String(sha || "");
@@ -979,48 +1040,127 @@ Item {
         root.openNewManager();
     }
 
+    function restackOccupiedBranch() {
+        if (!root.stackExecutor || !root.stackPlanner)
+            return "";
+
+        return root.stackExecutor.occupiedRequiredBranch(
+            root.stackPlanner.plan
+        );
+    }
+
+    function restackStageText() {
+        if (!root.stackPlanner || !root.stackExecutor)
+            return "NOT CONNECTED";
+
+        if (root.stackExecutor.running)
+            return "EXECUTING";
+
+        if (root.stackPlanner.busy)
+            return "READING";
+
+        if (root.stackExecutor.armed)
+            return "ARMED";
+
+        if (root.stackPlanner.startBranch === root.selectedBranch
+                && root.stackPlanner.plan.length > 0)
+            return "PREVIEWED";
+
+        return "READY";
+    }
+
+    function openRestackManager() {
+        if (!root.selectedBranch
+                || !root.stackPlanner
+                || !root.stackExecutor)
+            return;
+
+        root.managementMode = "restack";
+        root.managementMessage = "";
+        root.managementArm = "";
+    }
+
+    function previewRestack() {
+        if (!root.stackPlanner
+                || !root.stackExecutor
+                || !root.selectedBranch)
+            return;
+
+        if (root.stackExecutor.running)
+            return;
+
+        root.stackExecutor.disarm("NEW PREVIEW");
+        root.managementMessage = "READING // RESTACK PREVIEW";
+
+        if (!root.stackPlanner.buildPlan(
+                root.selectedBranch,
+                true
+            ))
+            root.managementMessage =
+                "REFUSED // "
+                + String(
+                    root.stackPlanner.lastError
+                    || "PREVIEW COULD NOT START"
+                  );
+    }
+
+    function armRestack() {
+        if (!root.stackExecutor || !root.stackPlanner)
+            return;
+
+        if (!root.stackExecutor.armFromPlanner()) {
+            root.managementMessage =
+                "REFUSED // "
+                + String(
+                    root.stackExecutor.lastError
+                    || "RESTACK ARM FAILED"
+                  );
+            return;
+        }
+
+        root.managementMessage = root.stackExecutor.armStatus;
+    }
+
+    function executeRestack() {
+        if (!root.stackExecutor)
+            return;
+
+        if (!root.stackExecutor.executeArmed()) {
+            root.managementMessage =
+                "REFUSED // "
+                + String(
+                    root.stackExecutor.lastError
+                    || "RESTACK EXECUTION COULD NOT START"
+                  );
+            return;
+        }
+
+        root.managementMessage = "RESTACK // EXECUTING";
+    }
+
+    function disarmRestack() {
+        if (!root.stackExecutor)
+            return;
+
+        root.stackExecutor.disarm("OPERATOR CANCELLED");
+        root.managementMessage = "RESTACK // DISARMED";
+    }
+
     function triggerRestackActuator() {
-        if (!selectedBranch || !stackPlanner || !stackExecutor)
-            return;
-
-        if (stackExecutor.running)
-            return;
-
-        if (stackExecutor.armed) {
-            stackExecutor.executeArmed();
-            return;
-        }
-
-        if (stackPlanner.startBranch === selectedBranch
-                && stackPlanner.executable
-                && stackPlanner.requiredCount > 0) {
-            stackExecutor.armFromPlanner();
-            return;
-        }
-
-        stackExecutor.disarm("NEW PREVIEW");
-        stackPlanner.buildPlan(selectedBranch, true);
+        root.openRestackManager();
     }
 
     function restackActuatorLabel() {
-        if (!stackPlanner || !stackExecutor)
+        if (!root.stackPlanner || !root.stackExecutor)
             return "RESTACK";
 
-        if (stackExecutor.running)
+        if (root.stackExecutor.running)
             return "RESTACKING";
 
-        if (stackPlanner.busy)
-            return "READING";
+        if (root.stackExecutor.armed)
+            return "RESTACK ✓";
 
-        if (stackExecutor.armed)
-            return "RESTACK";
-
-        if (stackPlanner.startBranch === selectedBranch
-                && stackPlanner.executable
-                && stackPlanner.requiredCount > 0)
-            return "ARM";
-
-        return "PREVIEW";
+        return "RESTACK";
     }
 
     component BranchButton: Rectangle {
@@ -2014,17 +2154,14 @@ Item {
                                 && stackPlanner
                                 && stackExecutor
                                 && !stackExecutor.running
-                                && !stackPlanner.busy
                                 && (
-                                    stackExecutor.armed
+                                    root.selectedStackParent.length > 0
+                                    || root.selectedStackDescendants.length > 0
                                     || (
                                         stackPlanner.startBranch
                                         === root.selectedBranch
-                                        && stackPlanner.executable
-                                        && stackPlanner.requiredCount > 0
+                                        && stackPlanner.plan.length > 0
                                        )
-                                    || root.selectedStackParent.length > 0
-                                    || root.selectedStackDescendants.length > 0
                                 )
                             onTriggered:
                                 root.triggerRestackActuator()
@@ -2177,6 +2314,8 @@ Item {
                         ? Colors.green
                         : root.managementMode === "workspace"
                         ? Colors.blue
+                        : root.managementMode === "restack"
+                        ? Colors.orange
                         : Colors.magenta
                     clip: true
 
@@ -2202,6 +2341,8 @@ Item {
                                     ? "NEW // " + root.selectedBranch
                                     : root.managementMode === "workspace"
                                     ? "WORKSPACE // " + root.selectedBranch
+                                    : root.managementMode === "restack"
+                                    ? "RESTACK // " + root.selectedBranch
                                     : "EDIT // " + root.selectedBranch
                                 font.pixelSize: 13
                                 color:
@@ -2211,6 +2352,8 @@ Item {
                                     ? Colors.green
                                     : root.managementMode === "workspace"
                                     ? Colors.blue
+                                    : root.managementMode === "restack"
+                                    ? Colors.orange
                                     : Colors.magenta
                                 elide: Text.ElideMiddle
                             }
@@ -2234,6 +2377,8 @@ Item {
                                 ? Colors.green
                                 : root.managementMode === "workspace"
                                 ? Colors.blue
+                                : root.managementMode === "restack"
+                                ? Colors.orange
                                 : Colors.cyan
                             opacity: 0.46
                         }

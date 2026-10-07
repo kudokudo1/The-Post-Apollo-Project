@@ -38,7 +38,8 @@ require(GIT, "DockButton {", "Git must prove the reusable component")
 require(GIT, "open: menuOpen", "Git open state must drive the component")
 require(GIT, "contentGlowSource: gitMark", "Git glow must stay attached to the exact mark")
 require(GIT, "onLeftClicked:", "Git must use component left-click behavior")
-require(GIT, "onRightClicked:", "Git must use component right-click behavior")
+assert "signal rightClicked" not in GIT, "Git must inherit DockButton right-click signal without redeclaring it"
+assert "onRightClicked:" not in GIT, "Git must not recursively re-emit the inherited right-click signal"
 require(TEMPLATE, "DockButton {", "future button template must use reusable component")
 require(TEMPLATE, "contentGlowSource: templateText", "template must demonstrate exact content glow targeting")
 

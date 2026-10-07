@@ -1,0 +1,33 @@
+name: Hospital Chart Memory
+
+on:
+  pull_request:
+    paths:
+      - "services/hospital/HospitalChartService.qml"
+      - "widgets/HospitalChartsView.qml"
+      - "widgets/HospitalW.qml"
+      - "tests/hospital/test_chart_manager_contracts.py"
+      - ".github/workflows/hospital-chart-memory.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "services/hospital/HospitalChartService.qml"
+      - "widgets/HospitalChartsView.qml"
+      - "widgets/HospitalW.qml"
+      - "tests/hospital/test_chart_manager_contracts.py"
+      - ".github/workflows/hospital-chart-memory.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate Patient and Room Chart contracts
+        run: python3 tests/hospital/test_chart_manager_contracts.py

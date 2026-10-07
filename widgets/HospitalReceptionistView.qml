@@ -6,6 +6,7 @@ Rectangle {
     id: root
 
     required property var receptionistService
+    required property var speechInputService
 
     property string floorLabel: "NO FLOOR"
     property string roomLabel: "NO ROOM"
@@ -35,6 +36,60 @@ Rectangle {
         return Colors.cyan;
     }
 
+    function scrollTranscriptToBottom() {
+        Qt.callLater(function() {
+            transcript.contentY = Math.max(
+                0,
+                transcript.contentHeight - transcript.height
+            );
+        });
+    }
+
+    function submitReceptionInput() {
+        const message =
+            String(receptionInput.text || "").trim();
+
+        if (!message)
+            return false;
+
+        const accepted =
+            root.receptionistService.submit(message);
+
+        receptionInput.resetHistory();
+
+        if (accepted)
+            receptionInput.text = "";
+
+        root.scrollTranscriptToBottom();
+        return accepted;
+    }
+
+    function acceptVoiceTranscript(
+            textValue,
+            submitRequested) {
+        const spoken =
+            String(textValue || "").trim();
+
+        if (!spoken)
+            return false;
+
+        const existing =
+            String(receptionInput.text || "").trim();
+        const combined =
+            existing
+            ? existing + " " + spoken
+            : spoken;
+
+        receptionInput.resetHistory();
+        receptionInput.applyHistoryText(combined);
+        receptionInput.forceActiveFocus();
+
+        if (submitRequested)
+            root.submitReceptionInput();
+
+        return true;
+    }
+
     color: Colors.black
     border.width: 1
     border.color: Colors.magenta
@@ -44,6 +99,19 @@ Rectangle {
 
         function onRouteRequested(route) {
             root.routeRequested(route);
+        }
+    }
+
+    Connections {
+        target: root.speechInputService
+
+        function onTranscriptionReady(
+                text,
+                submitRequested) {
+            root.acceptVoiceTranscript(
+                text,
+                submitRequested
+            );
         }
     }
 
@@ -939,7 +1007,11 @@ Rectangle {
             spacing: 7
 
             Rectangle {
-                width: composer.width - sendButton.width - composer.spacing
+                width:
+                    composer.width
+                    - micButton.width
+                    - sendButton.width
+                    - (composer.spacing * 2)
                 height: composer.height
                 color: Colors.dark
                 border.width: receptionInput.activeFocus ? 2 : 1
@@ -1030,6 +1102,9 @@ Rectangle {
                     selectionColor: Colors.magenta
                     selectedTextColor: Colors.black
                     font.pixelSize: 11
+                    enabled:
+                        !root.speechInputService.stopping
+                        && !root.speechInputService.transcribing
 
                     onActiveFocusChanged:
                         root.typingChanged(activeFocus)
@@ -1052,25 +1127,19 @@ Rectangle {
                     }
 
                     Keys.onReturnPressed: function(event) {
-                        const message = String(text || "").trim();
-
-                        if (message) {
-                            const accepted =
-                                root.receptionistService.submit(message);
-
-                            resetHistory();
-
-                            if (accepted)
-                                text = "";
+                        if (root.speechInputService.recording) {
+                            root.speechInputService.stopRecording(true);
+                            event.accepted = true;
+                            return;
                         }
 
-                        Qt.callLater(function() {
-                            transcript.contentY = Math.max(
-                                0,
-                                transcript.contentHeight - transcript.height
-                            );
-                        });
+                        if (root.speechInputService.stopping
+                                || root.speechInputService.transcribing) {
+                            event.accepted = true;
+                            return;
+                        }
 
+                        root.submitReceptionInput();
                         event.accepted = true;
                     }
                 }
@@ -1083,10 +1152,93 @@ Rectangle {
                     }
 
                     visible: receptionInput.text.length === 0
-                    text: "ASK RECEPTION..."
+                    text:
+                        root.speechInputService.recording
+                        ? "LISTENING..."
+                        : root.speechInputService.stopping
+                          || root.speechInputService.transcribing
+                        ? "TRANSCRIBING..."
+                        : "ASK RECEPTION..."
                     font.pixelSize: 10
-                    color: Colors.white
-                    opacity: 0.38
+                    color:
+                        root.speechInputService.recording
+                        ? Colors.magenta
+                        : root.speechInputService.transcribing
+                        ? Colors.orange
+                        : Colors.white
+                    opacity:
+                        root.speechInputService.busy
+                        ? 0.82 : 0.38
+                }
+            }
+
+            Rectangle {
+                id: micButton
+
+                width: 42
+                height: composer.height
+                color:
+                    micMouse.pressed
+                    ? Colors.black
+                    : Colors.dark
+                border.width:
+                    root.speechInputService.recording
+                    || micMouse.containsMouse
+                    ? 2 : 1
+                border.color:
+                    root.speechInputService.recording
+                    ? Colors.magenta
+                    : root.speechInputService.stopping
+                      || root.speechInputService.transcribing
+                    ? Colors.orange
+                    : micMouse.containsMouse
+                    ? Colors.orange
+                    : root.speechInputService.backendReady
+                    ? Colors.cyan
+                    : Colors.magenta
+                opacity:
+                    root.speechInputService.stopping
+                    || root.speechInputService.transcribing
+                    ? 0.55
+                    : root.speechInputService.backendReady
+                    ? 1.0 : 0.48
+
+                GohuText {
+                    anchors.centerIn: parent
+                    anchors.verticalCenterOffset: 1
+                    text: "🎙︎"
+                    font.pixelSize: 22
+                    color:
+                        root.speechInputService.recording
+                        ? Colors.magenta
+                        : micMouse.containsMouse
+                        ? Colors.orange
+                        : root.speechInputService.backendReady
+                        ? Colors.cyan
+                        : Colors.magenta
+                }
+
+                MouseArea {
+                    id: micMouse
+
+                    anchors.fill: parent
+                    enabled:
+                        !root.speechInputService.stopping
+                        && !root.speechInputService.transcribing
+                    hoverEnabled: true
+                    cursorShape:
+                        enabled
+                        ? Qt.PointingHandCursor
+                        : Qt.ArrowCursor
+
+                    onClicked: {
+                        receptionInput.forceActiveFocus();
+
+                        if (root.speechInputService.recording)
+                            root.speechInputService.stopRecording(false);
+                        else
+                            root.speechInputService.startRecording();
+                    }
                 }
             }
 
@@ -1103,19 +1255,34 @@ Rectangle {
                     sendMouse.containsMouse
                     ? 2 : 1
                 border.color:
-                    sendMouse.containsMouse
+                    root.speechInputService.recording
+                    ? Colors.magenta
+                    : sendMouse.containsMouse
                     ? Colors.orange
                     : Colors.green
                 opacity:
-                    receptionInput.text.trim().length > 0
+                    root.speechInputService.recording
+                    || (
+                        !root.speechInputService.stopping
+                        && !root.speechInputService.transcribing
+                        && receptionInput.text.trim().length > 0
+                       )
                     ? 1.0 : 0.48
 
                 GohuText {
                     anchors.centerIn: parent
-                    text: "ASK"
+                    text:
+                        root.speechInputService.recording
+                        ? "SEND"
+                        : root.speechInputService.stopping
+                          || root.speechInputService.transcribing
+                        ? "..."
+                        : "ASK"
                     font.pixelSize: 11
                     color:
-                        sendMouse.containsMouse
+                        root.speechInputService.recording
+                        ? Colors.magenta
+                        : sendMouse.containsMouse
                         ? Colors.orange
                         : Colors.green
                 }
@@ -1124,7 +1291,13 @@ Rectangle {
                     id: sendMouse
 
                     anchors.fill: parent
-                    enabled: receptionInput.text.trim().length > 0
+                    enabled:
+                        root.speechInputService.recording
+                        || (
+                            !root.speechInputService.stopping
+                            && !root.speechInputService.transcribing
+                            && receptionInput.text.trim().length > 0
+                           )
                     hoverEnabled: true
                     cursorShape:
                         enabled
@@ -1132,22 +1305,18 @@ Rectangle {
                         : Qt.ArrowCursor
 
                     onClicked: {
-                        const message =
-                            String(receptionInput.text || "").trim();
+                        receptionInput.forceActiveFocus();
 
-                        root.receptionistService.submit(message);
-                        receptionInput.resetHistory();
-                        receptionInput.text = "";
+                        if (root.speechInputService.recording) {
+                            root.speechInputService.stopRecording(true);
+                            return;
+                        }
 
-                        Qt.callLater(function() {
-                            transcript.contentY = Math.max(
-                                0,
-                                transcript.contentHeight - transcript.height
-                            );
-                        });
+                        root.submitReceptionInput();
                     }
                 }
             }
+        }
         }
     }
 }

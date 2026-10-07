@@ -108,12 +108,6 @@ Scope {
     readonly property bool available:
         String(repositoryPath || "").trim().length > 0
 
-    function rowAt(index) {
-        if (index < 0 || index >= rows.length)
-            return null;
-        return rows[index];
-    }
-
     function resetLanes() {
         activeLanes = [];
     }

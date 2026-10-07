@@ -109,7 +109,7 @@ room_chat = ROOM_CHAT.read_text()
 assert 'property string providerId: ""' in room_chat
 assert 'property string doctorId: ""' in room_chat
 assert "readonly property string activeSessionId: adapter.activeSessionId" in room_chat
-assert "providerId: root.providerId" in room_chat
+assert "providerId: root.effectiveProviderId" in room_chat
 assert "doctorId: root.doctorId" in room_chat
 assert "workingDirectory: root.bedPath" in room_chat
 assert 'return root.providerId ? "READY TO CONNECT" : "ROOM CHAT";' in room_chat

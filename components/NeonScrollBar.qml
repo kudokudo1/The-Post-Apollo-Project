@@ -31,6 +31,8 @@ Item {
     property bool interactive: true
     property bool wheelEnabled: true
     property bool clickToJump: true
+    property bool preserveDragOffset: false
+    property int pointerCursorShape: Qt.PointingHandCursor
     property bool autoHide: true
     property real scrollThreshold: 1
 
@@ -51,6 +53,15 @@ Item {
     property int handleBorderWidth: 1
     property color handleBorderColor: handleColor
     property bool handleGlowEnabled: true
+    property string handleGlowStyle: "rectangular"
+    readonly property bool dropHandleGlow:
+        String(root.handleGlowStyle || "").toLowerCase() === "drop"
+
+    // Safe DropShadow mode, used by legacy surfaces such as Notifications.
+    property real handleDropGlowRadius: 10
+    property int handleDropGlowSamples: 13
+    property real handleDropGlowIdleOpacity: 0.60
+    property real handleDropGlowHoverOpacity: 0.60
 
     // Normal bar glow.
     property real barGlowIdleSpread: 2
@@ -174,7 +185,7 @@ Item {
               );
     }
 
-    function scrollTo(mouseY) {
+    function scrollTo(mouseY, handleOffset) {
         if (!flickable || !root.interactive)
             return;
 
@@ -183,9 +194,13 @@ Item {
             0,
             root.height - extent
         );
+        const offset =
+            handleOffset === undefined || handleOffset === null
+            ? extent / 2
+            : Number(handleOffset);
         const target =
             Number(mouseY || 0)
-            - extent / 2;
+            - offset;
 
         const ratio =
             travel > 0
@@ -252,6 +267,28 @@ Item {
             : barHandleComponent
     }
 
+    SafeDropShadow {
+        anchors.fill: handleLoader
+
+        safeSource: handleLoader.item
+        requestedVisible:
+            root.handleGlowEnabled
+            && root.dropHandleGlow
+
+        horizontalOffset: 0
+        verticalOffset: 0
+        radius: root.handleDropGlowRadius
+        samples: root.handleDropGlowSamples
+
+        color: root.handleColor
+        opacity:
+            handleMouse.containsMouse
+            ? root.handleDropGlowHoverOpacity
+            : root.handleDropGlowIdleOpacity
+
+        transparentBorder: true
+    }
+
     Component {
         id: barHandleComponent
 
@@ -269,7 +306,9 @@ Item {
                 anchors.fill: parent
                 z: -1
 
-                visible: root.handleGlowEnabled
+                visible:
+                    root.handleGlowEnabled
+                    && !root.dropHandleGlow
 
                 spread:
                     handleMouse.containsMouse
@@ -353,7 +392,9 @@ Item {
                 anchors.fill: parent
                 z: -1
 
-                visible: root.handleGlowEnabled
+                visible:
+                    root.handleGlowEnabled
+                    && !root.dropHandleGlow
 
                 spread:
                     handleMouse.containsMouse
@@ -379,17 +420,35 @@ Item {
         hoverEnabled: true
         cursorShape:
             root.interactive
-            ? Qt.PointingHandCursor
+            ? root.pointerCursorShape
             : Qt.ArrowCursor
 
+        property real dragOffset: 0
+
         onPressed: function(mouse) {
+            const extent = root.activeHandleExtent();
+            const handleTop = root.handleY();
+            const insideHandle =
+                mouse.y >= handleTop
+                && mouse.y <= handleTop + extent;
+
+            dragOffset =
+                root.preserveDragOffset && insideHandle
+                ? mouse.y - handleTop
+                : extent / 2;
+
             if (root.clickToJump)
-                root.scrollTo(mouse.y);
+                root.scrollTo(mouse.y, dragOffset);
         }
 
         onPositionChanged: function(mouse) {
             if (pressed)
-                root.scrollTo(mouse.y);
+                root.scrollTo(
+                    mouse.y,
+                    root.preserveDragOffset
+                    ? dragOffset
+                    : undefined
+                );
         }
 
         onWheel: function(wheel) {

@@ -2354,106 +2354,41 @@ PanelWindow {
 
                 // ===== CUSTOM SCROLL BAR ========================
 
-                Item {
+                NeonScrollBar {
                     id: scrollBarArea
 
-                    anchors {
-                        top: parent.top
-                        bottom: parent.bottom
-                        right: parent.right
-                    }
+                    flickable: historyList
 
-                    width: root.scrollBarAreaWidth
+                    x: parent.width - width
+                    y: 0
+                    height: parent.height
+                    z: 0
 
-                    visible: root.activeFilter !== "manager" && historyList.contentHeight > historyList.height + 1
+                    barAreaWidth: root.scrollBarAreaWidth
+                    railWidth: root.scrollTrackWidth
+                    barHandleWidth: root.scrollThumbWidth
+                    minimumHandleHeight: root.scrollThumbMinHeight
 
-                    function scrollTo(localY) {
-                        var scrollable = Math.max(0, historyList.contentHeight - historyList.height);
+                    railColor: Colors.cyan
+                    railOpacity: 0.52
+                    railRadius: 0
+                    railGlowEnabled: false
 
-                        if (scrollable <= 0)
-                            return;
+                    handleColor: Colors.magenta
+                    barHandleRadius: 0
+                    handleBorderWidth: 0
+                    handleGlowStyle: "drop"
+                    handleDropGlowRadius: 10
+                    handleDropGlowSamples: 13
+                    handleDropGlowIdleOpacity: 0.60
+                    handleDropGlowHoverOpacity: 0.60
 
-                        var available = Math.max(1, scrollTrack.height - scrollThumb.height);
+                    wheelEnabled: false
+                    pointerCursorShape: Qt.ArrowCursor
 
-                        var target = localY - (scrollThumb.height / 2);
-
-                        var fraction = Math.max(0, Math.min(1, target / available));
-
-                        historyList.contentY = fraction * scrollable;
-                    }
-
-                    Rectangle {
-                        id: scrollTrack
-
-                        anchors {
-                            top: parent.top
-                            bottom: parent.bottom
-                            horizontalCenter: parent.horizontalCenter
-                        }
-
-                        width: root.scrollTrackWidth
-
-                        color: Colors.cyan
-
-                        opacity: 0.52
-                    }
-
-                    Rectangle {
-                        id: scrollThumb
-
-                        anchors.horizontalCenter: parent.horizontalCenter
-
-                        width: root.scrollThumbWidth
-
-                        height: Math.max(root.scrollThumbMinHeight, scrollTrack.height * Math.min(1, historyList.height / Math.max(1, historyList.contentHeight)))
-
-                        y: {
-                            var scrollable = Math.max(0, historyList.contentHeight - historyList.height);
-
-                            var available = Math.max(0, scrollTrack.height - scrollThumb.height);
-
-                            if (scrollable <= 0)
-                                return 0;
-
-                            var fraction = Math.max(0, Math.min(1, historyList.contentY / scrollable));
-
-                            return fraction * available;
-                        }
-
-                        color: Colors.magenta
-                    }
-
-                    SafeDropShadow {
-                        anchors.fill: scrollThumb
-
-                        safeSource: scrollThumb
-                        horizontalOffset: 0
-                        verticalOffset: 0
-
-                        radius: 10
-                        samples: 13
-
-                        color: Colors.magenta
-
-                        opacity: 0.60
-
-                        transparentBorder: true
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-
-                        hoverEnabled: true
-
-                        onPressed: function (mouse) {
-                            scrollBarArea.scrollTo(mouse.y);
-                        }
-
-                        onPositionChanged: function (mouse) {
-                            if (pressed)
-                                scrollBarArea.scrollTo(mouse.y);
-                        }
-                    }
+                    visible:
+                        root.activeFilter !== "manager"
+                        && scrollable
                 }
             }
         }

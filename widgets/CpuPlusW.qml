@@ -2144,168 +2144,48 @@ PanelWindow {
             }
         }
         // AppControl selector scrollbar geometry.
-        Rectangle {
+        NeonScrollBar {
             id: targetScrollTrack
 
-            width: 10
+            flickable: monitorSelectorScroll
 
-            anchors.top: targetSubModeStrip.bottom
-            anchors.bottom: parent.bottom
-            anchors.right: parent.right
+            x: parent.width - width - 3
+            y: monitorSelectorScroll.y + 2
+            height: Math.max(0, monitorSelectorScroll.height - 2)
+            z: 300
 
-            anchors.topMargin: 10
-            anchors.bottomMargin: 8
-            anchors.rightMargin: 3
+            barAreaWidth: 10
+            railWidth: 10
+            barHandleWidth: 6
+            minimumHandleHeight: 30
+            scrollThreshold: 0
 
-            color:
+            railColor:
                 cpuPlusWindow.selectedModeIndex === 2
                 ? Colors.orange
                 : Colors.cyan
+            railOpacity: 0.90
+            railRadius: 0
+            railGlowSpread: 2
+            railGlowOpacity: 0.24
 
-            opacity:
-                monitorSelectorScroll.contentHeight
-                > monitorSelectorScroll.height
-                ? 0.90 : 0.0
+            handleColor: Colors.magenta
+            handleOpacity: 0.90
+            barHandleRadius: 0
+            handleBorderWidth: 0
+            barGlowIdleSpread: 2
+            barGlowHoverSpread: 2
+            barGlowIdleOpacity: 0.28
+            barGlowHoverOpacity: 0.28
+
+            preserveDragOffset: true
+            wheelEnabled: false
+            pointerCursorShape: Qt.ArrowCursor
 
             visible:
                 (cpuPlusWindow.selectedModeIndex === 2
                  || cpuPlusWindow.selectedModeIndex === 3)
-                && opacity > 0.0
-
-            z: 300
-
-            property real maxContentY:
-                Math.max(
-                    0,
-                    monitorSelectorScroll.contentHeight
-                    - monitorSelectorScroll.height
-                )
-
-            property real handleTravel:
-                Math.max(
-                    0,
-                    height - targetScrollHandle.height
-                )
-
-            function setScrollFromHandleY(handleY) {
-                if (maxContentY <= 0 || handleTravel <= 0)
-                    return;
-
-                const clampedY =
-                    Math.max(
-                        0,
-                        Math.min(handleTravel, handleY)
-                    );
-
-                monitorSelectorScroll.contentY =
-                    (clampedY / handleTravel) * maxContentY;
-            }
-
-            RectangularShadow {
-                anchors.fill: parent
-                spread: 2
-                z: -1
-                opacity: 0.24
-                color: parent.color
-            }
-
-            Rectangle {
-                id: targetScrollHandle
-
-                width: 6
-                anchors.horizontalCenter: parent.horizontalCenter
-
-                height:
-                    Math.max(
-                        30,
-                        parent.height
-                        * Math.min(
-                            1.0,
-                            monitorSelectorScroll.visibleArea.heightRatio
-                        )
-                    )
-
-                y: {
-                    const ratio =
-                        Math.max(
-                            0.0,
-                            Math.min(
-                                1.0,
-                                Number(
-                                    monitorSelectorScroll.visibleArea.heightRatio
-                                    || 0
-                                )
-                            )
-                        );
-
-                    const maxPosition =
-                        Math.max(0.0, 1.0 - ratio);
-
-                    const position =
-                        Math.max(
-                            0.0,
-                            Math.min(
-                                maxPosition,
-                                Number(
-                                    monitorSelectorScroll.visibleArea.yPosition
-                                    || 0
-                                )
-                            )
-                        );
-
-                    if (maxPosition <= 0
-                            || targetScrollTrack.handleTravel <= 0)
-                        return 0;
-
-                    return (
-                        position / maxPosition
-                    ) * targetScrollTrack.handleTravel;
-                }
-
-                color: Colors.magenta
-
-                RectangularShadow {
-                    anchors.fill: parent
-                    spread: 2
-                    z: -1
-                    opacity: 0.28
-                    color: Colors.magenta
-                }
-            }
-
-            MouseArea {
-                id: targetScrollMouse
-
-                anchors.fill: parent
-                hoverEnabled: true
-                acceptedButtons: Qt.LeftButton
-
-                property real dragOffset: 0
-
-                onPressed: function(mouse) {
-                    const handleTop = targetScrollHandle.y;
-                    const handleBottom =
-                        targetScrollHandle.y
-                        + targetScrollHandle.height;
-
-                    dragOffset =
-                        mouse.y >= handleTop
-                        && mouse.y <= handleBottom
-                        ? mouse.y - handleTop
-                        : targetScrollHandle.height / 2;
-
-                    targetScrollTrack.setScrollFromHandleY(
-                        mouse.y - dragOffset
-                    );
-                }
-
-                onPositionChanged: function(mouse) {
-                    if (pressed)
-                        targetScrollTrack.setScrollFromHandleY(
-                            mouse.y - dragOffset
-                        );
-                }
-            }
+                && scrollable
         }
 
     }

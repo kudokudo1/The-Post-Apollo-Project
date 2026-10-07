@@ -2069,130 +2069,40 @@ Item {
                         }
                     }
 
-                    Rectangle {
+                    NeonScrollBar {
                         id: taskProcessScopeScrollTrack
-                        width: 8
-                        anchors.top: taskProcessScopeHeader.bottom
-                        anchors.bottom: parent.bottom
-                        anchors.right: parent.right
-                        anchors.topMargin: 4
-                        anchors.bottomMargin: 6
-                        anchors.rightMargin: 4
 
-                        color: taskProcessScopeInfo.border.color
-                        opacity:
-                            taskProcessScopeFlick.contentHeight
-                            > taskProcessScopeFlick.height + 1
-                            ? 0.90 : 0.0
-                        visible: opacity > 0.0
+                        flickable: taskProcessScopeFlick
+
+                        x: parent.width - width - 4
+                        y: taskProcessScopeFlick.y
+                        height: taskProcessScopeFlick.height
                         z: 20
 
-                        property real maxContentY:
-                            Math.max(
-                                0,
-                                taskProcessScopeFlick.contentHeight
-                                - taskProcessScopeFlick.height
-                            )
-                        property real handleTravel:
-                            Math.max(
-                                0,
-                                height - taskProcessScopeScrollHandle.height
-                            )
+                        barAreaWidth: 8
+                        railWidth: 8
+                        barHandleWidth: 5
+                        minimumHandleHeight: 18
 
-                        function setScrollFromHandleY(handleY) {
-                            if (maxContentY <= 0 || handleTravel <= 0)
-                                return;
+                        railColor: taskProcessScopeInfo.border.color
+                        railOpacity: 0.90
+                        railRadius: 0
+                        railGlowEnabled: false
 
-                            const clampedY = Math.max(
-                                0,
-                                Math.min(handleTravel, handleY)
-                            );
+                        handleColor: Colors.magenta
+                        handleOpacity: 0.90
+                        barHandleRadius: 0
+                        handleBorderWidth: 0
+                        barGlowIdleSpread: 2
+                        barGlowHoverSpread: 2
+                        barGlowIdleOpacity: 0.22
+                        barGlowHoverOpacity: 0.22
 
-                            taskProcessScopeFlick.contentY =
-                                (clampedY / handleTravel) * maxContentY;
-                        }
+                        preserveDragOffset: true
+                        wheelEnabled: false
+                        pointerCursorShape: Qt.ArrowCursor
 
-                        Rectangle {
-                            id: taskProcessScopeScrollHandle
-                            width: 5
-                            anchors.horizontalCenter: parent.horizontalCenter
-
-                            height: Math.max(
-                                18,
-                                parent.height * Math.min(
-                                    1.0,
-                                    taskProcessScopeFlick.visibleArea.heightRatio
-                                )
-                            )
-
-                            y: {
-                                if (taskProcessScopeScrollTrack.maxContentY <= 0
-                                        || taskProcessScopeScrollTrack.handleTravel <= 0)
-                                    return 0;
-
-                                const clampedContentY = Math.max(
-                                    0,
-                                    Math.min(
-                                        taskProcessScopeScrollTrack.maxContentY,
-                                        taskProcessScopeFlick.contentY
-                                    )
-                                );
-
-                                return (
-                                    clampedContentY
-                                    / taskProcessScopeScrollTrack.maxContentY
-                                ) * taskProcessScopeScrollTrack.handleTravel;
-                            }
-
-                            color: Colors.magenta
-
-                            RectangularShadow {
-                                anchors.fill: parent
-                                spread: 2
-                                z: -1
-                                opacity: 0.22
-                                color: Colors.magenta
-                            }
-                        }
-
-                        MouseArea {
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            acceptedButtons: Qt.LeftButton
-                            property real dragOffset: 0
-
-                            onPressed: function(mouse) {
-                                const handleTop = taskProcessScopeScrollHandle.y;
-                                const handleBottom =
-                                    taskProcessScopeScrollHandle.y
-                                    + taskProcessScopeScrollHandle.height;
-
-                                if (mouse.y >= handleTop && mouse.y <= handleBottom)
-                                    dragOffset =
-                                        mouse.y - taskProcessScopeScrollHandle.y;
-                                else {
-                                    dragOffset =
-                                        taskProcessScopeScrollHandle.height / 2;
-
-                                    taskProcessScopeScrollTrack.setScrollFromHandleY(
-                                        mouse.y - dragOffset
-                                    );
-                                }
-
-                                mouse.accepted = true;
-                            }
-
-                            onPositionChanged: function(mouse) {
-                                if (pressed)
-                                    taskProcessScopeScrollTrack.setScrollFromHandleY(
-                                        mouse.y - dragOffset
-                                    );
-                            }
-
-                            onWheel: function(wheel) {
-                                wheel.accepted = false;
-                            }
-                        }
+                        visible: scrollable
                     }
                 }
 

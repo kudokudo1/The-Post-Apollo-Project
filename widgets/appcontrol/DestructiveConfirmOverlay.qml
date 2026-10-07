@@ -148,125 +148,40 @@ Rectangle {
                 }
             }
 
-            Rectangle {
+            NeonScrollBar {
                 id: destructiveConfirmMessageScrollTrack
-                width: 9
-                anchors.top: parent.top
-                anchors.bottom: parent.bottom
-                anchors.right: parent.right
-                anchors.topMargin: 5
-                anchors.bottomMargin: 5
-                anchors.rightMargin: 4
-                color: Colors.red
-                opacity:
-                    destructiveConfirmMessageFlick.contentHeight
-                    > destructiveConfirmMessageFlick.height + 1
-                    ? 0.92 : 0.0
-                visible: opacity > 0.0
+
+                flickable: destructiveConfirmMessageFlick
+
+                x: parent.width - width - 4
+                y: 5
+                height: Math.max(0, parent.height - 10)
                 z: 20
 
-                property real maxContentY:
-                    Math.max(
-                        0,
-                        destructiveConfirmMessageFlick.contentHeight
-                        - destructiveConfirmMessageFlick.height
-                    )
-                property real handleTravel:
-                    Math.max(
-                        0,
-                        height - destructiveConfirmMessageScrollHandle.height
-                    )
+                barAreaWidth: 9
+                railWidth: 9
+                barHandleWidth: 6
+                minimumHandleHeight: 24
 
-                function setScrollFromHandleY(handleY) {
-                    if (maxContentY <= 0 || handleTravel <= 0)
-                        return;
+                railColor: Colors.red
+                railOpacity: 0.92
+                railRadius: 0
+                railGlowEnabled: false
 
-                    const yValue = Math.max(
-                        0,
-                        Math.min(handleTravel, handleY)
-                    );
+                handleColor: Colors.magenta
+                handleOpacity: 0.92
+                barHandleRadius: 0
+                handleBorderWidth: 0
+                barGlowIdleSpread: 2
+                barGlowHoverSpread: 2
+                barGlowIdleOpacity: 0.28
+                barGlowHoverOpacity: 0.28
 
-                    destructiveConfirmMessageFlick.contentY =
-                        (yValue / handleTravel) * maxContentY;
-                }
+                preserveDragOffset: true
+                wheelEnabled: false
+                pointerCursorShape: Qt.ArrowCursor
 
-                Rectangle {
-                    id: destructiveConfirmMessageScrollHandle
-                    width: 6
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    height: Math.max(
-                        24,
-                        parent.height * Math.min(
-                            1.0,
-                            destructiveConfirmMessageFlick.visibleArea.heightRatio
-                        )
-                    )
-                    y: {
-                        if (destructiveConfirmMessageScrollTrack.maxContentY <= 0
-                                || destructiveConfirmMessageScrollTrack.handleTravel <= 0)
-                            return 0;
-
-                        const value = Math.max(
-                            0,
-                            Math.min(
-                                destructiveConfirmMessageScrollTrack.maxContentY,
-                                destructiveConfirmMessageFlick.contentY
-                            )
-                        );
-
-                        return (
-                            value
-                            / destructiveConfirmMessageScrollTrack.maxContentY
-                        ) * destructiveConfirmMessageScrollTrack.handleTravel;
-                    }
-                    color: Colors.magenta
-
-                    RectangularShadow {
-                        anchors.fill: parent
-                        spread: 2
-                        z: -1
-                        opacity: 0.28
-                        color: Colors.magenta
-                    }
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    acceptedButtons: Qt.LeftButton
-                    property real dragOffset: 0
-
-                    onPressed: function(mouse) {
-                        const top = destructiveConfirmMessageScrollHandle.y;
-                        const bottom =
-                            destructiveConfirmMessageScrollHandle.y
-                            + destructiveConfirmMessageScrollHandle.height;
-
-                        if (mouse.y >= top && mouse.y <= bottom)
-                            dragOffset =
-                                mouse.y - destructiveConfirmMessageScrollHandle.y;
-                        else {
-                            dragOffset =
-                                destructiveConfirmMessageScrollHandle.height / 2;
-                            destructiveConfirmMessageScrollTrack.setScrollFromHandleY(
-                                mouse.y - dragOffset
-                            );
-                        }
-
-                        mouse.accepted = true;
-                    }
-
-                    onPositionChanged: function(mouse) {
-                        if (pressed)
-                            destructiveConfirmMessageScrollTrack.setScrollFromHandleY(
-                                mouse.y - dragOffset
-                            );
-                    }
-
-                    onWheel: function(wheel) {
-                        wheel.accepted = false;
-                    }
-                }
+                visible: scrollable
             }
         }
 

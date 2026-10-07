@@ -23,7 +23,14 @@ Scope {
     property int messageLimit: 100
     property string operatorId: "operator"
 
+    property bool bindingRoom: false
+    property string bindError: ""
+    property string bindingRoomId: ""
+    property var boundRoomResult: null
+    property var queuedRoomBinding: null
+
     signal messageSent
+    signal roomBound(var room)
 
     function pxArgs(args) {
         const suffix = Array.isArray(args) ? args : [];
@@ -33,6 +40,95 @@ Scope {
             'exec "$HOME/.local/bin/px" "$@"',
             "hospital-room-conversation"
         ].concat(suffix);
+    }
+
+    function bindRoom(roomValue) {
+        const room = roomValue || {};
+        const roomId = String(room.id || room.roomId || "").trim();
+        const repository = String(room.repository || "").trim();
+
+        if (!roomId || !repository) {
+            bindError = "HOSPITAL ROOM BIND // ROOM AND REPOSITORY REQUIRED";
+            return false;
+        }
+
+        if (bindProcess.running || bindingRoom) {
+            queuedRoomBinding = Object.assign({}, room);
+            return false;
+        }
+
+        selectedConversationId = roomId;
+        bindingRoom = true;
+        bindingRoomId = roomId;
+        boundRoomResult = null;
+        bindError = "";
+
+        const args = [
+            "hospital",
+            "room-bind",
+            roomId,
+            "--repository",
+            repository
+        ];
+
+        const patientId = String(room.patientId || "").trim();
+        const patientLabel = String(room.patientLabel || "").trim();
+        const team = String(room.team || roomId).trim();
+        const branch = String(room.branch || "").trim();
+        const bedPath = String(room.bedPath || "").trim();
+        const doctorId = String(room.doctorId || "").trim();
+        const assignmentId = String(room.assignmentId || "").trim();
+
+        if (patientId) {
+            args.push("--patient-id");
+            args.push(patientId);
+        }
+
+        if (patientLabel) {
+            args.push("--patient-label");
+            args.push(patientLabel);
+        }
+
+        if (team) {
+            args.push("--team");
+            args.push(team);
+        }
+
+        if (branch) {
+            args.push("--branch");
+            args.push(branch);
+        }
+
+        if (bedPath) {
+            args.push("--bed-path");
+            args.push(bedPath);
+        }
+
+        if (doctorId) {
+            args.push("--doctor-id");
+            args.push(doctorId);
+        }
+
+        if (assignmentId) {
+            args.push("--assignment-id");
+            args.push(assignmentId);
+        }
+
+        args.push("--json");
+        bindProcess.exec(pxArgs(args));
+        return true;
+    }
+
+    function runQueuedRoomBind() {
+        const next = queuedRoomBinding;
+
+        if (!next)
+            return;
+
+        queuedRoomBinding = null;
+        Qt.callLater(function() {
+            adapter.bindRoom(next);
+        });
     }
 
     function refresh() {
@@ -126,6 +222,56 @@ Scope {
         if (selectedConversationId)
             refreshMessages();
         refresh();
+    }
+
+    Process {
+        id: bindProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const body = String(this.text || "").trim();
+
+                if (!body)
+                    return;
+
+                try {
+                    adapter.boundRoomResult = JSON.parse(body);
+                } catch (parseError) {
+                    adapter.bindError =
+                        "HOSPITAL ROOM BIND // "
+                        + String(parseError);
+                }
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                const detail = String(this.text || "").trim();
+                if (detail)
+                    adapter.bindError = detail;
+            }
+        }
+
+        onExited: function(code, exitStatus) {
+            const roomId = adapter.bindingRoomId;
+            adapter.bindingRoom = false;
+            adapter.bindingRoomId = "";
+
+            if (Number(code) === 0
+                    && !adapter.bindError
+                    && adapter.boundRoomResult) {
+                adapter.roomBound(adapter.boundRoomResult);
+                adapter.refresh();
+
+                if (adapter.selectedConversationId === roomId)
+                    adapter.refreshMessages();
+            } else if (!adapter.bindError) {
+                adapter.bindError =
+                    "PX HOSPITAL ROOM BIND EXIT " + String(code);
+            }
+
+            adapter.runQueuedRoomBind();
+        }
     }
 
     Process {

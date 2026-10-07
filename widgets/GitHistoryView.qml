@@ -17,6 +17,10 @@ Item {
     property string resetMode: "mixed"
     property string selectedQuerySha: ""
     property string selectedReflogSha: ""
+    property string selectedReflogSelector: ""
+    property string selectedReflogSubject: ""
+    property bool selectedReflogReachable: false
+    property bool selectedReflogIsHead: false
     property string selectedCommitRefs: ""
     property string armedAction: ""
     property int ancestryParentIndex: 0
@@ -387,6 +391,104 @@ Item {
             && String(queryRangeInput.text || "").trim()
                === String(root.historyService.queryRange || "")
         );
+    }
+
+    function recoveryDefaultName() {
+        if (!root.selectedReflogSha)
+            return "";
+
+        return "recovery/" + root.selectedReflogSha.slice(0, 8);
+    }
+
+    function reflogStateLabel(row) {
+        const item = row || {};
+
+        if (Boolean(item.isHead))
+            return "CURRENT HEAD";
+        if (Boolean(item.reachable))
+            return "REACHABLE";
+        return "RECOVERY CANDIDATE";
+    }
+
+    function selectedReflogStateLabel() {
+        if (!root.selectedReflogSha)
+            return "NO SELECTION";
+
+        if (root.selectedReflogIsHead)
+            return "CURRENT HEAD";
+        if (root.selectedReflogReachable)
+            return "REACHABLE";
+        return "RECOVERY CANDIDATE";
+    }
+
+    function selectReflogEntry(row) {
+        const item = row || {};
+
+        root.selectedReflogSha = String(item.sha || "");
+        root.selectedReflogSelector =
+            String(item.selector || "");
+        root.selectedReflogSubject =
+            String(item.subject || "");
+        root.selectedReflogReachable =
+            Boolean(item.reachable);
+        root.selectedReflogIsHead =
+            Boolean(item.isHead);
+        root.selectedCommitRefs = "";
+
+        if (root.historyService && root.selectedReflogSha)
+            root.historyService.showCommit(
+                root.selectedReflogSha
+            );
+    }
+
+    function reconcileSelectedReflog() {
+        if (!root.historyService || !root.selectedReflogSha)
+            return;
+
+        const rows = root.historyService.reflogRows || [];
+
+        for (let i = 0; i < rows.length; ++i) {
+            const row = rows[i] || {};
+
+            if (String(row.sha || "") !== root.selectedReflogSha)
+                continue;
+
+            root.selectedReflogSelector =
+                String(row.selector || "");
+            root.selectedReflogSubject =
+                String(row.subject || "");
+            root.selectedReflogReachable =
+                Boolean(row.reachable);
+            root.selectedReflogIsHead =
+                Boolean(row.isHead);
+            return;
+        }
+
+        root.selectedReflogSha = "";
+        root.selectedReflogSelector = "";
+        root.selectedReflogSubject = "";
+        root.selectedReflogReachable = false;
+        root.selectedReflogIsHead = false;
+    }
+
+    function openReflogResultInLog() {
+        if (!root.historyService || !root.selectedReflogSha)
+            return;
+
+        const sha = root.selectedReflogSha;
+
+        root.pendingScopeRef = "ALL";
+        root.syncScopeIndex("ALL");
+        root.searchQuery = sha.slice(0, 8);
+        searchInput.text = root.searchQuery;
+        root.subMode = "log";
+
+        root.historyService.refresh(
+            "ALL",
+            root.historyService.selectedMode
+        );
+
+        root.historyService.showCommit(sha);
     }
 
     function openQueryResultInLog() {
@@ -2111,7 +2213,7 @@ Item {
                                             required property var modelData
 
                                             width: reflogColumn.width
-                                            height: 52
+                                            height: 62
                                             color:
                                                 reflogMouse.containsMouse
                                                 || root.selectedReflogSha
@@ -2134,9 +2236,8 @@ Item {
                                                 GohuText {
                                                     width: parent.width
                                                     text:
-                                                        String(
-                                                            reflogRow.modelData.selector
-                                                            || ""
+                                                        root.reflogStateLabel(
+                                                            reflogRow.modelData
                                                         )
                                                         + " // "
                                                         + String(
@@ -2144,7 +2245,29 @@ Item {
                                                             || ""
                                                         )
                                                     font.pixelSize: 10
-                                                    color: Colors.magenta
+                                                    color:
+                                                        Boolean(
+                                                            reflogRow.modelData.isHead
+                                                        )
+                                                        ? Colors.green
+                                                        : Boolean(
+                                                            reflogRow.modelData.reachable
+                                                          )
+                                                        ? Colors.cyan
+                                                        : Colors.magenta
+                                                    elide: Text.ElideRight
+                                                }
+
+                                                GohuText {
+                                                    width: parent.width
+                                                    text:
+                                                        String(
+                                                            reflogRow.modelData.selector
+                                                            || ""
+                                                        )
+                                                    font.pixelSize: 9
+                                                    color: Colors.orange
+                                                    opacity: 0.78
                                                     elide: Text.ElideRight
                                                 }
 
@@ -2168,17 +2291,10 @@ Item {
                                                 hoverEnabled: true
                                                 cursorShape: Qt.PointingHandCursor
 
-                                                onClicked: {
-                                                    root.selectedReflogSha =
-                                                        String(
-                                                            reflogRow.modelData.sha
-                                                            || ""
-                                                        );
-                                                    root.selectedCommitRefs = "";
-                                                    root.historyService.showCommit(
-                                                        root.selectedReflogSha
-                                                    );
-                                                }
+                                                onClicked:
+                                                    root.selectReflogEntry(
+                                                        reflogRow.modelData
+                                                    )
                                             }
                                         }
                                     }
@@ -2223,15 +2339,116 @@ Item {
                             elide: Text.ElideMiddle
                         }
 
-                        EditorBox {
-                            id: recoveryBranchInput
-
+                        Rectangle {
                             width: parent.width
-                            placeholder: "RECOVERY BRANCH NAME"
-                            accent: Colors.green
-                            keyboardOwner: root.keyboardHost
-                            editorFontSize: 10
-                            placeholderFontSize: 9
+                            height: 68
+                            color: Colors.dark
+                            border.width: 1
+                            border.color:
+                                root.selectedReflogIsHead
+                                ? Colors.green
+                                : root.selectedReflogReachable
+                                ? Colors.cyan
+                                : root.selectedReflogSha
+                                ? Colors.magenta
+                                : Colors.cyan
+
+                            Column {
+                                anchors {
+                                    fill: parent
+                                    margins: 7
+                                }
+                                spacing: 4
+
+                                GohuText {
+                                    width: parent.width
+                                    text:
+                                        root.selectedReflogStateLabel()
+                                        + (
+                                            root.selectedReflogSelector
+                                            ? " // "
+                                              + root.selectedReflogSelector
+                                            : ""
+                                          )
+                                    font.pixelSize: 10
+                                    color:
+                                        root.selectedReflogIsHead
+                                        ? Colors.green
+                                        : root.selectedReflogReachable
+                                        ? Colors.cyan
+                                        : root.selectedReflogSha
+                                        ? Colors.magenta
+                                        : Colors.cyan
+                                    elide: Text.ElideMiddle
+                                }
+
+                                GohuText {
+                                    width: parent.width
+                                    text:
+                                        root.selectedReflogIsHead
+                                        ? "This entry is the current HEAD."
+                                        : root.selectedReflogReachable
+                                        ? "This commit is already reachable from a current ref. A new branch is optional."
+                                        : root.selectedReflogSha
+                                        ? "This commit is not reachable from current refs. Creating a branch preserves it without moving HEAD."
+                                        : "Select an entry to inspect its recovery state."
+                                    font.pixelSize: 9
+                                    color: Colors.white
+                                    opacity: 0.66
+                                    wrapMode: Text.WordWrap
+                                }
+
+                                GohuText {
+                                    width: parent.width
+                                    text:
+                                        root.historyService
+                                        ? (
+                                            "LIVE // "
+                                            + (
+                                                root.historyService.reflogBranch
+                                                || "DETACHED"
+                                              )
+                                            + " @ "
+                                            + String(
+                                                root.historyService.reflogHeadSha
+                                                || ""
+                                              ).slice(0, 8)
+                                          )
+                                        : ""
+                                    font.pixelSize: 8
+                                    color: Colors.orange
+                                    elide: Text.ElideRight
+                                }
+                            }
+                        }
+
+                        Row {
+                            width: parent.width
+                            height: 30
+                            spacing: 6
+
+                            EditorBox {
+                                id: recoveryBranchInput
+
+                                width: parent.width - 96
+                                placeholder: "RECOVERY BRANCH NAME"
+                                accent: Colors.green
+                                keyboardOwner: root.keyboardHost
+                                editorFontSize: 10
+                                placeholderFontSize: 9
+                            }
+
+                            MiniButton {
+                                width: 90
+                                height: 30
+                                label: "AUTO NAME"
+                                accent: Colors.cyan
+                                enabledAction:
+                                    root.selectedReflogSha.length > 0
+                                onTriggered:
+                                    recoveryBranchInput.text =
+                                        root.recoveryDefaultName()
+                            }
                         }
 
                         Row {
@@ -2242,7 +2459,12 @@ Item {
                             MiniButton {
                                 width: (parent.width - 12) / 3
                                 height: 30
-                                label: "RECOVER BRANCH"
+                                label:
+                                    root.selectedReflogIsHead
+                                    ? "BRANCH HEAD"
+                                    : root.selectedReflogReachable
+                                    ? "SAVE BRANCH"
+                                    : "RECOVER BRANCH"
                                 accent: Colors.green
                                 enabledAction:
                                     root.selectedReflogSha.length > 0
@@ -2277,11 +2499,8 @@ Item {
                                 accent: Colors.cyan
                                 enabledAction:
                                     root.selectedReflogSha.length > 0
-                                onTriggered: {
-                                    searchInput.text =
-                                        root.selectedReflogSha.slice(0, 8);
-                                    root.subMode = "log";
-                                }
+                                onTriggered:
+                                    root.openReflogResultInLog()
                             }
                         }
 
@@ -2916,6 +3135,10 @@ Item {
                 || root.historyService.selectedRef
                 || "ALL"
             );
+        }
+
+        function onReflogRowsChanged() {
+            root.reconcileSelectedReflog();
         }
     }
 

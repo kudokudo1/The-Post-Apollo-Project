@@ -11,23 +11,35 @@ Scope {
 
     property var patientEntries: []
     property var roomEntries: []
+    property var patientSuggestions: []
+    property var roomSuggestions: []
 
     property bool patientLoading: false
     property bool roomLoading: false
+    property bool patientSuggestionLoading: false
+    property bool roomSuggestionLoading: false
     property bool writing: false
+    property bool suggestionWriting: false
     property string lastError: ""
     property var lastWriteResult: null
+    property var lastSuggestionResult: null
+    property string pendingSuggestionOperation: ""
 
     readonly property int patientActiveCount:
         activeCount(patientEntries)
     readonly property int roomActiveCount:
         activeCount(roomEntries)
+    readonly property int pendingSuggestionCount:
+        patientSuggestions.length + roomSuggestions.length
     readonly property bool loading:
         patientLoading || roomLoading
+        || patientSuggestionLoading || roomSuggestionLoading
 
     signal entriesRefreshed()
+    signal suggestionsRefreshed()
     signal entrySaved(var entry)
     signal entryStatusChanged(var entry)
+    signal suggestionDecision(string operation, var result)
 
     function pxArgs(args) {
         const suffix = Array.isArray(args) ? args : [];
@@ -91,8 +103,12 @@ Scope {
     function clear() {
         patientEntries = [];
         roomEntries = [];
+        patientSuggestions = [];
+        roomSuggestions = [];
         patientLoading = false;
         roomLoading = false;
+        patientSuggestionLoading = false;
+        roomSuggestionLoading = false;
         lastError = "";
     }
 
@@ -156,10 +172,127 @@ Scope {
         return true;
     }
 
+    function refreshPatientSuggestions() {
+        const id = String(patientId || "").trim();
+
+        if (!id) {
+            patientSuggestions = [];
+            return false;
+        }
+
+        if (patientSuggestionLoading || patientSuggestionProcess.running)
+            return false;
+
+        patientSuggestionLoading = true;
+        lastError = "";
+        patientSuggestionProcess.exec(pxArgs([
+            "hospital",
+            "chart-suggestions",
+            "--scope",
+            "PATIENT",
+            "--patient-id",
+            id,
+            "--status",
+            "PENDING",
+            "--limit",
+            "200",
+            "--json"
+        ]));
+        return true;
+    }
+
+    function refreshRoomSuggestions() {
+        const id = String(roomId || "").trim();
+
+        if (!id) {
+            roomSuggestions = [];
+            return false;
+        }
+
+        if (roomSuggestionLoading || roomSuggestionProcess.running)
+            return false;
+
+        roomSuggestionLoading = true;
+        lastError = "";
+        roomSuggestionProcess.exec(pxArgs([
+            "hospital",
+            "chart-suggestions",
+            "--scope",
+            "ROOM",
+            "--room-id",
+            id,
+            "--status",
+            "PENDING",
+            "--limit",
+            "200",
+            "--json"
+        ]));
+        return true;
+    }
+
+    function refreshSuggestions() {
+        const patientStarted = refreshPatientSuggestions();
+        const roomStarted = refreshRoomSuggestions();
+        return patientStarted || roomStarted;
+    }
+
     function refreshAll() {
         const patientStarted = refreshPatient();
         const roomStarted = refreshRoom();
-        return patientStarted || roomStarted;
+        const suggestionStarted = refreshSuggestions();
+        return patientStarted || roomStarted || suggestionStarted;
+    }
+
+    function promoteSuggestion(suggestionIdValue) {
+        const suggestionId = String(suggestionIdValue || "").trim();
+
+        if (!suggestionId
+                || suggestionWriting
+                || suggestionWriteProcess.running)
+            return false;
+
+        suggestionWriting = true;
+        pendingSuggestionOperation = "PROMOTE";
+        lastSuggestionResult = null;
+        lastError = "";
+        suggestionWriteProcess.exec(pxArgs([
+            "hospital",
+            "chart-suggestion-promote",
+            suggestionId,
+            "--operator-id",
+            "operator",
+            "--json"
+        ]));
+        return true;
+    }
+
+    function rejectSuggestion(suggestionIdValue, noteValue) {
+        const suggestionId = String(suggestionIdValue || "").trim();
+
+        if (!suggestionId
+                || suggestionWriting
+                || suggestionWriteProcess.running)
+            return false;
+
+        suggestionWriting = true;
+        pendingSuggestionOperation = "REJECT";
+        lastSuggestionResult = null;
+        lastError = "";
+
+        const args = [
+            "hospital",
+            "chart-suggestion-reject",
+            suggestionId,
+            "--operator-id",
+            "operator"
+        ];
+        const note = String(noteValue || "").trim();
+        if (note)
+            args.push("--note", note);
+        args.push("--json");
+
+        suggestionWriteProcess.exec(pxArgs(args));
+        return true;
     }
 
     function addEntry(
@@ -292,14 +425,20 @@ Scope {
 
     onPatientIdChanged: {
         patientEntries = [];
-        if (patientId)
+        patientSuggestions = [];
+        if (patientId) {
             Qt.callLater(root.refreshPatient);
+            Qt.callLater(root.refreshPatientSuggestions);
+        }
     }
 
     onRoomIdChanged: {
         roomEntries = [];
-        if (roomId)
+        roomSuggestions = [];
+        if (roomId) {
             Qt.callLater(root.refreshRoom);
+            Qt.callLater(root.refreshRoomSuggestions);
+        }
     }
 
     Process {
@@ -430,6 +569,129 @@ Scope {
                 else if (operation === "STATUS")
                     root.entryStatusChanged(root.lastWriteResult);
             }
+
+            Qt.callLater(root.refreshAll);
+        }
+    }
+
+
+    Process {
+        id: patientSuggestionProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const body = String(this.text || "").trim();
+                if (!body)
+                    return;
+                try {
+                    const result = JSON.parse(body);
+                    if (!Array.isArray(result))
+                        throw new Error("Patient suggestions returned non-array data");
+                    root.patientSuggestions = result;
+                    root.lastError = "";
+                } catch (error) {
+                    root.patientSuggestions = [];
+                    root.lastError = root.compactPxError(body || error);
+                }
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                const detail = String(this.text || "").trim();
+                if (detail)
+                    root.lastError = root.compactPxError(detail);
+            }
+        }
+
+        onExited: function(code, exitStatus) {
+            root.patientSuggestionLoading = false;
+            if (Number(code) !== 0 && !root.lastError)
+                root.lastError =
+                    "PX PATIENT CHART SUGGESTIONS EXIT " + String(code);
+            root.suggestionsRefreshed();
+        }
+    }
+
+    Process {
+        id: roomSuggestionProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const body = String(this.text || "").trim();
+                if (!body)
+                    return;
+                try {
+                    const result = JSON.parse(body);
+                    if (!Array.isArray(result))
+                        throw new Error("Room suggestions returned non-array data");
+                    root.roomSuggestions = result;
+                    root.lastError = "";
+                } catch (error) {
+                    root.roomSuggestions = [];
+                    root.lastError = root.compactPxError(body || error);
+                }
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                const detail = String(this.text || "").trim();
+                if (detail)
+                    root.lastError = root.compactPxError(detail);
+            }
+        }
+
+        onExited: function(code, exitStatus) {
+            root.roomSuggestionLoading = false;
+            if (Number(code) !== 0 && !root.lastError)
+                root.lastError =
+                    "PX ROOM CHART SUGGESTIONS EXIT " + String(code);
+            root.suggestionsRefreshed();
+        }
+    }
+
+    Process {
+        id: suggestionWriteProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const body = String(this.text || "").trim();
+                if (!body)
+                    return;
+                try {
+                    root.lastSuggestionResult = JSON.parse(body);
+                    root.lastError = "";
+                } catch (error) {
+                    root.lastSuggestionResult = null;
+                    root.lastError = root.compactPxError(body || error);
+                }
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                const detail = String(this.text || "").trim();
+                if (detail)
+                    root.lastError = root.compactPxError(detail);
+            }
+        }
+
+        onExited: function(code, exitStatus) {
+            const operation = root.pendingSuggestionOperation;
+            root.suggestionWriting = false;
+            root.pendingSuggestionOperation = "";
+
+            if (Number(code) !== 0 && !root.lastError)
+                root.lastError =
+                    "PX HOSPITAL CHART SUGGESTION WRITE EXIT "
+                    + String(code);
+
+            if (Number(code) === 0 && root.lastSuggestionResult)
+                root.suggestionDecision(
+                    operation,
+                    root.lastSuggestionResult
+                );
 
             Qt.callLater(root.refreshAll);
         }

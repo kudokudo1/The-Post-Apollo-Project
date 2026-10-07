@@ -196,6 +196,7 @@ Scope {
             "REPORT",
             "CHECKLIST",
             "NEXT",
+            "SUGGEST",
             "PAUSE"
         ];
 

@@ -164,6 +164,19 @@ PanelWindow {
         return true;
     }
 
+    function openRoomChartSuggestions() {
+        if (!root.selectedRoomTeam)
+            return false;
+
+        root.leaveRoomControls();
+        root.leaveBedControls();
+        root.phoneMenuOpen = false;
+        root.intercomMenuOpen = false;
+        root.operationsSurface = "chartSuggestions";
+        chartService.refreshSuggestions();
+        return true;
+    }
+
     function openRoomChat() {
         if (!root.selectedRoomTeam || !floorService.bedPath)
             return false;
@@ -1873,6 +1886,9 @@ PanelWindow {
             roomChatView.refresh();
             roomCheckpointService.refresh();
             roomReportService.refresh();
+
+            if (String(command || "") === "SUGGEST")
+                chartService.refreshSuggestions();
         }
 
         onReportFeedbackCompleted: function(reportId, result) {
@@ -5577,6 +5593,7 @@ PanelWindow {
                             "REPORT",
                             "CHECKLIST",
                             "NEXT",
+                            "SUGGEST",
                             "PAUSE"
                         ]
 
@@ -5605,8 +5622,8 @@ PanelWindow {
                             width:
                                 (
                                     semanticQuickActions.width
-                                    - semanticQuickActions.spacing * 4
-                                ) / 5
+                                    - semanticQuickActions.spacing * 5
+                                ) / 6
                             height: parent.height
 
                             color:
@@ -5700,7 +5717,7 @@ PanelWindow {
                             spacing: 7
 
                             GohuText {
-                                width: parent.width - 214
+                                width: parent.width - 310
                                 anchors.verticalCenter: parent.verticalCenter
                                 text:
                                     latestCheckpointCard.checkpoint
@@ -5801,6 +5818,44 @@ PanelWindow {
                                     onClicked: root.openRoomCharts()
                                 }
                             }
+
+                            Rectangle {
+                                id: chartSuggestionsButton
+
+                                width: 89
+                                height: 22
+                                anchors.verticalCenter: parent.verticalCenter
+                                color:
+                                    chartSuggestionsMouse.pressed
+                                    ? Colors.orange
+                                    : Colors.black
+                                border.width: 1
+                                border.color: Colors.orange
+
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    text:
+                                        "SUGGEST // "
+                                        + String(
+                                            chartService.pendingSuggestionCount
+                                        )
+                                    font.pixelSize: 7
+                                    color:
+                                        chartSuggestionsMouse.pressed
+                                        ? Colors.black
+                                        : Colors.orange
+                                }
+
+                                MouseArea {
+                                    id: chartSuggestionsMouse
+
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked:
+                                        root.openRoomChartSuggestions()
+                                }
+                            }
                         }
 
                         GohuText {
@@ -5876,6 +5931,29 @@ PanelWindow {
             }
 
             onCloseRequested: root.showSurgery()
+        }
+
+        HospitalChartSuggestionsView {
+            id: chartSuggestionsView
+
+            z: 700
+            visible:
+                root.operationsSurface === "chartSuggestions"
+
+            chartService: chartService
+
+            anchors {
+                left: parent.left
+                right: parent.right
+                top: fixedTop.bottom
+                bottom: actionBay.top
+                leftMargin: 18
+                rightMargin: 18
+                topMargin: 8
+                bottomMargin: 10
+            }
+
+            onCloseRequested: root.openRoomQuick()
         }
 
         HospitalRoomReportsView {

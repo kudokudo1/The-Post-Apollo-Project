@@ -5,7 +5,9 @@ on:
     paths:
       - "services/hospital/HospitalChartService.qml"
       - "widgets/HospitalChartsView.qml"
+      - "widgets/HospitalChartSuggestionsView.qml"
       - "widgets/HospitalW.qml"
+      - "services/hospital/HospitalDoctorRuntimeService.qml"
       - "tests/hospital/test_chart_manager_contracts.py"
       - ".github/workflows/hospital-chart-memory.yml"
   push:
@@ -14,7 +16,9 @@ on:
     paths:
       - "services/hospital/HospitalChartService.qml"
       - "widgets/HospitalChartsView.qml"
+      - "widgets/HospitalChartSuggestionsView.qml"
       - "widgets/HospitalW.qml"
+      - "services/hospital/HospitalDoctorRuntimeService.qml"
       - "tests/hospital/test_chart_manager_contracts.py"
       - ".github/workflows/hospital-chart-memory.yml"
 

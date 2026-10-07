@@ -11,6 +11,7 @@ Scope {
     property var savedSets: []
     property string queueRepository: ""
     property string queueRef: ""
+    property string activeProcedureName: ""
 
     signal procedureDispatched(string name, var procedure)
 
@@ -125,6 +126,8 @@ Scope {
                 || !queueRepositoryMatches
                 || queueRepository !== repoSlug)
             return false;
+
+        activeProcedureName = "AD HOC QUEUE";
 
         githubService.runWorkflowBatch(
             queue.map(function(item) {
@@ -305,6 +308,8 @@ Scope {
 
         if (!procedure || !procedure.runnable)
             return false;
+
+        activeProcedureName = clean;
 
         runSet(setRecord);
         procedureDispatched(clean, procedure);

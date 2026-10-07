@@ -806,26 +806,32 @@ Scope {
         if (!raw)
             return false;
 
-        const query = looseQuery(raw);
+        // Maintenance language should be forgiving in the same way as
+        // ordinary Reception speech. Strip punctuation/filler before testing
+        // intent so "Can you clean up the archive?" does not fall through to
+        // the generic archive-history reader.
+        const query = socialQuery(raw);
+        const mentionsArchive =
+            query.indexOf("archive") >= 0;
+        const hasCleanupVerb =
+            query.indexOf("clean") >= 0
+            || query.indexOf("cleanup") >= 0
+            || query.indexOf("prune") >= 0
+            || query.indexOf("compact") >= 0;
         const asksCleanup =
-            query === "clean archive"
-            || query === "cleanup archive"
-            || query === "clean up archive"
-            || query === "prune archive"
-            || query === "compact archive"
-            || query === "archive cleanup"
-            || query === "archive clean"
-            || query === "archive prune";
+            mentionsArchive && hasCleanupVerb;
         const asksStats =
-            query === "archive status"
-            || query === "archive stats"
-            || query === "archive size"
-            || query === "archive depth"
-            || query === "archive capacity"
-            || query === "archive health"
-            || query.indexOf("how big is the archive") >= 0
-            || query.indexOf("how big is my archive") >= 0
-            || query.indexOf("how full is the archive") >= 0;
+            mentionsArchive
+            && (
+                query.indexOf("status") >= 0
+                || query.indexOf("stats") >= 0
+                || query.indexOf("size") >= 0
+                || query.indexOf("depth") >= 0
+                || query.indexOf("capacity") >= 0
+                || query.indexOf("health") >= 0
+                || query.indexOf("how big") >= 0
+                || query.indexOf("how full") >= 0
+            );
 
         if (!asksCleanup && !asksStats)
             return false;

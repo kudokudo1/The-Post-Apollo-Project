@@ -11,10 +11,15 @@ Scope {
 
     property string repositoryPath: ""
     property var operationJournal: null
+    property var snapshotService: null
 
     property string pendingJournalId: ""
-    property string pendingJournalDetail: ""
-    property bool pendingJournalCompletion: false
+    property string pendingSnapshotRequest: ""
+    property string snapshotPhase: ""
+    property string pendingOperation: ""
+    property var pendingArguments: []
+    property bool pendingActionSuccess: false
+    property string pendingActionDetail: ""
 
     property bool refreshing: false
     property bool actionBusy: false
@@ -73,62 +78,102 @@ Scope {
         return worktreeForBranch(name) !== null;
     }
 
-    function journalSnapshot() {
+    function clearPendingMutation() {
+        pendingJournalId = "";
+        pendingSnapshotRequest = "";
+        snapshotPhase = "";
+        pendingOperation = "";
+        pendingArguments = [];
+        pendingActionSuccess = false;
+        pendingActionDetail = "";
+    }
+
+    function mutationContext() {
         return {
-            branch: String(currentBranch || ""),
-            head: String(currentHead || ""),
-            branches: branches.map(function(row) {
-                const item = row || {};
-                return {
-                    name: String(item.name || ""),
-                    head: String(item.head || ""),
-                    upstream: String(item.upstream || ""),
-                    merged: Boolean(item.merged)
-                };
-            }),
-            worktrees: worktrees.map(function(row) {
-                const item = row || {};
-                return {
-                    path: String(item.path || ""),
-                    head: String(item.head || ""),
-                    branch: String(item.branch || ""),
-                    detached: Boolean(item.detached),
-                    locked: Boolean(item.locked),
-                    prunable: Boolean(item.prunable),
-                    dirtyCount: Number(item.dirtyCount || 0)
-                };
-            })
+            source: "GitBranchWorkspaceService",
+            operation: String(pendingOperation || ""),
+            arguments: pendingArguments.slice()
         };
     }
 
-    function finishPendingJournal(success, detail) {
-        const operationId = String(pendingJournalId || "");
+    function failBeforeSnapshot(detail) {
+        const action = String(actionName || pendingOperation || "ACTION");
+        const message =
+            "BEFORE SNAPSHOT FAILED // "
+            + String(detail || "SNAPSHOT UNAVAILABLE");
 
-        if (!operationId || !operationJournal) {
-            pendingJournalId = "";
-            pendingJournalDetail = "";
-            pendingJournalCompletion = false;
-            return;
+        actionBusy = false;
+        actionStatus = action + " // REFUSED";
+        lastError = message;
+        clearPendingMutation();
+        actionFinished(action, false, message);
+    }
+
+    function finalizeMutation(afterSnapshot, snapshotWarning) {
+        const action = String(actionName || pendingOperation || "ACTION");
+        const detail = String(pendingActionDetail || "");
+        const warning = String(snapshotWarning || "");
+        const snapshot =
+            afterSnapshot
+            || {
+                snapshotVersion: 1,
+                repository: String(repositoryPath || ""),
+                capturedAt: new Date().toISOString(),
+                captureFailed: true,
+                recoveryClass: "EVIDENCE_ONLY",
+                recoveryReason:
+                    warning
+                    || "AFTER SNAPSHOT UNAVAILABLE"
+            };
+
+        if (pendingJournalId && operationJournal) {
+            if (pendingActionSuccess)
+                operationJournal.completeOperation(
+                    pendingJournalId,
+                    snapshot,
+                    warning
+                    ? detail + " // " + warning
+                    : detail
+                );
+            else
+                operationJournal.failOperation(
+                    pendingJournalId,
+                    snapshot,
+                    warning
+                    ? detail + " // " + warning
+                    : detail
+                );
         }
 
-        const snapshot = journalSnapshot();
+        actionBusy = false;
 
-        if (success)
-            operationJournal.completeOperation(
-                operationId,
-                snapshot,
-                String(detail || "")
-            );
-        else
-            operationJournal.failOperation(
-                operationId,
-                snapshot,
-                String(detail || "")
-            );
+        if (pendingActionSuccess) {
+            actionStatus =
+                action
+                + " // "
+                + (detail || "OK")
+                + (warning ? " // SNAPSHOT WARNING" : "");
+            lastError = warning;
+        } else {
+            lastError =
+                detail
+                || (action + " FAILED");
+            if (warning)
+                lastError += " // " + warning;
+            actionStatus = action + " // REFUSED";
+        }
 
-        pendingJournalId = "";
-        pendingJournalDetail = "";
-        pendingJournalCompletion = false;
+        const success = pendingActionSuccess;
+        const finalDetail =
+            warning
+            ? (detail || (success ? "OK" : "FAILED"))
+                + " // "
+                + warning
+            : (detail || (success ? "OK" : "FAILED"));
+
+        clearPendingMutation();
+        actionFinished(action, success, finalDetail);
+        refresh();
     }
 
     function refresh() {
@@ -311,70 +356,32 @@ Scope {
             ).trim();
 
             lastError = detail || "BRANCH INSPECTION FAILED";
-
-            if (pendingJournalCompletion) {
-                finishPendingJournal(
-                    true,
-                    pendingJournalDetail
-                    + " // AFTER SNAPSHOT FAILED // "
-                    + lastError
-                );
-            }
-
             return;
         }
 
         parseInspection(inspectStdoutText);
         lastError = "";
-
-        if (pendingJournalCompletion)
-            finishPendingJournal(true, pendingJournalDetail);
-
         refreshed();
     }
 
-    function runAction(operation, a, b, c) {
+    function executePendingAction() {
         const repo = String(repositoryPath || "").trim();
-        const op = String(operation || "").trim();
-
-        if (actionBusy || refreshing)
-            return false;
+        const op = String(pendingOperation || "").trim();
+        const args =
+            Array.isArray(pendingArguments)
+            ? pendingArguments
+            : [];
+        const a = args.length > 0 ? String(args[0] || "") : "";
+        const b = args.length > 1 ? String(args[1] || "") : "";
+        const c = args.length > 2 ? String(args[2] || "") : "";
 
         if (!repo || !op) {
-            lastError = !repo ? "NO REPOSITORY" : "NO OPERATION";
+            finalizeMutation(
+                null,
+                "PENDING MUTATION IDENTITY LOST BEFORE EXECUTION"
+            );
             return false;
         }
-
-        pendingJournalId = "";
-        pendingJournalDetail = "";
-        pendingJournalCompletion = false;
-
-        if (operationJournal) {
-            pendingJournalId = operationJournal.beginOperation(
-                "BRANCH_WORKSPACE/" + op.toUpperCase(),
-                journalSnapshot(),
-                {
-                    source: "GitBranchWorkspaceService",
-                    arguments: [
-                        String(a || ""),
-                        String(b || ""),
-                        String(c || "")
-                    ]
-                }
-            );
-        }
-
-        actionBusy = true;
-        actionName = op.toUpperCase();
-        actionStatus = actionName + " // RUNNING";
-        lastError = "";
-
-        actionExitSeen = false;
-        actionStdoutSeen = false;
-        actionStderrSeen = false;
-        actionExitCode = -1;
-        actionStdoutText = "";
-        actionStderrText = "";
 
         actionProcess.exec([
             "bash",
@@ -506,6 +513,66 @@ Scope {
             String(c || "")
         ]);
 
+
+        return true;
+    }
+
+    function runAction(operation, a, b, c) {
+        const repo = String(repositoryPath || "").trim();
+        const op = String(operation || "").trim();
+
+        if (actionBusy || refreshing)
+            return false;
+
+        if (!repo || !op) {
+            lastError = !repo ? "NO REPOSITORY" : "NO OPERATION";
+            return false;
+        }
+
+        if ((operationJournal && !snapshotService)
+                || (snapshotService && !operationJournal)) {
+            lastError =
+                "JOURNAL + SNAPSHOT SERVICES MUST BE PAIRED";
+            return false;
+        }
+
+        clearPendingMutation();
+
+        pendingOperation = op;
+        pendingArguments = [
+            String(a || ""),
+            String(b || ""),
+            String(c || "")
+        ];
+
+        actionBusy = true;
+        actionName = op.toUpperCase();
+        actionStatus = actionName + " // SNAPSHOT BEFORE";
+        lastError = "";
+
+        actionExitSeen = false;
+        actionStdoutSeen = false;
+        actionStderrSeen = false;
+        actionExitCode = -1;
+        actionStdoutText = "";
+        actionStderrText = "";
+
+        if (!operationJournal && !snapshotService)
+            return executePendingAction();
+
+        snapshotPhase = "BEFORE";
+        pendingSnapshotRequest = snapshotService.capture(
+            "BEFORE // " + actionName,
+            mutationContext()
+        );
+
+        if (!pendingSnapshotRequest) {
+            failBeforeSnapshot(
+                "SNAPSHOT SERVICE BUSY OR UNAVAILABLE"
+            );
+            return false;
+        }
+
         return true;
     }
 
@@ -557,8 +624,6 @@ Scope {
                 || !actionStderrSeen)
             return;
 
-        actionBusy = false;
-
         const out = String(actionStdoutText || "").trim();
         const err = String(actionStderrText || "").trim();
         const line = out.split("\n")[0] || "";
@@ -569,28 +634,105 @@ Scope {
             ? parts.slice(1).join("\t")
             : String(err || out || ("EXIT " + actionExitCode)).trim();
 
-        if (actionExitCode === 0 && kind === "OK") {
-            actionStatus = actionName + " // " + (detail || "OK");
-            lastError = "";
-            pendingJournalDetail = detail || "OK";
-            pendingJournalCompletion = !!pendingJournalId;
-            actionFinished(actionName, true, detail || "OK");
+        pendingActionSuccess =
+            actionExitCode === 0
+            && kind === "OK";
+        pendingActionDetail =
+            detail
+            || (
+                pendingActionSuccess
+                ? "OK"
+                : (actionName + " FAILED")
+            );
 
-            if (!refresh() && pendingJournalCompletion) {
-                finishPendingJournal(
-                    true,
-                    pendingJournalDetail
-                    + " // AFTER SNAPSHOT UNAVAILABLE"
-                );
-            }
-
+        if (!operationJournal || !snapshotService) {
+            finalizeMutation(null, "");
             return;
         }
 
-        lastError = detail || (actionName + " FAILED");
-        actionStatus = actionName + " // REFUSED";
-        finishPendingJournal(false, lastError);
-        actionFinished(actionName, false, lastError);
+        actionStatus = actionName + " // SNAPSHOT AFTER";
+        snapshotPhase = "AFTER";
+        pendingSnapshotRequest = snapshotService.capture(
+            "AFTER // " + actionName,
+            mutationContext()
+        );
+
+        if (!pendingSnapshotRequest) {
+            finalizeMutation(
+                null,
+                "AFTER SNAPSHOT COULD NOT START"
+            );
+        }
+    }
+
+    Connections {
+        target: root.snapshotService
+        enabled: root.snapshotService !== null
+        ignoreUnknownSignals: true
+
+        function onSnapshotReady(requestId, snapshot) {
+            if (String(requestId || "")
+                    !== String(root.pendingSnapshotRequest || ""))
+                return;
+
+            root.pendingSnapshotRequest = "";
+
+            if (root.snapshotPhase === "BEFORE") {
+                root.snapshotPhase = "";
+
+                root.pendingJournalId =
+                    root.operationJournal
+                    ? root.operationJournal.beginOperation(
+                        "BRANCH_WORKSPACE/"
+                            + String(root.pendingOperation || "")
+                                .toUpperCase(),
+                        snapshot,
+                        root.mutationContext()
+                    )
+                    : "";
+
+                if (root.operationJournal
+                        && !root.pendingJournalId) {
+                    root.failBeforeSnapshot(
+                        "JOURNAL RECORD COULD NOT START"
+                    );
+                    return;
+                }
+
+                root.actionStatus =
+                    root.actionName + " // RUNNING";
+                root.executePendingAction();
+                return;
+            }
+
+            if (root.snapshotPhase === "AFTER") {
+                root.snapshotPhase = "";
+                root.finalizeMutation(snapshot, "");
+            }
+        }
+
+        function onSnapshotFailed(requestId, detail) {
+            if (String(requestId || "")
+                    !== String(root.pendingSnapshotRequest || ""))
+                return;
+
+            root.pendingSnapshotRequest = "";
+
+            if (root.snapshotPhase === "BEFORE") {
+                root.snapshotPhase = "";
+                root.failBeforeSnapshot(detail);
+                return;
+            }
+
+            if (root.snapshotPhase === "AFTER") {
+                root.snapshotPhase = "";
+                root.finalizeMutation(
+                    null,
+                    "AFTER SNAPSHOT FAILED // "
+                        + String(detail || "UNKNOWN ERROR")
+                );
+            }
+        }
     }
 
     Process {

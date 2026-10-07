@@ -81,6 +81,8 @@ Scope {
             after: null,
             metadata: cloneValue(metadata || {}),
             detail: "",
+            recoveryClass:
+                String((beforeState || {}).recoveryClass || "EVIDENCE_ONLY"),
             undoState: "NOT_IMPLEMENTED"
         };
 
@@ -115,6 +117,13 @@ Scope {
             after: cloneValue(afterState),
             metadata: cloneValue(previous.metadata || {}),
             detail: String(detail || ""),
+            recoveryClass:
+                String(previous.recoveryClass || "EVIDENCE_ONLY")
+                === "REF_RECOVERABLE"
+                && String((afterState || {}).recoveryClass || "EVIDENCE_ONLY")
+                === "REF_RECOVERABLE"
+                ? "REF_RECOVERABLE"
+                : "EVIDENCE_ONLY",
             undoState: "NOT_IMPLEMENTED"
         };
 
@@ -145,6 +154,7 @@ Scope {
             after: cloneValue(afterState),
             metadata: cloneValue(previous.metadata || {}),
             detail: String(detail || ""),
+            recoveryClass: "EVIDENCE_ONLY",
             undoState: "NOT_IMPLEMENTED"
         };
 
@@ -203,6 +213,10 @@ Scope {
                     status === "RUNNING"
                     ? "APPLICATION EXITED BEFORE OPERATION COMPLETION WAS RECORDED"
                     : String(row.detail || ""),
+                recoveryClass:
+                    status === "RUNNING"
+                    ? "EVIDENCE_ONLY"
+                    : String(row.recoveryClass || "EVIDENCE_ONLY"),
                 undoState: String(row.undoState || "NOT_IMPLEMENTED")
             };
 

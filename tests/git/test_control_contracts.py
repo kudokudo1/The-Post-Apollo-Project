@@ -229,10 +229,62 @@ require(
     "atomicWrites: true",
     "operation journal persistence must be atomic",
 )
+# Live repository snapshots now gate journaled mutations. The snapshot must
+# capture actual Git state before the operation process can start.
+require(
+    "services/git/GitRepositorySnapshotService.qml",
+    "function capture(label, context)",
+    "repository snapshots must expose an asynchronous capture seam",
+)
+require(
+    "services/git/GitRepositorySnapshotService.qml",
+    'git -C "$repo" for-each-ref',
+    "repository snapshots must capture refs",
+)
+require(
+    "services/git/GitRepositorySnapshotService.qml",
+    'git -C "$repo" write-tree',
+    "repository snapshots must capture index tree state",
+)
+require(
+    "services/git/GitRepositorySnapshotService.qml",
+    'git -C "$repo" status --porcelain=v1 --untracked-files=all',
+    "repository snapshots must capture dirty worktree evidence",
+)
+require(
+    "services/git/GitRepositorySnapshotService.qml",
+    'git -C "$repo" reflog -1',
+    "repository snapshots must retain a reflog recovery pointer",
+)
+require(
+    "services/git/GitRepositorySnapshotService.qml",
+    'git -C "$repo" worktree list --porcelain',
+    "repository snapshots must capture worktree topology",
+)
+require(
+    "services/git/GitRepositorySnapshotService.qml",
+    '"REF_RECOVERABLE"',
+    "clean snapshots must classify ref-based recovery",
+)
+require(
+    "services/git/GitRepositorySnapshotService.qml",
+    '"EVIDENCE_ONLY"',
+    "dirty or active-operation snapshots must stay evidence-only",
+)
 require_regex(
     "services/git/GitBranchWorkspaceService.qml",
-    r"function runAction\(operation, a, b, c\).*operationJournal\.beginOperation\(.*actionProcess\.exec\(",
-    "branch/workspace mutations must journal before process execution",
+    r"function runAction\(operation, a, b, c\).*snapshotPhase = \"BEFORE\";.*snapshotService\.capture\(",
+    "branch/workspace mutations must request BEFORE snapshot before execution",
+)
+require_regex(
+    "services/git/GitBranchWorkspaceService.qml",
+    r"if \(root\.snapshotPhase === \"BEFORE\"\).*operationJournal\.beginOperation\(.*root\.executePendingAction\(\)",
+    "branch/workspace mutation may execute only after BEFORE snapshot opens journal record",
+)
+require_regex(
+    "services/git/GitBranchWorkspaceService.qml",
+    r"function maybeFinishAction\(\).*snapshotPhase = \"AFTER\";.*snapshotService\.capture\(",
+    "branch/workspace mutations must capture AFTER state before journal completion",
 )
 require(
     "services/git/GitBranchWorkspaceService.qml",
@@ -246,8 +298,13 @@ require(
 )
 require_regex(
     "widgets/GitW.qml",
-    r"GitOperationJournalService \{.*id: operationJournalService.*GitBranchWorkspaceService \{.*operationJournal: operationJournalService",
-    "GitW must inject one shared journal into branch/workspace mutations",
+    r"GitRepositorySnapshotService \{.*id: repositorySnapshotService.*GitOperationJournalService \{.*id: operationJournalService.*GitBranchWorkspaceService \{.*operationJournal: operationJournalService.*snapshotService: repositorySnapshotService",
+    "GitW must inject shared snapshot + journal services into branch/workspace mutations",
+)
+require(
+    "services/git/GitOperationJournalService.qml",
+    "recoveryClass:",
+    "journal entries must persist recovery classification",
 )
 require(
     ".gitignore",
@@ -319,6 +376,7 @@ focused_files = [
     "services/github/GitEvidenceProvider.qml",
     "services/github/WorkflowLibraryStore.qml",
     "services/git/GitOperationJournalService.qml",
+    "services/git/GitRepositorySnapshotService.qml",
     "services/git/GitRepositoryService.qml",
     "services/git/GitHistoryService.qml",
     "services/hospital/HospitalCertificationCoordinator.qml",

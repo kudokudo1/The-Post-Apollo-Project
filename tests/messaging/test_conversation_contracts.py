@@ -3,6 +3,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SHARED = ROOT / "components" / "ConversationFeed.qml"
 WRAPPER = ROOT / "widgets" / "messanger" / "ChatFeed.qml"
+ADAPTER = ROOT / "services" / "hospital" / "HospitalRoomConversationAdapter.qml"
 
 assert SHARED.is_file(), SHARED
 
@@ -26,3 +27,27 @@ assert 'property string sendingLabel: "SENDING"' in shared
 assert "textFormat: chatFeed.messageTextFormat" in shared
 
 print("conversation surface contracts: PASS")
+
+
+assert ADAPTER.is_file(), ADAPTER
+adapter = ADAPTER.read_text()
+for field in (
+    "property var conversations:",
+    "property string selectedConversationId:",
+    "property var messages:",
+    "property bool messagesLoading:",
+    "property bool sending:",
+    "property int sendSuccessSerial:",
+):
+    assert field in adapter, field
+
+assert "function loadMessages(conversationId)" in adapter
+assert "function refreshMessages()" in adapter
+assert "function sendMessage(conversationId, textValue)" in adapter
+assert '"hospital",\n            "rooms"' in adapter
+assert '"hospital",\n            "messages"' in adapter
+assert '"message-append"' in adapter
+assert "codex" not in adapter.lower()
+assert "hermes" not in adapter.lower()
+
+print("hospital conversation adapter contract: PASS")

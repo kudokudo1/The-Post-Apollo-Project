@@ -158,10 +158,6 @@ Scope {
 
         const next = clonePlan(plan);
         const row = next.splice(source, 1)[0];
-
-        if (source < target)
-            target -= 1;
-
         next.splice(target, 0, row);
         plan = next;
         disarm("PLAN CHANGED");

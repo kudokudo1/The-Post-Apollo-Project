@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 
 Scope {
     id: root
@@ -8,6 +9,111 @@ Scope {
     property var registryService: null
     property var assignmentService: null
     property string currentRoomId: ""
+
+    property var durableRooms: []
+    property var durableSessions: []
+    property bool graphLoading: false
+    property string graphError: ""
+    property bool roomsLoaded: false
+    property bool sessionsLoaded: false
+
+    signal graphRefreshed()
+
+    function refreshDurableGraph() {
+        if (graphLoading || roomsProcess.running || sessionsProcess.running)
+            return false;
+
+        graphLoading = true;
+        graphError = "";
+        roomsLoaded = false;
+        sessionsLoaded = false;
+
+        roomsProcess.exec([
+            "bash",
+            "-lc",
+            'exec "$HOME/.local/bin/px" hospital rooms --json'
+        ]);
+        sessionsProcess.exec([
+            "bash",
+            "-lc",
+            'exec "$HOME/.local/bin/px" hospital sessions --json'
+        ]);
+        return true;
+    }
+
+    function finishGraphPart(kind, textValue, exitCode) {
+        const kindName = String(kind || "").toUpperCase();
+        const body = String(textValue || "").trim();
+
+        if (Number(exitCode || 0) !== 0) {
+            graphError =
+                "RESPONSIBILITY " + kindName
+                + " // PX EXIT " + String(exitCode);
+        } else {
+            try {
+                const parsed = body ? JSON.parse(body) : [];
+                if (!Array.isArray(parsed))
+                    throw new Error("expected array");
+
+                if (kindName === "ROOMS")
+                    durableRooms = parsed;
+                else
+                    durableSessions = parsed;
+            } catch (error) {
+                graphError =
+                    "RESPONSIBILITY " + kindName
+                    + " // " + String(error);
+            }
+        }
+
+        if (kindName === "ROOMS")
+            roomsLoaded = true;
+        else
+            sessionsLoaded = true;
+
+        if (roomsLoaded && sessionsLoaded) {
+            graphLoading = false;
+            graphRefreshed();
+        }
+    }
+
+    Process {
+        id: roomsProcess
+
+        property string outputText: ""
+
+        stdout: StdioCollector {
+            onStreamFinished: roomsProcess.outputText = this.text
+        }
+
+        onExited: function(code, exitStatus) {
+            root.finishGraphPart("ROOMS", outputText, code);
+        }
+    }
+
+    Process {
+        id: sessionsProcess
+
+        property string outputText: ""
+
+        stdout: StdioCollector {
+            onStreamFinished: sessionsProcess.outputText = this.text
+        }
+
+        onExited: function(code, exitStatus) {
+            root.finishGraphPart("SESSIONS", outputText, code);
+        }
+    }
+
+    Connections {
+        target: roundsService
+
+        function onRefreshed() {
+            root.refreshDurableGraph();
+        }
+    }
+
+    Component.onCompleted: Qt.callLater(root.refreshDurableGraph)
 
     function normalized(value) {
         return String(value || "")

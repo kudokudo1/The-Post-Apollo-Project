@@ -637,7 +637,7 @@ Scope {
                 'if ls "$tmpdir"/detail-*.json >/dev/null 2>&1; then',
                 '  details_json="$(jq -s "." "$tmpdir"/detail-*.json)"',
                 'fi',
-                "jq -nc --argjson rows "$rows" --argjson details "$details_json" '$rows | map(. as $row | (($details | map(select(.number == $row.number)) | first) // {checkEvidence:[],checkEvidenceLoaded:false,checkEvidenceError:"",checkSuites:[],suiteError:"",reviewEvidence:[],reviewEvidenceLoaded:false,reviewEvidenceError:"",reviewRequestCount:0,reviewRequestEvidenceLoaded:false,reviewRequestError:""}) as $detail | $row + $detail)'",
+                "jq -nc --argjson rows \"$rows\" --argjson details \"$details_json\" '$rows | map(. as $row | (($details | map(select(.number == $row.number)) | first) // {checkEvidence:[],checkEvidenceLoaded:false,checkEvidenceError:\"\",checkSuites:[],suiteError:\"\",reviewEvidence:[],reviewEvidenceLoaded:false,reviewEvidenceError:\"\",reviewRequestCount:0,reviewRequestEvidenceLoaded:false,reviewRequestError:\"\"}) as $detail | $row + $detail)'",
                 'rm -rf "$tmpdir"'
             ].join("\n"),
             "pa-github-pulls-graphql",

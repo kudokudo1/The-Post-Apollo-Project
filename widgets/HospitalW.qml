@@ -1620,6 +1620,8 @@ PanelWindow {
     }
 
     function refreshGithubAttention() {
+        responsibilityService.refreshDurableGraph();
+
         if (githubAttentionProvider.busy)
             return false;
 
@@ -1661,6 +1663,7 @@ PanelWindow {
         root.attentionQueueBranch = base;
         root.attentionSubview = "queue";
         root.operationsSurface = "attention";
+        responsibilityService.refreshDurableGraph();
 
         if (!hospitalMergeQueueProvider.busy)
             hospitalMergeQueueProvider.refresh(repo, base);

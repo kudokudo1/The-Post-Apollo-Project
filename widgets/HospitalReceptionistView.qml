@@ -783,6 +783,7 @@ Rectangle {
 
                 spacing: 5
                 visible: root.receptionistService.contextActive
+                width: visible ? implicitWidth : 0
 
                 Rectangle {
                     id: contextOpen
@@ -1518,7 +1519,9 @@ Rectangle {
                     z: -1
                     opacity:
                         sendMouse.containsMouse
-                        ? 0.48 : 0.30
+                        ? 0.48
+                        : sendButton.enabledAction
+                        ? 0.30 : 0.12
                     color:
                         root.speechInputService.recording
                         ? Colors.magenta

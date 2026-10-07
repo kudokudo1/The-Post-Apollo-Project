@@ -37,8 +37,13 @@ require(
 )
 require(
     VIEW,
-    'label: "SPLIT // NEXT"',
-    "Split must remain visibly unavailable until implemented",
+    'label: "SPLIT"',
+    "Split must be a live Surgery mode",
+)
+require(
+    VIEW,
+    'selectedAction: root.surgeryMode === "split"',
+    "Surgery must expose Split selection state",
 )
 require(
     VIEW,

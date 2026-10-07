@@ -41,6 +41,9 @@ Scope {
     property bool contextUnreadOnly: false
     property bool contextFavoritesOnly: false
     property bool contextProblemsOnly: false
+    property double contextStartEpoch: 0
+    property double contextEndEpoch: 0
+    property string contextTimeLabel: ""
 
     readonly property bool contextActive:
         contextEventKey.length > 0
@@ -65,6 +68,9 @@ Scope {
 
         if (contextSource)
             parts.push(contextSource.toUpperCase());
+
+        if (contextTimeLabel)
+            parts.push(contextTimeLabel);
 
         if (contextHasEvent)
             parts.push("EVENT");
@@ -129,6 +135,238 @@ Scope {
     function timestampEpoch(value) {
         const parsed = Date.parse(String(value || ""));
         return Number.isFinite(parsed) ? parsed : 0;
+    }
+
+    function localDayStart(dateValue) {
+        const date = dateValue instanceof Date
+            ? dateValue
+            : new Date(dateValue);
+
+        return new Date(
+            date.getFullYear(),
+            date.getMonth(),
+            date.getDate()
+        ).getTime();
+    }
+
+    function numberWordValue(value) {
+        const token = String(value || "").toLowerCase();
+        const words = {
+            one: 1,
+            two: 2,
+            three: 3,
+            four: 4,
+            five: 5,
+            six: 6,
+            seven: 7,
+            eight: 8,
+            nine: 9,
+            ten: 10,
+            twelve: 12,
+            twenty: 20,
+            thirty: 30
+        };
+
+        if (Object.prototype.hasOwnProperty.call(words, token))
+            return Number(words[token] || 0);
+
+        const parsed = Number(token);
+        return Number.isFinite(parsed) ? parsed : 0;
+    }
+
+    function activityTimeWindow(queryValue) {
+        const query = looseQuery(queryValue);
+        const now = new Date();
+        const nowEpoch = now.getTime();
+        const todayStart = localDayStart(now);
+        const oneHour = 60 * 60 * 1000;
+        const oneDay = 24 * oneHour;
+
+        function result(label, start, end) {
+            return {
+                active: true,
+                label: String(label || ""),
+                startEpoch: Number(start || 0),
+                endEpoch: Number(end || 0)
+            };
+        }
+
+        if (query.indexOf("yesterday") >= 0) {
+            return result(
+                "YESTERDAY",
+                todayStart - oneDay,
+                todayStart
+            );
+        }
+
+        if (query.indexOf("this morning") >= 0
+                || query.indexOf("today morning") >= 0) {
+            const noon =
+                new Date(
+                    now.getFullYear(),
+                    now.getMonth(),
+                    now.getDate(),
+                    12, 0, 0, 0
+                ).getTime();
+
+            return result(
+                "THIS MORNING",
+                todayStart,
+                Math.min(nowEpoch + 1, noon)
+            );
+        }
+
+        if (query.indexOf("this afternoon") >= 0
+                || query.indexOf("today afternoon") >= 0) {
+            const noon =
+                new Date(
+                    now.getFullYear(),
+                    now.getMonth(),
+                    now.getDate(),
+                    12, 0, 0, 0
+                ).getTime();
+            const evening =
+                new Date(
+                    now.getFullYear(),
+                    now.getMonth(),
+                    now.getDate(),
+                    17, 0, 0, 0
+                ).getTime();
+
+            return result(
+                "THIS AFTERNOON",
+                noon,
+                Math.min(nowEpoch + 1, evening)
+            );
+        }
+
+        if (query.indexOf("this evening") >= 0
+                || query.indexOf("tonight") >= 0
+                || query.indexOf("today evening") >= 0) {
+            const evening =
+                new Date(
+                    now.getFullYear(),
+                    now.getMonth(),
+                    now.getDate(),
+                    17, 0, 0, 0
+                ).getTime();
+
+            return result(
+                "THIS EVENING",
+                evening,
+                nowEpoch + 1
+            );
+        }
+
+        if (query.indexOf("today") >= 0) {
+            return result(
+                "TODAY",
+                todayStart,
+                nowEpoch + 1
+            );
+        }
+
+        if (query.indexOf("this week") >= 0) {
+            const day = now.getDay();
+            const daysSinceMonday = day === 0 ? 6 : day - 1;
+
+            return result(
+                "THIS WEEK",
+                todayStart - (daysSinceMonday * oneDay),
+                nowEpoch + 1
+            );
+        }
+
+        const weekdayMatch =
+            query.match(
+                /\bsince\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/
+            );
+
+        if (weekdayMatch && weekdayMatch.length > 1) {
+            const weekdays = {
+                sunday: 0,
+                monday: 1,
+                tuesday: 2,
+                wednesday: 3,
+                thursday: 4,
+                friday: 5,
+                saturday: 6
+            };
+            const name = String(weekdayMatch[1] || "").toLowerCase();
+            const targetDay = Number(weekdays[name]);
+            let delta = now.getDay() - targetDay;
+
+            if (delta < 0)
+                delta += 7;
+
+            return result(
+                "SINCE " + name.toUpperCase(),
+                todayStart - (delta * oneDay),
+                nowEpoch + 1
+            );
+        }
+
+        const relativeMatch =
+            query.match(
+                /\b(?:last|past)\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|twenty|thirty)\s+(hour|hours|day|days)\b/
+            );
+
+        if (relativeMatch && relativeMatch.length > 2) {
+            const amount = numberWordValue(relativeMatch[1]);
+            const unit = String(relativeMatch[2] || "").toLowerCase();
+            const scale =
+                unit.indexOf("hour") === 0
+                ? oneHour
+                : oneDay;
+
+            if (amount > 0) {
+                return result(
+                    "LAST "
+                    + String(amount)
+                    + " "
+                    + (
+                        unit.indexOf("hour") === 0
+                        ? amount === 1 ? "HOUR" : "HOURS"
+                        : amount === 1 ? "DAY" : "DAYS"
+                      ),
+                    nowEpoch - (amount * scale),
+                    nowEpoch + 1
+                );
+            }
+        }
+
+        if (query.indexOf("last hour") >= 0
+                || query.indexOf("past hour") >= 0) {
+            return result(
+                "LAST HOUR",
+                nowEpoch - oneHour,
+                nowEpoch + 1
+            );
+        }
+
+        return {
+            active: false,
+            label: "",
+            startEpoch: 0,
+            endEpoch: 0
+        };
+    }
+
+    function eventInTimeWindow(
+            eventValue,
+            startEpochValue,
+            endEpochValue) {
+        const epoch = eventEpoch(eventValue || {});
+        const start = Number(startEpochValue || 0);
+        const end = Number(endEpochValue || 0);
+
+        if (start > 0 && epoch < start)
+            return false;
+
+        if (end > 0 && epoch >= end)
+            return false;
+
+        return true;
     }
 
     function readBaselineAt() {
@@ -838,7 +1076,11 @@ Scope {
         "send", "find", "locate", "there", "this",
         "that", "anything", "something", "update",
         "hello", "hey", "thanks", "thank", "morning",
-        "afternoon", "evening", "good", "going"
+        "afternoon", "evening", "good", "going",
+        "today", "yesterday", "tonight", "week", "since",
+        "hour", "hours", "day", "days", "past",
+        "monday", "tuesday", "wednesday", "thursday",
+        "friday", "saturday", "sunday"
     ]
 
     function editDistanceOneOrLess(leftValue, rightValue) {
@@ -1083,7 +1325,9 @@ Scope {
             sourceValue,
             unreadOnly,
             favoritesOnly,
-            targetValue) {
+            targetValue,
+            startEpochValue,
+            endEpochValue) {
         const source = String(sourceValue || "").toLowerCase();
         const target = String(targetValue || "");
         const matches = [];
@@ -1103,6 +1347,12 @@ Scope {
                 continue;
 
             if (favoritesOnly && !isPinned(event))
+                continue;
+
+            if (!eventInTimeWindow(
+                    event,
+                    startEpochValue,
+                    endEpochValue))
                 continue;
 
             matches.push(event);
@@ -1230,6 +1480,9 @@ Scope {
         contextUnreadOnly = false;
         contextFavoritesOnly = false;
         contextProblemsOnly = false;
+        contextStartEpoch = 0;
+        contextEndEpoch = 0;
+        contextTimeLabel = "";
     }
 
     function rememberActivityContext(
@@ -1238,7 +1491,10 @@ Scope {
             targetValue,
             unreadOnlyValue,
             favoritesOnlyValue,
-            problemsOnlyValue) {
+            problemsOnlyValue,
+            startEpochValue,
+            endEpochValue,
+            timeLabelValue) {
         const event = eventValue || {};
         const key = eventKey(event);
 
@@ -1253,6 +1509,9 @@ Scope {
         contextUnreadOnly = Boolean(unreadOnlyValue);
         contextFavoritesOnly = Boolean(favoritesOnlyValue);
         contextProblemsOnly = Boolean(problemsOnlyValue);
+        contextStartEpoch = Number(startEpochValue || 0);
+        contextEndEpoch = Number(endEpochValue || 0);
+        contextTimeLabel = String(timeLabelValue || "");
         return true;
     }
 
@@ -1278,7 +1537,9 @@ Scope {
                 contextSource,
                 contextUnreadOnly,
                 contextFavoritesOnly,
-                contextTarget
+                contextTarget,
+                contextStartEpoch,
+                contextEndEpoch
             );
 
         if (contextProblemsOnly) {
@@ -1383,7 +1644,10 @@ Scope {
             contextTarget,
             contextUnreadOnly,
             contextFavoritesOnly,
-            contextProblemsOnly
+            contextProblemsOnly,
+            contextStartEpoch,
+            contextEndEpoch,
+            contextTimeLabel
         );
         return true;
     }
@@ -1400,7 +1664,10 @@ Scope {
             contextTarget,
             contextUnreadOnly,
             contextFavoritesOnly,
-            contextProblemsOnly
+            contextProblemsOnly,
+            contextStartEpoch,
+            contextEndEpoch,
+            contextTimeLabel
         );
         return true;
     }
@@ -1771,13 +2038,17 @@ Scope {
             sourceValue,
             favoritesOnly,
             targetValue,
-            problemsOnly) {
+            problemsOnly,
+            startEpochValue,
+            endEpochValue) {
         let matches =
             matchingActivity(
                 sourceValue,
                 false,
                 favoritesOnly,
-                targetValue
+                targetValue,
+                startEpochValue,
+                endEpochValue
             );
 
         if (problemsOnly) {
@@ -1822,6 +2093,7 @@ Scope {
             return false;
 
         const target = activityTargetFromQuery(raw);
+        const timeWindow = activityTimeWindow(query);
         let source = activityQuerySource(query);
         const favoritesOnly =
             query.indexOf("favorite") >= 0
@@ -1842,7 +2114,8 @@ Scope {
             || query.indexOf("newest") >= 0
             || query.indexOf("recent") >= 0
             || favoritesOnly
-            || problemsOnly;
+            || problemsOnly
+            || timeWindow.active;
 
         if (target
                 && !source
@@ -1854,6 +2127,9 @@ Scope {
             contextUnreadOnly = false;
             contextFavoritesOnly = false;
             contextProblemsOnly = false;
+            contextStartEpoch = 0;
+            contextEndEpoch = 0;
+            contextTimeLabel = "";
             append(
                 "RECEPTION",
                 "OPENING ROOM // " + target
@@ -1871,7 +2147,9 @@ Scope {
                 source,
                 favoritesOnly,
                 target,
-                problemsOnly
+                problemsOnly,
+                timeWindow.startEpoch,
+                timeWindow.endEpoch
             );
 
         // A team may not have a retained Rounds event. Fall back to any
@@ -1885,7 +2163,9 @@ Scope {
                     "",
                     favoritesOnly,
                     target,
-                    false
+                    false,
+                    timeWindow.startEpoch,
+                    timeWindow.endEpoch
                 );
         }
 
@@ -1896,7 +2176,8 @@ Scope {
                 target,
                 source ? source.toUpperCase() : "",
                 favoritesOnly ? "FAVORITE" : "",
-                problemsOnly ? "PROBLEM" : ""
+                problemsOnly ? "PROBLEM" : "",
+                timeWindow.active ? timeWindow.label : ""
             ].filter(function(value) {
                 return String(value || "").length > 0;
             }).join(" // ");
@@ -1917,7 +2198,10 @@ Scope {
             target,
             false,
             favoritesOnly,
-            problemsOnly
+            problemsOnly,
+            timeWindow.startEpoch,
+            timeWindow.endEpoch,
+            timeWindow.label
         );
         append(
             "RECEPTION",
@@ -1935,6 +2219,7 @@ Scope {
 
         const query = looseQuery(raw);
         const targetHint = activityTargetFromQuery(raw);
+        const timeWindow = activityTimeWindow(query);
         const asksDoing =
             !!targetHint
             && (
@@ -2034,7 +2319,8 @@ Scope {
                 && !asksProblems
                 && !asksWhen
                 && !asksCount
-                && !asksHelp)
+                && !asksHelp
+                && !timeWindow.active)
             return false;
 
         append("OPERATOR", raw);
@@ -2042,7 +2328,7 @@ Scope {
         if (asksHelp) {
             append(
                 "RECEPTION",
-                "I understand recent activity, what changed, what went wrong, what needs attention, favorites, Room or team history, counts, and last activity. I can also find or show a team, then follow up with open this, take me there, favorite this, go back, or next one."
+                "I understand recent activity, what changed, what went wrong, what needs attention, favorites, Room or team history, counts, and time windows like today, yesterday, this morning, this week, since Monday, or the last few hours. I can also find or show a team, then follow up with open this, take me there, favorite this, go back, or next one."
             );
             return true;
         }
@@ -2054,7 +2340,9 @@ Scope {
                 source,
                 asksNew,
                 asksFavorites,
-                target
+                target,
+                timeWindow.startEpoch,
+                timeWindow.endEpoch
             );
 
         if (asksProblems) {
@@ -2080,6 +2368,9 @@ Scope {
         if (target)
             label += " // " + target;
 
+        if (timeWindow.active)
+            label += " // " + timeWindow.label;
+
         if (asksCount) {
             clearActivityContext();
             append(
@@ -2097,7 +2388,10 @@ Scope {
                     target,
                     asksNew,
                     asksFavorites,
-                    asksProblems
+                    asksProblems,
+                    timeWindow.startEpoch,
+                    timeWindow.endEpoch,
+                    timeWindow.label
                 );
             } else {
                 clearActivityContext();
@@ -2114,6 +2408,11 @@ Scope {
                         : source
                         ? source.toUpperCase()
                         : "ACTIVITY"
+                      )
+                    + (
+                        timeWindow.active
+                        ? " // " + timeWindow.label
+                        : ""
                       ),
                     [matches[0]]
                   )
@@ -2129,7 +2428,10 @@ Scope {
                 target,
                 asksNew,
                 asksFavorites,
-                asksProblems
+                asksProblems,
+                timeWindow.startEpoch,
+                timeWindow.endEpoch,
+                timeWindow.label
             );
         } else {
             clearActivityContext();

@@ -1836,6 +1836,9 @@ Item {
                             NeonScrollBar {
                                 flickable: repositoryScroll7
                                 starHandle: true
+                                topInset: 3
+                                bottomInset: 8
+                                rightInset: 5
                             }
 }
                     }

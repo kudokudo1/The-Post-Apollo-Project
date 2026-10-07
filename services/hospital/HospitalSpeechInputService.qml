@@ -17,6 +17,13 @@ Scope {
     property string audioFileName: "hospital-reception-voice.wav"
     property double recordingStartedAt: 0
     property int recordingElapsedSeconds: 0
+    property bool vadAvailable: false
+    property bool vadEnabled: false
+    property string vadStatus: "CHECKING"
+    property int vadSpeechThreshold: 600
+    property int vadSilenceMs: 2200
+    property int vadMinimumSpeechMs: 250
+    property int vadMaxSeconds: 90
 
     readonly property bool recording:
         voiceState === "recording"
@@ -47,6 +54,10 @@ Scope {
         Quickshell.cachePath(audioFileName)
     readonly property string helperPath:
         Quickshell.shellPath("scripts/hospital-reception-stt.sh")
+    readonly property string captureHelperPath:
+        Quickshell.shellPath("scripts/hospital-voice-record.py")
+    readonly property bool vadActive:
+        vadEnabled && vadAvailable
 
     signal transcriptionReady(string text, bool submitRequested)
     signal voiceError(string message)
@@ -83,6 +94,37 @@ Scope {
         return true;
     }
 
+    function probeVad() {
+        if (vadProbeProcess.running)
+            return false;
+
+        vadStatus = "CHECKING";
+        vadProbeProcess.command = [
+            "bash",
+            "-lc",
+            'command -v python3 >/dev/null 2>&1 && test -f "$1"',
+            "hospital-vad-probe",
+            captureHelperPath
+        ];
+        vadProbeProcess.running = true;
+        return true;
+    }
+
+    function setVadEnabled(value) {
+        const desired = Boolean(value);
+
+        if (desired && !vadAvailable) {
+            vadEnabled = false;
+            lastError = "VAD UNAVAILABLE // PYTHON3 OR CAPTURE HELPER MISSING";
+            voiceError(lastError);
+            return false;
+        }
+
+        vadEnabled = desired;
+        lastError = "";
+        return true;
+    }
+
     function startRecording() {
         if (busy)
             return false;
@@ -105,17 +147,32 @@ Scope {
         recordingClock.restart();
         voiceState = "recording";
 
-        recordProcess.command = [
-            "bash",
-            "-lc",
-            [
-                'audio="$1"',
-                'rm -f "$audio"',
-                'exec pw-record --rate=16000 --channels=1 --format=s16 "$audio"'
-            ].join("\n"),
-            "hospital-reception-record",
-            audioPath
-        ];
+        recordProcess.command =
+            vadActive
+            ? [
+                "python3",
+                captureHelperPath,
+                audioPath,
+                "--threshold",
+                String(vadSpeechThreshold),
+                "--silence-ms",
+                String(vadSilenceMs),
+                "--min-speech-ms",
+                String(vadMinimumSpeechMs),
+                "--max-seconds",
+                String(vadMaxSeconds)
+              ]
+            : [
+                "bash",
+                "-lc",
+                [
+                    'audio="$1"',
+                    'rm -f "$audio"',
+                    'exec pw-record --rate=16000 --channels=1 --format=s16 "$audio"'
+                ].join("\n"),
+                "hospital-reception-record",
+                audioPath
+              ];
         recordProcess.running = true;
         return true;
     }
@@ -166,7 +223,10 @@ Scope {
         return true;
     }
 
-    Component.onCompleted: probe()
+    Component.onCompleted: {
+        probe();
+        probeVad();
+    }
 
     Timer {
         id: recordingClock
@@ -187,6 +247,21 @@ Scope {
                         / 1000
                     )
                 );
+        }
+    }
+
+    Process {
+        id: vadProbeProcess
+
+        onExited: function(exitCode, exitStatus) {
+            root.vadAvailable = exitCode === 0;
+            root.vadStatus =
+                root.vadAvailable
+                ? "READY"
+                : "UNAVAILABLE";
+
+            if (!root.vadAvailable)
+                root.vadEnabled = false;
         }
     }
 
@@ -234,6 +309,22 @@ Scope {
             }
 
             if (root.stopRequested) {
+                root.startTranscription();
+                return;
+            }
+
+            const recordDetail =
+                String(recordErr.text || "");
+            const autoStopped =
+                root.vadActive
+                && (
+                    recordDetail.indexOf("VAD_STOP") >= 0
+                    || recordDetail.indexOf("VAD_MAX") >= 0
+                   );
+
+            if (root.voiceState === "recording"
+                    && autoStopped) {
+                root.recordingClock.stop();
                 root.startTranscription();
                 return;
             }

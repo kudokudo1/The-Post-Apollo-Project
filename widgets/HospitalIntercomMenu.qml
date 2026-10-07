@@ -506,7 +506,7 @@ Rectangle {
 
         anchors {
             left: parent.left
-            right: micButton.left
+            right: vadButton.left
             top: transcriptFrame.bottom
             leftMargin: 8
             rightMargin: 6
@@ -582,6 +582,11 @@ Rectangle {
                 ? (
                     "LISTENING "
                     + root.speechInputService.recordingElapsedLabel
+                    + (
+                        root.speechInputService.vadActive
+                        ? " // VAD"
+                        : ""
+                      )
                   )
                 : root.speechInputService.stopping
                   || root.speechInputService.transcribing
@@ -597,6 +602,90 @@ Rectangle {
             opacity:
                 root.speechInputService.busy
                 ? 0.82 : 0.38
+        }
+    }
+
+    Rectangle {
+        id: vadButton
+
+        readonly property bool enabledAction:
+            root.speechInputService.vadAvailable
+            && !root.speechInputService.busy
+
+        anchors {
+            right: micButton.left
+            top: transcriptFrame.bottom
+            rightMargin: 6
+            topMargin: 8
+        }
+
+        width: 42
+        height: 42
+        color:
+            root.speechInputService.vadEnabled
+            ? Colors.yellow
+            : vadMouse.pressed
+            ? Colors.black
+            : Colors.dark
+        border.width:
+            root.speechInputService.vadEnabled
+            || vadMouse.containsMouse
+            ? 2 : 1
+        border.color:
+            vadMouse.containsMouse
+            && vadButton.enabledAction
+            ? Colors.orange
+            : root.speechInputService.vadEnabled
+            ? Colors.omnitrix
+            : Colors.cyan
+
+        RectangularShadow {
+            anchors.fill: parent
+            spread: 3
+            z: -1
+            opacity:
+                root.speechInputService.vadEnabled
+                ? 0.38
+                : vadButton.enabledAction
+                ? 0.18 : 0.08
+            color:
+                root.speechInputService.vadEnabled
+                ? Colors.omnitrix
+                : Colors.cyan
+        }
+
+        GohuText {
+            anchors.centerIn: parent
+            text: "VAD"
+            font.pixelSize: 9
+            color:
+                root.speechInputService.vadEnabled
+                ? Colors.magenta
+                : vadMouse.containsMouse
+                  && vadButton.enabledAction
+                ? Colors.orange
+                : Colors.cyan
+            opacity:
+                vadButton.enabledAction
+                || root.speechInputService.vadEnabled
+                ? 1.0 : 0.34
+        }
+
+        MouseArea {
+            id: vadMouse
+
+            anchors.fill: parent
+            enabled: vadButton.enabledAction
+            hoverEnabled: true
+            cursorShape:
+                enabled
+                ? Qt.PointingHandCursor
+                : Qt.ArrowCursor
+
+            onClicked:
+                root.speechInputService.setVadEnabled(
+                    !root.speechInputService.vadEnabled
+                )
         }
     }
 
@@ -864,7 +953,14 @@ Rectangle {
               )
             || root.intercomService.lastError
             || root.intercomService.lastStatus
-            || "READY // INTERCOM"
+            || (
+                "READY // INTERCOM"
+                + (
+                    root.speechInputService.vadEnabled
+                    ? " // VAD"
+                    : ""
+                  )
+               )
         font.pixelSize: 9
         color:
             root.speechInputService.lastError

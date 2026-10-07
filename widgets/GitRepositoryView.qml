@@ -272,6 +272,98 @@ Item {
         return "RULE ignores matching untracked paths. NEGATE (!) re-includes a path after an earlier ignore. Comments and blank lines are preserved exactly.";
     }
 
+    function healthStateColor() {
+        if (!root.repositoryService)
+            return Colors.cyan;
+
+        const state =
+            String(root.repositoryService.healthState || "");
+
+        if (state === "PASS")
+            return Colors.green;
+        if (state === "RECOVERY")
+            return Colors.magenta;
+        if (state === "WARNING")
+            return Colors.orange;
+        if (state === "FAIL")
+            return Colors.red;
+
+        return Colors.cyan;
+    }
+
+    function objectConditionText() {
+        if (!root.repositoryService)
+            return "UNKNOWN";
+
+        if (root.repositoryService.garbageObjectCount > 0)
+            return "GARBAGE DETECTED";
+
+        if (root.repositoryService.prunePackableCount > 0)
+            return "CLEANUP AVAILABLE";
+
+        return "NORMAL";
+    }
+
+    function objectConditionColor() {
+        if (!root.repositoryService)
+            return Colors.cyan;
+
+        if (root.repositoryService.garbageObjectCount > 0)
+            return Colors.red;
+
+        if (root.repositoryService.prunePackableCount > 0)
+            return Colors.orange;
+
+        return Colors.green;
+    }
+
+    function healthCleanupBlocked() {
+        return Boolean(
+            root.repositoryService
+            && root.repositoryService.healthState === "FAIL"
+        );
+    }
+
+    function runHealthCleanup(kind) {
+        if (!root.repositoryService
+                || root.repositoryService.actionBusy
+                || root.healthCleanupBlocked())
+            return;
+
+        const action = String(kind || "");
+        const recovery =
+            root.repositoryService.healthState === "RECOVERY";
+
+        if (action === "gc") {
+            if (recovery) {
+                root.armOrRun(
+                    "gc-recovery",
+                    function() {
+                        root.repositoryService.runGcAuto();
+                    }
+                );
+                return;
+            }
+
+            root.repositoryService.runGcAuto();
+            return;
+        }
+
+        if (action === "maintenance") {
+            if (recovery) {
+                root.armOrRun(
+                    "maintenance-recovery",
+                    function() {
+                        root.repositoryService.runMaintenance();
+                    }
+                );
+                return;
+            }
+
+            root.repositoryService.runMaintenance();
+        }
+    }
+
     function configCategoryForKey(keyValue) {
         const key = String(keyValue || "").trim().toLowerCase();
 
@@ -3023,11 +3115,11 @@ Item {
                 visible: root.subMode === "health"
 
                 Rectangle {
-                    width: 450
+                    width: 520
                     height: parent.height
                     color: Colors.dark
                     border.width: 1
-                    border.color: Colors.red
+                    border.color: root.healthStateColor()
 
                     Column {
                         anchors {
@@ -3037,109 +3129,367 @@ Item {
                         spacing: 7
 
                         SectionLabel {
-                            text: "OBJECT DATABASE"
+                            text: "REPOSITORY HEALTH"
                         }
 
-                        Flickable {
-                            id: repositoryScroll9
+                        Rectangle {
                             width: parent.width
-                            height: 170
-                            clip: true
-                            contentWidth: width
-                            contentHeight: objectText.implicitHeight
+                            height: 110
+                            color: Colors.black
+                            border.width: 1
+                            border.color:
+                                root.healthStateColor()
 
-                            GohuText {
-                                id: objectText
-                                width: parent.width
-                                text:
-                                    root.repositoryService
-                                    ? root.repositoryService.objectInfo
-                                    : ""
-                                font.pixelSize: 11
-                                color: Colors.white
-                                wrapMode: Text.WrapAnywhere
+                            Column {
+                                anchors {
+                                    fill: parent
+                                    margins: 7
+                                }
+                                spacing: 5
+
+                                GohuText {
+                                    width: parent.width
+                                    text:
+                                        root.repositoryService
+                                        ? (
+                                            root.repositoryService.healthState
+                                            + " // "
+                                            + root.repositoryService.healthSummary
+                                          )
+                                        : "NO REPOSITORY SERVICE"
+                                    font.pixelSize: 11
+                                    color:
+                                        root.healthStateColor()
+                                    wrapMode: Text.WordWrap
+                                    elide: Text.ElideRight
+                                }
+
+                                GohuText {
+                                    width: parent.width
+                                    text:
+                                        root.repositoryService
+                                        ? root.repositoryService
+                                              .healthRecommendation
+                                        : ""
+                                    font.pixelSize: 9
+                                    color: Colors.white
+                                    opacity: 0.68
+                                    wrapMode: Text.WordWrap
+                                    elide: Text.ElideRight
+                                }
+
+                                GohuText {
+                                    width: parent.width
+                                    text:
+                                        root.repositoryService
+                                        ? (
+                                            "FSCK // "
+                                            + String(
+                                                root.repositoryService
+                                                    .fsckDanglingCount
+                                              )
+                                            + " DANGLING // "
+                                            + String(
+                                                root.repositoryService
+                                                    .fsckUnreachableCount
+                                              )
+                                            + " UNREACHABLE // "
+                                            + String(
+                                                root.repositoryService
+                                                    .fsckWarningCount
+                                              )
+                                            + " WARNING // "
+                                            + String(
+                                                root.repositoryService
+                                                    .fsckErrorCount
+                                              )
+                                            + " ERROR"
+                                          )
+                                        : ""
+                                    font.pixelSize: 8
+                                    color: Colors.cyan
+                                    elide: Text.ElideRight
+                                }
                             }
-                        
-                            NeonScrollBar {
-                                flickable: repositoryScroll9
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 126
+                            color: Colors.black
+                            border.width: 1
+                            border.color:
+                                root.objectConditionColor()
+
+                            Column {
+                                anchors {
+                                    fill: parent
+                                    margins: 7
+                                }
+                                spacing: 5
+
+                                GohuText {
+                                    width: parent.width
+                                    text:
+                                        "OBJECT DATABASE // "
+                                        + root.objectConditionText()
+                                    font.pixelSize: 10
+                                    color:
+                                        root.objectConditionColor()
+                                }
+
+                                GohuText {
+                                    width: parent.width
+                                    text:
+                                        root.repositoryService
+                                        ? (
+                                            "LOOSE // "
+                                            + String(
+                                                root.repositoryService
+                                                    .looseObjectCount
+                                              )
+                                            + " OBJECTS // "
+                                            + root.repositoryService
+                                                  .looseObjectSize
+                                          )
+                                        : ""
+                                    font.pixelSize: 9
+                                    color: Colors.white
+                                }
+
+                                GohuText {
+                                    width: parent.width
+                                    text:
+                                        root.repositoryService
+                                        ? (
+                                            "PACKED // "
+                                            + String(
+                                                root.repositoryService
+                                                    .packedObjectCount
+                                              )
+                                            + " OBJECTS // "
+                                            + String(
+                                                root.repositoryService
+                                                    .packCount
+                                              )
+                                            + " PACKS // "
+                                            + root.repositoryService
+                                                  .packedObjectSize
+                                          )
+                                        : ""
+                                    font.pixelSize: 9
+                                    color: Colors.white
+                                }
+
+                                GohuText {
+                                    width: parent.width
+                                    text:
+                                        root.repositoryService
+                                        ? (
+                                            "PRUNE-PACKABLE // "
+                                            + String(
+                                                root.repositoryService
+                                                    .prunePackableCount
+                                              )
+                                            + " // GARBAGE // "
+                                            + String(
+                                                root.repositoryService
+                                                    .garbageObjectCount
+                                              )
+                                            + " // "
+                                            + root.repositoryService
+                                                  .garbageObjectSize
+                                          )
+                                        : ""
+                                    font.pixelSize: 9
+                                    color:
+                                        root.objectConditionColor()
+                                }
+
+                                GohuText {
+                                    width: parent.width
+                                    text:
+                                        root.repositoryService
+                                        && root.repositoryService
+                                               .garbageObjectCount > 0
+                                        ? "Garbage entries are not the same as dangling commits; inspect evidence before cleanup."
+                                        : root.repositoryService
+                                          && root.repositoryService
+                                                 .prunePackableCount > 0
+                                        ? "Git reports loose objects already duplicated in packs; cleanup may reclaim them."
+                                        : "Object storage reports no obvious cleanup anomaly."
+                                    font.pixelSize: 8
+                                    color: Colors.white
+                                    opacity: 0.58
+                                    wrapMode: Text.WordWrap
+                                }
                             }
-}
+                        }
 
                         MiniButton {
                             width: parent.width
-                            label: "FSCK // VERIFY OBJECT GRAPH"
+                            label:
+                                root.repositoryService
+                                && root.repositoryService.actionBusy
+                                && root.repositoryService.actionName
+                                   === "FSCK"
+                                ? "FSCK // VERIFYING"
+                                : "FSCK // VERIFY OBJECT GRAPH"
                             accent: Colors.red
                             enabledAction:
                                 root.repositoryService
                                 && !root.repositoryService.actionBusy
-                            onTriggered:
-                                root.repositoryService.runFsck()
+                            onTriggered: {
+                                root.armedAction = "";
+                                root.repositoryService.runFsck();
+                            }
                         }
 
                         MiniButton {
                             width: parent.width
-                            label: "GC --AUTO"
-                            accent: Colors.orange
+                            label:
+                                root.healthCleanupBlocked()
+                                ? "GC --AUTO // BLOCKED BY FSCK FAIL"
+                                : root.armedAction === "gc-recovery"
+                                ? "CONFIRM GC // RECOVERY OBJECTS"
+                                : root.repositoryService
+                                  && root.repositoryService.healthState
+                                     === "RECOVERY"
+                                ? "GC --AUTO // RECOVERY OBJECTS"
+                                : "GC --AUTO"
+                            accent:
+                                root.healthCleanupBlocked()
+                                ? Colors.red
+                                : Colors.orange
                             enabledAction:
                                 root.repositoryService
                                 && !root.repositoryService.actionBusy
+                                && !root.healthCleanupBlocked()
                             onTriggered:
-                                root.repositoryService.runGcAuto()
+                                root.runHealthCleanup("gc")
                         }
 
                         MiniButton {
                             width: parent.width
-                            label: "MAINTENANCE RUN --AUTO"
-                            accent: Colors.cyan
+                            label:
+                                root.healthCleanupBlocked()
+                                ? "MAINTENANCE // BLOCKED BY FSCK FAIL"
+                                : root.armedAction
+                                  === "maintenance-recovery"
+                                ? "CONFIRM MAINTENANCE // RECOVERY OBJECTS"
+                                : root.repositoryService
+                                  && root.repositoryService.healthState
+                                     === "RECOVERY"
+                                ? "MAINTENANCE // RECOVERY OBJECTS"
+                                : "MAINTENANCE RUN --AUTO"
+                            accent:
+                                root.healthCleanupBlocked()
+                                ? Colors.red
+                                : Colors.cyan
                             enabledAction:
                                 root.repositoryService
                                 && !root.repositoryService.actionBusy
+                                && !root.healthCleanupBlocked()
                             onTriggered:
-                                root.repositoryService.runMaintenance()
+                                root.runHealthCleanup("maintenance")
                         }
                     }
                 }
 
                 Rectangle {
-                    width: parent.width - 458
+                    width: parent.width - 528
                     height: parent.height
                     color: Colors.black
                     border.width: 1
-                    border.color: Colors.cyan
+                    border.color: root.healthStateColor()
 
-                    Flickable {
-                        id: repositoryScroll10
+                    Column {
                         anchors {
                             fill: parent
                             margins: 8
                         }
-                        clip: true
-                        contentWidth: width
-                        contentHeight: healthText.implicitHeight
+                        spacing: 7
+
+                        Row {
+                            width: parent.width
+                            height: 24
+                            spacing: 6
+
+                            SectionLabel {
+                                width: parent.width - 176
+                                text: "RAW DIAGNOSTIC EVIDENCE"
+                            }
+
+                            GohuText {
+                                width: 170
+                                anchors.verticalCenter:
+                                    parent.verticalCenter
+                                text:
+                                    root.repositoryService
+                                    ? root.repositoryService.healthState
+                                    : "UNAVAILABLE"
+                                horizontalAlignment:
+                                    Text.AlignRight
+                                font.pixelSize: 10
+                                color:
+                                    root.healthStateColor()
+                            }
+                        }
 
                         GohuText {
-                            id: healthText
                             width: parent.width
                             text:
                                 root.repositoryService
-                                ? root.repositoryService.healthOutput
-                                : "NO REPOSITORY SERVICE"
-                            font.pixelSize: 11
-                            color:
-                                root.repositoryService
-                                && root.repositoryService.lastError
-                                ? Colors.red
-                                : Colors.white
-                            wrapMode: Text.WrapAnywhere
+                                ? (
+                                    "Latest health action output is preserved below. Interpretation never replaces the raw Git evidence."
+                                  )
+                                : ""
+                            font.pixelSize: 9
+                            color: Colors.white
+                            opacity: 0.52
+                            wrapMode: Text.WordWrap
                         }
-                    
-                        NeonScrollBar {
-                            flickable: repositoryScroll10
+
+                        Flickable {
+                            id: repositoryScroll10
+                            width: parent.width
+                            height:
+                                Math.max(
+                                    0,
+                                    parent.height - 62
+                                )
+                            clip: true
+                            contentWidth: width
+                            contentHeight:
+                                healthText.implicitHeight
+                            boundsBehavior:
+                                Flickable.StopAtBounds
+
+                            GohuText {
+                                id: healthText
+                                width: parent.width
+                                text:
+                                    root.repositoryService
+                                    ? root.repositoryService.healthOutput
+                                    : "NO REPOSITORY SERVICE"
+                                font.pixelSize: 10
+                                color:
+                                    root.repositoryService
+                                    && root.repositoryService
+                                           .healthState === "FAIL"
+                                    ? Colors.red
+                                    : Colors.white
+                                wrapMode: Text.WrapAnywhere
+                            }
+
+                            NeonScrollBar {
+                                flickable: repositoryScroll10
+                                starHandle: true
+                            }
                         }
-}
+                    }
                 }
             }
-        }
 
         Rectangle {
             width: parent.width

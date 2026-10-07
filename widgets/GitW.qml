@@ -39,6 +39,7 @@ PanelWindow {
     property bool runInspectorOpen: false
     property int runInspectorHeight: 400
     property string selectedGitCommitSha: ""
+    property bool blameOpen: false
     property var activeTextEditor: null
     property var gitKeyboardControls: []
     property var gitKeyboardControl: null
@@ -48,6 +49,11 @@ PanelWindow {
 
     readonly property bool gitCanGoBack:
         gitNavigationStack.length > 0
+
+    onGitViewChanged: {
+        if (gitView !== "history")
+            blameOpen = false;
+    }
     readonly property string gitBackLabel:
         gitNavigationStack.length > 0
         ? root.gitNavigationContextLabel(
@@ -1069,6 +1075,65 @@ PanelWindow {
         gitHistoryView.openPathQuery(target);
     }
 
+    function openBlameForPath(path, revision, line) {
+        const target = String(path || "").trim();
+        const rev = String(revision || "WORKTREE").trim() || "WORKTREE";
+        const targetLine = Math.max(0, Number(line || 0));
+
+        if (!target || !blameService.available)
+            return false;
+
+        root.activePage = "git";
+        root.gitView = "history";
+        root.blameOpen = true;
+        gitBlameView.pathText = target;
+        gitBlameView.revisionText = rev;
+        gitBlameView.startLineText =
+            targetLine > 0 ? String(targetLine) : "";
+        gitBlameView.endLineText =
+            targetLine > 0 ? String(targetLine) : "";
+
+        return gitBlameView.requestLoad();
+    }
+
+    function closeBlame() {
+        root.blameOpen = false;
+    }
+
+    function openCommitFromBlame(sha) {
+        const commit = String(sha || "").trim();
+
+        if (!commit)
+            return false;
+
+        root.blameOpen = false;
+        root.activePage = "git";
+        root.gitView = "history";
+        gitHistoryView.inspectorMode = "detail";
+        gitHistoryView.selectCommit(commit, "");
+        return true;
+    }
+
+    function openHistoryFromBlame(sha, path, line) {
+        const commit = String(sha || "").trim();
+        const target = String(path || "").trim();
+
+        if (!commit)
+            return false;
+
+        root.blameOpen = false;
+        root.activePage = "git";
+        root.gitView = "history";
+        gitHistoryView.selectCommit(commit, "");
+
+        if (target) {
+            gitHistoryView.inspectorMode = "file";
+            historyService.showFileDiff(commit, target);
+        }
+
+        return true;
+    }
+
     function openChangesForPath(path) {
         const target = String(path || "").trim();
 
@@ -1864,6 +1929,30 @@ PanelWindow {
             gitService.repoIsLocal
             ? gitService.repoRoot
             : ""
+    }
+
+    GitBlameService {
+        id: blameService
+        repositoryPath:
+            gitService.repoIsLocal
+            ? gitService.repoRoot
+            : ""
+    }
+
+    Connections {
+        target: blameService
+
+        function onCommitRequested(sha) {
+            root.openCommitFromBlame(sha);
+        }
+
+        function onHistoryRequested(sha, path, line) {
+            root.openHistoryFromBlame(
+                sha,
+                path,
+                line
+            );
+        }
     }
 
     GitInteractiveRebaseService {
@@ -4991,6 +5080,37 @@ PanelWindow {
                                 sha
                             );
                         }
+
+                        onBlameRequested: function(path, revision) {
+                            root.openBlameForPath(
+                                path,
+                                revision,
+                                0
+                            );
+                        }
+                    }
+
+                    GitBlameView {
+                        id: gitBlameView
+
+                        z: 80
+                        anchors {
+                            top: parent.top
+                            left: parent.left
+                            right: parent.right
+                            bottom: gitModeButtonRow.top
+                            topMargin: root.gitCanGoBack ? 34 : 0
+                            bottomMargin: 8
+                        }
+
+                        visible:
+                            root.gitView === "history"
+                            && root.blameOpen
+
+                        blameService: blameService
+
+                        onCloseRequested:
+                            root.closeBlame()
                     }
 
                     GitChangesView {

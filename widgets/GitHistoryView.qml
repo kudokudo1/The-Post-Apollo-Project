@@ -30,6 +30,7 @@ Item {
 
     signal changesRequested(string path)
     signal branchesRequested(string branch, string sha)
+    signal blameRequested(string path, string revision)
 
     readonly property var displayedRows: root.filteredRows()
 
@@ -1528,6 +1529,21 @@ Item {
                                 onTriggered:
                                     root.changesRequested(
                                         root.historyService.selectedFile
+                                    )
+                            }
+
+                            MiniButton {
+                                width: 72
+                                label: "BLAME"
+                                accent: Colors.blue
+                                enabledAction:
+                                    root.historyService
+                                    && root.historyService.selectedFile
+                                    && root.historyService.selectedSha
+                                onTriggered:
+                                    root.blameRequested(
+                                        root.historyService.selectedFile,
+                                        root.historyService.selectedSha
                                     )
                             }
 

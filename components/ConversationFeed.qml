@@ -289,6 +289,8 @@ Rectangle {
 
                 text: modelData.body || ""
 
+                textFormat: chatFeed.messageTextFormat
+
                 font.family: "GohuFont 11 Nerd Font Mono"
 
                 font.pixelSize: 14

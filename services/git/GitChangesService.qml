@@ -818,6 +818,94 @@ Scope {
                === "NONE";
     }
 
+    function snapshotContentIsClean(snapshot) {
+        const row = snapshot || {};
+        const working = row.workingState || {};
+
+        return Number(working.stagedCount || 0) === 0
+            && Number(working.unstagedCount || 0) === 0
+            && Number(working.untrackedCount || 0) === 0
+            && Number(working.conflictCount || 0) === 0
+            && String((row.operationState || {}).state || "NONE")
+               === "NONE";
+    }
+
+    function sameBranchHead(before, after) {
+        const first = before || {};
+        const second = after || {};
+        const branch = String(first.branch || "");
+        const head = String(first.head || "");
+        const ref = "refs/heads/" + branch;
+
+        return branch
+            && head
+            && String(second.branch || "") === branch
+            && String(second.head || "") === head
+            && snapshotRefSha(first, ref) === head
+            && snapshotRefSha(second, ref) === head;
+    }
+
+    function stashApplySnapshotCanRecover(before, after) {
+        const first = before || {};
+        const second = after || {};
+
+        return sameBranchHead(first, second)
+            && snapshotContentIsClean(first)
+            && Number((second.workingState || {}).conflictCount || 0) === 0
+            && String((second.operationState || {}).state || "NONE")
+               === "NONE"
+            && snapshotRefSha(first, "refs/stash")
+               === snapshotRefSha(second, "refs/stash");
+    }
+
+    function stashPopSnapshotCanRecover(before, after) {
+        const first = before || {};
+        const second = after || {};
+        const beforeStash = snapshotRefSha(first, "refs/stash");
+        const afterStash = snapshotRefSha(second, "refs/stash");
+
+        return sameBranchHead(first, second)
+            && snapshotContentIsClean(first)
+            && beforeStash
+            && beforeStash !== afterStash
+            && Number((second.workingState || {}).conflictCount || 0) === 0
+            && String((second.operationState || {}).state || "NONE")
+               === "NONE";
+    }
+
+    function stashDropSnapshotCanRecover(before, after) {
+        const first = before || {};
+        const second = after || {};
+        const beforeWorking = first.workingState || {};
+        const afterWorking = second.workingState || {};
+        const beforeIndex = first.index || {};
+        const afterIndex = second.index || {};
+        const beforeStash = snapshotRefSha(first, "refs/stash");
+        const afterStash = snapshotRefSha(second, "refs/stash");
+
+        return sameBranchHead(first, second)
+            && beforeStash
+            && beforeStash !== afterStash
+            && String(beforeIndex.tree || "")
+               === String(afterIndex.tree || "")
+            && String(beforeWorking.worktreePatchHash || "")
+               === String(afterWorking.worktreePatchHash || "")
+            && String(beforeWorking.untrackedListHash || "")
+               === String(afterWorking.untrackedListHash || "")
+            && Number(beforeWorking.stagedCount || 0)
+               === Number(afterWorking.stagedCount || 0)
+            && Number(beforeWorking.unstagedCount || 0)
+               === Number(afterWorking.unstagedCount || 0)
+            && Number(beforeWorking.untrackedCount || 0)
+               === Number(afterWorking.untrackedCount || 0)
+            && Number(beforeWorking.conflictCount || 0) === 0
+            && Number(afterWorking.conflictCount || 0) === 0
+            && String((first.operationState || {}).state || "NONE")
+               === "NONE"
+            && String((second.operationState || {}).state || "NONE")
+               === "NONE";
+    }
+
     function stashSnapshotCanRecover(before, after) {
         const first = before || {};
         const second = after || {};
@@ -944,6 +1032,88 @@ Scope {
             out.recoveryClass = "EVIDENCE_ONLY";
             out.recoveryReason =
                 "STASH CONTENT TRANSITION IS NOT EXACT";
+            return out;
+        }
+
+        if (operation === "stash-apply"
+                || operation === "stash-pop"
+                || operation === "stash-drop") {
+            const args =
+                Array.isArray(pendingArguments)
+                ? pendingArguments
+                : [];
+            const ref =
+                args.length > 0
+                ? String(args[0] || "")
+                : "";
+            const topRef =
+                !ref
+                || ref === "stash@{0}"
+                || ref === "refs/stash";
+
+            if (!topRef) {
+                out.recoveryClass = "EVIDENCE_ONLY";
+                out.recoveryReason =
+                    "ONLY TOP-STASH MUTATIONS HAVE EXACT AUTOMATIC UNDO";
+                return out;
+            }
+
+            if (stage === "BEFORE") {
+                if (operation === "stash-drop") {
+                    if (snapshotRefSha(out, "refs/stash")
+                            && Number(
+                                (out.workingState || {}).conflictCount || 0
+                            ) === 0
+                            && String(
+                                (out.operationState || {}).state || "NONE"
+                            ) === "NONE") {
+                        out.recoveryClass = "CONTENT_RECOVERABLE";
+                        out.recoveryReason =
+                            "TOP STASH DROP CAN RESTORE THE EXACT "
+                            + "STASH OBJECT WITHOUT TOUCHING CONTENT";
+                        return out;
+                    }
+                } else if (snapshotContentIsClean(out)
+                        && snapshotRefSha(out, "refs/stash")) {
+                    out.recoveryClass = "CONTENT_RECOVERABLE";
+                    out.recoveryReason =
+                        operation === "stash-pop"
+                        ? "CLEAN TOP-STASH POP CAN RESTORE CONTENT "
+                          + "AND RECREATE THE EXACT STASH OBJECT"
+                        : "CLEAN TOP-STASH APPLY CAN RETURN TO "
+                          + "THE EXACT CLEAN PRE-APPLY STATE";
+                    return out;
+                }
+            } else if (stage === "AFTER"
+                    && pendingBeforeSnapshot) {
+                const exact =
+                    operation === "stash-apply"
+                    ? stashApplySnapshotCanRecover(
+                        pendingBeforeSnapshot,
+                        out
+                      )
+                    : operation === "stash-pop"
+                    ? stashPopSnapshotCanRecover(
+                        pendingBeforeSnapshot,
+                        out
+                      )
+                    : stashDropSnapshotCanRecover(
+                        pendingBeforeSnapshot,
+                        out
+                      );
+
+                if (exact) {
+                    out.recoveryClass = "CONTENT_RECOVERABLE";
+                    out.recoveryReason =
+                        operation.toUpperCase()
+                        + " HAS AN EXACT GUARDED INVERSE";
+                    return out;
+                }
+            }
+
+            out.recoveryClass = "EVIDENCE_ONLY";
+            out.recoveryReason =
+                "STASH MUTATION CONTENT/STACK TRANSITION IS NOT EXACT";
             return out;
         }
 

@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Focused static contracts for the standalone Git blame/provenance service."""
+"""Focused static contracts for standalone Git blame/provenance."""
 
 from pathlib import Path
 import re
 
 ROOT = Path(__file__).resolve().parents[2]
 SERVICE_PATH = ROOT / "services/git/GitBlameService.qml"
+VIEW_PATH = ROOT / "widgets/GitBlameView.qml"
 errors = []
 
 
@@ -19,12 +20,17 @@ def require_regex(text: str, pattern: str, label: str) -> None:
         errors.append(f"{label}: did not match {pattern!r}")
 
 
-if not SERVICE_PATH.exists():
-    errors.append("missing services/git/GitBlameService.qml")
-    service = ""
-else:
-    service = SERVICE_PATH.read_text(encoding="utf-8")
+def read(path: Path, label: str) -> str:
+    if not path.exists():
+        errors.append(f"missing {label}: {path.relative_to(ROOT)}")
+        return ""
+    return path.read_text(encoding="utf-8")
 
+
+service = read(SERVICE_PATH, "blame service")
+view = read(VIEW_PATH, "blame view")
+
+# Backend provenance contract.
 require(
     service,
     'cmd=(git -C "$repo" blame --line-porcelain --root)',
@@ -108,9 +114,8 @@ require(
     "loaded provenance groups must support line/range filtering",
 )
 
-# This service is intentionally read-only. It may inspect revisions, but it
-# must not grow a generic mutation seam while Doc 3 owns repository mutation
-# history/recovery.
+# The backend is intentionally read-only. It may inspect revisions, but it
+# must not grow a mutation seam while Doc 3 owns repository time/recovery.
 for forbidden in (
     "runAction(",
     "GitOperationJournalService",
@@ -128,6 +133,78 @@ for forbidden in (
             f"read-only provenance boundary violated by {forbidden!r}"
         )
 
+# Presentation contract: the view consumes the service and stays free of Git
+# execution, mutation, History ownership, and GitW-specific integration.
+require(
+    view,
+    "required property var blameService",
+    "view must receive provenance through a service dependency",
+)
+require(
+    view,
+    "? blameService.groups",
+    "view must expose grouped provenance",
+)
+require(
+    view,
+    ": blameService.rows",
+    "view must expose line provenance",
+)
+require(
+    view,
+    "blameService.loadRange(",
+    "view must delegate line/range loading to the service",
+)
+require(
+    view,
+    "blameService.loadFile(",
+    "view must delegate whole-file loading to the service",
+)
+require(
+    view,
+    "blameService.requestHistory(",
+    "view must use the neutral History handoff",
+)
+require(
+    view,
+    "blameService.requestCommit(",
+    "view must use the neutral commit handoff",
+)
+require(
+    view,
+    "record.previousPath",
+    "view must surface rename/source provenance when available",
+)
+require(
+    view,
+    "record.uncommitted",
+    "view must visibly distinguish worktree-only provenance",
+)
+require(
+    view,
+    'label: "GROUPS"',
+    "view must offer grouped provenance mode",
+)
+require(
+    view,
+    'label: "LINES"',
+    "view must offer per-line provenance mode",
+)
+
+for forbidden in (
+    "Quickshell.Io",
+    "Process {",
+    "git -C",
+    "GitOperationJournalService",
+    "GitBranchWorkspaceService",
+    "GitHistoryService",
+    "GitW",
+):
+    if forbidden in view:
+        errors.append(
+            f"presentation boundary violated by {forbidden!r}"
+        )
+
 if errors:
     print("POST-APOLLO GIT BLAME CONTRACTS // FAIL")
     for error in errors:
@@ -135,4 +212,4 @@ if errors:
     raise SystemExit(1)
 
 print("POST-APOLLO GIT BLAME CONTRACTS // PASS")
-print("checked standalone provenance service")
+print("checked standalone provenance service + view")

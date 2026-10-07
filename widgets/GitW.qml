@@ -1896,6 +1896,16 @@ PanelWindow {
             : ""
     }
 
+    GitHistorySplitService {
+        id: historySplitService
+        operationJournal: operationJournalService
+        snapshotService: repositorySnapshotService
+        repositoryPath:
+            gitService.repoIsLocal
+            ? gitService.repoRoot
+            : ""
+    }
+
     GitHistoryAbsorbService {
         id: historyAbsorbService
         operationJournal: operationJournalService
@@ -5000,6 +5010,7 @@ PanelWindow {
                         interactiveRebaseSessionService:
                             interactiveRebaseSessionService
                         historyFoldService: historyFoldService
+                        historySplitService: historySplitService
                         historyAbsorbService: historyAbsorbService
                         keyboardHost: root
 

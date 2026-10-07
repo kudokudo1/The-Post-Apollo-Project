@@ -80,6 +80,9 @@ Scope {
         plan.length > 0 && invalidCount === 0
 
     function clear() {
+        if (submitBusy)
+            return false;
+
         previewBusy = false;
         startBranch = "";
         plan = [];
@@ -87,39 +90,52 @@ Scope {
         lastError = "";
         previewWatchdog.stop();
         disarm("");
+        return true;
     }
 
     function structuralSteps(branch) {
         const selected = String(branch || "").trim();
         const rows = [];
+        const seen = {};
 
         if (!selected || !branchStackStore)
             return rows;
 
-        function appendNode(node, includeNode) {
-            const name = String(node || "");
-            const parent = branchStackStore.parentOf(name);
+        function appendRelation(name) {
+            const child = String(name || "");
+            const parent = branchStackStore.parentOf(child);
 
-            if (includeNode && parent) {
-                rows.push({
-                    branch: name,
-                    parent: parent
-                });
-            }
+            if (!child || !parent || seen[child])
+                return;
 
-            const children = branchStackStore.childrenOf(name);
+            seen[child] = true;
+            rows.push({
+                branch: child,
+                parent: parent
+            });
+        }
+
+        // Include the ancestor chain so a selected middle branch never tries
+        // to target a base branch that this submission forgot to push.
+        const ancestors =
+            branchStackStore.ancestorsOf(selected).slice().reverse();
+
+        for (let i = 0; i < ancestors.length; ++i)
+            appendRelation(ancestors[i]);
+
+        appendRelation(selected);
+
+        function appendDescendants(parent) {
+            const children = branchStackStore.childrenOf(parent);
 
             for (let i = 0; i < children.length; ++i) {
                 const child = String(children[i] || "");
-                rows.push({
-                    branch: child,
-                    parent: name
-                });
-                appendNode(child, false);
+                appendRelation(child);
+                appendDescendants(child);
             }
         }
 
-        appendNode(selected, true);
+        appendDescendants(selected);
         return rows;
     }
 
@@ -164,6 +180,27 @@ Scope {
                 : !slug
                 ? "STACK SUBMIT PREVIEW // NO GITHUB REPOSITORY"
                 : "STACK SUBMIT PREVIEW // NO BRANCH";
+            previewState = lastError;
+            plan = [];
+            return false;
+        }
+
+        const stackRoot =
+            branchStackStore
+            ? String(branchStackStore.stackRoot(selected) || "")
+            : "";
+        const trunk =
+            branchStackStore
+            ? String(branchStackStore.trunkBranch || "main")
+            : "main";
+
+        if (stackRoot && stackRoot !== trunk) {
+            lastError =
+                "STACK SUBMIT PREVIEW // STACK ROOT "
+                + stackRoot
+                + " DOES NOT REACH TRUNK "
+                + trunk
+                + " // SET A PARENT FIRST";
             previewState = lastError;
             plan = [];
             return false;

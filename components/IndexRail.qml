@@ -88,7 +88,7 @@ Rectangle {
         color: rail.accentColor
         opacity: rail.count > 0 ? 0.90 : 0.18
 
-        layer.enabled: true
+        layer.enabled: Window.window !== null
         layer.effect: DropShadow {
             radius: 4
             samples: 5

@@ -11,6 +11,7 @@ Singleton {
 
     property ListModel notifications: ListModel {}
     property ListModel activeNotifications: ListModel {}
+    property ListModel sourcePolicies: ListModel {}
 
     property int normalTimeoutMs: 5000
     property int extendedTimeoutMs: 10000
@@ -27,8 +28,206 @@ Singleton {
     property int maxHistoryEntries: 300
     property int notificationsRevision: 0
 
+    // Persistent source-wide notification policy.
+    property int policyVersion: 1
+    property bool policyReady: false
+    property string policyStatus: "loading"
+    property int policyRevision: 0
+    property int defaultSnoozeDurationMs: 24 * 60 * 60 * 1000
+
     function markNotificationsChanged() {
         notificationsRevision += 1;
+    }
+
+    function sourceKey(sourceId, source) {
+        const sourceIdText = String(sourceId || "").trim().toLowerCase();
+        const sourceText = String(source || "").trim().toLowerCase();
+
+        if (sourceIdText !== "")
+            return sourceIdText;
+
+        if (sourceText !== "")
+            return sourceText;
+
+        return "unknown";
+    }
+
+    function policyIndex(appKey) {
+        const key = String(appKey || "").trim().toLowerCase();
+
+        for (let i = 0; i < sourcePolicies.count; i++) {
+            if (String(sourcePolicies.get(i).appKey || "") === key)
+                return i;
+        }
+
+        return -1;
+    }
+
+    function policyFor(appKey) {
+        const index = policyIndex(appKey);
+
+        if (index === -1) {
+            return {
+                "appKey": String(appKey || ""),
+                "source": "",
+                "sourceId": "",
+                "dnd": false,
+                "snoozeUntil": 0
+            };
+        }
+
+        const policy = sourcePolicies.get(index);
+
+        return {
+            "appKey": String(policy.appKey || ""),
+            "source": String(policy.source || ""),
+            "sourceId": String(policy.sourceId || ""),
+            "dnd": policy.dnd === true,
+            "snoozeUntil": Number(policy.snoozeUntil || 0)
+        };
+    }
+
+    function isDnd(appKey) {
+        return policyFor(appKey).dnd === true;
+    }
+
+    function isSnoozed(appKey) {
+        return Number(policyFor(appKey).snoozeUntil || 0) > Date.now();
+    }
+
+    function shouldSuppress(sourceId, source) {
+        const key = sourceKey(sourceId, source);
+        const policy = policyFor(key);
+
+        return policy.dnd === true || Number(policy.snoozeUntil || 0) > Date.now();
+    }
+
+    function ensurePolicy(appKey, sourceId, source) {
+        const key = String(appKey || sourceKey(sourceId, source)).trim().toLowerCase();
+        let index = policyIndex(key);
+
+        if (index === -1) {
+            sourcePolicies.append({
+                "appKey": key,
+                "source": String(source || ""),
+                "sourceId": String(sourceId || ""),
+                "dnd": false,
+                "snoozeUntil": 0
+            });
+
+            return sourcePolicies.count - 1;
+        }
+
+        if (String(source || "") !== "")
+            sourcePolicies.setProperty(index, "source", String(source));
+
+        if (String(sourceId || "") !== "")
+            sourcePolicies.setProperty(index, "sourceId", String(sourceId));
+
+        return index;
+    }
+
+    function markPoliciesChanged() {
+        policyRevision += 1;
+        schedulePolicySave();
+    }
+
+    function suppressActiveForKey(appKey) {
+        const key = String(appKey || "").trim().toLowerCase();
+
+        for (let i = activeNotifications.count - 1; i >= 0; i--) {
+            const entry = activeNotifications.get(i);
+
+            if (sourceKey(entry.sourceId, entry.source) === key)
+                activeNotifications.remove(i);
+        }
+    }
+
+    function compactPolicy(index) {
+        if (index < 0 || index >= sourcePolicies.count)
+            return;
+
+        const policy = sourcePolicies.get(index);
+
+        if (policy.dnd !== true && Number(policy.snoozeUntil || 0) <= Date.now())
+            sourcePolicies.remove(index);
+    }
+
+    function setDnd(appKey, sourceId, source, enabled) {
+        const index = ensurePolicy(appKey, sourceId, source);
+
+        sourcePolicies.setProperty(index, "dnd", enabled === true);
+
+        if (enabled === true) {
+            // DND is indefinite and supersedes a timed snooze.
+            sourcePolicies.setProperty(index, "snoozeUntil", 0);
+            suppressActiveForKey(String(sourcePolicies.get(index).appKey || ""));
+        } else {
+            compactPolicy(index);
+        }
+
+        markPoliciesChanged();
+    }
+
+    function toggleDnd(appKey, sourceId, source) {
+        setDnd(appKey, sourceId, source, !isDnd(appKey));
+    }
+
+    function snoozeApp(appKey, sourceId, source) {
+        const index = ensurePolicy(appKey, sourceId, source);
+        const until = Date.now() + Math.max(60000, Number(defaultSnoozeDurationMs || 0));
+
+        // Snooze is timed and replaces indefinite DND for this source.
+        sourcePolicies.setProperty(index, "dnd", false);
+        sourcePolicies.setProperty(index, "snoozeUntil", until);
+
+        suppressActiveForKey(String(sourcePolicies.get(index).appKey || ""));
+        markPoliciesChanged();
+    }
+
+    function clearSnooze(appKey) {
+        const index = policyIndex(appKey);
+
+        if (index === -1)
+            return;
+
+        sourcePolicies.setProperty(index, "snoozeUntil", 0);
+        compactPolicy(index);
+        markPoliciesChanged();
+    }
+
+    function setDefaultSnoozeDurationMs(durationMs) {
+        const minimum = 60 * 1000;
+        const maximum = 30 * 24 * 60 * 60 * 1000;
+        const next = Math.max(minimum, Math.min(maximum, Number(durationMs || 0)));
+
+        if (next === defaultSnoozeDurationMs)
+            return;
+
+        defaultSnoozeDurationMs = next;
+        markPoliciesChanged();
+    }
+
+    function expireSnoozes() {
+        const now = Date.now();
+        let changed = false;
+
+        for (let i = sourcePolicies.count - 1; i >= 0; i--) {
+            const policy = sourcePolicies.get(i);
+            const until = Number(policy.snoozeUntil || 0);
+
+            if (until > 0 && until <= now) {
+                sourcePolicies.setProperty(i, "snoozeUntil", 0);
+
+                if (policy.dnd !== true)
+                    sourcePolicies.remove(i);
+
+                changed = true;
+            }
+        }
+
+        if (changed)
+            markPoliciesChanged();
     }
 
     // ===== EXTERNAL NOTIFICATIONS ===============================
@@ -222,7 +421,12 @@ Singleton {
 
         pruneHistory();
 
-        if (activeIndex === -1) {
+        const suppressed = shouldSuppress(entry.sourceId, entry.source);
+
+        if (suppressed) {
+            if (activeIndex !== -1)
+                activeNotifications.remove(activeIndex);
+        } else if (activeIndex === -1) {
             activeNotifications.append(entry);
         } else {
             replaceModelEntry(activeNotifications, activeIndex, entry);
@@ -534,6 +738,161 @@ Singleton {
 
         onTriggered: {
             root.saveHistory();
+        }
+    }
+
+    // ===== POLICY STORAGE ======================================
+
+    function policyDocument() {
+        const policies = [];
+
+        for (let i = 0; i < sourcePolicies.count; i++) {
+            const policy = sourcePolicies.get(i);
+
+            policies.push({
+                "appKey": String(policy.appKey || ""),
+                "source": String(policy.source || ""),
+                "sourceId": String(policy.sourceId || ""),
+                "dnd": policy.dnd === true,
+                "snoozeUntil": Number(policy.snoozeUntil || 0)
+            });
+        }
+
+        return {
+            "version": policyVersion,
+            "savedAt": Date.now(),
+            "defaultSnoozeDurationMs": Number(defaultSnoozeDurationMs),
+            "policies": policies
+        };
+    }
+
+    function policyToJson() {
+        return JSON.stringify(policyDocument(), null, 4) + "\n";
+    }
+
+    function schedulePolicySave() {
+        if (!policyReady)
+            return;
+
+        policySaveTimer.restart();
+    }
+
+    function savePolicies() {
+        if (!policyReady)
+            return;
+
+        policyStatus = "saving";
+        policyFile.setText(policyToJson());
+    }
+
+    function loadPolicies() {
+        const raw = policyFile.text().trim();
+
+        if (raw === "")
+            return false;
+
+        let document;
+
+        try {
+            document = JSON.parse(raw);
+        } catch (error) {
+            policyStatus = "parse-error";
+            return false;
+        }
+
+        const loadedDuration = Number(document.defaultSnoozeDurationMs || 24 * 60 * 60 * 1000);
+        defaultSnoozeDurationMs = Math.max(60 * 1000, Math.min(30 * 24 * 60 * 60 * 1000, loadedDuration));
+
+        const policies = Array.isArray(document.policies) ? document.policies : [];
+        const now = Date.now();
+        let pruned = false;
+
+        sourcePolicies.clear();
+
+        for (let i = 0; i < policies.length; i++) {
+            const incoming = policies[i] || {};
+            const key = String(incoming.appKey || sourceKey(incoming.sourceId, incoming.source)).trim().toLowerCase();
+            const dnd = incoming.dnd === true;
+            const snoozeUntil = Number(incoming.snoozeUntil || 0);
+
+            if (!dnd && snoozeUntil <= now) {
+                pruned = true;
+                continue;
+            }
+
+            sourcePolicies.append({
+                "appKey": key,
+                "source": String(incoming.source || ""),
+                "sourceId": String(incoming.sourceId || ""),
+                "dnd": dnd,
+                "snoozeUntil": dnd ? 0 : snoozeUntil
+            });
+        }
+
+        policyRevision += 1;
+
+        return pruned;
+    }
+
+    FileView {
+        id: policyFile
+
+        path: Quickshell.dataPath("notification-policies.json")
+
+        atomicWrites: true
+        printErrors: true
+
+        onLoaded: {
+            const policyWasPruned = root.loadPolicies();
+
+            root.policyReady = true;
+
+            if (root.policyStatus !== "parse-error")
+                root.policyStatus = "ready";
+
+            if (policyWasPruned && root.policyStatus !== "parse-error")
+                root.savePolicies();
+        }
+
+        onLoadFailed: function (error) {
+            root.policyReady = true;
+
+            if (error === FileViewError.FileNotFound) {
+                root.policyStatus = "new";
+                root.savePolicies();
+                return;
+            }
+
+            root.policyStatus = "load-error";
+        }
+
+        onSaved: {
+            root.policyStatus = "saved";
+        }
+
+        onSaveFailed: function (error) {
+            root.policyStatus = "save-error";
+        }
+    }
+
+    Timer {
+        id: policySaveTimer
+
+        interval: 250
+        repeat: false
+
+        onTriggered: {
+            root.savePolicies();
+        }
+    }
+
+    Timer {
+        interval: 60000
+        repeat: true
+        running: root.sourcePolicies.count > 0
+
+        onTriggered: {
+            root.expireSnoozes();
         }
     }
 

@@ -115,6 +115,10 @@ PanelWindow {
         id: filteredNotifications
     }
 
+    ListModel {
+        id: managerDndPolicies
+    }
+
     Timer {
         id: filteredModelRefreshTimer
 
@@ -132,6 +136,10 @@ PanelWindow {
         function onNotificationsRevisionChanged() {
             root.scheduleFilteredModelRebuild();
         }
+
+        function onPolicyRevisionChanged() {
+            root.rebuildManagerDndPolicies();
+        }
     }
 
     onActiveFilterChanged: {
@@ -144,16 +152,13 @@ PanelWindow {
 
     Component.onCompleted: {
         root.scheduleFilteredModelRebuild();
+        root.rebuildManagerDndPolicies();
     }
 
     // ===== APP-WIDE CARD STATE ==================================
     //
-    // Temporary frontend state.
-    //
-    // State is keyed by APP, not by individual notification.
-    // Every card from the same source reads the same object.
-    //
-    // Later the rules/backend layer can own and persist this.
+    // Favorite remains a lightweight visual frontend state.
+    // Snooze and DND are persistent backend policy in NotificationsService.
 
     property var appStates: ({})
 
@@ -508,16 +513,7 @@ PanelWindow {
     // ===== APP STATE HELPERS ====================================
 
     function appKeyFor(sourceId, source) {
-        var sourceIdText = String(sourceId || "").trim().toLowerCase();
-        var sourceText = String(source || "").trim().toLowerCase();
-
-        if (sourceIdText !== "")
-            return sourceIdText;
-
-        if (sourceText !== "")
-            return sourceText;
-
-        return "unknown";
+        return NotificationsService.sourceKey(sourceId, source);
     }
 
     function stateForApp(appKey) {
@@ -527,9 +523,7 @@ PanelWindow {
             return current;
 
         return {
-            favorite: false,
-            snoozed: false,
-            dnd: false
+            favorite: false
         };
     }
 
@@ -542,9 +536,7 @@ PanelWindow {
         var current = root.stateForApp(appKey);
 
         var nextState = {
-            favorite: current.favorite === true,
-            snoozed: current.snoozed === true,
-            dnd: current.dnd === true
+            favorite: current.favorite === true
         };
 
         nextState[flagName] = enabled === true;
@@ -650,6 +642,9 @@ PanelWindow {
     function rebuildFilteredNotifications() {
         filteredNotifications.clear();
 
+        if (root.activeFilter === "manager")
+            return;
+
         for (var i = 0; i < NotificationsService.notifications.count; i++) {
             var entry = NotificationsService.notifications.get(i);
             var classification = root.classificationFor(entry.source, entry.sourceId, entry.category, entry.severity);
@@ -669,6 +664,41 @@ PanelWindow {
             });
         }
 
+    }
+
+    function rebuildManagerDndPolicies() {
+        managerDndPolicies.clear();
+
+        for (var i = 0; i < NotificationsService.sourcePolicies.count; i++) {
+            var policy = NotificationsService.sourcePolicies.get(i);
+
+            if (policy.dnd !== true)
+                continue;
+
+            managerDndPolicies.append({
+                "appKey": String(policy.appKey || ""),
+                "source": String(policy.source || ""),
+                "sourceId": String(policy.sourceId || "")
+            });
+        }
+    }
+
+    function durationLabel(durationMs) {
+        var milliseconds = Math.max(0, Number(durationMs || 0));
+        var hour = 60 * 60 * 1000;
+        var day = 24 * hour;
+
+        if (milliseconds >= day && milliseconds % day === 0) {
+            var days = Math.round(milliseconds / day);
+            return days + (days === 1 ? " DAY" : " DAYS");
+        }
+
+        if (milliseconds >= hour && milliseconds % hour === 0) {
+            var hours = Math.round(milliseconds / hour);
+            return hours + (hours === 1 ? " HOUR" : " HOURS");
+        }
+
+        return Math.round(milliseconds / 60000) + " MIN";
     }
 
     function notificationMatches(source, title, message, category, severity, filterGroup) {
@@ -1105,7 +1135,7 @@ PanelWindow {
 
                     spacing: root.filterButtonSpacing
 
-                    readonly property real buttonWidth: (width - (spacing * 5)) / 6
+                    readonly property real buttonWidth: (width - (spacing * 6)) / 7
 
                     FilterButton {
                         width: filterStrip.buttonWidth
@@ -1153,6 +1183,14 @@ PanelWindow {
                         filterId: "warning"
                         label: "WARNING"
                         accentColor: Colors.red
+                    }
+
+                    FilterButton {
+                        width: filterStrip.buttonWidth
+                        height: filterStrip.height
+                        filterId: "manager"
+                        label: "MANAGER"
+                        accentColor: Colors.magenta
                     }
                 }
 
@@ -1348,10 +1386,324 @@ PanelWindow {
                     rightMargin: 10
                 }
 
+                // ===== MANAGER ==================================
+
+                Item {
+                    id: managerPanel
+
+                    anchors.fill: parent
+
+                    visible: root.activeFilter === "manager"
+
+                    Rectangle {
+                        id: snoozeSettings
+
+                        anchors {
+                            top: parent.top
+                            left: parent.left
+                            right: parent.right
+                        }
+
+                        height: 122
+
+                        color: "transparent"
+
+                        border.width: 1
+                        border.color: Colors.orange
+
+                        Rectangle {
+                            anchors.fill: parent
+                            color: Colors.dark
+                            opacity: 0.52
+                            z: -1
+                        }
+
+                        GlowText {
+                            anchors {
+                                top: parent.top
+                                left: parent.left
+                            }
+
+                            anchors.topMargin: 10
+                            anchors.leftMargin: 12
+
+                            width: 190
+                            height: 22
+
+                            text: "SNOOZE DURATION"
+                            pixelSize: 13
+                            textColor: Colors.orange
+                            glowColor: Colors.orange
+                        }
+
+                        GlowText {
+                            anchors {
+                                top: parent.top
+                                right: parent.right
+                            }
+
+                            anchors.topMargin: 10
+                            anchors.rightMargin: 12
+
+                            width: 210
+                            height: 22
+
+                            text: "DEFAULT: " + root.durationLabel(NotificationsService.defaultSnoozeDurationMs)
+                            pixelSize: 11
+                            textColor: Colors.cyan
+                            glowColor: Colors.cyan
+                            horizontalAlignment: Text.AlignRight
+                        }
+
+                        GohuText {
+                            anchors {
+                                top: parent.top
+                                left: parent.left
+                                right: parent.right
+                            }
+
+                            anchors.topMargin: 39
+                            anchors.leftMargin: 12
+                            anchors.rightMargin: 12
+
+                            height: 18
+
+                            text: "ZZ suppresses new popups from that source for this long."
+                            font.pixelSize: 10
+                            color: Colors.white
+                            opacity: 0.78
+                        }
+
+                        Row {
+                            anchors {
+                                left: parent.left
+                                right: parent.right
+                                bottom: parent.bottom
+                            }
+
+                            anchors.leftMargin: 12
+                            anchors.rightMargin: 12
+                            anchors.bottomMargin: 12
+
+                            height: 30
+                            spacing: 6
+
+                            readonly property real presetWidth: (width - spacing * 5) / 6
+
+                            MiniButton {
+                                width: parent.presetWidth
+                                height: parent.height
+                                label: "1H"
+                                active: NotificationsService.defaultSnoozeDurationMs === 60 * 60 * 1000
+                                onTriggered: NotificationsService.setDefaultSnoozeDurationMs(60 * 60 * 1000)
+                            }
+
+                            MiniButton {
+                                width: parent.presetWidth
+                                height: parent.height
+                                label: "6H"
+                                active: NotificationsService.defaultSnoozeDurationMs === 6 * 60 * 60 * 1000
+                                onTriggered: NotificationsService.setDefaultSnoozeDurationMs(6 * 60 * 60 * 1000)
+                            }
+
+                            MiniButton {
+                                width: parent.presetWidth
+                                height: parent.height
+                                label: "12H"
+                                active: NotificationsService.defaultSnoozeDurationMs === 12 * 60 * 60 * 1000
+                                onTriggered: NotificationsService.setDefaultSnoozeDurationMs(12 * 60 * 60 * 1000)
+                            }
+
+                            MiniButton {
+                                width: parent.presetWidth
+                                height: parent.height
+                                label: "1D"
+                                active: NotificationsService.defaultSnoozeDurationMs === 24 * 60 * 60 * 1000
+                                onTriggered: NotificationsService.setDefaultSnoozeDurationMs(24 * 60 * 60 * 1000)
+                            }
+
+                            MiniButton {
+                                width: parent.presetWidth
+                                height: parent.height
+                                label: "3D"
+                                active: NotificationsService.defaultSnoozeDurationMs === 3 * 24 * 60 * 60 * 1000
+                                onTriggered: NotificationsService.setDefaultSnoozeDurationMs(3 * 24 * 60 * 60 * 1000)
+                            }
+
+                            MiniButton {
+                                width: parent.presetWidth
+                                height: parent.height
+                                label: "7D"
+                                active: NotificationsService.defaultSnoozeDurationMs === 7 * 24 * 60 * 60 * 1000
+                                onTriggered: NotificationsService.setDefaultSnoozeDurationMs(7 * 24 * 60 * 60 * 1000)
+                            }
+                        }
+                    }
+
+                    GlowText {
+                        id: dndManagerTitle
+
+                        anchors {
+                            top: snoozeSettings.bottom
+                            left: parent.left
+                            right: parent.right
+                        }
+
+                        anchors.topMargin: 14
+                        anchors.leftMargin: 4
+                        anchors.rightMargin: 4
+
+                        height: 24
+
+                        text: "DO NOT DISTURB  //  " + managerDndPolicies.count
+                        pixelSize: 13
+                        textColor: Colors.magenta
+                        glowColor: Colors.magenta
+                    }
+
+                    GohuText {
+                        anchors {
+                            top: dndManagerTitle.bottom
+                            left: parent.left
+                            right: parent.right
+                        }
+
+                        anchors.topMargin: 2
+                        anchors.leftMargin: 4
+                        anchors.rightMargin: 4
+
+                        height: 18
+
+                        text: "Sources stay suppressed until you explicitly ALLOW them again."
+                        font.pixelSize: 10
+                        color: Colors.white
+                        opacity: 0.72
+                    }
+
+                    ListView {
+                        id: dndManagerList
+
+                        anchors {
+                            top: dndManagerTitle.bottom
+                            bottom: parent.bottom
+                            left: parent.left
+                            right: parent.right
+                        }
+
+                        anchors.topMargin: 28
+
+                        clip: true
+                        spacing: 8
+                        boundsBehavior: Flickable.StopAtBounds
+
+                        model: managerDndPolicies
+
+                        delegate: Rectangle {
+                            id: dndRule
+
+                            required property string appKey
+                            required property string source
+                            required property string sourceId
+
+                            width: dndManagerList.width
+                            height: 64
+
+                            color: "transparent"
+                            border.width: 1
+                            border.color: Colors.magenta
+
+                            Rectangle {
+                                anchors.fill: parent
+                                color: Colors.dark
+                                opacity: 0.52
+                                z: -1
+                            }
+
+                            GlowText {
+                                anchors {
+                                    top: parent.top
+                                    left: parent.left
+                                    right: allowDndButton.left
+                                }
+
+                                anchors.topMargin: 9
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 10
+
+                                height: 20
+
+                                text: dndRule.source !== "" ? dndRule.source : dndRule.appKey
+                                pixelSize: 13
+                                textColor: Colors.magenta
+                                glowColor: Colors.magenta
+                                elideMode: Text.ElideRight
+                            }
+
+                            GohuText {
+                                anchors {
+                                    bottom: parent.bottom
+                                    left: parent.left
+                                    right: allowDndButton.left
+                                }
+
+                                anchors.bottomMargin: 9
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 10
+
+                                height: 16
+
+                                text: dndRule.sourceId !== "" ? dndRule.sourceId : dndRule.appKey
+                                font.pixelSize: 9
+                                color: Colors.cyan
+                                elide: Text.ElideRight
+                            }
+
+                            MiniButton {
+                                id: allowDndButton
+
+                                anchors {
+                                    verticalCenter: parent.verticalCenter
+                                    right: parent.right
+                                }
+
+                                anchors.rightMargin: 10
+
+                                width: 72
+                                height: 30
+
+                                label: "ALLOW"
+                                labelPixelSize: 10
+                                active: false
+
+                                onTriggered: {
+                                    NotificationsService.setDnd(dndRule.appKey, dndRule.sourceId, dndRule.source, false);
+                                }
+                            }
+                        }
+                    }
+
+                    GlowText {
+                        anchors.centerIn: dndManagerList
+
+                        visible: managerDndPolicies.count === 0
+
+                        width: dndManagerList.width - 40
+                        height: 30
+
+                        text: "NO SOURCES ON DND"
+                        pixelSize: 12
+                        textColor: Colors.cyan
+                        glowColor: Colors.cyan
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+                }
+
                 // ===== LIST =====================================
 
                 ListView {
                     id: historyList
+
+                    visible: root.activeFilter !== "manager"
 
                     anchors {
                         top: parent.top
@@ -1396,6 +1748,9 @@ PanelWindow {
                         readonly property string appKey: root.appKeyFor(notificationEntry.sourceId, notificationEntry.source)
 
                         readonly property var sharedAppState: root.stateForApp(notificationEntry.appKey)
+
+                        readonly property bool snoozed: NotificationsService.policyRevision >= 0 && NotificationsService.isSnoozed(notificationEntry.appKey)
+                        readonly property bool dnd: NotificationsService.policyRevision >= 0 && NotificationsService.isDnd(notificationEntry.appKey)
 
                         readonly property var classification: root.classificationFor(notificationEntry.source, notificationEntry.sourceId, notificationEntry.category, notificationEntry.severity)
 
@@ -1709,12 +2064,15 @@ PanelWindow {
 
                                     label: "ZZ"
 
-                                    active: notificationEntry.sharedAppState.snoozed === true
+                                    active: notificationEntry.snoozed
 
                                     activeColor: Colors.orange
 
                                     onTriggered: {
-                                        root.toggleAppFlag(notificationEntry.appKey, "snoozed");
+                                        if (notificationEntry.snoozed)
+                                            NotificationsService.clearSnooze(notificationEntry.appKey);
+                                        else
+                                            NotificationsService.snoozeApp(notificationEntry.appKey, notificationEntry.sourceId, notificationEntry.source);
                                     }
                                 }
 
@@ -1726,12 +2084,12 @@ PanelWindow {
 
                                     labelPixelSize: 9
 
-                                    active: notificationEntry.sharedAppState.dnd === true
+                                    active: notificationEntry.dnd
 
                                     activeColor: Colors.orange
 
                                     onTriggered: {
-                                        root.toggleAppFlag(notificationEntry.appKey, "dnd");
+                                        NotificationsService.toggleDnd(notificationEntry.appKey, notificationEntry.sourceId, notificationEntry.source);
                                     }
                                 }
 
@@ -1865,7 +2223,7 @@ PanelWindow {
 
                     width: root.scrollBarAreaWidth
 
-                    visible: historyList.contentHeight > historyList.height + 1
+                    visible: root.activeFilter !== "manager" && historyList.contentHeight > historyList.height + 1
 
                     function scrollTo(localY) {
                         var scrollable = Math.max(0, historyList.contentHeight - historyList.height);

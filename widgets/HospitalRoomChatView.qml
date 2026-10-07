@@ -6,9 +6,16 @@ Item {
     id: root
 
     property string roomId: ""
-    property string activeSessionId: ""
+    property string repository: ""
+    property string patientId: ""
+    property string patientLabel: ""
+    property string team: ""
+    property string branch: ""
+    property string bedPath: ""
     property string doctorId: ""
     property string providerId: ""
+    property string assignmentId: ""
+    property string activeSessionId: ""
 
     signal closeRequested()
 
@@ -38,38 +45,85 @@ Item {
     }
 
     readonly property string statusText: {
+        if (adapter.bindingRoom)
+            return "BINDING";
+
         if (adapter.sending)
             return "SENDING";
 
         if (adapter.messagesLoading || adapter.loading)
             return "LOADING";
 
-        if (adapter.sendError || adapter.messagesError || adapter.error)
+        if (adapter.bindError
+                || adapter.sendError
+                || adapter.messagesError
+                || adapter.error)
             return "ERROR";
 
         return root.activeSessionId ? "CONNECTED" : "ROOM CHAT";
     }
 
-    function refresh() {
-        adapter.refresh();
-
-        if (root.roomId)
-            adapter.loadMessages(root.roomId);
+    function roomBinding() {
+        return {
+            id: root.roomId,
+            repository: root.repository,
+            patientId: root.patientId,
+            patientLabel: root.patientLabel,
+            team: root.team || root.roomId,
+            branch: root.branch,
+            bedPath: root.bedPath,
+            doctorId: root.doctorId,
+            assignmentId: root.assignmentId
+        };
     }
 
-    onRoomIdChanged: {
-        if (roomId)
-            adapter.loadMessages(roomId);
-        else {
+    function syncRoomBinding() {
+        if (!root.roomId) {
             adapter.selectedConversationId = "";
             adapter.messages = [];
+            return;
         }
+
+        if (root.repository) {
+            adapter.bindRoom(root.roomBinding());
+            return;
+        }
+
+        adapter.loadMessages(root.roomId);
     }
+
+    function scheduleRoomBinding() {
+        bindTimer.restart();
+    }
+
+    function refresh() {
+        adapter.refresh();
+        scheduleRoomBinding();
+    }
+
+    onRoomIdChanged: scheduleRoomBinding()
+    onRepositoryChanged: scheduleRoomBinding()
+    onPatientIdChanged: scheduleRoomBinding()
+    onPatientLabelChanged: scheduleRoomBinding()
+    onTeamChanged: scheduleRoomBinding()
+    onBranchChanged: scheduleRoomBinding()
+    onBedPathChanged: scheduleRoomBinding()
+    onDoctorIdChanged: scheduleRoomBinding()
+    onAssignmentIdChanged: scheduleRoomBinding()
 
     HospitalRoomConversationAdapter {
         id: adapter
 
         activeSessionId: root.activeSessionId
+    }
+
+    Timer {
+        id: bindTimer
+
+        interval: 0
+        repeat: false
+
+        onTriggered: root.syncRoomBinding()
     }
 
     ConversationFeed {
@@ -81,7 +135,8 @@ Item {
         messages: root.roomId ? adapter.messages : []
         loading: adapter.messagesLoading
         error:
-            adapter.messagesError
+            adapter.bindError
+            || adapter.messagesError
             || (
                 root.roomId
                 ? ""

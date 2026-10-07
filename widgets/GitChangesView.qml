@@ -57,6 +57,74 @@ Item {
         }
     }
 
+    function reconcileSelectedFile() {
+        if (!root.changesService)
+            return;
+
+        if (!root.selectedPath) {
+            root.selectedFile = null;
+            return;
+        }
+
+        const rows = root.changesService.files || [];
+        let fresh = null;
+
+        for (let i = 0; i < rows.length; ++i) {
+            const row = rows[i] || {};
+
+            if (String(row.path || "") === root.selectedPath) {
+                fresh = row;
+                break;
+            }
+        }
+
+        if (!fresh) {
+            root.selectedFile = null;
+            root.selectedPath = "";
+            root.selectedHunkIndex = -1;
+            root.selectedLineIndex = -1;
+            root.clearArm();
+            root.changesService.hunks = [];
+            root.changesService.hunkPath = "";
+            return;
+        }
+
+        root.selectedFile = fresh;
+
+        if (Boolean(fresh.untracked)) {
+            root.selectedHunkIndex = -1;
+            root.selectedLineIndex = -1;
+            root.changesService.hunks = [];
+            root.changesService.hunkPath = root.selectedPath;
+            return;
+        }
+
+        let nextMode = root.hunkMode;
+
+        if (nextMode === "worktree"
+                && !Boolean(fresh.unstaged)
+                && Boolean(fresh.staged))
+            nextMode = "staged";
+        else if (nextMode === "staged"
+                && !Boolean(fresh.staged)
+                && Boolean(fresh.unstaged))
+            nextMode = "worktree";
+
+        if (nextMode !== root.hunkMode) {
+            root.hunkMode = nextMode;
+            root.selectedHunkIndex = -1;
+            root.selectedLineIndex = -1;
+            root.clearArm();
+        }
+
+        if (root.subMode === "hunks"
+                && !root.changesService.hunkBusy)
+            root.changesService.loadHunks(
+                root.selectedPath,
+                root.hunkMode
+            );
+    }
+
     function selectFile(row) {
         const data = row || {};
         root.selectedFile = data;
@@ -2436,6 +2504,7 @@ Item {
 
         function onRefreshed() {
             root.applyPendingFocus();
+            root.reconcileSelectedFile();
         }
 
         function onActionFinished(action, success, detail) {

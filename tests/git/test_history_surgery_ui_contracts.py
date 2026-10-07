@@ -6,8 +6,8 @@ import re
 
 ROOT = Path(__file__).resolve().parents[2]
 
-# Fold is the first live History Surgery organ. Absorb and Split are layered
-# on stacked follow-up branches so each surgery primitive can land independently.
+# Fold and file-group Split are live History Surgery organs. Absorb remains
+# the next surgery primitive and lands independently.
 
 
 def read(path: str) -> str:
@@ -40,8 +40,25 @@ require(
 )
 require(
     VIEW,
-    'label: "SPLIT // NEXT"',
-    "Split must remain visibly unavailable until implemented",
+    "required property var splitService",
+    "Surgery surface must accept the Split backend",
+)
+require(
+    VIEW,
+    'label: "SPLIT"',
+    "Split must be a live Surgery mode",
+)
+require(
+    VIEW,
+    'onTriggered: root.mode = "split"',
+    "Surgery mode selector must open Split",
+)
+require_regex(
+    VIEW,
+    r"GitHistorySplitView \{.*"
+    r'visible: root\.mode === "split".*'
+    r"splitService: root\.splitService",
+    "Surgery must host the Split panel without replacing Fold",
 )
 require(
     VIEW,
@@ -104,12 +121,18 @@ require(
     "property var historyFoldService: null",
     "HISTORY must accept the shared Fold service",
 )
+require(
+    HISTORY,
+    "property var historySplitService: null",
+    "HISTORY must accept the shared Split service",
+)
 require_regex(
     HISTORY,
     r"GitHistorySurgeryView \{.*"
     r'visible: root\.subMode === "surgery".*'
-    r"foldService: root\.historyFoldService",
-    "HISTORY must host the Surgery surface",
+    r"foldService: root\.historyFoldService.*"
+    r"splitService: root\.historySplitService",
+    "HISTORY must host Fold + Split on the Surgery surface",
 )
 
 require_regex(
@@ -122,9 +145,18 @@ require_regex(
 )
 require_regex(
     GITW,
+    r"GitHistorySplitService \{.*"
+    r"id: historySplitService.*"
+    r"operationJournal: operationJournalService.*"
+    r"snapshotService: repositorySnapshotService",
+    "GitW must host Split with shared journal and snapshots",
+)
+require_regex(
+    GITW,
     r"GitHistoryView \{.*"
-    r"historyFoldService: historyFoldService",
-    "GitW must pass Fold into HISTORY",
+    r"historyFoldService: historyFoldService.*"
+    r"historySplitService: historySplitService",
+    "GitW must pass Fold + Split into HISTORY",
 )
 
-print("Git HISTORY Surgery Fold UI contracts: PASS")
+print("Git HISTORY Surgery Fold + Split UI contracts: PASS")

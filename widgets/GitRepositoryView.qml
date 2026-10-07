@@ -3490,6 +3490,7 @@ Item {
                     }
                 }
             }
+        }
 
         Rectangle {
             width: parent.width

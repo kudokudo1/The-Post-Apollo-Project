@@ -29,12 +29,15 @@ Scope {
     property string headSha: ""
     property var originalShas: []
     property var plan: []
+    property bool mergePreserving: false
+    property int mergeCommitCount: 0
 
     property bool armed: false
     property string armedBaseSha: ""
     property string armedHeadSha: ""
     property string armedBranch: ""
     property string armedPlanJson: ""
+    property bool armedMergePreserving: false
 
     property string pendingJournalId: ""
     property string pendingSnapshotRequest: ""
@@ -88,6 +91,7 @@ Scope {
         armedHeadSha = "";
         armedBranch = "";
         armedPlanJson = "";
+        armedMergePreserving = false;
 
         if (reason)
             state = "REBASE // " + String(reason);
@@ -103,6 +107,8 @@ Scope {
         headSha = "";
         originalShas = [];
         plan = [];
+        mergePreserving = false;
+        mergeCommitCount = 0;
         lastError = "";
         disarm("");
         state = "READY";
@@ -148,6 +154,12 @@ Scope {
     function moveEntry(fromIndex, toIndex) {
         const source = Number(fromIndex);
         let target = Number(toIndex);
+
+        if (mergePreserving) {
+            lastError = "MERGE-PRESERVING TOPOLOGY LOCKED // REORDER DISABLED";
+            state = "REBASE // TOPOLOGY LOCKED";
+            return false;
+        }
 
         if (executionBusy
                 || source < 0
@@ -201,6 +213,14 @@ Scope {
             }
 
             seen[sha] = true;
+
+            if (mergePreserving
+                    && sha !== String(originalShas[i] || "")) {
+                return {
+                    valid: false,
+                    reason: "MERGE-PRESERVING COMMIT ORDER IS TOPOLOGY LOCKED"
+                };
+            }
 
             if (!allowedAction(action)) {
                 return {
@@ -293,9 +313,10 @@ Scope {
                 '[ ! -d "$gitdir/rebase-merge" ] && [ ! -d "$gitdir/rebase-apply" ] || refuse "REBASE IN PROGRESS"',
                 '[ ! -f "$gitdir/CHERRY_PICK_HEAD" ] || refuse "CHERRY-PICK IN PROGRESS"',
                 '[ ! -f "$gitdir/REVERT_HEAD" ] || refuse "REVERT IN PROGRESS"',
-                '[ -z "$(git -C "$repo" rev-list --merges "$base_sha..$head" 2>/dev/null)" ] || refuse "RANGE CONTAINS MERGE COMMITS // MERGE-PRESERVING REBASE NOT IMPLEMENTED"',
-                'printf "META\\t%s\\t%s\\t%s\\n" "$base_sha" "$branch" "$head"',
-                'git -C "$repo" log --reverse --format="COMMIT%x09%H%x09%s" "$base_sha..$head"'
+                'merge_count="$(git -C "$repo" rev-list --count --merges "$base_sha..$head" 2>/dev/null || printf 0)"',
+                'merge_mode=0; [ "$merge_count" -eq 0 ] || merge_mode=1',
+                'printf "META\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$base_sha" "$branch" "$head" "$merge_mode" "$merge_count"',
+                'git -C "$repo" log --reverse --no-merges --format="COMMIT%x09%H%x09%s" "$base_sha..$head"'
             ].join("\n"),
             "git-interactive-rebase-preview",
             repo,
@@ -352,7 +373,7 @@ Scope {
 
         if (previewExitCode !== 0
                 || !meta
-                || meta.length < 4
+                || meta.length < 6
                 || rows.length === 0) {
             let refused = "";
 
@@ -368,6 +389,8 @@ Scope {
             headSha = "";
             originalShas = [];
             plan = [];
+            mergePreserving = false;
+            mergeCommitCount = 0;
             lastError =
                 refused
                 || String(err || out || ("PREVIEW EXIT " + previewExitCode)).trim()
@@ -379,16 +402,32 @@ Scope {
         baseSha = String(meta[1] || "");
         branchName = String(meta[2] || "");
         headSha = String(meta[3] || "");
+        mergePreserving = String(meta[4] || "0") === "1";
+        mergeCommitCount = Number(meta[5] || 0);
         originalShas = rows.map(function(row) {
             return String((row || {}).sha || "");
         });
         plan = rows;
         lastError = "";
         state =
-            "REBASE // PLAN READY // "
-            + String(rows.length)
-            + " COMMIT"
-            + (rows.length === 1 ? "" : "S");
+            mergePreserving
+            ? (
+                "REBASE // MERGE-PRESERVING PLAN READY // "
+                + String(rows.length)
+                + " EDITABLE COMMIT"
+                + (rows.length === 1 ? "" : "S")
+                + " // "
+                + String(mergeCommitCount)
+                + " MERGE"
+                + (mergeCommitCount === 1 ? "" : "S")
+                + " // TOPOLOGY LOCKED"
+              )
+            : (
+                "REBASE // PLAN READY // "
+                + String(rows.length)
+                + " COMMIT"
+                + (rows.length === 1 ? "" : "S")
+              );
         previewReady(clonePlan(rows));
     }
 
@@ -408,6 +447,7 @@ Scope {
         armedHeadSha = String(headSha || "");
         armedBranch = String(branchName || "");
         armedPlanJson = JSON.stringify(plan);
+        armedMergePreserving = Boolean(mergePreserving);
         armed = true;
         lastError = "";
         state = "REBASE // ARMED";
@@ -429,7 +469,8 @@ Scope {
             && armedBaseSha === String(baseSha || "")
             && armedHeadSha === String(headSha || "")
             && armedBranch === String(branchName || "")
-            && armedPlanJson === JSON.stringify(plan);
+            && armedPlanJson === JSON.stringify(plan)
+            && armedMergePreserving === Boolean(mergePreserving);
     }
 
     function journalContext() {
@@ -440,6 +481,8 @@ Scope {
             baseSha: String(armedBaseSha || ""),
             branch: String(armedBranch || ""),
             head: String(armedHeadSha || ""),
+            mergePreserving: Boolean(armedMergePreserving),
+            mergeCommitCount: Number(mergeCommitCount || 0),
             plan: clonePlan(plan)
         };
     }
@@ -509,8 +552,9 @@ Scope {
 
     function engineScript() {
         return [
-            'import base64, json, os, shutil, stat, subprocess, sys, tempfile',
-            'repo, base_sha, expected_head, branch, plan_json = sys.argv[1:6]',
+            'import base64, json, os, shlex, shutil, stat, subprocess, sys, tempfile',
+            'repo, base_sha, expected_head, branch, plan_json, preserve_arg = sys.argv[1:7]',
+            'preserve_merges = preserve_arg == "1"',
             'def run(args, cwd=None, env=None, data=None):',
             '    return subprocess.run(args, cwd=cwd, env=env, input=data, stdout=subprocess.PIPE, stderr=subprocess.PIPE)',
             'def git(repo_path, *args, env=None): return run(["git", "-C", repo_path] + list(args), env=env)',
@@ -530,12 +574,16 @@ Scope {
             'if git(repo, "status", "--porcelain=v1", "--untracked-files=all").stdout.strip(): refuse("WORKTREE DIRTY SINCE ARM")',
             'if active_state(repo) != "NONE": refuse("GIT OPERATION STARTED SINCE ARM")',
             'if git(repo, "merge-base", "--is-ancestor", base_sha, expected_head).returncode: refuse("BASE NO LONGER ANCESTOR")',
-            'if git(repo, "rev-list", "--merges", base_sha + ".." + expected_head).stdout.strip(): refuse("RANGE NOW CONTAINS MERGE COMMITS")',
+            'has_merges = bool(git(repo, "rev-list", "--merges", base_sha + ".." + expected_head).stdout.strip())',
+            'if has_merges != preserve_merges: refuse("MERGE TOPOLOGY CHANGED SINCE ARM")',
             'try: rows = json.loads(plan_json)',
             'except Exception: refuse("REBASE PLAN JSON INVALID")',
-            'actual = text(git(repo, "rev-list", "--reverse", base_sha + ".." + expected_head)).splitlines()',
+            'actual_args = ["rev-list", "--reverse"] + (["--no-merges"] if preserve_merges else []) + [base_sha + ".." + expected_head]',
+            'actual = text(git(repo, *actual_args)).splitlines()',
             'planned = [str(row.get("sha", "")) for row in rows]',
-            'if len(planned) != len(actual) or set(planned) != set(actual): refuse("REBASE PLAN COMMIT SET CHANGED")',
+            'if preserve_merges:',
+            '    if planned != actual: refuse("MERGE-PRESERVING COMMIT ORDER OR SET CHANGED")',
+            'elif len(planned) != len(actual) or set(planned) != set(actual): refuse("REBASE PLAN COMMIT SET CHANGED")',
             'allowed = {"pick", "reword", "squash", "fixup", "drop"}',
             'first_kept = None',
             'todo = []',
@@ -551,6 +599,42 @@ Scope {
             '        todo.append("pick {} {}".format(sha, subject))',
             '        todo.append("exec sh -c \'printf %s {} | base64 -d | git commit --amend --no-verify -F -\'".format(payload))',
             '    else: todo.append("{} {} {}".format(action, sha, subject))',
+            'merge_editor = r"""',
+            'import base64, json, os, sys',
+            'todo_path = sys.argv[1]',
+            'rows = json.loads(base64.b64decode(os.environ["PA_REBASE_PLAN64"]).decode("utf-8"))',
+            'by_sha = {str(row.get("sha", "")): row for row in rows}',
+            'seen = set()',
+            'with open(todo_path, "r", encoding="utf-8", errors="replace") as handle:',
+            '    lines = handle.read().splitlines()',
+            'out = []',
+            'for line in lines:',
+            '    stripped = line.lstrip()',
+            '    indent = line[:len(line) - len(stripped)]',
+            '    parts = stripped.split(None, 2)',
+            '    if len(parts) >= 2 and parts[0] in ("pick", "p"):',
+            '        token = parts[1]',
+            '        matches = [sha for sha in by_sha if sha.startswith(token)]',
+            '        if len(matches) == 1:',
+            '            sha = matches[0]; row = by_sha[sha]',
+            '            action = str(row.get("action", "pick")).lower()',
+            '            rest = parts[2] if len(parts) > 2 else str(row.get("subject", ""))',
+            '            effective = "pick" if action == "reword" else action',
+            '            out.append("{}{} {} {}".format(indent, effective, token, rest))',
+            '            if action == "reword":',
+            '                message = str(row.get("message", "")).strip()',
+            '                payload = base64.b64encode(message.encode("utf-8")).decode("ascii")',
+            '                out.append("exec sh -c \'printf %s {} | base64 -d | git commit --amend --no-verify -F -\'".format(payload))',
+            '            seen.add(sha)',
+            '            continue',
+            '    out.append(line)',
+            'missing = [sha for sha in by_sha if sha not in seen]',
+            'if missing:',
+            '    print("MERGE-PRESERVING TODO LOST COMMITS // " + ",".join(missing), file=sys.stderr)',
+            '    sys.exit(94)',
+            'with open(todo_path, "w", encoding="utf-8") as handle:',
+            '    handle.write("\\n".join(out) + "\\n")',
+            '"""',
             'root = tempfile.mkdtemp(prefix="pa-interactive-rebase-")',
             'wt = os.path.join(root, "worktree")',
             'todo_path = os.path.join(root, "todo")',
@@ -558,11 +642,19 @@ Scope {
             'try:',
             '    add = git(repo, "worktree", "add", "--detach", wt, expected_head)',
             '    if add.returncode: refuse("REHEARSAL WORKTREE CREATE FAILED // " + add.stderr.decode("utf-8", "replace").strip())',
-            '    with open(todo_path, "w", encoding="utf-8") as handle: handle.write("\\n".join(todo) + "\\n")',
-            '    with open(editor_path, "w", encoding="utf-8") as handle: handle.write("#!/bin/sh\\ncp \\"$PA_REBASE_TODO\\" \\"$1\\"\\n")',
-            '    os.chmod(editor_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)',
-            '    env = dict(os.environ); env["GIT_SEQUENCE_EDITOR"] = editor_path; env["GIT_EDITOR"] = ":"; env["PA_REBASE_TODO"] = todo_path',
-            '    rehearse = git(wt, "-c", "commit.gpgSign=false", "rebase", "-i", "--empty=keep", "--reapply-cherry-picks", base_sha, env=env)',
+            '    env = dict(os.environ); env["GIT_EDITOR"] = ":"',
+            '    if preserve_merges:',
+            '        env["PA_REBASE_PLAN64"] = base64.b64encode(plan_json.encode("utf-8")).decode("ascii")',
+            '        env["GIT_SEQUENCE_EDITOR"] = "python3 -c " + shlex.quote(merge_editor)',
+            '    else:',
+            '        with open(todo_path, "w", encoding="utf-8") as handle: handle.write("\\n".join(todo) + "\\n")',
+            '        with open(editor_path, "w", encoding="utf-8") as handle: handle.write("#!/bin/sh\\ncp \\"$PA_REBASE_TODO\\" \\"$1\\"\\n")',
+            '        os.chmod(editor_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)',
+            '        env["GIT_SEQUENCE_EDITOR"] = editor_path; env["PA_REBASE_TODO"] = todo_path',
+            '    rebase_args = ["-c", "commit.gpgSign=false", "rebase", "-i"]',
+            '    if preserve_merges: rebase_args.append("--rebase-merges")',
+            '    rebase_args += ["--empty=keep", "--reapply-cherry-picks", base_sha]',
+            '    rehearse = git(wt, *rebase_args, env=env)',
             '    if rehearse.returncode:',
             '        git(wt, "rebase", "--abort")',
             '        detail = rehearse.stderr.decode("utf-8", "replace").strip() or rehearse.stdout.decode("utf-8", "replace").strip()',
@@ -603,7 +695,8 @@ Scope {
             String(armedBaseSha || ""),
             String(armedHeadSha || ""),
             String(armedBranch || ""),
-            String(armedPlanJson || "")
+            String(armedPlanJson || ""),
+            armedMergePreserving ? "1" : "0"
         ]);
 
         return true;

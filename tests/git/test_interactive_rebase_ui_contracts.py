@@ -59,6 +59,16 @@ require(
 )
 require(
     VIEW,
+    "!rebaseService.mergePreserving",
+    "MOVE controls must disable when merge topology is locked",
+)
+require(
+    VIEW,
+    "TOPOLOGY LOCKED",
+    "merge-preserving UI must identify the topology lock",
+)
+require(
+    VIEW,
     "rebaseService.setAction(selectedIndex, next)",
     "action changes must delegate to the engine",
 )
@@ -109,6 +119,16 @@ require(
     VIEW,
     "rebaseSessionService.start(",
     "persistent plans must delegate to the session controller",
+)
+require(
+    VIEW,
+    "rebaseService.armedMergePreserving",
+    "persistent session start must carry the armed merge-topology identity",
+)
+require(
+    VIEW,
+    "GIT OWNS LABEL / RESET / MERGE",
+    "merge-preserving UI must state that Git owns topology commands",
 )
 require(
     VIEW,

@@ -37,6 +37,16 @@ PanelWindow {
     property var gitKeyboardControl: null
     property bool dialControlMode: false
     property string gitSelectorSource: "keyboard"
+    property var gitNavigationStack: []
+
+    readonly property bool gitCanGoBack:
+        gitNavigationStack.length > 0
+    readonly property string gitBackLabel:
+        gitNavigationStack.length > 0
+        ? root.gitNavigationContextLabel(
+            gitNavigationStack[gitNavigationStack.length - 1]
+          )
+        : ""
 
     readonly property var selectedWorkflow:
         githubService.workflows.length > 0
@@ -203,6 +213,18 @@ PanelWindow {
         context: Qt.ApplicationShortcut
         enabled: root.menuOpen && root.keyboardActive
         onActivated: root.selectPrimaryMode(1)
+    }
+
+    Shortcut {
+        sequence: "Alt+Left"
+        context: Qt.ApplicationShortcut
+        enabled:
+            root.menuOpen
+            && root.keyboardActive
+            && root.activePage === "git"
+            && root.gitCanGoBack
+            && !root.activeTextEditor
+        onActivated: root.goBackGitNavigation()
     }
 
     Shortcut {
@@ -769,6 +791,173 @@ PanelWindow {
             root.open();
     }
 
+    function gitNavigationContextLabel(context) {
+        const ctx = context || {};
+        const view = String(ctx.view || "control");
+
+        if (view === "branches") {
+            const branch = String(ctx.branch || "");
+            const sha = String(ctx.sha || "");
+            return (
+                "BRANCHES"
+                + (branch ? " // " + branch : "")
+                + (!branch && sha ? " // " + sha.slice(0, 10) : "")
+            );
+        }
+
+        if (view === "changes") {
+            const path = String(ctx.path || "");
+            return "CHANGES" + (path ? " // " + path : "");
+        }
+
+        if (view === "history") {
+            const history = ctx.history || {};
+            const subMode = String(history.subMode || "log").toUpperCase();
+            const queryPath = String(history.queryPath || "");
+            const sha = String(history.selectedSha || "");
+            const scopeRef = String(history.scopeRef || "ALL");
+            let detail = "";
+
+            if (subMode === "QUERY" && queryPath)
+                detail = queryPath;
+            else if (sha)
+                detail = sha.slice(0, 10);
+            else if (scopeRef && scopeRef !== "ALL")
+                detail = scopeRef
+                    .replace(/^refs\/heads\//, "")
+                    .replace(/^refs\/tags\//, "");
+
+            return (
+                "HISTORY // "
+                + subMode
+                + (detail ? " // " + detail : "")
+            );
+        }
+
+        if (view === "repository") {
+            const subMode = String(ctx.subMode || "");
+            return (
+                "REPOSITORY"
+                + (subMode ? " // " + subMode.toUpperCase() : "")
+            );
+        }
+
+        return "CONTROL";
+    }
+
+    function captureGitNavigationContext() {
+        if (root.gitView === "branches") {
+            return {
+                view: "branches",
+                branch: String(gitBranchesView.selectedBranch || ""),
+                sha: String(gitBranchesView.selectedSha || "")
+            };
+        }
+
+        if (root.gitView === "changes") {
+            return {
+                view: "changes",
+                path: String(gitChangesView.selectedPath || ""),
+                subMode: String(gitChangesView.subMode || "files")
+            };
+        }
+
+        if (root.gitView === "history") {
+            return {
+                view: "history",
+                history: gitHistoryView.navigationContext()
+            };
+        }
+
+        if (root.gitView === "repository") {
+            return {
+                view: "repository",
+                subMode: String(gitRepositoryView.subMode || "remotes")
+            };
+        }
+
+        return { view: "control" };
+    }
+
+    function clearGitNavigation() {
+        root.gitNavigationStack = [];
+    }
+
+    function pushGitNavigationContext() {
+        if (root.activePage !== "git")
+            return;
+
+        const context = root.captureGitNavigationContext();
+        const next = root.gitNavigationStack.slice();
+
+        next.push(context);
+
+        while (next.length > 12)
+            next.shift();
+
+        root.gitNavigationStack = next;
+    }
+
+    function restoreGitNavigationContext(context) {
+        const ctx = context || {};
+        const view = String(ctx.view || "control");
+
+        root.localTargetMenuOpen = false;
+        root.remoteTargetMenuOpen = false;
+        root.activePage = "git";
+        root.gitView = view;
+
+        if (view === "branches") {
+            gitBranchesView.focusContext(
+                String(ctx.branch || ""),
+                String(ctx.sha || "")
+            );
+            branchWorkspaceService.refresh();
+            return;
+        }
+
+        if (view === "changes") {
+            const path = String(ctx.path || "");
+            gitChangesView.subMode = String(ctx.subMode || "files");
+
+            if (path)
+                gitChangesView.focusPath(path);
+
+            changesService.refresh();
+            return;
+        }
+
+        if (view === "history") {
+            gitService.refresh();
+            gitHistoryView.restoreNavigationContext(
+                ctx.history || {}
+            );
+            return;
+        }
+
+        if (view === "repository") {
+            gitRepositoryView.subMode =
+                String(ctx.subMode || "remotes");
+            repositoryService.refresh();
+            branchWorkspaceService.refresh();
+            return;
+        }
+
+        root.gitView = "control";
+        gitService.refresh();
+    }
+
+    function goBackGitNavigation() {
+        if (!root.gitCanGoBack)
+            return;
+
+        const next = root.gitNavigationStack.slice();
+        const context = next.pop();
+
+        root.gitNavigationStack = next;
+        root.restoreGitNavigationContext(context);
+    }
+
     function showGitPage() {
         root.workflowMenuOpen = false;
         root.localTargetMenuOpen = false;
@@ -789,12 +978,14 @@ PanelWindow {
     }
 
     function showGitControl() {
+        root.clearGitNavigation();
         root.localTargetMenuOpen = false;
         root.remoteTargetMenuOpen = false;
         root.gitView = "control";
     }
 
     function showGitBranches() {
+        root.clearGitNavigation();
         root.localTargetMenuOpen = false;
         root.remoteTargetMenuOpen = false;
         root.gitView = "branches";
@@ -802,6 +993,7 @@ PanelWindow {
     }
 
     function showGitChanges() {
+        root.clearGitNavigation();
         root.localTargetMenuOpen = false;
         root.remoteTargetMenuOpen = false;
         root.gitView = "changes";
@@ -809,6 +1001,7 @@ PanelWindow {
     }
 
     function showGitHistory() {
+        root.clearGitNavigation();
         root.localTargetMenuOpen = false;
         root.remoteTargetMenuOpen = false;
         root.gitView = "history";
@@ -817,6 +1010,7 @@ PanelWindow {
     }
 
     function showGitRepository() {
+        root.clearGitNavigation();
         root.localTargetMenuOpen = false;
         root.remoteTargetMenuOpen = false;
         root.gitView = "repository";
@@ -830,6 +1024,7 @@ PanelWindow {
         if (!branch)
             return;
 
+        root.pushGitNavigationContext();
         root.localTargetMenuOpen = false;
         root.remoteTargetMenuOpen = false;
         root.activePage = "git";
@@ -844,6 +1039,7 @@ PanelWindow {
         if (!target)
             return;
 
+        root.pushGitNavigationContext();
         root.localTargetMenuOpen = false;
         root.remoteTargetMenuOpen = false;
         root.activePage = "git";
@@ -857,6 +1053,7 @@ PanelWindow {
         if (!target)
             return;
 
+        root.pushGitNavigationContext();
         root.localTargetMenuOpen = false;
         root.remoteTargetMenuOpen = false;
         root.activePage = "git";
@@ -872,6 +1069,7 @@ PanelWindow {
         if (!branch && !commit)
             return;
 
+        root.pushGitNavigationContext();
         root.localTargetMenuOpen = false;
         root.remoteTargetMenuOpen = false;
         root.activePage = "git";
@@ -2823,6 +3021,96 @@ PanelWindow {
                     }
                     visible: root.activePage === "git"
 
+                    Rectangle {
+                        id: gitContextBar
+
+                        anchors {
+                            top: parent.top
+                            left: parent.left
+                            right: parent.right
+                        }
+
+                        height: root.gitCanGoBack ? 28 : 0
+                        visible: root.gitCanGoBack
+                        z: 1600
+                        color: Colors.black
+                        border.width: 1
+                        border.color: Colors.magenta
+
+                        Rectangle {
+                            id: gitBackButton
+
+                            anchors {
+                                left: parent.left
+                                top: parent.top
+                                bottom: parent.bottom
+                                margins: 3
+                            }
+
+                            width: 76
+                            color:
+                                gitBackMouse.pressed
+                                ? Colors.magenta
+                                : gitBackMouse.containsMouse
+                                ? Colors.dark
+                                : Colors.black
+                            border.width: 1
+                            border.color: Colors.cyan
+
+                            GohuText {
+                                anchors.centerIn: parent
+                                text: "‹ BACK"
+                                font.pixelSize: 9
+                                color:
+                                    gitBackMouse.pressed
+                                    ? Colors.black
+                                    : Colors.cyan
+                            }
+
+                            MouseArea {
+                                id: gitBackMouse
+
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.goBackGitNavigation()
+                            }
+                        }
+
+                        GohuText {
+                            anchors {
+                                left: gitBackButton.right
+                                right: gitStackCount.left
+                                verticalCenter: parent.verticalCenter
+                                leftMargin: 8
+                                rightMargin: 8
+                            }
+
+                            text: "FROM // " + root.gitBackLabel
+                            font.pixelSize: 9
+                            color: Colors.white
+                            elide: Text.ElideMiddle
+                        }
+
+                        GohuText {
+                            id: gitStackCount
+
+                            anchors {
+                                right: parent.right
+                                verticalCenter: parent.verticalCenter
+                                rightMargin: 7
+                            }
+
+                            width: 64
+                            horizontalAlignment: Text.AlignRight
+                            text:
+                                "STACK "
+                                + String(root.gitNavigationStack.length)
+                            font.pixelSize: 8
+                            color: Colors.magenta
+                        }
+                    }
+
                     MouseArea {
                         id: localTargetMenuShield
 
@@ -2847,6 +3135,7 @@ PanelWindow {
 
                         anchors {
                             fill: parent
+                            topMargin: root.gitCanGoBack ? 34 : 0
                             bottomMargin: 66
                         }
                         spacing: 10
@@ -4281,6 +4570,7 @@ PanelWindow {
                             left: parent.left
                             right: parent.right
                             bottom: gitModeButtonRow.top
+                            topMargin: root.gitCanGoBack ? 34 : 0
                             bottomMargin: 8
                         }
 
@@ -4300,6 +4590,7 @@ PanelWindow {
                             left: parent.left
                             right: parent.right
                             bottom: gitModeButtonRow.top
+                            topMargin: root.gitCanGoBack ? 34 : 0
                             bottomMargin: 8
                         }
 
@@ -4329,6 +4620,7 @@ PanelWindow {
                             left: parent.left
                             right: parent.right
                             bottom: gitModeButtonRow.top
+                            topMargin: root.gitCanGoBack ? 34 : 0
                             bottomMargin: 8
                         }
 
@@ -4351,6 +4643,7 @@ PanelWindow {
                             left: parent.left
                             right: parent.right
                             bottom: gitModeButtonRow.top
+                            topMargin: root.gitCanGoBack ? 34 : 0
                             bottomMargin: 8
                         }
 

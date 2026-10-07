@@ -5,6 +5,9 @@ import Quickshell.Io
 Scope {
     id: gitService
 
+    property var operationJournal: null
+    property var snapshotService: null
+
     property bool available: false
     property bool refreshing: false
     property bool refreshPending: false
@@ -97,6 +100,14 @@ Scope {
     property string actionTitle: "READY"
     property string actionOutput: "Select STATUS, DIFF, LOG, FETCH, PULL, or PUSH."
     property int actionExitCode: 0
+
+    property string pendingJournalId: ""
+    property string pendingSnapshotRequest: ""
+    property string snapshotPhase: ""
+    property string pendingProcessAction: ""
+    property var pendingActionCommand: []
+    property bool pendingActionSuccess: false
+    property string pendingActionDetail: ""
 
     property alias repoModel: repoRows
     property alias localBranchModel: localBranchRows
@@ -1235,6 +1246,240 @@ Scope {
         }
     }
 
+    function shouldJournalProcessAction(processAction) {
+        return [
+            "fetch",
+            "pull",
+            "push",
+            "track-checkout"
+        ].indexOf(String(processAction || "")) >= 0;
+    }
+
+    function cloneSnapshot(snapshot) {
+        try {
+            return JSON.parse(JSON.stringify(snapshot || {}));
+        } catch (error) {
+            return {};
+        }
+    }
+
+    function journalSnapshot(snapshot) {
+        const out = cloneSnapshot(snapshot);
+
+        if (pendingProcessAction === "push") {
+            out.recoveryClass = "EVIDENCE_ONLY";
+            out.recoveryReason =
+                "CONTROL PUSH MUTATES REMOTE REF STATE";
+        }
+
+        return out;
+    }
+
+    function clearPendingControlAction() {
+        pendingJournalId = "";
+        pendingSnapshotRequest = "";
+        snapshotPhase = "";
+        pendingProcessAction = "";
+        pendingActionCommand = [];
+        pendingActionSuccess = false;
+        pendingActionDetail = "";
+    }
+
+    function controlContext() {
+        return {
+            source: "GitService",
+            processAction: String(pendingProcessAction || ""),
+            target:
+                pendingProcessAction === "pull"
+                || pendingProcessAction === "track-checkout"
+                ? String(pullSourceTarget || selectedRemoteBranch || "")
+                : String(selectedRemoteBranch || ""),
+            pullMode: String(pullMode || ""),
+            localTarget: String(selectedLocalBranch || branch || ""),
+            repositorySlug: String(repoRemoteSlug || ""),
+            recoveryClass:
+                pendingProcessAction === "push"
+                ? "EVIDENCE_ONLY"
+                : ""
+        };
+    }
+
+    function failBeforeSnapshot(detail) {
+        const message =
+            "CONTROL BEFORE SNAPSHOT FAILED // "
+            + String(detail || "SNAPSHOT UNAVAILABLE");
+
+        actionBusy = false;
+        actionExitCode = 1;
+        actionOutput =
+            (actionOutput.length > 0 ? actionOutput + "\n" : "")
+            + message;
+        actionWatchdog.stop();
+        clearPendingControlAction();
+    }
+
+    function startPendingActionProcess() {
+        if (!actionBusy
+                || !Array.isArray(pendingActionCommand)
+                || pendingActionCommand.length === 0)
+            return false;
+
+        actionWatchdog.interval =
+            pendingProcessAction === "clone"
+            ? 120000
+            : 15000;
+        actionWatchdog.restart();
+        actionProcess.exec(pendingActionCommand);
+        return true;
+    }
+
+    function finalActionLine() {
+        const lines = String(actionOutput || "").split("\n");
+
+        for (let i = lines.length - 1; i >= 0; --i) {
+            const value = String(lines[i] || "").trim();
+
+            if (value)
+                return value;
+        }
+
+        return "";
+    }
+
+    function finalizeControlAction(afterSnapshot, snapshotWarning) {
+        const processAction = String(pendingProcessAction || "");
+        const warning = String(snapshotWarning || "");
+        const detail =
+            String(
+                pendingActionDetail
+                || finalActionLine()
+                || (
+                    actionTitle
+                    + (
+                        pendingActionSuccess
+                        ? " COMPLETE"
+                        : " FAILED"
+                      )
+                  )
+            );
+        const success = pendingActionSuccess;
+        const snapshot =
+            afterSnapshot
+            ? journalSnapshot(afterSnapshot)
+            : {
+                snapshotVersion: 1,
+                repository: String(repoRoot || repoPath || ""),
+                capturedAt: new Date().toISOString(),
+                captureFailed: true,
+                recoveryClass: "EVIDENCE_ONLY",
+                recoveryReason:
+                    warning
+                    || "CONTROL AFTER SNAPSHOT UNAVAILABLE"
+            };
+
+        if (pendingJournalId && operationJournal) {
+            if (success)
+                operationJournal.completeOperation(
+                    pendingJournalId,
+                    snapshot,
+                    warning
+                    ? detail + " // " + warning
+                    : detail
+                );
+            else
+                operationJournal.failOperation(
+                    pendingJournalId,
+                    snapshot,
+                    warning
+                    ? detail + " // " + warning
+                    : detail
+                );
+        }
+
+        actionBusy = false;
+        actionWatchdog.stop();
+
+        if (warning) {
+            actionOutput +=
+                (actionOutput.length > 0 ? "\n" : "")
+                + "SNAPSHOT WARNING // "
+                + warning;
+        }
+
+        if (processAction === "track-checkout") {
+            if (success) {
+                localTrackCheckoutMode = false;
+                selectedLocalBranch = "";
+                selectedLocalHead = "";
+                selectedLocalUpstream = "";
+                selectedLocalIndex = -1;
+            }
+
+            clearPendingControlAction();
+            refresh();
+            return;
+        }
+
+        if (processAction === "clone") {
+            const query = clonePendingQuery;
+            clonePendingQuery = "";
+
+            if (success) {
+                preferredRepoQuery = query;
+                discoverRepos();
+            } else {
+                actionOutput += (
+                    actionOutput.length > 0 ? "\n" : ""
+                ) + "CLONE DID NOT CREATE A LOCAL BED";
+            }
+
+            clearPendingControlAction();
+            return;
+        }
+
+        clearPendingControlAction();
+        refresh();
+    }
+
+    function finishActionProcess() {
+        if (!actionBusy)
+            return;
+
+        actionWatchdog.stop();
+        pendingActionSuccess = actionExitCode === 0;
+        pendingActionDetail =
+            finalActionLine()
+            || (
+                actionTitle
+                + (
+                    pendingActionSuccess
+                    ? " COMPLETE"
+                    : " FAILED // EXIT "
+                        + String(actionExitCode)
+                  )
+              );
+
+        if (!shouldJournalProcessAction(pendingProcessAction)
+                || !operationJournal
+                || !snapshotService) {
+            finalizeControlAction(null, "");
+            return;
+        }
+
+        snapshotPhase = "AFTER";
+        pendingSnapshotRequest = snapshotService.capture(
+            "CONTROL AFTER // " + actionTitle,
+            controlContext()
+        );
+
+        if (!pendingSnapshotRequest) {
+            finalizeControlAction(
+                null,
+                "AFTER SNAPSHOT COULD NOT START"
+            );
+        }
+    }
+
     function runReadAction(kind) {
         runAction(String(kind || "").toLowerCase());
     }
@@ -1344,10 +1589,7 @@ Scope {
         if (action === "clone")
             clonePendingQuery = repoRemoteSlug || repoLabel;
 
-        actionWatchdog.interval = action === "clone" ? 120000 : 15000;
-        actionWatchdog.restart();
-
-        actionProcess.exec([
+        const command = [
             "bash",
             "-lc",
             [
@@ -1503,6 +1745,37 @@ Scope {
             repoLabel,
             repoRemoteUrl
         ]);
+
+        if (shouldJournalProcessAction(processAction)
+                && ((operationJournal && !snapshotService)
+                    || (snapshotService && !operationJournal))) {
+            actionBusy = false;
+            actionExitCode = 1;
+            actionOutput =
+                "JOURNAL + SNAPSHOT SERVICES MUST BE PAIRED";
+            return;
+        }
+
+        clearPendingControlAction();
+        pendingProcessAction = processAction;
+        pendingActionCommand = command;
+
+        if (!shouldJournalProcessAction(processAction)
+                || (!operationJournal && !snapshotService)) {
+            startPendingActionProcess();
+            return;
+        }
+
+        snapshotPhase = "BEFORE";
+        pendingSnapshotRequest = snapshotService.capture(
+            "CONTROL BEFORE // " + actionTitle,
+            controlContext()
+        );
+
+        if (!pendingSnapshotRequest) {
+            failBeforeSnapshot("SNAPSHOT SERVICE BUSY OR UNAVAILABLE");
+            return;
+        }
     }
 
     function friendlyActionError(message) {
@@ -1546,39 +1819,7 @@ Scope {
         }
 
         if (raw === "__PA_DONE__") {
-            actionBusy = false;
-            actionWatchdog.stop();
-
-            if (actionTitle === "TRACK // CHECKOUT") {
-                if (actionExitCode === 0) {
-                    localTrackCheckoutMode = false;
-                    selectedLocalBranch = "";
-                    selectedLocalHead = "";
-                    selectedLocalUpstream = "";
-                    selectedLocalIndex = -1;
-                }
-
-                refresh();
-                return;
-            }
-
-            if (actionTitle === "CLONE") {
-                const query = clonePendingQuery;
-                clonePendingQuery = "";
-
-                if (actionExitCode === 0) {
-                    preferredRepoQuery = query;
-                    discoverRepos();
-                } else {
-                    actionOutput += (
-                        actionOutput.length > 0 ? "\n" : ""
-                    ) + "CLONE DID NOT CREATE A LOCAL BED";
-                }
-
-                return;
-            }
-
-            refresh();
+            finishActionProcess();
             return;
         }
 
@@ -1610,6 +1851,77 @@ Scope {
             "pa-lazygit",
             repoPath
         ]);
+    }
+
+    Connections {
+        target: gitService.snapshotService
+        enabled: gitService.snapshotService !== null
+        ignoreUnknownSignals: true
+
+        function onSnapshotReady(requestId, snapshot) {
+            if (String(requestId || "")
+                    !== String(gitService.pendingSnapshotRequest || ""))
+                return;
+
+            gitService.pendingSnapshotRequest = "";
+
+            if (gitService.snapshotPhase === "BEFORE") {
+                gitService.snapshotPhase = "";
+                const beforeSnapshot =
+                    gitService.journalSnapshot(snapshot);
+
+                gitService.pendingJournalId =
+                    gitService.operationJournal
+                    ? gitService.operationJournal.beginOperation(
+                        "CONTROL/"
+                            + String(
+                                gitService.pendingProcessAction || ""
+                              ).toUpperCase(),
+                        beforeSnapshot,
+                        gitService.controlContext()
+                    )
+                    : "";
+
+                if (gitService.operationJournal
+                        && !gitService.pendingJournalId) {
+                    gitService.failBeforeSnapshot(
+                        "JOURNAL RECORD COULD NOT START"
+                    );
+                    return;
+                }
+
+                gitService.startPendingActionProcess();
+                return;
+            }
+
+            if (gitService.snapshotPhase === "AFTER") {
+                gitService.snapshotPhase = "";
+                gitService.finalizeControlAction(snapshot, "");
+            }
+        }
+
+        function onSnapshotFailed(requestId, detail) {
+            if (String(requestId || "")
+                    !== String(gitService.pendingSnapshotRequest || ""))
+                return;
+
+            gitService.pendingSnapshotRequest = "";
+
+            if (gitService.snapshotPhase === "BEFORE") {
+                gitService.snapshotPhase = "";
+                gitService.failBeforeSnapshot(detail);
+                return;
+            }
+
+            if (gitService.snapshotPhase === "AFTER") {
+                gitService.snapshotPhase = "";
+                gitService.finalizeControlAction(
+                    null,
+                    "AFTER SNAPSHOT FAILED // "
+                        + String(detail || "UNKNOWN ERROR")
+                );
+            }
+        }
     }
 
     Process {
@@ -1688,11 +2000,40 @@ Scope {
         repeat: false
 
         onTriggered: {
+            if (!gitService.actionBusy)
+                return;
+
+            const detail =
+                "ACTION TIMEOUT // VERIFY REPOSITORY / REMOTE STATE";
+
+            if (gitService.pendingJournalId
+                    && gitService.operationJournal) {
+                gitService.operationJournal.failOperation(
+                    gitService.pendingJournalId,
+                    {
+                        snapshotVersion: 1,
+                        repository:
+                            String(
+                                gitService.repoRoot
+                                || gitService.repoPath
+                                || ""
+                            ),
+                        capturedAt: new Date().toISOString(),
+                        captureFailed: true,
+                        recoveryClass: "EVIDENCE_ONLY",
+                        recoveryReason:
+                            "CONTROL ACTION TIMEOUT // STATE UNCERTAIN"
+                    },
+                    detail
+                );
+            }
+
             gitService.actionBusy = false;
             gitService.actionExitCode = 1;
             gitService.actionOutput += (
                 gitService.actionOutput.length > 0 ? "\n" : ""
-            ) + "ACTION TIMEOUT";
+            ) + detail;
+            gitService.clearPendingControlAction();
         }
     }
 

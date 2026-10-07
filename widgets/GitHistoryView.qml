@@ -1868,113 +1868,122 @@ Item {
                             }
                         }
 
-                        Flickable {
-                            id: historyScroll7
+                        Item {
+                            id: reflogViewport
 
-                            width: Math.max(0, parent.width - 8)
-                            height: Math.max(0, parent.height - y - 4)
+                            width: parent.width
+                            height: Math.max(0, parent.height - 33)
                             clip: true
-                            contentWidth: width
-                            contentHeight: reflogColumn.implicitHeight
-                            boundsBehavior: Flickable.StopAtBounds
 
-                            Column {
-                                id: reflogColumn
+                            Flickable {
+                                id: historyScroll7
 
-                                width: parent.width
-                                spacing: 3
+                                anchors {
+                                    fill: parent
+                                    rightMargin: 12
+                                    bottomMargin: 10
+                                }
+                                clip: true
+                                contentWidth: width
+                                contentHeight: reflogColumn.implicitHeight
+                                boundsBehavior: Flickable.StopAtBounds
 
-                                Repeater {
-                                    model:
-                                        root.historyService
-                                        ? root.historyService.reflogRows
-                                        : []
+                                Column {
+                                    id: reflogColumn
 
-                                    Rectangle {
-                                        id: reflogRow
+                                    width: parent.width
+                                    spacing: 3
 
-                                        required property var modelData
+                                    Repeater {
+                                        model:
+                                            root.historyService
+                                            ? root.historyService.reflogRows
+                                            : []
 
-                                        width: reflogColumn.width
-                                        height: 52
-                                        color:
-                                            reflogMouse.containsMouse
-                                            || root.selectedReflogSha
-                                               === String(modelData.sha || "")
-                                            ? Colors.black
-                                            : "transparent"
-                                        border.width:
-                                            root.selectedReflogSha
-                                            === String(modelData.sha || "")
-                                            ? 1 : 0
-                                        border.color: Colors.magenta
+                                        Rectangle {
+                                            id: reflogRow
 
-                                        Column {
-                                            anchors {
-                                                fill: parent
-                                                margins: 6
+                                            required property var modelData
+
+                                            width: reflogColumn.width
+                                            height: 52
+                                            color:
+                                                reflogMouse.containsMouse
+                                                || root.selectedReflogSha
+                                                   === String(modelData.sha || "")
+                                                ? Colors.black
+                                                : "transparent"
+                                            border.width:
+                                                root.selectedReflogSha
+                                                === String(modelData.sha || "")
+                                                ? 1 : 0
+                                            border.color: Colors.magenta
+
+                                            Column {
+                                                anchors {
+                                                    fill: parent
+                                                    margins: 6
+                                                }
+                                                spacing: 2
+
+                                                GohuText {
+                                                    width: parent.width
+                                                    text:
+                                                        String(
+                                                            reflogRow.modelData.selector
+                                                            || ""
+                                                        )
+                                                        + " // "
+                                                        + String(
+                                                            reflogRow.modelData.shortSha
+                                                            || ""
+                                                        )
+                                                    font.pixelSize: 10
+                                                    color: Colors.magenta
+                                                    elide: Text.ElideRight
+                                                }
+
+                                                GohuText {
+                                                    width: parent.width
+                                                    text:
+                                                        String(
+                                                            reflogRow.modelData.subject
+                                                            || ""
+                                                        )
+                                                    font.pixelSize: 10
+                                                    color: Colors.white
+                                                    elide: Text.ElideRight
+                                                }
                                             }
-                                            spacing: 2
 
-                                            GohuText {
-                                                width: parent.width
-                                                text:
-                                                    String(
-                                                        reflogRow.modelData.selector
-                                                        || ""
-                                                    )
-                                                    + " // "
-                                                    + String(
-                                                        reflogRow.modelData.shortSha
-                                                        || ""
-                                                    )
-                                                font.pixelSize: 10
-                                                color: Colors.magenta
-                                                elide: Text.ElideRight
-                                            }
+                                            MouseArea {
+                                                id: reflogMouse
 
-                                            GohuText {
-                                                width: parent.width
-                                                text:
-                                                    String(
-                                                        reflogRow.modelData.subject
-                                                        || ""
-                                                    )
-                                                font.pixelSize: 10
-                                                color: Colors.white
-                                                elide: Text.ElideRight
-                                            }
-                                        }
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
 
-                                        MouseArea {
-                                            id: reflogMouse
-
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-
-                                            onClicked: {
-                                                root.selectedReflogSha =
-                                                    String(
-                                                        reflogRow.modelData.sha
-                                                        || ""
+                                                onClicked: {
+                                                    root.selectedReflogSha =
+                                                        String(
+                                                            reflogRow.modelData.sha
+                                                            || ""
+                                                        );
+                                                    root.selectedCommitRefs = "";
+                                                    root.historyService.showCommit(
+                                                        root.selectedReflogSha
                                                     );
-                                                root.selectedCommitRefs = "";
-                                                root.historyService.showCommit(
-                                                    root.selectedReflogSha
-                                                );
+                                                }
                                             }
                                         }
                                     }
                                 }
-                            }
 
-                            NeonScrollBar {
-                                flickable: historyScroll7
-                                starHandle: true
-                                topInset: 3
-                                bottomInset: 8
-                                rightInset: 5
+                                NeonScrollBar {
+                                    flickable: historyScroll7
+                                    starHandle: true
+                                    rightInset: 2
+                                }
                             }
                         }
                     }

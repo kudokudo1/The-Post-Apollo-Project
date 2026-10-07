@@ -8,6 +8,9 @@ HOSPITAL = (ROOT / "widgets/HospitalW.qml").read_text(encoding="utf-8")
 VIEW = (
     ROOT / "widgets/HospitalGitHubAttentionView.qml"
 ).read_text(encoding="utf-8")
+PROVIDER = (
+    ROOT / "services/github/GitHubAttentionProvider.qml"
+).read_text(encoding="utf-8")
 GITW = (ROOT / "widgets/GitW.qml").read_text(encoding="utf-8")
 SHELL = (ROOT / "shell.qml").read_text(encoding="utf-8")
 errors = []
@@ -65,6 +68,9 @@ require(
     "gitWindow.openGithubPullRequest(",
     "shell must use GitW public navigation seam",
 )
+
+if "\\\\'" in PROVIDER:
+    errors.append("GitHubAttentionProvider contains malformed double-backslash single-quote escapes")
 
 for forbidden in (
     "GitInteractiveRebaseService",

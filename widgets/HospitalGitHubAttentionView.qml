@@ -311,6 +311,12 @@ Rectangle {
                                 String(modelData.headRefName || "?")
                                 + " → "
                                 + String(modelData.baseRefName || "?")
+                                + " // MERGE "
+                                + String(
+                                    modelData.mergeStateStatus
+                                    || modelData.mergeable
+                                    || "UNKNOWN"
+                                  )
                                 + " // "
                                 + (
                                     Array.isArray(modelData.attentionStates)

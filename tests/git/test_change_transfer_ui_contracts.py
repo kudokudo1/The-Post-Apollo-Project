@@ -68,7 +68,26 @@ require_regex(
 require(
     VIEW,
     "transferService.preview(",
-    "PREVIEW must delegate to the guarded transfer backend",
+    "worktree PREVIEW must delegate to the guarded transfer backend",
+)
+require(
+    VIEW,
+    "transferService.previewStaged(",
+    "staged PREVIEW must delegate to the staged transfer backend",
+)
+require_regex(
+    VIEW,
+    r"readonly property bool stagedLayer:.*"
+    r'transferScope === "file".*'
+    r'transferLayer.*=== "staged"',
+    "transfer view must carry an explicit staged/worktree content layer",
+)
+require_regex(
+    VIEW,
+    r"readonly property bool previewMatchesSelection:.*"
+    r"previewLayer.*"
+    r"stagedLayer",
+    "execution eligibility must include the exact previewed content layer",
 )
 require(
     VIEW,
@@ -86,12 +105,40 @@ require_regex(
 )
 require_regex(
     CHANGES,
-    r"function fileTransferEligible\(\).*"
+    r"function worktreeFileTransferEligible\(\).*"
     r"Boolean\(row\.unstaged\).*"
     r"!Boolean\(row\.staged\).*"
     r"!Boolean\(row\.untracked\).*"
     r"!Boolean\(row\.conflict\)",
-    "Changes must not offer whole-file transfer for unsupported file states",
+    "worktree transfer must remain limited to unstaged-only tracked files",
+)
+require_regex(
+    CHANGES,
+    r"function stagedFileTransferEligible\(\).*"
+    r"Boolean\(row\.staged\).*"
+    r"!Boolean\(row\.unstaged\).*"
+    r"!Boolean\(row\.untracked\).*"
+    r"!Boolean\(row\.conflict\)",
+    "staged transfer must be limited to staged-only tracked files",
+)
+require_regex(
+    CHANGES,
+    r"function fileTransferEligible\(\).*"
+    r"worktreeFileTransferEligible\(\).*"
+    r"stagedFileTransferEligible\(\)",
+    "whole-file transfer entry must admit either supported content layer",
+)
+require_regex(
+    CHANGES,
+    r"function hunkTransferEligible\(\).*"
+    r"worktreeFileTransferEligible\(\)",
+    "hunk transfer must remain worktree-only",
+)
+require_regex(
+    CHANGES,
+    r"function lineTransferEligible\(\).*"
+    r"worktreeFileTransferEligible\(\)",
+    "line transfer must remain worktree-only",
 )
 require(
     CHANGES,
@@ -103,8 +150,17 @@ require_regex(
     r"GitChangeTransferView \{.*"
     r"transferService: root\.transferService.*"
     r"branchWorkspaceService: root\.branchWorkspaceService.*"
-    r"filePath: root\.selectedPath",
-    "Changes overlay must use the shared backend and selected file",
+    r"filePath: root\.selectedPath.*"
+    r"transferLayer: root\.transferLayer",
+    "Changes overlay must use the shared backend, selected file, and content layer",
+)
+require_regex(
+    CHANGES,
+    r"root\.transferLayer\s*=\s*"
+    r'requested === "file".*'
+    r"stagedFileTransferEligible\(\).*"
+    r'\? "staged"\s*:\s*"worktree"',
+    "opening whole-file transfer must select the supported source content layer",
 )
 require_regex(
     CHANGES,

@@ -455,10 +455,14 @@ Rectangle {
         z: 3
 
         width: messageViewport.width - 80
+        height: Math.min(implicitHeight, 96)
 
         text: chatFeed.error
 
         wrapMode: Text.Wrap
+        maximumLineCount: 5
+        elide: Text.ElideRight
+        clip: true
 
         horizontalAlignment: Text.AlignHCenter
 
@@ -736,6 +740,9 @@ Rectangle {
         text: chatFeed.sendError
 
         wrapMode: Text.Wrap
+        maximumLineCount: 3
+        elide: Text.ElideRight
+        clip: true
 
         horizontalAlignment: Text.AlignHCenter
 

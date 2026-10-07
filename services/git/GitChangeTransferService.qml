@@ -5,15 +5,16 @@ import Quickshell.Io
 // Safe first slice of GitButler-style change transfer.
 //
 // Scope:
-//   - tracked unstaged, staged, hunk, and untracked whole-file changes
+//   - tracked unstaged, staged, partially-staged, hunk, and untracked changes
+//   - conflicted regular-file RESULT drafts via guarded COPY-only handoff
 //   - source is repositoryPath
-//   - destination is an existing worktree of the same repository
-//   - COPY or MOVE
+//   - destination is an existing clean worktree of the same repository
+//   - COPY or MOVE where the source state has an exact safe inverse
 //
-// MOVE applies to the destination first, then reverses the exact previewed
-// patch in the source. If source removal fails, destination application is
-// rolled back. Staged, untracked, conflicted, or in-progress-operation state
-// is refused rather than reconstructed implicitly.
+// A conflict RESULT copy intentionally does not transplant unmerged index
+// stages or enclosing merge/rebase state. BASE / OURS / THEIRS remain owned
+// by the source operation; only the current RESULT bytes become an ordinary
+// destination worktree patch.
 Scope {
     id: root
 
@@ -670,6 +671,7 @@ Scope {
                 'cleanup() { git -C "$source" worktree remove --force "$rehearsal" >/dev/null 2>&1 || true; rm -rf "$tmp"; }',
                 'trap cleanup EXIT INT TERM',
                 'git -C "$source" worktree add --detach --quiet "$rehearsal" "$dst_head" >/dev/null 2>&1 || refuse "DESTINATION REHEARSAL WORKTREE CREATE FAILED"',
+                'git -C "$rehearsal" ls-files --error-unmatch -- "$path" >/dev/null 2>&1 || refuse "DESTINATION DOES NOT TRACK CONFLICT PATH"',
                 'mkdir -p "$rehearsal/$(dirname "$path")" || refuse "DESTINATION RESULT DIRECTORY CREATE FAILED"',
                 'cp -- "$source/$path" "$rehearsal/$path" || refuse "CONFLICT RESULT COPY INTO REHEARSAL FAILED"',
                 'git -C "$rehearsal" diff --binary --full-index -- "$path" >"$patch" || refuse "CONFLICT RESULT PATCH GENERATION FAILED"',
@@ -1313,6 +1315,7 @@ Scope {
                 '    conflict_tmp="$(mktemp -d "${TMPDIR:-/tmp}/pa-conflict-result-exec.XXXXXX")" || refuse "CONFLICT RESULT TEMP DIRECTORY CREATE FAILED"',
                 '    conflict_rehearsal="$conflict_tmp/rehearsal"',
                 '    git -C "$source" worktree add --detach --quiet "$conflict_rehearsal" "$expected_destination_head" >/dev/null 2>&1 || refuse "CONFLICT RESULT REHEARSAL WORKTREE CREATE FAILED"',
+                '    git -C "$conflict_rehearsal" ls-files --error-unmatch -- "$path" >/dev/null 2>&1 || refuse "DESTINATION NO LONGER TRACKS CONFLICT PATH"',
                 '    mkdir -p "$conflict_rehearsal/$(dirname "$path")" || refuse "CONFLICT RESULT DIRECTORY CREATE FAILED"',
                 '    cp -- "$source/$path" "$conflict_rehearsal/$path" || refuse "CONFLICT RESULT COPY INTO REHEARSAL FAILED"',
                 '    git -C "$conflict_rehearsal" diff --binary --full-index -- "$path" >"$patch" || refuse "CONFLICT RESULT PATCH REGENERATION FAILED"',

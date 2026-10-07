@@ -312,8 +312,8 @@ require(
     "local journal state must not dirty the Quickshell repository",
 )
 
-# Guarded operation recovery starts narrow: only exact clean ref
-# transitions with explicit inverse strategies may execute.
+# Guarded operation recovery only executes exact clean transitions with
+# explicit inverse strategies. Undo itself must also be snapshotted + journaled.
 require(
     "services/git/GitOperationRecoveryService.qml",
     "function preview(record)",
@@ -358,6 +358,65 @@ require_regex(
     "widgets/GitW.qml",
     r"GitOperationRecoveryService \{.*id: operationRecoveryService.*repositoryPath:",
     "GitW must own the shared recovery backend",
+)
+
+require_regex(
+    "widgets/GitW.qml",
+    r"GitOperationRecoveryService \{.*id: operationRecoveryService.*operationJournal: operationJournalService.*snapshotService: repositorySnapshotService.*repositoryPath:",
+    "GitW recovery must use the shared journal + snapshot services",
+)
+require(
+    "services/git/GitRepositorySnapshotService.qml",
+    'for-each-ref --format="UPSTREAM%09%(refname:short)%09%(upstream:short)"',
+    "snapshots must capture branch upstream relationships",
+)
+require(
+    "services/git/GitRepositorySnapshotService.qml",
+    "branchUpstreams: branchUpstreams",
+    "snapshots must expose normalized branch upstream evidence",
+)
+for strategy, label in (
+    ("RESTORE_DELETED_BRANCH", "branch deletion"),
+    ("SWITCH_BACK", "branch switch"),
+    ("RESTORE_UPSTREAM", "upstream mutation"),
+    ("REMOVE_ADDED_WORKTREE", "added worktree"),
+    ("REMOVE_NEW_WORKTREE_AND_BRANCH", "new worktree"),
+    ("RESTORE_REMOVED_WORKTREE", "removed worktree"),
+):
+    require(
+        "services/git/GitOperationRecoveryService.qml",
+        f'strategy: "{strategy}"',
+        f"{label} must have an explicit Undo strategy",
+    )
+require(
+    "services/git/GitOperationRecoveryService.qml",
+    '"UNDO/"',
+    "Undo attempts must create their own journal operation kind",
+)
+require_regex(
+    "services/git/GitOperationRecoveryService.qml",
+    r'snapshotPhase = "BEFORE";.*snapshotService\.capture\(.*operationJournal\.beginOperation\(.*executeRecoveryProcess\(\)',
+    "Undo must capture BEFORE state and open a journal record before mutation",
+)
+require_regex(
+    "services/git/GitOperationRecoveryService.qml",
+    r'function maybeFinish\(\).*snapshotPhase = "AFTER";.*snapshotService\.capture\(',
+    "Undo must capture AFTER state before journal completion",
+)
+require(
+    "services/git/GitOperationRecoveryService.qml",
+    "operationJournal.markUndoResult(",
+    "Undo completion must annotate the original journal operation",
+)
+require(
+    "services/git/GitOperationJournalService.qml",
+    "function markUndoResult(",
+    "journal must persist the relationship between an operation and its Undo",
+)
+require(
+    "services/git/GitOperationJournalService.qml",
+    'record.undoState = success ? "UNDONE" : "UNDO_FAILED"',
+    "journal must persist explicit Undo result state",
 )
 
 # Repository safety contracts.

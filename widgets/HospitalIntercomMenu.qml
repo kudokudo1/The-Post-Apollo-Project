@@ -704,7 +704,7 @@ Rectangle {
             topMargin: 8
         }
 
-        width: visible ? 62 : 0
+        width: visible ? 66 : 0
         height: 42
         color:
             voiceCancelMouse.pressed
@@ -774,7 +774,7 @@ Rectangle {
             topMargin: 8
         }
 
-        width: 82
+        width: 86
         height: 42
         color:
             sendMouse.pressed
@@ -795,7 +795,9 @@ Rectangle {
             z: -1
             opacity:
                 sendMouse.containsMouse
-                ? 0.48 : 0.28
+                ? 0.48
+                : sendButton.enabledAction
+                ? 0.28 : 0.12
             color:
                 root.speechInputService.recording
                 ? Colors.omnitrix

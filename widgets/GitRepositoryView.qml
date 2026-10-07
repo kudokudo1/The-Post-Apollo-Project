@@ -1705,6 +1705,7 @@ Item {
                 Rectangle {
                     width: 520
                     height: parent.height
+                    clip: true
                     color: Colors.dark
                     border.width: 1
                     border.color: Colors.yellow
@@ -1753,7 +1754,7 @@ Item {
 
                             width: parent.width
                             height: Math.max(0, parent.height - 33)
-                            clip: true
+                            clip: false
 
                             Flickable {
                                 id: repositoryScroll7
@@ -1844,6 +1845,7 @@ Item {
                                     flickable: repositoryScroll7
                                     starHandle: true
                                     rightInset: 2
+                                    trackTopExtension: 33
                                 }
                             }
                         }

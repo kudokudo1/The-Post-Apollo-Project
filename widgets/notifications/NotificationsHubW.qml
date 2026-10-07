@@ -127,13 +127,9 @@ PanelWindow {
     }
 
     Connections {
-        target: NotificationsService.notifications
+        target: NotificationsService
 
-        function onCountChanged() {
-            root.scheduleFilteredModelRebuild();
-        }
-
-        function onDataChanged(topLeft, bottomRight, roles) {
+        function onNotificationsRevisionChanged() {
             root.scheduleFilteredModelRebuild();
         }
     }
@@ -673,8 +669,6 @@ PanelWindow {
             });
         }
 
-        if (historyList)
-            historyList.positionViewAtBeginning();
     }
 
     function notificationMatches(source, title, message, category, severity, filterGroup) {
@@ -735,6 +729,7 @@ PanelWindow {
                 NotificationsService.activeNotifications.remove(i);
         }
 
+        NotificationsService.markNotificationsChanged();
         NotificationsService.scheduleHistorySave();
     }
 

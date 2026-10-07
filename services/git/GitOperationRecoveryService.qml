@@ -659,6 +659,61 @@ Scope {
         };
     }
 
+    function cloneRecoveryPlan(record) {
+        const row = record || {};
+        const metadata = row.metadata || {};
+        const before = row.before || {};
+        const after = row.after || {};
+
+        if (String(row.kind || "") !== "CONTROL/CLONE")
+            return null;
+
+        const destinationPath =
+            String(
+                after.destinationPath
+                || metadata.destinationPath
+                || ""
+            );
+        const beforePath =
+            String(before.destinationPath || "");
+        const expectedHead = String(after.head || "");
+        const expectedBranch = String(after.branch || "");
+        const expectedOrigin = String(after.origin || "");
+        const expectedFingerprint =
+            String(after.filesystemFingerprint || "");
+
+        if (String(row.recoveryClass || "")
+                    !== "EXTERNAL_RECOVERABLE"
+                || String(before.recoveryClass || "")
+                    !== "EXTERNAL_RECOVERABLE"
+                || String(after.recoveryClass || "")
+                    !== "EXTERNAL_RECOVERABLE"
+                || !Boolean(before.destinationRequiredAbsent)
+                || !Boolean(after.cloneCreated)
+                || !destinationPath
+                || beforePath !== destinationPath
+                || !expectedHead
+                || !expectedOrigin
+                || !expectedFingerprint) {
+            return refuse(
+                "CLONE DOES NOT HAVE EXACT EXTERNAL RECOVERY EVIDENCE"
+            );
+        }
+
+        return {
+            allowed: true,
+            strategy: "DELETE_EXACT_CLONE",
+            destinationPath: destinationPath,
+            expectedHead: expectedHead,
+            expectedBranch: expectedBranch,
+            expectedOrigin: expectedOrigin,
+            expectedFingerprint: expectedFingerprint,
+            summary:
+                "UNDO CLONE // DELETE EXACT UNCHANGED CHECKOUT // "
+                + destinationPath
+        };
+    }
+
     function preview(record) {
         const row = record || {};
         const kind = String(row.kind || "");
@@ -672,6 +727,10 @@ Scope {
 
         if (String(row.undoState || "") === "UNDONE")
             return refuse("OPERATION IS ALREADY UNDONE");
+
+        const clonePlan = cloneRecoveryPlan(row);
+        if (clonePlan)
+            return clonePlan;
 
         const transferPlan = transferRecoveryPlan(row);
         if (transferPlan)
@@ -1200,7 +1259,13 @@ Scope {
         let f = "";
         let g = "";
 
-        if (strategy === "DELETE_CREATED_BRANCH") {
+        if (strategy === "DELETE_EXACT_CLONE") {
+            a = String(plan.destinationPath || "");
+            b = String(plan.expectedHead || "");
+            c = String(plan.expectedBranch || "");
+            d = String(plan.expectedOrigin || "");
+            e = String(plan.expectedFingerprint || "");
+        } else if (strategy === "DELETE_CREATED_BRANCH") {
             a = String(plan.branch || "");
             c = String(plan.expectedSha || "");
         } else if (strategy === "DELETE_CREATED_TAG") {
@@ -1326,6 +1391,32 @@ Scope {
                 'e="$7"',
                 'f="$8"',
                 'g="$9"',
+                'fingerprint_tree() {',
+                '  python3 - "$1" <<\'PY\'',
+                'import hashlib, os, stat, sys',
+                'root = os.path.realpath(sys.argv[1])',
+                'h = hashlib.sha256()',
+                'for dirpath, dirnames, filenames in os.walk(root, topdown=True, followlinks=False):',
+                '    dirnames.sort(); filenames.sort()',
+                '    for name in list(dirnames) + list(filenames):',
+                '        path = os.path.join(dirpath, name)',
+                '        rel = os.path.relpath(path, root)',
+                '        st = os.lstat(path)',
+                '        h.update(rel.encode("utf-8", "surrogateescape") + b"\\0")',
+                '        h.update(str(stat.S_IFMT(st.st_mode)).encode() + b":" + str(stat.S_IMODE(st.st_mode)).encode() + b"\\0")',
+                '        if stat.S_ISLNK(st.st_mode):',
+                '            h.update(os.readlink(path).encode("utf-8", "surrogateescape"))',
+                '        elif stat.S_ISREG(st.st_mode):',
+                '            with open(path, "rb") as handle:',
+                '                while True:',
+                '                    chunk = handle.read(1024 * 1024)',
+                '                    if not chunk:',
+                '                        break',
+                '                    h.update(chunk)',
+                '        h.update(b"\\0")',
+                'print(h.hexdigest())',
+                'PY',
+                '}',
                 'if ! git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1; then',
                 '  printf "REFUSED\\tNOT A GIT WORKTREE\\n"',
                 '  exit 21',
@@ -1341,6 +1432,42 @@ Scope {
                 'fi',
                 'zeros="0000000000000000000000000000000000000000"',
                 'case "$strategy" in',
+                '  DELETE_EXACT_CLONE)',
+                '    clone_path="$a"',
+                '    expected_head="$b"',
+                '    expected_branch="$c"',
+                '    expected_origin="$d"',
+                '    expected_fingerprint="$e"',
+                '    [ -n "$clone_path" ] && [ -n "$expected_head" ] && [ -n "$expected_fingerprint" ] || { printf "REFUSED\\tCLONE RECOVERY IDENTITY MISSING\\n"; exit 23; }',
+                '    [ -d "$clone_path" ] && [ ! -L "$clone_path" ] || { printf "REFUSED\\tCLONE DESTINATION IS MISSING OR NOT A REAL DIRECTORY\\n"; exit 24; }',
+                '    clone_path="$(realpath "$clone_path" 2>/dev/null || true)"',
+                '    repo_top="$(git -C "$repo" rev-parse --show-toplevel 2>/dev/null || true)"',
+                '    repo_top="$(realpath "$repo_top" 2>/dev/null || true)"',
+                '    [ -n "$clone_path" ] && [ "$repo_top" = "$clone_path" ] || { printf "REFUSED\\tCURRENT REPOSITORY IS NOT THE RECORDED CLONE\\n"; exit 25; }',
+                '    projects="$(realpath "$HOME/Projects" 2>/dev/null || true)"',
+                '    [ -n "$projects" ] || { printf "REFUSED\\tPROJECTS ROOT CANNOT BE RESOLVED\\n"; exit 26; }',
+                '    case "$clone_path" in "$projects"/*) ;; *) printf "REFUSED\\tCLONE DESTINATION IS OUTSIDE PROJECTS ROOT\\n"; exit 27 ;; esac',
+                '    actual_head="$(git -C "$clone_path" rev-parse HEAD 2>/dev/null || true)"',
+                '    actual_branch="$(git -C "$clone_path" branch --show-current 2>/dev/null || true)"',
+                '    actual_origin="$(git -C "$clone_path" remote get-url origin 2>/dev/null || true)"',
+                '    [ "$actual_head" = "$expected_head" ] || { printf "REFUSED\\tCLONE HEAD CHANGED SINCE CREATION\\n"; exit 28; }',
+                '    [ "$actual_branch" = "$expected_branch" ] || { printf "REFUSED\\tCLONE BRANCH CHANGED SINCE CREATION\\n"; exit 29; }',
+                '    [ "$actual_origin" = "$expected_origin" ] || { printf "REFUSED\\tCLONE ORIGIN CHANGED SINCE CREATION\\n"; exit 30; }',
+                '    worktree_count="$(git -C "$clone_path" worktree list --porcelain 2>/dev/null | grep -c "^worktree " || true)"',
+                '    [ "$worktree_count" = "1" ] || { printf "REFUSED\\tCLONE HAS ADDITIONAL WORKTREES\\n"; exit 31; }',
+                '    actual_fingerprint="$(fingerprint_tree "$clone_path" 2>/dev/null || true)"',
+                '    [ -n "$actual_fingerprint" ] && [ "$actual_fingerprint" = "$expected_fingerprint" ] || { printf "REFUSED\\tCLONE DIRECTORY CHANGED SINCE CREATION\\n"; exit 32; }',
+                '    python3 - "$clone_path" <<\'PY\'',
+                'import os, shutil, sys',
+                'path = os.path.realpath(sys.argv[1])',
+                'if not os.path.isdir(path) or os.path.islink(path):',
+                '    raise SystemExit(1)',
+                'shutil.rmtree(path)',
+                'PY',
+                '    rc=$?',
+                '    [ "$rc" -eq 0 ] && [ ! -e "$clone_path" ] && [ ! -L "$clone_path" ] || { printf "REFUSED\\tEXACT CLONE DELETE FAILED\\n"; exit 33; }',
+                '    printf "OK\\tUNDID CLONE // EXACT CREATED REPOSITORY REMOVED\\n"',
+                '    ;;',
                 '  DELETE_CREATED_BRANCH)',
                 '    branch="$a"',
                 '    expected="$c"',
@@ -1875,6 +2002,22 @@ Scope {
         return true;
     }
 
+    function cloneUndoAfterSnapshot() {
+        const plan = pendingPlan || {};
+
+        return {
+            snapshotVersion: 1,
+            repository: String(plan.destinationPath || repositoryPath || ""),
+            capturedAt: new Date().toISOString(),
+            externalBoundary: "CLONE_UNDO",
+            destinationPath: String(plan.destinationPath || ""),
+            destinationPresent: false,
+            recoveryClass: "EXTERNAL_RECOVERABLE",
+            recoveryReason:
+                "EXACT CREATED CLONE DIRECTORY REMOVED"
+        };
+    }
+
     function maybeFinish() {
         if (!busy || !exitSeen || !stdoutSeen || !stderrSeen)
             return;
@@ -1899,6 +2042,16 @@ Scope {
                 ? "UNDO COMPLETE"
                 : "UNDO REFUSED"
             );
+
+        if (pendingRecoverySuccess
+                && String((pendingPlan || {}).strategy || "")
+                    === "DELETE_EXACT_CLONE") {
+            finalizeRecovery(
+                cloneUndoAfterSnapshot(),
+                ""
+            );
+            return;
+        }
 
         snapshotPhase = "AFTER";
         pendingSnapshotRequest = snapshotService.capture(

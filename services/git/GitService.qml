@@ -15,6 +15,21 @@ Scope {
     property bool discoveringRepos: false
     property bool actionBusy: false
     property string clonePendingQuery: ""
+    property bool pendingCloneCreated: false
+    property string pendingCloneDestination: ""
+    property string pendingCloneHead: ""
+    property string pendingCloneBranch: ""
+    property string pendingCloneOrigin: ""
+    property string pendingCloneFingerprint: ""
+
+    readonly property string cloneDestinationPath: {
+        const home = String(Quickshell.env("HOME") || "").trim();
+        const label = String(repoLabel || "").trim();
+
+        return home && label
+            ? home + "/Projects/" + label
+            : "";
+    }
 
     property string pullMode: "ff-only"
     readonly property string pullModeLabel:
@@ -1251,7 +1266,8 @@ Scope {
             "fetch",
             "pull",
             "push",
-            "track-checkout"
+            "track-checkout",
+            "clone"
         ].indexOf(String(processAction || "")) >= 0;
     }
 
@@ -1283,6 +1299,67 @@ Scope {
         pendingActionCommand = [];
         pendingActionSuccess = false;
         pendingActionDetail = "";
+        pendingCloneCreated = false;
+        pendingCloneDestination = "";
+        pendingCloneHead = "";
+        pendingCloneBranch = "";
+        pendingCloneOrigin = "";
+        pendingCloneFingerprint = "";
+    }
+
+    function cloneBoundaryBeforeSnapshot() {
+        return {
+            snapshotVersion: 1,
+            repository: String(cloneDestinationPath || ""),
+            capturedAt: new Date().toISOString(),
+            externalBoundary: "CLONE",
+            destinationPath: String(cloneDestinationPath || ""),
+            destinationRequiredAbsent: true,
+            recoveryClass: "EXTERNAL_RECOVERABLE",
+            recoveryReason:
+                "CLONE CREATION WILL PROVE DESTINATION ABSENCE"
+        };
+    }
+
+    function cloneBoundaryAfterSnapshot() {
+        const recoverable =
+            pendingActionSuccess
+            && pendingCloneCreated
+            && pendingCloneDestination
+            && pendingCloneHead
+            && pendingCloneFingerprint;
+
+        return {
+            snapshotVersion: 1,
+            repository:
+                String(
+                    pendingCloneDestination
+                    || cloneDestinationPath
+                    || ""
+                ),
+            capturedAt: new Date().toISOString(),
+            externalBoundary: "CLONE",
+            cloneCreated: Boolean(pendingCloneCreated),
+            destinationPath:
+                String(
+                    pendingCloneDestination
+                    || cloneDestinationPath
+                    || ""
+                ),
+            head: String(pendingCloneHead || ""),
+            branch: String(pendingCloneBranch || ""),
+            origin: String(pendingCloneOrigin || ""),
+            filesystemFingerprint:
+                String(pendingCloneFingerprint || ""),
+            recoveryClass:
+                recoverable
+                ? "EXTERNAL_RECOVERABLE"
+                : "EVIDENCE_ONLY",
+            recoveryReason:
+                recoverable
+                ? "EXACT CREATED CLONE DIRECTORY FINGERPRINT RECORDED"
+                : "CLONE DID NOT CREATE A NEW EXACTLY RECOVERABLE DIRECTORY"
+        };
     }
 
     function controlContext() {
@@ -1297,8 +1374,18 @@ Scope {
             pullMode: String(pullMode || ""),
             localTarget: String(selectedLocalBranch || branch || ""),
             repositorySlug: String(repoRemoteSlug || ""),
+            destinationPath:
+                pendingProcessAction === "clone"
+                ? String(cloneDestinationPath || "")
+                : "",
+            remoteUrl:
+                pendingProcessAction === "clone"
+                ? String(repoRemoteUrl || "")
+                : "",
             recoveryClass:
-                pendingProcessAction === "push"
+                pendingProcessAction === "clone"
+                ? "EXTERNAL_RECOVERABLE"
+                : pendingProcessAction === "push"
                 ? "EVIDENCE_ONLY"
                 : ""
         };
@@ -1459,6 +1546,14 @@ Scope {
                   )
               );
 
+        if (pendingProcessAction === "clone") {
+            finalizeControlAction(
+                cloneBoundaryAfterSnapshot(),
+                ""
+            );
+            return;
+        }
+
         if (!shouldJournalProcessAction(pendingProcessAction)
                 || !operationJournal
                 || !snapshotService) {
@@ -1586,8 +1681,11 @@ Scope {
         actionOutput = "";
         actionExitCode = 0;
 
-        if (action === "clone")
+        if (action === "clone") {
             clonePendingQuery = repoRemoteSlug || repoLabel;
+            pendingCloneDestination =
+                String(cloneDestinationPath || "");
+        }
 
         const command = [
             "bash",
@@ -1602,9 +1700,36 @@ Scope {
                 'repo_label="$7"',
                 'remote_url="$8"',
                 'rc=0',
+                'fingerprint_tree() {',
+                '  python3 - "$1" <<\'PY\'',
+                'import hashlib, os, stat, sys',
+                'root = os.path.realpath(sys.argv[1])',
+                'h = hashlib.sha256()',
+                'for dirpath, dirnames, filenames in os.walk(root, topdown=True, followlinks=False):',
+                '    dirnames.sort(); filenames.sort()',
+                '    for name in list(dirnames) + list(filenames):',
+                '        path = os.path.join(dirpath, name)',
+                '        rel = os.path.relpath(path, root)',
+                '        st = os.lstat(path)',
+                '        h.update(rel.encode("utf-8", "surrogateescape") + b"\\0")',
+                '        h.update(str(stat.S_IFMT(st.st_mode)).encode() + b":" + str(stat.S_IMODE(st.st_mode)).encode() + b"\\0")',
+                '        if stat.S_ISLNK(st.st_mode):',
+                '            h.update(os.readlink(path).encode("utf-8", "surrogateescape"))',
+                '        elif stat.S_ISREG(st.st_mode):',
+                '            with open(path, "rb") as handle:',
+                '                while True:',
+                '                    chunk = handle.read(1024 * 1024)',
+                '                    if not chunk:',
+                '                        break',
+                '                    h.update(chunk)',
+                '        h.update(b"\\0")',
+                'print(h.hexdigest())',
+                'PY',
+                '}',
                 'if [ "$kind" = "clone" ]; then',
                 '  projects="$HOME/Projects"',
                 '  dest="$projects/$repo_label"',
+                '  clone_created=0',
                 '  mkdir -p "$projects" || rc=$?',
                 '  if [ "$rc" -eq 0 ] && [ -e "$dest" ]; then',
                 '    if git -C "$dest" rev-parse --is-inside-work-tree >/dev/null 2>&1; then',
@@ -1624,12 +1749,26 @@ Scope {
                 '      rc=1',
                 '    fi',
                 '    if [ "$rc" -eq 0 ]; then',
+                '      clone_created=1',
                 '      if git -C "$dest" rev-parse --is-inside-work-tree >/dev/null 2>&1; then',
                 '        printf "CLONE VERIFIED // %s\\n" "$(git -C "$dest" rev-parse --show-toplevel)"',
                 '      else',
                 '        printf "CLONE FAILED VERIFICATION // no working tree at %s\\n" "$dest"',
                 '        rc=1',
                 '      fi',
+                '    fi',
+                '  fi',
+                '  if [ "$rc" -eq 0 ] && git -C "$dest" rev-parse --is-inside-work-tree >/dev/null 2>&1; then',
+                '    clone_top="$(git -C "$dest" rev-parse --show-toplevel 2>/dev/null || true)"',
+                '    clone_head="$(git -C "$dest" rev-parse HEAD 2>/dev/null || true)"',
+                '    clone_branch="$(git -C "$dest" branch --show-current 2>/dev/null || true)"',
+                '    clone_origin="$(git -C "$dest" remote get-url origin 2>/dev/null || true)"',
+                '    clone_fingerprint="$(fingerprint_tree "$dest" 2>/dev/null || true)"',
+                '    if [ -z "$clone_top" ] || [ -z "$clone_head" ] || [ -z "$clone_fingerprint" ]; then',
+                '      printf "CLONE FAILED EVIDENCE CAPTURE // %s\\n" "$dest"',
+                '      rc=1',
+                '    else',
+                '      printf "__PA_CLONE_META__\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$clone_created" "$clone_top" "$clone_head" "$clone_branch" "$clone_origin" "$clone_fingerprint"',
                 '    fi',
                 '  fi',
                 '  printf "__PA_RC__\\t%s\\n" "$rc"',
@@ -1746,7 +1885,8 @@ Scope {
             repoRemoteUrl
         ];
 
-        if (shouldJournalProcessAction(processAction)
+        if (processAction !== "clone"
+                && shouldJournalProcessAction(processAction)
                 && ((operationJournal && !snapshotService)
                     || (snapshotService && !operationJournal))) {
             actionBusy = false;
@@ -1759,6 +1899,39 @@ Scope {
         clearPendingControlAction();
         pendingProcessAction = processAction;
         pendingActionCommand = command;
+
+        if (processAction === "clone") {
+            if (!operationJournal) {
+                startPendingActionProcess();
+                return;
+            }
+
+            if (!cloneDestinationPath) {
+                actionBusy = false;
+                actionExitCode = 1;
+                actionOutput =
+                    "CLONE JOURNAL DESTINATION UNAVAILABLE";
+                clearPendingControlAction();
+                return;
+            }
+
+            pendingJournalId =
+                operationJournal.beginOperation(
+                    "CONTROL/CLONE",
+                    cloneBoundaryBeforeSnapshot(),
+                    controlContext()
+                );
+
+            if (!pendingJournalId) {
+                failBeforeSnapshot(
+                    "CLONE JOURNAL RECORD COULD NOT START"
+                );
+                return;
+            }
+
+            startPendingActionProcess();
+            return;
+        }
 
         if (!shouldJournalProcessAction(processAction)
                 || (!operationJournal && !snapshotService)) {
@@ -1812,6 +1985,24 @@ Scope {
 
     function consumeActionLine(line) {
         const raw = String(line || "");
+
+        if (raw.indexOf("__PA_CLONE_META__\t") === 0) {
+            const parts = raw.split("\t");
+            pendingCloneCreated =
+                parts.length > 1
+                && parts[1] === "1";
+            pendingCloneDestination =
+                parts.length > 2 ? parts[2] : "";
+            pendingCloneHead =
+                parts.length > 3 ? parts[3] : "";
+            pendingCloneBranch =
+                parts.length > 4 ? parts[4] : "";
+            pendingCloneOrigin =
+                parts.length > 5 ? parts[5] : "";
+            pendingCloneFingerprint =
+                parts.length > 6 ? parts[6] : "";
+            return;
+        }
 
         if (raw.indexOf("__PA_RC__\t") === 0) {
             actionExitCode = Number(raw.slice("__PA_RC__\t".length) || 0);

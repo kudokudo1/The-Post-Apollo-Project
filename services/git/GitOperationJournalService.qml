@@ -114,6 +114,10 @@ Scope {
                 && afterClass === "CONTENT_RECOVERABLE")
             return "CONTENT_RECOVERABLE";
 
+        if (beforeClass === "EXTERNAL_RECOVERABLE"
+                && afterClass === "EXTERNAL_RECOVERABLE")
+            return "EXTERNAL_RECOVERABLE";
+
         return "EVIDENCE_ONLY";
     }
 

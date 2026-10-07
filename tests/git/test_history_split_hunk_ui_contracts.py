@@ -46,8 +46,23 @@ require(
 )
 require(
     HUB,
-    'label: "LINE // NEXT"',
-    "line Split must remain visibly deferred until its backend lands",
+    "required property var lineService",
+    "Split hub must accept line Split",
+)
+require(
+    HUB,
+    'label: "LINE"',
+    "Split hub must expose LINE mode",
+)
+require(
+    HUB,
+    'selectedAction: root.mode === "line"',
+    "Split hub must show LINE selection state",
+)
+require(
+    HUB,
+    'onTriggered: root.mode = "line"',
+    "Split hub must navigate to line Split",
 )
 require_regex(
     HUB,

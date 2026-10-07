@@ -263,7 +263,8 @@ Scope {
             || kind === "HISTORY/INTERACTIVE_REBASE_SESSION"
             || kind === "HISTORY/FOLD_COMMITS"
             || kind === "HISTORY/SPLIT_COMMIT"
-            || kind === "HISTORY/SPLIT_COMMIT_HUNK";
+            || kind === "HISTORY/SPLIT_COMMIT_HUNK"
+            || kind === "HISTORY/SPLIT_COMMIT_LINE";
 
         if (historyRewrite) {
             const beforeBranch = String(before.branch || "");

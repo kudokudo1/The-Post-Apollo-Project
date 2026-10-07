@@ -49,6 +49,11 @@ require(
 )
 require(
     VIEW,
+    "required property var splitLineService",
+    "Surgery surface must accept the line Split backend",
+)
+require(
+    VIEW,
     'label: "SPLIT"',
     "Split must be a live Surgery mode",
 )
@@ -160,6 +165,11 @@ require(
 )
 require(
     HISTORY,
+    "property var historySplitLineService: null",
+    "HISTORY must accept the shared line Split service",
+)
+require(
+    HISTORY,
     "property var historyAbsorbService: null",
     "HISTORY must accept the shared Absorb service",
 )
@@ -197,6 +207,14 @@ require_regex(
     r"operationJournal: operationJournalService.*"
     r"snapshotService: repositorySnapshotService",
     "GitW must host hunk Split with shared journal and snapshots",
+)
+require_regex(
+    GITW,
+    r"GitHistorySplitLineService \{.*"
+    r"id: historySplitLineService.*"
+    r"operationJournal: operationJournalService.*"
+    r"snapshotService: repositorySnapshotService",
+    "GitW must host line Split with shared journal and snapshots",
 )
 require_regex(
     GITW,

@@ -2005,6 +2005,16 @@ PanelWindow {
             : ""
     }
 
+    GitHistorySplitLineService {
+        id: historySplitLineService
+        operationJournal: operationJournalService
+        snapshotService: repositorySnapshotService
+        repositoryPath:
+            gitService.repoIsLocal
+            ? gitService.repoRoot
+            : ""
+    }
+
     GitHistoryAbsorbService {
         id: historyAbsorbService
         operationJournal: operationJournalService
@@ -5111,6 +5121,7 @@ PanelWindow {
                         historyFoldService: historyFoldService
                         historySplitService: historySplitService
                         historySplitPatchService: historySplitPatchService
+                        historySplitLineService: historySplitLineService
                         historyAbsorbService: historyAbsorbService
                         keyboardHost: root
 

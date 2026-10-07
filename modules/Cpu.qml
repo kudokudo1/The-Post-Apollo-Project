@@ -1,14 +1,13 @@
 import QtQuick
 import Quickshell
 import "../components"
-import QtQuick.Effects
-import Qt5Compat.GraphicalEffects
 
-Rectangle {
+DockButton {
     id: cpuDock
 
     property var cpuPlusWindow
-    readonly property bool menuOpen: cpuPlusWindow && cpuPlusWindow.menuOpen
+    readonly property bool menuOpen:
+        cpuPlusWindow && cpuPlusWindow.menuOpen
 
     // Session-wide hardware services are injected by shell.qml. CPU++ can
     // build its own view/controller state without duplicating polling or PWM
@@ -19,91 +18,49 @@ Rectangle {
     implicitHeight: 50
     implicitWidth: 70
 
-    color: cpuDock.menuOpen ? Colors.yellow : Colors.black
+    open: menuOpen
 
-    Item {
-        id: cpuTextGlowContainer
+    normalForegroundColor: Colors.white
+    hoverForegroundColor: Colors.cyan
+    pressedForegroundColor: Colors.cyan
 
-        anchors.fill: parent
+    normalContentGlowColor: Colors.cyan
+    hoverContentGlowColor: Colors.cyan
+    pressedContentGlowColor: Colors.cyan
 
-        GohuText {
-            id: cpuText
+    normalDockGlowColor: Colors.cyan
+    hoverDockGlowColor: Colors.cyan
+    pressedDockGlowColor: Colors.cyan
 
-            anchors.centerIn: parent
+    contentGlowIdleOpacity: 0.60
+    contentGlowHoverOpacity: 0.80
+    contentGlowPressedOpacity: 1.0
+    contentGlowHoverRadius: 14
+    contentGlowPressedRadius: 14
+    contentGlowHoverSamples: 15
+    contentGlowPressedSamples: 15
 
-            text: "🖥"
+    softGlowIdleOpacity: 0.40
+    softGlowHoverOpacity: 0.50
+    softGlowPressedOpacity: 0.60
 
-            font.pixelSize: 20
+    wideGlowIdleOpacity: 0.07
+    wideGlowHoverOpacity: 0.09
+    wideGlowPressedOpacity: 0.12
 
-            color: cpuDock.menuOpen ? Colors.magenta : cpuMouse.pressed ? Colors.cyan : cpuMouse.containsMouse ? Colors.cyan : Colors.white
-        }
+    contentGlowSource: cpuText
 
-        DropShadow {
-            id: cpuTextGlow
+    GohuText {
+        id: cpuText
+        anchors.centerIn: parent
 
-            anchors.fill: cpuText
-            source: cpuText
-
-            horizontalOffset: 0
-            verticalOffset: 0
-
-            radius: 14
-            samples: 15
-
-            z: 2
-
-            opacity: cpuMouse.pressed ? 1.0 : cpuMouse.containsMouse ? 0.8 : 0.6
-
-            color: cpuDock.menuOpen ? Colors.magenta : cpuMouse.pressed ? Colors.cyan : cpuMouse.containsMouse ? Colors.cyan : Colors.cyan
-
-            transparentBorder: true
-        }
+        text: "🖥"
+        font.pixelSize: 20
+        color: cpuDock.foregroundColor
     }
 
-    MouseArea {
-        id: cpuMouse
-
-        anchors.fill: parent
-
-        hoverEnabled: true
-
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
-
-        onClicked: function (mouse) {
-            if (mouse.button === Qt.LeftButton) {
-                if (cpuDock.cpuPlusWindow)
-                    cpuDock.cpuPlusWindow.toggle();
-            }
-
-            if (mouse.button === Qt.RightButton) {
-                // Right-click function
-            }
-        }
-    }
-
-    RectangularShadow {
-        id: cpuDockSoftGlow
-
-        anchors.fill: parent
-
-        spread: 3
-        z: -1
-
-        opacity: cpuMouse.pressed ? 0.6 : cpuMouse.containsMouse ? 0.5 : 0.4
-
-        color: cpuDock.menuOpen ? Colors.magenta : cpuMouse.pressed ? Colors.cyan : cpuMouse.containsMouse ? Colors.cyan : Colors.cyan
-    }
-
-    RectangularShadow {
-        id: cpuDockWideGlow
-
-        anchors.fill: parent
-
-        spread: 10
-        z: 1
-
-        opacity: cpuMouse.pressed ? 0.12 : cpuMouse.containsMouse ? 0.09 : 0.07
-
-        color: cpuDock.menuOpen ? Colors.magenta : cpuMouse.pressed ? Colors.cyan : cpuMouse.containsMouse ? Colors.cyan : Colors.cyan
+    onLeftClicked: {
+        if (cpuPlusWindow)
+            cpuPlusWindow.toggle();
     }
 }

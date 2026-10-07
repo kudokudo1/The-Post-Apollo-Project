@@ -1,97 +1,49 @@
 import QtQuick
 import Quickshell
 import "../components"
-import QtQuick.Effects
-import Qt5Compat.GraphicalEffects
 
-Rectangle {
+DockButton {
     id: bluetoothDock
 
     implicitHeight: 50
     implicitWidth: 85
 
-    color: Colors.black
+    normalForegroundColor: Colors.white
+    hoverForegroundColor: Colors.cyan
+    pressedForegroundColor: Colors.cyan
 
-    Item {
-        id: bluetoothTextContainer
+    normalContentGlowColor: Colors.cyan
+    hoverContentGlowColor: Colors.cyan
+    pressedContentGlowColor: Colors.cyan
 
-        anchors.fill: parent
+    normalDockGlowColor: Colors.cyan
+    hoverDockGlowColor: Colors.cyan
+    pressedDockGlowColor: Colors.cyan
 
-        Text {
-            id: bluetoothText
+    contentGlowIdleOpacity: 0.60
+    contentGlowHoverOpacity: 0.80
+    contentGlowPressedOpacity: 1.0
+    contentGlowHoverRadius: 14
+    contentGlowPressedRadius: 14
+    contentGlowHoverSamples: 15
+    contentGlowPressedSamples: 15
 
-            anchors.centerIn: parent
+    softGlowIdleOpacity: 0.40
+    softGlowHoverOpacity: 0.50
+    softGlowPressedOpacity: 0.60
 
-            text: "(˓✟˒)"
+    wideGlowIdleOpacity: 0.07
+    wideGlowHoverOpacity: 0.09
+    wideGlowPressedOpacity: 0.12
 
-            font.pixelSize: 20
-            color: bluetoothDockMouse.pressed ? Colors.cyan : bluetoothDockMouse.containsMouse ? Colors.cyan : Colors.white
-        }
+    contentGlowSource: bluetoothText
 
-        DropShadow {
-            id: bluetoothTextGlow
+    Text {
+        id: bluetoothText
+        anchors.centerIn: parent
 
-            anchors.fill: bluetoothText
-            source: bluetoothText
-
-            horizontalOffset: 0
-            verticalOffset: 0
-
-            radius: 14
-            samples: 15
-
-            z: 2
-
-            opacity: bluetoothDockMouse.pressed ? 1.0 : bluetoothDockMouse.containsMouse ? 0.8 : 0.6
-
-            color: bluetoothDockMouse.pressed ? Colors.cyan : bluetoothDockMouse.containsMouse ? Colors.cyan : Colors.cyan
-
-            transparentBorder: true
-        }
-    }
-
-    MouseArea {
-        id: bluetoothDockMouse
-
-        anchors.fill: parent
-        hoverEnabled: true
-
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
-
-        onClicked: function (mouse) {
-            if (mouse.button === Qt.LeftButton) {
-                // Left-click function
-            }
-
-            if (mouse.button === Qt.RightButton) {
-                // Right-click function
-            }
-        }
-    }
-
-    RectangularShadow {
-        id: bluetoothDockSoftGlow
-
-        anchors.fill: parent
-
-        spread: 3
-        z: -1
-
-        opacity: bluetoothDockMouse.pressed ? 0.6 : bluetoothDockMouse.containsMouse ? 0.5 : 0.4
-
-        color: bluetoothDockMouse.pressed ? Colors.cyan : bluetoothDockMouse.containsMouse ? Colors.cyan : Colors.cyan
-    }
-
-    RectangularShadow {
-        id: bluetoothDockWideGlow
-
-        anchors.fill: parent
-
-        spread: 10
-        z: 1
-
-        opacity: bluetoothDockMouse.pressed ? 0.12 : bluetoothDockMouse.containsMouse ? 0.09 : 0.07
-
-        color: bluetoothDockMouse.pressed ? Colors.cyan : bluetoothDockMouse.containsMouse ? Colors.cyan : Colors.cyan
+        text: "(˓✟˒)"
+        font.pixelSize: 20
+        color: bluetoothDock.foregroundColor
     }
 }

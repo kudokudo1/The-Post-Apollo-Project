@@ -1,16 +1,12 @@
 import QtQuick
 import Quickshell
 import "../components"
-import QtQuick.Effects
-import Qt5Compat.GraphicalEffects
 
-Rectangle {
+DockButton {
     id: dock
 
     implicitHeight: 50
     implicitWidth: Math.max(72, hospitalMark.implicitWidth + 18)
-
-    color: dock.menuOpen ? Colors.yellow : Colors.black
 
     // Keep these exposed so the mark can be tuned without rebuilding the button.
     property int beatPixelSize: 11
@@ -18,162 +14,73 @@ Rectangle {
     property int markSpacing: 0
 
     property bool menuOpen: false
-
     signal toggleRequested()
-    signal rightClicked()
 
-    Item {
-        id: textglowContainer
+    open: menuOpen
 
-        anchors.fill: parent
+    normalForegroundColor: Colors.white
+    hoverForegroundColor: Colors.magenta
+    pressedForegroundColor: Colors.magenta
 
-        Row {
-            id: hospitalMark
+    normalContentGlowColor: Colors.magenta
+    hoverContentGlowColor: Colors.magenta
+    pressedContentGlowColor: Colors.magenta
 
-            anchors.centerIn: parent
-            spacing: dock.markSpacing
+    normalDockGlowColor: Colors.magenta
+    hoverDockGlowColor: Colors.magenta
+    pressedDockGlowColor: Colors.magenta
 
-            // Shared vertical box keeps the visible mark centered.
-            height: 34
+    contentGlowIdleOpacity: 0.60
+    contentGlowHoverOpacity: 0.80
+    contentGlowPressedOpacity: 1.0
+    contentGlowHoverRadius: 14
+    contentGlowPressedRadius: 14
+    contentGlowHoverSamples: 15
+    contentGlowPressedSamples: 15
 
-            Text {
-                id: leftBeat
+    softGlowIdleOpacity: 0.40
+    softGlowHoverOpacity: 0.50
+    softGlowPressedOpacity: 0.60
 
-                height: hospitalMark.height
+    wideGlowIdleOpacity: 0.07
+    wideGlowHoverOpacity: 0.09
+    wideGlowPressedOpacity: 0.12
 
-                text: "ﮩ٨ـﮩﮩ"
-                font.pixelSize: dock.beatPixelSize
-                verticalAlignment: Text.AlignVCenter
+    contentGlowSource: hospitalMark
 
-                color: dock.menuOpen
-                       ? Colors.magenta
-                       : mouse.pressed
-                       ? Colors.magenta
-                       : mouse.containsMouse
-                       ? Colors.magenta
-                       : Colors.white
-            }
+    Row {
+        id: hospitalMark
 
-            NotoText {
-                id: hospitalCenter
+        anchors.centerIn: parent
+        spacing: dock.markSpacing
+        height: 34
 
-                height: hospitalMark.height
-
-                text: "⚚"
-                font.pixelSize: dock.centerPixelSize
-                verticalAlignment: Text.AlignVCenter
-
-                color: dock.menuOpen
-                       ? Colors.magenta
-                       : mouse.pressed
-                       ? Colors.magenta
-                       : mouse.containsMouse
-                       ? Colors.magenta
-                       : Colors.white
-            }
-
-            Text {
-                id: rightBeat
-
-                height: hospitalMark.height
-
-                text: "ﮩ٨ـﮩ"
-                font.pixelSize: dock.beatPixelSize
-                verticalAlignment: Text.AlignVCenter
-
-                color: dock.menuOpen
-                       ? Colors.magenta
-                       : mouse.pressed
-                       ? Colors.magenta
-                       : mouse.containsMouse
-                       ? Colors.magenta
-                       : Colors.white
-            }
+        Text {
+            height: hospitalMark.height
+            text: "ﮩ٨ـﮩﮩ"
+            font.pixelSize: dock.beatPixelSize
+            verticalAlignment: Text.AlignVCenter
+            color: dock.foregroundColor
         }
 
-        DropShadow {
-            id: textGlow
+        NotoText {
+            height: hospitalMark.height
+            text: "⚚"
+            font.pixelSize: dock.centerPixelSize
+            verticalAlignment: Text.AlignVCenter
+            color: dock.foregroundColor
+        }
 
-            anchors.fill: hospitalMark
-            source: hospitalMark
-
-            horizontalOffset: 0
-            verticalOffset: 0
-
-            radius: 14
-            samples: 15
-
-            z: 2
-
-            opacity: dock.menuOpen
-                     ? 1.0
-                     : mouse.pressed
-                     ? 1.0
-                     : mouse.containsMouse
-                     ? 0.8
-                     : 0.6
-
-            color: Colors.magenta
-
-            transparentBorder: true
+        Text {
+            height: hospitalMark.height
+            text: "ﮩ٨ـﮩ"
+            font.pixelSize: dock.beatPixelSize
+            verticalAlignment: Text.AlignVCenter
+            color: dock.foregroundColor
         }
     }
 
-    MouseArea {
-        id: mouse
-
-        anchors.fill: parent
-
-        hoverEnabled: true
-
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
-
-        onClicked: function(mouse) {
-            if (mouse.button === Qt.LeftButton) {
-                dock.toggleRequested();
-            }
-
-            if (mouse.button === Qt.RightButton) {
-                dock.rightClicked();
-            }
-        }
-    }
-
-    RectangularShadow {
-        id: dockSoftGlow
-
-        anchors.fill: parent
-
-        spread: 3
-        z: -1
-
-        opacity: dock.menuOpen
-                 ? 0.75
-                 : mouse.pressed
-                 ? 0.6
-                 : mouse.containsMouse
-                 ? 0.5
-                 : 0.4
-
-        color: Colors.magenta
-    }
-
-    RectangularShadow {
-        id: dockWideGlow
-
-        anchors.fill: parent
-
-        spread: 10
-        z: 1
-
-        opacity: dock.menuOpen
-                 ? 0.16
-                 : mouse.pressed
-                 ? 0.12
-                 : mouse.containsMouse
-                 ? 0.09
-                 : 0.07
-
-        color: Colors.magenta
+    onLeftClicked: {
+        dock.toggleRequested();
     }
 }

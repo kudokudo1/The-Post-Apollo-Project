@@ -769,6 +769,7 @@ Scope {
             || kind === "HISTORY/SPLIT_COMMIT"
             || kind === "HISTORY/SPLIT_COMMIT_HUNK"
             || kind === "HISTORY/SPLIT_COMMIT_LINE"
+            || kind === "HISTORY/MERGE"
             || kind === "HISTORY/CHERRY-PICK"
             || kind === "HISTORY/REVERT"
             || kind === "HISTORY/RESET";
@@ -1678,7 +1679,7 @@ Scope {
                 '      printf "REFUSED\\tREWRITE WORKTREE REALIGN FAILED // REF ROLLED BACK\\n"',
                 '      exit 124',
                 '    fi',
-                '    printf "OK\\tRESTORED PRE-REBASE HEAD // %s\\n" "$branch"',
+                '    printf "OK\\tRESTORED PRE-OPERATION HEAD // %s\\n" "$branch"',
                 '    ;;',
                 '  UNDO_COMMIT_TO_STAGED)',
                 '    branch="$a"',

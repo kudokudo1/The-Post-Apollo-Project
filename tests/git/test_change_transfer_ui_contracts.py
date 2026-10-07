@@ -82,6 +82,11 @@ require(
 )
 require(
     VIEW,
+    "transferService.previewConflictResult(",
+    "conflicted files must use the guarded RESULT-copy backend path",
+)
+require(
+    VIEW,
     "transferService.execute()",
     "execution must delegate to the guarded transfer backend",
 )
@@ -89,10 +94,11 @@ require_regex(
     VIEW,
     r"readonly property string effectiveLayer:.*"
     r'untrackedSource.*\? "untracked".*'
+    r'transferLayer.*\? "conflict-result".*'
     r'transferLayer.*\? "partial".*'
     r'transferLayer.*\? "staged".*'
     r': "worktree"',
-    "transfer view must resolve worktree/staged/partial/untracked content layers",
+    "transfer view must resolve worktree/staged/partial/untracked/conflict-result layers",
 )
 require_regex(
     VIEW,
@@ -141,11 +147,31 @@ require_regex(
 )
 require_regex(
     CHANGES,
+    r"function conflictFileTransferEligible\(\).*"
+    r"Boolean\(row\.conflict\)",
+    "conflicted files must have a dedicated guarded whole-file entry path",
+)
+require_regex(
+    VIEW,
+    r"readonly property bool conflictResultLayer:.*"
+    r'effectiveLayer === "conflict-result"',
+    "transfer view must identify conflict-result mode explicitly",
+)
+require_regex(
+    VIEW,
+    r'label: "MOVE".*'
+    r"enabledAction:.*"
+    r"!root\.conflictResultLayer",
+    "conflict-result Transfer must disable MOVE",
+)
+require_regex(
+    CHANGES,
     r"function fileTransferEligible\(\).*"
     r"worktreeFileTransferEligible\(\).*"
     r"stagedFileTransferEligible\(\).*"
     r"partialFileTransferEligible\(\).*"
-    r"untrackedFileTransferEligible\(\)",
+    r"untrackedFileTransferEligible\(\).*"
+    r"conflictFileTransferEligible\(\)",
     "whole-file Transfer must admit each supported content layer",
 )
 require_regex(
@@ -183,6 +209,8 @@ require_regex(
     CHANGES,
     r"root\.transferLayer\s*=\s*"
     r'requested !== "file".*'
+    r'conflictFileTransferEligible\(\).*'
+    r'\? "conflict-result".*'
     r'untrackedFileTransferEligible\(\).*'
     r'\? "untracked".*'
     r'partialFileTransferEligible\(\).*'
@@ -190,7 +218,7 @@ require_regex(
     r'stagedFileTransferEligible\(\).*'
     r'\? "staged".*'
     r': "worktree"',
-    "opening Transfer must select worktree, staged, partial, or untracked content explicitly",
+    "opening Transfer must select worktree, staged, partial, untracked, or conflict-result content explicitly",
 )
 require_regex(
     CHANGES,

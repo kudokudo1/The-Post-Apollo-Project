@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Effects
+import Qt5Compat.GraphicalEffects
 import qs.components
 
 Rectangle {
@@ -151,6 +152,15 @@ Rectangle {
                 text: "RECEPTION // FRONT DESK"
                 font.pixelSize: 14
                 color: Colors.magenta
+
+                layer.enabled: true
+                layer.effect: DropShadow {
+                    radius: 8
+                    samples: 9
+                    opacity: 0.58
+                    color: Colors.magenta
+                    transparentBorder: true
+                }
             }
 
             Rectangle {
@@ -233,6 +243,15 @@ Rectangle {
                     color: Colors.white
                     elide: Text.ElideRight
                     width: parent.width - deskControls.width - 34
+
+                    layer.enabled: true
+                    layer.effect: DropShadow {
+                        radius: 6
+                        samples: 7
+                        opacity: 0.48
+                        color: Colors.cyan
+                        transparentBorder: true
+                    }
                 }
 
                 Row {
@@ -270,6 +289,19 @@ Rectangle {
                                 deskControlMouse.containsMouse
                                 ? Colors.orange
                                 : modelData.color
+
+                            RectangularShadow {
+                                anchors.fill: parent
+                                spread: 4
+                                z: -1
+                                opacity:
+                                    deskControlMouse.containsMouse
+                                    ? 0.48 : 0.32
+                                color:
+                                    deskControlMouse.containsMouse
+                                    ? Colors.orange
+                                    : parent.modelData.color
+                            }
 
                             GohuText {
                                 anchors.centerIn: parent
@@ -345,31 +377,95 @@ Rectangle {
             width: parent.width
             height: 38
             color: Colors.dark
-            border.width: 1
-            border.color: Colors.green
+            border.width: 0
 
-            GohuText {
-                anchors {
-                    fill: parent
-                    margins: 8
+            Row {
+                id: statusMetrics
+
+                anchors.fill: parent
+                spacing: 5
+
+                Repeater {
+                    model: [
+                        {
+                            label: "STAFF READY",
+                            value:
+                                String(root.readyCount)
+                                + "/"
+                                + String(root.specialistCount),
+                            accent: Colors.green,
+                            weight: 0.20
+                        },
+                        {
+                            label: "ATTENTION",
+                            value: String(root.attentionCount),
+                            accent: Colors.yellow,
+                            weight: 0.17
+                        },
+                        {
+                            label: "NEW",
+                            value: String(root.newCount),
+                            accent: Colors.magenta,
+                            weight: 0.12
+                        },
+                        {
+                            label: "RECENT",
+                            value: String(root.recentCount),
+                            accent: Colors.cyan,
+                            weight: 0.13
+                        },
+                        {
+                            label: "AUTHORITY",
+                            value: "ROUTE + EXPLAIN + INITIATE",
+                            accent: Colors.magenta,
+                            weight: 0.38
+                        }
+                    ]
+
+                    Rectangle {
+                        required property var modelData
+
+                        width:
+                            (
+                                statusMetrics.width
+                                - statusMetrics.spacing * 4
+                            ) * Number(modelData.weight || 0)
+                        height: statusMetrics.height
+                        color: Colors.dark
+                        border.width: 1
+                        border.color: modelData.accent
+
+                        RectangularShadow {
+                            anchors.fill: parent
+                            spread: 3
+                            z: -1
+                            opacity: 0.30
+                            color: parent.modelData.accent
+                        }
+
+                        GohuText {
+                            anchors.centerIn: parent
+                            width: parent.width - 10
+                            text:
+                                String(parent.modelData.label || "")
+                                + " // "
+                                + String(parent.modelData.value || "")
+                            font.pixelSize: 9
+                            color: parent.modelData.accent
+                            horizontalAlignment: Text.AlignHCenter
+                            elide: Text.ElideRight
+
+                            layer.enabled: true
+                            layer.effect: DropShadow {
+                                radius: 5
+                                samples: 7
+                                opacity: 0.38
+                                color: parent.color
+                                transparentBorder: true
+                            }
+                        }
+                    }
                 }
-
-                verticalAlignment: Text.AlignVCenter
-                text:
-                    "STAFF READY "
-                    + String(root.readyCount)
-                    + "/"
-                    + String(root.specialistCount)
-                    + "    //    ATTENTION "
-                    + String(root.attentionCount)
-                    + "    //    NEW "
-                    + String(root.newCount)
-                    + "    //    RECENT "
-                    + String(root.recentCount)
-                    + "    //    AUTHORITY: ROUTE + EXPLAIN + INITIATE"
-                font.pixelSize: 10
-                color: Colors.green
-                elide: Text.ElideRight
             }
         }
 
@@ -381,6 +477,14 @@ Rectangle {
             color: Colors.dark
             border.width: 1
             border.color: Colors.yellow
+
+            RectangularShadow {
+                anchors.fill: parent
+                spread: 3
+                z: -1
+                opacity: 0.24
+                color: Colors.yellow
+            }
 
             Column {
                 anchors {
@@ -1030,6 +1134,8 @@ Rectangle {
             spacing: 7
 
             Rectangle {
+                id: promptFrame
+
                 width:
                     composer.width
                     - micButton.width
@@ -1038,10 +1144,17 @@ Rectangle {
                 height: composer.height
                 color: Colors.dark
                 border.width: receptionInput.activeFocus ? 2 : 1
-                border.color:
-                    receptionInput.activeFocus
-                    ? Colors.orange
-                    : Colors.cyan
+                border.color: Colors.magenta
+
+                RectangularShadow {
+                    anchors.fill: parent
+                    spread: 3
+                    z: -1
+                    opacity:
+                        receptionInput.activeFocus
+                        ? 0.42 : 0.24
+                    color: Colors.magenta
+                }
 
                 TextInput {
                     id: receptionInput
@@ -1121,7 +1234,7 @@ Rectangle {
 
                     verticalAlignment: TextInput.AlignVCenter
                     clip: true
-                    color: Colors.white
+                    color: Colors.magenta
                     selectionColor: Colors.magenta
                     selectedTextColor: Colors.black
                     font.pixelSize: 11
@@ -1185,10 +1298,10 @@ Rectangle {
                     font.pixelSize: 10
                     color:
                         root.speechInputService.recording
-                        ? Colors.magenta
+                        ? Colors.omnitrix
                         : root.speechInputService.transcribing
                         ? Colors.orange
-                        : Colors.white
+                        : Colors.magenta
                     opacity:
                         root.speechInputService.busy
                         ? 0.82 : 0.38
@@ -1210,15 +1323,33 @@ Rectangle {
                     ? 2 : 1
                 border.color:
                     root.speechInputService.recording
-                    ? Colors.magenta
+                    ? Colors.omnitrix
                     : root.speechInputService.stopping
                       || root.speechInputService.transcribing
                     ? Colors.orange
                     : micMouse.containsMouse
                     ? Colors.orange
-                    : root.speechInputService.backendReady
-                    ? Colors.cyan
-                    : Colors.magenta
+                    : Colors.omnitrix
+
+                RectangularShadow {
+                    anchors.fill: parent
+                    spread: 4
+                    z: -1
+                    opacity:
+                        root.speechInputService.stopping
+                          || root.speechInputService.transcribing
+                        ? 0.24
+                        : micMouse.containsMouse
+                        ? 0.48 : 0.34
+                    color:
+                        root.speechInputService.stopping
+                          || root.speechInputService.transcribing
+                        ? Colors.orange
+                        : micMouse.containsMouse
+                        ? Colors.orange
+                        : Colors.omnitrix
+                }
+
                 opacity:
                     root.speechInputService.stopping
                     || root.speechInputService.transcribing
@@ -1229,16 +1360,26 @@ Rectangle {
                 GohuText {
                     anchors.centerIn: parent
                     anchors.verticalCenterOffset: 1
-                    text: "🎙︎"
+                    text: "🗣︎"
                     font.pixelSize: 22
                     color:
                         root.speechInputService.recording
-                        ? Colors.magenta
+                        ? Colors.omnitrix
                         : micMouse.containsMouse
                         ? Colors.orange
-                        : root.speechInputService.backendReady
-                        ? Colors.cyan
-                        : Colors.magenta
+                        : Colors.omnitrix
+
+                    layer.enabled: true
+                    layer.effect: DropShadow {
+                        radius: 7
+                        samples: 9
+                        opacity: 0.54
+                        color:
+                            micMouse.containsMouse
+                            ? Colors.orange
+                            : Colors.omnitrix
+                        transparentBorder: true
+                    }
                 }
 
                 MouseArea {
@@ -1283,6 +1424,22 @@ Rectangle {
                     : sendMouse.containsMouse
                     ? Colors.orange
                     : Colors.green
+
+                RectangularShadow {
+                    anchors.fill: parent
+                    spread: 4
+                    z: -1
+                    opacity:
+                        sendMouse.containsMouse
+                        ? 0.48 : 0.30
+                    color:
+                        root.speechInputService.recording
+                        ? Colors.magenta
+                        : sendMouse.containsMouse
+                        ? Colors.orange
+                        : Colors.green
+                }
+
                 opacity:
                     root.speechInputService.recording
                     || (

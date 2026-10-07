@@ -47,4 +47,9 @@ jobs:
           echo "PX workflow is alive."
 
       - name: Validate Git control contracts
-        run: python3 tests/git/test_control_contracts.py
+        run: |
+          set -euo pipefail
+          for contract in tests/git/test_*contracts.py; do
+            echo "==> $contract"
+            python3 "$contract"
+          done

@@ -639,13 +639,9 @@ Rectangle {
                 }
             }
 
-            DropShadow {
+            SafeDropShadow {
                 anchors.fill: spaceBand
-                source:
-                    spaceBand.Window.window !== null
-                    ? spaceBand
-                    : null
-                visible: source !== null
+                safeSource: spaceBand
 
                 z: -1
 
@@ -1059,13 +1055,9 @@ Rectangle {
                 }
             }
 
-            DropShadow {
+            SafeDropShadow {
                 anchors.fill: skyBand
-                source:
-                    skyBand.Window.window !== null
-                    ? skyBand
-                    : null
-                visible: source !== null
+                safeSource: skyBand
 
                 z: -1
 
@@ -1396,13 +1388,9 @@ Rectangle {
                 }
             }
 
-            DropShadow {
+            SafeDropShadow {
                 anchors.fill: groundBand
-                source:
-                    groundBand.Window.window !== null
-                    ? groundBand
-                    : null
-                visible: source !== null
+                safeSource: groundBand
 
                 z: -1
 

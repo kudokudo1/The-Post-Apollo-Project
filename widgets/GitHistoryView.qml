@@ -1872,7 +1872,7 @@ Item {
                             id: historyScroll7
 
                             width: parent.width
-                            height: parent.height - 34
+                            height: Math.max(0, parent.height - y)
                             clip: true
                             contentWidth: width
                             contentHeight: reflogColumn.implicitHeight
@@ -2072,7 +2072,7 @@ Item {
                             id: historyScroll8
 
                             width: parent.width
-                            height: parent.height - 106
+                            height: Math.max(0, parent.height - y)
                             clip: true
                             contentWidth: width
                             contentHeight: reflogDetail.implicitHeight

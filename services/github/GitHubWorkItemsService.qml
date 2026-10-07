@@ -267,18 +267,8 @@ Scope {
     }
 
     function pullCheckState(row) {
-        const state = pullCheckRollupState(row);
-
-        if (state === "SUCCESS")
-            return "PASS";
-
-        if (state === "FAILURE" || state === "ERROR")
-            return "FAIL";
-
-        if (state === "PENDING" || state === "EXPECTED")
-            return "PENDING";
-
-        const counts = pullCheckCounts(row);
+        const source = row || {};
+        const counts = pullCheckCounts(source);
 
         if (counts.total > 0) {
             if (counts.failed > 0 || counts.cancelled > 0)
@@ -290,30 +280,44 @@ Scope {
             return "PASS";
         }
 
-        if (String((row || {}).suiteError || "").trim())
-            return "ERROR";
+        const state = pullCheckRollupState(source);
 
-        const suiteCounts = pullCheckSuiteCounts(row);
+        if (state === "SUCCESS")
+            return "PASS";
 
-        if (suiteCounts.total === 0)
-            return "NONE";
-
-        if (suiteCounts.failed > 0
-                || suiteCounts.startupFailed > 0
-                || suiteCounts.cancelled > 0)
+        if (state === "FAILURE" || state === "ERROR")
             return "FAIL";
 
-        if (suiteCounts.pending > 0)
+        if (state === "PENDING" || state === "EXPECTED")
             return "PENDING";
 
-        return "PASS";
+        const suiteCounts = pullCheckSuiteCounts(source);
+
+        if (suiteCounts.total > 0) {
+            if (suiteCounts.failed > 0
+                    || suiteCounts.startupFailed > 0
+                    || suiteCounts.cancelled > 0)
+                return "FAIL";
+
+            if (suiteCounts.pending > 0)
+                return "PENDING";
+
+            return "PASS";
+        }
+
+        if (String(source.checkEvidenceError || "").trim()
+                || String(source.suiteError || "").trim())
+            return "ERROR";
+
+        return "NONE";
     }
 
     function pullCheckSummary(row) {
-        const rollupState = pullCheckRollupState(row);
-        const counts = pullCheckCounts(row);
+        const source = row || {};
+        const counts = pullCheckCounts(source);
+        const rollupState = pullCheckRollupState(source);
 
-        if (rollupState || counts.total > 0) {
+        if (counts.total > 0) {
             const parts = [];
 
             if (counts.passed > 0)
@@ -329,28 +333,31 @@ Scope {
                 parts.push(String(counts.pending) + " PENDING");
 
             const stateText =
-                rollupState
-                || (
-                    counts.failed > 0 || counts.cancelled > 0
-                    ? "FAILURE"
-                    : counts.pending > 0
-                    ? "PENDING"
-                    : "SUCCESS"
-                   );
+                counts.failed > 0 || counts.cancelled > 0
+                ? "FAILURE"
+                : counts.pending > 0
+                ? "PENDING"
+                : "SUCCESS";
 
             return (
                 stateText
-                + (parts.length > 0 ? " // " + parts.join(" · ") : "")
+                + " // "
+                + parts.join(" · ")
             );
         }
 
-        if (String((row || {}).suiteError || "").trim())
-            return "ERROR";
+        if (rollupState)
+            return rollupState;
 
-        const suiteCounts = pullCheckSuiteCounts(row);
+        const suiteCounts = pullCheckSuiteCounts(source);
 
-        if (suiteCounts.total === 0)
+        if (suiteCounts.total === 0) {
+            if (String(source.checkEvidenceError || "").trim()
+                    || String(source.suiteError || "").trim())
+                return "ERROR";
+
             return "NONE";
+        }
 
         if (suiteCounts.startupFailed > 0
                 && suiteCounts.startupFailed === suiteCounts.total) {

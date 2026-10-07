@@ -96,9 +96,12 @@ Item {
     }
 
     function fileTransferEligible() {
-        return root.worktreeFileTransferEligible()
+        const wholeFileCandidate =
+            root.worktreeFileTransferEligible()
             || root.stagedFileTransferEligible()
             || root.untrackedFileTransferEligible();
+
+        return wholeFileCandidate;
     }
 
     function transferEligible() {

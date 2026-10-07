@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Effects
 import qs.components
+import "../services/git"
 
 Item {
     id: root
@@ -14,6 +15,7 @@ Item {
     property bool transferOpen: false
     property string transferScope: "file"
     property int transferHunkIndex: -1
+    property int transferLineIndex: -1
 
     property string subMode: "files"
     property string selectedPath: ""
@@ -36,6 +38,22 @@ Item {
     property bool stashRestoreIndex: false
 
     property string armedAction: ""
+
+    GitLineTransferService {
+        id: lineTransferService
+        operationJournal:
+            root.transferService
+            ? root.transferService.operationJournal
+            : null
+        snapshotService:
+            root.transferService
+            ? root.transferService.snapshotService
+            : null
+        repositoryPath:
+            root.gitService
+            ? String(root.gitService.repoRoot || "")
+            : ""
+    }
 
     function fileTransferEligible() {
         const row = root.selectedFile || {};
@@ -64,13 +82,32 @@ Item {
             && !root.changesService.hunkBusy;
     }
 
+    function lineTransferEligible() {
+        const line = root.selectedLine();
+
+        return root.fileTransferEligible()
+            && root.hunkMode === "worktree"
+            && root.selectedHunkIndex >= 0
+            && root.selectedLineIndex >= 0
+            && line
+            && Boolean(line.selectable)
+            && !root.changesService.hunkBusy
+            && !lineTransferService.previewBusy
+            && !lineTransferService.transferBusy;
+    }
+
     function openTransfer(scope) {
+        const token = String(scope || "file");
         const requested =
-            String(scope || "file") === "hunk"
+            token === "line"
+            ? "line"
+            : token === "hunk"
             ? "hunk"
             : "file";
         const eligible =
-            requested === "hunk"
+            requested === "line"
+            ? root.lineTransferEligible()
+            : requested === "hunk"
             ? root.hunkTransferEligible()
             : root.fileTransferEligible();
 
@@ -78,11 +115,19 @@ Item {
             return false;
 
         root.clearArm();
-        root.transferService.clearPreview();
+
+        if (root.transferService)
+            root.transferService.clearPreview();
+        lineTransferService.clearPreview();
+
         root.transferScope = requested;
         root.transferHunkIndex =
-            requested === "hunk"
+            requested === "hunk" || requested === "line"
             ? root.selectedHunkIndex
+            : -1;
+        root.transferLineIndex =
+            requested === "line"
+            ? root.selectedLineIndex
             : -1;
         root.transferOpen = true;
 
@@ -96,9 +141,11 @@ Item {
         root.transferOpen = false;
         root.transferScope = "file";
         root.transferHunkIndex = -1;
+        root.transferLineIndex = -1;
 
         if (root.transferService)
             root.transferService.clearPreview();
+        lineTransferService.clearPreview();
     }
 
     function focusPath(path) {
@@ -1467,7 +1514,7 @@ Item {
                             spacing: 5
 
                             LabelText {
-                                width: parent.width - 230
+                                width: parent.width - 321
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: root.selectedLineSummary()
                                 color:
@@ -1549,6 +1596,15 @@ Item {
                                         }
                                     )
                             }
+
+                            MiniButton {
+                                width: 86
+                                label: "TRANSFER"
+                                accent: Colors.blue
+                                enabledAction: root.lineTransferEligible()
+                                onTriggered: root.openTransfer("line")
+                            }
+
                         }
 
                         Flickable {
@@ -2589,7 +2645,9 @@ Item {
         id: changeTransferView
 
         anchors.fill: parent
-        visible: root.transferOpen
+        visible:
+            root.transferOpen
+            && root.transferScope !== "line"
         z: 5000
 
         transferService: root.transferService
@@ -2609,6 +2667,48 @@ Item {
         onCloseRequested: root.closeTransfer()
     }
 
+    GitLineTransferView {
+        id: lineTransferView
+
+        anchors.fill: parent
+        visible:
+            root.transferOpen
+            && root.transferScope === "line"
+        z: 5000
+
+        lineTransferService: lineTransferService
+        branchWorkspaceService: root.branchWorkspaceService
+        sourcePath:
+            root.gitService
+            ? String(root.gitService.repoRoot || "")
+            : ""
+        filePath: root.selectedPath
+        hunkIndex: root.transferHunkIndex
+        lineIndex: root.transferLineIndex
+        lineSummary: root.selectedLineSummary()
+
+        onCloseRequested: root.closeTransfer()
+    }
+
+    Connections {
+        target: lineTransferService
+        ignoreUnknownSignals: true
+
+        function onTransferFinished(success, detail) {
+            if (!success)
+                return;
+
+            root.closeTransfer();
+            root.clearArm();
+
+            if (root.changesService)
+                root.changesService.refresh();
+
+            if (root.branchWorkspaceService)
+                root.branchWorkspaceService.refresh();
+        }
+    }
+
     Connections {
         target: root.transferService
         enabled: root.transferService !== null
@@ -2618,9 +2718,7 @@ Item {
             if (!success)
                 return;
 
-            root.transferOpen = false;
-            root.transferScope = "file";
-            root.transferHunkIndex = -1;
+            root.closeTransfer();
             root.clearArm();
 
             if (root.changesService)

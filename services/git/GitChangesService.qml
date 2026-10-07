@@ -26,6 +26,22 @@ Scope {
     property int untrackedCount: 0
     property int conflictCount: 0
 
+    property string currentBranch: ""
+    property string upstreamBranch: ""
+    property int upstreamAhead: 0
+    property int upstreamBehind: 0
+    property string headSha: ""
+    property string headSubject: ""
+    property int stagedInsertions: 0
+    property int stagedDeletions: 0
+    property int stagedBinaryFiles: 0
+    property bool signingDefault: false
+    property string signingKey: ""
+    property string signingFormat: "openpgp"
+    property string hooksPath: ""
+    property var commitHooks: []
+    property string commitTemplate: ""
+
     property string operationState: "NONE"
 
     property string previewPath: ""
@@ -137,6 +153,21 @@ Scope {
             unstagedCount = 0;
             untrackedCount = 0;
             conflictCount = 0;
+            currentBranch = "";
+            upstreamBranch = "";
+            upstreamAhead = 0;
+            upstreamBehind = 0;
+            headSha = "";
+            headSubject = "";
+            stagedInsertions = 0;
+            stagedDeletions = 0;
+            stagedBinaryFiles = 0;
+            signingDefault = false;
+            signingKey = "";
+            signingFormat = "openpgp";
+            hooksPath = "";
+            commitHooks = [];
+            commitTemplate = "";
             operationState = "NONE";
             lastError = "NO REPOSITORY";
             return false;
@@ -170,6 +201,32 @@ Scope {
                 'elif [ -f "$gitdir/REVERT_HEAD" ]; then state="REVERT";',
                 'elif [ -f "$gitdir/BISECT_LOG" ]; then state="BISECT"; fi',
                 'printf "STATE\\t%s\\n" "$state"',
+                'branch="$(git -C "$repo" branch --show-current 2>/dev/null || true)"',
+                'printf "BRANCH\\t%s\\n" "$branch"',
+                'upstream="$(git -C "$repo" rev-parse --abbrev-ref --symbolic-full-name "@{upstream}" 2>/dev/null || true)"',
+                'printf "UPSTREAM\\t%s\\n" "$upstream"',
+                'behind=0; ahead=0',
+                'if [ -n "$upstream" ]; then read -r behind ahead < <(git -C "$repo" rev-list --left-right --count "$upstream"...HEAD 2>/dev/null || printf "0 0"); fi',
+                'printf "AHEADBEHIND\\t%s\\t%s\\n" "$ahead" "$behind"',
+                'if git -C "$repo" rev-parse --verify HEAD >/dev/null 2>&1; then',
+                '  git -C "$repo" log -1 --format="HEAD%x09%H%x09%s" HEAD',
+                'else',
+                '  printf "HEAD\\t\\tNO COMMITS YET\\n"',
+                'fi',
+                "git -C \"$repo\" diff --cached --numstat 2>/dev/null | awk 'BEGIN{a=0;d=0;b=0} $1==\"-\" || $2==\"-\" {b++; next} {a+=$1; d+=$2} END{printf \"STAGEDSTAT\\\\t%d\\\\t%d\\\\t%d\\\\n\",a,d,b}'",
+                'sign_default="$(git -C "$repo" config --bool commit.gpgSign 2>/dev/null || true)"',
+                'sign_key="$(git -C "$repo" config user.signingkey 2>/dev/null || true)"',
+                'sign_format="$(git -C "$repo" config gpg.format 2>/dev/null || true)"',
+                '[ -n "$sign_format" ] || sign_format="openpgp"',
+                'printf "SIGNING\\t%s\\t%s\\t%s\\n" "$sign_default" "$sign_key" "$sign_format"',
+                'hooks_dir="$(git -C "$repo" rev-parse --git-path hooks 2>/dev/null || true)"',
+                'case "$hooks_dir" in /*) ;; "") ;; *) hooks_dir="$repo/$hooks_dir" ;; esac',
+                'printf "HOOKSPATH\\t%s\\n" "$hooks_dir"',
+                'for hook in pre-commit prepare-commit-msg commit-msg post-commit; do',
+                '  [ -n "$hooks_dir" ] && [ -x "$hooks_dir/$hook" ] && printf "HOOK\\t%s\\n" "$hook"',
+                'done',
+                'template="$(git -C "$repo" config --path commit.template 2>/dev/null || true)"',
+                'printf "TEMPLATE\\t%s\\n" "$template"',
                 'git -C "$repo" status --porcelain=v1 --untracked-files=all | while IFS= read -r line; do',
                 '  printf "STATUS\\t%s\\n" "$line"',
                 'done',
@@ -190,6 +247,21 @@ Scope {
         let unstaged = 0;
         let untracked = 0;
         let state = "NONE";
+        let branch = "";
+        let upstream = "";
+        let ahead = 0;
+        let behind = 0;
+        let nextHeadSha = "";
+        let nextHeadSubject = "";
+        let insertions = 0;
+        let deletions = 0;
+        let binaryFiles = 0;
+        let defaultSigning = false;
+        let nextSigningKey = "";
+        let nextSigningFormat = "openpgp";
+        let nextHooksPath = "";
+        const nextCommitHooks = [];
+        let nextCommitTemplate = "";
 
         const lines = String(text || "").split("\n");
 
@@ -200,6 +272,67 @@ Scope {
 
             if (line.indexOf("STATE\t") === 0) {
                 state = line.slice(6).trim() || "NONE";
+                continue;
+            }
+
+            if (line.indexOf("BRANCH\t") === 0) {
+                branch = line.slice(7).trim();
+                continue;
+            }
+
+            if (line.indexOf("UPSTREAM\t") === 0) {
+                upstream = line.slice(9).trim();
+                continue;
+            }
+
+            if (line.indexOf("AHEADBEHIND\t") === 0) {
+                const p = line.split("\t");
+                ahead = p.length > 1 ? Number(p[1] || 0) : 0;
+                behind = p.length > 2 ? Number(p[2] || 0) : 0;
+                continue;
+            }
+
+            if (line.indexOf("HEAD\t") === 0) {
+                const p = line.split("\t");
+                nextHeadSha = p.length > 1 ? p[1] : "";
+                nextHeadSubject =
+                    p.length > 2 ? p.slice(2).join("\t") : "";
+                continue;
+            }
+
+            if (line.indexOf("STAGEDSTAT\t") === 0) {
+                const p = line.split("\t");
+                insertions = p.length > 1 ? Number(p[1] || 0) : 0;
+                deletions = p.length > 2 ? Number(p[2] || 0) : 0;
+                binaryFiles = p.length > 3 ? Number(p[3] || 0) : 0;
+                continue;
+            }
+
+            if (line.indexOf("SIGNING\t") === 0) {
+                const p = line.split("\t");
+                defaultSigning =
+                    String(p.length > 1 ? p[1] : "").toLowerCase()
+                    === "true";
+                nextSigningKey = p.length > 2 ? p[2] : "";
+                nextSigningFormat =
+                    (p.length > 3 ? p[3] : "") || "openpgp";
+                continue;
+            }
+
+            if (line.indexOf("HOOKSPATH\t") === 0) {
+                nextHooksPath = line.slice(10).trim();
+                continue;
+            }
+
+            if (line.indexOf("HOOK\t") === 0) {
+                const hook = line.slice(5).trim();
+                if (hook)
+                    nextCommitHooks.push(hook);
+                continue;
+            }
+
+            if (line.indexOf("TEMPLATE\t") === 0) {
+                nextCommitTemplate = line.slice(9).trim();
                 continue;
             }
 
@@ -269,6 +402,21 @@ Scope {
         unstagedCount = unstaged;
         untrackedCount = untracked;
         conflictCount = conflictRows.length;
+        currentBranch = branch;
+        upstreamBranch = upstream;
+        upstreamAhead = ahead;
+        upstreamBehind = behind;
+        headSha = nextHeadSha;
+        headSubject = nextHeadSubject;
+        stagedInsertions = insertions;
+        stagedDeletions = deletions;
+        stagedBinaryFiles = binaryFiles;
+        signingDefault = defaultSigning;
+        signingKey = nextSigningKey;
+        signingFormat = nextSigningFormat;
+        hooksPath = nextHooksPath;
+        commitHooks = nextCommitHooks;
+        commitTemplate = nextCommitTemplate;
         operationState = state;
 
         if (previewPath) {

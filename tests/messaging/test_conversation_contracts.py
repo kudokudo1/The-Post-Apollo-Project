@@ -4,6 +4,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SHARED = ROOT / "components" / "ConversationFeed.qml"
 WRAPPER = ROOT / "widgets" / "messanger" / "ChatFeed.qml"
 ADAPTER = ROOT / "services" / "hospital" / "HospitalRoomConversationAdapter.qml"
+ROOM_CHAT = ROOT / "widgets" / "HospitalRoomChatView.qml"
 
 assert SHARED.is_file(), SHARED
 
@@ -51,3 +52,14 @@ assert "codex" not in adapter.lower()
 assert "hermes" not in adapter.lower()
 
 print("hospital conversation adapter contract: PASS")
+
+
+assert ROOM_CHAT.is_file(), ROOM_CHAT
+room_chat = ROOM_CHAT.read_text()
+assert "ConversationFeed {" in room_chat
+assert "HospitalRoomConversationAdapter {" in room_chat
+assert "messageTextFormat: Text.MarkdownText" in room_chat
+assert 'emptyConversationLabel: "SELECT A ROOM"' in room_chat
+assert "adapter.sendMessage(conversationId, text)" in room_chat
+
+print("hospital room chat view contract: PASS")

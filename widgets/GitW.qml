@@ -1886,6 +1886,16 @@ PanelWindow {
             : ""
     }
 
+    GitHistoryFoldService {
+        id: historyFoldService
+        operationJournal: operationJournalService
+        snapshotService: repositorySnapshotService
+        repositoryPath:
+            gitService.repoIsLocal
+            ? gitService.repoRoot
+            : ""
+    }
+
     GitChangesService {
         id: changesService
         operationJournal: operationJournalService
@@ -4979,6 +4989,7 @@ PanelWindow {
                         interactiveRebaseService: interactiveRebaseService
                         interactiveRebaseSessionService:
                             interactiveRebaseSessionService
+                        historyFoldService: historyFoldService
                         keyboardHost: root
 
                         onChangesRequested: function(path) {

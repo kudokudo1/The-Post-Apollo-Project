@@ -96,7 +96,7 @@ import "../../components"
                                     font.pixelSize: 10
                                     color: taskMetricCard.accent
                                     opacity: 0.90
-                                    layer.enabled: true
+                                    layer.enabled: Window.window !== null
                                     layer.effect: DropShadow {
                                         radius: modelData.critical ? 9 : 5
                                         samples: 7
@@ -112,7 +112,7 @@ import "../../components"
                                     font.pixelSize: 16
                                     color: taskMetricCard.accent
                                     elide: Text.ElideRight
-                                    layer.enabled: true
+                                    layer.enabled: Window.window !== null
                                     layer.effect: DropShadow {
                                         radius: modelData.critical ? 10 : 5
                                         samples: 9
@@ -138,7 +138,7 @@ import "../../components"
                                     font.pixelSize: 13
                                     color: taskMetricCard.favorite ? taskMetricCard.accent : Colors.white
                                     opacity: taskMetricCard.favorite ? 1.0 : 0.48
-                                    layer.enabled: taskMetricCard.favorite
+                                    layer.enabled: Window.window !== null && (taskMetricCard.favorite)
                                     layer.effect: DropShadow {
                                         radius: 5
                                         samples: 5
@@ -215,7 +215,7 @@ import "../../components"
                         font.pixelSize: 12
                         color: taskCpuGraph.accent
 
-                        layer.enabled: true
+                        layer.enabled: Window.window !== null
                         layer.effect: DropShadow {
                             horizontalOffset: 0
                             verticalOffset: 0
@@ -238,7 +238,7 @@ import "../../components"
                             text: "HUNTER " + hunterGraph.combiIcon + " HISTORY  •  "
                             font.pixelSize: 12
                             color: Colors.yellow
-                            layer.enabled: true
+                            layer.enabled: Window.window !== null
                             layer.effect: DropShadow {
                                 radius: 5
                                 samples: 5
@@ -251,7 +251,7 @@ import "../../components"
                             text: "CPU"
                             font.pixelSize: 12
                             color: Colors.orange
-                            layer.enabled: true
+                            layer.enabled: Window.window !== null
                             layer.effect: DropShadow {
                                 radius: 4; samples: 5; opacity: 0.40
                                 color: Colors.orange; transparentBorder: true
@@ -267,7 +267,7 @@ import "../../components"
                             text: "MEM"
                             font.pixelSize: 12
                             color: Colors.magenta
-                            layer.enabled: true
+                            layer.enabled: Window.window !== null
                             layer.effect: DropShadow {
                                 radius: 4; samples: 5; opacity: 0.40
                                 color: Colors.magenta; transparentBorder: true
@@ -283,7 +283,7 @@ import "../../components"
                             text: "I/O"
                             font.pixelSize: 12
                             color: Colors.cyan
-                            layer.enabled: true
+                            layer.enabled: Window.window !== null
                             layer.effect: DropShadow {
                                 radius: 4; samples: 5; opacity: 0.40
                                 color: Colors.cyan; transparentBorder: true
@@ -299,7 +299,7 @@ import "../../components"
                             text: "AGE"
                             font.pixelSize: 12
                             color: Colors.white
-                            layer.enabled: true
+                            layer.enabled: Window.window !== null
                             layer.effect: DropShadow {
                                 radius: 4; samples: 5; opacity: 0.30
                                 color: Colors.white; transparentBorder: true
@@ -700,7 +700,7 @@ import "../../components"
                         font.pixelSize: 12
                         color: taskCombiScoreGraph.accent
 
-                        layer.enabled: true
+                        layer.enabled: Window.window !== null
                         layer.effect: DropShadow {
                             horizontalOffset: 0
                             verticalOffset: 0
@@ -917,7 +917,7 @@ import "../../components"
                         font.pixelSize: 12
                         color: Colors.magenta
 
-                        layer.enabled: true
+                        layer.enabled: Window.window !== null
                         layer.effect: DropShadow {
                             horizontalOffset: 0
                             verticalOffset: 0
@@ -1259,7 +1259,7 @@ Item {
                             text: "↻"
                             font.pixelSize: 20
                             color: taskRestartAction.isPressed ? Colors.black : Colors.red
-                            layer.enabled: !taskRestartAction.isPressed
+                            layer.enabled: Window.window !== null && (!taskRestartAction.isPressed)
                             layer.effect: DropShadow {
                                 radius: 8
                                 samples: 7
@@ -1277,7 +1277,7 @@ Item {
                                 : "RESTART PROCESS"
                             font.pixelSize: 13
                             color: taskRestartAction.isPressed ? Colors.black : Colors.red
-                            layer.enabled: !taskRestartAction.isPressed
+                            layer.enabled: Window.window !== null && (!taskRestartAction.isPressed)
                             layer.effect: DropShadow {
                                 radius: 8
                                 samples: 7
@@ -1438,7 +1438,7 @@ Item {
                             parent.trackSpan * Math.max(0, Math.min(100, parent.activePercent)) / 100)
                         color: Colors.yellow
                         opacity: 0.52
-                        layer.enabled: true
+                        layer.enabled: Window.window !== null
                         layer.effect: DropShadow {
                             radius: 6
                             samples: 7
@@ -1511,7 +1511,7 @@ Item {
                                 verticalAlignment: Text.AlignVCenter
                                 font.pixelSize: 10
                                 color: Colors.yellow
-                                layer.enabled: true
+                                layer.enabled: Window.window !== null
                                 layer.effect: DropShadow {
                                     radius: 5
                                     samples: 5
@@ -1633,7 +1633,7 @@ Item {
                                 font.pixelSize: 9
                                 color: Colors.yellow
                                 opacity: 1.0
-                                layer.enabled: true
+                                layer.enabled: Window.window !== null
                                 layer.effect: DropShadow {
                                     radius: 5
                                     samples: 5
@@ -1773,7 +1773,7 @@ Item {
                             color: taskFreezeAction.isPressed ? Colors.black
                                    : taskFreezeAction.isHovered ? Colors.cyan
                                    : Colors.white
-                            layer.enabled: !taskFreezeAction.isPressed
+                            layer.enabled: Window.window !== null && (!taskFreezeAction.isPressed)
                             layer.effect: DropShadow {
                                 radius: 7
                                 samples: 7
@@ -1794,7 +1794,7 @@ Item {
                             color: taskFreezeAction.isPressed ? Colors.black
                                    : taskFreezeAction.isHovered ? Colors.cyan
                                    : Colors.white
-                            layer.enabled: !taskFreezeAction.isPressed
+                            layer.enabled: Window.window !== null && (!taskFreezeAction.isPressed)
                             layer.effect: DropShadow {
                                 radius: 7
                                 samples: 7
@@ -1816,7 +1816,7 @@ Item {
                             color: taskFreezeAction.isPressed ? Colors.black
                                    : taskFreezeAction.isHovered ? Colors.cyan
                                    : Colors.white
-                            layer.enabled: !taskFreezeAction.isPressed
+                            layer.enabled: Window.window !== null && (!taskFreezeAction.isPressed)
                             layer.effect: DropShadow {
                                 radius: 7
                                 samples: 7
@@ -1913,7 +1913,7 @@ Item {
                                 ? Colors.black
                                 : Colors.red
 
-                            layer.enabled: !taskEndAction.isPressed
+                            layer.enabled: Window.window !== null && (!taskEndAction.isPressed)
                             layer.effect: DropShadow {
                                 horizontalOffset: 0
                                 verticalOffset: 0
@@ -1938,7 +1938,7 @@ Item {
                                 ? Colors.black
                                 : Colors.red
 
-                            layer.enabled: !taskEndAction.isPressed
+                            layer.enabled: Window.window !== null && (!taskEndAction.isPressed)
                             layer.effect: DropShadow {
                                 horizontalOffset: 0
                                 verticalOffset: 0
@@ -1961,7 +1961,7 @@ Item {
                                 ? Colors.black
                                 : Colors.red
 
-                            layer.enabled: !taskEndAction.isPressed
+                            layer.enabled: Window.window !== null && (!taskEndAction.isPressed)
                             layer.effect: DropShadow {
                                 horizontalOffset: 0
                                 verticalOffset: 0

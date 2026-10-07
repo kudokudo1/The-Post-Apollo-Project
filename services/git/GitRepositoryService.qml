@@ -17,6 +17,12 @@ Scope {
     property var remoteBranches: []
     property var tags: []
     property var configRows: []
+
+    property string tagRemoteCheckRemote: ""
+    property string tagRemoteCheckTag: ""
+    property string tagRemoteCheckState: "UNCHECKED"
+    property string tagRemoteLocalTarget: ""
+    property string tagRemoteTarget: ""
     property var submodules: []
     property var hooks: []
     property var ignoreLines: []
@@ -109,10 +115,32 @@ Scope {
                 '  push="$(git -C "$repo" remote get-url --push "$name" 2>/dev/null || true)"',
                 '  fetchspec="$(git -C "$repo" config --get-all "remote.$name.fetch" 2>/dev/null | paste -sd ";" -)"',
                 '  pushspec="$(git -C "$repo" config --get-all "remote.$name.push" 2>/dev/null | paste -sd ";" -)"',
-                '  printf "REMOTE\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$name" "$url" "$push" "$fetchspec" "$pushspec"',
+                '  remote_head="$(git -C "$repo" symbolic-ref --quiet --short "refs/remotes/$name/HEAD" 2>/dev/null || true)"',
+                '  remote_head="${remote_head#"$name/"}"',
+                '  prune="$(git -C "$repo" config --bool "remote.$name.prune" 2>/dev/null || true)"',
+                '  [ -n "$prune" ] || prune="$(git -C "$repo" config --bool fetch.prune 2>/dev/null || true)"',
+                '  [ -n "$prune" ] || prune="default"',
+                '  printf "REMOTE\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$name" "$url" "$push" "$fetchspec" "$pushspec" "$remote_head" "$prune"',
                 'done < <(git -C "$repo" remote 2>/dev/null)',
                 'git -C "$repo" for-each-ref --sort=-committerdate --format="RBRANCH%x09%(refname:short)%09%(objectname:short=10)%09%(committerdate:unix)" refs/remotes 2>/dev/null || true',
-                'git -C "$repo" for-each-ref --sort=-creatordate --format="TAG%x09%(refname:short)%09%(objectname:short=10)%09%(creatordate:unix)%09%(subject)" refs/tags 2>/dev/null',
+                'head_sha="$(git -C "$repo" rev-parse HEAD 2>/dev/null || true)"',
+                'git -C "$repo" for-each-ref --sort=-creatordate --format="%(refname:short)" refs/tags 2>/dev/null | while IFS= read -r tag; do',
+                '  [ -n "$tag" ] || continue',
+                '  object_sha="$(git -C "$repo" rev-parse "refs/tags/$tag" 2>/dev/null || true)"',
+                '  object_type="$(git -C "$repo" cat-file -t "refs/tags/$tag" 2>/dev/null || true)"',
+                '  peeled="$(git -C "$repo" rev-parse "refs/tags/$tag^{}" 2>/dev/null || true)"',
+                '  target_type="$(git -C "$repo" cat-file -t "$peeled" 2>/dev/null || true)"',
+                '  epoch="$(git -C "$repo" for-each-ref --format="%(creatordate:unix)" "refs/tags/$tag" 2>/dev/null)"',
+                '  subject="$(git -C "$repo" for-each-ref --format="%(subject)" "refs/tags/$tag" 2>/dev/null)"',
+                '  signed=0',
+                '  if [ "$object_type" = "tag" ]; then',
+                '    raw_tag="$(git -C "$repo" cat-file tag "refs/tags/$tag" 2>/dev/null || true)"',
+                '    printf "%s" "$raw_tag" | grep -Eq -- "-----BEGIN (PGP|SSH) SIGNATURE-----" && signed=1',
+                '  fi',
+                '  at_head=0',
+                '  [ -n "$head_sha" ] && [ "$peeled" = "$head_sha" ] && at_head=1',
+                '  printf "TAG\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$tag" "${object_sha:0:10}" "$epoch" "$object_type" "$target_type" "$peeled" "$signed" "$at_head" "$subject"',
+                'done',
                 'git -C "$repo" config --local --list 2>/dev/null | while IFS= read -r line; do',
                 '  key="${line%%=*}"; value="${line#*=}"',
                 '  printf "CONFIG\\t%s\\t%s\\n" "$key" "$value"',
@@ -178,7 +206,9 @@ Scope {
                     url: p.length > 2 ? p[2] : "",
                     pushUrl: p.length > 3 ? p[3] : "",
                     fetchSpec: p.length > 4 ? p[4] : "",
-                    pushSpec: p.length > 5 ? p[5] : ""
+                    pushSpec: p.length > 5 ? p[5] : "",
+                    defaultBranch: p.length > 6 ? p[6] : "",
+                    prune: p.length > 7 ? p[7] : "default"
                 });
             } else if (kind === "RBRANCH") {
                 const name = p.length > 1 ? p[1] : "";
@@ -194,11 +224,24 @@ Scope {
                     });
                 }
             } else if (kind === "TAG") {
+                const objectType = p.length > 4 ? p[4] : "";
+                const signed = p.length > 7 && p[7] === "1";
+                const tagKind =
+                    objectType === "tag"
+                    ? (signed ? "signed" : "annotated")
+                    : "lightweight";
+
                 tagRows.push({
                     name: p.length > 1 ? p[1] : "",
                     shortSha: p.length > 2 ? p[2] : "",
                     epoch: p.length > 3 ? Number(p[3] || 0) : 0,
-                    subject: p.length > 4 ? p.slice(4).join("\t") : ""
+                    objectType: objectType,
+                    targetType: p.length > 5 ? p[5] : "",
+                    targetSha: p.length > 6 ? p[6] : "",
+                    signed: signed,
+                    atHead: p.length > 8 && p[8] === "1",
+                    kind: tagKind,
+                    subject: p.length > 9 ? p.slice(9).join("\t") : ""
                 });
             } else if (kind === "CONFIG") {
                 configs.push({

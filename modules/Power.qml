@@ -104,14 +104,14 @@ PanelWindow {
             x: 155
             y: 230
 
-            color: powerMouse.pressed ? Colors.black : powerMouse.containsMouse ? Colors.black : Colors.black
+            color: menuOpen || confirmShutdown || confirmReboot ? Colors.yellow : Colors.black
 
             Text {
                 anchors.centerIn: parent
                 text: "⏻"
                 font.pixelSize: 35
 
-                color: powerMouse.pressed ? Colors.orange : powerMouse.containsMouse ? Colors.orange : Colors.white
+                color: menuOpen || confirmShutdown || confirmReboot ? Colors.magenta : powerMouse.pressed ? Colors.orange : powerMouse.containsMouse ? Colors.orange : Colors.white
             }
 
             MouseArea {
@@ -164,7 +164,7 @@ PanelWindow {
 
             opacity: powerMouse.pressed ? 0.7 : powerMouse.containsMouse ? 0.5 : 0.3
 
-            color: powerMouse.pressed ? Colors.orange : powerMouse.containsMouse ? Colors.orange : Colors.cyan
+            color: menuOpen || confirmShutdown || confirmReboot ? Colors.magenta : powerMouse.pressed ? Colors.orange : powerMouse.containsMouse ? Colors.orange : Colors.cyan
             transparentBorder: true
         }
 
@@ -179,7 +179,7 @@ PanelWindow {
 
             opacity: powerMouse.pressed ? 0.9 : powerMouse.containsMouse ? 0.7 : 0.5
 
-            color: powerMouse.pressed ? Colors.orange : powerMouse.containsMouse ? Colors.orange : Colors.cyan
+            color: menuOpen || confirmShutdown || confirmReboot ? Colors.magenta : powerMouse.pressed ? Colors.orange : powerMouse.containsMouse ? Colors.orange : Colors.cyan
         }
     }
 

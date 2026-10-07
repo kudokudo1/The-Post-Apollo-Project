@@ -8,6 +8,7 @@ Rectangle {
     id: cpuDock
 
     property var cpuPlusWindow
+    readonly property bool menuOpen: cpuPlusWindow && cpuPlusWindow.menuOpen
 
     // Session-wide hardware services are injected by shell.qml. CPU++ can
     // build its own view/controller state without duplicating polling or PWM
@@ -18,7 +19,7 @@ Rectangle {
     implicitHeight: 50
     implicitWidth: 70
 
-    color: Colors.black
+    color: cpuDock.menuOpen ? Colors.yellow : Colors.black
 
     Item {
         id: cpuTextGlowContainer
@@ -34,7 +35,7 @@ Rectangle {
 
             font.pixelSize: 20
 
-            color: cpuMouse.pressed ? Colors.cyan : cpuMouse.containsMouse ? Colors.cyan : Colors.white
+            color: cpuDock.menuOpen ? Colors.magenta : cpuMouse.pressed ? Colors.cyan : cpuMouse.containsMouse ? Colors.cyan : Colors.white
         }
 
         DropShadow {
@@ -53,7 +54,7 @@ Rectangle {
 
             opacity: cpuMouse.pressed ? 1.0 : cpuMouse.containsMouse ? 0.8 : 0.6
 
-            color: cpuMouse.pressed ? Colors.cyan : cpuMouse.containsMouse ? Colors.cyan : Colors.cyan
+            color: cpuDock.menuOpen ? Colors.magenta : cpuMouse.pressed ? Colors.cyan : cpuMouse.containsMouse ? Colors.cyan : Colors.cyan
 
             transparentBorder: true
         }
@@ -90,7 +91,7 @@ Rectangle {
 
         opacity: cpuMouse.pressed ? 0.6 : cpuMouse.containsMouse ? 0.5 : 0.4
 
-        color: cpuMouse.pressed ? Colors.cyan : cpuMouse.containsMouse ? Colors.cyan : Colors.cyan
+        color: cpuDock.menuOpen ? Colors.magenta : cpuMouse.pressed ? Colors.cyan : cpuMouse.containsMouse ? Colors.cyan : Colors.cyan
     }
 
     RectangularShadow {
@@ -103,6 +104,6 @@ Rectangle {
 
         opacity: cpuMouse.pressed ? 0.12 : cpuMouse.containsMouse ? 0.09 : 0.07
 
-        color: cpuMouse.pressed ? Colors.cyan : cpuMouse.containsMouse ? Colors.cyan : Colors.cyan
+        color: cpuDock.menuOpen ? Colors.magenta : cpuMouse.pressed ? Colors.cyan : cpuMouse.containsMouse ? Colors.cyan : Colors.cyan
     }
 }

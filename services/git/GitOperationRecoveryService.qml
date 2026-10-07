@@ -195,6 +195,47 @@ Scope {
             return refuse("OPERATION IS NOT CLEAN REF-RECOVERABLE");
         }
 
+        if (kind === "HISTORY/INTERACTIVE_REBASE") {
+            const beforeBranch = String(before.branch || "");
+            const afterBranch = String(after.branch || "");
+
+            if (!beforeBranch
+                    || beforeBranch !== afterBranch) {
+                return refuse(
+                    "REBASE BRANCH IDENTITY CHANGED"
+                );
+            }
+
+            const ref = "refs/heads/" + beforeBranch;
+            const beforeSha = refSha(before, ref);
+            const afterSha = refSha(after, ref);
+
+            if (!beforeSha
+                    || !afterSha
+                    || beforeSha === afterSha
+                    || String(before.head || "") !== beforeSha
+                    || String(after.head || "") !== afterSha) {
+                return refuse(
+                    "REBASE REF TRANSITION IS NOT EXACT"
+                );
+            }
+
+            return {
+                allowed: true,
+                strategy: "RESTORE_REWRITTEN_BRANCH",
+                branch: beforeBranch,
+                expectedSha: afterSha,
+                restoreSha: beforeSha,
+                summary:
+                    "RESTORE "
+                    + beforeBranch
+                    + " // "
+                    + afterSha.slice(0, 12)
+                    + " -> "
+                    + beforeSha.slice(0, 12)
+            };
+        }
+
         if (kind === "BRANCH_WORKSPACE/CREATE") {
             const name = argument(row, 0);
             const ref = "refs/heads/" + name;
@@ -613,6 +654,10 @@ Scope {
             b = String(plan.branch || "");
             c = String(plan.expectedSha || "");
             d = plan.detached ? "1" : "0";
+        } else if (strategy === "RESTORE_REWRITTEN_BRANCH") {
+            a = String(plan.branch || "");
+            b = String(plan.restoreSha || "");
+            c = String(plan.expectedSha || "");
         } else if (strategy === "UNDO_TRANSFER_CONTENT") {
             a = String(plan.sourcePath || "");
             b = String(plan.destinationPath || "");
@@ -773,6 +818,26 @@ Scope {
                 '      git -C "$repo" worktree add "$path" "$branch" >/dev/null 2>&1 || { printf "REFUSED\\tWORKTREE RESTORE FAILED\\n"; exit 96; }',
                 '    fi',
                 '    printf "OK\\tRESTORED REMOVED WORKTREE // %s\\n" "$path"',
+                '    ;;',
+                '  RESTORE_REWRITTEN_BRANCH)',
+                '    branch="$a"',
+                '    restore="$b"',
+                '    expected="$c"',
+                '    ref="refs/heads/$branch"',
+                '    head_ref="$(git -C "$repo" symbolic-ref -q HEAD 2>/dev/null || true)"',
+                '    [ "$head_ref" = "$ref" ] || { printf "REFUSED\\tREWRITTEN BRANCH IS NOT CURRENTLY CHECKED OUT\\n"; exit 97; }',
+                '    actual="$(git -C "$repo" rev-parse -q --verify "$ref" 2>/dev/null || true)"',
+                '    [ "$actual" = "$expected" ] || { printf "REFUSED\\tREWRITTEN BRANCH MOVED SINCE OPERATION\\n"; exit 98; }',
+                '    git -C "$repo" cat-file -e "$restore^{commit}" 2>/dev/null || { printf "REFUSED\\tPRE-REWRITE COMMIT MISSING\\n"; exit 99; }',
+                '    git -C "$repo" update-ref ORIG_HEAD "$expected" >/dev/null 2>&1 || true',
+                '    git -C "$repo" update-ref "$ref" "$restore" "$expected" || { printf "REFUSED\\tGUARDED REWRITE RESTORE FAILED\\n"; exit 122; }',
+                '    if ! git -C "$repo" reset --hard "$restore" >/dev/null 2>&1; then',
+                '      git -C "$repo" update-ref "$ref" "$expected" "$restore" >/dev/null 2>&1 || { printf "REFUSED\\tREWRITE WORKTREE REALIGN FAILED // REF ROLLBACK FAILED\\n"; exit 123; }',
+                '      git -C "$repo" reset --hard "$expected" >/dev/null 2>&1 || true',
+                '      printf "REFUSED\\tREWRITE WORKTREE REALIGN FAILED // REF ROLLED BACK\\n"',
+                '      exit 124',
+                '    fi',
+                '    printf "OK\\tRESTORED PRE-REBASE HEAD // %s\\n" "$branch"',
                 '    ;;',
                 '  UNDO_TRANSFER_CONTENT)',
                 '    source="$a"',

@@ -2730,7 +2730,9 @@ PanelWindow {
         SelectorSlider {
             id: repoSlider
 
-            visible: root.activePage === "git"
+            visible:
+                root.activePage === "git"
+                && root.gitView === "control"
             z: 100
             anchors {
                 left: parent.left

@@ -129,6 +129,7 @@ PanelWindow {
         root.intercomMenuOpen = false;
         root.operationsSurface = "quick";
         doctorRuntimeService.refresh();
+        roomCheckpointService.refresh();
         return true;
     }
 
@@ -1767,11 +1768,18 @@ PanelWindow {
 
         onQuickCompleted: function(command, result) {
             roomChatView.refresh();
+            roomCheckpointService.refresh();
         }
 
         onTurnCancelled: function(result) {
             roomChatView.refresh();
         }
+    }
+
+    HospitalRoomCheckpointService {
+        id: roomCheckpointService
+
+        roomId: root.selectedRoomTeam
     }
 
     HospitalPhoneService {
@@ -5449,11 +5457,88 @@ PanelWindow {
                     }
                 }
 
+                Rectangle {
+                    id: latestCheckpointCard
+
+                    readonly property var checkpoint:
+                        roomCheckpointService.latestCheckpoint
+
+                    width: parent.width
+                    height: checkpoint ? 126 : 54
+                    color: Colors.black
+                    border.width: 1
+                    border.color:
+                        checkpoint
+                        ? Colors.magenta
+                        : Colors.blue
+
+                    Column {
+                        anchors {
+                            fill: parent
+                            margins: 8
+                        }
+                        spacing: 4
+
+                        GohuText {
+                            width: parent.width
+                            text:
+                                latestCheckpointCard.checkpoint
+                                ? (
+                                    "LATEST CHECKPOINT // "
+                                    + String(
+                                        latestCheckpointCard
+                                            .checkpoint.kind
+                                        || "PROGRESS"
+                                      )
+                                    + " // "
+                                    + String(
+                                        latestCheckpointCard
+                                            .checkpoint.createdAt
+                                        || ""
+                                      )
+                                  )
+                                : "NO CHECKPOINT // USE REPORT"
+                            font.pixelSize: 9
+                            color:
+                                latestCheckpointCard.checkpoint
+                                ? Colors.magenta
+                                : Colors.blue
+                            elide: Text.ElideRight
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            height:
+                                latestCheckpointCard.checkpoint
+                                ? 82 : 18
+                            visible:
+                                latestCheckpointCard.checkpoint !== null
+                            text:
+                                latestCheckpointCard.checkpoint
+                                ? String(
+                                    latestCheckpointCard.checkpoint.body
+                                    || ""
+                                  )
+                                : ""
+                            font.pixelSize: 9
+                            color: Colors.white
+                            wrapMode: Text.Wrap
+                            maximumLineCount: 6
+                            elide: Text.ElideRight
+                            clip: true
+                        }
+                    }
+                }
+
                 GohuText {
                     width: parent.width
                     height: Math.min(implicitHeight, 58)
-                    visible: doctorRuntimeService.lastError.length > 0
-                    text: doctorRuntimeService.lastError
+                    visible:
+                        doctorRuntimeService.lastError.length > 0
+                        || roomCheckpointService.lastError.length > 0
+                    text:
+                        doctorRuntimeService.lastError
+                        || roomCheckpointService.lastError
                     font.pixelSize: 9
                     color: Colors.red
                     wrapMode: Text.Wrap

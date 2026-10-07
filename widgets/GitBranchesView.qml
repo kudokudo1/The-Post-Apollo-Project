@@ -2106,6 +2106,7 @@ Item {
                                 width: 76
                                 height: 32
                                 label: "CLOSE"
+                                destructive: true
                                 onTriggered: root.closeManager()
                             }
                         }

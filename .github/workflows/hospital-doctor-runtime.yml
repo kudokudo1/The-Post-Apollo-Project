@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "services/hospital/HospitalDoctorRuntimeService.qml"
+      - "services/hospital/HospitalRoomCheckpointService.qml"
       - "widgets/HospitalW.qml"
       - "tests/hospital/test_doctor_runtime_contracts.py"
       - ".github/workflows/hospital-doctor-runtime.yml"
@@ -12,6 +13,7 @@ on:
       - main
     paths:
       - "services/hospital/HospitalDoctorRuntimeService.qml"
+      - "services/hospital/HospitalRoomCheckpointService.qml"
       - "widgets/HospitalW.qml"
       - "tests/hospital/test_doctor_runtime_contracts.py"
       - ".github/workflows/hospital-doctor-runtime.yml"

@@ -9,6 +9,7 @@ Item {
     property var historyService: null
     property var interactiveRebaseService: null
     property var interactiveRebaseSessionService: null
+    property var historyFoldService: null
     property var keyboardHost: null
 
     property string subMode: "log"
@@ -1051,6 +1052,11 @@ Item {
                         key: "rebase",
                         label: "REBASE",
                         color: Colors.magenta
+                    },
+                    {
+                        key: "surgery",
+                        label: "SURGERY",
+                        color: Colors.red
                     }
                 ]
 
@@ -1059,8 +1065,8 @@ Item {
                     width:
                         (
                             parent.width
-                            - parent.spacing * 5
-                        ) / 6
+                            - parent.spacing * 6
+                        ) / 7
                     height: 34
                     label: modelData.label
                     accent: modelData.color
@@ -2745,6 +2751,16 @@ Item {
                 onOpenChangesRequested: function(path) {
                     root.changesRequested(path);
                 }
+            }
+
+            // ===== SURGERY ===============================================
+            GitHistorySurgeryView {
+                anchors.fill: parent
+                visible: root.subMode === "surgery"
+
+                foldService: root.historyFoldService
+                historyService: root.historyService
+                keyboardHost: root.keyboardHost
             }
 
             // ===== OPERATE ===============================================

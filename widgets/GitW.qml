@@ -2035,6 +2035,16 @@ PanelWindow {
             : ""
     }
 
+    GitConflictEditorService {
+        id: conflictEditorService
+        operationJournal: operationJournalService
+        snapshotService: repositorySnapshotService
+        repositoryPath:
+            gitService.repoIsLocal
+            ? gitService.repoRoot
+            : ""
+    }
+
     GitChangeTransferService {
         id: changeTransferService
         operationJournal: operationJournalService
@@ -5186,6 +5196,7 @@ PanelWindow {
                         gitService: gitService
                         transferService: changeTransferService
                         branchWorkspaceService: branchWorkspaceService
+                        conflictEditorService: conflictEditorService
                         keyboardHost: root
 
                         onHistoryRequested: function(path) {

@@ -1673,6 +1673,17 @@ PanelWindow {
             : ""
     }
 
+    GitStackSubmitService {
+        id: stackSubmitService
+        branchStackStore: branchStackStore
+        branchWorkspaceService: branchWorkspaceService
+        repositoryPath:
+            gitService.repoIsLocal
+            ? gitService.repoRoot
+            : ""
+        repoSlug: gitService.repoRemoteSlug
+    }
+
     GitHubService {
         id: githubService
         originUrl: gitService.origin
@@ -1702,6 +1713,23 @@ PanelWindow {
     GitHubWorkItemsService {
         id: githubWorkItemsService
         repoSlug: gitService.repoRemoteSlug
+    }
+
+    Connections {
+        target: stackSubmitService
+
+        function onSubmissionFinished(success, result) {
+            if (!success)
+                return;
+
+            gitService.refresh();
+            branchWorkspaceService.refresh();
+
+            if (gitService.repoRemoteSlug)
+                githubWorkItemsService.refreshPulls(
+                    gitService.repoRemoteSlug
+                );
+        }
     }
 
     Connections {
@@ -4654,6 +4682,7 @@ PanelWindow {
                         branchStackStore: branchStackStore
                         stackPlanner: stackPlanner
                         stackExecutor: stackExecutor
+                        stackSubmitService: stackSubmitService
                         keyboardHost: root
 
                         onHistoryRequested: function(branch) {

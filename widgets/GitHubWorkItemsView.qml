@@ -17,6 +17,8 @@ Item {
     property string searchText: ""
     property string armedProjectRemoveUrl: ""
 
+    signal pullRequestControlRequested(var row)
+
     readonly property bool isPulls: kind === "pulls"
     readonly property var sourceRows:
         isPulls
@@ -608,7 +610,7 @@ Item {
                         : ""
 
                     width: sourceList.width
-                    height: 104
+                    height: root.isPulls ? 132 : 104
                     color: Colors.dark
                     border.width: 1
                     border.color:
@@ -820,6 +822,26 @@ Item {
                             width: parent.width
                             height: 25
                             label: "OPEN"
+                            keyboardListIndex: sourceRow.index
+                            enabledAction: !!sourceRow.itemUrl
+                            onTriggered: {
+                                root.armedProjectRemoveUrl = "";
+
+                                if (root.isPulls) {
+                                    root.pullRequestControlRequested(
+                                        sourceRow.modelData
+                                    );
+                                } else {
+                                    Qt.openUrlExternally(sourceRow.itemUrl);
+                                }
+                            }
+                        }
+
+                        ViewButton {
+                            visible: root.isPulls
+                            width: parent.width
+                            height: 25
+                            label: "WEB"
                             keyboardListIndex: sourceRow.index
                             enabledAction: !!sourceRow.itemUrl
                             onTriggered: {

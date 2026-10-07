@@ -48,6 +48,7 @@ Rectangle {
     border.color: Colors.magenta
 
     signal targetRefreshRequested()
+    signal closeRequested()
 
     function clearArm() {
         armedAction = "";
@@ -356,7 +357,7 @@ Rectangle {
                 spacing: 6
 
                 Column {
-                    width: parent.width - 390
+                    width: parent.width - 470
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 2
 
@@ -392,6 +393,14 @@ Rectangle {
                         color: Colors.cyan
                         elide: Text.ElideRight
                     }
+                }
+
+                ActionButton {
+                    width: 82
+                    label: "← PULLS"
+                    accent: Colors.cyan
+                    enabledAction: !root.anyBusy
+                    onTriggered: root.closeRequested()
                 }
 
                 Repeater {

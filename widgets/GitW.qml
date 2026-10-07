@@ -18,6 +18,8 @@ PanelWindow {
     property string activePage: "git"
     property string gitView: "control"
     property string githubView: "control"
+    property bool pullRequestControlOpen: false
+    property var selectedPullRequest: null
     property bool projectsExpanded: false
     property string factoryTemplate: "smoke"
     property string factoryTrigger: "manual"
@@ -679,10 +681,14 @@ PanelWindow {
                     githubWorkItemsService.refreshIssues(
                         gitService.repoRemoteSlug
                     );
-                else if (githubView === "pulls")
-                    githubWorkItemsService.refreshPulls(
-                        gitService.repoRemoteSlug
-                    );
+                else if (githubView === "pulls") {
+                    if (root.pullRequestControlOpen)
+                        pullRequestControlView.refreshFacts();
+                    else
+                        githubWorkItemsService.refreshPulls(
+                            gitService.repoRemoteSlug
+                        );
+                }
                 else
                     githubService.refresh();
             } else {
@@ -1390,6 +1396,8 @@ PanelWindow {
     function showGithubPulls() {
         root.workflowMenuOpen = false;
         root.runInspectorOpen = false;
+        root.pullRequestControlOpen = false;
+        root.selectedPullRequest = null;
         root.githubView = "pulls";
 
         githubWorkItemsService.refreshPulls(
@@ -1399,6 +1407,59 @@ PanelWindow {
         if (!githubProjectsService.busy
                 && githubProjectsService.projects.length === 0)
             githubProjectsService.refreshProjects();
+    }
+
+    function openPullRequestControl(row) {
+        const candidate = row || {};
+        const number = githubWorkItemsService.rowNumber(candidate);
+
+        if (number <= 0 || !gitService.repoRemoteSlug)
+            return false;
+
+        root.selectedPullRequest = candidate;
+        root.pullRequestControlOpen = true;
+        root.clearGitKeyboardControl();
+        Qt.callLater(root.ensureGitKeyboardControl);
+        root.restoreGitKeyboardFocus(false);
+        return true;
+    }
+
+    function closePullRequestControl() {
+        root.pullRequestControlOpen = false;
+        root.selectedPullRequest = null;
+
+        if (gitService.repoRemoteSlug
+                && !githubWorkItemsService.pullsBusy) {
+            githubWorkItemsService.refreshPulls(
+                gitService.repoRemoteSlug
+            );
+        }
+
+        root.clearGitKeyboardControl();
+        Qt.callLater(root.ensureGitKeyboardControl);
+        root.restoreGitKeyboardFocus(false);
+    }
+
+    function refreshSelectedPullRequest() {
+        if (!root.pullRequestControlOpen
+                || !root.selectedPullRequest)
+            return;
+
+        const number =
+            githubWorkItemsService.rowNumber(
+                root.selectedPullRequest
+            );
+        const rows =
+            Array.isArray(githubWorkItemsService.pulls)
+            ? githubWorkItemsService.pulls
+            : [];
+
+        for (let i = 0; i < rows.length; ++i) {
+            if (githubWorkItemsService.rowNumber(rows[i]) === number) {
+                root.selectedPullRequest = rows[i];
+                return;
+            }
+        }
     }
 
     function githubStateText() {
@@ -1794,6 +1855,34 @@ PanelWindow {
         repoSlug: gitService.repoRemoteSlug
     }
 
+    GitHubPullRequestLifecycleService {
+        id: githubPullRequestLifecycleService
+    }
+
+    GitHubMergeQueueProvider {
+        id: githubMergeQueueProvider
+    }
+
+    GitHubMergeQueueLifecycleService {
+        id: githubMergeQueueLifecycleService
+    }
+
+    GitHubPullRequestReviewThreadProvider {
+        id: githubPullRequestReviewThreadProvider
+    }
+
+    GitHubPullRequestReviewThreadLifecycleService {
+        id: githubPullRequestReviewThreadLifecycleService
+    }
+
+    Connections {
+        target: githubWorkItemsService
+
+        function onPullsRefreshed() {
+            root.refreshSelectedPullRequest();
+        }
+    }
+
     Connections {
         target: stackSubmitService
 
@@ -1813,6 +1902,11 @@ PanelWindow {
 
     Connections {
         target: gitService
+
+        function onRepoRemoteSlugChanged() {
+            root.pullRequestControlOpen = false;
+            root.selectedPullRequest = null;
+        }
 
         function onRefreshed() {
             if (root.activePage === "git"
@@ -6030,14 +6124,87 @@ PanelWindow {
                             }
 
                             GitHubWorkItemsView {
+                                id: githubPullsListView
+
                                 anchors.fill: parent
-                                visible: root.githubView === "pulls"
+                                visible:
+                                    root.githubView === "pulls"
+                                    && !root.pullRequestControlOpen
 
                                 kind: "pulls"
                                 workService: githubWorkItemsService
                                 projectService: githubProjectsService
                                 gitService: gitService
                                 keyboardHost: root
+
+                                onPullRequestControlRequested: function(row) {
+                                    root.openPullRequestControl(row);
+                                }
+                            }
+
+                            GitHubPullRequestControlView {
+                                id: pullRequestControlView
+
+                                anchors.fill: parent
+                                visible:
+                                    root.githubView === "pulls"
+                                    && root.pullRequestControlOpen
+                                    && !!root.selectedPullRequest
+
+                                lifecycleService:
+                                    githubPullRequestLifecycleService
+                                queueProvider:
+                                    githubMergeQueueProvider
+                                queueLifecycleService:
+                                    githubMergeQueueLifecycleService
+                                threadProvider:
+                                    githubPullRequestReviewThreadProvider
+                                threadLifecycleService:
+                                    githubPullRequestReviewThreadLifecycleService
+
+                                repositorySlug: gitService.repoRemoteSlug
+                                pullRequestNumber:
+                                    githubWorkItemsService.rowNumber(
+                                        root.selectedPullRequest
+                                    )
+                                pullRequestTitle:
+                                    githubWorkItemsService.rowTitle(
+                                        root.selectedPullRequest
+                                    )
+                                pullRequestState:
+                                    githubWorkItemsService.rowState(
+                                        root.selectedPullRequest
+                                    )
+                                pullRequestDraft:
+                                    githubWorkItemsService.pullIsDraft(
+                                        root.selectedPullRequest
+                                    )
+                                pullRequestHeadSha:
+                                    String(
+                                        (root.selectedPullRequest || {}).headRefOid
+                                        || ""
+                                    )
+                                pullRequestBaseRef:
+                                    String(
+                                        (root.selectedPullRequest || {}).baseRefName
+                                        || ""
+                                    )
+                                pullRequestHeadRef:
+                                    String(
+                                        (root.selectedPullRequest || {}).headRefName
+                                        || ""
+                                    )
+
+                                onCloseRequested:
+                                    root.closePullRequestControl()
+
+                                onTargetRefreshRequested: {
+                                    if (!githubWorkItemsService.pullsBusy) {
+                                        githubWorkItemsService.refreshPulls(
+                                            gitService.repoRemoteSlug
+                                        );
+                                    }
+                                }
                             }
                         }
 

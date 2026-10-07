@@ -85,20 +85,35 @@ require(
     "property var conflictEditorService: null",
     "CHANGES must accept the shared conflict editor service",
 )
-require_regex(
+require(
     CHANGES,
-    r'function applyPendingFocus().*'
-    r'const conflicts = root.changesService.conflicts.*'
-    r'root.subMode = "conflicts";.*'
-    r'root.selectFile(row);',
-    "path handoff must prefer CONFLICTS when the target is unmerged",
+    "const conflicts = root.changesService.conflicts || [];",
+    "path handoff must inspect unresolved conflicts first",
 )
-require_regex(
+require(
     CHANGES,
-    r'if (root.subMode === "conflicts".*'
-    r'root.conflictEditorService.load(.*'
-    r'root.selectedPath',
-    "selecting a conflict must load the exact three-way stages",
+    'root.subMode = "conflicts";',
+    "unmerged path handoff must open the CONFLICTS camera",
+)
+require(
+    CHANGES,
+    "root.selectFile(row);",
+    "unmerged path handoff must select the matching conflict row",
+)
+require(
+    CHANGES,
+    'root.subMode === "conflicts"',
+    "selected-file handling must distinguish the CONFLICTS camera",
+)
+require(
+    CHANGES,
+    "root.conflictEditorService.load(",
+    "selecting a conflict must invoke the guarded three-way loader",
+)
+require(
+    CHANGES,
+    "root.selectedPath",
+    "three-way loader must use the selected conflict path",
 )
 require_regex(
     CHANGES,

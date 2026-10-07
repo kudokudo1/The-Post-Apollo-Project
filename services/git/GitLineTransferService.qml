@@ -23,6 +23,8 @@ Scope {
     property int hunkIndex: -1
     property int lineIndex: -1
     property string fingerprint: ""
+    property string patchBase64: ""
+    property int maxRecoveryPatchBytes: 524288
     property string sourceBranch: ""
     property string destinationBranch: ""
     property string sourceHead: ""
@@ -87,12 +89,19 @@ Scope {
         hunkIndex = -1;
         lineIndex = -1;
         fingerprint = "";
+        patchBase64 = "";
         sourceBranch = "";
         destinationBranch = "";
         sourceHead = "";
         destinationHead = "";
         patchBytes = 0;
         patchLines = 0;
+    }
+
+    function contentRecoverable() {
+        return patchBase64.length > 0
+            && patchBytes > 0
+            && patchBytes <= maxRecoveryPatchBytes;
     }
 
     function context() {
@@ -107,11 +116,19 @@ Scope {
             hunkIndex: Number(hunkIndex),
             lineIndex: Number(lineIndex),
             fingerprint: String(fingerprint || ""),
+            patchBytes: Number(patchBytes || 0),
+            patchBase64:
+                contentRecoverable()
+                ? String(patchBase64 || "")
+                : "",
             sourceBranch: String(sourceBranch || ""),
             destinationBranch: String(destinationBranch || ""),
             sourceHead: String(sourceHead || ""),
             destinationHead: String(destinationHead || ""),
-            recoveryClass: "EVIDENCE_ONLY"
+            recoveryClass:
+                contentRecoverable()
+                ? "CONTENT_RECOVERABLE"
+                : "EVIDENCE_ONLY"
         };
     }
 
@@ -124,15 +141,23 @@ Scope {
             out = {};
         }
 
-        out.recoveryClass = "EVIDENCE_ONLY";
-        out.recoveryReason =
-            "LINE TRANSFER CONTENT RECOVERY IS NOT YET IMPLEMENTED";
+        if (contentRecoverable()) {
+            out.recoveryClass = "CONTENT_RECOVERABLE";
+            out.recoveryReason =
+                "EXACT LINE TRANSFER PATCH STORED IN JOURNAL";
+        } else {
+            out.recoveryClass = "EVIDENCE_ONLY";
+            out.recoveryReason =
+                patchBytes > maxRecoveryPatchBytes
+                ? "LINE TRANSFER PATCH EXCEEDS RECOVERY PAYLOAD LIMIT"
+                : "LINE TRANSFER RECOVERY PAYLOAD UNAVAILABLE";
+        }
         return out;
     }
 
     function engineScript() {
         return [
-            'import difflib, hashlib, os, re, subprocess, sys',
+            'import base64, difflib, hashlib, os, re, subprocess, sys',
             'phase, source, destination, mode, path, hi, li, expected, esh, edh = sys.argv[1:11]',
             'hunk_index, line_index = int(hi), int(li)',
             'def run(args, cwd=None, data=None):',
@@ -215,6 +240,7 @@ Scope {
             '    reverse = run(["git", "-C", source, "apply", "-R", "--check", "--whitespace=nowarn", "-"], data=patch)',
             '    if reverse.returncode: refuse("SOURCE LINE CANNOT BE REMOVED CLEANLY")',
             'if phase == "preview":',
+            '    if len(patch) <= 524288: print("PATCH64\\t" + base64.b64encode(patch).decode("ascii"))',
             '    print("PREVIEW\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}".format(fingerprint, len(patch), patch.count(b"\\n"), src_branch, dst_branch, src_head, dst_head, mode))',
             '    sys.exit(0)',
             'if fingerprint != expected: refuse("SOURCE LINE CHANGED SINCE PREVIEW")',
@@ -353,6 +379,12 @@ Scope {
         const err = String(processStderr || "").trim();
         const rows = out.split("\n");
         let control = "";
+        let recoveryPayload = "";
+
+        for (let i = 0; i < rows.length; ++i) {
+            if (rows[i].indexOf("PATCH64\t") === 0)
+                recoveryPayload = rows[i].slice(8);
+        }
 
         for (let i = rows.length - 1; i >= 0; --i) {
             if (rows[i].indexOf("PREVIEW\t") === 0
@@ -382,6 +414,7 @@ Scope {
             }
 
             fingerprint = fields[1];
+            patchBase64 = recoveryPayload;
             patchBytes = Number(fields[2] || 0);
             patchLines = Number(fields[3] || 0);
             sourceBranch = fields[4];
@@ -404,6 +437,10 @@ Scope {
                 lineIndex: lineIndex,
                 mode: transferMode,
                 fingerprint: fingerprint,
+                recoveryClass:
+                    contentRecoverable()
+                    ? "CONTENT_RECOVERABLE"
+                    : "EVIDENCE_ONLY",
                 sourceHead: sourceHead,
                 destinationHead: destinationHead,
                 patchBytes: patchBytes,

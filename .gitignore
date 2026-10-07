@@ -31,3 +31,6 @@ workflow-sets.json
 
 # Local repository profile manager state
 repository-profile-sets.json
+
+# Local Git operation journal state
+git-operation-journal.json

@@ -1492,7 +1492,8 @@ Scope {
         "clean", "cleanup", "prune", "compact", "size", "depth",
         "capacity", "health", "duplicate", "duplicates",
         "critical", "urgent", "serious", "action", "notice", "notices",
-        "routine", "background", "priority", "priorities", "ignore"
+        "routine", "background", "priority", "priorities", "prioritize",
+        "focus", "ignore", "wait", "later", "top"
     ]
 
     function editDistanceOneOrLess(leftValue, rightValue) {
@@ -1798,11 +1799,18 @@ Scope {
     function activityListResponse(
             labelValue,
             eventsValue,
-            showAttention) {
+            showAttention,
+            limitValue) {
         const label = String(labelValue || "RECENT");
+        const requestedLimit =
+            Number(limitValue || 0);
+        const limit =
+            requestedLimit > 0
+            ? Math.max(1, Math.min(5, requestedLimit))
+            : 5;
         const events =
             Array.isArray(eventsValue)
-            ? eventsValue.slice(0, 5)
+            ? eventsValue.slice(0, limit)
             : [];
 
         if (events.length === 0)
@@ -1988,6 +1996,74 @@ Scope {
         return "";
     }
 
+    function rankActivityByAttention(eventsValue) {
+        const events =
+            Array.isArray(eventsValue)
+            ? eventsValue.slice()
+            : [];
+
+        events.sort(function(a, b) {
+            const scoreDelta =
+                root.activityAttentionScore(b)
+                - root.activityAttentionScore(a);
+
+            if (scoreDelta !== 0)
+                return scoreDelta;
+
+            return root.eventEpoch(b) - root.eventEpoch(a);
+        });
+
+        return events;
+    }
+
+    function attentionRankingQuery(queryValue) {
+        const query = socialQuery(queryValue);
+        let active = false;
+        let limit = 3;
+
+        if (query.indexOf("top ") >= 0
+                || query === "top"
+                || query.indexOf("prioritize") >= 0
+                || query.indexOf("priority order") >= 0
+                || query.indexOf("what comes first") >= 0
+                || query.indexOf("where should i start") >= 0
+                || query.indexOf("what should i do first") >= 0
+                || query.indexOf("what should i look at first") >= 0
+                || query.indexOf("what should i check first") >= 0
+                || query.indexOf("what should i focus on") >= 0
+                || query.indexOf("most important") >= 0) {
+            active = true;
+        }
+
+        if (!active)
+            return {
+                active: false,
+                limit: 0
+            };
+
+        if (query.indexOf(" first") >= 0
+                || query.indexOf("most important") >= 0)
+            limit = 1;
+
+        const topMatch =
+            query.match(
+                /\\btop\\s+(\\d+|one|two|three|four|five|six|seven|eight|nine|ten)\\b/
+            );
+
+        if (topMatch && topMatch[1]) {
+            const requested =
+                numberWordValue(topMatch[1]);
+
+            if (requested > 0)
+                limit = requested;
+        }
+
+        return {
+            active: true,
+            limit: Math.max(1, Math.min(5, limit))
+        };
+    }
+
     function activityAttentionQuery(queryValue) {
         const query = looseQuery(queryValue);
         let mode = "";
@@ -2000,7 +2076,11 @@ Scope {
                 || query.indexOf("background") >= 0
                 || query.indexOf("low priority") >= 0
                 || query.indexOf("can i ignore") >= 0
-                || query.indexOf("can ignore") >= 0)
+                || query.indexOf("can ignore") >= 0
+                || query.indexOf("what can wait") >= 0
+                || query.indexOf("can wait") >= 0
+                || query.indexOf("leave for later") >= 0
+                || query.indexOf("not urgent") >= 0)
             mode = "routine";
         else if (query.indexOf("notice") >= 0
                 || query.indexOf("notices") >= 0
@@ -2012,6 +2092,9 @@ Scope {
                 || query.indexOf("needs attention") >= 0
                 || query.indexOf("what should i check") >= 0
                 || query.indexOf("what should i look at") >= 0
+                || query.indexOf("what should i focus on") >= 0
+                || query.indexOf("what should i prioritize") >= 0
+                || query.indexOf("where should i start") >= 0
                 || query.indexOf("important") >= 0
                 || query.indexOf("high priority") >= 0)
             mode = "action";
@@ -2923,6 +3006,7 @@ Scope {
         const targetHint = activityTargetFromQuery(raw);
         const timeWindow = activityTimeWindow(query);
         const attention = activityAttentionQuery(query);
+        const ranking = attentionRankingQuery(query);
         const asksDoing =
             !!targetHint
             && (
@@ -3030,6 +3114,7 @@ Scope {
                 && !asksOldest
                 && !asksHelp
                 && !attention.active
+                && !ranking.active
                 && !timeWindow.active)
             return false;
 
@@ -3038,7 +3123,7 @@ Scope {
         if (asksHelp) {
             append(
                 "RECEPTION",
-                "I understand recent activity, archive history, archive status and cleanup, oldest or earliest activity, critical/action/notice/routine attention levels, what changed, what went wrong, what needs attention, favorites, Room or team history, counts, and time windows like today, yesterday, this morning, this week, since Monday, or the last 3 hours. I can also find or show a team, then follow up with open this, take me there, favorite this, go back, or next one."
+                "I understand recent activity, archive history, archive status and cleanup, oldest or earliest activity, critical/action/notice/routine attention levels, ranked priorities like top three or what should I look at first, what changed, what went wrong, what needs attention, favorites, Room or team history, counts, and time windows like today, yesterday, this morning, this week, since Monday, or the last 3 hours. I can also find or show a team, then follow up with open this, take me there, favorite this, go back, or next one."
             );
             return true;
         }
@@ -3074,10 +3159,18 @@ Scope {
                 attention.mode
             );
 
+        if (ranking.active)
+            matches = rankActivityByAttention(matches);
+
         let label = "";
 
         if (asksFavorites)
             label = "FAVORITES";
+        else if (ranking.active)
+            label =
+                attention.active
+                ? attention.label
+                : "PRIORITY";
         else if (attention.active)
             label = attention.label;
         else if (asksProblems)
@@ -3097,6 +3190,9 @@ Scope {
 
         if (timeWindow.active)
             label += " // " + timeWindow.label;
+
+        if (ranking.active)
+            label += " // TOP " + String(ranking.limit);
 
         if (asksCount) {
             clearActivityContext();
@@ -3206,7 +3302,8 @@ Scope {
             activityListResponse(
                 label,
                 matches,
-                attention.active
+                attention.active || ranking.active,
+                ranking.active ? ranking.limit : 0
             )
         );
         return true;

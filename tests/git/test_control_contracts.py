@@ -172,6 +172,30 @@ require(
     "project membership must use canonical URLs",
 )
 
+# BranchMap graph connectors depend on runtime topology accessors. These
+# functions are called from Canvas JavaScript and can look unused to static
+# cleanup passes even though removing them makes every branch rail disappear.
+require(
+    "services/git/GitService.qml",
+    "function commitAt(index)",
+    "branch map must retain topology row access",
+)
+require(
+    "services/git/GitService.qml",
+    "function indexOfSha(sha)",
+    "branch map must retain parent SHA lookup",
+)
+require(
+    "components/BranchMap.qml",
+    "branchMap.topologyService.commitAt(i)",
+    "branch map Canvas must read topology rows",
+)
+require(
+    "components/BranchMap.qml",
+    "branchMap.topologyService.indexOfSha(parentList[p])",
+    "branch map Canvas must resolve parent connectors",
+)
+
 # Repository safety contracts.
 require(
     "services/git/GitRepositoryService.qml",

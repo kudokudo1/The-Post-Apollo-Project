@@ -135,6 +135,24 @@ Scope {
         return remoteBranchRows.get(index);
     }
 
+    // BranchMap Canvas resolves graph parents through these accessors.
+    // They are runtime dependencies even though static call-site scans may miss
+    // them, so keep both methods paired with topologyRows.
+    function commitAt(index) {
+        if (index < 0 || index >= topologyRows.count)
+            return null;
+        return topologyRows.get(index);
+    }
+
+    function indexOfSha(sha) {
+        const needle = String(sha || "");
+        for (let i = 0; i < topologyRows.count; ++i) {
+            if (String(topologyRows.get(i).sha) === needle)
+                return i;
+        }
+        return -1;
+    }
+
     function repoIndexOfPath(pathValue) {
         const needle = String(pathValue || "");
         for (let i = 0; i < repoRows.count; ++i) {

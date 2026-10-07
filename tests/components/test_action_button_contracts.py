@@ -60,3 +60,44 @@ assert not re.search(r"(?m)^\s*DropShadow\s*\{", COMPONENT), (
 )
 
 print("Action button contracts: PASS")
+
+
+# First Git proof migration: three historically identical MiniButton families
+# now inherit ActionButton while preserving their current appearance. These
+# values are migration-fidelity checks, not a declaration of final style.
+GIT_MINI_BUTTONS = (
+    "widgets/GitChangesView.qml",
+    "widgets/GitHistoryView.qml",
+    "widgets/GitRepositoryView.qml",
+)
+
+for relative in GIT_MINI_BUTTONS:
+    source = (ROOT / relative).read_text(encoding="utf-8")
+    require(source, "component MiniButton: ActionButton {", f"{relative} must inherit ActionButton")
+    for needle in (
+        "height: 28",
+        "available: enabledAction",
+        "acceptedButtons: Qt.LeftButton",
+        "idleFillColor: Colors.black",
+        "hoverFillColor: Colors.dark",
+        "pressedFillColor: accent",
+        "selectedFillColor: Colors.dark",
+        "idleForegroundColor: accent",
+        "selectedForegroundColor: Colors.white",
+        "selectedBorderWidth: 2",
+        "unavailableOpacity: 0.26",
+        "contentGlowEnabled: false",
+        "softGlowEnabled: false",
+        "wideGlowEnabled: false",
+    ):
+        require(source, needle, f"preserve Git MiniButton values in {relative}")
+
+    # The adapter may contain content, but must not rebuild the button engine.
+    block = source[source.index("component MiniButton: ActionButton {"):]
+    next_component = block.find("\n    component ", 1)
+    if next_component >= 0:
+        block = block[:next_component]
+    assert "MouseArea {" not in block, f"{relative} reintroduced local MiniButton MouseArea"
+    assert "RectangularShadow {" not in block, f"{relative} reintroduced local MiniButton halo"
+
+print("Git MiniButton ActionButton migration: PASS")

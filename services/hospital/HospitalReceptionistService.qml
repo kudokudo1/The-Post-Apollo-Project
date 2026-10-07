@@ -15,6 +15,7 @@ Scope {
     signal routeRequested(string route)
     signal activityActionRequested(var item)
     signal teamNavigationRequested(string team)
+    signal specialistHandoffRequested(string mode, string operatorText)
 
     property var inbox: []
     property var activityEvents: []
@@ -3752,6 +3753,38 @@ Scope {
         return true;
     }
 
+    function specialistHandoffIntent(textValue) {
+        const query = looseQuery(textValue);
+        const refersToContext =
+            query.indexOf("about this") >= 0
+            || query.indexOf("about that") >= 0
+            || query.indexOf("about it") >= 0
+            || query.indexOf("regarding this") >= 0
+            || query.indexOf("regarding that") >= 0
+            || query.indexOf("with this context") >= 0
+            || query.indexOf("send this to") >= 0
+            || query.indexOf("send that to") >= 0;
+
+        if (!refersToContext)
+            return "";
+
+        if (query.indexOf("call") >= 0
+                || query.indexOf("dial") >= 0
+                || query.indexOf("phone") >= 0)
+            return "phone";
+
+        if (query.indexOf("intercom") >= 0
+                || query.indexOf("message") >= 0
+                || query.indexOf("send this to") >= 0
+                || query.indexOf("send that to") >= 0
+                || query.indexOf("talk to") >= 0
+                || query.indexOf("tell ") >= 0
+                || query.indexOf("ask ") >= 0)
+            return "intercom";
+
+        return "";
+    }
+
     function request(route, operatorText) {
         const target = String(route || "").toLowerCase();
 
@@ -3807,6 +3840,18 @@ Scope {
 
         if (answerActivityQuestion(raw))
             return true;
+
+        const handoffMode =
+            specialistHandoffIntent(raw);
+
+        if (handoffMode) {
+            append("OPERATOR", raw);
+            specialistHandoffRequested(
+                handoffMode,
+                raw
+            );
+            return true;
+        }
 
         if (query.indexOf("intercom") >= 0
                 || query.indexOf("message") >= 0

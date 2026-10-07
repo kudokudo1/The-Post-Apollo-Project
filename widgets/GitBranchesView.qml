@@ -318,7 +318,7 @@ Item {
         GohuText {
             anchors.centerIn: parent
             text: button.label
-            font.pixelSize: 8
+            font.pixelSize: 10
             color:
                 mouse.pressed
                 ? Colors.black
@@ -377,7 +377,7 @@ Item {
                 verticalCenter: parent.verticalCenter
             }
             text: compoundButton.actionLabel
-            font.pixelSize: 8
+            font.pixelSize: 10
             color:
                 compoundButton.destructive
                 ? Colors.red
@@ -413,7 +413,7 @@ Item {
                 id: modeText
                 anchors.centerIn: parent
                 text: compoundButton.modeLabel
-                font.pixelSize: 9
+                font.pixelSize: 10
                 color: Colors.magenta
             }
 
@@ -468,22 +468,22 @@ Item {
         property color valueColor: Colors.white
 
         width: parent ? parent.width : 0
-        height: 17
-        spacing: 6
+        height: 22
+        spacing: 8
 
         GohuText {
-            width: 54
+            width: 62
             anchors.verticalCenter: parent.verticalCenter
             text: parent.label
-            font.pixelSize: 7
+            font.pixelSize: 10
             color: Colors.magenta
         }
 
         GohuText {
-            width: parent.width - 60
+            width: parent.width - 70
             anchors.verticalCenter: parent.verticalCenter
             text: parent.value || "—"
-            font.pixelSize: 8
+            font.pixelSize: 11
             color: parent.valueColor
             elide: Text.ElideMiddle
         }
@@ -541,7 +541,7 @@ Item {
                               : ""
                             )
                         : "NO BRANCH SERVICE"
-                    font.pixelSize: 8
+                    font.pixelSize: 10
                     color: Colors.cyan
                 }
 
@@ -737,7 +737,7 @@ Item {
                                         text:
                                             (parent.isCurrent ? "★ " : "")
                                             + String(parent.modelData.name || "")
-                                        font.pixelSize: 11
+                                        font.pixelSize: 13
                                         color:
                                             parent.isCurrent
                                             ? Colors.yellow
@@ -927,7 +927,7 @@ Item {
                             root.selectedBranch
                             ? "SELECTED // " + root.selectedBranch
                             : "SELECT A BRANCH"
-                        font.pixelSize: 11
+                        font.pixelSize: 14
                         color:
                             root.selectedBranch
                             ? Colors.magenta
@@ -1013,7 +1013,7 @@ Item {
 
                     GohuText {
                         text: "BRANCH"
-                        font.pixelSize: 8
+                        font.pixelSize: 10
                         color: Colors.orange
                     }
 
@@ -1103,7 +1103,7 @@ Item {
 
                     GohuText {
                         text: "STACK"
-                        font.pixelSize: 8
+                        font.pixelSize: 10
                         color: Colors.orange
                     }
 

@@ -1,0 +1,33 @@
+name: "Notification policy contracts"
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "services/notifications/**"
+      - "widgets/notifications/**"
+      - "tests/notifications/**"
+      - ".github/workflows/notification-policy-contracts.yml"
+  pull_request:
+    paths:
+      - "services/notifications/**"
+      - "widgets/notifications/**"
+      - "tests/notifications/**"
+      - ".github/workflows/notification-policy-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    name: Notification policy contracts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate notification policy contracts
+        run: python3 tests/notifications/test_notification_policy_contracts.py

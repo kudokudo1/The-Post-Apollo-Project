@@ -1631,6 +1631,8 @@ PanelWindow {
 
     GitService {
         id: gitService
+        operationJournal: operationJournalService
+        snapshotService: repositorySnapshotService
     }
 
     GitRepositoryService {

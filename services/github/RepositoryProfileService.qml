@@ -11,6 +11,16 @@ Scope {
     property string reviewText: "BUILD A BATCH, CHOOSE CHANGES, THEN REVIEW."
     property string resultText: "READY"
     property string lastError: ""
+    property var batchResults: []
+
+    readonly property int batchSuccessCount:
+        batchResults.filter(function(row) {
+            return String((row || {}).state || "") === "OK";
+        }).length
+    readonly property int batchFailureCount:
+        batchResults.filter(function(row) {
+            return String((row || {}).state || "") === "FAILED";
+        }).length
 
     property bool stdoutSeen: false
     property bool stderrSeen: false
@@ -197,6 +207,7 @@ Scope {
 
         busy = true;
         reviewReady = false;
+        batchResults = [];
         resultText = "APPLYING // " + String(cleanTargets.length) + " REPOSITORY"
                    + (cleanTargets.length === 1 ? "" : "IES");
         lastError = "";
@@ -283,6 +294,39 @@ Scope {
         return true;
     }
 
+    function parseBatchResults(text) {
+        const lines = String(text || "").split("\n");
+        const rows = [];
+
+        for (let i = 0; i < lines.length; ++i) {
+            const line = String(lines[i] || "").trim();
+
+            if (line.indexOf("OK // ") === 0) {
+                rows.push({
+                    state: "OK",
+                    repository: line.slice(6).trim(),
+                    detail: ""
+                });
+                continue;
+            }
+
+            if (line.indexOf("FAILED // ") === 0) {
+                const parts = line.split(" // ");
+                rows.push({
+                    state: "FAILED",
+                    repository:
+                        parts.length > 1 ? parts[1] : "",
+                    detail:
+                        parts.length > 2
+                        ? parts.slice(2).join(" // ")
+                        : ""
+                });
+            }
+        }
+
+        batchResults = rows;
+    }
+
     function maybeFinish() {
         if (!busy || !stdoutSeen || !stderrSeen || !exitSeen)
             return;
@@ -293,20 +337,49 @@ Scope {
         const output = String(stdoutText || "").trim();
         const error = String(stderrText || "").trim();
 
+        parseBatchResults(output);
+
         if (exitCode === 0) {
-            resultText = output
-                ? "COMPLETE\n" + output
-                : "COMPLETE";
+            resultText =
+                "COMPLETE // "
+                + String(batchSuccessCount)
+                + " OK // 0 FAILED"
+                + (output ? "\n" + output : "");
             lastError = "";
             batchFinished(true);
             return;
         }
 
-        lastError = error || output || "REPOSITORY PROFILE APPLY FAILED";
+        const summary =
+            batchSuccessCount > 0
+            ? (
+                "PARTIAL // "
+                + String(batchSuccessCount)
+                + " OK // "
+                + String(batchFailureCount)
+                + " FAILED"
+              )
+            : (
+                "FAILED // 0 OK // "
+                + String(batchFailureCount)
+                + " FAILED"
+              );
+
+        lastError =
+            error
+            || (
+                batchFailureCount > 0
+                ? String(batchFailureCount)
+                  + " REPOSITORY TARGET"
+                  + (batchFailureCount === 1 ? "" : "S")
+                  + " FAILED"
+                : "REPOSITORY PROFILE APPLY FAILED"
+              );
+
         resultText =
-            (output ? output + "\n" : "")
-            + "ERROR // "
-            + lastError;
+            summary
+            + (output ? "\n" + output : "")
+            + (error ? "\nERROR // " + error : "");
         batchFinished(false);
     }
 
@@ -343,8 +416,11 @@ Scope {
 
         onTriggered: {
             root.busy = false;
-            root.lastError = "REPOSITORY PROFILE APPLY TIMEOUT";
-            root.resultText = "ERROR // " + root.lastError;
+            root.lastError =
+                "REPOSITORY PROFILE APPLY TIMEOUT // RESULT UNCERTAIN";
+            root.resultText =
+                "UNCERTAIN // TIMEOUT // SOME REPOSITORIES MAY HAVE CHANGED\n"
+                + root.lastError;
             root.batchFinished(false);
         }
     }

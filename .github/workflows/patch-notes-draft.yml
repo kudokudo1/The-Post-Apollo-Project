@@ -1,0 +1,54 @@
+name: PATCH NOTES // DRAFT
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_ref:
+        description: "Optional starting tag, branch, or SHA. Leave blank to use the previous reachable tag."
+        required: false
+        default: ""
+        type: string
+      head_ref:
+        description: "Ending branch, tag, or SHA."
+        required: false
+        default: "main"
+        type: string
+      max_commits:
+        description: "Maximum commits to inspect when no previous tag is available."
+        required: false
+        default: "150"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  draft:
+    name: Generate patch-note draft
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out full Git history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Generate draft
+        run: |
+          python scripts/generate_patch_notes.py \
+            --base "${{ inputs.base_ref }}" \
+            --head "${{ inputs.head_ref }}" \
+            --max-commits "${{ inputs.max_commits }}" \
+            --output patch-notes-draft.md
+
+      - name: Show draft in run summary
+        run: cat patch-notes-draft.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload draft
+        uses: actions/upload-artifact@v4
+        with:
+          name: patch-notes-draft
+          path: patch-notes-draft.md
+          if-no-files-found: error
+          retention-days: 14

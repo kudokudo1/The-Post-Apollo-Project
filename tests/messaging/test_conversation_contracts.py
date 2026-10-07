@@ -6,6 +6,8 @@ QMLDIR = ROOT / "components" / "qmldir"
 WRAPPER = ROOT / "widgets" / "messanger" / "ChatFeed.qml"
 ADAPTER = ROOT / "services" / "hospital" / "HospitalRoomConversationAdapter.qml"
 ROOM_CHAT = ROOT / "widgets" / "HospitalRoomChatView.qml"
+PROVIDERS = ROOT / "services" / "hospital" / "HospitalProviderService.qml"
+DOCTORS = ROOT / "services" / "hospital" / "HospitalDoctorService.qml"
 
 assert SHARED.is_file(), SHARED
 
@@ -113,3 +115,25 @@ assert "workingDirectory: root.bedPath" in room_chat
 assert 'return root.providerId ? "READY TO CONNECT" : "ROOM CHAT";' in room_chat
 
 print("hospital live doctor chat view contract: PASS")
+
+
+assert PROVIDERS.is_file(), PROVIDERS
+providers = PROVIDERS.read_text()
+assert '"agent",\n            "providers"' in providers
+assert "property var providers:" in providers
+assert "function providerById(value)" in providers
+assert "readonly property int readyCount:" in providers
+assert "codex" not in providers.lower()
+assert "hermes" not in providers.lower()
+assert "Quickshell.execDetached" not in providers
+
+assert DOCTORS.is_file(), DOCTORS
+doctors = DOCTORS.read_text()
+assert '"hospital",\n            "doctors"' in doctors
+assert '"doctor-put"' in doctors
+assert "function doctorById(value)" in doctors
+assert "function saveDoctor(idValue, nameValue, roleValue, statusValue)" in doctors
+assert "function releaseDoctor(idValue)" in doctors
+assert "provider" not in doctors.lower()
+
+print("hospital staffing services contracts: PASS")

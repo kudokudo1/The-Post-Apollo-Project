@@ -1,0 +1,35 @@
+name: Conversation Surface Contracts
+
+on:
+  pull_request:
+    paths:
+      - "components/ConversationFeed.qml"
+      - "widgets/messanger/ChatFeed.qml"
+      - "services/hospital/HospitalRoomConversationAdapter.qml"
+      - "widgets/HospitalRoomChatView.qml"
+      - "tests/messaging/**"
+      - ".github/workflows/conversation-contracts.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "components/ConversationFeed.qml"
+      - "widgets/messanger/ChatFeed.qml"
+      - "services/hospital/HospitalRoomConversationAdapter.qml"
+      - "widgets/HospitalRoomChatView.qml"
+      - "tests/messaging/**"
+      - ".github/workflows/conversation-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate shared conversation contracts
+        run: python3 tests/messaging/test_conversation_contracts.py

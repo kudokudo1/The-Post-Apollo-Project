@@ -2,16 +2,16 @@ import QtQuick
 import Quickshell
 import "../components"
 import qs.services.notifications
-import QtQuick.Effects
-import Qt5Compat.GraphicalEffects
 
 PanelWindow {
     id: notificationsWindow
 
     // ===== WINDOW ===============================================
 
-    implicitWidth: 420
-    implicitHeight: 150
+    // The visible card remains 420x150. The native window is slightly larger
+    // only to host the glow without clipping it.
+    implicitWidth: 444
+    implicitHeight: 164
 
     anchors {
         top: true
@@ -21,10 +21,14 @@ PanelWindow {
     }
 
     margins {
-        top: 90
+        // Visible card top = 0px window margin + 2px internal offset.
+        top: 0
         bottom: 0
         left: 0
-        right: 20
+
+        // 8px window margin + 12px internal glow gutter preserves the
+        // established 20px visible-card distance from the screen right edge.
+        right: 8
     }
 
     exclusiveZone: 0
@@ -81,12 +85,22 @@ PanelWindow {
     Item {
         id: notificationContainer
 
-        anchors.fill: parent
+        anchors {
+            top: parent.top
+            left: parent.left
+            right: parent.right
+
+            topMargin: 2
+            leftMargin: 12
+            rightMargin: 12
+        }
+
+        height: 150
 
         Repeater {
             model: NotificationsService.activeNotifications
 
-            Rectangle {
+            WindowPanelFrame {
                 id: notificationCard
 
                 required property int index
@@ -103,10 +117,16 @@ PanelWindow {
 
                 visible: notificationCard.index === NotificationsService.activeNotifications.count - 1
 
-                color: Colors.black
+                fillColor: Colors.black
 
-                border.width: 1
-                border.color: Colors.cyan
+                borderWidth: 1
+                borderColor: Colors.cyan
+
+                glowColor: Colors.cyan
+                closeGlowSpread: 4
+                closeGlowOpacity: 0.55
+                wideGlowSpread: 12
+                wideGlowOpacity: 0.14
 
                 // ===== APP ICON ================================
 
@@ -192,31 +212,6 @@ PanelWindow {
                     }
                 }
 
-                // ===== GLOW ====================================
-
-                RectangularShadow {
-                    anchors.fill: parent
-
-                    spread: 3
-
-                    z: -1
-
-                    opacity: 0.55
-
-                    color: Colors.cyan
-                }
-
-                RectangularShadow {
-                    anchors.fill: parent
-
-                    spread: 12
-
-                    z: -2
-
-                    opacity: 0.08
-
-                    color: Colors.cyan
-                }
             }
         }
     }

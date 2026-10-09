@@ -625,3 +625,59 @@ require(
 )
 
 print("AppControl TAB ActionButton migration: PASS")
+
+
+# Extracted AppControl action-family proof: Task Manager process actions and
+# System Monitor component actions use the shared ActionButton engine without
+# absorbing the LIMIT slider, safety lock, or mode/selector controls.
+TASK_MANAGER = (ROOT / "widgets/appcontrol/TaskManagerView.qml").read_text(encoding="utf-8")
+SYSTEM_MONITOR = (ROOT / "widgets/appcontrol/SystemMonitorView.qml").read_text(encoding="utf-8")
+
+for control_id in ("taskRestartAction", "taskFreezeAction", "taskEndAction"):
+    marker = f"id: {control_id}"
+    marker_pos = TASK_MANAGER.index(marker)
+    block_start = TASK_MANAGER.rfind("ActionButton {", 0, marker_pos)
+    assert block_start >= 0, f"{control_id} must inherit ActionButton"
+    rectangle_start = TASK_MANAGER.rfind("Rectangle {", 0, marker_pos)
+    assert rectangle_start < block_start, f"{control_id} fell back to a private Rectangle"
+
+for private_mouse in (
+    "id: taskRestartActionMouse",
+    "id: taskFreezeActionMouse",
+    "id: taskEndActionMouse",
+):
+    assert private_mouse not in TASK_MANAGER, f"Task Manager reintroduced private action pointer engine: {private_mouse}"
+
+for needle, message in (
+    ("id: taskRestartAction", "restart action remains present"),
+    ("property bool canRestart:", "restart availability guard remains"),
+    ("property bool canFreeze:", "freeze availability guard remains"),
+    ("property bool canEnd:", "end-process availability guard remains"),
+    ("dangerActionUnlocked(\n                                   taskManagerBody.currentTask, \"freeze\"", "freeze danger unlock remains"),
+    ("dangerActionUnlocked(\n                                   taskManagerBody.currentTask, \"kill\"", "kill danger unlock remains"),
+    ("destructive: true", "destructive task actions preserve semantics"),
+    ("softGlowMargin: 4", "restart/freeze halo gutter preservation"),
+    ("softGlowMargin: 5", "end-process halo gutter preservation"),
+    ("id: taskLimitSlider", "LIMIT remains a dedicated continuous control"),
+    ("id: taskActionSafetyLockPlate", "safety lock remains a separate toggle family"),
+):
+    require(TASK_MANAGER, needle, message)
+
+system_marker = SYSTEM_MONITOR.index("id: systemControlActionButton")
+system_block = SYSTEM_MONITOR.rfind("ActionButton {", 0, system_marker)
+assert system_block >= 0, "system component actions must inherit ActionButton"
+assert SYSTEM_MONITOR.rfind("Rectangle {", 0, system_marker) < system_block, (
+    "system component actions fell back to a private Rectangle"
+)
+for needle, message in (
+    ("label: modelData.label", "system action label delegation"),
+    ("available: canRun", "system action availability"),
+    ("isRebootAction ? Colors.red : Colors.yellow", "reboot-specific hover fill"),
+    ("onTriggered: {", "system action trigger delegation"),
+):
+    require(SYSTEM_MONITOR[system_block:system_marker + 2600], needle, message)
+assert "id: systemControlMouse" not in SYSTEM_MONITOR, (
+    "System Monitor reintroduced a private action pointer engine"
+)
+
+print("Extracted AppControl action families: PASS")

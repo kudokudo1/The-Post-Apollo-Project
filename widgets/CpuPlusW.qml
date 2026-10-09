@@ -660,33 +660,22 @@ PanelWindow {
     // Structural glow remains orange at every interaction state.
     // ============================================================
 
-    RectangularShadow {
-        anchors.fill: background
-
-        spread: 6
-        z: -20
-
-        opacity: 0.38
-        color: Colors.orange
-    }
-
-    RectangularShadow {
-        anchors.fill: background
-
-        spread: 12
-        z: -21
-
-        opacity: 0.12
-        color: Colors.orange
-    }
-
-    Rectangle {
+    WindowPanelFrame {
         id: background
 
         anchors.fill: parent
         anchors.margins: 12
 
-        color: "transparent"
+        fillVisible: false
+        borderVisible: false
+
+        glowColor: Colors.orange
+        closeGlowSpread: 6
+        closeGlowOpacity: 0.38
+        wideGlowSpread: 12
+        wideGlowOpacity: 0.12
+
+        z: -20
     }
 
     // ============================================================

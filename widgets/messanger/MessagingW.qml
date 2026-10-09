@@ -794,7 +794,7 @@ PanelWindow {
     // VISUAL CONTENT
     // ============================================================
 
-    Item {
+    WindowPanelFrame {
         id: messagingContent
 
         parent: socialWindow.contentItem
@@ -802,22 +802,14 @@ PanelWindow {
 
         visible: messagingWindow.menuOpen
 
-        // ========================================================
-        // BACKGROUND
-        // ========================================================
+        fillColor: Colors.black
+        fillOpacity: 0.20
+        borderVisible: false
+        radius: 0
 
-        Rectangle {
-            id: messagingBackground
-
-            anchors.fill: parent
-
-            color: Colors.black
-            opacity: 0.20
-
-            radius: 0
-
-            z: -100
-        }
+        // Social already composes its glow from its app/contact surfaces.
+        // Preserve that visual balance instead of adding a second outer aura.
+        glowVisible: false
 
         // ========================================================
         // KEYBOARD CONTROLLER

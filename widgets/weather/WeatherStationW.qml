@@ -148,7 +148,7 @@ PanelWindow {
             open();
     }
 
-    Rectangle {
+    WindowPanelFrame {
         id: stationBackground
 
         width: 1000
@@ -159,27 +159,14 @@ PanelWindow {
 
         visible: weatherStation.menuOpen
 
-        color: "transparent"
+        fillVisible: false
+        borderVisible: false
 
-        RectangularShadow {
-            anchors.fill: parent
-
-            z: -2
-            spread: 4
-
-            color: Colors.cyan
-            opacity: 0.30
-        }
-
-        RectangularShadow {
-            anchors.fill: parent
-
-            z: -3
-            spread: 14
-
-            color: Colors.cyan
-            opacity: 0.10
-        }
+        glowColor: Colors.cyan
+        closeGlowSpread: 4
+        closeGlowOpacity: 0.30
+        wideGlowSpread: 14
+        wideGlowOpacity: 0.10
 
         // ─────────────────────────────────────────
         // HEADER

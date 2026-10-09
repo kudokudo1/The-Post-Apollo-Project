@@ -8,6 +8,8 @@ on:
     paths:
       - "components/ActionButton.qml"
       - "widgets/AppControlW.qml"
+      - "widgets/appcontrol/SystemMonitorView.qml"
+      - "widgets/appcontrol/TaskManagerView.qml"
       - "components/ActionButton.qml.template"
       - "components/qmldir"
       - "widgets/GitChangesView.qml"
@@ -22,6 +24,8 @@ on:
     paths:
       - "components/ActionButton.qml"
       - "widgets/AppControlW.qml"
+      - "widgets/appcontrol/SystemMonitorView.qml"
+      - "widgets/appcontrol/TaskManagerView.qml"
       - "components/ActionButton.qml.template"
       - "components/qmldir"
       - "widgets/GitChangesView.qml"

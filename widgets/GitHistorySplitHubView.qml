@@ -1,7 +1,7 @@
 import QtQuick
 import qs.components
 
-Rectangle {
+SectionFrame {
     id: root
 
     required property var fileService
@@ -11,9 +11,9 @@ Rectangle {
     property var keyboardHost: null
     property string mode: "file"
 
-    color: Colors.dark
-    border.width: 1
-    border.color: Colors.orange
+    fillColor: Colors.dark
+    borderWidth: 1
+    borderColor: Colors.orange
 
     component ScopeButton: Rectangle {
         id: button

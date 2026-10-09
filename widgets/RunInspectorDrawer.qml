@@ -362,19 +362,17 @@ Item {
                 spacing: 8
 
                 // LEFT = identity + steps.
-                Rectangle {
+                SectionFrame {
                     width: 336
                     height: parent.height
 
-                    color: Colors.dark
-                    border.width: 1
-                    border.color: Colors.blue
+                    fillColor: Colors.dark
+                    borderWidth: 1
+                    borderColor: Colors.blue
+                    inset: 8
 
                     Column {
-                        anchors {
-                            fill: parent
-                            margins: 8
-                        }
+                        anchors.fill: parent
 
                         spacing: 5
 
@@ -657,22 +655,20 @@ Item {
                 }
 
                 // RIGHT = raw run log stream.
-                Rectangle {
+                SectionFrame {
                     width: parent.width - 344
                     height: parent.height
 
-                    color: Colors.dark
-                    border.width: 1
-                    border.color:
+                    fillColor: Colors.dark
+                    borderWidth: 1
+                    borderColor:
                         root.githubService.inspectorError
                         ? Colors.red
                         : Colors.orange
+                    inset: 8
 
                     Column {
-                        anchors {
-                            fill: parent
-                            margins: 8
-                        }
+                        anchors.fill: parent
 
                         spacing: 5
 

@@ -171,20 +171,18 @@ Item {
             }
         }
 
-        Rectangle {
+        SectionFrame {
             width: parent.width
             height: parent.height - 38
-            color: Colors.black
-            border.width: 1
-            border.color: Colors.cyan
+            fillColor: Colors.black
+            borderWidth: 1
+            borderColor: Colors.cyan
+            inset: 8
 
             Flickable {
                 id: tableScroll
 
-                anchors {
-                    fill: parent
-                    margins: 8
-                }
+                anchors.fill: parent
 
                 clip: true
                 contentWidth: Math.max(width, root.totalWidth)

@@ -1,7 +1,7 @@
 import QtQuick
 import qs.components
 
-Rectangle {
+SectionFrame {
     id: root
 
     required property var blameService
@@ -15,9 +15,9 @@ Rectangle {
 
     signal closeRequested()
 
-    color: Colors.dark
-    border.width: 1
-    border.color: Colors.cyan
+    fillColor: Colors.dark
+    borderWidth: 1
+    borderColor: Colors.cyan
 
     readonly property var visibleRows:
         groupedMode
@@ -696,7 +696,7 @@ Rectangle {
             }
         }
 
-        Rectangle {
+        SectionFrame {
             id: detailFrame
 
             anchors {
@@ -706,9 +706,9 @@ Rectangle {
             }
 
             height: 112
-            color: Colors.black
-            border.width: 1
-            border.color: Colors.blue
+            fillColor: Colors.black
+            borderWidth: 1
+            borderColor: Colors.blue
 
             property var record: root.selectedRecord()
 

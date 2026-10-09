@@ -21,14 +21,15 @@ PanelWindow {
     }
 
     margins {
-        // Visible card top = 0px window margin + 2px internal offset.
-        top: 0
+        // Visible card top = 2px window margin + 2px internal offset:
+        // 4px from the screen top, 2px lower than the previous position.
+        top: 2
         bottom: 0
         left: 0
 
-        // 5px window margin + 12px internal glow gutter places the visible
-        // card 17px from the screen right edge: 3px farther right.
-        right: 5
+        // 3px window margin + 12px internal glow gutter places the visible
+        // card 15px from the screen right edge: 2px farther right.
+        right: 3
     }
 
     exclusiveZone: 0

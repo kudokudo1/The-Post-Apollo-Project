@@ -845,53 +845,133 @@ Scope {
             && snapshotRefSha(second, ref) === head;
     }
 
-    function stashApplySnapshotCanRecover(before, after) {
-        const first = before || {};
-        const second = after || {};
-
-        return sameBranchHead(first, second)
-            && snapshotContentIsClean(first)
-            && Number((second.workingState || {}).conflictCount || 0) === 0
-            && String((second.operationState || {}).state || "NONE")
-               === "NONE"
-            && snapshotRefSha(first, "refs/stash")
-               === snapshotRefSha(second, "refs/stash");
+    function stashEntries(snapshot) {
+        return snapshot && Array.isArray(snapshot.stashEntries)
+            ? snapshot.stashEntries
+            : [];
     }
 
-    function stashPopSnapshotCanRecover(before, after) {
+    function normalizedStashRef(value) {
+        const ref = String(value || "");
+        return !ref || ref === "refs/stash"
+            ? "stash@{0}"
+            : ref;
+    }
+
+    function stashEntry(snapshot, refName) {
+        const rows = stashEntries(snapshot);
+        const ref = normalizedStashRef(refName);
+
+        for (let i = 0; i < rows.length; ++i) {
+            const row = rows[i] || {};
+            if (String(row.ref || "") === ref)
+                return row;
+        }
+
+        return null;
+    }
+
+    function stashStackShas(snapshot) {
+        return stashEntries(snapshot).map(function(row) {
+            return String((row || {}).sha || "");
+        }).filter(function(sha) {
+            return sha.length > 0;
+        });
+    }
+
+    function sameStringArray(first, second) {
+        const a = Array.isArray(first) ? first : [];
+        const b = Array.isArray(second) ? second : [];
+
+        if (a.length !== b.length)
+            return false;
+
+        for (let i = 0; i < a.length; ++i) {
+            if (String(a[i] || "") !== String(b[i] || ""))
+                return false;
+        }
+
+        return true;
+    }
+
+    function stashStackAfterRemoving(before, refName) {
+        const rows = stashEntries(before);
+        const ref = normalizedStashRef(refName);
+        const out = [];
+        let removed = false;
+
+        for (let i = 0; i < rows.length; ++i) {
+            const row = rows[i] || {};
+            if (!removed && String(row.ref || "") === ref) {
+                removed = true;
+                continue;
+            }
+
+            const sha = String(row.sha || "");
+            if (sha)
+                out.push(sha);
+        }
+
+        return removed ? out : null;
+    }
+
+    function stashApplySnapshotCanRecover(before, after, refName) {
         const first = before || {};
         const second = after || {};
-        const beforeStash = snapshotRefSha(first, "refs/stash");
-        const afterStash = snapshotRefSha(second, "refs/stash");
+        const selected = stashEntry(first, refName);
 
         return sameBranchHead(first, second)
             && snapshotContentIsClean(first)
-            && beforeStash
-            && beforeStash !== afterStash
+            && selected
+            && sameStringArray(
+                stashStackShas(first),
+                stashStackShas(second)
+            )
             && Number((second.workingState || {}).conflictCount || 0) === 0
             && String((second.operationState || {}).state || "NONE")
                === "NONE";
     }
 
-    function stashDropSnapshotCanRecover(before, after) {
+    function stashPopSnapshotCanRecover(before, after, refName) {
+        const first = before || {};
+        const second = after || {};
+        const expectedStack = stashStackAfterRemoving(first, refName);
+
+        return sameBranchHead(first, second)
+            && snapshotContentIsClean(first)
+            && expectedStack !== null
+            && sameStringArray(
+                expectedStack,
+                stashStackShas(second)
+            )
+            && Number((second.workingState || {}).conflictCount || 0) === 0
+            && String((second.operationState || {}).state || "NONE")
+               === "NONE";
+    }
+
+    function stashDropSnapshotCanRecover(before, after, refName) {
         const first = before || {};
         const second = after || {};
         const beforeWorking = first.workingState || {};
         const afterWorking = second.workingState || {};
         const beforeIndex = first.index || {};
         const afterIndex = second.index || {};
-        const beforeStash = snapshotRefSha(first, "refs/stash");
-        const afterStash = snapshotRefSha(second, "refs/stash");
+        const expectedStack = stashStackAfterRemoving(first, refName);
 
         return sameBranchHead(first, second)
-            && beforeStash
-            && beforeStash !== afterStash
+            && expectedStack !== null
+            && sameStringArray(
+                expectedStack,
+                stashStackShas(second)
+            )
             && String(beforeIndex.tree || "")
                === String(afterIndex.tree || "")
             && String(beforeWorking.worktreePatchHash || "")
                === String(afterWorking.worktreePatchHash || "")
             && String(beforeWorking.untrackedListHash || "")
                === String(afterWorking.untrackedListHash || "")
+            && String(beforeWorking.untrackedContentHash || "")
+               === String(afterWorking.untrackedContentHash || "")
             && Number(beforeWorking.stagedCount || 0)
                === Number(afterWorking.stagedCount || 0)
             && Number(beforeWorking.unstagedCount || 0)
@@ -906,7 +986,7 @@ Scope {
                === "NONE";
     }
 
-    function stashSnapshotCanRecover(before, after) {
+    function stashSnapshotCanRecover(before, after, modeName) {
         const first = before || {};
         const second = after || {};
         const beforeWorking = first.workingState || {};
@@ -916,28 +996,68 @@ Scope {
         const branch = String(first.branch || "");
         const head = String(first.head || "");
         const branchRef = "refs/heads/" + branch;
-        const beforeStash = snapshotRefSha(first, "refs/stash");
-        const afterStash = snapshotRefSha(second, "refs/stash");
-
-        return branch
+        const mode = String(modeName || "all");
+        const beforeStack = stashStackShas(first);
+        const afterStack = stashStackShas(second);
+        const created =
+            afterStack.length > 0
+            ? String(afterStack[0] || "")
+            : "";
+        const stackExact =
+            created
+            && afterStack.length === beforeStack.length + 1
+            && sameStringArray(
+                afterStack.slice(1),
+                beforeStack
+            );
+        const common =
+            branch
             && head
             && String(second.branch || "") === branch
             && String(second.head || "") === head
             && snapshotRefSha(first, branchRef) === head
             && snapshotRefSha(second, branchRef) === head
-            && afterStash
-            && afterStash !== beforeStash
+            && stackExact
             && String(beforeIndex.tree || "")
             && String(afterIndex.tree || "")
             && Number(beforeWorking.conflictCount || 0) === 0
-            && Number(afterWorking.stagedCount || 0) === 0
-            && Number(afterWorking.unstagedCount || 0) === 0
-            && Number(afterWorking.untrackedCount || 0) === 0
             && Number(afterWorking.conflictCount || 0) === 0
             && String((first.operationState || {}).state || "NONE")
                === "NONE"
             && String((second.operationState || {}).state || "NONE")
                === "NONE";
+
+        if (!common)
+            return false;
+
+        if (mode === "all") {
+            return Number(afterWorking.stagedCount || 0) === 0
+                && Number(afterWorking.unstagedCount || 0) === 0
+                && Number(afterWorking.untrackedCount || 0) === 0;
+        }
+
+        if (mode === "keep-index") {
+            return String(afterIndex.tree || "")
+                   === String(beforeIndex.tree || "")
+                && Number(afterWorking.unstagedCount || 0) === 0
+                && Number(afterWorking.untrackedCount || 0) === 0
+                && Number(afterWorking.stagedCount || 0)
+                   === Number(beforeWorking.stagedCount || 0);
+        }
+
+        if (mode === "staged") {
+            return Number(beforeWorking.unstagedCount || 0) === 0
+                && Number(afterWorking.stagedCount || 0) === 0
+                && Number(afterWorking.unstagedCount || 0) === 0
+                && Number(afterWorking.untrackedCount || 0)
+                   === Number(beforeWorking.untrackedCount || 0)
+                && String(afterWorking.untrackedListHash || "")
+                   === String(beforeWorking.untrackedListHash || "")
+                && String(afterWorking.untrackedContentHash || "")
+                   === String(beforeWorking.untrackedContentHash || "");
+        }
+
+        return false;
     }
 
     function journalSnapshot(snapshot, phase) {
@@ -992,18 +1112,22 @@ Scope {
                 ? String(args[1] || "all")
                 : "all";
 
-            if (mode !== "all") {
+            if (["all", "keep-index", "staged"].indexOf(mode) < 0) {
                 out.recoveryClass = "EVIDENCE_ONLY";
                 out.recoveryReason =
-                    "ONLY FULL STASH CREATION HAS EXACT AUTOMATIC UNDO";
+                    "UNKNOWN STASH MODE CANNOT BE RECOVERED";
                 return out;
             }
 
             if (stage === "BEFORE") {
                 const working = out.workingState || {};
                 const index = out.index || {};
+                const stagedSafe =
+                    mode !== "staged"
+                    || Number(working.unstagedCount || 0) === 0;
 
-                if (String(out.branch || "")
+                if (stagedSafe
+                        && String(out.branch || "")
                         && String(out.head || "")
                         && String(index.tree || "")
                         && Number(working.conflictCount || 0) === 0
@@ -1012,26 +1136,33 @@ Scope {
                         ) === "NONE") {
                     out.recoveryClass = "CONTENT_RECOVERABLE";
                     out.recoveryReason =
-                        "FULL STASH WILL PRESERVE DIRTY CONTENT "
-                        + "IN A DURABLE STASH OBJECT";
+                        mode === "keep-index"
+                        ? "KEEP-INDEX STASH HAS EXACT INDEX + CONTENT EVIDENCE"
+                        : mode === "staged"
+                        ? "STAGED-ONLY STASH HAS NO RETAINED TRACKED WORKTREE DELTA"
+                        : "FULL STASH HAS EXACT INDEX + CONTENT EVIDENCE";
                     return out;
                 }
             } else if (stage === "AFTER"
                     && pendingBeforeSnapshot
                     && stashSnapshotCanRecover(
                         pendingBeforeSnapshot,
-                        out
+                        out,
+                        mode
                     )) {
                 out.recoveryClass = "CONTENT_RECOVERABLE";
                 out.recoveryReason =
-                    "FULL STASH CAN RESTORE THE EXACT PRE-STASH "
-                    + "INDEX + WORKTREE + UNTRACKED STATE";
+                    "STASH "
+                    + mode.toUpperCase()
+                    + " HAS AN EXACT GUARDED CONTENT INVERSE";
                 return out;
             }
 
             out.recoveryClass = "EVIDENCE_ONLY";
             out.recoveryReason =
-                "STASH CONTENT TRANSITION IS NOT EXACT";
+                mode === "staged"
+                ? "STAGED STASH WITH RETAINED TRACKED WORKTREE CONTENT IS NOT AUTOMATICALLY RECOVERABLE"
+                : "STASH CONTENT/STACK TRANSITION IS NOT EXACT";
             return out;
         }
 
@@ -1046,21 +1177,10 @@ Scope {
                 args.length > 0
                 ? String(args[0] || "")
                 : "";
-            const topRef =
-                !ref
-                || ref === "stash@{0}"
-                || ref === "refs/stash";
-
-            if (!topRef) {
-                out.recoveryClass = "EVIDENCE_ONLY";
-                out.recoveryReason =
-                    "ONLY TOP-STASH MUTATIONS HAVE EXACT AUTOMATIC UNDO";
-                return out;
-            }
 
             if (stage === "BEFORE") {
                 if (operation === "stash-drop") {
-                    if (snapshotRefSha(out, "refs/stash")
+                    if (stashEntry(out, ref)
                             && Number(
                                 (out.workingState || {}).conflictCount || 0
                             ) === 0
@@ -1074,13 +1194,13 @@ Scope {
                         return out;
                     }
                 } else if (snapshotContentIsClean(out)
-                        && snapshotRefSha(out, "refs/stash")) {
+                        && stashEntry(out, ref)) {
                     out.recoveryClass = "CONTENT_RECOVERABLE";
                     out.recoveryReason =
                         operation === "stash-pop"
-                        ? "CLEAN TOP-STASH POP CAN RESTORE CONTENT "
-                          + "AND RECREATE THE EXACT STASH OBJECT"
-                        : "CLEAN TOP-STASH APPLY CAN RETURN TO "
+                        ? "CLEAN SELECTED-STASH POP CAN RESTORE CONTENT "
+                          + "AND RECREATE THE EXACT STACK"
+                        : "CLEAN SELECTED-STASH APPLY CAN RETURN TO "
                           + "THE EXACT CLEAN PRE-APPLY STATE";
                     return out;
                 }
@@ -1090,16 +1210,19 @@ Scope {
                     operation === "stash-apply"
                     ? stashApplySnapshotCanRecover(
                         pendingBeforeSnapshot,
-                        out
+                        out,
+                        ref
                       )
                     : operation === "stash-pop"
                     ? stashPopSnapshotCanRecover(
                         pendingBeforeSnapshot,
-                        out
+                        out,
+                        ref
                       )
                     : stashDropSnapshotCanRecover(
                         pendingBeforeSnapshot,
-                        out
+                        out,
+                        ref
                       );
 
                 if (exact) {

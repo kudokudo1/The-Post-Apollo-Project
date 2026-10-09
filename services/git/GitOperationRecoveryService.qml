@@ -100,6 +100,80 @@ Scope {
             : "";
     }
 
+    function hasFullStashStack(snapshot) {
+        return snapshot && Array.isArray(snapshot.stashEntries);
+    }
+
+    function stashEntries(snapshot) {
+        return hasFullStashStack(snapshot)
+            ? snapshot.stashEntries
+            : [];
+    }
+
+    function normalizedStashRef(value) {
+        const ref = String(value || "");
+        return !ref || ref === "refs/stash"
+            ? "stash@{0}"
+            : ref;
+    }
+
+    function stashEntry(snapshot, refName) {
+        const rows = stashEntries(snapshot);
+        const ref = normalizedStashRef(refName);
+
+        for (let i = 0; i < rows.length; ++i) {
+            const row = rows[i] || {};
+            if (String(row.ref || "") === ref)
+                return row;
+        }
+
+        return null;
+    }
+
+    function stashStackShas(snapshot) {
+        return stashEntries(snapshot).map(function(row) {
+            return String((row || {}).sha || "");
+        }).filter(function(sha) {
+            return sha.length > 0;
+        });
+    }
+
+    function sameStringArray(first, second) {
+        const a = Array.isArray(first) ? first : [];
+        const b = Array.isArray(second) ? second : [];
+
+        if (a.length !== b.length)
+            return false;
+
+        for (let i = 0; i < a.length; ++i) {
+            if (String(a[i] || "") !== String(b[i] || ""))
+                return false;
+        }
+
+        return true;
+    }
+
+    function stashStackAfterRemoving(snapshot, refName) {
+        const rows = stashEntries(snapshot);
+        const ref = normalizedStashRef(refName);
+        const out = [];
+        let removed = false;
+
+        for (let i = 0; i < rows.length; ++i) {
+            const row = rows[i] || {};
+            if (!removed && String(row.ref || "") === ref) {
+                removed = true;
+                continue;
+            }
+
+            const sha = String(row.sha || "");
+            if (sha)
+                out.push(sha);
+        }
+
+        return removed ? out : null;
+    }
+
     function refuse(reason) {
         return {
             allowed: false,
@@ -357,10 +431,8 @@ Scope {
             ? String(args[1] || "all")
             : "all";
 
-        if (mode !== "all")
-            return refuse(
-                "ONLY FULL STASH CREATION HAS EXACT AUTOMATIC UNDO"
-            );
+        if (["all", "keep-index", "staged"].indexOf(mode) < 0)
+            return refuse("UNKNOWN STASH MODE CANNOT BE UNDONE");
 
         if (String(row.recoveryClass || "") !== "CONTENT_RECOVERABLE"
                 || String((row.before || {}).recoveryClass || "")
@@ -381,8 +453,101 @@ Scope {
         const branch = String(before.branch || "");
         const branchRef = "refs/heads/" + branch;
         const head = String(before.head || "");
-        const stashSha = refSha(after, "refs/stash");
-        const previousStashSha = refSha(before, "refs/stash");
+        const fullStackEvidence =
+            hasFullStashStack(before)
+            && hasFullStashStack(after);
+
+        if (!fullStackEvidence) {
+            if (mode !== "all")
+                return refuse(
+                    "OLDER JOURNAL RECORD LACKS FULL STASH-STACK EVIDENCE"
+                );
+
+            const stashSha = refSha(after, "refs/stash");
+            const previousStashSha = refSha(before, "refs/stash");
+
+            if (!branch
+                    || !head
+                    || String(after.branch || "") !== branch
+                    || String(after.head || "") !== head
+                    || refSha(before, branchRef) !== head
+                    || refSha(after, branchRef) !== head
+                    || !stashSha
+                    || stashSha === previousStashSha
+                    || !String(beforeIndex.tree || "")
+                    || !String(afterIndex.tree || "")
+                    || Number(afterWorking.stagedCount || 0) !== 0
+                    || Number(afterWorking.unstagedCount || 0) !== 0
+                    || Number(afterWorking.untrackedCount || 0) !== 0
+                    || Number(afterWorking.conflictCount || 0) !== 0) {
+                return refuse(
+                    "LEGACY FULL-STASH TRANSITION IS NOT EXACT"
+                );
+            }
+
+            return {
+                allowed: true,
+                strategy: "UNDO_STASH_CREATE_ALL",
+                branch: branch,
+                expectedHead: head,
+                stashSha: stashSha,
+                previousStashSha: previousStashSha,
+                expectedAfterIndexTree: String(afterIndex.tree || ""),
+                expectedAfterWorktreeHash:
+                    String(afterWorking.worktreePatchHash || ""),
+                expectedAfterUntrackedHash:
+                    String(afterWorking.untrackedListHash || ""),
+                restoreIndexTree: String(beforeIndex.tree || ""),
+                restoreWorktreeHash:
+                    String(beforeWorking.worktreePatchHash || ""),
+                restoreUntrackedHash:
+                    String(beforeWorking.untrackedListHash || ""),
+                summary:
+                    "UNDO LEGACY FULL STASH // RESTORE INDEX + WORKTREE + UNTRACKED"
+            };
+        }
+
+        const beforeStack = stashStackShas(before);
+        const afterStack = stashStackShas(after);
+        const stashSha =
+            afterStack.length > 0
+            ? String(afterStack[0] || "")
+            : "";
+        const stackExact =
+            stashSha
+            && afterStack.length === beforeStack.length + 1
+            && sameStringArray(
+                afterStack.slice(1),
+                beforeStack
+            );
+
+        let modeExact = false;
+
+        if (mode === "all") {
+            modeExact =
+                Number(afterWorking.stagedCount || 0) === 0
+                && Number(afterWorking.unstagedCount || 0) === 0
+                && Number(afterWorking.untrackedCount || 0) === 0;
+        } else if (mode === "keep-index") {
+            modeExact =
+                String(afterIndex.tree || "")
+                   === String(beforeIndex.tree || "")
+                && Number(afterWorking.unstagedCount || 0) === 0
+                && Number(afterWorking.untrackedCount || 0) === 0
+                && Number(afterWorking.stagedCount || 0)
+                   === Number(beforeWorking.stagedCount || 0);
+        } else {
+            modeExact =
+                Number(beforeWorking.unstagedCount || 0) === 0
+                && Number(afterWorking.stagedCount || 0) === 0
+                && Number(afterWorking.unstagedCount || 0) === 0
+                && Number(afterWorking.untrackedCount || 0)
+                   === Number(beforeWorking.untrackedCount || 0)
+                && String(afterWorking.untrackedListHash || "")
+                   === String(beforeWorking.untrackedListHash || "")
+                && String(afterWorking.untrackedContentHash || "")
+                   === String(beforeWorking.untrackedContentHash || "");
+        }
 
         if (!branch
                 || !head
@@ -390,38 +555,44 @@ Scope {
                 || String(after.head || "") !== head
                 || refSha(before, branchRef) !== head
                 || refSha(after, branchRef) !== head
-                || !stashSha
-                || stashSha === previousStashSha
+                || !stackExact
                 || !String(beforeIndex.tree || "")
                 || !String(afterIndex.tree || "")
-                || Number(afterWorking.stagedCount || 0) !== 0
-                || Number(afterWorking.unstagedCount || 0) !== 0
-                || Number(afterWorking.untrackedCount || 0) !== 0
-                || Number(afterWorking.conflictCount || 0) !== 0) {
+                || Number(beforeWorking.conflictCount || 0) !== 0
+                || Number(afterWorking.conflictCount || 0) !== 0
+                || !modeExact) {
             return refuse(
-                "STASH CREATION CONTENT TRANSITION IS NOT EXACT"
+                "STASH CREATION CONTENT/STACK TRANSITION IS NOT EXACT"
             );
         }
 
         return {
             allowed: true,
-            strategy: "UNDO_STASH_CREATE_ALL",
+            strategy: "UNDO_STASH_CREATE_EXACT",
+            mode: mode,
             branch: branch,
             expectedHead: head,
             stashSha: stashSha,
-            previousStashSha: previousStashSha,
+            beforeStack: beforeStack,
+            afterStack: afterStack,
             expectedAfterIndexTree: String(afterIndex.tree || ""),
             expectedAfterWorktreeHash:
                 String(afterWorking.worktreePatchHash || ""),
             expectedAfterUntrackedHash:
                 String(afterWorking.untrackedListHash || ""),
+            expectedAfterUntrackedContentHash:
+                String(afterWorking.untrackedContentHash || ""),
             restoreIndexTree: String(beforeIndex.tree || ""),
             restoreWorktreeHash:
                 String(beforeWorking.worktreePatchHash || ""),
             restoreUntrackedHash:
                 String(beforeWorking.untrackedListHash || ""),
+            restoreUntrackedContentHash:
+                String(beforeWorking.untrackedContentHash || ""),
             summary:
-                "UNDO FULL STASH // RESTORE INDEX + WORKTREE + UNTRACKED"
+                "UNDO STASH "
+                + mode.toUpperCase()
+                + " // RESTORE EXACT PRE-STASH CONTENT + STACK"
         };
     }
 
@@ -445,15 +616,10 @@ Scope {
             args.length > 0
             ? String(args[0] || "")
             : "";
-        const topRef =
-            !ref
-            || ref === "stash@{0}"
-            || ref === "refs/stash";
-
-        if (!topRef)
-            return refuse(
-                "ONLY TOP-STASH MUTATIONS HAVE EXACT AUTOMATIC UNDO"
-            );
+        const normalizedRef = normalizedStashRef(ref);
+        const useIndex =
+            args.length > 1
+            && String(args[1] || "") === "index";
 
         if (String(row.recoveryClass || "") !== "CONTENT_RECOVERABLE"
                 || String((row.before || {}).recoveryClass || "")
@@ -474,11 +640,9 @@ Scope {
         const branch = String(before.branch || "");
         const head = String(before.head || "");
         const branchRef = "refs/heads/" + branch;
-        const beforeStash = refSha(before, "refs/stash");
-        const afterStash = refSha(after, "refs/stash");
-        const useIndex =
-            args.length > 1
-            && String(args[1] || "") === "index";
+        const fullStackEvidence =
+            hasFullStashStack(before)
+            && hasFullStashStack(after);
 
         if (!branch
                 || !head
@@ -495,69 +659,151 @@ Scope {
             );
         }
 
+        if (!fullStackEvidence) {
+            const topRef =
+                !ref
+                || ref === "stash@{0}"
+                || ref === "refs/stash";
+
+            if (!topRef)
+                return refuse(
+                    "OLDER JOURNAL RECORD LACKS SELECTED-STASH STACK EVIDENCE"
+                );
+
+            const beforeStash = refSha(before, "refs/stash");
+            const afterStash = refSha(after, "refs/stash");
+            const common = {
+                branch: branch,
+                expectedHead: head,
+                beforeStashSha: beforeStash,
+                afterStashSha: afterStash,
+                expectedAfterIndexTree: String(afterIndex.tree || ""),
+                expectedAfterWorktreeHash:
+                    String(afterWorking.worktreePatchHash || ""),
+                expectedAfterUntrackedHash:
+                    String(afterWorking.untrackedListHash || ""),
+                restoreIndexTree: String(beforeIndex.tree || ""),
+                restoreWorktreeHash:
+                    String(beforeWorking.worktreePatchHash || ""),
+                restoreUntrackedHash:
+                    String(beforeWorking.untrackedListHash || ""),
+                useIndex: useIndex
+            };
+
+            if (kind === "CHANGES/STASH-APPLY") {
+                if (!beforeStash
+                        || beforeStash !== afterStash
+                        || Number(beforeWorking.stagedCount || 0) !== 0
+                        || Number(beforeWorking.unstagedCount || 0) !== 0
+                        || Number(beforeWorking.untrackedCount || 0) !== 0) {
+                    return refuse(
+                        "LEGACY STASH APPLY TRANSITION IS NOT EXACT"
+                    );
+                }
+                common.allowed = true;
+                common.strategy = "UNDO_STASH_APPLY_CLEAN";
+                common.summary = "UNDO LEGACY TOP-STASH APPLY";
+                return common;
+            }
+
+            if (kind === "CHANGES/STASH-POP") {
+                if (!beforeStash
+                        || beforeStash === afterStash
+                        || Number(beforeWorking.stagedCount || 0) !== 0
+                        || Number(beforeWorking.unstagedCount || 0) !== 0
+                        || Number(beforeWorking.untrackedCount || 0) !== 0) {
+                    return refuse(
+                        "LEGACY STASH POP TRANSITION IS NOT EXACT"
+                    );
+                }
+                common.allowed = true;
+                common.strategy = "UNDO_STASH_POP_TOP";
+                common.summary = "UNDO LEGACY TOP-STASH POP";
+                return common;
+            }
+
+            if (!beforeStash || beforeStash === afterStash)
+                return refuse(
+                    "LEGACY STASH DROP TRANSITION IS NOT EXACT"
+                );
+
+            common.allowed = true;
+            common.strategy = "UNDO_STASH_DROP_TOP";
+            common.summary = "UNDO LEGACY TOP-STASH DROP";
+            return common;
+        }
+
+        const selected = stashEntry(before, normalizedRef);
+        const beforeStack = stashStackShas(before);
+        const afterStack = stashStackShas(after);
+        const expectedAfterStack =
+            kind === "CHANGES/STASH-APPLY"
+            ? beforeStack
+            : stashStackAfterRemoving(before, normalizedRef);
+
+        if (!selected
+                || expectedAfterStack === null
+                || !sameStringArray(
+                    expectedAfterStack,
+                    afterStack
+                )) {
+            return refuse(
+                "SELECTED STASH STACK TRANSITION IS NOT EXACT"
+            );
+        }
+
+        if ((kind === "CHANGES/STASH-APPLY"
+                    || kind === "CHANGES/STASH-POP")
+                && (
+                    Number(beforeWorking.stagedCount || 0) !== 0
+                    || Number(beforeWorking.unstagedCount || 0) !== 0
+                    || Number(beforeWorking.untrackedCount || 0) !== 0
+                )) {
+            return refuse(
+                "STASH APPLY/POP DID NOT START FROM AN EXACT CLEAN STATE"
+            );
+        }
+
         const common = {
             branch: branch,
             expectedHead: head,
-            beforeStashSha: beforeStash,
-            afterStashSha: afterStash,
+            selectedRef: normalizedRef,
+            selectedStashSha: String(selected.sha || ""),
+            beforeStack: beforeStack,
+            afterStack: afterStack,
             expectedAfterIndexTree: String(afterIndex.tree || ""),
             expectedAfterWorktreeHash:
                 String(afterWorking.worktreePatchHash || ""),
             expectedAfterUntrackedHash:
                 String(afterWorking.untrackedListHash || ""),
+            expectedAfterUntrackedContentHash:
+                String(afterWorking.untrackedContentHash || ""),
             restoreIndexTree: String(beforeIndex.tree || ""),
             restoreWorktreeHash:
                 String(beforeWorking.worktreePatchHash || ""),
             restoreUntrackedHash:
                 String(beforeWorking.untrackedListHash || ""),
+            restoreUntrackedContentHash:
+                String(beforeWorking.untrackedContentHash || ""),
             useIndex: useIndex
         };
 
-        if (kind === "CHANGES/STASH-APPLY") {
-            if (!beforeStash
-                    || beforeStash !== afterStash
-                    || Number(beforeWorking.stagedCount || 0) !== 0
-                    || Number(beforeWorking.unstagedCount || 0) !== 0
-                    || Number(beforeWorking.untrackedCount || 0) !== 0) {
-                return refuse(
-                    "STASH APPLY DID NOT START FROM AN EXACT CLEAN TOP-STASH STATE"
-                );
-            }
-
-            common.allowed = true;
-            common.strategy = "UNDO_STASH_APPLY_CLEAN";
-            common.summary =
-                "UNDO TOP-STASH APPLY // RESTORE CLEAN PRE-APPLY STATE";
-            return common;
-        }
-
-        if (kind === "CHANGES/STASH-POP") {
-            if (!beforeStash
-                    || beforeStash === afterStash
-                    || Number(beforeWorking.stagedCount || 0) !== 0
-                    || Number(beforeWorking.unstagedCount || 0) !== 0
-                    || Number(beforeWorking.untrackedCount || 0) !== 0) {
-                return refuse(
-                    "STASH POP DID NOT START FROM AN EXACT CLEAN TOP-STASH STATE"
-                );
-            }
-
-            common.allowed = true;
-            common.strategy = "UNDO_STASH_POP_TOP";
-            common.summary =
-                "UNDO TOP-STASH POP // CLEAN CONTENT + RESTORE STASH OBJECT";
-            return common;
-        }
-
-        if (!beforeStash || beforeStash === afterStash)
-            return refuse(
-                "STASH DROP DID NOT REMOVE THE RECORDED TOP STASH"
-            );
-
         common.allowed = true;
-        common.strategy = "UNDO_STASH_DROP_TOP";
-        common.summary =
-            "UNDO TOP-STASH DROP // RESTORE EXACT STASH OBJECT";
+
+        if (kind === "CHANGES/STASH-APPLY") {
+            common.strategy = "UNDO_STASH_APPLY_REF";
+            common.summary =
+                "UNDO " + normalizedRef + " APPLY // RESTORE CLEAN PRE-APPLY STATE";
+        } else if (kind === "CHANGES/STASH-POP") {
+            common.strategy = "UNDO_STASH_POP_REF";
+            common.summary =
+                "UNDO " + normalizedRef + " POP // RESTORE CONTENT + EXACT STACK ORDER";
+        } else {
+            common.strategy = "UNDO_STASH_DROP_REF";
+            common.summary =
+                "UNDO " + normalizedRef + " DROP // RESTORE EXACT STACK ORDER";
+        }
+
         return common;
     }
 
@@ -1419,6 +1665,72 @@ Scope {
             d = String(plan.expectedIndexTree || "");
             e = String(plan.expectedWorktreeHash || "");
             f = String(plan.expectedUntrackedHash || "");
+        } else if (strategy === "UNDO_STASH_CREATE_EXACT") {
+            a = String(plan.branch || "");
+            b = String(plan.expectedHead || "");
+            c = String(plan.stashSha || "");
+            d = String(plan.mode || "");
+            e = String(plan.expectedAfterIndexTree || "");
+            f = String(plan.expectedAfterWorktreeHash || "");
+            g =
+                String(plan.expectedAfterUntrackedHash || "")
+                + "\t"
+                + String(plan.expectedAfterUntrackedContentHash || "")
+                + "\t"
+                + String(plan.restoreIndexTree || "")
+                + "\t"
+                + String(plan.restoreWorktreeHash || "")
+                + "\t"
+                + String(plan.restoreUntrackedHash || "")
+                + "\t"
+                + String(plan.restoreUntrackedContentHash || "")
+                + "\t"
+                + (
+                    Array.isArray(plan.beforeStack)
+                    ? plan.beforeStack.join(",")
+                    : ""
+                  )
+                + "\t"
+                + (
+                    Array.isArray(plan.afterStack)
+                    ? plan.afterStack.join(",")
+                    : ""
+                  );
+        } else if (strategy === "UNDO_STASH_APPLY_REF"
+                || strategy === "UNDO_STASH_POP_REF"
+                || strategy === "UNDO_STASH_DROP_REF") {
+            a = String(plan.branch || "");
+            b = String(plan.expectedHead || "");
+            c = String(plan.selectedStashSha || "");
+            d = String(plan.selectedRef || "");
+            e = String(plan.expectedAfterIndexTree || "");
+            f = String(plan.expectedAfterWorktreeHash || "");
+            g =
+                String(plan.expectedAfterUntrackedHash || "")
+                + "\t"
+                + String(plan.expectedAfterUntrackedContentHash || "")
+                + "\t"
+                + String(plan.restoreIndexTree || "")
+                + "\t"
+                + String(plan.restoreWorktreeHash || "")
+                + "\t"
+                + String(plan.restoreUntrackedHash || "")
+                + "\t"
+                + String(plan.restoreUntrackedContentHash || "")
+                + "\t"
+                + (
+                    Array.isArray(plan.beforeStack)
+                    ? plan.beforeStack.join(",")
+                    : ""
+                  )
+                + "\t"
+                + (
+                    Array.isArray(plan.afterStack)
+                    ? plan.afterStack.join(",")
+                    : ""
+                  )
+                + "\t"
+                + (plan.useIndex ? "1" : "0");
         } else if (strategy === "UNDO_STASH_APPLY_CLEAN"
                 || strategy === "UNDO_STASH_POP_TOP"
                 || strategy === "UNDO_STASH_DROP_TOP") {
@@ -1512,11 +1824,40 @@ Scope {
                 'print(h.hexdigest())',
                 'PY',
                 '}',
+                'untracked_content_hash() {',
+                '  local target="$1"',
+                '  git -C "$target" ls-files --others --exclude-standard -z 2>/dev/null | while IFS= read -r -d "" p; do printf "%s\\0" "$p"; git -C "$target" hash-object -- "$p" 2>/dev/null || true; done | git -C "$target" hash-object --stdin 2>/dev/null || true',
+                '}',
+                'stash_stack() {',
+                '  git -C "$1" stash list --format="%H" 2>/dev/null | paste -sd, -',
+                '}',
+                'stash_stack_objects_exist() {',
+                '  local target="$1" csv="$2" sha',
+                '  [ -z "$csv" ] && return 0',
+                '  IFS="," read -ra stack_rows <<<"$csv"',
+                '  for sha in "${stack_rows[@]}"; do',
+                '    [ -n "$sha" ] || continue',
+                '    git -C "$target" cat-file -e "$sha^{commit}" 2>/dev/null || return 1',
+                '  done',
+                '}',
+                'rebuild_stash_stack() {',
+                '  local target="$1" csv="$2" sha message i',
+                '  stash_stack_objects_exist "$target" "$csv" || return 1',
+                '  git -C "$target" update-ref -d refs/stash >/dev/null 2>&1 || true',
+                '  [ -z "$csv" ] && return 0',
+                '  IFS="," read -ra stack_rows <<<"$csv"',
+                '  for ((i=${#stack_rows[@]}-1; i>=0; i--)); do',
+                '    sha="${stack_rows[$i]}"',
+                '    [ -n "$sha" ] || continue',
+                '    message="$(git -C "$target" log -1 --format=%s "$sha" 2>/dev/null || printf "Post-Apollo restored stash")"',
+                '    git -C "$target" stash store -m "$message" "$sha" >/dev/null 2>&1 || return 1',
+                '  done',
+                '}',
                 'if ! git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1; then',
                 '  printf "REFUSED\\tNOT A GIT WORKTREE\\n"',
                 '  exit 21',
                 'fi',
-                'if [ "$strategy" != "UNDO_TRANSFER_CONTENT" ] && [ "$strategy" != "UNDO_COMMIT_TO_STAGED" ] && [ "$strategy" != "UNDO_RESET_SOFT_OR_MIXED" ] && [ "$strategy" != "UNDO_STASH_CREATE_ALL" ] && [ "$strategy" != "UNDO_STASH_APPLY_CLEAN" ] && [ "$strategy" != "UNDO_STASH_POP_TOP" ] && [ "$strategy" != "UNDO_STASH_DROP_TOP" ]; then',
+                'if [ "$strategy" != "UNDO_TRANSFER_CONTENT" ] && [ "$strategy" != "UNDO_COMMIT_TO_STAGED" ] && [ "$strategy" != "UNDO_RESET_SOFT_OR_MIXED" ] && [ "$strategy" != "UNDO_STASH_CREATE_ALL" ] && [ "$strategy" != "UNDO_STASH_CREATE_EXACT" ] && [ "$strategy" != "UNDO_STASH_APPLY_CLEAN" ] && [ "$strategy" != "UNDO_STASH_POP_TOP" ] && [ "$strategy" != "UNDO_STASH_DROP_TOP" ] && [ "$strategy" != "UNDO_STASH_APPLY_REF" ] && [ "$strategy" != "UNDO_STASH_POP_REF" ] && [ "$strategy" != "UNDO_STASH_DROP_REF" ]; then',
                 '  while IFS= read -r wt; do',
                 '    [ -n "$wt" ] || continue',
                 '    if [ -n "$(git -C "$wt" status --porcelain=v1 --untracked-files=all 2>/dev/null)" ]; then',
@@ -1863,6 +2204,125 @@ Scope {
                 '    git -C "$repo" update-ref ORIG_HEAD "$expected" >/dev/null 2>&1 || true',
                 '    git -C "$repo" update-ref "$ref" "$restore" "$expected" || { printf "REFUSED\\tGUARDED COMMIT UNDO REF RESTORE FAILED\\n"; exit 149; }',
                 '    printf "OK\\tRESTORED PRE-COMMIT HEAD + STAGED CONTENT // %s\\n" "$branch"',
+                '    ;;',
+                '  UNDO_STASH_CREATE_EXACT)',
+                '    branch="$a"',
+                '    expected_head="$b"',
+                '    stash_sha="$c"',
+                '    mode="$d"',
+                '    expected_index_tree="$e"',
+                '    expected_worktree_hash="$f"',
+                '    IFS="$(printf "\\t")" read -r expected_untracked_hash expected_untracked_content_hash restore_index_tree restore_worktree_hash restore_untracked_hash restore_untracked_content_hash before_stack after_stack <<<"$g"',
+                '    ref="refs/heads/$branch"',
+                '    head_ref="$(git -C "$repo" symbolic-ref -q HEAD 2>/dev/null || true)"',
+                '    [ "$head_ref" = "$ref" ] || { printf "REFUSED\\tSTASH BRANCH IS NOT CURRENTLY CHECKED OUT\\n"; exit 212; }',
+                '    actual_head="$(git -C "$repo" rev-parse HEAD 2>/dev/null || true)"',
+                '    [ "$actual_head" = "$expected_head" ] || { printf "REFUSED\\tHEAD CHANGED SINCE STASH CREATION\\n"; exit 213; }',
+                '    [ "$(stash_stack "$repo")" = "$after_stack" ] || { printf "REFUSED\\tSTASH STACK CHANGED SINCE CREATION\\n"; exit 214; }',
+                '    stash_stack_objects_exist "$repo" "$before_stack" || { printf "REFUSED\\tPRE-STASH STACK OBJECT MISSING\\n"; exit 215; }',
+                '    git -C "$repo" cat-file -e "$stash_sha^{commit}" 2>/dev/null || { printf "REFUSED\\tCREATED STASH OBJECT MISSING\\n"; exit 216; }',
+                '    [ -z "$(git -C "$repo" ls-files -u 2>/dev/null)" ] || { printf "REFUSED\\tCURRENT INDEX HAS CONFLICTS\\n"; exit 217; }',
+                '    actual_index_tree="$(git -C "$repo" write-tree 2>/dev/null || true)"',
+                '    [ "$actual_index_tree" = "$expected_index_tree" ] || { printf "REFUSED\\tINDEX CHANGED SINCE STASH CREATION\\n"; exit 218; }',
+                '    actual_worktree_hash="$(git -C "$repo" diff --binary 2>/dev/null | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
+                '    [ "$actual_worktree_hash" = "$expected_worktree_hash" ] || { printf "REFUSED\\tWORKTREE CHANGED SINCE STASH CREATION\\n"; exit 219; }',
+                '    actual_untracked_hash="$(git -C "$repo" ls-files --others --exclude-standard -z 2>/dev/null | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
+                '    [ "$actual_untracked_hash" = "$expected_untracked_hash" ] || { printf "REFUSED\\tUNTRACKED SET CHANGED SINCE STASH CREATION\\n"; exit 220; }',
+                '    actual_untracked_content_hash="$(untracked_content_hash "$repo")"',
+                '    [ "$actual_untracked_content_hash" = "$expected_untracked_content_hash" ] || { printf "REFUSED\\tUNTRACKED CONTENT CHANGED SINCE STASH CREATION\\n"; exit 221; }',
+                '    case "$mode" in all|keep-index|staged) ;; *) printf "REFUSED\\tINVALID RECORDED STASH MODE\\n"; exit 222 ;; esac',
+                '    restore_post_creation() {',
+                '      git -C "$repo" reset --hard "$expected_head" >/dev/null 2>&1 || return 1',
+                '      git -C "$repo" read-tree "$expected_index_tree" >/dev/null 2>&1 || return 1',
+                '      git -C "$repo" checkout-index -a -f >/dev/null 2>&1 || return 1',
+                '      if [ "$mode" != "staged" ]; then git -C "$repo" clean -fd >/dev/null 2>&1 || return 1; fi',
+                '      rebuild_stash_stack "$repo" "$after_stack" || return 1',
+                '    }',
+                '    if [ "$mode" != "staged" ]; then',
+                '      git -C "$repo" reset --hard "$expected_head" >/dev/null 2>&1 || { printf "REFUSED\\tSTASH UNDO CLEAN RESET FAILED\\n"; exit 223; }',
+                '      git -C "$repo" clean -fd >/dev/null 2>&1 || { printf "REFUSED\\tSTASH UNDO CLEAN FAILED\\n"; exit 224; }',
+                '    fi',
+                '    if ! git -C "$repo" stash apply --index "$stash_sha" >/dev/null 2>&1; then',
+                '      restore_post_creation >/dev/null 2>&1 || { printf "REFUSED\\tSTASH RESTORE FAILED // POST-STATE ROLLBACK FAILED\\n"; exit 225; }',
+                '      printf "REFUSED\\tSTASH RESTORE FAILED // POST-STATE RESTORED\\n"',
+                '      exit 226',
+                '    fi',
+                '    if ! rebuild_stash_stack "$repo" "$before_stack"; then',
+                '      restore_post_creation >/dev/null 2>&1 || { printf "REFUSED\\tSTASH STACK RESTORE FAILED // POST-STATE ROLLBACK FAILED\\n"; exit 227; }',
+                '      printf "REFUSED\\tSTASH STACK RESTORE FAILED // POST-STATE RESTORED\\n"',
+                '      exit 228',
+                '    fi',
+                '    restored_index_tree="$(git -C "$repo" write-tree 2>/dev/null || true)"',
+                '    restored_worktree_hash="$(git -C "$repo" diff --binary 2>/dev/null | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
+                '    restored_untracked_hash="$(git -C "$repo" ls-files --others --exclude-standard -z 2>/dev/null | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
+                '    restored_untracked_content_hash="$(untracked_content_hash "$repo")"',
+                '    restored_stack="$(stash_stack "$repo")"',
+                '    if [ "$restored_index_tree" != "$restore_index_tree" ] || [ "$restored_worktree_hash" != "$restore_worktree_hash" ] || [ "$restored_untracked_hash" != "$restore_untracked_hash" ] || [ "$restored_untracked_content_hash" != "$restore_untracked_content_hash" ] || [ "$restored_stack" != "$before_stack" ]; then',
+                '      restore_post_creation >/dev/null 2>&1 || { printf "REFUSED\\tSTASH RESTORE EVIDENCE MISMATCH // POST-STATE ROLLBACK FAILED\\n"; exit 229; }',
+                '      printf "REFUSED\\tSTASH RESTORE EVIDENCE MISMATCH // POST-STATE RESTORED\\n"',
+                '      exit 230',
+                '    fi',
+                '    printf "OK\\tRESTORED PRE-STASH CONTENT + STACK // %s\\n" "$mode"',
+                '    ;;',
+                '  UNDO_STASH_APPLY_REF|UNDO_STASH_POP_REF|UNDO_STASH_DROP_REF)',
+                '    branch="$a"',
+                '    expected_head="$b"',
+                '    selected_stash="$c"',
+                '    selected_ref="$d"',
+                '    expected_index_tree="$e"',
+                '    expected_worktree_hash="$f"',
+                '    IFS="$(printf "\\t")" read -r expected_untracked_hash expected_untracked_content_hash restore_index_tree restore_worktree_hash restore_untracked_hash restore_untracked_content_hash before_stack after_stack use_index <<<"$g"',
+                '    ref="refs/heads/$branch"',
+                '    head_ref="$(git -C "$repo" symbolic-ref -q HEAD 2>/dev/null || true)"',
+                '    [ "$head_ref" = "$ref" ] || { printf "REFUSED\\tSTASH MUTATION BRANCH IS NOT CURRENTLY CHECKED OUT\\n"; exit 231; }',
+                '    actual_head="$(git -C "$repo" rev-parse HEAD 2>/dev/null || true)"',
+                '    [ "$actual_head" = "$expected_head" ] || { printf "REFUSED\\tHEAD CHANGED SINCE STASH MUTATION\\n"; exit 232; }',
+                '    [ "$(stash_stack "$repo")" = "$after_stack" ] || { printf "REFUSED\\tSTASH STACK CHANGED SINCE MUTATION\\n"; exit 233; }',
+                '    stash_stack_objects_exist "$repo" "$before_stack" || { printf "REFUSED\\tRECORDED PRE-MUTATION STASH OBJECT MISSING\\n"; exit 234; }',
+                '    git -C "$repo" cat-file -e "$selected_stash^{commit}" 2>/dev/null || { printf "REFUSED\\tSELECTED STASH OBJECT MISSING\\n"; exit 235; }',
+                '    [ -z "$(git -C "$repo" ls-files -u 2>/dev/null)" ] || { printf "REFUSED\\tCURRENT INDEX HAS CONFLICTS\\n"; exit 236; }',
+                '    actual_index_tree="$(git -C "$repo" write-tree 2>/dev/null || true)"',
+                '    [ "$actual_index_tree" = "$expected_index_tree" ] || { printf "REFUSED\\tINDEX CHANGED SINCE STASH MUTATION\\n"; exit 237; }',
+                '    actual_worktree_hash="$(git -C "$repo" diff --binary 2>/dev/null | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
+                '    [ "$actual_worktree_hash" = "$expected_worktree_hash" ] || { printf "REFUSED\\tWORKTREE CHANGED SINCE STASH MUTATION\\n"; exit 238; }',
+                '    actual_untracked_hash="$(git -C "$repo" ls-files --others --exclude-standard -z 2>/dev/null | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
+                '    [ "$actual_untracked_hash" = "$expected_untracked_hash" ] || { printf "REFUSED\\tUNTRACKED SET CHANGED SINCE STASH MUTATION\\n"; exit 239; }',
+                '    actual_untracked_content_hash="$(untracked_content_hash "$repo")"',
+                '    [ "$actual_untracked_content_hash" = "$expected_untracked_content_hash" ] || { printf "REFUSED\\tUNTRACKED CONTENT CHANGED SINCE STASH MUTATION\\n"; exit 240; }',
+                '    reapply_selected() {',
+                '      git -C "$repo" reset --hard "$expected_head" >/dev/null 2>&1 || return 1',
+                '      git -C "$repo" clean -fd >/dev/null 2>&1 || return 1',
+                '      if [ "$use_index" = "1" ]; then git -C "$repo" stash apply --index "$selected_stash" >/dev/null 2>&1; else git -C "$repo" stash apply "$selected_stash" >/dev/null 2>&1; fi',
+                '    }',
+                '    rollback_stash_mutation() {',
+                '      rebuild_stash_stack "$repo" "$after_stack" >/dev/null 2>&1 || return 1',
+                '      if [ "$strategy" = "UNDO_STASH_APPLY_REF" ] || [ "$strategy" = "UNDO_STASH_POP_REF" ]; then reapply_selected || return 1; fi',
+                '    }',
+                '    case "$strategy" in',
+                '      UNDO_STASH_APPLY_REF)',
+                '        git -C "$repo" reset --hard "$expected_head" >/dev/null 2>&1 || { printf "REFUSED\\tSTASH APPLY UNDO RESET FAILED\\n"; exit 241; }',
+                '        git -C "$repo" clean -fd >/dev/null 2>&1 || { printf "REFUSED\\tSTASH APPLY UNDO CLEAN FAILED\\n"; exit 242; }',
+                '        ;;',
+                '      UNDO_STASH_POP_REF)',
+                '        git -C "$repo" reset --hard "$expected_head" >/dev/null 2>&1 || { printf "REFUSED\\tSTASH POP UNDO RESET FAILED\\n"; exit 243; }',
+                '        git -C "$repo" clean -fd >/dev/null 2>&1 || { printf "REFUSED\\tSTASH POP UNDO CLEAN FAILED\\n"; exit 244; }',
+                '        rebuild_stash_stack "$repo" "$before_stack" || { rollback_stash_mutation >/dev/null 2>&1 || true; printf "REFUSED\\tSTASH POP STACK RESTORE FAILED\\n"; exit 245; }',
+                '        ;;',
+                '      UNDO_STASH_DROP_REF)',
+                '        rebuild_stash_stack "$repo" "$before_stack" || { rollback_stash_mutation >/dev/null 2>&1 || true; printf "REFUSED\\tSTASH DROP STACK RESTORE FAILED\\n"; exit 246; }',
+                '        ;;',
+                '    esac',
+                '    restored_index_tree="$(git -C "$repo" write-tree 2>/dev/null || true)"',
+                '    restored_worktree_hash="$(git -C "$repo" diff --binary 2>/dev/null | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
+                '    restored_untracked_hash="$(git -C "$repo" ls-files --others --exclude-standard -z 2>/dev/null | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
+                '    restored_untracked_content_hash="$(untracked_content_hash "$repo")"',
+                '    restored_stack="$(stash_stack "$repo")"',
+                '    if [ "$restored_index_tree" != "$restore_index_tree" ] || [ "$restored_worktree_hash" != "$restore_worktree_hash" ] || [ "$restored_untracked_hash" != "$restore_untracked_hash" ] || [ "$restored_untracked_content_hash" != "$restore_untracked_content_hash" ] || [ "$restored_stack" != "$before_stack" ]; then',
+                '      rollback_stash_mutation >/dev/null 2>&1 || { printf "REFUSED\\tSTASH MUTATION UNDO EVIDENCE MISMATCH // ROLLBACK FAILED\\n"; exit 247; }',
+                '      printf "REFUSED\\tSTASH MUTATION UNDO EVIDENCE MISMATCH // POST-STATE RESTORED\\n"',
+                '      exit 248',
+                '    fi',
+                '    printf "OK\\tRESTORED PRE-STASH-MUTATION CONTENT + STACK // %s\\n" "$selected_ref"',
                 '    ;;',
                 '  UNDO_STASH_APPLY_CLEAN|UNDO_STASH_POP_TOP|UNDO_STASH_DROP_TOP)',
                 '    branch="$a"',
@@ -2302,6 +2762,7 @@ Scope {
                 if (strategy !== "UNDO_TRANSFER_CONTENT"
                         && strategy !== "UNDO_COMMIT_TO_STAGED"
                         && strategy !== "UNDO_RESET_SOFT_OR_MIXED"
+                        && strategy.indexOf("UNDO_STASH_") !== 0
                         && snapshotClass !== "REF_RECOVERABLE") {
                     root.failBeforeSnapshot(
                         "CURRENT REPOSITORY STATE IS NOT CLEAN REF-RECOVERABLE"

@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Contracts + runtime smoke tests for top-stash apply/pop/drop Undo."""
+"""Contracts + runtime smoke tests for selected-stash apply/pop/drop Undo."""
 
 from pathlib import Path
 import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
+SNAPSHOT = "services/git/GitRepositorySnapshotService.qml"
 CHANGES = "services/git/GitChangesService.qml"
 RECOVERY = "services/git/GitOperationRecoveryService.qml"
 
@@ -20,30 +21,33 @@ def require(path: str, needle: str, message: str) -> None:
 
 
 for needle, message in (
-    ("function stashApplySnapshotCanRecover(before, after)", "Changes must validate stash apply transitions"),
-    ("function stashPopSnapshotCanRecover(before, after)", "Changes must validate stash pop transitions"),
-    ("function stashDropSnapshotCanRecover(before, after)", "Changes must validate stash drop transitions"),
-    ('operation === "stash-apply"', "stash apply must receive recovery classification"),
-    ('operation === "stash-pop"', "stash pop must receive recovery classification"),
-    ('operation === "stash-drop"', "stash drop must receive recovery classification"),
-    ("ONLY TOP-STASH MUTATIONS HAVE EXACT AUTOMATIC UNDO", "non-top stash mutation must remain conservative"),
+    ("stashEntries: stashEntries", "repository snapshots must persist the ordered stash stack"),
+    ("untrackedContentHash: untrackedContentHash", "repository snapshots must persist untracked-content identity"),
+):
+    require(SNAPSHOT, needle, message)
+
+for needle, message in (
+    ("function stashEntry(snapshot, refName)", "Changes must resolve the selected stash ref"),
+    ("function stashStackAfterRemoving(before, refName)", "Changes must model removal at an arbitrary stack position"),
+    ("function stashApplySnapshotCanRecover(before, after, refName)", "apply classification must be selected-ref aware"),
+    ("function stashPopSnapshotCanRecover(before, after, refName)", "pop classification must be selected-ref aware"),
+    ("function stashDropSnapshotCanRecover(before, after, refName)", "drop classification must be selected-ref aware"),
+    ("untrackedContentHash", "stash mutation evidence must include untracked file content"),
 ):
     require(CHANGES, needle, message)
 
 for needle, message in (
-    ('"CHANGES/STASH-APPLY"', "recovery must recognize stash apply"),
-    ('"CHANGES/STASH-POP"', "recovery must recognize stash pop"),
-    ('"CHANGES/STASH-DROP"', "recovery must recognize stash drop"),
-    ('strategy = "UNDO_STASH_APPLY_CLEAN"', "stash apply needs a dedicated inverse"),
-    ('strategy = "UNDO_STASH_POP_TOP"', "stash pop needs a dedicated inverse"),
-    ('strategy = "UNDO_STASH_DROP_TOP"', "stash drop needs a dedicated inverse"),
-    ("STASH STACK CHANGED SINCE MUTATION", "stash Undo must refuse stack drift"),
-    ("INDEX CHANGED SINCE STASH MUTATION", "stash Undo must refuse index drift"),
-    ("WORKTREE CHANGED SINCE STASH MUTATION", "stash Undo must refuse worktree drift"),
-    ("UNTRACKED SET CHANGED SINCE STASH MUTATION", "stash Undo must refuse untracked drift"),
-    ("POPPED STASH OBJECT MISSING", "pop Undo must prove the object still exists"),
-    ("DROPPED STASH OBJECT MISSING", "drop Undo must prove the object still exists"),
-    ("STASH STACK DID NOT RETURN TO RECORDED PRE-MUTATION HEAD", "stash Undo must verify restored stack identity"),
+    ('strategy = "UNDO_STASH_APPLY_REF"', "new apply records need selected-ref recovery"),
+    ('strategy = "UNDO_STASH_POP_REF"', "new pop records need selected-ref recovery"),
+    ('strategy = "UNDO_STASH_DROP_REF"', "new drop records need selected-ref recovery"),
+    ("OLDER JOURNAL RECORD LACKS SELECTED-STASH STACK EVIDENCE", "legacy non-top records must remain conservative"),
+    ("rebuild_stash_stack()", "recovery must own exact stack reconstruction"),
+    ('rebuild_stash_stack "$repo" "$before_stack"', "pop/drop Undo must reconstruct the recorded object order"),
+    ("UNTRACKED CONTENT CHANGED SINCE STASH MUTATION", "stash Undo must refuse untracked-content drift"),
+    ('strategy.indexOf("UNDO_STASH_") !== 0', "stash strategies must bypass only the generic clean-state gate"),
+    ("STASH MUTATION UNDO EVIDENCE MISMATCH // POST-STATE RESTORED", "failed verification must roll back to the recorded post-state"),
+    ("UNDO_STASH_POP_TOP", "legacy top-pop journal records must remain supported"),
+    ("UNDO_STASH_DROP_TOP", "legacy top-drop journal records must remain supported"),
 ):
     require(RECOVERY, needle, message)
 
@@ -62,61 +66,17 @@ def git(repo: Path, *args: str, check=True):
     return run(["git", "-C", str(repo), *args], check=check)
 
 
-def hash_stdout(repo: Path, producer):
-    first = subprocess.Popen(
-        producer,
-        cwd=repo,
-        stdout=subprocess.PIPE,
-    )
-    second = subprocess.run(
-        ["git", "-C", str(repo), "hash-object", "--stdin"],
-        stdin=first.stdout,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=True,
-    )
-    first.stdout.close()
-    assert first.wait() == 0
-    return second.stdout.decode().strip()
+def stack(repo: Path):
+    raw = git(repo, "stash", "list", "--format=%H").stdout.decode()
+    return [line for line in raw.splitlines() if line]
 
 
-def index_tree(repo: Path):
-    return git(repo, "write-tree").stdout.decode().strip()
-
-
-def worktree_hash(repo: Path):
-    return hash_stdout(
-        repo,
-        ["git", "-C", str(repo), "diff", "--binary"],
-    )
-
-
-def untracked_hash(repo: Path):
-    return hash_stdout(
-        repo,
-        [
-            "git",
-            "-C",
-            str(repo),
-            "ls-files",
-            "--others",
-            "--exclude-standard",
-            "-z",
-        ],
-    )
-
-
-def evidence(repo: Path):
-    return (
-        index_tree(repo),
-        worktree_hash(repo),
-        untracked_hash(repo),
-    )
-
-
-def stash_sha(repo: Path):
-    result = git(repo, "rev-parse", "-q", "--verify", "refs/stash", check=False)
-    return result.stdout.decode().strip() if result.returncode == 0 else ""
+def rebuild_stack(repo: Path, shas):
+    git(repo, "update-ref", "-d", "refs/stash", check=False)
+    for sha in reversed(shas):
+        subject = git(repo, "log", "-1", "--format=%s", sha).stdout.decode().strip()
+        result = git(repo, "stash", "store", "-m", subject, sha, check=False)
+        assert result.returncode == 0, result.stderr.decode()
 
 
 def make_repo(root: Path):
@@ -131,115 +91,103 @@ def make_repo(root: Path):
     return repo
 
 
-def make_top_stash(repo: Path):
-    (repo / "tracked.txt").write_text("stashed tracked\n", encoding="utf-8")
+def make_stash(repo: Path, label: str, payload: str):
+    (repo / "tracked.txt").write_text(payload + "\n", encoding="utf-8")
     git(repo, "add", "tracked.txt")
-    (repo / "extra.txt").write_text("stashed untracked\n", encoding="utf-8")
-    git(repo, "stash", "push", "-u", "-m", "top payload")
-    sha = stash_sha(repo)
-    assert sha
+    (repo / f"{label}.txt").write_text(
+        f"{label} untracked\n",
+        encoding="utf-8",
+    )
+    git(repo, "stash", "push", "-u", "-m", label)
+    result = stack(repo)
+    assert result
     assert git(repo, "status", "--porcelain=v1").stdout == b""
-    return sha
+    return result[0]
 
 
-def restore_stash_object(repo: Path, sha: str):
-    subject = git(repo, "log", "-1", "--format=%s", sha).stdout.decode().strip()
-    git(repo, "stash", "store", "-m", subject, sha)
+def make_three_stashes(repo: Path):
+    first = make_stash(repo, "one", "one")
+    second = make_stash(repo, "two", "two")
+    third = make_stash(repo, "three", "three")
+    assert stack(repo) == [third, second, first]
+    return third, second, first
 
 
-def smoke_apply_undo():
-    with tempfile.TemporaryDirectory(prefix="pa-stash-apply-") as tmp:
+def smoke_non_top_apply_undo():
+    with tempfile.TemporaryDirectory(prefix="pa-stash-apply-ref-") as tmp:
         repo = make_repo(Path(tmp))
-        top = make_top_stash(repo)
-        before = evidence(repo)
+        _top, selected, _bottom = make_three_stashes(repo)
+        before_stack = stack(repo)
 
-        result = git(repo, "stash", "apply", "--index", "stash@{0}", check=False)
+        result = git(repo, "stash", "apply", "--index", "stash@{1}", check=False)
         assert result.returncode == 0, result.stderr.decode()
-        after = evidence(repo)
-        assert after != before
-        assert stash_sha(repo) == top
+        assert stack(repo) == before_stack
+        assert (repo / "two.txt").exists()
 
-        # Undo apply from the exact recorded post-apply state.
+        # Selected-stash apply Undo returns to the clean pre-apply state while
+        # leaving the entire stack object order unchanged.
         git(repo, "reset", "--hard", "HEAD")
         git(repo, "clean", "-fd")
-        assert evidence(repo) == before
-        assert stash_sha(repo) == top
+        assert git(repo, "status", "--porcelain=v1").stdout == b""
+        assert stack(repo) == before_stack
+        assert selected == before_stack[1]
 
 
-def smoke_pop_undo():
-    with tempfile.TemporaryDirectory(prefix="pa-stash-pop-") as tmp:
+def smoke_non_top_pop_undo():
+    with tempfile.TemporaryDirectory(prefix="pa-stash-pop-ref-") as tmp:
         repo = make_repo(Path(tmp))
+        top, selected, bottom = make_three_stashes(repo)
+        before_stack = stack(repo)
 
-        # Keep one older entry underneath the stash being popped.
-        (repo / "old.txt").write_text("older\n", encoding="utf-8")
-        git(repo, "stash", "push", "-u", "-m", "older")
-        previous = stash_sha(repo)
-
-        popped = make_top_stash(repo)
-        before = evidence(repo)
-        assert popped != previous
-
-        result = git(repo, "stash", "pop", "--index", "stash@{0}", check=False)
+        result = git(repo, "stash", "pop", "--index", "stash@{1}", check=False)
         assert result.returncode == 0, result.stderr.decode()
-        assert stash_sha(repo) == previous
-        after = evidence(repo)
-        assert after != before
+        assert stack(repo) == [top, bottom]
+        assert (repo / "two.txt").exists()
 
-        # Undo pop: clear applied content then put the exact stash object back.
         git(repo, "reset", "--hard", "HEAD")
         git(repo, "clean", "-fd")
-        restore_stash_object(repo, popped)
+        rebuild_stack(repo, before_stack)
 
-        assert evidence(repo) == before
-        assert stash_sha(repo) == popped
+        assert git(repo, "status", "--porcelain=v1").stdout == b""
+        assert stack(repo) == before_stack
+        assert selected == before_stack[1]
 
 
-def smoke_drop_undo():
-    with tempfile.TemporaryDirectory(prefix="pa-stash-drop-") as tmp:
+def smoke_non_top_drop_undo():
+    with tempfile.TemporaryDirectory(prefix="pa-stash-drop-ref-") as tmp:
         repo = make_repo(Path(tmp))
-        dropped = make_top_stash(repo)
-        before = evidence(repo)
+        top, selected, bottom = make_three_stashes(repo)
+        before_stack = stack(repo)
 
-        git(repo, "stash", "drop", "stash@{0}")
-        assert stash_sha(repo) != dropped
-        assert evidence(repo) == before
+        git(repo, "stash", "drop", "stash@{1}")
+        assert stack(repo) == [top, bottom]
+        assert git(repo, "status", "--porcelain=v1").stdout == b""
 
-        restore_stash_object(repo, dropped)
-        assert stash_sha(repo) == dropped
-        assert evidence(repo) == before
+        rebuild_stack(repo, before_stack)
+        assert stack(repo) == before_stack
+        assert selected == before_stack[1]
 
 
-def smoke_non_top_is_not_exact():
-    with tempfile.TemporaryDirectory(prefix="pa-stash-nontop-") as tmp:
+def smoke_stack_rebuild_requires_objects():
+    with tempfile.TemporaryDirectory(prefix="pa-stash-stack-objects-") as tmp:
         repo = make_repo(Path(tmp))
-        first = make_top_stash(repo)
-
-        (repo / "tracked.txt").write_text(
-            "second stash tracked payload\n",
-            encoding="utf-8",
-        )
-        git(repo, "add", "tracked.txt")
-        (repo / "second-extra.txt").write_text(
-            "second stash untracked payload\n",
-            encoding="utf-8",
-        )
-        git(repo, "stash", "push", "-u", "-m", "second top")
-        second = stash_sha(repo)
-        assert first != second
-        refs = (
-            git(repo, "stash", "list", "--format=%gd")
-            .stdout.decode()
-            .splitlines()
-        )
-        assert refs[:2] == ["stash@{0}", "stash@{1}"]
-        # The implementation intentionally refuses stash@{1}: restoring its
-        # original reflog position is not equivalent to restoring the top.
-        assert "stash@{1}" != "stash@{0}"
+        make_three_stashes(repo)
+        before_stack = stack(repo)
+        for sha in before_stack:
+            assert git(
+                repo,
+                "cat-file",
+                "-e",
+                f"{sha}^{{commit}}",
+                check=False,
+            ).returncode == 0
+        rebuild_stack(repo, before_stack)
+        assert stack(repo) == before_stack
 
 
-smoke_apply_undo()
-smoke_pop_undo()
-smoke_drop_undo()
-smoke_non_top_is_not_exact()
+smoke_non_top_apply_undo()
+smoke_non_top_pop_undo()
+smoke_non_top_drop_undo()
+smoke_stack_rebuild_requires_objects()
 
-print("Git top-stash apply/pop/drop Undo contracts: PASS")
+print("Git selected-stash apply/pop/drop Undo contracts: PASS")

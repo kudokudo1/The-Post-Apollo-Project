@@ -73,6 +73,7 @@ Scope {
                 'printf "IDENTITY\\t%s\\t%s\\t%s\\n" "$branch" "$head" "$head_ref"',
                 'git -C "$repo" for-each-ref --format="REF%09%(refname)%09%(objectname)%09%(objecttype)" refs/heads refs/tags refs/remotes 2>/dev/null',
                 'git -C "$repo" for-each-ref --format="UPSTREAM%09%(refname:short)%09%(upstream:short)" refs/heads 2>/dev/null',
+                'git -C "$repo" stash list --format="STASH%x09%gd%x09%H%x09%gs" 2>/dev/null || true',
                 'index_tree="$(git -C "$repo" write-tree 2>/dev/null || true)"',
                 'index_path="$(git -C "$repo" rev-parse --git-path index 2>/dev/null || true)"',
                 'case "$index_path" in /*) ;; "") ;; *) index_path="$repo/$index_path" ;; esac',
@@ -87,7 +88,8 @@ Scope {
                 'staged_hash="$(git -C "$repo" diff --cached --binary 2>/dev/null | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
                 'worktree_hash="$(git -C "$repo" diff --binary 2>/dev/null | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
                 'untracked_hash="$(git -C "$repo" ls-files --others --exclude-standard -z 2>/dev/null | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
-                'printf "STATUS\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$staged" "$unstaged" "$untracked" "$conflicts" "$status64" "$staged_hash" "$worktree_hash" "$untracked_hash"',
+                'untracked_content_hash="$(git -C "$repo" ls-files --others --exclude-standard -z 2>/dev/null | while IFS= read -r -d "" p; do printf "%s\\0" "$p"; git -C "$repo" hash-object -- "$p" 2>/dev/null || true; done | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
+                'printf "STATUS\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$staged" "$unstaged" "$untracked" "$conflicts" "$status64" "$staged_hash" "$worktree_hash" "$untracked_hash" "$untracked_content_hash"',
                 'state="NONE"',
                 'if [ -n "$gitdir" ] && [ -f "$gitdir/MERGE_HEAD" ]; then state="MERGE";',
                 'elif [ -n "$gitdir" ] && { [ -d "$gitdir/rebase-merge" ] || [ -d "$gitdir/rebase-apply" ]; }; then state="REBASE";',
@@ -121,6 +123,7 @@ Scope {
         const refs = [];
         const branchUpstreams = [];
         const worktrees = [];
+        const stashEntries = [];
         const lines = String(text || "").split("\n");
 
         let branch = "";
@@ -137,6 +140,7 @@ Scope {
         let stagedPatchHash = "";
         let worktreePatchHash = "";
         let untrackedListHash = "";
+        let untrackedContentHash = "";
 
         let operationState = "NONE";
         let origHead = "";
@@ -182,6 +186,17 @@ Scope {
                 continue;
             }
 
+            if (line.indexOf("STASH\t") === 0) {
+                const p = line.split("\t");
+                stashEntries.push({
+                    ref: p.length > 1 ? p[1] : "",
+                    sha: p.length > 2 ? p[2] : "",
+                    message:
+                        p.length > 3 ? p.slice(3).join("\t") : ""
+                });
+                continue;
+            }
+
             if (line.indexOf("INDEX\t") === 0) {
                 const p = line.split("\t");
                 indexTree = p.length > 1 ? p[1] : "";
@@ -199,6 +214,7 @@ Scope {
                 stagedPatchHash = p.length > 6 ? p[6] : "";
                 worktreePatchHash = p.length > 7 ? p[7] : "";
                 untrackedListHash = p.length > 8 ? p[8] : "";
+                untrackedContentHash = p.length > 9 ? p[9] : "";
                 continue;
             }
 
@@ -271,6 +287,7 @@ Scope {
             headRef: headRef,
             refs: refs,
             branchUpstreams: branchUpstreams,
+            stashEntries: stashEntries,
 
             index: {
                 tree: indexTree,
@@ -285,7 +302,8 @@ Scope {
                 statusBase64: statusBase64,
                 stagedPatchHash: stagedPatchHash,
                 worktreePatchHash: worktreePatchHash,
-                untrackedListHash: untrackedListHash
+                untrackedListHash: untrackedListHash,
+                untrackedContentHash: untrackedContentHash
             },
 
             operationState: {

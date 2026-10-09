@@ -4,6 +4,7 @@ import Quickshell.Wayland
 import Quickshell.Io
 import "../services/audio"
 import "../services/media"
+import "../services/media/MediaAudioTargetResolver.js" as AudioTarget
 import "../components"
 
 // Initial Hi-Fi deck chassis. Adapted from MenuTemplate.qml.template:
@@ -68,25 +69,39 @@ PanelWindow {
     readonly property var audioCandidateInputs:
         browserAudioEvidence ? browserAudioEvidence.inputs : []
 
-    // A PipeWire stream index is a temporary stream coordinate, not a tab ID.
-    // Keep this selection anchored across ordinary re-ordered probe snapshots.
-    property int selectedAudioStreamIndex: -1
-    readonly property int selectedAudioCandidatePosition: {
-        const index = audioCandidateInputs.findIndex(function(input) {
-            return Number(input.index) === selectedAudioStreamIndex;
-        });
-        return index >= 0 ? index : 0;
-    }
-    readonly property var selectedAudioCandidate:
-        audioCandidateInputs.length > 0
-        ? audioCandidateInputs[selectedAudioCandidatePosition] : null
+    // Exact-title evidence can select a stream automatically. Otherwise a
+    // stream must be selected manually; disappearance never picks a neighbor.
+    // Neither route establishes general browser-tab identity.
+    readonly property string playerAudioBusName:
+        mediaAdapter.activePlayer
+        ? String(mediaAdapter.activePlayer.dbusName || "") : ""
+    readonly property string playerAudioTitle:
+        mediaAdapter.activePlayer
+        ? String(mediaAdapter.activePlayer.trackTitle || "") : ""
+
+    property var manualAudioBinding: null
+    readonly property var audioTargetResolution:
+        AudioTarget.resolve(playerAudioBusName, playerAudioTitle,
+                            audioCandidateInputs, manualAudioBinding)
+    readonly property var selectedAudioCandidate: audioTargetResolution.input
+    readonly property int selectedAudioCandidatePosition:
+        selectedAudioCandidate
+        ? audioCandidateInputs.findIndex(function(input) {
+            return Number(input.index) === Number(selectedAudioCandidate.index);
+        }) : -1
 
     readonly property string audioSelectionLabel:
         selectedAudioCandidate
-        ? ("STREAM #" + selectedAudioCandidate.index
+        ? ((audioTargetResolution.mode === "AUTO_TITLE" ? "AUTO" : "MANUAL")
+           + " STREAM #" + selectedAudioCandidate.index
            + " (" + (selectedAudioCandidatePosition + 1)
            + "/" + audioCandidateInputs.length + ")")
-        : "NO MATCHED STREAM"
+        : "NO AUDIO TARGET"
+
+    // A changed MPRIS session must never inherit an armed prior experiment.
+    readonly property string playerAudioSessionKey:
+        playerAudioBusName + "|" + playerAudioTitle
+    onPlayerAudioSessionKeyChanged: audioTestArmed = false
 
     // This is an explicitly armed *stream-level* experiment, not per-tab
     // targeting. A browser stream may contain multiple tabs.
@@ -95,7 +110,19 @@ PanelWindow {
 
     function handleAudioExperiment(action) {
         if (action === "arm") {
+            if (!selectedAudioCandidate) {
+                audioTestArmed = false;
+                audioTestStatus = "NO TARGET / USE NEXT STREAM FIRST";
+                return;
+            }
             audioTestArmed = !audioTestArmed;
+            return;
+        }
+
+        if (action === "auto") {
+            audioTestArmed = false;
+            manualAudioBinding = null;
+            audioTestStatus = "AUTO RECHECK / " + audioTargetResolution.status;
             return;
         }
 
@@ -106,18 +133,22 @@ PanelWindow {
                 audioTestStatus = "NO AUDIO STREAMS TO SELECT";
                 return;
             }
-            if (inputs.length === 1) {
-                selectedAudioStreamIndex = Number(inputs[0].index);
-                audioTestStatus = "ONLY ONE STREAM MATCHED";
+
+            const nextPosition = selectedAudioCandidatePosition < 0
+                ? 0 : (selectedAudioCandidatePosition + 1) % inputs.length;
+            const next = inputs[nextPosition];
+            const binding = AudioTarget.bindManual(playerAudioBusName,
+                                                   playerAudioTitle, next);
+            if (!binding) {
+                audioTestStatus = "NO PROCESS EVIDENCE / NOT SELECTED";
                 return;
             }
 
-            const next = inputs[(selectedAudioCandidatePosition + 1) % inputs.length];
-            selectedAudioStreamIndex = Number(next.index);
-            audioTestStatus = "SELECTED " + (selectedAudioCandidatePosition + 1)
+            manualAudioBinding = binding;
+            audioTestStatus = "MANUAL SELECTED " + (nextPosition + 1)
                               + "/" + inputs.length + " • #" + next.index;
-            console.log("MediaDeck: selected PipeWire stream", next.index,
-                        "of", inputs.length, "candidates");
+            console.log("MediaDeck: manually selected PipeWire stream",
+                        next.index, "of", inputs.length, "candidates");
             return;
         }
 
@@ -308,6 +339,7 @@ PanelWindow {
                           + "  /  " + deck.audioSelectionLabel
                     color: Colors.cyan
                     font.pixelSize: 12
+                    elide: Text.ElideRight
                 }
 
                 GohuText {
@@ -323,9 +355,20 @@ PanelWindow {
                     elide: Text.ElideRight
                 }
 
+                GohuText {
+                    anchors.top: parent.top
+                    anchors.topMargin: 132
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    text: "TARGET: " + deck.audioTargetResolution.status
+                    color: deck.selectedAudioCandidate ? Colors.cyan : Colors.orange
+                    font.pixelSize: 10
+                    elide: Text.ElideRight
+                }
+
                 Row {
                     anchors.top: parent.top
-                    anchors.topMargin: 152
+                    anchors.topMargin: 158
                     anchors.left: parent.left
                     spacing: 9
 
@@ -412,6 +455,48 @@ PanelWindow {
                             cursorShape: Qt.PointingHandCursor
                             onClicked: deck.transportMode = "mpd"
                         }
+                    }
+                }
+
+                Row {
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.topMargin: 202
+                    spacing: 10
+
+                    Rectangle {
+                        width: 118
+                        height: 30
+                        radius: 3
+                        color: autoMouse.containsMouse ? "#39333E" : "#29252E"
+                        border.width: 1
+                        border.color: deck.audioTargetResolution.mode === "AUTO_TITLE"
+                                      ? Colors.orange : Colors.cyan
+                        opacity: deck.transportMode === "mpris" ? 1 : 0.4
+
+                        GohuText {
+                            anchors.centerIn: parent
+                            text: "AUTO TARGET"
+                            font.pixelSize: 11
+                            color: Colors.white
+                        }
+
+                        MouseArea {
+                            id: autoMouse
+                            anchors.fill: parent
+                            enabled: deck.transportMode === "mpris"
+                            hoverEnabled: true
+                            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                            onClicked: deck.handleAudioExperiment("auto")
+                        }
+                    }
+
+                    GohuText {
+                        text: "EXACT TITLE ONLY / NO GUESSING"
+                        anchors.verticalCenter: parent.verticalCenter
+                        color: Colors.cyan
+                        opacity: 0.8
+                        font.pixelSize: 10
                     }
                 }
 

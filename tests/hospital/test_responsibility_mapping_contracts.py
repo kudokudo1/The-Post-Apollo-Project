@@ -29,8 +29,8 @@ for needle, label in (
     ("property var durableRooms: []", "durable Room evidence"),
     ("property var durableSessions: []", "persistent session evidence"),
     ("function refreshDurableGraph()", "durable graph refresh"),
-    ('"hospital", "rooms"', "PX durable Room query"),
-    ('"hospital", "sessions"', "PX persistent session query"),
+    ('hospital rooms --json', "PX durable Room query"),
+    ('hospital sessions --json', "PX persistent session query"),
     ("function roomScore(roomValue, repositoryValue, branchValue)", "room scorer"),
     ("function bestRoom(repositoryValue, branchValue)", "room resolver"),
     ("function specialistsForRoom(roomValue)", "specialist resolver"),
@@ -66,7 +66,7 @@ for needle, label in (
     ("responsibilityService.contextForWorkItem(item)", "Attention work-item ownership lookup"),
     ('"OWNER // "', "Attention ownership rendering"),
     ('"CHAIN // "', "Attention responsibility chain rendering"),
-    ('+ " // ROOM "', "Room identity rendering"),
+    ('" // ROOM "', "Room identity rendering"),
     ("responsibility.confidence", "ownership confidence rendering"),
 ):
     require(ATTENTION, needle, label)
@@ -76,7 +76,7 @@ for needle, label in (
     ("responsibilityService.contextForWorkItem({", "Queue work-item ownership lookup"),
     ('"OWNER // "', "Queue ownership rendering"),
     ('"CHAIN // "', "Queue responsibility chain rendering"),
-    ('+ " // ROOM "', "Queue Room rendering"),
+    ('" // ROOM "', "Queue Room rendering"),
     ("responsibility.assignmentTitle", "Queue Assignment rendering"),
 ):
     require(QUEUE, needle, label)

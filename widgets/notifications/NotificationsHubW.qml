@@ -56,7 +56,7 @@ PanelWindow {
 
     // Notification cards.
     property int cardHeight: 116
-    property int cardSpacing: 10
+    property int cardSpacing: 2
     property int cardGlowGutter: 24
     property int cardContentMargin: 10
 
@@ -69,21 +69,23 @@ PanelWindow {
     property int tightGlowRadius: 7
     property int tightGlowSamples: 9
 
-    // Outer window glow: explicit close + wide neon layers.
-    // Both spreads fit inside the existing 8px frame gutter, so the native
-    // window no longer clips most of the effect before it reaches the screen.
-    property int frameCloseGlowSpread: 6
-    property real frameCloseGlowOpacity: 0.46
-    property int frameWideGlowSpread: 8
-    property real frameWideGlowOpacity: 0.16
+    // Outer window glow is border-sourced rather than a full-rectangle shadow.
+    // This keeps orange light around the perimeter without tinting the
+    // translucent purple glass through the center of the Hub.
+    property int frameCloseGlowRadius: 5
+    property int frameCloseGlowSamples: 7
+    property real frameCloseGlowOpacity: 0.34
+    property int frameWideGlowRadius: 8
+    property int frameWideGlowSamples: 11
+    property real frameWideGlowOpacity: 0.08
 
-    // Notification cards reserve their own vertical effect gutter inside the
-    // clipped history ListView, then use the same close + wide glow grammar.
-    property int cardGlowVerticalGutter: 12
-    property int cardCloseGlowSpread: 4
-    property real cardCloseGlowOpacity: 0.50
-    property int cardWideGlowSpread: 12
-    property real cardWideGlowOpacity: 0.14
+    // History cards keep only a restrained local aura. Their combined
+    // gutter/spacing is intentionally close to the old pre-glow density.
+    property int cardGlowVerticalGutter: 5
+    property int cardCloseGlowSpread: 2
+    property real cardCloseGlowOpacity: 0.28
+    property int cardWideGlowSpread: 5
+    property real cardWideGlowOpacity: 0.06
 
     // Typography.
     property int hubTitleFontSize: 20
@@ -847,6 +849,44 @@ PanelWindow {
         // by frameInset so the glow is fully rendered instead of being clipped
         // by the native PanelWindow edge.
 
+        Rectangle {
+            id: frameGlowSource
+
+            anchors.fill: parent
+            anchors.margins: root.frameInset
+
+            color: "transparent"
+            border.width: 2
+            border.color: Colors.orange
+            z: -2
+        }
+
+        SafeDropShadow {
+            anchors.fill: frameGlowSource
+            safeSource: frameGlowSource
+            horizontalOffset: 0
+            verticalOffset: 0
+            radius: root.frameCloseGlowRadius
+            samples: root.frameCloseGlowSamples
+            color: Colors.orange
+            opacity: root.frameCloseGlowOpacity
+            z: -3
+            transparentBorder: true
+        }
+
+        SafeDropShadow {
+            anchors.fill: frameGlowSource
+            safeSource: frameGlowSource
+            horizontalOffset: 0
+            verticalOffset: 0
+            radius: root.frameWideGlowRadius
+            samples: root.frameWideGlowSamples
+            color: Colors.orange
+            opacity: root.frameWideGlowOpacity
+            z: -4
+            transparentBorder: true
+        }
+
         WindowPanelFrame {
             id: frame
 
@@ -859,11 +899,9 @@ PanelWindow {
             borderWidth: 2
             borderColor: Colors.orange
 
-            glowColor: Colors.orange
-            closeGlowSpread: root.frameCloseGlowSpread
-            closeGlowOpacity: root.frameCloseGlowOpacity
-            wideGlowSpread: root.frameWideGlowSpread
-            wideGlowOpacity: root.frameWideGlowOpacity
+            // The Hub is translucent, so a full rectangular shadow would show
+            // through the glass. Its glow comes from frameGlowSource instead.
+            glowVisible: false
 
             // ===== HEADER =======================================
 

@@ -12,31 +12,34 @@ def require(text: str, needle: str, message: str) -> None:
     assert needle in text, f"{message}: missing {needle!r}"
 
 
-# Full notification hub uses the shared window chassis and keeps the glow
-# inside the existing 8px native-window gutter.
+# Full notification hub keeps the shared surface chassis, but sources its
+# glow from the orange border so translucent glass does not turn orange.
 for needle, message in (
     ("property int frameInset: 8", "hub frame gutter"),
-    ("property int frameCloseGlowSpread: 6", "hub close glow spread"),
-    ("property real frameCloseGlowOpacity: 0.46", "hub close glow strength"),
-    ("property int frameWideGlowSpread: 8", "hub wide glow spread"),
-    ("property real frameWideGlowOpacity: 0.16", "hub wide glow strength"),
+    ("property int frameCloseGlowRadius: 5", "hub close glow radius"),
+    ("property real frameCloseGlowOpacity: 0.34", "hub close glow strength"),
+    ("property int frameWideGlowRadius: 8", "hub wide glow radius"),
+    ("property real frameWideGlowOpacity: 0.08", "hub wide glow strength"),
+    ("Rectangle {\n            id: frameGlowSource", "hub border-only glow source"),
+    ("safeSource: frameGlowSource", "hub border glow source wiring"),
     ("WindowPanelFrame {\n            id: frame", "shared hub chassis"),
     ("fillColor: Colors.black\n            fillOpacity: root.backgroundOpacity", "hub glass fill"),
     ("borderWidth: 2\n            borderColor: Colors.orange", "hub orange frame"),
+    ("glowVisible: false", "hub disables full-rectangle chassis glow"),
 ):
     require(HUB, needle, message)
 
-assert "id: frameGlowSource" not in HUB
-assert "frameGlowRadius" not in HUB
+assert HUB.count("safeSource: frameGlowSource") == 2
 
-# Each history card reserves enough vertical space for its 12px wide bloom,
-# even though the ListView itself intentionally remains clipped.
+# History cards keep a subtle aura while returning close to the old vertical
+# density. The ListView itself intentionally remains clipped.
 for needle, message in (
-    ("property int cardGlowVerticalGutter: 12", "card vertical glow gutter"),
-    ("property int cardCloseGlowSpread: 4", "card close glow spread"),
-    ("property real cardCloseGlowOpacity: 0.50", "card close glow strength"),
-    ("property int cardWideGlowSpread: 12", "card wide glow spread"),
-    ("property real cardWideGlowOpacity: 0.14", "card wide glow strength"),
+    ("property int cardSpacing: 2", "compact card spacing"),
+    ("property int cardGlowVerticalGutter: 5", "card vertical glow gutter"),
+    ("property int cardCloseGlowSpread: 2", "card close glow spread"),
+    ("property real cardCloseGlowOpacity: 0.28", "card close glow strength"),
+    ("property int cardWideGlowSpread: 5", "card wide glow spread"),
+    ("property real cardWideGlowOpacity: 0.06", "card wide glow strength"),
     ("+ (root.cardGlowVerticalGutter * 2)", "delegate reserves both glow gutters"),
     ("topMargin: root.cardGlowVerticalGutter", "card sits inside reserved top gutter"),
     ("WindowPanelFrame {\n                            id: card", "history card shared chassis"),

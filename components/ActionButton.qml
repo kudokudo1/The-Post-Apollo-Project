@@ -118,6 +118,7 @@ Rectangle {
     // Primary action halo. AppControl commonly uses one rectangular halo.
     property bool softGlowEnabled: true
     property real softGlowSpread: 3
+    property real softGlowMargin: 0
 
     property color idleSoftGlowColor: accentColor
     property color hoverSoftGlowColor: Colors.orange
@@ -460,6 +461,7 @@ Rectangle {
 
     RectangularShadow {
         anchors.fill: parent
+        anchors.margins: -actionButton.softGlowMargin
 
         spread: actionButton.softGlowSpread
         z: -1

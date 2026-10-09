@@ -243,10 +243,16 @@ def smoke_staged_with_unstaged_is_conservative():
             encoding="utf-8",
         )
         status = git(repo, "status", "--porcelain=v1").stdout.decode()
-        assert status.startswith("MM ")
-        # The journal classifier uses this same boundary: staged mode is only
-        # automatic when tracked unstagedCount == 0.
-        assert " M" in status
+        status_lines = status.splitlines()
+        assert any(
+            len(line) >= 4
+            and line[:2] == "MM"
+            and line[3:] == "tracked.txt"
+            for line in status_lines
+        )
+        # The journal classifier uses the worktree-status column (Y=M) as the
+        # conservative boundary: staged mode is automatic only when tracked
+        # unstagedCount == 0.
 
 
 smoke_full_stash_undo()

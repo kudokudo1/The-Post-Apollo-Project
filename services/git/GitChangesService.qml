@@ -970,6 +970,8 @@ Scope {
                === String(afterWorking.worktreePatchHash || "")
             && String(beforeWorking.untrackedListHash || "")
                === String(afterWorking.untrackedListHash || "")
+            && String(beforeWorking.untrackedContentHash || "")
+               === String(afterWorking.untrackedContentHash || "")
             && Number(beforeWorking.stagedCount || 0)
                === Number(afterWorking.stagedCount || 0)
             && Number(beforeWorking.unstagedCount || 0)
@@ -1050,7 +1052,9 @@ Scope {
                 && Number(afterWorking.untrackedCount || 0)
                    === Number(beforeWorking.untrackedCount || 0)
                 && String(afterWorking.untrackedListHash || "")
-                   === String(beforeWorking.untrackedListHash || "");
+                   === String(beforeWorking.untrackedListHash || "")
+                && String(afterWorking.untrackedContentHash || "")
+                   === String(beforeWorking.untrackedContentHash || "");
         }
 
         return false;

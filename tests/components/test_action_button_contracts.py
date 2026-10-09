@@ -506,8 +506,10 @@ window_primary_start = APPCONTROL.rfind("delegate: ActionButton {", 0, window_pr
 assert window_primary_start >= 0, "window primary delegate must use ActionButton"
 window_primary = APPCONTROL[window_primary_start:window_primary_marker + 7600]
 
+repeater_prefix = APPCONTROL[max(0, window_primary_start - 180):window_primary_start]
+require(repeater_prefix, "model: 5", "window primary repeater cardinality")
+
 for needle in (
-    "model: 5",
     "acceptedButtons: Qt.LeftButton",
     "index === 2 || index === 4",
     "index === 2\n                            ? Colors.white",

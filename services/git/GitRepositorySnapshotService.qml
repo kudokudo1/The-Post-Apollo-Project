@@ -73,6 +73,7 @@ Scope {
                 'printf "IDENTITY\\t%s\\t%s\\t%s\\n" "$branch" "$head" "$head_ref"',
                 'git -C "$repo" for-each-ref --format="REF%09%(refname)%09%(objectname)%09%(objecttype)" refs/heads refs/tags refs/remotes 2>/dev/null',
                 'git -C "$repo" for-each-ref --format="UPSTREAM%09%(refname:short)%09%(upstream:short)" refs/heads 2>/dev/null',
+                'git -C "$repo" stash list --format="STASH%x09%gd%x09%H%x09%gs" 2>/dev/null || true',
                 'index_tree="$(git -C "$repo" write-tree 2>/dev/null || true)"',
                 'index_path="$(git -C "$repo" rev-parse --git-path index 2>/dev/null || true)"',
                 'case "$index_path" in /*) ;; "") ;; *) index_path="$repo/$index_path" ;; esac',
@@ -121,6 +122,7 @@ Scope {
         const refs = [];
         const branchUpstreams = [];
         const worktrees = [];
+        const stashEntries = [];
         const lines = String(text || "").split("\n");
 
         let branch = "";
@@ -178,6 +180,17 @@ Scope {
                 branchUpstreams.push({
                     branch: p.length > 1 ? p[1] : "",
                     upstream: p.length > 2 ? p[2] : ""
+                });
+                continue;
+            }
+
+            if (line.indexOf("STASH\t") === 0) {
+                const p = line.split("\t");
+                stashEntries.push({
+                    ref: p.length > 1 ? p[1] : "",
+                    sha: p.length > 2 ? p[2] : "",
+                    message:
+                        p.length > 3 ? p.slice(3).join("\t") : ""
                 });
                 continue;
             }
@@ -271,6 +284,7 @@ Scope {
             headRef: headRef,
             refs: refs,
             branchUpstreams: branchUpstreams,
+            stashEntries: stashEntries,
 
             index: {
                 tree: indexTree,

@@ -416,6 +416,7 @@ APPCONTROL_LEFT_ONLY_ACTIONS = (
     "hiddenKillAction", "appMuteAction", "windowMuteAction", "runKillAction",
     "windowPrimaryActionButton",
     "fileActionButton", "remoteActionButton",
+    "appTabControlButton",
 )
 for control_id in APPCONTROL_LEFT_ONLY_ACTIONS:
     marker_pos = APPCONTROL.index(f"id: {control_id}")
@@ -579,3 +580,48 @@ for repeater_id, control_id, old_mouse, expected_count in (
     require(APPCONTROL, detail_count_needle, f"{repeater_id} action count")
 
 print("AppControl file/remote ActionButton migration: PASS")
+
+
+# Ninth AppControl proof migration: dynamic TAB controls are immediate actions,
+# but retain semantic subtypes (mute/new-tab/builtin) and keep CLOSE delegated
+# to the dedicated destructive close control.
+tab_action_marker = APPCONTROL.index("id: appTabControlButton")
+tab_action_start = APPCONTROL.rfind("delegate: ActionButton {", 0, tab_action_marker)
+assert tab_action_start >= 0, "TAB control delegate must use ActionButton"
+tab_action = APPCONTROL[tab_action_start:tab_action_marker + 9200]
+
+for needle in (
+    "visible: !isCloseAction",
+    "acceptedButtons: Qt.LeftButton",
+    "readonly property bool isMuteAction:",
+    "readonly property bool isNewTabAction:",
+    "readonly property bool isBuiltinDesktopAction:",
+    "isCloseAction\n                            ? Colors.red",
+    "isMuteAction\n                            ? Colors.omnitrix",
+    "isBuiltinDesktopAction\n                            ? Colors.orange",
+    "hovered || selected\n                            ? Colors.orange",
+    "hoverFillColor:\n                            isCloseAction ? Colors.black : Colors.yellow",
+    "pressedFillColor:\n                            isCloseAction ? Colors.red : Colors.magenta",
+    "softGlowHoverOpacity:\n                            isCloseAction ? 0.78 : 0.46",
+    "softGlowPressedOpacity:\n                            isCloseAction ? 0.92 : 0.0",
+    "selectedDetailActionIndex = index;",
+):
+    require(tab_action, needle, "dynamic TAB ActionButton fidelity")
+
+assert "id: appTabControlMouse" not in tab_action, (
+    "dynamic TAB controls reintroduced private pointer engine"
+)
+for old_alias in (
+    "appTabControlButton.isPressed",
+    "appTabControlButton.isHovered",
+    "appTabControlButton.isSelected",
+):
+    assert old_alias not in tab_action, f"TAB control retained old state alias: {old_alias}"
+
+require(
+    APPCONTROL,
+    "id: tabCloseActionBelowFreeze",
+    "dedicated TAB close action remains separate",
+)
+
+print("AppControl TAB ActionButton migration: PASS")

@@ -24619,7 +24619,7 @@ PanelWindow {
 
                     model: tabControlSection.controls
 
-                    delegate: Rectangle {
+                    delegate: ActionButton {
                         id: appTabControlButton
 
                         required property var modelData
@@ -24631,15 +24631,12 @@ PanelWindow {
 
                         anchors.horizontalCenter: parent.horizontalCenter
 
-                        property bool isHovered:
-                            !appControlWindow.keyboardActive
-                            && appTabControlMouse.containsMouse
-                        property bool isPressed:
-                            appTabControlMouse.pressed
-                        property bool isSelected:
-                            appControlWindow.detailFocused
-                            && appControlWindow.selectedDetailActionIndex
-                               === index
+                        suppressHover: appControlWindow.keyboardActive
+                        selected: appControlWindow.detailFocused
+                            && appControlWindow.selectedDetailActionIndex === index
+                        showLabel: false
+                        pointerCursorShape: Qt.ArrowCursor
+                        acceptedButtons: Qt.LeftButton
 
                         readonly property string actionName: String(
                             modelData.controlName
@@ -24696,22 +24693,57 @@ PanelWindow {
                         readonly property color visualAccent:
                             hasSemanticAccent
                             ? semanticAccent
-                            : isHovered || isSelected
+                            : hovered || selected
                             ? Colors.orange
                             : Colors.cyan
 
-                        // Selected CLOSE/MUTE controls keep their semantic
-                        // red/omnitrix border + glow while using yellow fill.
-                        color:
-                            isCloseAction && isPressed ? Colors.red
-                            : isCloseAction ? Colors.black
-                            : isPressed ? Colors.magenta
-                            : isHovered || isSelected ? Colors.yellow
-                            : Colors.black
+                        // CLOSE remains hidden in this repeater and is rendered
+                        // by tabCloseActionBelowFreeze. Keep the donor CLOSE
+                        // state intact in case provider data changes.
+                        idleFillColor: Colors.black
+                        hoverFillColor:
+                            isCloseAction ? Colors.black : Colors.yellow
+                        selectedFillColor:
+                            isCloseAction ? Colors.black : Colors.yellow
+                        pressedFillColor:
+                            isCloseAction ? Colors.red : Colors.magenta
 
-                        border.width: 1
-                        border.color: visualAccent
+                        idleBorderColor: visualAccent
+                        hoverBorderColor: visualAccent
+                        selectedBorderColor: visualAccent
+                        pressedBorderColor: visualAccent
+                        keyboardSelectedBorderColor: visualAccent
 
+                        contentGlowEnabled: false
+                        softGlowEnabled: true
+                        softGlowSpread: 3
+                        idleSoftGlowColor: visualAccent
+                        hoverSoftGlowColor: visualAccent
+                        selectedSoftGlowColor: visualAccent
+                        pressedSoftGlowColor: visualAccent
+                        keyboardSelectedSoftGlowColor: visualAccent
+                        softGlowIdleOpacity: 0.20
+                        softGlowHoverOpacity:
+                            isCloseAction ? 0.78 : 0.46
+                        softGlowPressedOpacity:
+                            isCloseAction ? 0.92 : 0.0
+                        softGlowSelectedOpacity:
+                            isCloseAction ? 0.78 : 0.46
+                        softGlowKeyboardSelectedOpacity:
+                            isCloseAction ? 0.78 : 0.46
+                        wideGlowEnabled: false
+
+                        onHoverEntered: {
+                            appControlWindow.keyboardActive = false;
+                            appControlWindow.modeRailFocused = false;
+                            appControlWindow.detailFocused = true;
+                            appControlWindow.selectedDetailActionIndex = index;
+                        }
+
+                        onTriggered: {
+                            appControlWindow.selectedDetailActionIndex = index;
+                            appControlWindow.activateSelectedDetailAction();
+                        }
                         Item {
                             anchors.fill: parent
                             anchors.leftMargin: 10
@@ -24730,9 +24762,9 @@ PanelWindow {
                                     visible: !appTabControlButton.hasKeyCommand
                                     text:
                                         appTabControlButton.isCloseAction
-                                        ? (appTabControlButton.isPressed
+                                        ? (appTabControlButton.pressed
                                            ? "(=ᗜ=)デ╾━ ๋࣭⭑"
-                                           : appTabControlButton.isHovered || appTabControlButton.isSelected
+                                           : appTabControlButton.hovered || appTabControlButton.selected
                                            ? "ദ്ദി(-_•)デ╾━"
                                            : "(-_•)デ╾━")
                                         : appTabControlButton.isMuteAction
@@ -24741,7 +24773,7 @@ PanelWindow {
                                            : "* (ˊᗜˋو)و︎︎♬*")
                                         : "⌯"
                                     font.pixelSize: 14
-                                    color: appTabControlButton.isPressed
+                                    color: appTabControlButton.pressed
                                            ? Colors.black
                                            : appTabControlButton.visualAccent
                                 }
@@ -24817,7 +24849,7 @@ PanelWindow {
                                     verticalOffset: 0
                                     radius: 5
                                     samples: 5
-                                    opacity: appTabControlButton.isPressed ? 0.0 : 0.42
+                                    opacity: appTabControlButton.pressed ? 0.0 : 0.42
                                     color: appTabControlButton.visualAccent
                                     transparentBorder: true
                                 }
@@ -24838,17 +24870,17 @@ PanelWindow {
                                       : appTabControlButton.displayActionName
                                 font.pixelSize: 14
                                 verticalAlignment: Text.AlignVCenter
-                                color: appTabControlButton.isPressed
+                                color: appTabControlButton.pressed
                                        ? Colors.black
                                        : appTabControlButton.hasSemanticAccent
                                        ? appTabControlButton.semanticAccent
-                                       : appTabControlButton.isHovered
-                                         || appTabControlButton.isSelected
+                                       : appTabControlButton.hovered
+                                         || appTabControlButton.selected
                                        ? Colors.orange
                                        : Colors.white
                                 elide: Text.ElideRight
 
-                                layer.enabled: !appTabControlButton.isPressed
+                                layer.enabled: !appTabControlButton.pressed
                                 layer.effect: DropShadow {
                                     horizontalOffset: 0
                                     verticalOffset: 0
@@ -24861,45 +24893,9 @@ PanelWindow {
                             }
                         }
 
-                        MouseArea {
-                            id: appTabControlMouse
 
-                            anchors.fill: parent
-                            hoverEnabled: true
 
-                            onEntered: {
-                                appControlWindow.keyboardActive = false;
-                            appControlWindow.modeRailFocused = false;
-                            appControlWindow.detailFocused = true;
-                                appControlWindow.selectedDetailActionIndex =
-                                    appTabControlButton.index;
-                            }
 
-                            onClicked: {
-                                appControlWindow.selectedDetailActionIndex =
-                                    appTabControlButton.index;
-
-                                appControlWindow.activateSelectedDetailAction();
-                            }
-                        }
-
-                        RectangularShadow {
-                            anchors.fill: parent
-                            spread: 3
-                            z: -1
-
-                            opacity:
-                                appTabControlButton.isCloseAction
-                                && appTabControlButton.isPressed ? 0.92
-                                : appTabControlButton.isCloseAction
-                                  && (appTabControlButton.isHovered
-                                      || appTabControlButton.isSelected) ? 0.78
-                                : appTabControlButton.isPressed ? 0.0
-                                : appTabControlButton.isHovered
-                                  || appTabControlButton.isSelected ? 0.46
-                                : 0.20
-                            color: appTabControlButton.visualAccent
-                        }
                     }
                 }
 

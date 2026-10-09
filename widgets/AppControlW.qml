@@ -25200,7 +25200,7 @@ PanelWindow {
 
                     model: 5
 
-                    delegate: Rectangle {
+                    delegate: ActionButton {
                         id: windowPrimaryActionButton
 
                         required property int index
@@ -25210,14 +25210,13 @@ PanelWindow {
 
                         anchors.horizontalCenter: parent.horizontalCenter
 
-                        property bool isHovered:
-                            !appControlWindow.keyboardActive
-                            && windowPrimaryActionMouse.containsMouse
-                        property bool isPressed:
-                            windowPrimaryActionMouse.pressed
-                        property bool isSelected:
-                            appControlWindow.detailFocused
+                        suppressHover: appControlWindow.keyboardActive
+                        selected: appControlWindow.detailFocused
                             && appControlWindow.selectedDetailActionIndex === index
+                        showLabel: false
+                        pointerCursorShape: Qt.ArrowCursor
+                        acceptedButtons: Qt.LeftButton
+
                         readonly property bool hasSemanticAccent:
                             index === 2 || index === 4
                         readonly property color inactiveAccent:
@@ -25227,27 +25226,54 @@ PanelWindow {
                             ? Colors.omnitrix
                             : Colors.cyan
                         readonly property color visualAccent:
-                            isHovered || isSelected
+                            hovered || selected
                             ? Colors.orange
                             : inactiveAccent
                         readonly property color glowAccent:
-                            isHovered || isSelected
+                            hovered || selected
                             ? Colors.orange
                             : index === 2
                             ? Colors.cyan
                             : inactiveAccent
 
-                        color: isPressed
-                               ? Colors.magenta
-                               : isHovered || isSelected
-                               ? Colors.yellow
-                               : index === 0
-                               ? Colors.dark
-                               : Colors.black
+                        idleFillColor:
+                            index === 0 ? Colors.dark : Colors.black
+                        hoverFillColor: Colors.yellow
+                        selectedFillColor: Colors.yellow
+                        pressedFillColor: Colors.magenta
 
-                        border.width: 1
-                        border.color: visualAccent
+                        idleBorderColor: inactiveAccent
+                        hoverBorderColor: Colors.orange
+                        selectedBorderColor: Colors.orange
+                        pressedBorderColor: Colors.orange
+                        keyboardSelectedBorderColor: Colors.orange
 
+                        contentGlowEnabled: false
+                        softGlowEnabled: true
+                        softGlowSpread: 3
+                        idleSoftGlowColor: glowAccent
+                        hoverSoftGlowColor: Colors.orange
+                        selectedSoftGlowColor: Colors.orange
+                        pressedSoftGlowColor: Colors.orange
+                        keyboardSelectedSoftGlowColor: Colors.orange
+                        softGlowIdleOpacity: 0.20
+                        softGlowHoverOpacity: 0.46
+                        softGlowPressedOpacity: 0.0
+                        softGlowSelectedOpacity: 0.46
+                        softGlowKeyboardSelectedOpacity: 0.46
+                        wideGlowEnabled: false
+
+                        onHoverEntered: {
+                            appControlWindow.keyboardActive = false;
+                            appControlWindow.modeRailFocused = false;
+                            appControlWindow.detailFocused = true;
+                            appControlWindow.selectedDetailActionIndex = index;
+                        }
+
+                        onTriggered: {
+                            appControlWindow.selectedDetailActionIndex = index;
+                            appControlWindow.activateSelectedDetailAction();
+                        }
                         Row {
                             anchors.left: parent.left
                             anchors.verticalCenter: parent.verticalCenter
@@ -25276,12 +25302,12 @@ PanelWindow {
 
                                     font.pixelSize: 14
 
-                                    color: windowPrimaryActionButton.isPressed
+                                    color: windowPrimaryActionButton.pressed
                                            ? Colors.black
                                            : windowPrimaryActionButton.hasSemanticAccent
                                            ? windowPrimaryActionButton.visualAccent
-                                           : windowPrimaryActionButton.isHovered
-                                             || windowPrimaryActionButton.isSelected
+                                           : windowPrimaryActionButton.hovered
+                                             || windowPrimaryActionButton.selected
                                            ? Colors.orange
                                            : Colors.white
                                 }
@@ -25313,20 +25339,20 @@ PanelWindow {
                                         : 7
 
                                     opacity:
-                                        windowPrimaryActionButton.isPressed
+                                        windowPrimaryActionButton.pressed
                                         ? 0.0
                                         : topThreeIcon
-                                        ? (windowPrimaryActionButton.isHovered
-                                           || windowPrimaryActionButton.isSelected
+                                        ? (windowPrimaryActionButton.hovered
+                                           || windowPrimaryActionButton.selected
                                            ? 1.0
                                            : 0.98)
                                         : boostedIcon
-                                        ? (windowPrimaryActionButton.isHovered
-                                           || windowPrimaryActionButton.isSelected
+                                        ? (windowPrimaryActionButton.hovered
+                                           || windowPrimaryActionButton.selected
                                            ? 0.98
                                            : 0.92)
-                                        : (windowPrimaryActionButton.isHovered
-                                           || windowPrimaryActionButton.isSelected
+                                        : (windowPrimaryActionButton.hovered
+                                           || windowPrimaryActionButton.selected
                                            ? 0.72
                                            : 0.56)
 
@@ -25348,17 +25374,17 @@ PanelWindow {
 
                                 font.pixelSize: 14
 
-                                color: windowPrimaryActionButton.isPressed
+                                color: windowPrimaryActionButton.pressed
                                        ? Colors.black
                                        : windowPrimaryActionButton.hasSemanticAccent
                                        ? windowPrimaryActionButton.visualAccent
-                                       : windowPrimaryActionButton.isHovered
-                                         || windowPrimaryActionButton.isSelected
+                                       : windowPrimaryActionButton.hovered
+                                         || windowPrimaryActionButton.selected
                                        ? Colors.orange
                                        : Colors.white
 
                                 layer.enabled:
-                                    !windowPrimaryActionButton.isPressed
+                                    !windowPrimaryActionButton.pressed
 
                                 layer.effect: DropShadow {
                                     horizontalOffset: 0
@@ -25372,45 +25398,9 @@ PanelWindow {
                             }
                         }
 
-                        MouseArea {
-                            id: windowPrimaryActionMouse
 
-                            anchors.fill: parent
-                            hoverEnabled: true
 
-                            onEntered: {
-                                appControlWindow.keyboardActive = false;
-                            appControlWindow.modeRailFocused = false;
-                            appControlWindow.detailFocused = true;
-                                appControlWindow.selectedDetailActionIndex =
-                                    windowPrimaryActionButton.index;
-                            }
 
-                            onClicked: {
-                                appControlWindow.selectedDetailActionIndex =
-                                    windowPrimaryActionButton.index;
-                                appControlWindow.activateSelectedDetailAction();
-                            }
-                        }
-
-                        RectangularShadow {
-                            anchors.fill: parent
-
-                            spread: 3
-                            z: -1
-
-                            opacity:
-                                windowPrimaryActionButton.isPressed
-                                ? 0.0
-                                : windowPrimaryActionButton.isHovered
-                                  || windowPrimaryActionButton.isSelected
-                                ? 0.46
-                                : 0.20
-
-                            // FLOAT keeps white text/border but uses a cyan halo.
-                            // FULLSCREEN keeps its omnitrix semantic accent.
-                            color: windowPrimaryActionButton.glowAccent
-                        }
                     }
                 }
 

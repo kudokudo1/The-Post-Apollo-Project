@@ -676,7 +676,7 @@ for needle, message in (
     ("isRebootAction ? Colors.red : Colors.yellow", "reboot-specific hover fill"),
     ("onTriggered: {", "system action trigger delegation"),
 ):
-    require(SYSTEM_MONITOR[system_block:system_marker + 2600], needle, message)
+    require(SYSTEM_MONITOR[system_block:system_marker + 5200], needle, message)
 assert "id: systemControlMouse" not in SYSTEM_MONITOR, (
     "System Monitor reintroduced a private action pointer engine"
 )

@@ -8,7 +8,7 @@ Scope {
     property var transcript: [
         {
             sender: "RECEPTION",
-            body: "Front desk online. I can route you to Surgery, Archive, Reports, Rounds, Staff, Phone, or Intercom."
+            body: "Front desk online. I can route you to Surgery, Attention, Merge Queue, Archive, Reports, Rounds, Staff, Phone, or Intercom."
         }
     ]
 
@@ -3844,6 +3844,10 @@ Scope {
             response = "Opening Reception archive.";
         else if (target === "reports")
             response = "Opening surgical history and evidence.";
+        else if (target === "attention")
+            response = "Opening GitHub Attention triage.";
+        else if (target === "merge_queue")
+            response = "Opening the current repository merge queue.";
         else if (target === "rounds")
             response = "Opening Hospital-wide rounds.";
         else if (target === "staff")
@@ -3855,7 +3859,7 @@ Scope {
         else {
             append(
                 "RECEPTION",
-                "I can route Surgery, Archive, Reports, Rounds, Staff, Phone, or Intercom."
+                "I can route Surgery, Attention, Merge Queue, Archive, Reports, Rounds, Staff, Phone, or Intercom."
             );
             return false;
         }
@@ -3936,8 +3940,17 @@ Scope {
                 || query.indexOf("clipboard") >= 0)
             return request("reports", raw);
 
+        if (query.indexOf("merge queue") >= 0
+                || query.indexOf("mergequeue") >= 0)
+            return request("merge_queue", raw);
+
+        if (query.indexOf("attention") >= 0
+                || query.indexOf("triage") >= 0
+                || query.indexOf("pull request") >= 0
+                || query.indexOf("github") >= 0)
+            return request("attention", raw);
+
         if (query.indexOf("round") >= 0
-                || query.indexOf("attention") >= 0
                 || query.indexOf("bell") >= 0
                 || query.indexOf("hospital wide") >= 0)
             return request("rounds", raw);
@@ -3966,7 +3979,7 @@ Scope {
         append("OPERATOR", raw);
         append(
             "RECEPTION",
-            "I don't have authority to improvise that action. Ask for Surgery, Archive, Reports, Rounds, Staff, Phone, or Intercom."
+            "I don't have authority to improvise that action. Ask for Surgery, Attention, Merge Queue, Archive, Reports, Rounds, Staff, Phone, or Intercom."
         );
         return false;
     }

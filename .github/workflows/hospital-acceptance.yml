@@ -1,0 +1,36 @@
+name: Hospital Acceptance
+
+on:
+  pull_request:
+    paths:
+      - "components/ConversationFeed.qml"
+      - "services/hospital/**"
+      - "widgets/Hospital*.qml"
+      - "tests/hospital/**"
+      - ".github/workflows/hospital-acceptance.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "components/ConversationFeed.qml"
+      - "services/hospital/**"
+      - "widgets/Hospital*.qml"
+      - "tests/hospital/**"
+      - ".github/workflows/hospital-acceptance.yml"
+  workflow_dispatch:
+
+jobs:
+  hospital-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run Hospital acceptance and contract burn-in
+        shell: bash
+        run: |
+          set -euo pipefail
+          for test in tests/hospital/test_*contracts.py; do
+            echo "==> $test"
+            python3 "$test"
+          done

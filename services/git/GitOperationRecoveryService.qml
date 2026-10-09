@@ -100,6 +100,80 @@ Scope {
             : "";
     }
 
+    function hasFullStashStack(snapshot) {
+        return snapshot && Array.isArray(snapshot.stashEntries);
+    }
+
+    function stashEntries(snapshot) {
+        return hasFullStashStack(snapshot)
+            ? snapshot.stashEntries
+            : [];
+    }
+
+    function normalizedStashRef(value) {
+        const ref = String(value || "");
+        return !ref || ref === "refs/stash"
+            ? "stash@{0}"
+            : ref;
+    }
+
+    function stashEntry(snapshot, refName) {
+        const rows = stashEntries(snapshot);
+        const ref = normalizedStashRef(refName);
+
+        for (let i = 0; i < rows.length; ++i) {
+            const row = rows[i] || {};
+            if (String(row.ref || "") === ref)
+                return row;
+        }
+
+        return null;
+    }
+
+    function stashStackShas(snapshot) {
+        return stashEntries(snapshot).map(function(row) {
+            return String((row || {}).sha || "");
+        }).filter(function(sha) {
+            return sha.length > 0;
+        });
+    }
+
+    function sameStringArray(first, second) {
+        const a = Array.isArray(first) ? first : [];
+        const b = Array.isArray(second) ? second : [];
+
+        if (a.length !== b.length)
+            return false;
+
+        for (let i = 0; i < a.length; ++i) {
+            if (String(a[i] || "") !== String(b[i] || ""))
+                return false;
+        }
+
+        return true;
+    }
+
+    function stashStackAfterRemoving(snapshot, refName) {
+        const rows = stashEntries(snapshot);
+        const ref = normalizedStashRef(refName);
+        const out = [];
+        let removed = false;
+
+        for (let i = 0; i < rows.length; ++i) {
+            const row = rows[i] || {};
+            if (!removed && String(row.ref || "") === ref) {
+                removed = true;
+                continue;
+            }
+
+            const sha = String(row.sha || "");
+            if (sha)
+                out.push(sha);
+        }
+
+        return removed ? out : null;
+    }
+
     function refuse(reason) {
         return {
             allowed: false,

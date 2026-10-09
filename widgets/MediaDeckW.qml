@@ -64,7 +64,7 @@ PanelWindow {
                 id: cassetteSection
                 height: parent.height
                 width: Math.round(
-                    (deckSections.width - 2 * deckSections.spacing) * 0.44
+                    (deckSections.width - 2 * deckSections.spacing) * 0.35
                 )
                 inset: 14
                 fillColor: Colors.black
@@ -86,7 +86,7 @@ PanelWindow {
                 id: displaySection
                 height: parent.height
                 width: Math.round(
-                    (deckSections.width - 2 * deckSections.spacing) * 0.29
+                    (deckSections.width - 2 * deckSections.spacing) * 0.23
                 )
                 inset: 14
                 fillColor: Colors.black

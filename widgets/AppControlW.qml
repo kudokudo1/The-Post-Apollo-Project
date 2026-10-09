@@ -24060,7 +24060,7 @@ MouseArea {
 
                 }
 
-                Rectangle {
+                ActionButton {
                     id: appKillAction
 
                     visible: {
@@ -24091,29 +24091,56 @@ MouseArea {
                     property bool canKill:
                         appControlWindow.selectedApplicationKillPids().length > 0
 
-                    property bool isHovered:
-                        canKill
-                        && !appControlWindow.keyboardActive
-                        && appKillActionMouse.containsMouse
-
-                    property bool isPressed:
-                        canKill
-                        && appKillActionMouse.pressed
-
-                    property bool isSelected:
-                        appControlWindow.detailFocused
+                    available: canKill
+                    suppressHover: appControlWindow.keyboardActive
+                    selected: appControlWindow.detailFocused
                         && appControlWindow.selectedDetailActionIndex
                            === detailIndex
+                    destructive: true
+                    showLabel: false
+                    pointerCursorShape: Qt.ArrowCursor
 
-                    color:
-                        isPressed ? Colors.red
-                        : isHovered || isSelected ? Colors.yellow
-                        : Colors.black
+                    idleFillColor: Colors.black
+                    hoverFillColor: Colors.yellow
+                    selectedFillColor: Colors.yellow
+                    pressedFillColor: Colors.red
 
-                    opacity: canKill ? 1.0 : 0.44
+                    idleBorderColor: Colors.red
+                    hoverBorderColor: Colors.red
+                    selectedBorderColor: Colors.red
+                    pressedBorderColor: Colors.black
+                    keyboardSelectedBorderColor: Colors.red
+                    unavailableOpacity: 0.44
 
-                    border.width: 1
-                    border.color: isPressed ? Colors.black : Colors.red
+                    contentGlowEnabled: false
+                    softGlowEnabled: true
+                    softGlowSpread: 5
+                    softGlowMargin: 0
+                    idleSoftGlowColor: Colors.red
+                    hoverSoftGlowColor: Colors.red
+                    selectedSoftGlowColor: Colors.red
+                    pressedSoftGlowColor: Colors.red
+                    keyboardSelectedSoftGlowColor: Colors.red
+                    softGlowIdleOpacity: 0.22
+                    softGlowHoverOpacity: 0.78
+                    softGlowPressedOpacity: 0.92
+                    softGlowSelectedOpacity: 0.78
+                    softGlowKeyboardSelectedOpacity: 0.78
+                    wideGlowEnabled: false
+
+                    onHoverEntered: {
+                        appControlWindow.keyboardActive = false;
+                        appControlWindow.modeRailFocused = false;
+                        appControlWindow.detailFocused = true;
+                        appControlWindow.selectedDetailActionIndex =
+                            appKillAction.detailIndex;
+                    }
+
+                    onTriggered: {
+                        appControlWindow.selectedDetailActionIndex =
+                            appKillAction.detailIndex;
+                        appControlWindow.terminateSelectedApplication();
+                    }
 
                     Row {
                         anchors.left: parent.left
@@ -24125,20 +24152,20 @@ MouseArea {
                             id: appKillActionIcon
 
                             text:
-                                appKillAction.isPressed
+                                appKillAction.pressed
                                 ? "(=ᗜ=)デ╾━ ๋࣭⭑"
-                                : appKillAction.isHovered || appKillAction.isSelected
+                                : appKillAction.hovered || appKillAction.selected
                                 ? "ദ്ദി(-_•)デ╾━"
                                 : "(-_•)デ╾━"
 
                             font.pixelSize: 14
 
                             color:
-                                appKillAction.isPressed
+                                appKillAction.pressed
                                 ? Colors.black
                                 : Colors.red
 
-                            layer.enabled: !appKillAction.isPressed
+                            layer.enabled: !appKillAction.pressed
                             layer.effect: DropShadow {
                                 horizontalOffset: 0
                                 verticalOffset: 0
@@ -24161,11 +24188,11 @@ MouseArea {
                             font.pixelSize: 14
 
                             color:
-                                appKillAction.isPressed
+                                appKillAction.pressed
                                 ? Colors.black
                                 : Colors.red
 
-                            layer.enabled: !appKillAction.isPressed
+                            layer.enabled: !appKillAction.pressed
                             layer.effect: DropShadow {
                                 horizontalOffset: 0
                                 verticalOffset: 0
@@ -24178,40 +24205,9 @@ MouseArea {
                         }
                     }
 
-                    MouseArea {
-                        id: appKillActionMouse
 
-                        anchors.fill: parent
-                        enabled: appKillAction.canKill
-                        hoverEnabled: true
 
-                        onEntered: {
-                            appControlWindow.keyboardActive = false;
-                            appControlWindow.modeRailFocused = false;
-                            appControlWindow.detailFocused = true;
-                            appControlWindow.selectedDetailActionIndex =
-                                appKillAction.detailIndex;
-                        }
 
-                        onClicked: {
-                            appControlWindow.selectedDetailActionIndex =
-                                appKillAction.detailIndex;
-                            appControlWindow.terminateSelectedApplication();
-                        }
-                    }
-
-                    RectangularShadow {
-                        anchors.fill: parent
-                        spread: 5
-                        z: -1
-
-                        opacity:
-                            appKillAction.isPressed ? 0.92
-                            : appKillAction.isHovered || appKillAction.isSelected
-                            ? 0.78 : 0.22
-
-                        color: Colors.red
-                    }
 
                 }
 
@@ -24934,7 +24930,7 @@ MouseArea {
 
                 }
 
-                Rectangle {
+                ActionButton {
                     id: tabCloseActionBelowFreeze
 
                     readonly property int detailIndex:
@@ -24944,27 +24940,59 @@ MouseArea {
                         && detailIndex < tabControlSection.controls.length
                         ? tabControlSection.controls[detailIndex]
                         : null
-                    readonly property bool isHovered:
-                        !appControlWindow.keyboardActive
-                        && tabCloseActionBelowFreezeMouse.containsMouse
-                    readonly property bool isPressed:
-                        tabCloseActionBelowFreezeMouse.pressed
-                    readonly property bool isSelected:
-                        appControlWindow.detailFocused
+                    available: detailIndex >= 0 && controlData !== null
+                    suppressHover: appControlWindow.keyboardActive
+                    selected: appControlWindow.detailFocused
                         && detailIndex >= 0
                         && appControlWindow.selectedDetailActionIndex === detailIndex
+                    destructive: true
+                    showLabel: false
+                    pointerCursorShape: Qt.ArrowCursor
 
-                    visible: detailIndex >= 0 && controlData !== null
-                    width: tabControlSection.width - 10
-                    height: visible ? 34 : 0
-                    anchors.horizontalCenter: parent.horizontalCenter
+                    idleFillColor: Colors.black
+                    hoverFillColor: Colors.yellow
+                    selectedFillColor: Colors.yellow
+                    pressedFillColor: Colors.red
 
-                    color:
-                        isPressed ? Colors.red
-                        : isHovered || isSelected ? Colors.yellow
-                        : Colors.black
-                    border.width: 1
-                    border.color: isPressed ? Colors.black : Colors.red
+                    idleBorderColor: Colors.red
+                    hoverBorderColor: Colors.red
+                    selectedBorderColor: Colors.red
+                    pressedBorderColor: Colors.black
+                    keyboardSelectedBorderColor: Colors.red
+
+                    contentGlowEnabled: false
+                    softGlowEnabled: true
+                    softGlowSpread: 4
+                    softGlowMargin: 4
+                    idleSoftGlowColor: Colors.red
+                    hoverSoftGlowColor: Colors.red
+                    selectedSoftGlowColor: Colors.red
+                    pressedSoftGlowColor: Colors.red
+                    keyboardSelectedSoftGlowColor: Colors.red
+                    softGlowIdleOpacity: 0.24
+                    softGlowHoverOpacity: 0.78
+                    softGlowPressedOpacity: 0.92
+                    softGlowSelectedOpacity: 0.78
+                    softGlowKeyboardSelectedOpacity: 0.78
+                    wideGlowEnabled: false
+
+                    onHoverEntered: {
+                        appControlWindow.keyboardActive = false;
+                        appControlWindow.modeRailFocused = false;
+                        appControlWindow.detailFocused = true;
+                        if (tabCloseActionBelowFreeze.detailIndex >= 0)
+                            appControlWindow.selectedDetailActionIndex =
+                                tabCloseActionBelowFreeze.detailIndex;
+                    }
+
+                    onTriggered: {
+                        if (tabCloseActionBelowFreeze.detailIndex < 0)
+                            return;
+
+                        appControlWindow.selectedDetailActionIndex =
+                            tabCloseActionBelowFreeze.detailIndex;
+                        appControlWindow.activateSelectedDetailAction();
+                    }
 
                     Row {
                         anchors.left: parent.left
@@ -24976,18 +25004,18 @@ MouseArea {
 
                         GohuText {
                             text:
-                                tabCloseActionBelowFreeze.isPressed
+                                tabCloseActionBelowFreeze.pressed
                                 ? "(=ᗜ=)デ╾━ ๋࣭⭑"
-                                : tabCloseActionBelowFreeze.isHovered
-                                  || tabCloseActionBelowFreeze.isSelected
+                                : tabCloseActionBelowFreeze.hovered
+                                  || tabCloseActionBelowFreeze.selected
                                 ? "ദ്ദി(-_•)デ╾━"
                                 : "(-_•)デ╾━"
                             font.pixelSize: 14
                             color:
-                                tabCloseActionBelowFreeze.isPressed
+                                tabCloseActionBelowFreeze.pressed
                                 ? Colors.black : Colors.red
 
-                            layer.enabled: !tabCloseActionBelowFreeze.isPressed
+                            layer.enabled: !tabCloseActionBelowFreeze.pressed
                             layer.effect: DropShadow {
                                 radius: 8
                                 samples: 7
@@ -25001,16 +25029,16 @@ MouseArea {
                             text: "\"CLOSE\" TAB"
                             font.pixelSize: 14
                             color:
-                                tabCloseActionBelowFreeze.isPressed
+                                tabCloseActionBelowFreeze.pressed
                                 ? Colors.black : Colors.red
 
-                            layer.enabled: !tabCloseActionBelowFreeze.isPressed
+                            layer.enabled: !tabCloseActionBelowFreeze.pressed
                             layer.effect: DropShadow {
                                 radius: 7
                                 samples: 7
                                 opacity:
-                                    tabCloseActionBelowFreeze.isHovered
-                                    || tabCloseActionBelowFreeze.isSelected
+                                    tabCloseActionBelowFreeze.hovered
+                                    || tabCloseActionBelowFreeze.selected
                                     ? 0.72 : 0.44
                                 color: Colors.red
                                 transparentBorder: true
@@ -25018,42 +25046,9 @@ MouseArea {
                         }
                     }
 
-                    MouseArea {
-                        id: tabCloseActionBelowFreezeMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
 
-                        onEntered: {
-                            appControlWindow.keyboardActive = false;
-                            appControlWindow.modeRailFocused = false;
-                            appControlWindow.detailFocused = true;
-                            if (tabCloseActionBelowFreeze.detailIndex >= 0)
-                                appControlWindow.selectedDetailActionIndex =
-                                    tabCloseActionBelowFreeze.detailIndex;
-                        }
 
-                        onClicked: {
-                            if (tabCloseActionBelowFreeze.detailIndex < 0)
-                                return;
 
-                            appControlWindow.selectedDetailActionIndex =
-                                tabCloseActionBelowFreeze.detailIndex;
-                            appControlWindow.activateSelectedDetailAction();
-                        }
-                    }
-
-                    RectangularShadow {
-                        anchors.fill: parent
-                        anchors.margins: -4
-                        spread: 4
-                        z: -1
-                        opacity:
-                            tabCloseActionBelowFreeze.isPressed ? 0.92
-                            : tabCloseActionBelowFreeze.isHovered
-                              || tabCloseActionBelowFreeze.isSelected
-                            ? 0.78 : 0.24
-                        color: Colors.red
-                    }
                 }
 
                 Loader {
@@ -26051,7 +26046,7 @@ MouseArea {
 
                 }
 
-                Rectangle {
+                ActionButton {
                     id: windowKillAction
 
                     width: parent.width - 10
@@ -26059,22 +26054,51 @@ MouseArea {
 
                     anchors.horizontalCenter: parent.horizontalCenter
 
-                    property bool isHovered:
-                        !appControlWindow.keyboardActive
-                        && windowKillActionMouse.containsMouse
-                    property bool isPressed:
-                        windowKillActionMouse.pressed
-                    property bool isSelected:
-                        appControlWindow.detailFocused
+                    suppressHover: appControlWindow.keyboardActive
+                    selected: appControlWindow.detailFocused
                         && appControlWindow.selectedDetailActionIndex === 7
+                    destructive: true
+                    showLabel: false
+                    pointerCursorShape: Qt.ArrowCursor
 
-                    color:
-                        isPressed ? Colors.red
-                        : isHovered || isSelected ? Colors.yellow
-                        : Colors.black
+                    idleFillColor: Colors.black
+                    hoverFillColor: Colors.yellow
+                    selectedFillColor: Colors.yellow
+                    pressedFillColor: Colors.red
 
-                    border.width: 1
-                    border.color: isPressed ? Colors.black : Colors.red
+                    idleBorderColor: Colors.red
+                    hoverBorderColor: Colors.red
+                    selectedBorderColor: Colors.red
+                    pressedBorderColor: Colors.black
+                    keyboardSelectedBorderColor: Colors.red
+
+                    contentGlowEnabled: false
+                    softGlowEnabled: true
+                    softGlowSpread: 5
+                    softGlowMargin: 0
+                    idleSoftGlowColor: Colors.red
+                    hoverSoftGlowColor: Colors.red
+                    selectedSoftGlowColor: Colors.red
+                    pressedSoftGlowColor: Colors.red
+                    keyboardSelectedSoftGlowColor: Colors.red
+                    softGlowIdleOpacity: 0.22
+                    softGlowHoverOpacity: 0.78
+                    softGlowPressedOpacity: 0.92
+                    softGlowSelectedOpacity: 0.78
+                    softGlowKeyboardSelectedOpacity: 0.78
+                    wideGlowEnabled: false
+
+                    onHoverEntered: {
+                        appControlWindow.keyboardActive = false;
+                        appControlWindow.modeRailFocused = false;
+                        appControlWindow.detailFocused = true;
+                        appControlWindow.selectedDetailActionIndex = 7;
+                    }
+
+                    onTriggered: {
+                        appControlWindow.selectedDetailActionIndex = 7;
+                        appControlWindow.activateSelectedDetailAction();
+                    }
 
                     Row {
                         anchors.left: parent.left
@@ -26088,17 +26112,17 @@ MouseArea {
                             anchors.verticalCenter: parent.verticalCenter
 
                             text:
-                                windowKillAction.isPressed
+                                windowKillAction.pressed
                                 ? "(=ᗜ=)デ╾━ ๋࣭⭑"
-                                : windowKillAction.isHovered || windowKillAction.isSelected
+                                : windowKillAction.hovered || windowKillAction.selected
                                 ? "ദ്ദി(-_•)デ╾━"
                                 : "(-_•)デ╾━"
                             font.pixelSize: 14
-                            color: windowKillAction.isPressed
+                            color: windowKillAction.pressed
                                    ? Colors.black
                                    : Colors.red
 
-                            layer.enabled: !windowKillAction.isPressed
+                            layer.enabled: !windowKillAction.pressed
                             layer.effect: DropShadow {
                                 horizontalOffset: 0
                                 verticalOffset: 0
@@ -26107,8 +26131,8 @@ MouseArea {
                                 samples: 7
 
                                 opacity:
-                                    windowKillAction.isHovered
-                                    || windowKillAction.isSelected
+                                    windowKillAction.hovered
+                                    || windowKillAction.selected
                                     ? 0.82
                                     : 0.60
 
@@ -26125,11 +26149,11 @@ MouseArea {
                             text: "KILL WINDOW"
 
                             font.pixelSize: 14
-                            color: windowKillAction.isPressed
+                            color: windowKillAction.pressed
                                    ? Colors.black
                                    : Colors.red
 
-                            layer.enabled: !windowKillAction.isPressed
+                            layer.enabled: !windowKillAction.pressed
                             layer.effect: DropShadow {
                                 horizontalOffset: 0
                                 verticalOffset: 0
@@ -26142,36 +26166,9 @@ MouseArea {
                         }
                     }
 
-                    MouseArea {
-                        id: windowKillActionMouse
 
-                        anchors.fill: parent
-                        hoverEnabled: true
 
-                        onEntered: {
-                            appControlWindow.keyboardActive = false;
-                            appControlWindow.modeRailFocused = false;
-                            appControlWindow.detailFocused = true;
-                            appControlWindow.selectedDetailActionIndex = 7;
-                        }
 
-                        onClicked: {
-                            appControlWindow.selectedDetailActionIndex = 7;
-                            appControlWindow.activateSelectedDetailAction();
-                        }
-                    }
-
-                    RectangularShadow {
-                        anchors.fill: parent
-                        spread: 5
-                        z: -1
-
-                        opacity: windowKillAction.isPressed ? 0.92
-                                 : windowKillAction.isHovered || windowKillAction.isSelected
-                                 ? 0.78 : 0.22
-
-                        color: Colors.red
-                    }
 
                 }
 

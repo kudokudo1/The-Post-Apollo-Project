@@ -260,3 +260,30 @@ for private_mouse in (
     assert private_mouse not in APPCONTROL, f"AppControl reintroduced private freeze pointer engine: {private_mouse}"
 
 print("AppControl freeze ActionButton migration: PASS")
+
+
+# Second AppControl proof migration: destructive APP KILL, TAB CLOSE, and
+# WINDOW KILL controls use the same ActionButton engine while preserving their
+# red semantics and their mode-specific activation paths.
+for control_id in ("appKillAction", "tabCloseActionBelowFreeze", "windowKillAction"):
+    marker = f"id: {control_id}"
+    marker_pos = APPCONTROL.index(marker)
+    block_start = APPCONTROL.rfind("ActionButton {", 0, marker_pos)
+    assert block_start >= 0, f"{control_id} must be hosted by ActionButton"
+
+    rectangle_start = APPCONTROL.rfind("Rectangle {", 0, marker_pos)
+    assert rectangle_start < block_start, f"{control_id} fell back to a private Rectangle"
+
+    window = APPCONTROL[block_start:marker_pos + 2600]
+    require(window, "destructive: true", f"{control_id} destructive semantics")
+    require(window, "pressedFillColor: Colors.red", f"{control_id} pressed fill")
+    require(window, "pressedBorderColor: Colors.black", f"{control_id} pressed border")
+
+for private_mouse in (
+    "id: appKillActionMouse",
+    "id: tabCloseActionBelowFreezeMouse",
+    "id: windowKillActionMouse",
+):
+    assert private_mouse not in APPCONTROL, f"AppControl reintroduced private destructive pointer engine: {private_mouse}"
+
+print("AppControl destructive ActionButton migration: PASS")

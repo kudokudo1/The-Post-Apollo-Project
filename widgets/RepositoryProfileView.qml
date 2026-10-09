@@ -54,6 +54,23 @@ Item {
         return false;
     }
 
+    function catalogSlugs() {
+        const out = [];
+
+        for (let i = 0; i < root.gitService.repoCount; ++i) {
+            const row = root.gitService.repoAt(i);
+            const slug =
+                row
+                ? String(row.remoteSlug || "").trim()
+                : "";
+
+            if (slug)
+                out.push(slug);
+        }
+
+        return out;
+    }
+
     function targetMissing(slugValue) {
         return root.gitService.repoCount > 0
             && !root.gitService.discoveringRepos
@@ -672,16 +689,36 @@ Item {
                         Row {
                             width: parent.width
                             height: 24
+                            spacing: 4
 
                             GohuText {
-                                width: parent.width - 70
+                                width: parent.width - 168
                                 text: "TARGET BATCH"
                                 font.pixelSize: 9
                                 color: Colors.magenta
                             }
 
                             ManagerButton {
-                                width: 70
+                                width: 94
+                                height: 24
+                                label:
+                                    root.queueMissingCount() > 0
+                                    ? "PRUNE "
+                                      + String(root.queueMissingCount())
+                                    : "PRUNE STALE"
+                                dangerAccent: root.queueMissingCount() > 0
+                                enabledAction: root.queueMissingCount() > 0
+
+                                onTriggered: {
+                                    root.profileStore.pruneQueue(
+                                        root.catalogSlugs()
+                                    );
+                                    root.markDirty();
+                                }
+                            }
+
+                            ManagerButton {
+                                width: 66
                                 height: 24
                                 label: "CLEAR"
                                 enabledAction: root.profileStore.queueCount > 0
@@ -896,7 +933,7 @@ Item {
                                             spacing: 4
 
                                             GohuText {
-                                                width: parent.width - 112
+                                                width: parent.width - 168
                                                 anchors.verticalCenter: parent.verticalCenter
                                                 text:
                                                     String(modelData.name || "SET")
@@ -929,6 +966,27 @@ Item {
                                                     ? Colors.red
                                                     : Colors.white
                                                 elide: Text.ElideRight
+                                            }
+
+                                            ManagerButton {
+                                                width: 52
+                                                height: 24
+                                                label: "PRUNE"
+                                                dangerAccent:
+                                                    root.savedSetMissingCount(
+                                                        modelData
+                                                    ) > 0
+                                                enabledAction:
+                                                    root.savedSetMissingCount(
+                                                        modelData
+                                                    ) > 0
+                                                onTriggered: {
+                                                    root.profileStore.pruneSet(
+                                                        modelData,
+                                                        root.catalogSlugs()
+                                                    );
+                                                    root.clearSetArm();
+                                                }
                                             }
 
                                             ManagerButton {

@@ -21878,6 +21878,7 @@ PanelWindow {
                         && appControlWindow.selectedDetailActionIndex === 0
                     showLabel: false
                     pointerCursorShape: Qt.ArrowCursor
+                    acceptedButtons: Qt.LeftButton
 
                     idleFillColor: Colors.dark
                     hoverFillColor: Colors.yellow
@@ -22680,6 +22681,7 @@ PanelWindow {
                             && appControlWindow.selectedDetailActionIndex === index + 1
                         showLabel: false
                         pointerCursorShape: Qt.ArrowCursor
+                        acceptedButtons: Qt.LeftButton
 
                         idleFillColor: Colors.black
                         hoverFillColor: Colors.yellow
@@ -26284,6 +26286,7 @@ PanelWindow {
                         && appControlWindow.selectedDetailActionIndex === 0
                     showLabel: false
                     pointerCursorShape: Qt.ArrowCursor
+                    acceptedButtons: Qt.LeftButton
 
                     idleFillColor: Colors.dark
                     hoverFillColor: Colors.yellow
@@ -26522,6 +26525,7 @@ PanelWindow {
                         && appControlWindow.selectedDetailActionIndex === 1
                     showLabel: false
                     pointerCursorShape: Qt.ArrowCursor
+                    acceptedButtons: Qt.LeftButton
 
                     idleFillColor: Colors.black
                     hoverFillColor: Colors.yellow
@@ -26766,6 +26770,7 @@ PanelWindow {
                         && appControlWindow.selectedDetailActionIndex === 2
                     showLabel: false
                     pointerCursorShape: Qt.ArrowCursor
+                    acceptedButtons: Qt.LeftButton
 
                     idleFillColor: Colors.black
                     hoverFillColor: Colors.yellow
@@ -27010,6 +27015,7 @@ PanelWindow {
                         && appControlWindow.selectedDetailActionIndex === 3
                     showLabel: false
                     pointerCursorShape: Qt.ArrowCursor
+                    acceptedButtons: Qt.LeftButton
 
                     idleFillColor: Colors.black
                     hoverFillColor: Colors.yellow
@@ -27258,6 +27264,7 @@ PanelWindow {
                         && appControlWindow.selectedDetailActionIndex === 4
                     showLabel: false
                     pointerCursorShape: Qt.ArrowCursor
+                    acceptedButtons: Qt.LeftButton
 
                     idleFillColor: Colors.black
                     hoverFillColor: Colors.yellow

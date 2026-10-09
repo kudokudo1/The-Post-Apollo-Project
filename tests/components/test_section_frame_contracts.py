@@ -8,6 +8,7 @@ COMPONENT = (ROOT / "components/SectionFrame.qml").read_text(encoding="utf-8")
 QMLDIR = (ROOT / "components/qmldir").read_text(encoding="utf-8")
 WORKFLOW_LIBRARY = (ROOT / "widgets/WorkflowLibraryView.qml").read_text(encoding="utf-8")
 REPOSITORY_PROFILE = (ROOT / "widgets/RepositoryProfileView.qml").read_text(encoding="utf-8")
+HOSPITAL_CHARTS = (ROOT / "widgets/HospitalChartsView.qml").read_text(encoding="utf-8")
 
 
 def require(text: str, needle: str, message: str) -> None:
@@ -95,5 +96,14 @@ for needle, message in (
     ("SectionFrame {\n            width: parent.width\n            height: 42\n            fillColor: Colors.dark\n            borderWidth: 1\n            borderColor: Colors.blue\n            inset: 8", "account profile header shell values"),
 ):
     require(REPOSITORY_PROFILE, needle, message)
+
+# Hospital Charts proves the same flat workbench shell grammar across domains.
+for needle, message in (
+    ("SectionFrame {\n            width: parent.width\n            height: 42\n            fillColor: Colors.dark\n            borderWidth: 1\n            borderColor: Colors.green\n            inset: 7", "hospital chart header shell"),
+    ("root.selectedEntry\n                    ? root.statusColor(root.selectedEntry.status)\n                    : Colors.green\n                inset: 10", "selected chart detail dynamic border and inset"),
+    ("SectionFrame {\n                width: parent.width\n                height: 42\n                fillColor: Colors.black\n                borderWidth: 1\n                borderColor: Colors.magenta\n                inset: 7", "suggestions header shell"),
+    ("root.selectedSuggestion\n                        ? Colors.magenta : Colors.blue\n                    inset: 10", "selected suggestion detail dynamic border and inset"),
+):
+    require(HOSPITAL_CHARTS, needle, message)
 
 print("Section frame contracts: PASS")

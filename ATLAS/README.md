@@ -12,7 +12,7 @@
 
 ### ★⋆˙ CORE // WHAT THIS ROOM IS
 
-ATLAS orients readers to Taskbars // Post-Apollo without changing the live runtime layout.
+ATLAS orients readers to Meta Apollo Logos // Post-Apollo Project without changing the live runtime layout.
 
 ### 🧭 CONTENTS // CURRENT
 

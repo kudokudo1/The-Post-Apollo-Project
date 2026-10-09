@@ -28,7 +28,7 @@ SURFACES = {
     "components/DockButton.qml": 1,
     "components/ConversationFeed.qml": 6,
     "components/NeonScrollBar.qml": 1,
-    "widgets/notifications/NotificationsHubW.qml": 13,
+    "widgets/notifications/NotificationsHubW.qml": 11,
     "widgets/weather/StationHome.qml": 3,
 }
 

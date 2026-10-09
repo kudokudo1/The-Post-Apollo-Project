@@ -69,15 +69,21 @@ PanelWindow {
     property int tightGlowRadius: 7
     property int tightGlowSamples: 9
 
-    // Outer window glow: stronger, slightly tighter, fewer samples.
-    property real frameGlowOpacity: 0.76
-    property int frameGlowRadius: 16
-    property int frameGlowSamples: 23
+    // Outer window glow: explicit close + wide neon layers.
+    // Both spreads fit inside the existing 8px frame gutter, so the native
+    // window no longer clips most of the effect before it reaches the screen.
+    property int frameCloseGlowSpread: 6
+    property real frameCloseGlowOpacity: 0.46
+    property int frameWideGlowSpread: 8
+    property real frameWideGlowOpacity: 0.16
 
-    // Notification card glow: stronger, less perfectly smooth.
-    property real cardGlowOpacity: 0.68
-    property int cardGlowRadius: 20
-    property int cardGlowSamples: 25
+    // Notification cards reserve their own vertical effect gutter inside the
+    // clipped history ListView, then use the same close + wide glow grammar.
+    property int cardGlowVerticalGutter: 12
+    property int cardCloseGlowSpread: 4
+    property real cardCloseGlowOpacity: 0.50
+    property int cardWideGlowSpread: 12
+    property real cardWideGlowOpacity: 0.14
 
     // Typography.
     property int hubTitleFontSize: 20
@@ -834,66 +840,30 @@ PanelWindow {
 
         opacity: root.menuOpen ? 1.0 : 0.0
 
-        // ===== PURPLE GLASS =====================================
+        // ===== MAIN WINDOW PANEL ================================
+        //
+        // Notifications now uses the same reusable large-window chassis as the
+        // other major menus. The close/wide spreads are intentionally bounded
+        // by frameInset so the glow is fully rendered instead of being clipped
+        // by the native PanelWindow edge.
 
-        Rectangle {
-            id: background
-
-            anchors.fill: parent
-            anchors.margins: root.frameInset
-
-            color: Colors.black
-
-            opacity: root.backgroundOpacity
-        }
-
-        // ===== ACTIVE OUTER FRAME GLOW ==========================
-
-        Rectangle {
-            id: frameGlowSource
-
-            anchors.fill: parent
-            anchors.margins: root.frameInset
-
-            color: "transparent"
-
-            border.width: 2
-            border.color: Colors.orange
-
-            z: -2
-        }
-
-        SafeDropShadow {
-            anchors.fill: frameGlowSource
-
-            safeSource: frameGlowSource
-            horizontalOffset: 0
-            verticalOffset: 0
-
-            radius: root.frameGlowRadius
-            samples: root.frameGlowSamples
-
-            color: Colors.orange
-
-            opacity: root.frameGlowOpacity
-
-            z: -3
-
-            transparentBorder: true
-        }
-
-        // ===== MAIN FRAME =======================================
-
-        Rectangle {
+        WindowPanelFrame {
             id: frame
 
             anchors.fill: parent
             anchors.margins: root.frameInset
 
-            color: "transparent"
+            fillColor: Colors.black
+            fillOpacity: root.backgroundOpacity
 
-            border.width: 2
-            border.color: Colors.orange
+            borderWidth: 2
+            borderColor: Colors.orange
+
+            glowColor: Colors.orange
+            closeGlowSpread: root.frameCloseGlowSpread
+            closeGlowOpacity: root.frameCloseGlowOpacity
+            wideGlowSpread: root.frameWideGlowSpread
+            wideGlowOpacity: root.frameWideGlowOpacity
 
             // ===== HEADER =======================================
 
@@ -1896,54 +1866,14 @@ PanelWindow {
                         readonly property url resolvedAppIcon: root.resolveAppIcon(notificationEntry.appIcon, notificationEntry.sourceId)
 
                         width: historyList.width
-                        height: root.cardHeight + root.cardSpacing
+                        height:
+                            root.cardHeight
+                            + (root.cardGlowVerticalGutter * 2)
+                            + root.cardSpacing
 
-                        // ===== SOFT CARD GLOW SOURCE =============
+                        // ===== CARD + RESERVED GLOW GUTTER =======
 
-                        Rectangle {
-                            id: cardGlowSource
-
-                            anchors {
-                                top: parent.top
-                                left: parent.left
-                                right: parent.right
-
-                                leftMargin: root.cardGlowGutter
-                                rightMargin: root.cardGlowGutter
-                            }
-
-                            height: root.cardHeight
-
-                            color: "transparent"
-
-                            border.width: 1
-                            border.color: notificationEntry.notificationColor
-
-                            z: -3
-                        }
-
-                        SafeDropShadow {
-                            anchors.fill: cardGlowSource
-
-                            safeSource: cardGlowSource
-                            horizontalOffset: 0
-                            verticalOffset: 0
-
-                            radius: root.cardGlowRadius
-                            samples: root.cardGlowSamples
-
-                            color: notificationEntry.notificationColor
-
-                            opacity: root.cardGlowOpacity
-
-                            z: -4
-
-                            transparentBorder: true
-                        }
-
-                        // ===== CARD ===============================
-
-                        Rectangle {
+                        WindowPanelFrame {
                             id: card
 
                             anchors {
@@ -1951,16 +1881,24 @@ PanelWindow {
                                 left: parent.left
                                 right: parent.right
 
+                                topMargin: root.cardGlowVerticalGutter
                                 leftMargin: root.cardGlowGutter
                                 rightMargin: root.cardGlowGutter
                             }
 
                             height: root.cardHeight
 
-                            color: "transparent"
+                            fillColor: Colors.black
+                            fillOpacity: root.cardFillOpacity
 
-                            border.width: 1
-                            border.color: notificationEntry.notificationColor
+                            borderWidth: 1
+                            borderColor: notificationEntry.notificationColor
+
+                            glowColor: notificationEntry.notificationColor
+                            closeGlowSpread: root.cardCloseGlowSpread
+                            closeGlowOpacity: root.cardCloseGlowOpacity
+                            wideGlowSpread: root.cardWideGlowSpread
+                            wideGlowOpacity: root.cardWideGlowOpacity
 
                             // Clicking the card means TAKE ME TO the app.
                             MouseArea {
@@ -1975,17 +1913,6 @@ PanelWindow {
                                 onClicked: {
                                     root.takeMeToApp(notificationEntry.sourceId, notificationEntry.source);
                                 }
-                            }
-
-                            // Only the fill receives opacity.
-                            Rectangle {
-                                anchors.fill: parent
-
-                                color: Colors.black
-
-                                opacity: root.cardFillOpacity
-
-                                z: -2
                             }
 
                             // Small internal accent rail.

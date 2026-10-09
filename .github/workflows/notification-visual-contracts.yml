@@ -1,0 +1,37 @@
+name: "Notification visual contracts"
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "components/SurfaceFrame.qml"
+      - "components/WindowPanelFrame.qml"
+      - "modules/Notifications.qml"
+      - "widgets/notifications/NotificationsHubW.qml"
+      - "tests/notifications/test_notification_visual_contracts.py"
+      - ".github/workflows/notification-visual-contracts.yml"
+  pull_request:
+    paths:
+      - "components/SurfaceFrame.qml"
+      - "components/WindowPanelFrame.qml"
+      - "modules/Notifications.qml"
+      - "widgets/notifications/NotificationsHubW.qml"
+      - "tests/notifications/test_notification_visual_contracts.py"
+      - ".github/workflows/notification-visual-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    name: Notification visual contracts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate notification geometry and glow contracts
+        run: python3 tests/notifications/test_notification_visual_contracts.py

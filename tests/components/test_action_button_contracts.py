@@ -97,6 +97,10 @@ for needle, message in (
     ("property real unavailableBorderOpacity:", "layered border availability fade"),
     ("property real unavailableContentOpacity:", "layered content availability fade"),
     ("id: contentHost", "custom content host"),
+    ("property alias interactionData: interactionHost.data", "interactive overlay data slot"),
+    ("property alias interactionItem: interactionHost", "interactive overlay item"),
+    ("id: interactionHost", "interactive overlay host"),
+    ("z: 20", "interactive overlay above pointer layer"),
     ("property real unavailableContentGlowOpacity:", "layered content-glow availability fade"),
     ("property real unavailableSoftGlowOpacity:", "layered halo availability fade"),
     ("property real unavailableWideGlowOpacity:", "layered wide-halo availability fade"),
@@ -287,3 +291,34 @@ for private_mouse in (
     assert private_mouse not in APPCONTROL, f"AppControl reintroduced private destructive pointer engine: {private_mouse}"
 
 print("AppControl destructive ActionButton migration: PASS")
+
+
+# Third AppControl proof migration: LAUNCH and repeated desktop actions carry
+# nested favorite-star controls. Their shared action pointer engine stays below
+# the explicit ActionButton interaction overlay so the star remains independent.
+for control_id, root_mouse, star_id in (
+    ("launchAction", "launchMouse", "launchActionFavoriteStar"),
+    ("desktopActionButton", "desktopActionMouse", "desktopActionFavoriteStar"),
+):
+    marker = f"id: {control_id}"
+    marker_pos = APPCONTROL.index(marker)
+    block_start = APPCONTROL.rfind("ActionButton {", 0, marker_pos)
+    assert block_start >= 0, f"{control_id} must be hosted by ActionButton"
+
+    window = APPCONTROL[block_start:marker_pos + 7000]
+    assert f"id: {root_mouse}" not in window, f"{control_id} reintroduced its root pointer engine"
+    require(window, f"id: {star_id}", f"{control_id} favorite star survives migration")
+    require(window, f"parent: {control_id}.interactionItem", f"{control_id} favorite star uses interaction overlay")
+    require(window, "suppressHover: appControlWindow.keyboardActive", f"{control_id} keyboard/mouse separation")
+
+launch_marker = APPCONTROL.index("id: launchAction")
+launch_window = APPCONTROL[launch_marker:launch_marker + 3800]
+for needle in (
+    "property var currentResult:",
+    "property var sourceResult:",
+    "property bool canLaunch:",
+    "property bool targetIsFlatpak:",
+):
+    require(launch_window, needle, "launch target-state preservation")
+
+print("AppControl star-bearing ActionButton migration: PASS")

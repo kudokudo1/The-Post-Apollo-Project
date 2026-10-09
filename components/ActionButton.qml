@@ -10,6 +10,8 @@ Rectangle {
     // content and bind to foregroundColor / hovered / pressed / selected.
     default property alias contentData: contentHost.data
     property alias contentItem: contentHost
+    property alias interactionData: interactionHost.data
+    property alias interactionItem: interactionHost
 
     // Semantic state.
     property bool available: true
@@ -457,6 +459,15 @@ Rectangle {
         onWheel: function(wheelEvent) {
             actionButton.wheel(wheelEvent);
         }
+    }
+
+    // Rich action consumers may place nested interactive controls here.
+    // This host intentionally sits above the shared pointer layer so controls
+    // such as AppControl's favorite star remain independently clickable.
+    Item {
+        id: interactionHost
+        anchors.fill: parent
+        z: 20
     }
 
     RectangularShadow {

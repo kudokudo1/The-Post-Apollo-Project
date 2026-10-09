@@ -21848,22 +21848,13 @@ PanelWindow {
                     }
                 }
 
-                Rectangle {
+                ActionButton {
                     id: launchAction
 
                     width: parent.width - 10
                     height: 38
 
                     anchors.horizontalCenter: parent.horizontalCenter
-
-                    property bool isHovered:
-                        canLaunch
-                        && !appControlWindow.keyboardActive
-                        && launchMouse.containsMouse
-                    property bool isPressed:
-                        canLaunch && launchMouse.pressed
-                    property bool isSelected: appControlWindow.detailFocused
-                                              && appControlWindow.selectedDetailActionIndex === 0
 
                     property var currentResult:
                         appControlWindow.selectedResult()
@@ -21881,16 +21872,51 @@ PanelWindow {
                         sourceResult
                         && appControlWindow.appEntryIsFlatpak(sourceResult)
 
-                    color: isPressed
-                           ? Colors.magenta
-                           : isHovered || isSelected
-                           ? Colors.yellow
-                           : Colors.dark
+                    available: canLaunch
+                    suppressHover: appControlWindow.keyboardActive
+                    selected: appControlWindow.detailFocused
+                        && appControlWindow.selectedDetailActionIndex === 0
+                    showLabel: false
+                    pointerCursorShape: Qt.ArrowCursor
 
-                    opacity: launchAction.canLaunch ? 1.0 : 0.48
+                    idleFillColor: Colors.dark
+                    hoverFillColor: Colors.yellow
+                    selectedFillColor: Colors.yellow
+                    pressedFillColor: Colors.magenta
 
-                    border.width: 1
-                    border.color: isHovered || isSelected ? Colors.orange : Colors.cyan
+                    idleBorderColor: Colors.cyan
+                    hoverBorderColor: Colors.orange
+                    selectedBorderColor: Colors.orange
+                    pressedBorderColor: Colors.orange
+                    keyboardSelectedBorderColor: Colors.orange
+                    unavailableOpacity: 0.48
+
+                    contentGlowEnabled: false
+                    softGlowEnabled: true
+                    softGlowSpread: 5
+                    idleSoftGlowColor: Colors.cyan
+                    hoverSoftGlowColor: Colors.orange
+                    selectedSoftGlowColor: Colors.orange
+                    pressedSoftGlowColor: Colors.orange
+                    keyboardSelectedSoftGlowColor: Colors.orange
+                    softGlowIdleOpacity: 0.26
+                    softGlowHoverOpacity: 0.62
+                    softGlowPressedOpacity: 0.62
+                    softGlowSelectedOpacity: 0.62
+                    softGlowKeyboardSelectedOpacity: 0.62
+                    wideGlowEnabled: false
+
+                    onHoverEntered: {
+                        appControlWindow.keyboardActive = false;
+                        appControlWindow.modeRailFocused = false;
+                        appControlWindow.detailFocused = true;
+                        appControlWindow.selectedDetailActionIndex = 0;
+                    }
+
+                    onTriggered: {
+                        appControlWindow.selectedDetailActionIndex = 0;
+                        appControlWindow.activateSelectedDetailAction();
+                    }
 
                     GohuText {
                         id: launchActionText
@@ -21910,9 +21936,9 @@ PanelWindow {
 
                         font.pixelSize: 13
 
-                        color: launchAction.isPressed
+                        color: launchAction.pressed
                                ? Colors.black
-                               : launchAction.isHovered || launchAction.isSelected
+                               : launchAction.hovered || launchAction.selected
                                ? Colors.orange
                                : Colors.cyan
                     }
@@ -21929,58 +21955,28 @@ PanelWindow {
 
                         z: 2
 
-                        opacity: launchAction.isPressed
+                        opacity: launchAction.pressed
                                  ? 0.0
-                                 : launchAction.isHovered || launchAction.isSelected
+                                 : launchAction.hovered || launchAction.selected
                                  ? 0.48
                                  : 0.38
 
-                        color: launchAction.isHovered || launchAction.isSelected
+                        color: launchAction.hovered || launchAction.selected
                                ? Colors.orange
                                : Colors.cyan
 
                         transparentBorder: true
                     }
 
-                    MouseArea {
-                        id: launchMouse
 
-                        anchors.fill: parent
-                        enabled: launchAction.canLaunch
-                        hoverEnabled: true
 
-                        onEntered: {
-                            appControlWindow.keyboardActive = false;
-                            appControlWindow.modeRailFocused = false;
-                            appControlWindow.detailFocused = true;
-                            appControlWindow.selectedDetailActionIndex = 0;
-                        }
 
-                        onClicked: {
-                            appControlWindow.selectedDetailActionIndex = 0;
-                            appControlWindow.activateSelectedDetailAction();
-                        }
-                    }
-
-                    RectangularShadow {
-                        anchors.fill: parent
-
-                        spread: 5
-                        z: -1
-
-                        opacity: launchAction.isHovered || launchAction.isSelected
-                                 ? 0.62
-                                 : 0.26
-
-                        color: launchAction.isHovered || launchAction.isSelected
-                               ? Colors.orange
-                               : Colors.cyan
-                    }
                 
 
 
                     Item {
                         id: launchActionFavoriteStar
+                        parent: launchAction.interactionItem
 
                         anchors.right: parent.right
                         anchors.rightMargin: 6
@@ -22613,7 +22609,7 @@ MouseArea {
                         return appControlWindow.appDesktopActions(source);
                     }
 
-                    Rectangle {
+                    ActionButton {
                         id: desktopActionButton
 
                         required property int index
@@ -22624,19 +22620,49 @@ MouseArea {
 
                         anchors.horizontalCenter: parent.horizontalCenter
 
-                        property bool isHovered: !appControlWindow.keyboardActive && desktopActionMouse.containsMouse
-                        property bool isPressed: desktopActionMouse.pressed
-                        property bool isSelected: appControlWindow.detailFocused
-                                                  && appControlWindow.selectedDetailActionIndex === index + 1
+                        suppressHover: appControlWindow.keyboardActive
+                        selected: appControlWindow.detailFocused
+                            && appControlWindow.selectedDetailActionIndex === index + 1
+                        showLabel: false
+                        pointerCursorShape: Qt.ArrowCursor
 
-                        color: isPressed
-                               ? Colors.magenta
-                               : isHovered || isSelected
-                               ? Colors.yellow
-                               : Colors.black
+                        idleFillColor: Colors.black
+                        hoverFillColor: Colors.yellow
+                        selectedFillColor: Colors.yellow
+                        pressedFillColor: Colors.magenta
 
-                        border.width: 1
-                        border.color: Colors.orange
+                        idleBorderColor: Colors.orange
+                        hoverBorderColor: Colors.orange
+                        selectedBorderColor: Colors.orange
+                        pressedBorderColor: Colors.orange
+                        keyboardSelectedBorderColor: Colors.orange
+
+                        contentGlowEnabled: false
+                        softGlowEnabled: true
+                        softGlowSpread: 5
+                        idleSoftGlowColor: Colors.orange
+                        hoverSoftGlowColor: Colors.orange
+                        selectedSoftGlowColor: Colors.orange
+                        pressedSoftGlowColor: Colors.orange
+                        keyboardSelectedSoftGlowColor: Colors.orange
+                        softGlowIdleOpacity: 0.26
+                        softGlowHoverOpacity: 0.60
+                        softGlowPressedOpacity: 0.60
+                        softGlowSelectedOpacity: 0.60
+                        softGlowKeyboardSelectedOpacity: 0.60
+                        wideGlowEnabled: false
+
+                        onHoverEntered: {
+                            appControlWindow.keyboardActive = false;
+                            appControlWindow.modeRailFocused = false;
+                            appControlWindow.detailFocused = true;
+                            appControlWindow.selectedDetailActionIndex = index + 1;
+                        }
+
+                        onTriggered: {
+                            appControlWindow.selectedDetailActionIndex = index + 1;
+                            appControlWindow.activateSelectedDetailAction();
+                        }
 
                         Row {
                             anchors.left: parent.left
@@ -22676,10 +22702,10 @@ MouseArea {
 
                                     font.pixelSize: 14
 
-                                    color: desktopActionButton.isPressed
+                                    color: desktopActionButton.pressed
                                            ? Colors.black
-                                           : desktopActionButton.isHovered
-                                             || desktopActionButton.isSelected
+                                           : desktopActionButton.hovered
+                                             || desktopActionButton.selected
                                            ? Colors.orange
                                            : Colors.orange
                                 }
@@ -22696,10 +22722,10 @@ MouseArea {
 
                                     z: 2
 
-                                    opacity: desktopActionButton.isPressed
+                                    opacity: desktopActionButton.pressed
                                              ? 0.0
-                                             : desktopActionButton.isHovered
-                                               || desktopActionButton.isSelected
+                                             : desktopActionButton.hovered
+                                               || desktopActionButton.selected
                                              ? 0.48
                                              : 0.38
 
@@ -22709,43 +22735,15 @@ MouseArea {
                             }
                         }
 
-                        MouseArea {
-                            id: desktopActionMouse
 
-                            anchors.fill: parent
-                            hoverEnabled: true
 
-                            onEntered: {
-                                appControlWindow.keyboardActive = false;
-                            appControlWindow.modeRailFocused = false;
-                            appControlWindow.detailFocused = true;
-                                appControlWindow.selectedDetailActionIndex = index + 1;
-                            }
 
-                            onClicked: {
-                                appControlWindow.selectedDetailActionIndex = index + 1;
-                                appControlWindow.activateSelectedDetailAction();
-                            }
-                        }
-
-                        RectangularShadow {
-                            anchors.fill: parent
-
-                            spread: 5
-                            z: -1
-
-                            opacity: desktopActionButton.isHovered
-                                     || desktopActionButton.isSelected
-                                     ? 0.60
-                                     : 0.26
-
-                            color: Colors.orange
-                        }
                     
 
 
                         Item {
                             id: desktopActionFavoriteStar
+                            parent: desktopActionButton.interactionItem
 
                             anchors.right: parent.right
                             anchors.rightMargin: 6

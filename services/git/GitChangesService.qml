@@ -1108,18 +1108,22 @@ Scope {
                 ? String(args[1] || "all")
                 : "all";
 
-            if (mode !== "all") {
+            if (["all", "keep-index", "staged"].indexOf(mode) < 0) {
                 out.recoveryClass = "EVIDENCE_ONLY";
                 out.recoveryReason =
-                    "ONLY FULL STASH CREATION HAS EXACT AUTOMATIC UNDO";
+                    "UNKNOWN STASH MODE CANNOT BE RECOVERED";
                 return out;
             }
 
             if (stage === "BEFORE") {
                 const working = out.workingState || {};
                 const index = out.index || {};
+                const stagedSafe =
+                    mode !== "staged"
+                    || Number(working.unstagedCount || 0) === 0;
 
-                if (String(out.branch || "")
+                if (stagedSafe
+                        && String(out.branch || "")
                         && String(out.head || "")
                         && String(index.tree || "")
                         && Number(working.conflictCount || 0) === 0
@@ -1128,26 +1132,33 @@ Scope {
                         ) === "NONE") {
                     out.recoveryClass = "CONTENT_RECOVERABLE";
                     out.recoveryReason =
-                        "FULL STASH WILL PRESERVE DIRTY CONTENT "
-                        + "IN A DURABLE STASH OBJECT";
+                        mode === "keep-index"
+                        ? "KEEP-INDEX STASH HAS EXACT INDEX + CONTENT EVIDENCE"
+                        : mode === "staged"
+                        ? "STAGED-ONLY STASH HAS NO RETAINED TRACKED WORKTREE DELTA"
+                        : "FULL STASH HAS EXACT INDEX + CONTENT EVIDENCE";
                     return out;
                 }
             } else if (stage === "AFTER"
                     && pendingBeforeSnapshot
                     && stashSnapshotCanRecover(
                         pendingBeforeSnapshot,
-                        out
+                        out,
+                        mode
                     )) {
                 out.recoveryClass = "CONTENT_RECOVERABLE";
                 out.recoveryReason =
-                    "FULL STASH CAN RESTORE THE EXACT PRE-STASH "
-                    + "INDEX + WORKTREE + UNTRACKED STATE";
+                    "STASH "
+                    + mode.toUpperCase()
+                    + " HAS AN EXACT GUARDED CONTENT INVERSE";
                 return out;
             }
 
             out.recoveryClass = "EVIDENCE_ONLY";
             out.recoveryReason =
-                "STASH CONTENT TRANSITION IS NOT EXACT";
+                mode === "staged"
+                ? "STAGED STASH WITH RETAINED TRACKED WORKTREE CONTENT IS NOT AUTOMATICALLY RECOVERABLE"
+                : "STASH CONTENT/STACK TRANSITION IS NOT EXACT";
             return out;
         }
 
@@ -1162,21 +1173,10 @@ Scope {
                 args.length > 0
                 ? String(args[0] || "")
                 : "";
-            const topRef =
-                !ref
-                || ref === "stash@{0}"
-                || ref === "refs/stash";
-
-            if (!topRef) {
-                out.recoveryClass = "EVIDENCE_ONLY";
-                out.recoveryReason =
-                    "ONLY TOP-STASH MUTATIONS HAVE EXACT AUTOMATIC UNDO";
-                return out;
-            }
 
             if (stage === "BEFORE") {
                 if (operation === "stash-drop") {
-                    if (snapshotRefSha(out, "refs/stash")
+                    if (stashEntry(out, ref)
                             && Number(
                                 (out.workingState || {}).conflictCount || 0
                             ) === 0
@@ -1190,13 +1190,13 @@ Scope {
                         return out;
                     }
                 } else if (snapshotContentIsClean(out)
-                        && snapshotRefSha(out, "refs/stash")) {
+                        && stashEntry(out, ref)) {
                     out.recoveryClass = "CONTENT_RECOVERABLE";
                     out.recoveryReason =
                         operation === "stash-pop"
-                        ? "CLEAN TOP-STASH POP CAN RESTORE CONTENT "
-                          + "AND RECREATE THE EXACT STASH OBJECT"
-                        : "CLEAN TOP-STASH APPLY CAN RETURN TO "
+                        ? "CLEAN SELECTED-STASH POP CAN RESTORE CONTENT "
+                          + "AND RECREATE THE EXACT STACK"
+                        : "CLEAN SELECTED-STASH APPLY CAN RETURN TO "
                           + "THE EXACT CLEAN PRE-APPLY STATE";
                     return out;
                 }
@@ -1206,16 +1206,19 @@ Scope {
                     operation === "stash-apply"
                     ? stashApplySnapshotCanRecover(
                         pendingBeforeSnapshot,
-                        out
+                        out,
+                        ref
                       )
                     : operation === "stash-pop"
                     ? stashPopSnapshotCanRecover(
                         pendingBeforeSnapshot,
-                        out
+                        out,
+                        ref
                       )
                     : stashDropSnapshotCanRecover(
                         pendingBeforeSnapshot,
-                        out
+                        out,
+                        ref
                       );
 
                 if (exact) {

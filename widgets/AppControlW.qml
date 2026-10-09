@@ -22144,7 +22144,7 @@ PanelWindow {
                             }
                         ]
 
-                        Rectangle {
+                        ActionButton {
                             id: hiddenActionButton
 
                             required property int index
@@ -22155,36 +22155,57 @@ PanelWindow {
                             anchors.horizontalCenter: parent.horizontalCenter
 
                             property int detailIndex: index + 1
-                            property bool isHovered:
-                                !appControlWindow.keyboardActive
-                                && hiddenActionMouse.containsMouse
-                            property bool isPressed:
-                                hiddenActionMouse.pressed
-                            property bool isSelected:
-                                appControlWindow.detailFocused
-                                && appControlWindow.selectedDetailActionIndex
-                                   === detailIndex
+                    readonly property color haloColor:
+                        hovered || selected
+                        ? Colors.orange
+                        : modelData.label === "FLOAT"
+                        ? Colors.cyan
+                        : modelData.accent
 
-                            readonly property color haloColor:
-                                isHovered || isSelected
-                                ? Colors.orange
-                                : modelData.label === "FLOAT"
-                                ? Colors.cyan
-                                : modelData.accent
+                    suppressHover: appControlWindow.keyboardActive
+                    selected: appControlWindow.detailFocused
+                        && appControlWindow.selectedDetailActionIndex === hiddenActionButton.detailIndex
+                    showLabel: false
+                    pointerCursorShape: Qt.ArrowCursor
+                    acceptedButtons: Qt.LeftButton
 
-                            color:
-                                isPressed
-                                ? Colors.magenta
-                                : isHovered || isSelected
-                                ? Colors.yellow
-                                : Colors.black
+                    idleFillColor: Colors.black
+                    hoverFillColor: Colors.yellow
+                    selectedFillColor: Colors.yellow
+                    pressedFillColor: Colors.magenta
 
-                            border.width: 1
-                            border.color:
-                                isHovered || isSelected
-                                ? Colors.orange
-                                : modelData.accent
+                    idleBorderColor: modelData.accent
+                    hoverBorderColor: Colors.orange
+                    selectedBorderColor: Colors.orange
+                    pressedBorderColor: Colors.orange
+                    keyboardSelectedBorderColor: Colors.orange
 
+                    contentGlowEnabled: false
+                    softGlowEnabled: true
+                    softGlowSpread: 3
+                    idleSoftGlowColor: hiddenActionButton.haloColor
+                    hoverSoftGlowColor: Colors.orange
+                    selectedSoftGlowColor: Colors.orange
+                    pressedSoftGlowColor: Colors.orange
+                    keyboardSelectedSoftGlowColor: Colors.orange
+                    softGlowIdleOpacity: 0.28
+                    softGlowHoverOpacity: 0.48
+                    softGlowPressedOpacity: 0.48
+                    softGlowSelectedOpacity: 0.48
+                    softGlowKeyboardSelectedOpacity: 0.48
+                    wideGlowEnabled: false
+
+                    onHoverEntered: {
+                        appControlWindow.keyboardActive = false;
+                        appControlWindow.modeRailFocused = false;
+                        appControlWindow.detailFocused = true;
+                        appControlWindow.selectedDetailActionIndex = hiddenActionButton.detailIndex;
+                    }
+
+                    onTriggered: {
+                        appControlWindow.selectedDetailActionIndex = hiddenActionButton.detailIndex;
+                        appControlWindow.activateSelectedDetailAction();
+                    }
                             Row {
                                 anchors.left: parent.left
                                 anchors.verticalCenter: parent.verticalCenter
@@ -22198,20 +22219,20 @@ PanelWindow {
                                     font.pixelSize: 14
 
                                     color:
-                                        hiddenActionButton.isPressed
+                                        hiddenActionButton.pressed
                                         ? Colors.black
-                                        : hiddenActionButton.isHovered
-                                          || hiddenActionButton.isSelected
+                                        : hiddenActionButton.hovered
+                                          || hiddenActionButton.selected
                                         ? Colors.orange
                                         : modelData.accent
 
-                                    layer.enabled: !hiddenActionButton.isPressed
+                                    layer.enabled: !hiddenActionButton.pressed
                                     layer.effect: DropShadow {
                                         radius: 8
                                         samples: 7
                                         opacity:
-                                            hiddenActionButton.isHovered
-                                            || hiddenActionButton.isSelected
+                                            hiddenActionButton.hovered
+                                            || hiddenActionButton.selected
                                             ? 0.68
                                             : 0.56
                                         color: hiddenActionButton.haloColor
@@ -22226,20 +22247,20 @@ PanelWindow {
                                     font.pixelSize: 14
 
                                     color:
-                                        hiddenActionButton.isPressed
+                                        hiddenActionButton.pressed
                                         ? Colors.black
-                                        : hiddenActionButton.isHovered
-                                          || hiddenActionButton.isSelected
+                                        : hiddenActionButton.hovered
+                                          || hiddenActionButton.selected
                                         ? Colors.orange
                                         : modelData.accent
 
-                                    layer.enabled: !hiddenActionButton.isPressed
+                                    layer.enabled: !hiddenActionButton.pressed
                                     layer.effect: DropShadow {
                                         radius: 8
                                         samples: 7
                                         opacity:
-                                            hiddenActionButton.isHovered
-                                            || hiddenActionButton.isSelected
+                                            hiddenActionButton.hovered
+                                            || hiddenActionButton.selected
                                             ? 0.68
                                             : 0.56
                                         color: hiddenActionButton.haloColor
@@ -22248,40 +22269,9 @@ PanelWindow {
                                 }
                             }
 
-                            MouseArea {
-                                id: hiddenActionMouse
 
-                                anchors.fill: parent
-                                hoverEnabled: true
 
-                                onEntered: {
-                                    appControlWindow.keyboardActive = false;
-                            appControlWindow.modeRailFocused = false;
-                            appControlWindow.detailFocused = true;
-                                    appControlWindow.selectedDetailActionIndex =
-                                        hiddenActionButton.detailIndex;
-                                }
 
-                                onClicked: {
-                                    appControlWindow.selectedDetailActionIndex =
-                                        hiddenActionButton.detailIndex;
-                                    appControlWindow.activateSelectedDetailAction();
-                                }
-                            }
-
-                            RectangularShadow {
-                                anchors.fill: parent
-                                spread: 3
-                                z: -1
-
-                                opacity:
-                                    hiddenActionButton.isHovered
-                                    || hiddenActionButton.isSelected
-                                    ? 0.48
-                                    : 0.28
-
-                                color: hiddenActionButton.haloColor
-                            }
                         }
                     }
 
@@ -22301,19 +22291,58 @@ PanelWindow {
                         }
                     }
 
-                    Rectangle {
+                    ActionButton {
                         id: hiddenBottleAction
                         width: hiddenCommandActionsSection.width - 10
                         height: 34
                         anchors.horizontalCenter: parent.horizontalCenter
                         property bool canRun: appControlWindow.detailActionAvailable(4)
-                        property bool isHovered: canRun && !appControlWindow.keyboardActive && hiddenBottleActionMouse.containsMouse
-                        property bool isPressed: canRun && hiddenBottleActionMouse.pressed
-                        property bool isSelected: appControlWindow.detailFocused && appControlWindow.selectedDetailActionIndex === 4
-                        color: isPressed ? Colors.magenta : isHovered || isSelected ? Colors.yellow : Colors.black
-                        opacity: canRun ? 1.0 : 0.38
-                        border.width: 1
-                        border.color: Colors.magenta
+                    available: canRun
+                    unavailableOpacity: 0.38
+                    suppressHover: appControlWindow.keyboardActive
+                    selected: appControlWindow.detailFocused
+                        && appControlWindow.selectedDetailActionIndex === 4
+                    showLabel: false
+                    pointerCursorShape: Qt.ArrowCursor
+                    acceptedButtons: Qt.LeftButton
+
+                    idleFillColor: Colors.black
+                    hoverFillColor: Colors.yellow
+                    selectedFillColor: Colors.yellow
+                    pressedFillColor: Colors.magenta
+
+                    idleBorderColor: Colors.magenta
+                    hoverBorderColor: Colors.magenta
+                    selectedBorderColor: Colors.magenta
+                    pressedBorderColor: Colors.magenta
+                    keyboardSelectedBorderColor: Colors.magenta
+
+                    contentGlowEnabled: false
+                    softGlowEnabled: true
+                    softGlowSpread: 3
+                    idleSoftGlowColor: Colors.magenta
+                    hoverSoftGlowColor: Colors.magenta
+                    selectedSoftGlowColor: Colors.magenta
+                    pressedSoftGlowColor: Colors.magenta
+                    keyboardSelectedSoftGlowColor: Colors.magenta
+                    softGlowIdleOpacity: 0.24
+                    softGlowHoverOpacity: 0.46
+                    softGlowPressedOpacity: 0.46
+                    softGlowSelectedOpacity: 0.46
+                    softGlowKeyboardSelectedOpacity: 0.46
+                    wideGlowEnabled: false
+
+                    onHoverEntered: {
+                        appControlWindow.keyboardActive = false;
+                        appControlWindow.modeRailFocused = false;
+                        appControlWindow.detailFocused = true;
+                        appControlWindow.selectedDetailActionIndex = 4;
+                    }
+
+                    onTriggered: {
+                        appControlWindow.selectedDetailActionIndex = 4;
+                        appControlWindow.activateSelectedDetailAction();
+                    }
                         Row {
                             id: hiddenBottleActionContent
                             anchors.left: parent.left
@@ -22330,11 +22359,11 @@ PanelWindow {
                                     text: "⚱"
                                     font.pixelSize: 10
                                     color:
-                                        hiddenBottleAction.isPressed
+                                        hiddenBottleAction.pressed
                                         ? Colors.black
                                         : Colors.magenta
 
-                                    layer.enabled: !hiddenBottleAction.isPressed
+                                    layer.enabled: !hiddenBottleAction.pressed
                                     layer.effect: DropShadow {
                                         radius: 7
                                         samples: 7
@@ -22349,11 +22378,11 @@ PanelWindow {
                                     text: "⚱"
                                     font.pixelSize: 17
                                     color:
-                                        hiddenBottleAction.isPressed
+                                        hiddenBottleAction.pressed
                                         ? Colors.black
                                         : Colors.magenta
 
-                                    layer.enabled: !hiddenBottleAction.isPressed
+                                    layer.enabled: !hiddenBottleAction.pressed
                                     layer.effect: DropShadow {
                                         radius: 8
                                         samples: 7
@@ -22368,11 +22397,11 @@ PanelWindow {
                                     text: "⚱"
                                     font.pixelSize: 10
                                     color:
-                                        hiddenBottleAction.isPressed
+                                        hiddenBottleAction.pressed
                                         ? Colors.black
                                         : Colors.magenta
 
-                                    layer.enabled: !hiddenBottleAction.isPressed
+                                    layer.enabled: !hiddenBottleAction.pressed
                                     layer.effect: DropShadow {
                                         radius: 7
                                         samples: 7
@@ -22391,17 +22420,17 @@ PanelWindow {
                                 : "BOTTLES  [NO TARGET]"
                                 font.pixelSize: 14
                                 color:
-                                    hiddenBottleAction.isPressed
+                                    hiddenBottleAction.pressed
                                     ? Colors.black
                                     : Colors.magenta
 
-                                layer.enabled: !hiddenBottleAction.isPressed
+                                layer.enabled: !hiddenBottleAction.pressed
                                 layer.effect: DropShadow {
                                     radius: 8
                                     samples: 7
                                     opacity:
-                                        hiddenBottleAction.isHovered
-                                        || hiddenBottleAction.isSelected
+                                        hiddenBottleAction.hovered
+                                        || hiddenBottleAction.selected
                                         ? 0.66
                                         : 0.46
                                     color: Colors.magenta
@@ -22410,27 +22439,59 @@ PanelWindow {
                             }
                         }
 
-MouseArea {
-                            id: hiddenBottleActionMouse; anchors.fill: parent; enabled: hiddenBottleAction.canRun; hoverEnabled: true
-                            onEntered: { appControlWindow.keyboardActive = false;
-                            appControlWindow.modeRailFocused = false;
-                            appControlWindow.detailFocused = true; appControlWindow.selectedDetailActionIndex = 4; }
-                            onClicked: { appControlWindow.selectedDetailActionIndex = 4; appControlWindow.activateSelectedDetailAction(); }
-                        }
-                        RectangularShadow { anchors.fill: parent; spread: 3; z: -1; opacity: hiddenBottleAction.isHovered || hiddenBottleAction.isSelected ? 0.46 : 0.24; color: Colors.magenta }
+
+
                     }
 
-                    Rectangle {
+                    ActionButton {
                         id: hiddenToolboxAction
                         width: hiddenCommandActionsSection.width - 10
                         height: 34
                         anchors.horizontalCenter: parent.horizontalCenter
-                        property bool isHovered: !appControlWindow.keyboardActive && hiddenToolboxActionMouse.containsMouse
-                        property bool isPressed: hiddenToolboxActionMouse.pressed
-                        property bool isSelected: appControlWindow.detailFocused && appControlWindow.selectedDetailActionIndex === 5
-                        color: isPressed ? Colors.magenta : isHovered || isSelected ? Colors.yellow : Colors.black
-                        border.width: 1
-                        border.color: Colors.omnitrix
+                    suppressHover: appControlWindow.keyboardActive
+                    selected: appControlWindow.detailFocused
+                        && appControlWindow.selectedDetailActionIndex === 5
+                    showLabel: false
+                    pointerCursorShape: Qt.ArrowCursor
+                    acceptedButtons: Qt.LeftButton
+
+                    idleFillColor: Colors.black
+                    hoverFillColor: Colors.yellow
+                    selectedFillColor: Colors.yellow
+                    pressedFillColor: Colors.magenta
+
+                    idleBorderColor: Colors.omnitrix
+                    hoverBorderColor: Colors.omnitrix
+                    selectedBorderColor: Colors.omnitrix
+                    pressedBorderColor: Colors.omnitrix
+                    keyboardSelectedBorderColor: Colors.omnitrix
+
+                    contentGlowEnabled: false
+                    softGlowEnabled: true
+                    softGlowSpread: 3
+                    idleSoftGlowColor: Colors.omnitrix
+                    hoverSoftGlowColor: Colors.omnitrix
+                    selectedSoftGlowColor: Colors.omnitrix
+                    pressedSoftGlowColor: Colors.omnitrix
+                    keyboardSelectedSoftGlowColor: Colors.omnitrix
+                    softGlowIdleOpacity: 0.26
+                    softGlowHoverOpacity: 0.46
+                    softGlowPressedOpacity: 0.46
+                    softGlowSelectedOpacity: 0.46
+                    softGlowKeyboardSelectedOpacity: 0.46
+                    wideGlowEnabled: false
+
+                    onHoverEntered: {
+                        appControlWindow.keyboardActive = false;
+                        appControlWindow.modeRailFocused = false;
+                        appControlWindow.detailFocused = true;
+                        appControlWindow.selectedDetailActionIndex = 5;
+                    }
+
+                    onTriggered: {
+                        appControlWindow.selectedDetailActionIndex = 5;
+                        appControlWindow.activateSelectedDetailAction();
+                    }
                         Row {
                             id: hiddenToolboxActionContent
                             anchors.left: parent.left
@@ -22452,11 +22513,11 @@ MouseArea {
                                     text: "🛠"
                                     font.pixelSize: 13
                                     color:
-                                        hiddenToolboxAction.isPressed
+                                        hiddenToolboxAction.pressed
                                         ? Colors.black
                                         : Colors.omnitrix
 
-                                    layer.enabled: !hiddenToolboxAction.isPressed
+                                    layer.enabled: !hiddenToolboxAction.pressed
                                     layer.effect: DropShadow {
                                         radius: 7
                                         samples: 7
@@ -22473,17 +22534,17 @@ MouseArea {
                                 text: "TOOLBOX"
                                 font.pixelSize: 14
                                 color:
-                                    hiddenToolboxAction.isPressed
+                                    hiddenToolboxAction.pressed
                                     ? Colors.black
                                     : Colors.omnitrix
 
-                                layer.enabled: !hiddenToolboxAction.isPressed
+                                layer.enabled: !hiddenToolboxAction.pressed
                                 layer.effect: DropShadow {
                                     radius: 8
                                     samples: 7
                                     opacity:
-                                        hiddenToolboxAction.isHovered
-                                        || hiddenToolboxAction.isSelected
+                                        hiddenToolboxAction.hovered
+                                        || hiddenToolboxAction.selected
                                         ? 0.66
                                         : 0.46
                                     color: Colors.omnitrix
@@ -22492,14 +22553,8 @@ MouseArea {
                             }
                         }
 
-MouseArea {
-                            id: hiddenToolboxActionMouse; anchors.fill: parent; hoverEnabled: true
-                            onEntered: { appControlWindow.keyboardActive = false;
-                            appControlWindow.modeRailFocused = false;
-                            appControlWindow.detailFocused = true; appControlWindow.selectedDetailActionIndex = 5; }
-                            onClicked: { appControlWindow.selectedDetailActionIndex = 5; appControlWindow.activateSelectedDetailAction(); }
-                        }
-                        RectangularShadow { anchors.fill: parent; spread: 3; z: -1; opacity: hiddenToolboxAction.isHovered || hiddenToolboxAction.isSelected ? 0.46 : 0.26; color: Colors.omnitrix }
+
+
                     }
 
                     Item {
@@ -22894,7 +22949,7 @@ MouseArea {
                     }
                 }
 
-                Rectangle {
+                ActionButton {
                     id: appBottleAction
 
                     visible: {
@@ -22927,36 +22982,52 @@ MouseArea {
                     property bool hasBottle:
                         appControlWindow.selectedBottleName.length > 0
 
-                    property bool isHovered:
-                        hasBottle
-                        && !appControlWindow.bottlesLoading
-                        && !appControlWindow.keyboardActive
-                        && appBottleActionMouse.containsMouse
+                    available: hasBottle && !appControlWindow.bottlesLoading
+                    unavailableOpacity: 0.48
+                    suppressHover: appControlWindow.keyboardActive
+                    selected: appControlWindow.detailFocused
+                        && appControlWindow.selectedDetailActionIndex === appBottleAction.detailIndex
+                    showLabel: false
+                    pointerCursorShape: Qt.ArrowCursor
+                    acceptedButtons: Qt.LeftButton
 
-                    property bool isPressed:
-                        hasBottle
-                        && !appControlWindow.bottlesLoading
-                        && appBottleActionMouse.pressed
+                    idleFillColor: Colors.black
+                    hoverFillColor: Colors.yellow
+                    selectedFillColor: Colors.yellow
+                    pressedFillColor: Colors.magenta
 
-                    property bool isSelected:
-                        appControlWindow.detailFocused
-                        && appControlWindow.selectedDetailActionIndex
-                           === detailIndex
+                    idleBorderColor: Colors.magenta
+                    hoverBorderColor: Colors.magenta
+                    selectedBorderColor: Colors.magenta
+                    pressedBorderColor: Colors.magenta
+                    keyboardSelectedBorderColor: Colors.magenta
 
-                    color: isPressed
-                           ? Colors.magenta
-                           : isHovered || isSelected
-                           ? Colors.yellow
-                           : Colors.black
+                    contentGlowEnabled: false
+                    softGlowEnabled: true
+                    softGlowSpread: 5
+                    idleSoftGlowColor: Colors.magenta
+                    hoverSoftGlowColor: Colors.magenta
+                    selectedSoftGlowColor: Colors.magenta
+                    pressedSoftGlowColor: Colors.magenta
+                    keyboardSelectedSoftGlowColor: Colors.magenta
+                    softGlowIdleOpacity: 0.20
+                    softGlowHoverOpacity: 0.58
+                    softGlowPressedOpacity: 0.58
+                    softGlowSelectedOpacity: 0.58
+                    softGlowKeyboardSelectedOpacity: 0.58
+                    wideGlowEnabled: false
 
-                    opacity:
-                        appControlWindow.bottlesLoading
-                        || !appBottleAction.hasBottle
-                        ? 0.48
-                        : 1.0
+                    onHoverEntered: {
+                        appControlWindow.keyboardActive = false;
+                        appControlWindow.modeRailFocused = false;
+                        appControlWindow.detailFocused = true;
+                        appControlWindow.selectedDetailActionIndex = appBottleAction.detailIndex;
+                    }
 
-                    border.width: 1
-                    border.color: Colors.magenta
+                    onTriggered: {
+                        appControlWindow.selectedDetailActionIndex = appBottleAction.detailIndex;
+                        appControlWindow.activateSelectedDetailAction();
+                    }
                     Row {
                         id: appBottleActionContent
                         anchors.left: parent.left
@@ -22973,11 +23044,11 @@ MouseArea {
                                 text: "⚱"
                                 font.pixelSize: 10
                                 color:
-                                    appBottleAction.isPressed
+                                    appBottleAction.pressed
                                     ? Colors.black
                                     : Colors.magenta
 
-                                layer.enabled: !appBottleAction.isPressed
+                                layer.enabled: !appBottleAction.pressed
                                 layer.effect: DropShadow {
                                     radius: 7
                                     samples: 7
@@ -22992,11 +23063,11 @@ MouseArea {
                                 text: "⚱"
                                 font.pixelSize: 17
                                 color:
-                                    appBottleAction.isPressed
+                                    appBottleAction.pressed
                                     ? Colors.black
                                     : Colors.magenta
 
-                                layer.enabled: !appBottleAction.isPressed
+                                layer.enabled: !appBottleAction.pressed
                                 layer.effect: DropShadow {
                                     radius: 8
                                     samples: 7
@@ -23011,11 +23082,11 @@ MouseArea {
                                 text: "⚱"
                                 font.pixelSize: 10
                                 color:
-                                    appBottleAction.isPressed
+                                    appBottleAction.pressed
                                     ? Colors.black
                                     : Colors.magenta
 
-                                layer.enabled: !appBottleAction.isPressed
+                                layer.enabled: !appBottleAction.pressed
                                 layer.effect: DropShadow {
                                     radius: 7
                                     samples: 7
@@ -23036,17 +23107,17 @@ MouseArea {
                                 : "BOTTLES  [NO TARGET]"
                             font.pixelSize: 14
                             color:
-                                appBottleAction.isPressed
+                                appBottleAction.pressed
                                 ? Colors.black
                                 : Colors.magenta
 
-                            layer.enabled: !appBottleAction.isPressed
+                            layer.enabled: !appBottleAction.pressed
                             layer.effect: DropShadow {
                                 radius: 8
                                 samples: 7
                                 opacity:
-                                    appBottleAction.isHovered
-                                    || appBottleAction.isSelected
+                                    appBottleAction.hovered
+                                    || appBottleAction.selected
                                     ? 0.66
                                     : 0.46
                                 color: Colors.magenta
@@ -23055,49 +23126,15 @@ MouseArea {
                         }
                     }
 
-MouseArea {
-                        id: appBottleActionMouse
 
-                        anchors.fill: parent
-                        enabled:
-                            appBottleAction.hasBottle
-                            && !appControlWindow.bottlesLoading
-                        hoverEnabled: true
 
-                        onEntered: {
-                            appControlWindow.keyboardActive = false;
-                            appControlWindow.modeRailFocused = false;
-                            appControlWindow.detailFocused = true;
-                            appControlWindow.selectedDetailActionIndex =
-                                appBottleAction.detailIndex;
-                        }
 
-                        onClicked: {
-                            appControlWindow.selectedDetailActionIndex =
-                                appBottleAction.detailIndex;
-                            appControlWindow.activateSelectedDetailAction();
-                        }
-                    }
-
-                    RectangularShadow {
-                        anchors.fill: parent
-
-                        spread: 5
-                        z: -1
-
-                        opacity:
-                            appBottleAction.isHovered
-                            || appBottleAction.isSelected
-                            ? 0.58
-                            : 0.20
-
-                        color: Colors.magenta
-                    }
                 
 
 
                     Item {
                         id: appBottleActionFavoriteStar
+                        parent: appBottleAction.interactionItem
 
                         anchors.right: parent.right
                         anchors.rightMargin: 6
@@ -23197,7 +23234,7 @@ MouseArea {
                     }
 }
 
-                Rectangle {
+                ActionButton {
                     id: appToolboxAction
 
                     visible: {
@@ -23233,29 +23270,52 @@ MouseArea {
                                currentResult
                            ).length > 0
 
-                    property bool isHovered:
-                        canLaunch
-                        && !appControlWindow.keyboardActive
-                        && appToolboxActionMouse.containsMouse
+                    available: canLaunch
+                    unavailableOpacity: 0.48
+                    suppressHover: appControlWindow.keyboardActive
+                    selected: appControlWindow.detailFocused
+                        && appControlWindow.selectedDetailActionIndex === appToolboxAction.detailIndex
+                    showLabel: false
+                    pointerCursorShape: Qt.ArrowCursor
+                    acceptedButtons: Qt.LeftButton
 
-                    property bool isPressed:
-                        canLaunch && appToolboxActionMouse.pressed
+                    idleFillColor: Colors.black
+                    hoverFillColor: Colors.yellow
+                    selectedFillColor: Colors.yellow
+                    pressedFillColor: Colors.magenta
 
-                    property bool isSelected:
-                        appControlWindow.detailFocused
-                        && appControlWindow.selectedDetailActionIndex
-                           === detailIndex
+                    idleBorderColor: Colors.omnitrix
+                    hoverBorderColor: Colors.omnitrix
+                    selectedBorderColor: Colors.omnitrix
+                    pressedBorderColor: Colors.omnitrix
+                    keyboardSelectedBorderColor: Colors.omnitrix
 
-                    color: isPressed
-                           ? Colors.magenta
-                           : isHovered || isSelected
-                           ? Colors.yellow
-                           : Colors.black
+                    contentGlowEnabled: false
+                    softGlowEnabled: true
+                    softGlowSpread: 5
+                    idleSoftGlowColor: Colors.omnitrix
+                    hoverSoftGlowColor: Colors.omnitrix
+                    selectedSoftGlowColor: Colors.omnitrix
+                    pressedSoftGlowColor: Colors.omnitrix
+                    keyboardSelectedSoftGlowColor: Colors.omnitrix
+                    softGlowIdleOpacity: 0.18
+                    softGlowHoverOpacity: 0.56
+                    softGlowPressedOpacity: 0.56
+                    softGlowSelectedOpacity: 0.56
+                    softGlowKeyboardSelectedOpacity: 0.56
+                    wideGlowEnabled: false
 
-                    opacity: canLaunch ? 1.0 : 0.48
+                    onHoverEntered: {
+                        appControlWindow.keyboardActive = false;
+                        appControlWindow.modeRailFocused = false;
+                        appControlWindow.detailFocused = true;
+                        appControlWindow.selectedDetailActionIndex = appToolboxAction.detailIndex;
+                    }
 
-                    border.width: 1
-                    border.color: Colors.omnitrix
+                    onTriggered: {
+                        appControlWindow.selectedDetailActionIndex = appToolboxAction.detailIndex;
+                        appControlWindow.activateSelectedDetailAction();
+                    }
                     Row {
                         id: appToolboxActionContent
                         anchors.left: parent.left
@@ -23277,11 +23337,11 @@ MouseArea {
                                 text: "🛠"
                                 font.pixelSize: 13
                                 color:
-                                    appToolboxAction.isPressed
+                                    appToolboxAction.pressed
                                     ? Colors.black
                                     : Colors.omnitrix
 
-                                layer.enabled: !appToolboxAction.isPressed
+                                layer.enabled: !appToolboxAction.pressed
                                 layer.effect: DropShadow {
                                     radius: 7
                                     samples: 7
@@ -23300,17 +23360,17 @@ MouseArea {
                                 : "TOOLBOX  [UNAVAILABLE]"
                             font.pixelSize: 14
                             color:
-                                appToolboxAction.isPressed
+                                appToolboxAction.pressed
                                 ? Colors.black
                                 : Colors.omnitrix
 
-                            layer.enabled: !appToolboxAction.isPressed
+                            layer.enabled: !appToolboxAction.pressed
                             layer.effect: DropShadow {
                                 radius: 8
                                 samples: 7
                                 opacity:
-                                    appToolboxAction.isHovered
-                                    || appToolboxAction.isSelected
+                                    appToolboxAction.hovered
+                                    || appToolboxAction.selected
                                     ? 0.66
                                     : 0.46
                                 color: Colors.omnitrix
@@ -23319,45 +23379,13 @@ MouseArea {
                         }
                     }
 
-MouseArea {
-                        id: appToolboxActionMouse
 
-                        anchors.fill: parent
-                        enabled: appToolboxAction.canLaunch
-                        hoverEnabled: true
 
-                        onEntered: {
-                            appControlWindow.keyboardActive = false;
-                            appControlWindow.modeRailFocused = false;
-                            appControlWindow.detailFocused = true;
-                            appControlWindow.selectedDetailActionIndex =
-                                appToolboxAction.detailIndex;
-                        }
 
-                        onClicked: {
-                            appControlWindow.selectedDetailActionIndex =
-                                appToolboxAction.detailIndex;
-                            appControlWindow.activateSelectedDetailAction();
-                        }
-                    }
-
-                    RectangularShadow {
-                        anchors.fill: parent
-
-                        spread: 5
-                        z: -1
-
-                        opacity:
-                            appToolboxAction.isHovered
-                            || appToolboxAction.isSelected
-                            ? 0.56
-                            : 0.18
-
-                        color: Colors.omnitrix
-                    }
 
                     Item {
                         id: appToolboxActionFavoriteStar
+                        parent: appToolboxAction.interactionItem
 
                         anchors.right: parent.right
                         anchors.rightMargin: 6
@@ -23968,6 +23996,7 @@ MouseArea {
                         && appControlWindow.selectedDetailActionIndex === detailIndex
                     showLabel: false
                     pointerCursorShape: Qt.ArrowCursor
+                    acceptedButtons: Qt.LeftButton
 
                     idleFillColor: Colors.black
                     hoverFillColor: Colors.yellow
@@ -24097,6 +24126,7 @@ MouseArea {
                     destructive: true
                     showLabel: false
                     pointerCursorShape: Qt.ArrowCursor
+                    acceptedButtons: Qt.LeftButton
 
                     idleFillColor: Colors.black
                     hoverFillColor: Colors.yellow
@@ -24844,6 +24874,7 @@ MouseArea {
                         && appControlWindow.selectedDetailActionIndex === detailIndex
                     showLabel: false
                     pointerCursorShape: Qt.ArrowCursor
+                    acceptedButtons: Qt.LeftButton
 
                     idleFillColor: Colors.black
                     hoverFillColor: Colors.yellow
@@ -24946,6 +24977,7 @@ MouseArea {
                     destructive: true
                     showLabel: false
                     pointerCursorShape: Qt.ArrowCursor
+                    acceptedButtons: Qt.LeftButton
 
                     idleFillColor: Colors.black
                     hoverFillColor: Colors.yellow
@@ -25960,6 +25992,7 @@ MouseArea {
                         && appControlWindow.selectedDetailActionIndex === 6
                     showLabel: false
                     pointerCursorShape: Qt.ArrowCursor
+                    acceptedButtons: Qt.LeftButton
 
                     idleFillColor: Colors.black
                     hoverFillColor: Colors.yellow
@@ -26058,6 +26091,7 @@ MouseArea {
                     destructive: true
                     showLabel: false
                     pointerCursorShape: Qt.ArrowCursor
+                    acceptedButtons: Qt.LeftButton
 
                     idleFillColor: Colors.black
                     hoverFillColor: Colors.yellow

@@ -417,7 +417,10 @@ APPCONTROL_LEFT_ONLY_ACTIONS = (
 for control_id in APPCONTROL_LEFT_ONLY_ACTIONS:
     marker_pos = APPCONTROL.index(f"id: {control_id}")
     block_start = APPCONTROL.rfind("ActionButton {", 0, marker_pos)
-    window = APPCONTROL[block_start:marker_pos + 2600]
-    require(window, "acceptedButtons: Qt.LeftButton", f"{control_id} accepted-buttons fidelity")
+    root_prefix = APPCONTROL[block_start:marker_pos + 1800]
+    assert re.search(
+        r"pointerCursorShape:\s*Qt\.ArrowCursor\s*\n\s*acceptedButtons:\s*Qt\.LeftButton",
+        root_prefix,
+    ), f"{control_id} root accepted-buttons fidelity"
 
 print("AppControl alternate launch ActionButton migration: PASS")

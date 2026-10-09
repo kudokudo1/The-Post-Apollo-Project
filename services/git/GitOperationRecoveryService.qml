@@ -2762,6 +2762,7 @@ Scope {
                 if (strategy !== "UNDO_TRANSFER_CONTENT"
                         && strategy !== "UNDO_COMMIT_TO_STAGED"
                         && strategy !== "UNDO_RESET_SOFT_OR_MIXED"
+                        && strategy.indexOf("UNDO_STASH_") !== 0
                         && snapshotClass !== "REF_RECOVERABLE") {
                     root.failBeforeSnapshot(
                         "CURRENT REPOSITORY STATE IS NOT CLEAN REF-RECOVERABLE"

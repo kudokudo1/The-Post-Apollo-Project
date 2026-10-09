@@ -24,6 +24,10 @@ GIT_SPLIT_FILE = (ROOT / "widgets/GitHistorySplitView.qml").read_text(encoding="
 GIT_SURGERY = (ROOT / "widgets/GitHistorySurgeryView.qml").read_text(encoding="utf-8")
 GIT_REBASE_SESSION = (ROOT / "widgets/GitInteractiveRebaseSessionView.qml").read_text(encoding="utf-8")
 GIT_LINE_TRANSFER = (ROOT / "widgets/GitLineTransferView.qml").read_text(encoding="utf-8")
+GIT_BRANCHES = (ROOT / "widgets/GitBranchesView.qml").read_text(encoding="utf-8")
+GIT_HISTORY = (ROOT / "widgets/GitHistoryView.qml").read_text(encoding="utf-8")
+GITHUB_WORK_ITEMS = (ROOT / "widgets/GitHubWorkItemsView.qml").read_text(encoding="utf-8")
+GIT_REBASE = (ROOT / "widgets/GitInteractiveRebaseView.qml").read_text(encoding="utf-8")
 
 
 def require(text: str, needle: str, message: str) -> None:
@@ -162,6 +166,21 @@ for text_value, needle, message in (
     (GIT_REBASE_SESSION, "sessionService.lastError\n                ? Colors.red\n                : Colors.cyan\n            inset: 7", "rebase session footer"),
     (GIT_LINE_TRANSFER, "width: parent.width - 438\n                height: parent.height\n                fillColor: Colors.black\n                borderWidth: 1\n                borderColor: Colors.magenta\n                inset: 8", "line transfer control shell"),
     (GIT_LINE_TRANSFER, "root.previewMatchesSelection\n                            ? Colors.green\n                            : Colors.cyan\n                        inset: 7", "line transfer preview shell"),
+):
+    require(text_value, needle, message)
+
+# Final Git/GitHub flat-workbench rollout.
+for text_value, needle, message in (
+    (GIT_BRANCHES, "id: inspector\n\n                width: parent.width - mapPane.width - parent.spacing\n                height: parent.height\n                fillColor: Colors.dark\n                borderWidth: 1", "branch inspector shell"),
+    (GIT_BRANCHES, "root.newBranchBlockReason()\n                                    ? Colors.orange\n                                    : Colors.green\n                                inset: 7", "new branch preview shell"),
+    (GIT_BRANCHES, "root.managementMessage.indexOf(\"ARMED\") === 0\n                                ? Colors.orange\n                                : Colors.cyan\n                            inset: 7", "branch management status shell"),
+    (GIT_HISTORY, "width: parent.width - 528\n                    height: parent.height\n                    fillColor: Colors.black\n                    borderWidth: 1\n                    borderColor: Colors.orange\n                    inset: 7", "history inspector shell"),
+    (GIT_HISTORY, "root.queryHasFilters()\n                                ? Colors.green\n                                : Colors.cyan\n                            inset: 6", "history query summary shell"),
+    (GIT_HISTORY, "width: parent.width - 478\n                    height: parent.height\n                    fillColor: Colors.black\n                    borderWidth: 1\n                    borderColor: Colors.cyan\n                    inset: 8", "history recovery shell"),
+    (GIT_HISTORY, "width: 360\n                    height: parent.height\n                    fillColor: Colors.dark\n                    borderWidth: 1\n                    borderColor: Colors.orange\n                    inset: 8", "history compare shell"),
+    (GITHUB_WORK_ITEMS, "height: 54\n            fillColor: Colors.dark\n            borderWidth: 1\n            borderColor: Colors.cyan\n            inset: 8", "work items header shell"),
+    (GIT_REBASE, "rebaseService.lastError\n                ? Colors.red\n                : rebaseService.armed\n                ? Colors.orange\n                : Colors.cyan\n            inset: 7", "interactive rebase status shell"),
+    (GIT_REBASE, "width: parent.width - Math.floor(parent.width * 0.57) - 8\n                height: parent.height\n                fillColor: Colors.black\n                borderWidth: 1\n                borderColor: Colors.magenta\n                inset: 8", "interactive rebase control shell"),
 ):
     require(text_value, needle, message)
 

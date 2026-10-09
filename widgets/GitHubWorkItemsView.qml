@@ -366,18 +366,16 @@ Item {
         anchors.fill: parent
         spacing: 8
 
-        Rectangle {
+        SectionFrame {
             width: parent.width
             height: 54
-            color: Colors.dark
-            border.width: 1
-            border.color: Colors.cyan
+            fillColor: Colors.dark
+            borderWidth: 1
+            borderColor: Colors.cyan
+            inset: 8
 
             Column {
-                anchors {
-                    fill: parent
-                    margins: 8
-                }
+                anchors.fill: parent
                 spacing: 3
 
                 Row {

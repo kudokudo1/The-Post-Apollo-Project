@@ -1,6 +1,8 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
+import "../services/audio"
+import "../services/media"
 import "../components"
 
 // Initial Hi-Fi deck chassis. Adapted from MenuTemplate.qml.template:
@@ -18,6 +20,63 @@ PanelWindow {
     property int panelLeftMargin: 200
     property int contentInset: 14
     property int sectionSpacing: 10
+    // MPD remains the default. MPRIS is opt-in and targets one explicitly
+    // selected external player; it is not a loaded YouTube playlist.
+    property string transportMode: "mpd"
+
+    MprisPlaybackAdapter {
+        id: mediaAdapter
+    }
+
+    // Read-only use of the existing AppControl-extracted audio physiology.
+    // Discovery is application/stream evidence, NOT per-browser-tab ownership.
+    ApplicationAudioService {
+        id: audioProbe
+    }
+
+    function playerAudioDescriptor() {
+        const p = mediaAdapter.activePlayer;
+        if (!p)
+            return null;
+
+        const blocked = [
+            "browser", "stable", "beta", "dev", "bin", "app",
+            "desktop", "player", "media", "org", "com", "chromium",
+            "application", "electron"
+        ];
+        const tokens = [];
+        const names = [String(p.desktopEntry || ""), String(p.identity || "")];
+        for (let i = 0; i < names.length; i++) {
+            const parts = [names[i]].concat(names[i].split(/[^a-zA-Z0-9]+/));
+            for (let j = 0; j < parts.length; j++) {
+                const token = String(parts[j]).toLowerCase().replace(/[^a-z0-9]/g, "");
+                if (token.length >= 3 && blocked.indexOf(token) === -1
+                        && tokens.indexOf(token) === -1)
+                    tokens.push(token);
+            }
+        }
+        return { pids: [], tokens: tokens, strictTokens: true };
+    }
+
+    readonly property var browserAudioDescriptor: playerAudioDescriptor()
+    readonly property var browserAudioEvidence:
+        browserAudioDescriptor
+        ? audioProbe.resolve(browserAudioDescriptor, audioProbe.sinkInputs)
+        : null
+
+    onMenuOpenChanged: {
+        if (menuOpen)
+            audioProbe.refresh();
+    }
+
+    function runTransport(action) {
+        if (transportMode === "mpris") {
+            if (!mediaAdapter.run(action))
+                console.log("MediaDeck: MPRIS command unavailable", action);
+            return;
+        }
+        runLocalTransport(action);
+    }
     // The three functional zones are now stacked, with controls receiving
     // the largest share. These proportions are still design parameters.
     property real displayHeightShare: 0.34
@@ -102,6 +161,160 @@ PanelWindow {
                     color: Colors.cyan
                     font.pixelSize: 16
                 }
+
+                GohuText {
+                    anchors.top: parent.top
+                    anchors.topMargin: 35
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    text: mediaAdapter.connected
+                          ? ("EXTERNAL: " + String(mediaAdapter.activePlayer.identity || "MPRIS"))
+                          : "EXTERNAL: NO PLAYER SELECTED"
+                    color: Colors.orange
+                    font.pixelSize: 12
+                    elide: Text.ElideRight
+                }
+
+                GohuText {
+                    anchors.top: parent.top
+                    anchors.topMargin: 61
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    text: mediaAdapter.connected
+                          ? String(mediaAdapter.activePlayer.trackTitle || "NO TRACK METADATA")
+                          : "Open a YouTube video in a browser first."
+                    color: Colors.white
+                    font.pixelSize: 14
+                    elide: Text.ElideRight
+                }
+
+                GohuText {
+                    anchors.top: parent.top
+                    anchors.topMargin: 90
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    text: "AUDIO: "
+                          + (browserAudioEvidence
+                             ? browserAudioEvidence.indexes.length + " APP-MATCHED STREAM(S)"
+                             : "NO APP TARGET")
+                    color: Colors.cyan
+                    font.pixelSize: 12
+                }
+
+                GohuText {
+                    anchors.top: parent.top
+                    anchors.topMargin: 111
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    text: audioProbe.errorText
+                          ? ("PROBE ERROR: " + audioProbe.errorText)
+                          : "PIPEWIRE MATCH IS NOT PER-TAB PROOF"
+                    color: Colors.orange
+                    font.pixelSize: 11
+                    elide: Text.ElideRight
+                }
+
+                Row {
+                    anchors.top: parent.top
+                    anchors.topMargin: 152
+                    anchors.left: parent.left
+                    spacing: 9
+
+                    Rectangle {
+                        width: 128
+                        height: 36
+                        radius: 3
+                        color: modeMouse.containsMouse ? "#39333E" : "#29252E"
+                        border.width: 1
+                        border.color: deck.transportMode === "mpris"
+                                      ? Colors.orange : Colors.cyan
+
+                        GohuText {
+                            anchors.centerIn: parent
+                            text: "USE MPRIS"
+                            font.pixelSize: 12
+                            color: Colors.white
+                        }
+
+                        MouseArea {
+                            id: modeMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (!mediaAdapter.connected
+                                        && !mediaAdapter.selectNextPlayer())
+                                    return;
+                                deck.transportMode = "mpris";
+                                audioProbe.refresh();
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        width: 140
+                        height: 36
+                        radius: 3
+                        color: playerMouse.containsMouse ? "#39333E" : "#29252E"
+                        border.width: 1
+                        border.color: Colors.cyan
+
+                        GohuText {
+                            anchors.centerIn: parent
+                            text: "NEXT PLAYER"
+                            font.pixelSize: 12
+                            color: Colors.white
+                        }
+
+                        MouseArea {
+                            id: playerMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (mediaAdapter.selectNextPlayer()) {
+                                    deck.transportMode = "mpris";
+                                    audioProbe.refresh();
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        width: 125
+                        height: 36
+                        radius: 3
+                        color: localMouse.containsMouse ? "#39333E" : "#29252E"
+                        border.width: 1
+                        border.color: deck.transportMode === "mpd"
+                                      ? Colors.orange : Colors.cyan
+
+                        GohuText {
+                            anchors.centerIn: parent
+                            text: "LOCAL / MPD"
+                            font.pixelSize: 12
+                            color: Colors.white
+                        }
+
+                        MouseArea {
+                            id: localMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: deck.transportMode = "mpd"
+                        }
+                    }
+                }
+
+                GohuText {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    text: "READ-ONLY AUDIO PROBE • NO VOLUME MUTATIONS"
+                    color: Colors.cyan
+                    opacity: 0.65
+                    font.pixelSize: 10
+                }
             }
 
             // Middle zone: the future cassette or alternative loaded medium.
@@ -151,7 +364,7 @@ PanelWindow {
                 GohuText {
                     anchors.right: parent.right
                     anchors.top: parent.top
-                    text: "LOCAL / MPD"
+                    text: deck.transportMode === "mpris" ? "MPRIS / EXTERNAL" : "LOCAL / MPD"
                     color: Colors.orange
                     font.pixelSize: 11
                 }
@@ -189,6 +402,8 @@ PanelWindow {
                                     - 3 * transportGrid.spacing) / 4
                             height: 50
                             radius: 3
+                            opacity: deck.transportMode !== "mpris"
+                                     || mediaAdapter.supports(modelData.action) ? 1.0 : 0.45
 
                             color: keyMouse.pressed
                                    ? "#16131B"
@@ -225,7 +440,7 @@ PanelWindow {
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
 
-                                onClicked: deck.runLocalTransport(
+                                onClicked: deck.runTransport(
                                     transportKey.modelData.action
                                 )
                             }
@@ -236,7 +451,9 @@ PanelWindow {
                 GohuText {
                     anchors.left: parent.left
                     anchors.bottom: parent.bottom
-                    text: "TRANSPORT // FIRST HARDWARE TEST"
+                    text: deck.transportMode === "mpris"
+                          ? "EXTERNAL PLAYER // BROWSER TAB NOT VERIFIED"
+                          : "TRANSPORT // LOCAL MPD"
                     color: Colors.cyan
                     opacity: 0.6
                     font.pixelSize: 10

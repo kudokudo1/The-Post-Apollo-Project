@@ -415,6 +415,7 @@ APPCONTROL_LEFT_ONLY_ACTIONS = (
     "appBottleAction", "appToolboxAction",
     "hiddenKillAction", "appMuteAction", "windowMuteAction", "runKillAction",
     "windowPrimaryActionButton",
+    "fileActionButton", "remoteActionButton",
 )
 for control_id in APPCONTROL_LEFT_ONLY_ACTIONS:
     marker_pos = APPCONTROL.index(f"id: {control_id}")
@@ -533,3 +534,48 @@ for old_alias in (
     assert old_alias not in window_primary, f"window primary action retained old state alias: {old_alias}"
 
 print("AppControl window-primary ActionButton migration: PASS")
+
+
+# Eighth AppControl proof migration: FILES and REMOTE rows are immediate
+# operations, not navigation selectors. Both repeaters now share ActionButton
+# while preserving their model-provided accent colors and magenta selection.
+for repeater_id, control_id, old_mouse, expected_count in (
+    ("fileActionsRepeater", "fileActionButton", "fileActionMouse", 4),
+    ("remoteActionsRepeater", "remoteActionButton", "remoteActionMouse", 6),
+):
+    repeater_marker = APPCONTROL.index(f"id: {repeater_id}")
+    control_marker = APPCONTROL.index(f"id: {control_id}", repeater_marker)
+    block_start = APPCONTROL.rfind("ActionButton {", repeater_marker, control_marker)
+    assert block_start >= 0, f"{control_id} must use ActionButton"
+    window = APPCONTROL[block_start:control_marker + 4400]
+
+    assert f"id: {old_mouse}" not in window, f"{control_id} reintroduced private pointer engine"
+    for needle in (
+        "acceptedButtons: Qt.LeftButton",
+        "idleFillColor: Colors.dark",
+        "idleBorderColor: modelData.accent",
+        "hoverBorderColor: Colors.orange",
+        "selectedBorderColor: Colors.magenta",
+        "pressedBorderColor:",
+        "selected ? Colors.magenta",
+        "softGlowSpread: selected || hovered ? 4 : 2",
+        "idleSoftGlowColor: modelData.accent",
+        "selectedSoftGlowColor: Colors.magenta",
+        "softGlowIdleOpacity: 0.22",
+        "softGlowHoverOpacity: 0.48",
+        "selectedDetailActionIndex = index;",
+    ):
+        require(window, needle, f"{control_id} action-row fidelity")
+
+    repeater_window = APPCONTROL[repeater_marker:control_marker]
+    require(repeater_window, f"model: [", f"{repeater_id} retains explicit model")
+    # Cardinality is protected through the existing detail-action contract:
+    # FILES exposes 4 actions and REMOTE exposes 6.
+    detail_count_needle = (
+        "if (selectedResultIsFile())\n            return 4;"
+        if expected_count == 4
+        else "if (selectedResultIsRemote())\n            return 6;"
+    )
+    require(APPCONTROL, detail_count_needle, f"{repeater_id} action count")
+
+print("AppControl file/remote ActionButton migration: PASS")

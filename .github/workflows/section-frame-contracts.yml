@@ -8,6 +8,7 @@ on:
     paths:
       - "components/SurfaceFrame.qml"
       - "components/SectionFrame.qml"
+      - "widgets/WorkflowLibraryView.qml"
       - "components/qmldir"
       - "tests/components/test_section_frame_contracts.py"
       - ".github/workflows/section-frame-contracts.yml"
@@ -15,6 +16,7 @@ on:
     paths:
       - "components/SurfaceFrame.qml"
       - "components/SectionFrame.qml"
+      - "widgets/WorkflowLibraryView.qml"
       - "components/qmldir"
       - "tests/components/test_section_frame_contracts.py"
       - ".github/workflows/section-frame-contracts.yml"

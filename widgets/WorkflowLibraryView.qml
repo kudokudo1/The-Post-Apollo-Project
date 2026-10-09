@@ -173,21 +173,19 @@ Item {
             height: parent.height
             spacing: 10
 
-            Rectangle {
+            SectionFrame {
                 id: queuePane
 
                 width: parent.width
                 height: (parent.height - 10) * 0.58
 
-                color: Colors.dark
-                border.width: 1
-                border.color: Colors.orange
+                fillColor: Colors.dark
+                borderWidth: 1
+                borderColor: Colors.orange
+                inset: 8
 
                 Column {
-                    anchors {
-                        fill: parent
-                        margins: 8
-                    }
+                    anchors.fill: parent
 
                     spacing: 6
 
@@ -887,21 +885,19 @@ Item {
 
         // ===== COMPLETE WORKFLOW LIBRARY =======================
 
-        Rectangle {
+        SectionFrame {
             id: workflowPane
 
             width: (parent.width - 10) * 0.54
             height: parent.height
 
-            color: Colors.dark
-            border.width: 1
-            border.color: Colors.cyan
+            fillColor: Colors.dark
+            borderWidth: 1
+            borderColor: Colors.cyan
+            inset: 9
 
             Column {
-                anchors {
-                    fill: parent
-                    margins: 9
-                }
+                anchors.fill: parent
 
                 spacing: 7
 

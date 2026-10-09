@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 COMPONENT = (ROOT / "components/SectionFrame.qml").read_text(encoding="utf-8")
 QMLDIR = (ROOT / "components/qmldir").read_text(encoding="utf-8")
+WORKFLOW_LIBRARY = (ROOT / "widgets/WorkflowLibraryView.qml").read_text(encoding="utf-8")
 
 
 def require(text: str, needle: str, message: str) -> None:
@@ -62,5 +63,17 @@ assert COMPONENT.count("SurfaceFrame {") == 1, (
 )
 assert "property real inset: 7" not in COMPONENT
 assert "property real inset: 8" not in COMPONENT
+
+# First lossless proof consumers: preserve the two established flat workbench panes.
+for needle, message in (
+    ("SectionFrame {\n                id: queuePane", "queue pane must use SectionFrame"),
+    ("fillColor: Colors.dark\n                borderWidth: 1\n                borderColor: Colors.orange\n                inset: 8", "queue pane visual/inset values"),
+    ("SectionFrame {\n            id: workflowPane", "workflow pane must use SectionFrame"),
+    ("fillColor: Colors.dark\n            borderWidth: 1\n            borderColor: Colors.cyan\n            inset: 9", "workflow pane visual/inset values"),
+):
+    require(WORKFLOW_LIBRARY, needle, message)
+
+assert "Rectangle {\n                id: queuePane" not in WORKFLOW_LIBRARY
+assert "Rectangle {\n            id: workflowPane" not in WORKFLOW_LIBRARY
 
 print("Section frame contracts: PASS")

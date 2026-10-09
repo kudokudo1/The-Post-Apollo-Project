@@ -17,6 +17,13 @@ GIT_OPERATIONS = (ROOT / "widgets/GitOperationsView.qml").read_text(encoding="ut
 GITHUB_ISSUE = (ROOT / "widgets/GitHubIssueControlView.qml").read_text(encoding="utf-8")
 GITHUB_PROJECTS = (ROOT / "widgets/GitHubProjectsView.qml").read_text(encoding="utf-8")
 GITHUB_PR = (ROOT / "widgets/GitHubPullRequestControlView.qml").read_text(encoding="utf-8")
+GIT_ABSORB = (ROOT / "widgets/GitHistoryAbsorbView.qml").read_text(encoding="utf-8")
+GIT_SPLIT_HUNK = (ROOT / "widgets/GitHistorySplitHunkView.qml").read_text(encoding="utf-8")
+GIT_SPLIT_LINE = (ROOT / "widgets/GitHistorySplitLineView.qml").read_text(encoding="utf-8")
+GIT_SPLIT_FILE = (ROOT / "widgets/GitHistorySplitView.qml").read_text(encoding="utf-8")
+GIT_SURGERY = (ROOT / "widgets/GitHistorySurgeryView.qml").read_text(encoding="utf-8")
+GIT_REBASE_SESSION = (ROOT / "widgets/GitInteractiveRebaseSessionView.qml").read_text(encoding="utf-8")
+GIT_LINE_TRANSFER = (ROOT / "widgets/GitLineTransferView.qml").read_text(encoding="utf-8")
 
 
 def require(text: str, needle: str, message: str) -> None:
@@ -140,6 +147,21 @@ for text_value, needle, message in (
     (GITHUB_PR, "height: 52\n            fillColor: Colors.black\n            borderWidth: 1\n            borderColor: Colors.magenta\n            inset: 7", "pull request header shell"),
     (GITHUB_PR, "height: 78\n                    fillColor: Colors.black\n                    borderWidth: 1\n                    borderColor: Colors.red\n                    inset: 8", "pull request merge shell"),
     (GITHUB_PR, "? Colors.orange\n                    : Colors.blue\n                inset: 8", "pull request preview shell"),
+):
+    require(text_value, needle, message)
+
+# History/rebase/transfer rollout keeps strict-operation shells lossless.
+for text_value, needle, message in (
+    (GIT_ABSORB, "width: parent.width - Math.floor(parent.width * 0.56) - 8\n                height: parent.height\n                fillColor: Colors.black\n                borderWidth: 1\n                borderColor: Colors.orange\n                inset: 8", "absorb strict slice shell"),
+    (GIT_ABSORB, "height: 70\n                        fillColor: Colors.dark\n                        borderWidth: 1\n                        borderColor: Colors.cyan\n                        inset: 7", "absorb undo contract shell"),
+    (GIT_SPLIT_HUNK, "height: 92\n                        fillColor: Colors.dark\n                        borderWidth: 1\n                        borderColor: Colors.orange\n                        inset: 7", "hunk split strict shell"),
+    (GIT_SPLIT_LINE, "height: 104\n                        fillColor: Colors.dark\n                        borderWidth: 1\n                        borderColor: Colors.magenta\n                        inset: 7", "line split strict shell"),
+    (GIT_SPLIT_FILE, "height: 86\n                        fillColor: Colors.dark\n                        borderWidth: 1\n                        borderColor: Colors.orange\n                        inset: 7", "file split strict shell"),
+    (GIT_SURGERY, "height: 76\n                        fillColor: Colors.dark\n                        borderWidth: 1\n                        borderColor: Colors.orange\n                        inset: 7", "history surgery strict shell"),
+    (GIT_REBASE_SESSION, "height: 84\n            fillColor: Colors.black\n            borderWidth: 1\n            borderColor: Colors.cyan\n            inset: 7", "rebase session state shell"),
+    (GIT_REBASE_SESSION, "sessionService.lastError\n                ? Colors.red\n                : Colors.cyan\n            inset: 7", "rebase session footer"),
+    (GIT_LINE_TRANSFER, "width: parent.width - 438\n                height: parent.height\n                fillColor: Colors.black\n                borderWidth: 1\n                borderColor: Colors.magenta\n                inset: 8", "line transfer control shell"),
+    (GIT_LINE_TRANSFER, "root.previewMatchesSelection\n                            ? Colors.green\n                            : Colors.cyan\n                        inset: 7", "line transfer preview shell"),
 ):
     require(text_value, needle, message)
 

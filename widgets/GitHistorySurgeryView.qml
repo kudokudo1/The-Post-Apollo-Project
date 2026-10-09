@@ -457,16 +457,16 @@ Rectangle {
                                 )
                     }
 
-                    Rectangle {
+                    SectionFrame {
                         width: parent.width
                         height: 76
-                        color: Colors.dark
-                        border.width: 1
-                        border.color: Colors.orange
+                        fillColor: Colors.dark
+                        borderWidth: 1
+                        borderColor: Colors.orange
+                        inset: 7
 
                         GohuText {
                             anchors.fill: parent
-                            anchors.margins: 7
                             text:
                                 "STRICT FIRST SLICE\n"
                                 + "• contiguous commits only\n"
@@ -523,16 +523,16 @@ Rectangle {
             }
         }
 
-        Rectangle {
+        SectionFrame {
             width: parent.width
             height: 42
-            color: Colors.black
-            border.width: 1
-            border.color: Colors.cyan
+            fillColor: Colors.black
+            borderWidth: 1
+            borderColor: Colors.cyan
+            inset: 7
 
             GohuText {
                 anchors.fill: parent
-                anchors.margins: 7
                 verticalAlignment: Text.AlignVCenter
                 text:
                     "OPERATIONS UNDO RESTORES THE EXACT PRE-FOLD BRANCH HEAD "

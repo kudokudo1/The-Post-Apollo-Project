@@ -461,16 +461,16 @@ Rectangle {
                         keyboardOwner: root.keyboardHost
                     }
 
-                    Rectangle {
+                    SectionFrame {
                         width: parent.width
                         height: 104
-                        color: Colors.dark
-                        border.width: 1
-                        border.color: Colors.magenta
+                        fillColor: Colors.dark
+                        borderWidth: 1
+                        borderColor: Colors.magenta
+                        inset: 7
 
                         GohuText {
                             anchors.fill: parent
-                            anchors.margins: 7
                             text:
                                 "STRICT LINE SPLIT\n"
                                 + "• selected atomic edits -> part 1\n"
@@ -532,16 +532,16 @@ Rectangle {
             }
         }
 
-        Rectangle {
+        SectionFrame {
             width: parent.width
             height: 42
-            color: Colors.black
-            border.width: 1
-            border.color: Colors.cyan
+            fillColor: Colors.black
+            borderWidth: 1
+            borderColor: Colors.cyan
+            inset: 7
 
             GohuText {
                 anchors.fill: parent
-                anchors.margins: 7
                 verticalAlignment: Text.AlignVCenter
                 text:
                     "OPERATIONS UNDO RESTORES THE EXACT PRE-SPLIT BRANCH HEAD "

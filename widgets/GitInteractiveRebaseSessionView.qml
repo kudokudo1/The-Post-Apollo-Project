@@ -136,16 +136,16 @@ Rectangle {
             }
         }
 
-        Rectangle {
+        SectionFrame {
             width: parent.width
             height: 84
-            color: Colors.black
-            border.width: 1
-            border.color: Colors.cyan
+            fillColor: Colors.black
+            borderWidth: 1
+            borderColor: Colors.cyan
+            inset: 7
 
             Grid {
                 anchors.fill: parent
-                anchors.margins: 7
                 columns: 2
                 columnSpacing: 12
                 rowSpacing: 4
@@ -385,16 +385,16 @@ Rectangle {
                 }
             }
 
-            Rectangle {
+            SectionFrame {
                 width: parent.width - Math.floor(parent.width * 0.56) - 8
                 height: parent.height
-                color: Colors.black
-                border.width: 1
-                border.color: Colors.magenta
+                fillColor: Colors.black
+                borderWidth: 1
+                borderColor: Colors.magenta
+                inset: 8
 
                 Column {
                     anchors.fill: parent
-                    anchors.margins: 8
                     spacing: 7
 
                     GohuText {
@@ -494,19 +494,19 @@ Rectangle {
             }
         }
 
-        Rectangle {
+        SectionFrame {
             width: parent.width
             height: 42
-            color: Colors.black
-            border.width: 1
-            border.color:
+            fillColor: Colors.black
+            borderWidth: 1
+            borderColor:
                 sessionService.lastError
                 ? Colors.red
                 : Colors.cyan
+            inset: 7
 
             GohuText {
                 anchors.fill: parent
-                anchors.margins: 7
                 verticalAlignment: Text.AlignVCenter
                 text:
                     sessionService.lastError

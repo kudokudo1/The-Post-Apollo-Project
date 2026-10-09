@@ -358,16 +358,16 @@ Rectangle {
                 }
             }
 
-            Rectangle {
+            SectionFrame {
                 width: parent.width - Math.floor(parent.width * 0.56) - 8
                 height: parent.height
-                color: Colors.black
-                border.width: 1
-                border.color: Colors.orange
+                fillColor: Colors.black
+                borderWidth: 1
+                borderColor: Colors.orange
+                inset: 8
 
                 Column {
                     anchors.fill: parent
-                    anchors.margins: 8
                     spacing: 7
 
                     GohuText {
@@ -391,16 +391,16 @@ Rectangle {
                         wrapMode: Text.Wrap
                     }
 
-                    Rectangle {
+                    SectionFrame {
                         width: parent.width
                         height: 70
-                        color: Colors.dark
-                        border.width: 1
-                        border.color: Colors.cyan
+                        fillColor: Colors.dark
+                        borderWidth: 1
+                        borderColor: Colors.cyan
+                        inset: 7
 
                         GohuText {
                             anchors.fill: parent
-                            anchors.margins: 7
                             text:
                                 "UNDO CONTRACT\n"
                                 + "RESTORE OLD HEAD + EXACT STAGED PATCH "
@@ -451,16 +451,16 @@ Rectangle {
             }
         }
 
-        Rectangle {
+        SectionFrame {
             width: parent.width
             height: 42
-            color: Colors.black
-            border.width: 1
-            border.color: Colors.magenta
+            fillColor: Colors.black
+            borderWidth: 1
+            borderColor: Colors.magenta
+            inset: 7
 
             GohuText {
                 anchors.fill: parent
-                anchors.margins: 7
                 verticalAlignment: Text.AlignVCenter
                 text:
                     "ABSORB REHEARSES A FIXUP + AUTOSQUASH IN A TEMP WORKTREE "

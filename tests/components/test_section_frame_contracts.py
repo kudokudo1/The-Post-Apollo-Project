@@ -9,6 +9,7 @@ QMLDIR = (ROOT / "components/qmldir").read_text(encoding="utf-8")
 WORKFLOW_LIBRARY = (ROOT / "widgets/WorkflowLibraryView.qml").read_text(encoding="utf-8")
 REPOSITORY_PROFILE = (ROOT / "widgets/RepositoryProfileView.qml").read_text(encoding="utf-8")
 HOSPITAL_CHARTS = (ROOT / "widgets/HospitalChartsView.qml").read_text(encoding="utf-8")
+GIT_REPOSITORY = (ROOT / "widgets/GitRepositoryView.qml").read_text(encoding="utf-8")
 
 
 def require(text: str, needle: str, message: str) -> None:
@@ -105,5 +106,16 @@ for needle, message in (
     ("root.selectedSuggestion\n                        ? Colors.magenta : Colors.blue\n                    inset: 10", "selected suggestion detail dynamic border and inset"),
 ):
     require(HOSPITAL_CHARTS, needle, message)
+
+# Git Repository proves nested and dynamic workbench shell composition.
+for needle, message in (
+    ("SectionFrame {\n            width: parent.width\n            height: 62\n            fillColor: Colors.dark\n            borderWidth: 1\n            borderColor: Colors.orange\n            inset: 8", "repository mechanics header"),
+    ("height: 82\n                            fillColor: Colors.dark\n                            borderWidth: 1\n                            borderColor: Colors.magenta\n                            inset: 7", "remote intelligence panel"),
+    ("SectionFrame {\n                    width: parent.width - 478\n                    height: parent.height\n                    fillColor: Colors.black\n                    borderWidth: 1\n                    borderColor: Colors.magenta\n                    inset: 8", "tag operations outer shell"),
+    ("root.selectedTagRow()\n                                  )\n                                : Colors.orange\n                            inset: 7", "tag intelligence dynamic border and inset"),
+    ("root.tagRemoteStateColor()\n                            inset: 7", "tag remote status dynamic border and inset"),
+    ("SectionFrame {\n                    width: 560\n                    height: parent.height\n                    fillColor: Colors.dark\n                    borderWidth: 1\n                    borderColor: Colors.green\n                    inset: 7", "local config pane"),
+):
+    require(GIT_REPOSITORY, needle, message)
 
 print("Section frame contracts: PASS")

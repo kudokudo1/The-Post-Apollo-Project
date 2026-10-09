@@ -67,11 +67,26 @@ PanelWindow {
 
     readonly property var audioCandidateInputs:
         browserAudioEvidence ? browserAudioEvidence.inputs : []
-    property int audioCandidatePosition: 0
+
+    // A PipeWire stream index is a temporary stream coordinate, not a tab ID.
+    // Keep this selection anchored across ordinary re-ordered probe snapshots.
+    property int selectedAudioStreamIndex: -1
+    readonly property int selectedAudioCandidatePosition: {
+        const index = audioCandidateInputs.findIndex(function(input) {
+            return Number(input.index) === selectedAudioStreamIndex;
+        });
+        return index >= 0 ? index : 0;
+    }
     readonly property var selectedAudioCandidate:
         audioCandidateInputs.length > 0
-        ? audioCandidateInputs[audioCandidatePosition % audioCandidateInputs.length]
-        : null
+        ? audioCandidateInputs[selectedAudioCandidatePosition] : null
+
+    readonly property string audioSelectionLabel:
+        selectedAudioCandidate
+        ? ("STREAM #" + selectedAudioCandidate.index
+           + " (" + (selectedAudioCandidatePosition + 1)
+           + "/" + audioCandidateInputs.length + ")")
+        : "NO MATCHED STREAM"
 
     // This is an explicitly armed *stream-level* experiment, not per-tab
     // targeting. A browser stream may contain multiple tabs.
@@ -85,8 +100,24 @@ PanelWindow {
         }
 
         if (action === "next") {
-            audioCandidatePosition += 1;
             audioTestArmed = false;
+            const inputs = audioCandidateInputs;
+            if (inputs.length === 0) {
+                audioTestStatus = "NO AUDIO STREAMS TO SELECT";
+                return;
+            }
+            if (inputs.length === 1) {
+                selectedAudioStreamIndex = Number(inputs[0].index);
+                audioTestStatus = "ONLY ONE STREAM MATCHED";
+                return;
+            }
+
+            const next = inputs[(selectedAudioCandidatePosition + 1) % inputs.length];
+            selectedAudioStreamIndex = Number(next.index);
+            audioTestStatus = "SELECTED " + (selectedAudioCandidatePosition + 1)
+                              + "/" + inputs.length + " • #" + next.index;
+            console.log("MediaDeck: selected PipeWire stream", next.index,
+                        "of", inputs.length, "candidates");
             return;
         }
 
@@ -272,8 +303,9 @@ PanelWindow {
                     anchors.right: parent.right
                     text: "AUDIO: "
                           + (browserAudioEvidence
-                             ? browserAudioEvidence.indexes.length + " APP-MATCHED STREAM(S)"
+                             ? browserAudioEvidence.indexes.length + " APP STREAM(S)"
                              : "NO APP TARGET")
+                          + "  /  " + deck.audioSelectionLabel
                     color: Colors.cyan
                     font.pixelSize: 12
                 }
@@ -596,10 +628,18 @@ PanelWindow {
                     anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.topMargin: 259
-                    text: "STREAM "
-                          + (deck.selectedAudioCandidate
-                             ? deck.selectedAudioCandidate.index : "NONE")
-                          + " / " + deck.audioTestStatus
+                    text: deck.audioSelectionLabel
+                    color: Colors.orange
+                    font.pixelSize: 12
+                    elide: Text.ElideRight
+                }
+
+                GohuText {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.topMargin: 281
+                    text: deck.audioTestStatus
                     color: Colors.cyan
                     font.pixelSize: 10
                     elide: Text.ElideRight

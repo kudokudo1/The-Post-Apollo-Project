@@ -992,18 +992,16 @@ Item {
                 height: parent.height
                 spacing: 8
 
-                Rectangle {
+                SectionFrame {
                     width: parent.width
                     height: 292
-                    color: Colors.dark
-                    border.width: 1
-                    border.color: Colors.blue
+                    fillColor: Colors.dark
+                    borderWidth: 1
+                    borderColor: Colors.blue
+                    inset: 8
 
                     Column {
-                        anchors {
-                            fill: parent
-                            margins: 8
-                        }
+                        anchors.fill: parent
 
                         spacing: 7
 
@@ -1159,23 +1157,21 @@ Item {
                     }
                 }
 
-                Rectangle {
+                SectionFrame {
                     width: parent.width
                     height: parent.height - 300
-                    color: Colors.dark
-                    border.width: 1
-                    border.color:
+                    fillColor: Colors.dark
+                    borderWidth: 1
+                    borderColor:
                         root.profileService.lastError
                         ? Colors.red
                         : root.profileService.reviewReady
                         ? Colors.orange
                         : Colors.cyan
+                    inset: 8
 
                     Column {
-                        anchors {
-                            fill: parent
-                            margins: 8
-                        }
+                        anchors.fill: parent
 
                         spacing: 7
 
@@ -1334,18 +1330,16 @@ Item {
         visible: root.profileMode === "account"
         spacing: 10
 
-        Rectangle {
+        SectionFrame {
             width: parent.width
             height: 42
-            color: Colors.dark
-            border.width: 1
-            border.color: Colors.blue
+            fillColor: Colors.dark
+            borderWidth: 1
+            borderColor: Colors.blue
+            inset: 8
 
             Row {
-                anchors {
-                    fill: parent
-                    margins: 8
-                }
+                anchors.fill: parent
 
                 spacing: 8
 

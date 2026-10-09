@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[2]
 COMPONENT = (ROOT / "components/SectionFrame.qml").read_text(encoding="utf-8")
 QMLDIR = (ROOT / "components/qmldir").read_text(encoding="utf-8")
 WORKFLOW_LIBRARY = (ROOT / "widgets/WorkflowLibraryView.qml").read_text(encoding="utf-8")
+REPOSITORY_PROFILE = (ROOT / "widgets/RepositoryProfileView.qml").read_text(encoding="utf-8")
 
 
 def require(text: str, needle: str, message: str) -> None:
@@ -85,5 +86,14 @@ for needle, message in (
     require(WORKFLOW_LIBRARY, needle, message)
 
 assert "Rectangle {\n                        id: procedureReport" not in WORKFLOW_LIBRARY
+
+# Repository Profile proves SectionFrame around shells that contain controls without owning them.
+for needle, message in (
+    ("SectionFrame {\n                    width: parent.width\n                    height: 292\n                    fillColor: Colors.dark\n                    borderWidth: 1\n                    borderColor: Colors.blue\n                    inset: 8", "profile patch shell values"),
+    ("SectionFrame {\n                    width: parent.width\n                    height: parent.height - 300\n                    fillColor: Colors.dark\n                    borderWidth: 1\n                    borderColor:", "review/apply shell must use SectionFrame"),
+    ("root.profileService.reviewReady\n                        ? Colors.orange\n                        : Colors.cyan\n                    inset: 8", "review/apply dynamic border and inset"),
+    ("SectionFrame {\n            width: parent.width\n            height: 42\n            fillColor: Colors.dark\n            borderWidth: 1\n            borderColor: Colors.blue\n            inset: 8", "account profile header shell values"),
+):
+    require(REPOSITORY_PROFILE, needle, message)
 
 print("Section frame contracts: PASS")

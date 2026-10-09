@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="240" viewBox="0 0 1200 240">
+  <rect width="1200" height="240" rx="10" fill="#050505"/>
+  <g transform="translate(600 120)">
+    <path d="M0,-82 C8,-26 18,-12 92,0 C18,12 8,26 0,82 C-8,26 -18,12 -92,0 C-18,-12 -8,-26 0,-82 Z" fill="#FF7A00"/>
+    <path d="M0,-82 C8,-26 18,-12 92,0 C18,12 8,26 0,82 C-8,26 -18,-12 -92,0 C-18,-12 -8,-26 0,-82 Z" fill="none" stroke="#FF9A2B" stroke-width="3" opacity="0.55"/>
+  </g>
+  <text x="600" y="128" text-anchor="middle"
+        font-family="JetBrains Mono, Fira Code, SFMono-Regular, Consolas, monospace"
+        font-size="23" font-weight="500" letter-spacing="4" fill="#FFFFFF">META APOLLO LOGOS // POST-APOLLO PROJECT</text>
+</svg>

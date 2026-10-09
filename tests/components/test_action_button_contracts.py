@@ -322,3 +322,36 @@ for needle in (
     require(launch_window, needle, "launch target-state preservation")
 
 print("AppControl star-bearing ActionButton migration: PASS")
+
+
+# Fourth AppControl proof migration: RUN actions share ActionButton while each
+# variant keeps its own idle accent language and independent favorite star.
+RUN_ACTIONS = {
+    "runAction": ("runActionMouse", "runActionFavoriteStar", "Colors.cyan", "Colors.cyan", 0),
+    "runKittyAction": ("runKittyActionMouse", "runKittyActionFavoriteStar", "Colors.magenta", "Colors.magenta", 1),
+    "runFloatAction": ("runFloatActionMouse", "runFloatActionFavoriteStar", "Colors.white", "Colors.cyan", 2),
+    "runFullscreenAction": ("runFullscreenActionMouse", "runFullscreenActionFavoriteStar", "Colors.omnitrix", "Colors.omnitrix", 3),
+    "runToolboxAction": ("runToolboxActionMouse", "runToolboxActionFavoriteStar", "Colors.omnitrix", "Colors.omnitrix", 4),
+}
+
+for control_id, (root_mouse, star_id, idle_border, idle_glow, action_index) in RUN_ACTIONS.items():
+    marker = f"id: {control_id}"
+    marker_pos = APPCONTROL.index(marker)
+    block_start = APPCONTROL.rfind("ActionButton {", 0, marker_pos)
+    assert block_start >= 0, f"{control_id} must be hosted by ActionButton"
+
+    window = APPCONTROL[block_start:marker_pos + 7600]
+    assert f"id: {root_mouse}" not in window, f"{control_id} reintroduced its root pointer engine"
+    require(window, f"id: {star_id}", f"{control_id} favorite star survives migration")
+    require(window, f"parent: {control_id}.interactionItem", f"{control_id} favorite star uses interaction overlay")
+    require(window, f"selectedDetailActionIndex === {action_index}", f"{control_id} action index")
+    require(window, f"idleBorderColor: {idle_border}", f"{control_id} idle border identity")
+    require(window, f"idleSoftGlowColor: {idle_glow}", f"{control_id} idle halo identity")
+
+run_toolbox_marker = APPCONTROL.index("id: runToolboxAction")
+run_toolbox_window = APPCONTROL[run_toolbox_marker:run_toolbox_marker + 3200]
+require(run_toolbox_window, "property bool canLaunch:", "RUN toolbox availability state")
+require(run_toolbox_window, "available: canLaunch", "RUN toolbox ActionButton availability")
+require(run_toolbox_window, "unavailableOpacity: 0.48", "RUN toolbox unavailable fade")
+
+print("AppControl RUN ActionButton migration: PASS")

@@ -26237,7 +26237,7 @@ MouseArea {
                     }
                 }
 
-                Rectangle {
+                ActionButton {
                     id: runAction
 
                     width: parent.width - 10
@@ -26245,25 +26245,49 @@ MouseArea {
 
                     anchors.horizontalCenter: parent.horizontalCenter
 
-                    property bool isHovered:
-                        !appControlWindow.keyboardActive
-                        && runActionMouse.containsMouse
-                    property bool isPressed: runActionMouse.pressed
-                    property bool isSelected:
-                        appControlWindow.detailFocused
+                    suppressHover: appControlWindow.keyboardActive
+                    selected: appControlWindow.detailFocused
                         && appControlWindow.selectedDetailActionIndex === 0
+                    showLabel: false
+                    pointerCursorShape: Qt.ArrowCursor
 
-                    color: isPressed
-                           ? Colors.magenta
-                           : isHovered || isSelected
-                           ? Colors.yellow
-                           : Colors.dark
+                    idleFillColor: Colors.dark
+                    hoverFillColor: Colors.yellow
+                    selectedFillColor: Colors.yellow
+                    pressedFillColor: Colors.magenta
 
-                    border.width: 1
-                    border.color: isHovered || isSelected
-                                  ? Colors.orange
-                                  : Colors.cyan
+                    idleBorderColor: Colors.cyan
+                    hoverBorderColor: Colors.orange
+                    selectedBorderColor: Colors.orange
+                    pressedBorderColor: Colors.orange
+                    keyboardSelectedBorderColor: Colors.orange
 
+                    contentGlowEnabled: false
+                    softGlowEnabled: true
+                    softGlowSpread: 5
+                    idleSoftGlowColor: Colors.cyan
+                    hoverSoftGlowColor: Colors.orange
+                    selectedSoftGlowColor: Colors.orange
+                    pressedSoftGlowColor: Colors.orange
+                    keyboardSelectedSoftGlowColor: Colors.orange
+                    softGlowIdleOpacity: 0.26
+                    softGlowHoverOpacity: 0.62
+                    softGlowPressedOpacity: 0.62
+                    softGlowSelectedOpacity: 0.62
+                    softGlowKeyboardSelectedOpacity: 0.62
+                    wideGlowEnabled: false
+
+                    onHoverEntered: {
+                        appControlWindow.keyboardActive = false;
+                        appControlWindow.modeRailFocused = false;
+                        appControlWindow.detailFocused = true;
+                        appControlWindow.selectedDetailActionIndex = 0;
+                    }
+
+                    onTriggered: {
+                        appControlWindow.selectedDetailActionIndex = 0;
+                        appControlWindow.activateSelectedDetailAction();
+                    }
                     GohuText {
                         id: runActionText
 
@@ -26275,10 +26299,10 @@ MouseArea {
 
                         font.pixelSize: 15
 
-                        color: runAction.isPressed
+                        color: runAction.pressed
                                ? Colors.black
-                               : runAction.isHovered
-                                 || runAction.isSelected
+                               : runAction.hovered
+                                 || runAction.selected
                                ? Colors.orange
                                : Colors.cyan
                     }
@@ -26295,57 +26319,28 @@ MouseArea {
 
                         z: 2
 
-                        opacity: runAction.isPressed
+                        opacity: runAction.pressed
                                  ? 0.0
-                                 : runAction.isHovered || runAction.isSelected
+                                 : runAction.hovered || runAction.selected
                                  ? 0.48
                                  : 0.38
 
-                        color: runAction.isHovered || runAction.isSelected
+                        color: runAction.hovered || runAction.selected
                                ? Colors.orange
                                : Colors.cyan
 
                         transparentBorder: true
                     }
 
-                    MouseArea {
-                        id: runActionMouse
 
-                        anchors.fill: parent
-                        hoverEnabled: true
 
-                        onEntered: {
-                            appControlWindow.keyboardActive = false;
-                            appControlWindow.modeRailFocused = false;
-                            appControlWindow.detailFocused = true;
-                            appControlWindow.selectedDetailActionIndex = 0;
-                        }
 
-                        onClicked: {
-                            appControlWindow.selectedDetailActionIndex = 0;
-                            appControlWindow.activateSelectedDetailAction();
-                        }
-                    }
-
-                    RectangularShadow {
-                        anchors.fill: parent
-
-                        spread: 5
-                        z: -1
-
-                        opacity: runAction.isHovered || runAction.isSelected
-                                 ? 0.62
-                                 : 0.26
-
-                        color: runAction.isHovered || runAction.isSelected
-                               ? Colors.orange
-                               : Colors.cyan
-                    }
                 
 
 
                     Item {
                         id: runActionFavoriteStar
+                        parent: runAction.interactionItem
 
                         anchors.right: parent.right
                         anchors.rightMargin: 6
@@ -26480,7 +26475,7 @@ MouseArea {
                     }
                 }
 
-                Rectangle {
+                ActionButton {
                     id: runKittyAction
 
                     width: parent.width - 10
@@ -26488,27 +26483,49 @@ MouseArea {
 
                     anchors.horizontalCenter: parent.horizontalCenter
 
-                    property bool isHovered:
-                        !appControlWindow.keyboardActive
-                        && runKittyActionMouse.containsMouse
-                    property bool isPressed: runKittyActionMouse.pressed
-                    property bool isSelected:
-                        appControlWindow.detailFocused
+                    suppressHover: appControlWindow.keyboardActive
+                    selected: appControlWindow.detailFocused
                         && appControlWindow.selectedDetailActionIndex === 1
+                    showLabel: false
+                    pointerCursorShape: Qt.ArrowCursor
 
-                    // Match the alternate/desktop-action visual language.
-                    color: isPressed
-                           ? Colors.magenta
-                           : isHovered || isSelected
-                           ? Colors.yellow
-                           : Colors.black
+                    idleFillColor: Colors.black
+                    hoverFillColor: Colors.yellow
+                    selectedFillColor: Colors.yellow
+                    pressedFillColor: Colors.magenta
 
-                    border.width: 1
-                    border.color:
-                        isHovered || isSelected
-                        ? Colors.orange
-                        : Colors.magenta
+                    idleBorderColor: Colors.magenta
+                    hoverBorderColor: Colors.orange
+                    selectedBorderColor: Colors.orange
+                    pressedBorderColor: Colors.orange
+                    keyboardSelectedBorderColor: Colors.orange
 
+                    contentGlowEnabled: false
+                    softGlowEnabled: true
+                    softGlowSpread: 5
+                    idleSoftGlowColor: Colors.magenta
+                    hoverSoftGlowColor: Colors.orange
+                    selectedSoftGlowColor: Colors.orange
+                    pressedSoftGlowColor: Colors.orange
+                    keyboardSelectedSoftGlowColor: Colors.orange
+                    softGlowIdleOpacity: 0.26
+                    softGlowHoverOpacity: 0.60
+                    softGlowPressedOpacity: 0.60
+                    softGlowSelectedOpacity: 0.60
+                    softGlowKeyboardSelectedOpacity: 0.60
+                    wideGlowEnabled: false
+
+                    onHoverEntered: {
+                        appControlWindow.keyboardActive = false;
+                        appControlWindow.modeRailFocused = false;
+                        appControlWindow.detailFocused = true;
+                        appControlWindow.selectedDetailActionIndex = 1;
+                    }
+
+                    onTriggered: {
+                        appControlWindow.selectedDetailActionIndex = 1;
+                        appControlWindow.activateSelectedDetailAction();
+                    }
                     Row {
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
@@ -26524,14 +26541,14 @@ MouseArea {
                             text: "≽(^•⩊•^)≼"
                             font.pixelSize: 14
 
-                            color: runKittyAction.isPressed
+                            color: runKittyAction.pressed
                                    ? Colors.black
-                                   : runKittyAction.isHovered
-                                     || runKittyAction.isSelected
+                                   : runKittyAction.hovered
+                                     || runKittyAction.selected
                                    ? Colors.orange
                                    : Colors.magenta
 
-                            layer.enabled: !runKittyAction.isPressed
+                            layer.enabled: !runKittyAction.pressed
                             layer.effect: DropShadow {
                                 horizontalOffset: 0
                                 verticalOffset: 0
@@ -26540,14 +26557,14 @@ MouseArea {
                                 samples: 7
 
                                 opacity:
-                                    runKittyAction.isHovered
-                                    || runKittyAction.isSelected
+                                    runKittyAction.hovered
+                                    || runKittyAction.selected
                                     ? 0.68
                                     : 0.50
 
                                 color:
-                                    runKittyAction.isHovered
-                                    || runKittyAction.isSelected
+                                    runKittyAction.hovered
+                                    || runKittyAction.selected
                                     ? Colors.orange
                                     : Colors.magenta
                                 transparentBorder: true
@@ -26562,14 +26579,14 @@ MouseArea {
                             text: "KITTY"
 
                             font.pixelSize: 14
-                            color: runKittyAction.isPressed
+                            color: runKittyAction.pressed
                                    ? Colors.black
-                                   : runKittyAction.isHovered
-                                     || runKittyAction.isSelected
+                                   : runKittyAction.hovered
+                                     || runKittyAction.selected
                                    ? Colors.orange
                                    : Colors.magenta
 
-                            layer.enabled: !runKittyAction.isPressed
+                            layer.enabled: !runKittyAction.pressed
                             layer.effect: DropShadow {
                                 horizontalOffset: 0
                                 verticalOffset: 0
@@ -26578,14 +26595,14 @@ MouseArea {
                                 samples: 9
 
                                 opacity:
-                                    runKittyAction.isHovered
-                                    || runKittyAction.isSelected
+                                    runKittyAction.hovered
+                                    || runKittyAction.selected
                                     ? 0.78
                                     : 0.60
 
                                 color:
-                                    runKittyAction.isHovered
-                                    || runKittyAction.isSelected
+                                    runKittyAction.hovered
+                                    || runKittyAction.selected
                                     ? Colors.orange
                                     : Colors.magenta
                                 transparentBorder: true
@@ -26594,47 +26611,15 @@ MouseArea {
                     }
 
 
-                    MouseArea {
-                        id: runKittyActionMouse
 
-                        anchors.fill: parent
-                        hoverEnabled: true
 
-                        onEntered: {
-                            appControlWindow.keyboardActive = false;
-                            appControlWindow.modeRailFocused = false;
-                            appControlWindow.detailFocused = true;
-                            appControlWindow.selectedDetailActionIndex = 1;
-                        }
 
-                        onClicked: {
-                            appControlWindow.selectedDetailActionIndex = 1;
-                            appControlWindow.activateSelectedDetailAction();
-                        }
-                    }
-
-                    RectangularShadow {
-                        anchors.fill: parent
-
-                        spread: 5
-                        z: -1
-
-                        opacity: runKittyAction.isHovered
-                                 || runKittyAction.isSelected
-                                 ? 0.60
-                                 : 0.26
-
-                        color:
-                            runKittyAction.isHovered
-                            || runKittyAction.isSelected
-                            ? Colors.orange
-                            : Colors.magenta
-                    }
                 
 
 
                     Item {
                         id: runKittyActionFavoriteStar
+                        parent: runKittyAction.interactionItem
 
                         anchors.right: parent.right
                         anchors.rightMargin: 6
@@ -26734,7 +26719,7 @@ MouseArea {
                     }
 }
 
-                Rectangle {
+                ActionButton {
                     id: runFloatAction
 
                     width: parent.width - 10
@@ -26742,29 +26727,49 @@ MouseArea {
 
                     anchors.horizontalCenter: parent.horizontalCenter
 
-                    property bool isHovered:
-                        !appControlWindow.keyboardActive
-                        && runFloatActionMouse.containsMouse
-                    property bool isPressed: runFloatActionMouse.pressed
-                    property bool isSelected:
-                        appControlWindow.detailFocused
+                    suppressHover: appControlWindow.keyboardActive
+                    selected: appControlWindow.detailFocused
                         && appControlWindow.selectedDetailActionIndex === 2
+                    showLabel: false
+                    pointerCursorShape: Qt.ArrowCursor
 
-                    // Same alternate-action language as KITTY and desktop
-                    // actions: orange frame/text, yellow selected, magenta
-                    // pressed.
-                    color: isPressed
-                           ? Colors.magenta
-                           : isHovered || isSelected
-                           ? Colors.yellow
-                           : Colors.black
+                    idleFillColor: Colors.black
+                    hoverFillColor: Colors.yellow
+                    selectedFillColor: Colors.yellow
+                    pressedFillColor: Colors.magenta
 
-                    border.width: 1
-                    border.color:
-                        isHovered || isSelected
-                        ? Colors.orange
-                        : Colors.white
+                    idleBorderColor: Colors.white
+                    hoverBorderColor: Colors.orange
+                    selectedBorderColor: Colors.orange
+                    pressedBorderColor: Colors.orange
+                    keyboardSelectedBorderColor: Colors.orange
 
+                    contentGlowEnabled: false
+                    softGlowEnabled: true
+                    softGlowSpread: 5
+                    idleSoftGlowColor: Colors.cyan
+                    hoverSoftGlowColor: Colors.orange
+                    selectedSoftGlowColor: Colors.orange
+                    pressedSoftGlowColor: Colors.orange
+                    keyboardSelectedSoftGlowColor: Colors.orange
+                    softGlowIdleOpacity: 0.26
+                    softGlowHoverOpacity: 0.60
+                    softGlowPressedOpacity: 0.60
+                    softGlowSelectedOpacity: 0.60
+                    softGlowKeyboardSelectedOpacity: 0.60
+                    wideGlowEnabled: false
+
+                    onHoverEntered: {
+                        appControlWindow.keyboardActive = false;
+                        appControlWindow.modeRailFocused = false;
+                        appControlWindow.detailFocused = true;
+                        appControlWindow.selectedDetailActionIndex = 2;
+                    }
+
+                    onTriggered: {
+                        appControlWindow.selectedDetailActionIndex = 2;
+                        appControlWindow.activateSelectedDetailAction();
+                    }
                     Row {
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
@@ -26780,14 +26785,14 @@ MouseArea {
                             text: "⊹ ࣪ ˖🕊⋆₊⊹"
                             font.pixelSize: 14
 
-                            color: runFloatAction.isPressed
+                            color: runFloatAction.pressed
                                    ? Colors.black
-                                   : runFloatAction.isHovered
-                                     || runFloatAction.isSelected
+                                   : runFloatAction.hovered
+                                     || runFloatAction.selected
                                    ? Colors.orange
                                    : Colors.white
 
-                            layer.enabled: !runFloatAction.isPressed
+                            layer.enabled: !runFloatAction.pressed
                             layer.effect: DropShadow {
                                 horizontalOffset: 0
                                 verticalOffset: 0
@@ -26796,14 +26801,14 @@ MouseArea {
                                 samples: 7
 
                                 opacity:
-                                    runFloatAction.isHovered
-                                    || runFloatAction.isSelected
+                                    runFloatAction.hovered
+                                    || runFloatAction.selected
                                     ? 0.68
                                     : 0.50
 
                                 color:
-                                    runFloatAction.isHovered
-                                    || runFloatAction.isSelected
+                                    runFloatAction.hovered
+                                    || runFloatAction.selected
                                     ? Colors.orange
                                     : Colors.cyan
                                 transparentBorder: true
@@ -26818,14 +26823,14 @@ MouseArea {
                             text: "FLOAT"
 
                             font.pixelSize: 14
-                            color: runFloatAction.isPressed
+                            color: runFloatAction.pressed
                                    ? Colors.black
-                                   : runFloatAction.isHovered
-                                     || runFloatAction.isSelected
+                                   : runFloatAction.hovered
+                                     || runFloatAction.selected
                                    ? Colors.orange
                                    : Colors.white
 
-                            layer.enabled: !runFloatAction.isPressed
+                            layer.enabled: !runFloatAction.pressed
                             layer.effect: DropShadow {
                                 horizontalOffset: 0
                                 verticalOffset: 0
@@ -26834,14 +26839,14 @@ MouseArea {
                                 samples: 9
 
                                 opacity:
-                                    runFloatAction.isHovered
-                                    || runFloatAction.isSelected
+                                    runFloatAction.hovered
+                                    || runFloatAction.selected
                                     ? 0.78
                                     : 0.60
 
                                 color:
-                                    runFloatAction.isHovered
-                                    || runFloatAction.isSelected
+                                    runFloatAction.hovered
+                                    || runFloatAction.selected
                                     ? Colors.orange
                                     : Colors.cyan
                                 transparentBorder: true
@@ -26850,47 +26855,15 @@ MouseArea {
                     }
 
 
-                    MouseArea {
-                        id: runFloatActionMouse
 
-                        anchors.fill: parent
-                        hoverEnabled: true
 
-                        onEntered: {
-                            appControlWindow.keyboardActive = false;
-                            appControlWindow.modeRailFocused = false;
-                            appControlWindow.detailFocused = true;
-                            appControlWindow.selectedDetailActionIndex = 2;
-                        }
 
-                        onClicked: {
-                            appControlWindow.selectedDetailActionIndex = 2;
-                            appControlWindow.activateSelectedDetailAction();
-                        }
-                    }
-
-                    RectangularShadow {
-                        anchors.fill: parent
-
-                        spread: 5
-                        z: -1
-
-                        opacity: runFloatAction.isHovered
-                                 || runFloatAction.isSelected
-                                 ? 0.60
-                                 : 0.26
-
-                        color:
-                            runFloatAction.isHovered
-                            || runFloatAction.isSelected
-                            ? Colors.orange
-                            : Colors.cyan
-                    }
                 
 
 
                     Item {
                         id: runFloatActionFavoriteStar
+                        parent: runFloatAction.interactionItem
 
                         anchors.right: parent.right
                         anchors.rightMargin: 6
@@ -26990,7 +26963,7 @@ MouseArea {
                     }
 }
 
-                Rectangle {
+                ActionButton {
                     id: runFullscreenAction
 
                     width: parent.width - 10
@@ -26998,26 +26971,49 @@ MouseArea {
 
                     anchors.horizontalCenter: parent.horizontalCenter
 
-                    property bool isHovered:
-                        !appControlWindow.keyboardActive
-                        && runFullscreenActionMouse.containsMouse
-                    property bool isPressed: runFullscreenActionMouse.pressed
-                    property bool isSelected:
-                        appControlWindow.detailFocused
+                    suppressHover: appControlWindow.keyboardActive
+                    selected: appControlWindow.detailFocused
                         && appControlWindow.selectedDetailActionIndex === 3
+                    showLabel: false
+                    pointerCursorShape: Qt.ArrowCursor
 
-                    color: isPressed
-                           ? Colors.magenta
-                           : isHovered || isSelected
-                           ? Colors.yellow
-                           : Colors.black
+                    idleFillColor: Colors.black
+                    hoverFillColor: Colors.yellow
+                    selectedFillColor: Colors.yellow
+                    pressedFillColor: Colors.magenta
 
-                    border.width: 1
-                    border.color:
-                        isHovered || isSelected
-                        ? Colors.orange
-                        : Colors.omnitrix
+                    idleBorderColor: Colors.omnitrix
+                    hoverBorderColor: Colors.orange
+                    selectedBorderColor: Colors.orange
+                    pressedBorderColor: Colors.orange
+                    keyboardSelectedBorderColor: Colors.orange
 
+                    contentGlowEnabled: false
+                    softGlowEnabled: true
+                    softGlowSpread: 5
+                    idleSoftGlowColor: Colors.omnitrix
+                    hoverSoftGlowColor: Colors.orange
+                    selectedSoftGlowColor: Colors.orange
+                    pressedSoftGlowColor: Colors.orange
+                    keyboardSelectedSoftGlowColor: Colors.orange
+                    softGlowIdleOpacity: 0.26
+                    softGlowHoverOpacity: 0.60
+                    softGlowPressedOpacity: 0.60
+                    softGlowSelectedOpacity: 0.60
+                    softGlowKeyboardSelectedOpacity: 0.60
+                    wideGlowEnabled: false
+
+                    onHoverEntered: {
+                        appControlWindow.keyboardActive = false;
+                        appControlWindow.modeRailFocused = false;
+                        appControlWindow.detailFocused = true;
+                        appControlWindow.selectedDetailActionIndex = 3;
+                    }
+
+                    onTriggered: {
+                        appControlWindow.selectedDetailActionIndex = 3;
+                        appControlWindow.activateSelectedDetailAction();
+                    }
                     Row {
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
@@ -27033,14 +27029,14 @@ MouseArea {
                             text: "🂡🂱🃑🂭🂽"
                             font.pixelSize: 16
 
-                            color: runFullscreenAction.isPressed
+                            color: runFullscreenAction.pressed
                                    ? Colors.black
-                                   : runFullscreenAction.isHovered
-                                     || runFullscreenAction.isSelected
+                                   : runFullscreenAction.hovered
+                                     || runFullscreenAction.selected
                                    ? Colors.orange
                                    : Colors.omnitrix
 
-                            layer.enabled: !runFullscreenAction.isPressed
+                            layer.enabled: !runFullscreenAction.pressed
                             layer.effect: DropShadow {
                                 horizontalOffset: 0
                                 verticalOffset: 0
@@ -27049,14 +27045,14 @@ MouseArea {
                                 samples: 7
 
                                 opacity:
-                                    runFullscreenAction.isHovered
-                                    || runFullscreenAction.isSelected
+                                    runFullscreenAction.hovered
+                                    || runFullscreenAction.selected
                                     ? 0.68
                                     : 0.50
 
                                 color:
-                                    runFullscreenAction.isHovered
-                                    || runFullscreenAction.isSelected
+                                    runFullscreenAction.hovered
+                                    || runFullscreenAction.selected
                                     ? Colors.orange
                                     : Colors.omnitrix
                                 transparentBorder: true
@@ -27071,14 +27067,14 @@ MouseArea {
                             text: "FULLSCREEN"
 
                             font.pixelSize: 14
-                            color: runFullscreenAction.isPressed
+                            color: runFullscreenAction.pressed
                                    ? Colors.black
-                                   : runFullscreenAction.isHovered
-                                     || runFullscreenAction.isSelected
+                                   : runFullscreenAction.hovered
+                                     || runFullscreenAction.selected
                                    ? Colors.orange
                                    : Colors.omnitrix
 
-                            layer.enabled: !runFullscreenAction.isPressed
+                            layer.enabled: !runFullscreenAction.pressed
                             layer.effect: DropShadow {
                                 horizontalOffset: 0
                                 verticalOffset: 0
@@ -27087,14 +27083,14 @@ MouseArea {
                                 samples: 9
 
                                 opacity:
-                                    runFullscreenAction.isHovered
-                                    || runFullscreenAction.isSelected
+                                    runFullscreenAction.hovered
+                                    || runFullscreenAction.selected
                                     ? 0.78
                                     : 0.60
 
                                 color:
-                                    runFullscreenAction.isHovered
-                                    || runFullscreenAction.isSelected
+                                    runFullscreenAction.hovered
+                                    || runFullscreenAction.selected
                                     ? Colors.orange
                                     : Colors.omnitrix
                                 transparentBorder: true
@@ -27103,47 +27099,15 @@ MouseArea {
                     }
 
 
-                    MouseArea {
-                        id: runFullscreenActionMouse
 
-                        anchors.fill: parent
-                        hoverEnabled: true
 
-                        onEntered: {
-                            appControlWindow.keyboardActive = false;
-                            appControlWindow.modeRailFocused = false;
-                            appControlWindow.detailFocused = true;
-                            appControlWindow.selectedDetailActionIndex = 3;
-                        }
 
-                        onClicked: {
-                            appControlWindow.selectedDetailActionIndex = 3;
-                            appControlWindow.activateSelectedDetailAction();
-                        }
-                    }
-
-                    RectangularShadow {
-                        anchors.fill: parent
-
-                        spread: 5
-                        z: -1
-
-                        opacity: runFullscreenAction.isHovered
-                                 || runFullscreenAction.isSelected
-                                 ? 0.60
-                                 : 0.26
-
-                        color:
-                            runFullscreenAction.isHovered
-                            || runFullscreenAction.isSelected
-                            ? Colors.orange
-                            : Colors.omnitrix
-                    }
                 
 
 
                     Item {
                         id: runFullscreenActionFavoriteStar
+                        parent: runFullscreenAction.interactionItem
 
                         anchors.right: parent.right
                         anchors.rightMargin: 6
@@ -27243,35 +27207,61 @@ MouseArea {
                     }
 }
 
-                Rectangle {
+                ActionButton {
                     id: runToolboxAction
 
                     width: parent.width - 10
                     height: 34
                     anchors.horizontalCenter: parent.horizontalCenter
 
-                    property bool isHovered:
-                        !appControlWindow.keyboardActive
-                        && runToolboxActionMouse.containsMouse
-                    property bool isPressed:
-                        runToolboxActionMouse.pressed
-                    property bool isSelected:
-                        appControlWindow.detailFocused
-                        && appControlWindow.selectedDetailActionIndex === 4
                     property bool canLaunch:
                         appControlWindow.detailActionAvailable(4)
 
-                    color:
-                        isPressed
-                        ? Colors.magenta
-                        : isHovered || isSelected
-                        ? Colors.yellow
-                        : Colors.black
+                    available: canLaunch
+                    unavailableOpacity: 0.48
+                    suppressHover: appControlWindow.keyboardActive
+                    selected: appControlWindow.detailFocused
+                        && appControlWindow.selectedDetailActionIndex === 4
+                    showLabel: false
+                    pointerCursorShape: Qt.ArrowCursor
 
-                    opacity: canLaunch ? 1.0 : 0.48
+                    idleFillColor: Colors.black
+                    hoverFillColor: Colors.yellow
+                    selectedFillColor: Colors.yellow
+                    pressedFillColor: Colors.magenta
 
-                    border.width: 1
-                    border.color: Colors.omnitrix
+                    idleBorderColor: Colors.omnitrix
+                    hoverBorderColor: Colors.omnitrix
+                    selectedBorderColor: Colors.omnitrix
+                    pressedBorderColor: Colors.omnitrix
+                    keyboardSelectedBorderColor: Colors.omnitrix
+
+                    contentGlowEnabled: false
+                    softGlowEnabled: true
+                    softGlowSpread: 5
+                    idleSoftGlowColor: Colors.omnitrix
+                    hoverSoftGlowColor: Colors.omnitrix
+                    selectedSoftGlowColor: Colors.omnitrix
+                    pressedSoftGlowColor: Colors.omnitrix
+                    keyboardSelectedSoftGlowColor: Colors.omnitrix
+                    softGlowIdleOpacity: 0.18
+                    softGlowHoverOpacity: 0.56
+                    softGlowPressedOpacity: 0.56
+                    softGlowSelectedOpacity: 0.56
+                    softGlowKeyboardSelectedOpacity: 0.56
+                    wideGlowEnabled: false
+
+                    onHoverEntered: {
+                        appControlWindow.keyboardActive = false;
+                        appControlWindow.modeRailFocused = false;
+                        appControlWindow.detailFocused = true;
+                        appControlWindow.selectedDetailActionIndex = 4;
+                    }
+
+                    onTriggered: {
+                        appControlWindow.selectedDetailActionIndex = 4;
+                        appControlWindow.activateSelectedDetailAction();
+                    }
                     Row {
                         id: runToolboxActionContent
                         anchors.left: parent.left
@@ -27293,11 +27283,11 @@ MouseArea {
                                 text: "🛠"
                                 font.pixelSize: 13
                                 color:
-                                    runToolboxAction.isPressed
+                                    runToolboxAction.pressed
                                     ? Colors.black
                                     : Colors.omnitrix
 
-                                layer.enabled: !runToolboxAction.isPressed
+                                layer.enabled: !runToolboxAction.pressed
                                 layer.effect: DropShadow {
                                     radius: 7
                                     samples: 7
@@ -27316,17 +27306,17 @@ MouseArea {
                                 : "TOOLBOX  [UNAVAILABLE]"
                             font.pixelSize: 14
                             color:
-                                runToolboxAction.isPressed
+                                runToolboxAction.pressed
                                 ? Colors.black
                                 : Colors.omnitrix
 
-                            layer.enabled: !runToolboxAction.isPressed
+                            layer.enabled: !runToolboxAction.pressed
                             layer.effect: DropShadow {
                                 radius: 8
                                 samples: 7
                                 opacity:
-                                    runToolboxAction.isHovered
-                                    || runToolboxAction.isSelected
+                                    runToolboxAction.hovered
+                                    || runToolboxAction.selected
                                     ? 0.66
                                     : 0.46
                                 color: Colors.omnitrix
@@ -27335,41 +27325,13 @@ MouseArea {
                         }
                     }
 
-MouseArea {
-                        id: runToolboxActionMouse
-                        anchors.fill: parent
-                        enabled: runToolboxAction.canLaunch
-                        hoverEnabled: true
 
-                        onEntered: {
-                            appControlWindow.keyboardActive = false;
-                            appControlWindow.modeRailFocused = false;
-                            appControlWindow.detailFocused = true;
-                            appControlWindow.selectedDetailActionIndex = 4;
-                        }
 
-                        onClicked: {
-                            appControlWindow.selectedDetailActionIndex = 4;
-                            appControlWindow.activateSelectedDetailAction();
-                        }
-                    }
 
-                    RectangularShadow {
-                        anchors.fill: parent
-                        spread: 5
-                        z: -1
-
-                        opacity:
-                            runToolboxAction.isHovered
-                            || runToolboxAction.isSelected
-                            ? 0.56
-                            : 0.18
-
-                        color: Colors.omnitrix
-                    }
 
                     Item {
                         id: runToolboxActionFavoriteStar
+                        parent: runToolboxAction.interactionItem
 
                         anchors.right: parent.right
                         anchors.rightMargin: 6

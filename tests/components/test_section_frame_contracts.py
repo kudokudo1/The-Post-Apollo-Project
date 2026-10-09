@@ -34,6 +34,11 @@ HOSPITAL_CHART_SUGGESTIONS = (ROOT / "widgets/HospitalChartSuggestionsView.qml")
 HOSPITAL_GITHUB_ATTENTION = (ROOT / "widgets/HospitalGitHubAttentionView.qml").read_text(encoding="utf-8")
 HOSPITAL_GITHUB_MERGE_QUEUE = (ROOT / "widgets/HospitalGitHubMergeQueueView.qml").read_text(encoding="utf-8")
 HOSPITAL_ROOM_REPORTS = (ROOT / "widgets/HospitalRoomReportsView.qml").read_text(encoding="utf-8")
+GIT_BLAME = (ROOT / "widgets/GitBlameView.qml").read_text(encoding="utf-8")
+GIT_SPLIT_HUB = (ROOT / "widgets/GitHistorySplitHubView.qml").read_text(encoding="utf-8")
+GITHUB_PROJECTS_ROADMAP = (ROOT / "widgets/GitHubProjectsRoadmapView.qml").read_text(encoding="utf-8")
+GITHUB_PROJECTS_TABLE = (ROOT / "widgets/GitHubProjectsTableView.qml").read_text(encoding="utf-8")
+RUN_INSPECTOR = (ROOT / "widgets/RunInspectorDrawer.qml").read_text(encoding="utf-8")
 
 
 def require(text: str, needle: str, message: str) -> None:
@@ -200,6 +205,19 @@ for text_value, needle, message in (
     (HOSPITAL_GITHUB_ATTENTION, "height: 54\n            fillColor: Colors.black\n            borderWidth: 1\n            borderColor: Colors.red\n            inset: 7", "Hospital GitHub attention header"),
     (HOSPITAL_GITHUB_MERGE_QUEUE, "height: 56\n            fillColor: Colors.black\n            borderWidth: 1\n            borderColor: Colors.blue\n            inset: 7", "Hospital merge queue header"),
     (HOSPITAL_ROOM_REPORTS, "root.selectedReport\n                    ? root.evidenceColor(root.selectedReport)\n                    : Colors.magenta\n                inset: 10", "Hospital room reports detail pane"),
+):
+    require(text_value, needle, message)
+
+# Remaining collision-free flat panels.
+for text_value, needle, message in (
+    (GIT_BLAME, "SectionFrame {\n    id: root\n\n    required property var blameService", "Git Blame outer shell"),
+    (GIT_BLAME, "id: detailFrame\n\n            anchors {\n                left: parent.left\n                right: parent.right\n                bottom: parent.bottom\n            }\n\n            height: 112\n            fillColor: Colors.black\n            borderWidth: 1\n            borderColor: Colors.blue", "Git Blame detail shell"),
+    (GIT_SPLIT_HUB, "SectionFrame {\n    id: root\n\n    required property var fileService", "history split hub outer shell"),
+    (GITHUB_PROJECTS_ROADMAP, "height: parent.height - 38\n            fillColor: Colors.black\n            borderWidth: 1\n            borderColor: Colors.cyan\n            inset: 8\n\n            Flickable {\n                id: roadmapScroll\n\n                anchors.fill: parent", "Projects roadmap scroll shell"),
+    (GITHUB_PROJECTS_ROADMAP, "height: 30\n                        visible: root.unscheduled.length > 0\n                        fillColor: Colors.black\n                        borderWidth: 1\n                        borderColor: Colors.orange", "Projects roadmap unscheduled header"),
+    (GITHUB_PROJECTS_TABLE, "height: parent.height - 38\n            fillColor: Colors.black\n            borderWidth: 1\n            borderColor: Colors.cyan\n            inset: 8\n\n            Flickable {\n                id: tableScroll\n\n                anchors.fill: parent", "Projects table scroll shell"),
+    (RUN_INSPECTOR, "width: 336\n                    height: parent.height\n\n                    fillColor: Colors.dark\n                    borderWidth: 1\n                    borderColor: Colors.blue\n                    inset: 8", "Run Inspector identity pane"),
+    (RUN_INSPECTOR, "width: parent.width - 344\n                    height: parent.height\n\n                    fillColor: Colors.dark\n                    borderWidth: 1\n                    borderColor:\n                        root.githubService.inspectorError\n                        ? Colors.red\n                        : Colors.orange\n                    inset: 8", "Run Inspector output pane"),
 ):
     require(text_value, needle, message)
 

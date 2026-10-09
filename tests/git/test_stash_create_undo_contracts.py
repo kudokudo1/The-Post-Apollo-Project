@@ -214,8 +214,12 @@ def smoke_staged_only_undo():
         git(repo, "stash", "push", "--staged", "-m", "staged only")
         created = stash_sha(repo)
         post_status = git(repo, "status", "--porcelain=v1", "--untracked-files=all").stdout
-        assert b"tracked.txt" not in post_status
-        assert b"?? untracked.txt" in post_status
+        post_lines = post_status.splitlines()
+        assert not any(
+            len(line) >= 4 and line[3:] == b"tracked.txt"
+            for line in post_lines
+        )
+        assert b"?? untracked.txt" in post_lines
 
         # Safe staged-only recovery applies directly onto the exact retained
         # post-state; it never cleans unrelated untracked content.

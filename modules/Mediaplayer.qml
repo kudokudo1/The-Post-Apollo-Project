@@ -107,7 +107,10 @@ DockButton {
     }
 
     function receiveCavaFrame(frame) {
-        var columns = String(frame).trim().split(";");
+        var raw = String(frame).trim();
+        if (raw.endsWith(";"))
+            raw = raw.slice(0, -1);
+        var columns = raw.split(";");
         if (columns.length !== barCount)
             return;
 

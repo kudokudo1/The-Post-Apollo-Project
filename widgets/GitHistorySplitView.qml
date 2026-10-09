@@ -393,16 +393,16 @@ Rectangle {
                         keyboardOwner: root.keyboardHost
                     }
 
-                    Rectangle {
+                    SectionFrame {
                         width: parent.width
                         height: 86
-                        color: Colors.dark
-                        border.width: 1
-                        border.color: Colors.orange
+                        fillColor: Colors.dark
+                        borderWidth: 1
+                        borderColor: Colors.orange
+                        inset: 7
 
                         GohuText {
                             anchors.fill: parent
-                            anchors.margins: 7
                             text:
                                 "STRICT FILE SPLIT SLICE\n"
                                 + "• one non-merge commit\n"
@@ -464,16 +464,16 @@ Rectangle {
             }
         }
 
-        Rectangle {
+        SectionFrame {
             width: parent.width
             height: 42
-            color: Colors.black
-            border.width: 1
-            border.color: Colors.cyan
+            fillColor: Colors.black
+            borderWidth: 1
+            borderColor: Colors.cyan
+            inset: 7
 
             GohuText {
                 anchors.fill: parent
-                anchors.margins: 7
                 verticalAlignment: Text.AlignVCenter
                 text:
                     "CLICK FILE ROWS TO TOGGLE PART 1 / PART 2 // "

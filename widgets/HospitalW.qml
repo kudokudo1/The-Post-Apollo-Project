@@ -2703,38 +2703,9 @@ PanelWindow {
         }
     }
 
-    // Main chassis glow: exact AppControl / CPU++ structural recipe.
-    // The surface has a transparent gutter so the outer glow is not clipped.
-    Rectangle {
-        id: chassisGeometry
-
-        width: root.panelWidth
-        height: root.panelHeight
-        anchors.top: parent.top
-        anchors.topMargin: root.topGlowGutter
-        anchors.horizontalCenter: parent.horizontalCenter
-
-        color: "transparent"
-        opacity: root.menuOpen ? 1.0 : 0.0
-    }
-
-    RectangularShadow {
-        anchors.fill: chassisGeometry
-        spread: 6
-        z: -20
-        opacity: root.menuOpen ? 0.21 : 0.0
-        color: Colors.magenta
-    }
-
-    RectangularShadow {
-        anchors.fill: chassisGeometry
-        spread: 12
-        z: -21
-        opacity: root.menuOpen ? 0.05 : 0.0
-        color: Colors.magenta
-    }
-
-    Rectangle {
+    // Main chassis glow: same shared structural recipe as AppControl / CPU++.
+    // The window keeps its existing transparent gutter so the bloom is not clipped.
+    WindowPanelFrame {
         id: frame
 
         width: root.panelWidth
@@ -2743,11 +2714,17 @@ PanelWindow {
         anchors.topMargin: root.topGlowGutter
         anchors.horizontalCenter: parent.horizontalCenter
 
-        color: Colors.black
-        opacity: root.menuOpen ? 0.97 : 0.0
+        fillColor: Colors.black
+        borderWidth: 1
+        borderColor: Colors.magenta
+        surfaceOpacity: root.menuOpen ? 0.97 : 0.0
 
-        border.width: 1
-        border.color: Colors.magenta
+        glowVisible: root.menuOpen
+        glowColor: Colors.magenta
+        closeGlowSpread: 6
+        closeGlowOpacity: 0.21
+        wideGlowSpread: 12
+        wideGlowOpacity: 0.05
 
         HoverHandler {
             enabled: root.menuOpen

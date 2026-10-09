@@ -18,3 +18,4 @@ ActionButton 1.0 ActionButton.qml
 SafeDropShadow 1.0 SafeDropShadow.qml
 SurfaceFrame 1.0 SurfaceFrame.qml
 SectionFrame 1.0 SectionFrame.qml
+WindowPanelFrame 1.0 WindowPanelFrame.qml

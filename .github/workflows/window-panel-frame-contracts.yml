@@ -1,0 +1,45 @@
+name: "Window panel frame contracts"
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "components/SurfaceFrame.qml"
+      - "components/WindowPanelFrame.qml"
+      - "components/qmldir"
+      - "widgets/AppControlW.qml"
+      - "widgets/HospitalW.qml"
+      - "widgets/CpuPlusW.qml"
+      - "widgets/weather/WeatherStationW.qml"
+      - "widgets/messanger/MessagingW.qml"
+      - "tests/components/test_window_panel_frame_contracts.py"
+      - ".github/workflows/window-panel-frame-contracts.yml"
+  pull_request:
+    paths:
+      - "components/SurfaceFrame.qml"
+      - "components/WindowPanelFrame.qml"
+      - "components/qmldir"
+      - "widgets/AppControlW.qml"
+      - "widgets/HospitalW.qml"
+      - "widgets/CpuPlusW.qml"
+      - "widgets/weather/WeatherStationW.qml"
+      - "widgets/messanger/MessagingW.qml"
+      - "tests/components/test_window_panel_frame_contracts.py"
+      - ".github/workflows/window-panel-frame-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    name: Window panel frame contracts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate shared large-window chassis
+        run: python3 tests/components/test_window_panel_frame_contracts.py

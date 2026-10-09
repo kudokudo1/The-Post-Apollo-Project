@@ -1,6 +1,6 @@
 ✦︎✦︎✦︎ Meta Apollo Logos //
 
-# 🖳 TASKBARS // POST-APOLLO
+# 🖳 META APOLLO LOGOS // POST-APOLLO PROJECT
 
 ![](BUILD/assets/design/chassis/focus-rail.svg)
 
@@ -8,7 +8,7 @@
 
 > **STATE //** active \~\~ **VIEW //** operator desktop / Quickshell shell
 
-The operator interface layer of the Post-Apollo Family — enhancing the relationship between operator, desktop, controls, applications, services, system state, and information, bringing desktop functions into an expressive modular environment where the machine is observed, navigated, and controlled with continuity of place and operator agency.
+The core desktop implementation of the Post-Apollo Family — shaping the relationship between operator, desktop, applications, services, tools, system state, and information into one modular environment where the machine can be observed, navigated, and controlled with continuity of place and operator agency.
 
 **FAMILY //** [META APOLLO LOGOS](https://github.com/kudokudo1/Meta-Apollo-Logos) · [DEV EXP](https://github.com/kudokudo1/The-Post-Apollo-Dev-Exp) · [FOREST](https://github.com/kudokudo1/The-Post-Apollo-Forest-Project)
 

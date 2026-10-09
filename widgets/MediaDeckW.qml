@@ -12,12 +12,16 @@ PanelWindow {
     property bool menuOpen: false
 
     // Keep the first pass easy to resize/reposition during the design phase.
-    property int panelWidth: 960
-    property int panelHeight: 370
+    property int panelWidth: 520
+    property int panelHeight: 850
     property int panelTopMargin: 78
     property int panelLeftMargin: 200
     property int contentInset: 14
     property int sectionSpacing: 10
+    // The three functional zones are now stacked, with controls receiving
+    // the largest share. These proportions are still design parameters.
+    property real displayHeightShare: 0.34
+    property real cassetteHeightShare: 0.24
 
     // Only the local MPD backend is connected in this prototype.
     // A shared source-neutral transport service is a later milestone.
@@ -70,19 +74,43 @@ PanelWindow {
         borderColor: Colors.cyan
         borderWidth: 2
 
-        Row {
+        Column {
             id: deckSections
 
             anchors.fill: parent
             anchors.margins: deck.contentInset
             spacing: deck.sectionSpacing
 
-            // Zone A — the future loadable cassette and animated label.
+            // Top zone: the future text-first browser and playback display.
+            SectionFrame {
+                id: displaySection
+                width: parent.width
+                height: Math.round(
+                    (deckSections.height - 2 * deckSections.spacing)
+                    * deck.displayHeightShare
+                )
+                inset: 14
+                fillColor: Colors.black
+                fillOpacity: 0.48
+                borderColor: Colors.cyan
+                borderOpacity: 0.68
+
+                GohuText {
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    text: "DISPLAY / BROWSER"
+                    color: Colors.cyan
+                    font.pixelSize: 16
+                }
+            }
+
+            // Middle zone: the future cassette or alternative loaded medium.
             SectionFrame {
                 id: cassetteSection
-                height: parent.height
-                width: Math.round(
-                    (deckSections.width - 2 * deckSections.spacing) * 0.35
+                width: parent.width
+                height: Math.round(
+                    (deckSections.height - 2 * deckSections.spacing)
+                    * deck.cassetteHeightShare
                 )
                 inset: 14
                 fillColor: Colors.black
@@ -99,35 +127,13 @@ PanelWindow {
                 }
             }
 
-            // Zone B — player information and meters, not a fixed UI yet.
-            SectionFrame {
-                id: displaySection
-                height: parent.height
-                width: Math.round(
-                    (deckSections.width - 2 * deckSections.spacing) * 0.23
-                )
-                inset: 14
-                fillColor: Colors.black
-                fillOpacity: 0.48
-                borderColor: Colors.cyan
-                borderOpacity: 0.68
-
-                GohuText {
-                    anchors.left: parent.left
-                    anchors.top: parent.top
-                    text: "DISPLAY / METERS"
-                    color: Colors.cyan
-                    font.pixelSize: 16
-                }
-            }
-
             // Zone C — first tactile transport test, not the final hardware.
             SectionFrame {
-                height: parent.height
-                width: deckSections.width
-                       - cassetteSection.width
-                       - displaySection.width
-                       - 2 * deckSections.spacing
+                width: parent.width
+                height: deckSections.height
+                        - displaySection.height
+                        - cassetteSection.height
+                        - 2 * deckSections.spacing
                 inset: 14
                 fillColor: Colors.black
                 fillOpacity: 0.48

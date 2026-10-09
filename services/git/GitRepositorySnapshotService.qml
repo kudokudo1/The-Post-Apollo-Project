@@ -88,7 +88,8 @@ Scope {
                 'staged_hash="$(git -C "$repo" diff --cached --binary 2>/dev/null | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
                 'worktree_hash="$(git -C "$repo" diff --binary 2>/dev/null | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
                 'untracked_hash="$(git -C "$repo" ls-files --others --exclude-standard -z 2>/dev/null | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
-                'printf "STATUS\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$staged" "$unstaged" "$untracked" "$conflicts" "$status64" "$staged_hash" "$worktree_hash" "$untracked_hash"',
+                'untracked_content_hash="$(git -C "$repo" ls-files --others --exclude-standard -z 2>/dev/null | while IFS= read -r -d "" p; do printf "%s\\0" "$p"; git -C "$repo" hash-object -- "$p" 2>/dev/null || true; done | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
+                'printf "STATUS\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$staged" "$unstaged" "$untracked" "$conflicts" "$status64" "$staged_hash" "$worktree_hash" "$untracked_hash" "$untracked_content_hash"',
                 'state="NONE"',
                 'if [ -n "$gitdir" ] && [ -f "$gitdir/MERGE_HEAD" ]; then state="MERGE";',
                 'elif [ -n "$gitdir" ] && { [ -d "$gitdir/rebase-merge" ] || [ -d "$gitdir/rebase-apply" ]; }; then state="REBASE";',
@@ -139,6 +140,7 @@ Scope {
         let stagedPatchHash = "";
         let worktreePatchHash = "";
         let untrackedListHash = "";
+        let untrackedContentHash = "";
 
         let operationState = "NONE";
         let origHead = "";
@@ -212,6 +214,7 @@ Scope {
                 stagedPatchHash = p.length > 6 ? p[6] : "";
                 worktreePatchHash = p.length > 7 ? p[7] : "";
                 untrackedListHash = p.length > 8 ? p[8] : "";
+                untrackedContentHash = p.length > 9 ? p[9] : "";
                 continue;
             }
 
@@ -299,7 +302,8 @@ Scope {
                 statusBase64: statusBase64,
                 stagedPatchHash: stagedPatchHash,
                 worktreePatchHash: worktreePatchHash,
-                untrackedListHash: untrackedListHash
+                untrackedListHash: untrackedListHash,
+                untrackedContentHash: untrackedContentHash
             },
 
             operationState: {

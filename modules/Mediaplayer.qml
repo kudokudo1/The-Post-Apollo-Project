@@ -2,11 +2,24 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "../components"
+import "../widgets"
 
 // Compact music transport placeholder. The full Hi-Fi deck will be a separate
 // surface; this module only owns its taskbar artwork and initial MPD controls.
-DockButton {
+Item {
+    id: mediaRoot
+
+    // The taskbar only measures this compact surface; the deck is a separate
+    // PanelWindow so it can expand without occupying taskbar layout space.
+    implicitWidth: mediaDock.implicitWidth
+    implicitHeight: mediaDock.implicitHeight
+
+    property bool deckOpen: false
+
+    DockButton {
     id: mediaDock
+    anchors.fill: parent
+    open: mediaRoot.deckOpen
 
     readonly property int barCount: 16
     property var levels: Array(barCount).fill(0)
@@ -178,14 +191,30 @@ DockButton {
         }
     }
 
-    // Basic transport until the expanded deck's behavior is decided.
+    // Left-click now opens/closes the deck. Playback controls will live in
+    // the future control section. Right-click remains free for the planned
+    // Desktop / Player CAVA source switch.
     onLeftClicked: {
-        if (mpdOnline)
-            Quickshell.execDetached(["mpc", "toggle"]);
+        if (!mediaRoot.deckOpen) {
+            // shell.qml currently starts 50px from the DP-5 screen edge.
+            // Follow the dock's current temporary placement without editing
+            // shared shell.qml or inventing its final taskbar position.
+            var dockSceneX = mediaDock.mapToItem(null, 0, 0).x;
+            var screenWidth = deckPanel.screen
+                              ? deckPanel.screen.width : 2560;
+            var maxLeft = Math.max(
+                8, screenWidth - deckPanel.panelWidth - 8
+            );
+            deckPanel.panelLeftMargin = Math.max(
+                8, Math.min(maxLeft, Math.round(50 + dockSceneX))
+            );
+        }
+        mediaRoot.deckOpen = !mediaRoot.deckOpen;
+    }
     }
 
-    onRightClicked: {
-        if (mpdOnline)
-            Quickshell.execDetached(["mpc", "next"]);
+    MediaDeckW {
+        id: deckPanel
+        menuOpen: mediaRoot.deckOpen
     }
 }

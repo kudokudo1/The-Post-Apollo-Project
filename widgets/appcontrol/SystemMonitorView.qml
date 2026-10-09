@@ -569,7 +569,7 @@ required property var controller
                         }
                     ]
 
-                    Rectangle {
+                    ActionButton {
                         id: systemControlActionButton
 
                         required property var modelData
@@ -582,88 +582,66 @@ required property var controller
                         property bool isRebootAction:
                             modelData.action === "reboot"
 
-                        color:
-                            systemControlMouse.pressed
-                            ? Colors.magenta
-                            : systemControlMouse.containsMouse
-                              && canRun
-                              && isRebootAction
-                            ? Colors.red
-                            : systemControlMouse.containsMouse
-                              && canRun
-                            ? Colors.yellow
-                            : Colors.black
+                        available: canRun
+                        label: modelData.label
+                        labelPixelSize: 9
+                        unavailableOpacity: 0.32
+                        unavailableContentOpacity: 0.42
 
-                        opacity: canRun ? 1.0 : 0.32
+                        idleFillColor: Colors.black
+                        hoverFillColor:
+                            isRebootAction ? Colors.red : Colors.yellow
+                        pressedFillColor: Colors.magenta
 
-                        border.width: 1
-                        border.color:
-                            canRun
-                            ? modelData.accent
-                            : Colors.white
+                        idleForegroundColor:
+                            available ? modelData.accent : Colors.white
+                        hoverForegroundColor:
+                            isRebootAction ? Colors.black : Colors.orange
+                        pressedForegroundColor: Colors.black
 
-                        GohuText {
-                            anchors.centerIn: parent
-                            text: modelData.label
-                            font.pixelSize: 9
+                        idleBorderColor:
+                            available ? modelData.accent : Colors.white
+                        hoverBorderColor:
+                            available ? modelData.accent : Colors.white
+                        pressedBorderColor:
+                            available ? modelData.accent : Colors.white
 
-                            color:
-                                systemControlMouse.pressed
-                                ? Colors.black
-                                : systemControlMouse.containsMouse
-                                  && parent.canRun
-                                  && parent.isRebootAction
-                                ? Colors.black
-                                : systemControlMouse.containsMouse
-                                  && parent.canRun
-                                ? Colors.orange
-                                : parent.canRun
-                                ? modelData.accent
-                                : Colors.white
+                        contentGlowEnabled: available
+                        idleContentGlowColor: modelData.accent
+                        hoverContentGlowColor:
+                            isRebootAction ? Colors.red : modelData.accent
+                        pressedContentGlowColor:
+                            isRebootAction ? Colors.red : modelData.accent
+                        contentGlowIdleOpacity: 0.34
+                        contentGlowHoverOpacity: 0.34
+                        contentGlowPressedOpacity: 0.34
+                        contentGlowRadius: 5
+                        contentGlowSamples: 5
 
-                            opacity: parent.canRun ? 1.0 : 0.42
+                        softGlowEnabled: true
+                        softGlowSpread: 2
+                        idleSoftGlowColor: Colors.red
+                        hoverSoftGlowColor: Colors.red
+                        pressedSoftGlowColor: Colors.red
+                        softGlowIdleOpacity: 0.0
+                        softGlowHoverOpacity:
+                            isRebootAction ? 0.46 : 0.0
+                        softGlowPressedOpacity:
+                            isRebootAction ? 0.46 : 0.0
+                        wideGlowEnabled: false
 
-                            layer.enabled: parent.canRun
-                            layer.effect: DropShadow {
-                                radius: 5
-                                samples: 5
-                                opacity: 0.34
-                                color:
-                                    systemControlActionButton.isRebootAction
-                                    && systemControlMouse.containsMouse
-                                    ? Colors.red
-                                    : modelData.accent
-                                transparentBorder: true
-                            }
+                        onTriggered: {
+                            controller.runSystemComponentAction(
+                                systemMonitorBody.currentComponent,
+                                modelData.action
+                            );
                         }
 
-                        RectangularShadow {
-                            anchors.fill: parent
-                            spread: 2
-                            z: -1
-                            opacity:
-                                systemControlMouse.containsMouse
-                                && parent.isRebootAction
-                                && parent.canRun
-                                ? 0.46
-                                : 0.0
-                            color: Colors.red
-                        }
 
-                        MouseArea {
-                            id: systemControlMouse
 
-                            anchors.fill: parent
-                            enabled: parent.canRun
-                            hoverEnabled: true
 
-                            onClicked: {
-                                controller.runSystemComponentAction(
-                                    systemMonitorBody.currentComponent,
-                                    modelData.action
-                                );
-                            }
-                        }
+
+
                     }
                 }
             }

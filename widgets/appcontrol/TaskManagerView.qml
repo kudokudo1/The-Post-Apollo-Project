@@ -1215,7 +1215,7 @@ Item {
 
 
 
-                Rectangle {
+                ActionButton {
                     id: taskRestartAction
                     width: parent.width - 10
                     height: 34
@@ -1231,23 +1231,51 @@ Item {
                             || processController.dangerActionUnlocked(
                                    taskManagerBody.currentTask, "kill"
                                ))
-                    property bool isHovered:
-                        canRestart
-                        && !host.keyboardActive
-                        && taskRestartActionMouse.containsMouse
-                    property bool isPressed: canRestart && taskRestartActionMouse.pressed
-                    property bool isSelected:
+                    available: canRestart
+                    suppressHover: host.keyboardActive
+                    selected:
                         host.detailFocused
                         && (processController.currentTask !== null)
                         && host.selectedDetailActionIndex === 0
+                    destructive: true
+                    showLabel: false
+                    pointerCursorShape: Qt.ArrowCursor
 
-                    color:
-                        isPressed ? Colors.red
-                        : isHovered || isSelected ? Colors.yellow
-                        : Colors.black
-                    opacity: canRestart ? 1.0 : 0.34
-                    border.width: 1
-                    border.color: isPressed ? Colors.black : Colors.red
+                    idleFillColor: Colors.black
+                    hoverFillColor: Colors.yellow
+                    selectedFillColor: Colors.yellow
+                    pressedFillColor: Colors.red
+                    idleBorderColor: Colors.red
+                    hoverBorderColor: Colors.red
+                    selectedBorderColor: Colors.red
+                    pressedBorderColor: Colors.black
+                    unavailableOpacity: 0.34
+
+                    contentGlowEnabled: false
+                    softGlowEnabled: true
+                    softGlowSpread: 4
+                    softGlowMargin: 4
+                    idleSoftGlowColor: Colors.red
+                    hoverSoftGlowColor: Colors.red
+                    selectedSoftGlowColor: Colors.red
+                    pressedSoftGlowColor: Colors.red
+                    softGlowIdleOpacity: 0.30
+                    softGlowHoverOpacity: 0.58
+                    softGlowSelectedOpacity: 0.58
+                    softGlowPressedOpacity: 0.58
+                    wideGlowEnabled: false
+
+                    onHoverEntered: {
+                        host.setKeyboardActive(false);
+                        host.clearModeRailFocus();
+                        host.setDetailFocused(true);
+                        host.setDetailActionIndex(0);
+                    }
+
+                    onTriggered: {
+                        host.setDetailActionIndex(0);
+                        processController.requestRestart();
+                    }
 
                     Row {
                         anchors.left: parent.left
@@ -1258,12 +1286,12 @@ Item {
                         GohuText {
                             text: "↻"
                             font.pixelSize: 20
-                            color: taskRestartAction.isPressed ? Colors.black : Colors.red
-                            layer.enabled: !taskRestartAction.isPressed
+                            color: taskRestartAction.pressed ? Colors.black : Colors.red
+                            layer.enabled: !taskRestartAction.pressed
                             layer.effect: DropShadow {
                                 radius: 8
                                 samples: 7
-                                opacity: taskRestartAction.isHovered || taskRestartAction.isSelected ? 0.82 : 0.52
+                                opacity: taskRestartAction.hovered || taskRestartAction.selected ? 0.82 : 0.52
                                 color: Colors.red
                                 transparentBorder: true
                             }
@@ -1276,43 +1304,21 @@ Item {
                                 ? "LOCKED • RESTART PROCESS"
                                 : "RESTART PROCESS"
                             font.pixelSize: 13
-                            color: taskRestartAction.isPressed ? Colors.black : Colors.red
-                            layer.enabled: !taskRestartAction.isPressed
+                            color: taskRestartAction.pressed ? Colors.black : Colors.red
+                            layer.enabled: !taskRestartAction.pressed
                             layer.effect: DropShadow {
                                 radius: 8
                                 samples: 7
-                                opacity: taskRestartAction.isHovered || taskRestartAction.isSelected ? 0.76 : 0.48
+                                opacity: taskRestartAction.hovered || taskRestartAction.selected ? 0.76 : 0.48
                                 color: Colors.red
                                 transparentBorder: true
                             }
                         }
                     }
 
-                    MouseArea {
-                        id: taskRestartActionMouse
-                        anchors.fill: parent
-                        enabled: taskRestartAction.canRestart
-                        hoverEnabled: true
-                        onEntered: {
-                            host.setKeyboardActive(false);
-                            host.clearModeRailFocus();
-                            host.setDetailFocused(true);
-                            host.setDetailActionIndex(0);
-                        }
-                        onClicked: {
-                            host.setDetailActionIndex(0);
-                            processController.requestRestart();
-                        }
-                    }
 
-                    RectangularShadow {
-                        anchors.fill: parent
-                        anchors.margins: -4
-                        spread: 4
-                        z: -1
-                        opacity: taskRestartAction.isHovered || taskRestartAction.isSelected ? 0.58 : 0.30
-                        color: Colors.red
-                    }
+
+
                 }
 
                 Rectangle {
@@ -1717,21 +1723,13 @@ Item {
                     }
                 }
 
-                Rectangle {
+                ActionButton {
                     id: taskFreezeAction
 
                     width: parent.width - 10
                     height: 34
                     anchors.horizontalCenter: parent.horizontalCenter
 
-                    property bool isHovered:
-                        !host.keyboardActive
-                        && taskFreezeActionMouse.containsMouse
-                    property bool isPressed: taskFreezeActionMouse.pressed
-                    property bool isSelected:
-                        host.detailFocused
-                        && (processController.currentTask !== null)
-                        && host.selectedDetailActionIndex === 1
                     property bool protectedTask:
                         taskManagerBody.currentTask
                         && processController.requiresDangerUnlock(taskManagerBody.currentTask)
@@ -1748,13 +1746,50 @@ Item {
                         && Number(taskManagerBody.currentTask.pid || 0) > 1
                         && taskUnlocked
 
-                    color:
-                        isPressed ? Colors.magenta
-                        : isHovered || isSelected ? Colors.yellow
-                        : Colors.black
-                    opacity: canFreeze ? 1.0 : 0.34
-                    border.width: 1
-                    border.color: Colors.cyan
+                    available: canFreeze
+                    suppressHover: host.keyboardActive
+                    selected:
+                        host.detailFocused
+                        && (processController.currentTask !== null)
+                        && host.selectedDetailActionIndex === 1
+                    showLabel: false
+                    pointerCursorShape: Qt.ArrowCursor
+
+                    idleFillColor: Colors.black
+                    hoverFillColor: Colors.yellow
+                    selectedFillColor: Colors.yellow
+                    pressedFillColor: Colors.magenta
+                    idleBorderColor: Colors.cyan
+                    hoverBorderColor: Colors.cyan
+                    selectedBorderColor: Colors.cyan
+                    pressedBorderColor: Colors.cyan
+                    unavailableOpacity: 0.34
+
+                    contentGlowEnabled: false
+                    softGlowEnabled: true
+                    softGlowSpread: 4
+                    softGlowMargin: 4
+                    idleSoftGlowColor: Colors.cyan
+                    hoverSoftGlowColor: Colors.cyan
+                    selectedSoftGlowColor: Colors.cyan
+                    pressedSoftGlowColor: Colors.cyan
+                    softGlowIdleOpacity: 0.28
+                    softGlowHoverOpacity: 0.54
+                    softGlowSelectedOpacity: 0.54
+                    softGlowPressedOpacity: 0.54
+                    wideGlowEnabled: false
+
+                    onHoverEntered: {
+                        host.setKeyboardActive(false);
+                        host.clearModeRailFocus();
+                        host.setDetailFocused(true);
+                        host.setDetailActionIndex(1);
+                    }
+
+                    onTriggered: {
+                        host.setDetailActionIndex(1);
+                        processController.toggleFreeze();
+                    }
 
                     Row {
                         anchors.fill: parent
@@ -1770,14 +1805,14 @@ Item {
                             height: parent.height
                             verticalAlignment: Text.AlignVCenter
                             font.pixelSize: 13
-                            color: taskFreezeAction.isPressed ? Colors.black
-                                   : taskFreezeAction.isHovered ? Colors.cyan
+                            color: taskFreezeAction.pressed ? Colors.black
+                                   : taskFreezeAction.hovered ? Colors.cyan
                                    : Colors.white
-                            layer.enabled: !taskFreezeAction.isPressed
+                            layer.enabled: !taskFreezeAction.pressed
                             layer.effect: DropShadow {
                                 radius: 7
                                 samples: 7
-                                opacity: taskFreezeAction.isHovered || taskFreezeAction.isSelected ? 0.62 : 0.40
+                                opacity: taskFreezeAction.hovered || taskFreezeAction.selected ? 0.62 : 0.40
                                 color: Colors.cyan
                                 transparentBorder: true
                             }
@@ -1791,14 +1826,14 @@ Item {
                             verticalAlignment: Text.AlignVCenter
                             font.pixelSize:
                                 processController.isFrozen() ? 17 : 28
-                            color: taskFreezeAction.isPressed ? Colors.black
-                                   : taskFreezeAction.isHovered ? Colors.cyan
+                            color: taskFreezeAction.pressed ? Colors.black
+                                   : taskFreezeAction.hovered ? Colors.cyan
                                    : Colors.white
-                            layer.enabled: !taskFreezeAction.isPressed
+                            layer.enabled: !taskFreezeAction.pressed
                             layer.effect: DropShadow {
                                 radius: 7
                                 samples: 7
-                                opacity: taskFreezeAction.isHovered || taskFreezeAction.isSelected ? 0.68 : 0.44
+                                opacity: taskFreezeAction.hovered || taskFreezeAction.selected ? 0.68 : 0.44
                                 color: Colors.cyan
                                 transparentBorder: true
                             }
@@ -1813,63 +1848,33 @@ Item {
                             height: parent.height
                             verticalAlignment: Text.AlignVCenter
                             font.pixelSize: 13
-                            color: taskFreezeAction.isPressed ? Colors.black
-                                   : taskFreezeAction.isHovered ? Colors.cyan
+                            color: taskFreezeAction.pressed ? Colors.black
+                                   : taskFreezeAction.hovered ? Colors.cyan
                                    : Colors.white
-                            layer.enabled: !taskFreezeAction.isPressed
+                            layer.enabled: !taskFreezeAction.pressed
                             layer.effect: DropShadow {
                                 radius: 7
                                 samples: 7
-                                opacity: taskFreezeAction.isHovered || taskFreezeAction.isSelected ? 0.62 : 0.40
+                                opacity: taskFreezeAction.hovered || taskFreezeAction.selected ? 0.62 : 0.40
                                 color: Colors.cyan
                                 transparentBorder: true
                             }
                         }
                     }
 
-                    MouseArea {
-                        id: taskFreezeActionMouse
-                        anchors.fill: parent
-                        enabled: taskFreezeAction.canFreeze
-                        hoverEnabled: true
-                        onEntered: {
-                            host.setKeyboardActive(false);
-                            host.clearModeRailFocus();
-                            host.setDetailFocused(true);
-                            host.setDetailActionIndex(1);
-                        }
-                        onClicked: {
-                            host.setDetailActionIndex(1);
-                            processController.toggleFreeze();
-                        }
-                    }
+
 
                     
-                    RectangularShadow {
-                        anchors.fill: parent
-                        anchors.margins: -4
-                        spread: 4
-                        z: -1
-                        opacity: taskFreezeAction.isHovered || taskFreezeAction.isSelected ? 0.54 : 0.28
-                        color: Colors.cyan
-                    }
+
                 }
 
-                Rectangle {
+                ActionButton {
                     id: taskEndAction
 
                     width: parent.width - 10
                     height: 36
                     anchors.horizontalCenter: parent.horizontalCenter
 
-                    property bool isHovered:
-                        !host.keyboardActive
-                        && taskEndActionMouse.containsMouse
-                    property bool isPressed: taskEndActionMouse.pressed
-                    property bool isSelected:
-                        host.detailFocused
-                        && (processController.currentTask !== null)
-                        && host.selectedDetailActionIndex === 2
                     property bool protectedTask:
                         taskManagerBody.currentTask
                         && processController.requiresDangerUnlock(taskManagerBody.currentTask)
@@ -1886,15 +1891,51 @@ Item {
                         && Number(taskManagerBody.currentTask.pid || 0) > 1
                         && taskUnlocked
 
-                    color:
-                        isPressed ? Colors.red
-                        : isHovered || isSelected ? Colors.yellow
-                        : Colors.black
+                    available: canEnd
+                    suppressHover: host.keyboardActive
+                    selected:
+                        host.detailFocused
+                        && (processController.currentTask !== null)
+                        && host.selectedDetailActionIndex === 2
+                    destructive: true
+                    showLabel: false
+                    pointerCursorShape: Qt.ArrowCursor
 
-                    opacity: canEnd ? 1.0 : 0.34
+                    idleFillColor: Colors.black
+                    hoverFillColor: Colors.yellow
+                    selectedFillColor: Colors.yellow
+                    pressedFillColor: Colors.red
+                    idleBorderColor: Colors.red
+                    hoverBorderColor: Colors.red
+                    selectedBorderColor: Colors.red
+                    pressedBorderColor: Colors.black
+                    unavailableOpacity: 0.34
 
-                    border.width: 1
-                    border.color: isPressed ? Colors.black : Colors.red
+                    contentGlowEnabled: false
+                    softGlowEnabled: true
+                    softGlowSpread: 5
+                    softGlowMargin: 5
+                    idleSoftGlowColor: Colors.red
+                    hoverSoftGlowColor: Colors.red
+                    selectedSoftGlowColor: Colors.red
+                    pressedSoftGlowColor: Colors.red
+                    softGlowIdleOpacity: 0.34
+                    softGlowHoverOpacity: 0.82
+                    softGlowSelectedOpacity: 0.82
+                    softGlowPressedOpacity: 0.92
+                    wideGlowEnabled: false
+
+                    onHoverEntered: {
+                        host.setKeyboardActive(false);
+                        host.clearModeRailFocus();
+                        host.setDetailFocused(true);
+                        host.setDetailActionIndex(2);
+                    }
+
+                    onTriggered: {
+                        host.setDetailActionIndex(2);
+                        processController.requestTerminate();
+                    }
 
                     Row {
                         anchors.left: parent.left
@@ -1909,11 +1950,11 @@ Item {
                             text: "⚠︎"
                             font.pixelSize: 14
                             color:
-                                taskEndAction.isPressed
+                                taskEndAction.pressed
                                 ? Colors.black
                                 : Colors.red
 
-                            layer.enabled: !taskEndAction.isPressed
+                            layer.enabled: !taskEndAction.pressed
                             layer.effect: DropShadow {
                                 horizontalOffset: 0
                                 verticalOffset: 0
@@ -1927,18 +1968,18 @@ Item {
 
                         GohuText {
                             text:
-                                taskEndAction.isPressed
+                                taskEndAction.pressed
                                 ? "(=ᗜ=)デ╾━ ๋࣭⭑"
-                                : taskEndAction.isHovered || taskEndAction.isSelected
+                                : taskEndAction.hovered || taskEndAction.selected
                                 ? "ദ്ദി(-_•)デ╾━"
                                 : "(-_•)デ╾━"
                             font.pixelSize: 14
                             color:
-                                taskEndAction.isPressed
+                                taskEndAction.pressed
                                 ? Colors.black
                                 : Colors.red
 
-                            layer.enabled: !taskEndAction.isPressed
+                            layer.enabled: !taskEndAction.pressed
                             layer.effect: DropShadow {
                                 horizontalOffset: 0
                                 verticalOffset: 0
@@ -1957,11 +1998,11 @@ Item {
                                 : "END PROCESS  [TERM]"
                             font.pixelSize: 14
                             color:
-                                taskEndAction.isPressed
+                                taskEndAction.pressed
                                 ? Colors.black
                                 : Colors.red
 
-                            layer.enabled: !taskEndAction.isPressed
+                            layer.enabled: !taskEndAction.pressed
                             layer.effect: DropShadow {
                                 horizontalOffset: 0
                                 verticalOffset: 0
@@ -1974,38 +2015,10 @@ Item {
                         }
                     }
 
-                    MouseArea {
-                        id: taskEndActionMouse
 
-                        anchors.fill: parent
-                        enabled: taskEndAction.canEnd
-                        hoverEnabled: true
-
-                        onEntered: {
-                            host.setKeyboardActive(false);
-                            host.clearModeRailFocus();
-                            host.setDetailFocused(true);
-                            host.setDetailActionIndex(2);
-                        }
-
-                        onClicked: {
-                            host.setDetailActionIndex(2);
-                            processController.requestTerminate();
-                        }
-                    }
 
                     
-                    RectangularShadow {
-                        anchors.fill: parent
-                        anchors.margins: -5
-                        spread: 5
-                        z: -1
-                        opacity:
-                            taskEndAction.isPressed ? 0.92
-                            : taskEndAction.isHovered || taskEndAction.isSelected
-                            ? 0.82 : 0.34
-                        color: Colors.red
-                    }
+
 
                 }
 

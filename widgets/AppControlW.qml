@@ -23945,7 +23945,7 @@ MouseArea {
                     sourceComponent: resourceLimitControlComponent
                 }
 
-                Rectangle {
+                ActionButton {
                     id: appFreezeAction
                     visible: appResourceHeaderBox.visible
                     width: parent.width - 10
@@ -23964,19 +23964,53 @@ MouseArea {
                         && appControlWindow.selectedResourceScopeRows().length > 0
                         && (appControlWindow.selectedResourceScopeIsFrozen()
                             || !appControlWindow.selectedResourceScopeContainsProtected())
-                    property bool isHovered:
-                        canFreeze && !appControlWindow.keyboardActive
-                        && appFreezeActionMouse.containsMouse
-                    property bool isPressed: canFreeze && appFreezeActionMouse.pressed
-                    property bool isSelected:
-                        appControlWindow.detailFocused
+                    available: canFreeze
+                    suppressHover: appControlWindow.keyboardActive
+                    selected: appControlWindow.detailFocused
                         && appControlWindow.selectedDetailActionIndex === detailIndex
+                    showLabel: false
+                    pointerCursorShape: Qt.ArrowCursor
 
-                    color: isPressed ? Colors.magenta
-                           : isHovered || isSelected ? Colors.yellow : Colors.black
-                    opacity: canFreeze ? 1.0 : 0.34
-                    border.width: 1
-                    border.color: canFreeze ? Colors.cyan : Colors.white
+                    idleFillColor: Colors.black
+                    hoverFillColor: Colors.yellow
+                    selectedFillColor: Colors.yellow
+                    pressedFillColor: Colors.magenta
+
+                    idleBorderColor: available ? Colors.cyan : Colors.white
+                    hoverBorderColor: Colors.cyan
+                    selectedBorderColor: Colors.cyan
+                    pressedBorderColor: Colors.cyan
+                    keyboardSelectedBorderColor: Colors.cyan
+                    unavailableOpacity: 0.34
+
+                    contentGlowEnabled: false
+                    softGlowEnabled: true
+                    softGlowSpread: 4
+                    softGlowMargin: 4
+                    idleSoftGlowColor: available ? Colors.cyan : Colors.white
+                    hoverSoftGlowColor: Colors.cyan
+                    selectedSoftGlowColor: Colors.cyan
+                    pressedSoftGlowColor: Colors.cyan
+                    keyboardSelectedSoftGlowColor: Colors.cyan
+                    softGlowIdleOpacity: 0.28
+                    softGlowHoverOpacity: 0.54
+                    softGlowPressedOpacity: 0.54
+                    softGlowSelectedOpacity: 0.54
+                    softGlowKeyboardSelectedOpacity: 0.54
+                    unavailableSoftGlowOpacity: 0.06
+                    wideGlowEnabled: false
+
+                    onHoverEntered: {
+                        appControlWindow.keyboardActive = false;
+                        appControlWindow.modeRailFocused = false;
+                        appControlWindow.detailFocused = true;
+                        appControlWindow.selectedDetailActionIndex = appFreezeAction.detailIndex;
+                    }
+
+                    onTriggered: {
+                        appControlWindow.selectedDetailActionIndex = appFreezeAction.detailIndex;
+                        appControlWindow.activateSelectedDetailAction();
+                    }
 
                     Row {
                         anchors.fill: parent
@@ -23992,10 +24026,10 @@ MouseArea {
                             verticalAlignment: Text.AlignVCenter
                             font.pixelSize:
                                 appControlWindow.selectedResourceScopeIsFrozen() ? 17 : 28
-                            color: appFreezeAction.isPressed ? Colors.black
-                                   : appFreezeAction.isHovered ? Colors.cyan
+                            color: appFreezeAction.pressed ? Colors.black
+                                   : appFreezeAction.hovered ? Colors.cyan
                                    : Colors.white
-                            layer.enabled: !appFreezeAction.isPressed
+                            layer.enabled: !appFreezeAction.pressed
                             layer.effect: DropShadow {
                                 radius: 7; samples: 7; opacity: 0.52
                                 color: Colors.cyan; transparentBorder: true
@@ -24006,49 +24040,24 @@ MouseArea {
                             height: parent.height
                             verticalAlignment: Text.AlignVCenter
                             font.pixelSize: 13
-                            color: appFreezeAction.isPressed ? Colors.black
-                                   : appFreezeAction.isHovered ? Colors.cyan
+                            color: appFreezeAction.pressed ? Colors.black
+                                   : appFreezeAction.hovered ? Colors.cyan
                                    : Colors.white
                         
-                            layer.enabled: !appFreezeAction.isPressed
+                            layer.enabled: !appFreezeAction.pressed
                             layer.effect: DropShadow {
                                 radius: 7
                                 samples: 7
-                                opacity: appFreezeAction.isHovered || appFreezeAction.isSelected ? 0.70 : 0.46
+                                opacity: appFreezeAction.hovered || appFreezeAction.selected ? 0.70 : 0.46
                                 color: Colors.cyan
                                 transparentBorder: true
                             }
 }
                     }
 
-                    MouseArea {
-                        id: appFreezeActionMouse
-                        anchors.fill: parent
-                        enabled: appFreezeAction.canFreeze
-                        hoverEnabled: true
-                        onEntered: {
-                            appControlWindow.keyboardActive = false;
-                            appControlWindow.modeRailFocused = false;
-                            appControlWindow.detailFocused = true;
-                            appControlWindow.selectedDetailActionIndex = appFreezeAction.detailIndex;
-                        }
-                        onClicked: {
-                            appControlWindow.selectedDetailActionIndex = appFreezeAction.detailIndex;
-                            appControlWindow.activateSelectedDetailAction();
-                        }
-                    }
 
-                    RectangularShadow {
-                        anchors.fill: parent
-                        anchors.margins: -4
-                        spread: 4
-                        z: -1
-                        opacity:
-                            !appFreezeAction.canFreeze ? 0.06
-                            : appFreezeAction.isHovered || appFreezeAction.isSelected
-                              ? 0.54 : 0.28
-                        color: appFreezeAction.canFreeze ? Colors.cyan : Colors.white
-                    }
+
+
                 }
 
                 Rectangle {
@@ -24823,7 +24832,7 @@ MouseArea {
                     sourceComponent: resourceLimitControlComponent
                 }
 
-                Rectangle {
+                ActionButton {
                     id: tabFreezeAction
                     width: tabControlSection.width - 10
                     height: 34
@@ -24835,19 +24844,52 @@ MouseArea {
                         || (appControlWindow.selectedResourceScopeRows().length > 0
                             && (appControlWindow.selectedResourceScopeIsFrozen()
                                 || !appControlWindow.selectedResourceScopeContainsProtected()))
-                    property bool isHovered:
-                        canFreeze && !appControlWindow.keyboardActive
-                        && tabFreezeActionMouse.containsMouse
-                    property bool isPressed: canFreeze && tabFreezeActionMouse.pressed
-                    property bool isSelected:
-                        appControlWindow.detailFocused
+                    available: canFreeze
+                    suppressHover: appControlWindow.keyboardActive
+                    selected: appControlWindow.detailFocused
                         && appControlWindow.selectedDetailActionIndex === detailIndex
+                    showLabel: false
+                    pointerCursorShape: Qt.ArrowCursor
 
-                    color: isPressed ? Colors.magenta
-                           : isHovered || isSelected ? Colors.yellow : Colors.black
-                    opacity: canFreeze ? 1.0 : 0.34
-                    border.width: 1
-                    border.color: Colors.cyan
+                    idleFillColor: Colors.black
+                    hoverFillColor: Colors.yellow
+                    selectedFillColor: Colors.yellow
+                    pressedFillColor: Colors.magenta
+
+                    idleBorderColor: Colors.cyan
+                    hoverBorderColor: Colors.cyan
+                    selectedBorderColor: Colors.cyan
+                    pressedBorderColor: Colors.cyan
+                    keyboardSelectedBorderColor: Colors.cyan
+                    unavailableOpacity: 0.34
+
+                    contentGlowEnabled: false
+                    softGlowEnabled: true
+                    softGlowSpread: 4
+                    softGlowMargin: 4
+                    idleSoftGlowColor: Colors.cyan
+                    hoverSoftGlowColor: Colors.cyan
+                    selectedSoftGlowColor: Colors.cyan
+                    pressedSoftGlowColor: Colors.cyan
+                    keyboardSelectedSoftGlowColor: Colors.cyan
+                    softGlowIdleOpacity: 0.28
+                    softGlowHoverOpacity: 0.54
+                    softGlowPressedOpacity: 0.54
+                    softGlowSelectedOpacity: 0.54
+                    softGlowKeyboardSelectedOpacity: 0.54
+                    wideGlowEnabled: false
+
+                    onHoverEntered: {
+                        appControlWindow.keyboardActive = false;
+                        appControlWindow.modeRailFocused = false;
+                        appControlWindow.detailFocused = true;
+                        appControlWindow.selectedDetailActionIndex = tabFreezeAction.detailIndex;
+                    }
+
+                    onTriggered: {
+                        appControlWindow.selectedDetailActionIndex = tabFreezeAction.detailIndex;
+                        appControlWindow.activateSelectedDetailAction();
+                    }
 
                     Row {
                         anchors.fill: parent
@@ -24863,8 +24905,8 @@ MouseArea {
                             verticalAlignment: Text.AlignVCenter
                             font.pixelSize:
                                 appControlWindow.selectedResourceScopeIsFrozen() ? 17 : 28
-                            color: tabFreezeAction.isPressed ? Colors.black
-                                   : tabFreezeAction.isHovered ? Colors.cyan
+                            color: tabFreezeAction.pressed ? Colors.black
+                                   : tabFreezeAction.hovered ? Colors.cyan
                                    : Colors.white
                         }
                         GohuText {
@@ -24872,46 +24914,24 @@ MouseArea {
                             height: parent.height
                             verticalAlignment: Text.AlignVCenter
                             font.pixelSize: 13
-                            color: tabFreezeAction.isPressed ? Colors.black
-                                   : tabFreezeAction.isHovered ? Colors.cyan
+                            color: tabFreezeAction.pressed ? Colors.black
+                                   : tabFreezeAction.hovered ? Colors.cyan
                                    : Colors.white
                         
-                            layer.enabled: !tabFreezeAction.isPressed
+                            layer.enabled: !tabFreezeAction.pressed
                             layer.effect: DropShadow {
                                 radius: 7
                                 samples: 7
-                                opacity: tabFreezeAction.isHovered || tabFreezeAction.isSelected ? 0.70 : 0.46
+                                opacity: tabFreezeAction.hovered || tabFreezeAction.selected ? 0.70 : 0.46
                                 color: Colors.cyan
                                 transparentBorder: true
                             }
 }
                     }
 
-                    MouseArea {
-                        id: tabFreezeActionMouse
-                        anchors.fill: parent
-                        enabled: tabFreezeAction.canFreeze
-                        hoverEnabled: true
-                        onEntered: {
-                            appControlWindow.keyboardActive = false;
-                            appControlWindow.modeRailFocused = false;
-                            appControlWindow.detailFocused = true;
-                            appControlWindow.selectedDetailActionIndex = tabFreezeAction.detailIndex;
-                        }
-                        onClicked: {
-                            appControlWindow.selectedDetailActionIndex = tabFreezeAction.detailIndex;
-                            appControlWindow.activateSelectedDetailAction();
-                        }
-                    }
 
-                    RectangularShadow {
-                        anchors.fill: parent
-                        anchors.margins: -4
-                        spread: 4
-                        z: -1
-                        opacity: tabFreezeAction.isHovered || tabFreezeAction.isSelected ? 0.54 : 0.28
-                        color: Colors.cyan
-                    }
+
+
                 }
 
                 Rectangle {
@@ -25931,7 +25951,7 @@ MouseArea {
                     sourceComponent: resourceLimitControlComponent
                 }
 
-                Rectangle {
+                ActionButton {
                     id: windowFreezeAction
                     width: parent.width - 10
                     height: 34
@@ -25941,19 +25961,52 @@ MouseArea {
                         appControlWindow.selectedResourceScopeRows().length > 0
                         && (appControlWindow.selectedResourceScopeIsFrozen()
                             || !appControlWindow.selectedResourceScopeContainsProtected())
-                    property bool isHovered:
-                        canFreeze && !appControlWindow.keyboardActive
-                        && windowFreezeActionMouse.containsMouse
-                    property bool isPressed: canFreeze && windowFreezeActionMouse.pressed
-                    property bool isSelected:
-                        appControlWindow.detailFocused
+                    available: canFreeze
+                    suppressHover: appControlWindow.keyboardActive
+                    selected: appControlWindow.detailFocused
                         && appControlWindow.selectedDetailActionIndex === 6
+                    showLabel: false
+                    pointerCursorShape: Qt.ArrowCursor
 
-                    color: isPressed ? Colors.magenta
-                           : isHovered || isSelected ? Colors.yellow : Colors.black
-                    opacity: canFreeze ? 1.0 : 0.34
-                    border.width: 1
-                    border.color: Colors.cyan
+                    idleFillColor: Colors.black
+                    hoverFillColor: Colors.yellow
+                    selectedFillColor: Colors.yellow
+                    pressedFillColor: Colors.magenta
+
+                    idleBorderColor: Colors.cyan
+                    hoverBorderColor: Colors.cyan
+                    selectedBorderColor: Colors.cyan
+                    pressedBorderColor: Colors.cyan
+                    keyboardSelectedBorderColor: Colors.cyan
+                    unavailableOpacity: 0.34
+
+                    contentGlowEnabled: false
+                    softGlowEnabled: true
+                    softGlowSpread: 4
+                    softGlowMargin: 4
+                    idleSoftGlowColor: Colors.cyan
+                    hoverSoftGlowColor: Colors.cyan
+                    selectedSoftGlowColor: Colors.cyan
+                    pressedSoftGlowColor: Colors.cyan
+                    keyboardSelectedSoftGlowColor: Colors.cyan
+                    softGlowIdleOpacity: 0.28
+                    softGlowHoverOpacity: 0.54
+                    softGlowPressedOpacity: 0.54
+                    softGlowSelectedOpacity: 0.54
+                    softGlowKeyboardSelectedOpacity: 0.54
+                    wideGlowEnabled: false
+
+                    onHoverEntered: {
+                        appControlWindow.keyboardActive = false;
+                        appControlWindow.modeRailFocused = false;
+                        appControlWindow.detailFocused = true;
+                        appControlWindow.selectedDetailActionIndex = 6;
+                    }
+
+                    onTriggered: {
+                        appControlWindow.selectedDetailActionIndex = 6;
+                        appControlWindow.activateSelectedDetailAction();
+                    }
 
                     Row {
                         anchors.fill: parent
@@ -25969,8 +26022,8 @@ MouseArea {
                             verticalAlignment: Text.AlignVCenter
                             font.pixelSize:
                                 appControlWindow.selectedResourceScopeIsFrozen() ? 17 : 28
-                            color: windowFreezeAction.isPressed ? Colors.black
-                                   : windowFreezeAction.isHovered ? Colors.cyan
+                            color: windowFreezeAction.pressed ? Colors.black
+                                   : windowFreezeAction.hovered ? Colors.cyan
                                    : Colors.white
                         }
                         GohuText {
@@ -25978,46 +26031,24 @@ MouseArea {
                             height: parent.height
                             verticalAlignment: Text.AlignVCenter
                             font.pixelSize: 13
-                            color: windowFreezeAction.isPressed ? Colors.black
-                                   : windowFreezeAction.isHovered ? Colors.cyan
+                            color: windowFreezeAction.pressed ? Colors.black
+                                   : windowFreezeAction.hovered ? Colors.cyan
                                    : Colors.white
                         
-                            layer.enabled: !windowFreezeAction.isPressed
+                            layer.enabled: !windowFreezeAction.pressed
                             layer.effect: DropShadow {
                                 radius: 7
                                 samples: 7
-                                opacity: windowFreezeAction.isHovered || windowFreezeAction.isSelected ? 0.70 : 0.46
+                                opacity: windowFreezeAction.hovered || windowFreezeAction.selected ? 0.70 : 0.46
                                 color: Colors.cyan
                                 transparentBorder: true
                             }
 }
                     }
 
-                    MouseArea {
-                        id: windowFreezeActionMouse
-                        anchors.fill: parent
-                        enabled: windowFreezeAction.canFreeze
-                        hoverEnabled: true
-                        onEntered: {
-                            appControlWindow.keyboardActive = false;
-                            appControlWindow.modeRailFocused = false;
-                            appControlWindow.detailFocused = true;
-                            appControlWindow.selectedDetailActionIndex = 6;
-                        }
-                        onClicked: {
-                            appControlWindow.selectedDetailActionIndex = 6;
-                            appControlWindow.activateSelectedDetailAction();
-                        }
-                    }
 
-                    RectangularShadow {
-                        anchors.fill: parent
-                        anchors.margins: -4
-                        spread: 4
-                        z: -1
-                        opacity: windowFreezeAction.isHovered || windowFreezeAction.isSelected ? 0.54 : 0.28
-                        color: Colors.cyan
-                    }
+
+
                 }
 
                 Rectangle {

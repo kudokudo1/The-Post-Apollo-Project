@@ -4,7 +4,7 @@
 
 ![](BUILD/assets/design/chassis/focus-rail.svg)
 
-![Taskbars // Post-Apollo](./BUILD/assets/design/taskbars-post-apollo-banner.svg)
+![Meta Apollo Logos // Post-Apollo Project](./BUILD/assets/design/post-apollo-project-banner.svg)
 
 > **STATE //** active \~\~ **VIEW //** operator desktop / Quickshell shell
 

@@ -21397,18 +21397,58 @@ PanelWindow {
                                 { label: "REVEAL", icon: "‧₊🔎︎˚⋆˙", accent: Colors.orange },
                                 { label: "OPEN TERMINAL HERE", icon: "༘⋆ ๋࣭⭑", accent: Colors.omnitrix }
                             ]
-                            Rectangle {
+                            ActionButton {
+                                id: fileActionButton
                                 required property int index
                                 required property var modelData
                                 width: fileControlBody.width
                                 height: 34
-                                property bool selected: appControlWindow.detailFocused
-                                                        && appControlWindow.selectedDetailActionIndex === index
-                                property bool hovered: fileActionMouse.containsMouse
-                                color: fileActionMouse.pressed ? Colors.magenta
-                                       : selected || hovered ? Colors.yellow : Colors.dark
-                                border.width: 1
-                                border.color: selected ? Colors.magenta : hovered ? Colors.orange : modelData.accent
+                                selected: appControlWindow.detailFocused
+                                    && appControlWindow.selectedDetailActionIndex === index
+                                showLabel: false
+                                pointerCursorShape: Qt.ArrowCursor
+                                acceptedButtons: Qt.LeftButton
+
+                                idleFillColor: Colors.dark
+                                hoverFillColor: Colors.yellow
+                                selectedFillColor: Colors.yellow
+                                pressedFillColor: Colors.magenta
+
+                                idleBorderColor: modelData.accent
+                                hoverBorderColor: Colors.orange
+                                selectedBorderColor: Colors.magenta
+                                pressedBorderColor:
+                                    selected ? Colors.magenta
+                                    : hovered ? Colors.orange
+                                    : modelData.accent
+                                keyboardSelectedBorderColor: Colors.magenta
+
+                                contentGlowEnabled: false
+                                softGlowEnabled: true
+                                softGlowSpread: selected || hovered ? 4 : 2
+                                idleSoftGlowColor: modelData.accent
+                                hoverSoftGlowColor: modelData.accent
+                                selectedSoftGlowColor: Colors.magenta
+                                pressedSoftGlowColor:
+                                    selected ? Colors.magenta : modelData.accent
+                                keyboardSelectedSoftGlowColor: Colors.magenta
+                                softGlowIdleOpacity: 0.22
+                                softGlowHoverOpacity: 0.48
+                                softGlowPressedOpacity: 0.48
+                                softGlowSelectedOpacity: 0.48
+                                softGlowKeyboardSelectedOpacity: 0.48
+                                wideGlowEnabled: false
+
+                                onHoverEntered: {
+                                    appControlWindow.keyboardActive = false;
+                                    appControlWindow.detailFocused = true;
+                                    appControlWindow.selectedDetailActionIndex = index;
+                                }
+
+                                onTriggered: {
+                                    appControlWindow.selectedDetailActionIndex = index;
+                                    appControlWindow.activateSelectedDetailAction();
+                                }
                                 Row {
                                     id: fileActionRow
                                     anchors.centerIn: parent
@@ -21419,33 +21459,20 @@ PanelWindow {
                                         height: parent.height
                                         font.pixelSize: 14
                                         verticalAlignment: Text.AlignVCenter
-                                        color: fileActionMouse.pressed ? Colors.black : modelData.accent
+                                        color: fileActionButton.pressed ? Colors.black : modelData.accent
                                     }
                                     GohuText {
                                         text: modelData.label
                                         height: parent.height
                                         font.pixelSize: 11
                                         verticalAlignment: Text.AlignVCenter
-                                        color: fileActionMouse.pressed ? Colors.black
+                                        color: fileActionButton.pressed ? Colors.black
                                                : selected ? Colors.magenta
                                                : hovered ? Colors.orange : Colors.white
                                     }
                                 }
-                                RectangularShadow { anchors.fill: parent; spread: selected || hovered ? 4 : 2; z: -1; opacity: selected || hovered ? 0.48 : 0.22; color: selected ? Colors.magenta : modelData.accent }
-                                MouseArea {
-                                    id: fileActionMouse
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    onEntered: {
-                                        appControlWindow.keyboardActive = false;
-                                        appControlWindow.detailFocused = true;
-                                        appControlWindow.selectedDetailActionIndex = index;
-                                    }
-                                    onClicked: {
-                                        appControlWindow.selectedDetailActionIndex = index;
-                                        appControlWindow.activateSelectedDetailAction();
-                                    }
-                                }
+
+
                             }
                         }
                     }
@@ -21528,18 +21555,58 @@ PanelWindow {
                                 { label: "EDIT SSH CONFIG", icon: "✎", accent: Colors.yellow },
                                 { label: "COPY SFTP COMMAND", icon: "⋆˙🗐⋆˙", accent: Colors.magenta }
                             ]
-                            Rectangle {
+                            ActionButton {
+                                id: remoteActionButton
                                 required property int index
                                 required property var modelData
                                 width: remoteControlBody.width
                                 height: 34
-                                property bool selected: appControlWindow.detailFocused
-                                                        && appControlWindow.selectedDetailActionIndex === index
-                                property bool hovered: remoteActionMouse.containsMouse
-                                color: remoteActionMouse.pressed ? Colors.magenta
-                                       : selected || hovered ? Colors.yellow : Colors.dark
-                                border.width: 1
-                                border.color: selected ? Colors.magenta : hovered ? Colors.orange : modelData.accent
+                                selected: appControlWindow.detailFocused
+                                    && appControlWindow.selectedDetailActionIndex === index
+                                showLabel: false
+                                pointerCursorShape: Qt.ArrowCursor
+                                acceptedButtons: Qt.LeftButton
+
+                                idleFillColor: Colors.dark
+                                hoverFillColor: Colors.yellow
+                                selectedFillColor: Colors.yellow
+                                pressedFillColor: Colors.magenta
+
+                                idleBorderColor: modelData.accent
+                                hoverBorderColor: Colors.orange
+                                selectedBorderColor: Colors.magenta
+                                pressedBorderColor:
+                                    selected ? Colors.magenta
+                                    : hovered ? Colors.orange
+                                    : modelData.accent
+                                keyboardSelectedBorderColor: Colors.magenta
+
+                                contentGlowEnabled: false
+                                softGlowEnabled: true
+                                softGlowSpread: selected || hovered ? 4 : 2
+                                idleSoftGlowColor: modelData.accent
+                                hoverSoftGlowColor: modelData.accent
+                                selectedSoftGlowColor: Colors.magenta
+                                pressedSoftGlowColor:
+                                    selected ? Colors.magenta : modelData.accent
+                                keyboardSelectedSoftGlowColor: Colors.magenta
+                                softGlowIdleOpacity: 0.22
+                                softGlowHoverOpacity: 0.48
+                                softGlowPressedOpacity: 0.48
+                                softGlowSelectedOpacity: 0.48
+                                softGlowKeyboardSelectedOpacity: 0.48
+                                wideGlowEnabled: false
+
+                                onHoverEntered: {
+                                    appControlWindow.keyboardActive = false;
+                                    appControlWindow.detailFocused = true;
+                                    appControlWindow.selectedDetailActionIndex = index;
+                                }
+
+                                onTriggered: {
+                                    appControlWindow.selectedDetailActionIndex = index;
+                                    appControlWindow.activateSelectedDetailAction();
+                                }
                                 Row {
                                     anchors.centerIn: parent
                                     height: parent.height
@@ -21549,33 +21616,20 @@ PanelWindow {
                                         height: parent.height
                                         font.pixelSize: 14
                                         verticalAlignment: Text.AlignVCenter
-                                        color: remoteActionMouse.pressed ? Colors.black : modelData.accent
+                                        color: remoteActionButton.pressed ? Colors.black : modelData.accent
                                     }
                                     GohuText {
                                         text: modelData.label
                                         height: parent.height
                                         font.pixelSize: 11
                                         verticalAlignment: Text.AlignVCenter
-                                        color: remoteActionMouse.pressed ? Colors.black
+                                        color: remoteActionButton.pressed ? Colors.black
                                                : selected ? Colors.magenta
                                                : hovered ? Colors.orange : Colors.white
                                     }
                                 }
-                                RectangularShadow { anchors.fill: parent; spread: selected || hovered ? 4 : 2; z: -1; opacity: selected || hovered ? 0.48 : 0.22; color: selected ? Colors.magenta : modelData.accent }
-                                MouseArea {
-                                    id: remoteActionMouse
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    onEntered: {
-                                        appControlWindow.keyboardActive = false;
-                                        appControlWindow.detailFocused = true;
-                                        appControlWindow.selectedDetailActionIndex = index;
-                                    }
-                                    onClicked: {
-                                        appControlWindow.selectedDetailActionIndex = index;
-                                        appControlWindow.activateSelectedDetailAction();
-                                    }
-                                }
+
+
                             }
                         }
                     }

@@ -26,9 +26,9 @@ PanelWindow {
         bottom: 0
         left: 0
 
-        // 8px window margin + 12px internal glow gutter preserves the
-        // established 20px visible-card distance from the screen right edge.
-        right: 8
+        // 5px window margin + 12px internal glow gutter places the visible
+        // card 17px from the screen right edge: 3px farther right.
+        right: 5
     }
 
     exclusiveZone: 0

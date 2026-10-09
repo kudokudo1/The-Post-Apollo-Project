@@ -51,13 +51,13 @@ assert "id: cardGlowSource" not in HUB
 assert "cardGlowRadius" not in HUB
 require(HUB, "clip: true", "history viewport clipping stays enabled")
 
-# Transient popup: preserve the visible 420x150 card, keep its top edge at
-# exactly 2px, and move it 3px farther right to a 17px visible-card margin.
+# Transient popup: preserve the visible 420x150 card, move its top edge down
+# 2px to 4px from screen top, and move it 2px farther right to a 15px margin.
 for needle, message in (
     ("implicitWidth: 444", "popup glow-host width"),
     ("implicitHeight: 164", "popup glow-host height"),
-    ("top: 0", "popup native top margin"),
-    ("right: 5", "popup native right margin"),
+    ("top: 2", "popup native top margin"),
+    ("right: 3", "popup native right margin"),
     ("topMargin: 2", "visible card two-pixel top placement"),
     ("leftMargin: 12", "popup left glow gutter"),
     ("rightMargin: 12", "popup right glow gutter"),

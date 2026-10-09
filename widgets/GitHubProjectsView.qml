@@ -415,14 +415,15 @@ Item {
                 }
             }
 
-        Rectangle {
+        SectionFrame {
                 x: root.projectExpanded ? 0 : 190
                 y: 0
                 width: root.projectExpanded ? parent.width : parent.width - 190
                 height: parent.height
-                color: Colors.dark
-                border.width: 1
-                border.color: Colors.cyan
+                fillColor: Colors.dark
+                borderWidth: 1
+                borderColor: Colors.cyan
+                inset: 10
 
                 Behavior on x {
                     NumberAnimation {
@@ -439,10 +440,7 @@ Item {
                 }
 
                 Column {
-                    anchors {
-                        fill: parent
-                        margins: 10
-                    }
+                    anchors.fill: parent
 
                     spacing: 6
 

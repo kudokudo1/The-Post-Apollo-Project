@@ -171,19 +171,19 @@ Rectangle {
             }
         }
 
-        Rectangle {
+        SectionFrame {
             width: parent.width
             height: 40
-            color: Colors.dark
-            border.width: 1
-            border.color:
+            fillColor: Colors.dark
+            borderWidth: 1
+            borderColor:
                 conflictService.unresolvedCount > 0
                 ? Colors.orange
                 : Colors.green
+            inset: 6
 
             Row {
                 anchors.fill: parent
-                anchors.margins: 6
                 spacing: 8
 
                 GohuText {

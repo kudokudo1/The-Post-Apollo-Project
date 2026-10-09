@@ -250,16 +250,16 @@ Item {
                 }
             }
 
-            Rectangle {
+            SectionFrame {
                 width: parent.width - operationList.parent.width - 8
                 height: parent.height
-                color: Colors.dark
-                border.width: 1
-                border.color: Colors.magenta
+                fillColor: Colors.dark
+                borderWidth: 1
+                borderColor: Colors.magenta
+                inset: 9
 
                 Column {
                     anchors.fill: parent
-                    anchors.margins: 9
                     spacing: 8
 
                     GohuText {
@@ -291,16 +291,16 @@ Item {
                         wrapMode: Text.Wrap
                     }
 
-                    Rectangle {
+                    SectionFrame {
                         width: parent.width
                         height: 72
-                        color: Colors.black
-                        border.width: 1
-                        border.color: Colors.cyan
+                        fillColor: Colors.black
+                        borderWidth: 1
+                        borderColor: Colors.cyan
+                        inset: 7
 
                         Column {
                             anchors.fill: parent
-                            anchors.margins: 7
                             spacing: 4
 
                             GohuText {
@@ -446,19 +446,19 @@ Item {
             }
         }
 
-        Rectangle {
+        SectionFrame {
             width: parent.width
             height: 46
-            color: Colors.black
-            border.width: 1
-            border.color:
+            fillColor: Colors.black
+            borderWidth: 1
+            borderColor:
                 root.statusText.indexOf("REFUSED") >= 0
                 ? Colors.red
                 : Colors.cyan
+            inset: 8
 
             GohuText {
                 anchors.fill: parent
-                anchors.margins: 8
                 verticalAlignment: Text.AlignVCenter
                 text:
                     root.statusText

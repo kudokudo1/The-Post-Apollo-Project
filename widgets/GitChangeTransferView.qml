@@ -497,16 +497,16 @@ Rectangle {
             }
         }
 
-        Rectangle {
+        SectionFrame {
             width: parent.width
             height: 46
-            color: Colors.black
-            border.width: 1
-            border.color: Colors.orange
+            fillColor: Colors.black
+            borderWidth: 1
+            borderColor: Colors.orange
+            inset: 7
 
             GohuText {
                 anchors.fill: parent
-                anchors.margins: 7
                 verticalAlignment: Text.AlignVCenter
                 text:
                     root.transferScope === "hunk"
@@ -899,19 +899,19 @@ Rectangle {
                         }
                     }
 
-                    Rectangle {
+                    SectionFrame {
                         width: parent.width
                         height: 108
-                        color: Colors.dark
-                        border.width: 1
-                        border.color:
+                        fillColor: Colors.dark
+                        borderWidth: 1
+                        borderColor:
                             root.previewMatchesSelection
                             ? Colors.green
                             : Colors.cyan
+                        inset: 7
 
                         Column {
                             anchors.fill: parent
-                            anchors.margins: 7
                             spacing: 4
 
                             GohuText {

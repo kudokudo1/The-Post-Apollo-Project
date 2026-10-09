@@ -348,16 +348,16 @@ Rectangle {
         anchors.margins: 8
         spacing: 7
 
-        Rectangle {
+        SectionFrame {
             width: parent.width
             height: 52
-            color: Colors.black
-            border.width: 1
-            border.color: Colors.magenta
+            fillColor: Colors.black
+            borderWidth: 1
+            borderColor: Colors.magenta
+            inset: 7
 
             Row {
                 anchors.fill: parent
-                anchors.margins: 7
                 spacing: 6
 
                 Column {
@@ -921,16 +921,16 @@ Rectangle {
                     }
                 }
 
-                Rectangle {
+                SectionFrame {
                     width: parent.width
                     height: 78
-                    color: Colors.black
-                    border.width: 1
-                    border.color: Colors.red
+                    fillColor: Colors.black
+                    borderWidth: 1
+                    borderColor: Colors.red
+                    inset: 8
 
                     Row {
                         anchors.fill: parent
-                        anchors.margins: 8
                         spacing: 7
 
                         GohuText {
@@ -1089,20 +1089,20 @@ Rectangle {
                     : "THIS PR // NOT CURRENTLY VISIBLE IN QUEUE"
             }
 
-            Rectangle {
+            SectionFrame {
                 width: parent.width
                 height: 118
-                color: Colors.black
-                border.width: 1
-                border.color:
+                fillColor: Colors.black
+                borderWidth: 1
+                borderColor:
                     root.queueLifecycleService.preview
                     && root.queueLifecycleService.preview.action
                     ? Colors.orange
                     : Colors.blue
+                inset: 8
 
                 Column {
                     anchors.fill: parent
-                    anchors.margins: 8
                     spacing: 6
 
                     GohuText {

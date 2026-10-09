@@ -414,6 +414,7 @@ APPCONTROL_LEFT_ONLY_ACTIONS = (
     "hiddenActionButton", "hiddenBottleAction", "hiddenToolboxAction",
     "appBottleAction", "appToolboxAction",
     "hiddenKillAction", "appMuteAction", "windowMuteAction", "runKillAction",
+    "windowPrimaryActionButton",
 )
 for control_id in APPCONTROL_LEFT_ONLY_ACTIONS:
     marker_pos = APPCONTROL.index(f"id: {control_id}")
@@ -495,3 +496,38 @@ for needle in (
     require(run_kill_window, needle, "RUN KILL fidelity")
 
 print("AppControl mute/kill ActionButton migration: PASS")
+
+
+# Seventh AppControl proof migration: the five primary window operations are
+# immediate actions, but retain their index-specific cyan/white/omnitrix visual
+# identities through one ActionButton delegate.
+window_primary_marker = APPCONTROL.index("id: windowPrimaryActionButton")
+window_primary_start = APPCONTROL.rfind("delegate: ActionButton {", 0, window_primary_marker)
+assert window_primary_start >= 0, "window primary delegate must use ActionButton"
+window_primary = APPCONTROL[window_primary_start:window_primary_marker + 7600]
+
+for needle in (
+    "model: 5",
+    "acceptedButtons: Qt.LeftButton",
+    "index === 2 || index === 4",
+    "index === 2\n                            ? Colors.white",
+    "index === 4\n                            ? Colors.omnitrix",
+    "index === 0 ? Colors.dark : Colors.black",
+    "idleBorderColor: inactiveAccent",
+    "idleSoftGlowColor: glowAccent",
+    "softGlowPressedOpacity: 0.0",
+    "selectedDetailActionIndex = index;",
+):
+    require(window_primary, needle, "window primary ActionButton fidelity")
+
+assert "id: windowPrimaryActionMouse" not in window_primary, (
+    "window primary actions reintroduced private pointer engine"
+)
+for old_alias in (
+    "windowPrimaryActionButton.isPressed",
+    "windowPrimaryActionButton.isHovered",
+    "windowPrimaryActionButton.isSelected",
+):
+    assert old_alias not in window_primary, f"window primary action retained old state alias: {old_alias}"
+
+print("AppControl window-primary ActionButton migration: PASS")

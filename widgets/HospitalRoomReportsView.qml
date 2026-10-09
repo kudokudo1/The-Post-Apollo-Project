@@ -324,23 +324,21 @@ Item {
                 }
             }
 
-            Rectangle {
+            SectionFrame {
                 width: parent.width
                        - Math.max(260, parent.width * 0.32)
                        - parent.spacing
                 height: parent.height
-                color: Colors.dark
-                border.width: 1
-                border.color:
+                fillColor: Colors.dark
+                borderWidth: 1
+                borderColor:
                     root.selectedReport
                     ? root.evidenceColor(root.selectedReport)
                     : Colors.magenta
+                inset: 10
 
                 Column {
-                    anchors {
-                        fill: parent
-                        margins: 10
-                    }
+                    anchors.fill: parent
                     spacing: 7
 
                     GohuText {

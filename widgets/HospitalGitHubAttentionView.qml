@@ -239,16 +239,16 @@ Rectangle {
         anchors.margins: 8
         spacing: 7
 
-        Rectangle {
+        SectionFrame {
             width: parent.width
             height: 54
-            color: Colors.black
-            border.width: 1
-            border.color: Colors.red
+            fillColor: Colors.black
+            borderWidth: 1
+            borderColor: Colors.red
+            inset: 7
 
             Row {
                 anchors.fill: parent
-                anchors.margins: 7
                 spacing: 7
 
                 Column {

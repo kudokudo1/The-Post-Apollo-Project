@@ -64,6 +64,82 @@ PanelWindow {
         ? audioProbe.resolve(browserAudioDescriptor, audioProbe.sinkInputs)
         : null
 
+    readonly property var audioCandidateInputs:
+        browserAudioEvidence ? browserAudioEvidence.inputs : []
+    property int audioCandidatePosition: 0
+    readonly property var selectedAudioCandidate:
+        audioCandidateInputs.length > 0
+        ? audioCandidateInputs[audioCandidatePosition % audioCandidateInputs.length]
+        : null
+
+    // This is an explicitly armed *stream-level* experiment, not per-tab
+    // targeting. A browser stream may contain multiple tabs.
+    property bool audioTestArmed: false
+    property string audioTestStatus: "NO EXPERIMENT RUN YET"
+
+    function handleAudioExperiment(action) {
+        if (action === "arm") {
+            audioTestArmed = !audioTestArmed;
+            return;
+        }
+
+        if (action === "next") {
+            audioCandidatePosition += 1;
+            audioTestArmed = false;
+            return;
+        }
+
+        if (!audioTestArmed || !selectedAudioCandidate
+                || audioExperimentProcess.running || transportMode !== "mpris")
+            return;
+
+        const input = selectedAudioCandidate;
+        const props = input.properties || {};
+        const pid = String(props["application.process.id"] || "");
+        const binary = String(props["application.process.binary"] || "");
+        if (!pid && !binary) {
+            audioTestStatus = "CANNOT VERIFY STREAM IDENTITY";
+            audioTestArmed = false;
+            return;
+        }
+
+        audioTestArmed = false;
+        audioTestStatus = "TESTING STREAM " + input.index + " / 3 SEC";
+        audioExperimentProcess.exec([
+            "/usr/bin/python3",
+            Quickshell.shellPath("scripts/media/temporary_audio_test.py"),
+            String(input.index), action, pid, binary
+        ]);
+    }
+
+    Process {
+        id: audioExperimentProcess
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const response = String(text || "").trim();
+                if (response)
+                    deck.audioTestStatus = response;
+                audioProbe.refresh();
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                const message = String(text || "").trim();
+                if (message)
+                    deck.audioTestStatus = "TEST ERROR: " + message;
+            }
+        }
+    }
+
+    Timer {
+        interval: 2000
+        repeat: true
+        running: deck.menuOpen && deck.transportMode === "mpris"
+        onTriggered: audioProbe.refresh()
+    }
+
     onMenuOpenChanged: {
         if (menuOpen)
             audioProbe.refresh();
@@ -450,9 +526,89 @@ PanelWindow {
 
                 GohuText {
                     anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.topMargin: 184
+                    text: deck.transportMode === "mpris"
+                          ? "STREAM TEST / MAY AFFECT OTHER BROWSER TABS"
+                          : "SWITCH TO MPRIS TO INSPECT BROWSER AUDIO"
+                    color: Colors.orange
+                    font.pixelSize: 11
+                    elide: Text.ElideRight
+                }
+
+                Row {
+                    id: audioTestButtons
+                    anchors.top: parent.top
+                    anchors.topMargin: 212
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    spacing: 8
+
+                    Repeater {
+                        model: [
+                            { label: deck.audioTestArmed ? "ARMED" : "ARM TEST",
+                              action: "arm" },
+                            { label: "NEXT STREAM", action: "next" },
+                            { label: "MUTE / 3S", action: "mute" },
+                            { label: "VOLUME / 3S", action: "volume" }
+                        ]
+
+                        Rectangle {
+                            id: experimentButton
+                            required property var modelData
+
+                            width: (audioTestButtons.width - 3 * audioTestButtons.spacing) / 4
+                            height: 37
+                            radius: 3
+                            opacity: deck.transportMode === "mpris" ? 1.0 : 0.4
+                            color: experimentMouse.containsMouse ? "#39333E" : "#29252E"
+                            border.width: 1
+                            border.color: deck.audioTestArmed
+                                          && experimentButton.modelData.action === "arm"
+                                          ? Colors.orange : Colors.cyan
+
+                            GohuText {
+                                anchors.centerIn: parent
+                                text: experimentButton.modelData.label
+                                font.pixelSize: 10
+                                color: Colors.white
+                            }
+
+                            MouseArea {
+                                id: experimentMouse
+                                anchors.fill: parent
+                                enabled: deck.transportMode === "mpris"
+                                hoverEnabled: true
+                                cursorShape: enabled ? Qt.PointingHandCursor
+                                                     : Qt.ArrowCursor
+                                onClicked: deck.handleAudioExperiment(
+                                    experimentButton.modelData.action
+                                )
+                            }
+                        }
+                    }
+                }
+
+                GohuText {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.topMargin: 259
+                    text: "STREAM "
+                          + (deck.selectedAudioCandidate
+                             ? deck.selectedAudioCandidate.index : "NONE")
+                          + " / " + deck.audioTestStatus
+                    color: Colors.cyan
+                    font.pixelSize: 10
+                    elide: Text.ElideRight
+                }
+
+                GohuText {
+                    anchors.left: parent.left
                     anchors.bottom: parent.bottom
                     text: deck.transportMode === "mpris"
-                          ? "EXTERNAL PLAYER // BROWSER TAB NOT VERIFIED"
+                          ? "3S EXPERIMENT // AUTO-RESTORE REQUESTED"
                           : "TRANSPORT // LOCAL MPD"
                     color: Colors.cyan
                     opacity: 0.6

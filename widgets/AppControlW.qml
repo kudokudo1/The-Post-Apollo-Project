@@ -22570,33 +22570,64 @@ PanelWindow {
                         }
                     }
 
-                    Rectangle {
+                    ActionButton {
                         id: hiddenKillAction
                         width: hiddenCommandActionsSection.width - 10
                         height: 36
                         anchors.horizontalCenter: parent.horizontalCenter
-                        property bool isHovered: !appControlWindow.keyboardActive && hiddenKillActionMouse.containsMouse
-                        property bool isPressed: hiddenKillActionMouse.pressed
-                        property bool isSelected: appControlWindow.detailFocused && appControlWindow.selectedDetailActionIndex === 6
-                        color:
-                            isPressed ? Colors.red
-                            : isHovered || isSelected ? Colors.yellow
-                            : Colors.black
-                        border.width: 1
-                        border.color: isPressed ? Colors.black : Colors.red
+                    suppressHover: appControlWindow.keyboardActive
+                    selected: appControlWindow.detailFocused
+                        && appControlWindow.selectedDetailActionIndex === 6
+                    destructive: true
+                    showLabel: false
+                    pointerCursorShape: Qt.ArrowCursor
+                    acceptedButtons: Qt.LeftButton
+
+                    idleFillColor: Colors.black
+                    hoverFillColor: Colors.yellow
+                    selectedFillColor: Colors.yellow
+                    pressedFillColor: Colors.red
+
+                    idleBorderColor: Colors.red
+                    hoverBorderColor: Colors.red
+                    selectedBorderColor: Colors.red
+                    pressedBorderColor: Colors.black
+                    keyboardSelectedBorderColor: Colors.red
+
+                    contentGlowEnabled: false
+                    softGlowEnabled: true
+                    softGlowSpread: 4
+                    softGlowMargin: 4
+                    idleSoftGlowColor: Colors.red
+                    hoverSoftGlowColor: Colors.red
+                    selectedSoftGlowColor: Colors.red
+                    pressedSoftGlowColor: Colors.red
+                    keyboardSelectedSoftGlowColor: Colors.red
+                    softGlowIdleOpacity: 0.26
+                    softGlowHoverOpacity: 0.76
+                    softGlowPressedOpacity: 0.92
+                    softGlowSelectedOpacity: 0.76
+                    softGlowKeyboardSelectedOpacity: 0.76
+                    wideGlowEnabled: false
+
+                    onHoverEntered: {
+                        appControlWindow.keyboardActive = false;
+                        appControlWindow.modeRailFocused = false;
+                        appControlWindow.detailFocused = true;
+                        appControlWindow.selectedDetailActionIndex = 6;
+                    }
+
+                    onTriggered: {
+                        appControlWindow.selectedDetailActionIndex = 6;
+                        appControlWindow.activateSelectedDetailAction();
+                    }
                         Row {
                             anchors.left: parent.left; anchors.leftMargin: 10; anchors.verticalCenter: parent.verticalCenter; spacing: 8
-                            GohuText { text: hiddenKillAction.isPressed ? "(=ᗜ=)デ╾━ ๋࣭⭑" : hiddenKillAction.isHovered || hiddenKillAction.isSelected ? "ദ്ദി(-_•)デ╾━" : "(-_•)デ╾━"; font.pixelSize: 13; color: hiddenKillAction.isPressed ? Colors.black : Colors.red; layer.enabled: !hiddenKillAction.isPressed; layer.effect: DropShadow { radius: 8; samples: 7; opacity: 0.56; color: Colors.red; transparentBorder: true } }
-                            GohuText { text: "KILL COMMAND  [TERM]"; font.pixelSize: 13; color: hiddenKillAction.isPressed ? Colors.black : Colors.red; layer.enabled: !hiddenKillAction.isPressed; layer.effect: DropShadow { radius: 8; samples: 7; opacity: 0.56; color: Colors.red; transparentBorder: true } }
+                            GohuText { text: hiddenKillAction.pressed ? "(=ᗜ=)デ╾━ ๋࣭⭑" : hiddenKillAction.hovered || hiddenKillAction.selected ? "ദ്ദി(-_•)デ╾━" : "(-_•)デ╾━"; font.pixelSize: 13; color: hiddenKillAction.pressed ? Colors.black : Colors.red; layer.enabled: !hiddenKillAction.pressed; layer.effect: DropShadow { radius: 8; samples: 7; opacity: 0.56; color: Colors.red; transparentBorder: true } }
+                            GohuText { text: "KILL COMMAND  [TERM]"; font.pixelSize: 13; color: hiddenKillAction.pressed ? Colors.black : Colors.red; layer.enabled: !hiddenKillAction.pressed; layer.effect: DropShadow { radius: 8; samples: 7; opacity: 0.56; color: Colors.red; transparentBorder: true } }
                         }
-                        MouseArea {
-                            id: hiddenKillActionMouse; anchors.fill: parent; hoverEnabled: true
-                            onEntered: { appControlWindow.keyboardActive = false;
-                            appControlWindow.modeRailFocused = false;
-                            appControlWindow.detailFocused = true; appControlWindow.selectedDetailActionIndex = 6; }
-                            onClicked: { appControlWindow.selectedDetailActionIndex = 6; appControlWindow.activateSelectedDetailAction(); }
-                        }
-                        RectangularShadow { anchors.fill: parent; anchors.margins: -4; spread: 4; z: -1; opacity: hiddenKillAction.isPressed ? 0.92 : hiddenKillAction.isHovered || hiddenKillAction.isSelected ? 0.76 : 0.26; color: Colors.red }
+
+
                     }
 
                 }
@@ -23789,7 +23820,7 @@ PanelWindow {
                     }
                 }
 
-                Rectangle {
+                ActionButton {
                     id: appMuteAction
 
                     visible: {
@@ -23815,24 +23846,53 @@ PanelWindow {
                           ).length + 3
                         : 3
                     property bool canMute: appControlWindow.appAudioAvailable
-                    property bool isHovered:
-                        canMute
-                        && !appControlWindow.keyboardActive
-                        && appMuteActionMouse.containsMouse
-                    property bool isPressed: canMute && appMuteActionMouse.pressed
-                    property bool isSelected:
-                        appControlWindow.detailFocused
-                        && appControlWindow.selectedDetailActionIndex === detailIndex
+                    available: canMute
+                    unavailableOpacity: 0.42
+                    suppressHover: appControlWindow.keyboardActive
+                    selected: appControlWindow.detailFocused
+                        && appControlWindow.selectedDetailActionIndex === appMuteAction.detailIndex
+                    showLabel: false
+                    pointerCursorShape: Qt.ArrowCursor
+                    acceptedButtons: Qt.LeftButton
 
-                    color: isPressed
-                           ? Colors.magenta
-                           : isHovered || isSelected
-                           ? Colors.yellow
-                           : Colors.black
-                    opacity: canMute ? 1.0 : 0.42
-                    border.width: 1
-                    border.color: Colors.omnitrix
+                    idleFillColor: Colors.black
+                    hoverFillColor: Colors.yellow
+                    selectedFillColor: Colors.yellow
+                    pressedFillColor: Colors.magenta
 
+                    idleBorderColor: Colors.omnitrix
+                    hoverBorderColor: Colors.omnitrix
+                    selectedBorderColor: Colors.omnitrix
+                    pressedBorderColor: Colors.omnitrix
+                    keyboardSelectedBorderColor: Colors.omnitrix
+
+                    contentGlowEnabled: false
+                    softGlowEnabled: true
+                    softGlowSpread: 5
+                    softGlowMargin: 0
+                    idleSoftGlowColor: Colors.green
+                    hoverSoftGlowColor: Colors.green
+                    selectedSoftGlowColor: Colors.green
+                    pressedSoftGlowColor: Colors.green
+                    keyboardSelectedSoftGlowColor: Colors.green
+                    softGlowIdleOpacity: 0.20
+                    softGlowHoverOpacity: 0.54
+                    softGlowPressedOpacity: 0.54
+                    softGlowSelectedOpacity: 0.54
+                    softGlowKeyboardSelectedOpacity: 0.54
+                    wideGlowEnabled: false
+
+                    onHoverEntered: {
+                        appControlWindow.keyboardActive = false;
+                        appControlWindow.modeRailFocused = false;
+                        appControlWindow.detailFocused = true;
+                        appControlWindow.selectedDetailActionIndex = appMuteAction.detailIndex;
+                    }
+
+                    onTriggered: {
+                        appControlWindow.selectedDetailActionIndex = appMuteAction.detailIndex;
+                        appControlWindow.activateSelectedDetailAction();
+                    }
                     Item {
                         anchors.fill: parent
                         anchors.leftMargin: 10
@@ -23852,7 +23912,7 @@ PanelWindow {
                                       ? "⊹ ࣪ (ᴗ˳ᴗ)ᶻ𝗓 ࣪ "
                                       : "* (ˊᗜˋو)و︎︎♬*"
                                 font.pixelSize: 14
-                                color: appMuteAction.isPressed
+                                color: appMuteAction.pressed
                                        ? Colors.black
                                        : Colors.omnitrix
                             }
@@ -23862,10 +23922,10 @@ PanelWindow {
                                 source: appMuteActionIcon
                                 radius: 15
                                 samples: 11
-                                opacity: appMuteAction.isPressed
+                                opacity: appMuteAction.pressed
                                          ? 0.0
-                                         : appMuteAction.isHovered
-                                           || appMuteAction.isSelected
+                                         : appMuteAction.hovered
+                                           || appMuteAction.selected
                                          ? 0.94 : 0.78
                                 color: Colors.green
                                 transparentBorder: true
@@ -23883,17 +23943,17 @@ PanelWindow {
                                   : "MUTE APP"
                             font.pixelSize: 14
                             verticalAlignment: Text.AlignVCenter
-                            color: appMuteAction.isPressed
+                            color: appMuteAction.pressed
                                    ? Colors.black
                                    : Colors.omnitrix
                             elide: Text.ElideRight
 
-                            layer.enabled: !appMuteAction.isPressed
+                            layer.enabled: !appMuteAction.pressed
                             layer.effect: DropShadow {
                                 radius: 11
                                 samples: 9
-                                opacity: appMuteAction.isHovered
-                                         || appMuteAction.isSelected
+                                opacity: appMuteAction.hovered
+                                         || appMuteAction.selected
                                          ? 0.82 : 0.58
                                 color: Colors.green
                                 transparentBorder: true
@@ -23901,37 +23961,9 @@ PanelWindow {
                         }
                     }
 
-                    MouseArea {
-                        id: appMuteActionMouse
-                        anchors.fill: parent
-                        enabled: appMuteAction.canMute
-                        hoverEnabled: true
 
-                        onEntered: {
-                            appControlWindow.keyboardActive = false;
-                            appControlWindow.modeRailFocused = false;
-                            appControlWindow.detailFocused = true;
-                            appControlWindow.selectedDetailActionIndex =
-                                appMuteAction.detailIndex;
-                        }
 
-                        onClicked: {
-                            appControlWindow.selectedDetailActionIndex =
-                                appMuteAction.detailIndex;
-                            appControlWindow.activateSelectedDetailAction();
-                        }
-                    }
 
-                    RectangularShadow {
-                        anchors.fill: parent
-                        spread: 5
-                        z: -1
-                        opacity: appMuteAction.isHovered
-                                 || appMuteAction.isSelected
-                                 ? 0.54
-                                 : 0.20
-                        color: Colors.green
-                    }
                 }
 
                 Item {
@@ -25654,7 +25686,7 @@ PanelWindow {
                     }
                 }
 
-                Rectangle {
+                ActionButton {
                     id: windowMuteAction
 
                     width: parent.width - 10
@@ -25662,26 +25694,51 @@ PanelWindow {
 
                     anchors.horizontalCenter: parent.horizontalCenter
 
-                    property bool isHovered:
-                        !appControlWindow.keyboardActive
-                        && windowMuteActionMouse.containsMouse
-                    property bool isPressed:
-                        windowMuteActionMouse.pressed
-                    property bool isSelected:
-                        appControlWindow.detailFocused
+                    suppressHover: appControlWindow.keyboardActive
+                    selected: appControlWindow.detailFocused
                         && appControlWindow.selectedDetailActionIndex === 5
+                    showLabel: false
+                    pointerCursorShape: Qt.ArrowCursor
+                    acceptedButtons: Qt.LeftButton
 
-                    color: isPressed
-                           ? Colors.magenta
-                           : isHovered || isSelected
-                           ? Colors.yellow
-                           : Colors.black
+                    idleFillColor: Colors.black
+                    hoverFillColor: Colors.yellow
+                    selectedFillColor: Colors.yellow
+                    pressedFillColor: Colors.magenta
 
-                    opacity: 1.0
+                    idleBorderColor: Colors.omnitrix
+                    hoverBorderColor: Colors.omnitrix
+                    selectedBorderColor: Colors.omnitrix
+                    pressedBorderColor: Colors.omnitrix
+                    keyboardSelectedBorderColor: Colors.omnitrix
 
-                    border.width: 1
-                    border.color: Colors.omnitrix
+                    contentGlowEnabled: false
+                    softGlowEnabled: true
+                    softGlowSpread: 5
+                    softGlowMargin: 0
+                    idleSoftGlowColor: Colors.green
+                    hoverSoftGlowColor: Colors.green
+                    selectedSoftGlowColor: Colors.green
+                    pressedSoftGlowColor: Colors.green
+                    keyboardSelectedSoftGlowColor: Colors.green
+                    softGlowIdleOpacity: 0.20
+                    softGlowHoverOpacity: 0.54
+                    softGlowPressedOpacity: 0.54
+                    softGlowSelectedOpacity: 0.54
+                    softGlowKeyboardSelectedOpacity: 0.54
+                    wideGlowEnabled: false
 
+                    onHoverEntered: {
+                        appControlWindow.keyboardActive = false;
+                        appControlWindow.modeRailFocused = false;
+                        appControlWindow.detailFocused = true;
+                        appControlWindow.selectedDetailActionIndex = 5;
+                    }
+
+                    onTriggered: {
+                        appControlWindow.selectedDetailActionIndex = 5;
+                        appControlWindow.activateSelectedDetailAction();
+                    }
                     Row {
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
@@ -25707,9 +25764,9 @@ PanelWindow {
 
                                 font.pixelSize: 14
 
-                                color: windowMuteAction.isPressed
+                                color: windowMuteAction.pressed
                                        ? Colors.black
-                                       : windowMuteAction.isHovered
+                                       : windowMuteAction.hovered
                                        ? Colors.green
                                        : Colors.omnitrix
                             }
@@ -25725,10 +25782,10 @@ PanelWindow {
                                 samples: 11
 
                                 opacity:
-                                    windowMuteAction.isPressed
+                                    windowMuteAction.pressed
                                     ? 0.0
-                                    : windowMuteAction.isHovered
-                                      || windowMuteAction.isSelected
+                                    : windowMuteAction.hovered
+                                      || windowMuteAction.selected
                                     ? 0.94
                                     : 0.78
 
@@ -25748,11 +25805,11 @@ PanelWindow {
                                   : "MUTE WINDOW"
 
                             font.pixelSize: 14
-                            color: windowMuteAction.isPressed
+                            color: windowMuteAction.pressed
                                    ? Colors.black
                                    : Colors.omnitrix
 
-                            layer.enabled: !windowMuteAction.isPressed
+                            layer.enabled: !windowMuteAction.pressed
                             layer.effect: DropShadow {
                                 horizontalOffset: 0
                                 verticalOffset: 0
@@ -25761,8 +25818,8 @@ PanelWindow {
                                 samples: 9
 
                                 opacity:
-                                    windowMuteAction.isHovered
-                                    || windowMuteAction.isSelected
+                                    windowMuteAction.hovered
+                                    || windowMuteAction.selected
                                     ? 0.82
                                     : 0.58
 
@@ -25773,38 +25830,9 @@ PanelWindow {
                         }
                     }
 
-                    MouseArea {
-                        id: windowMuteActionMouse
 
-                        anchors.fill: parent
-                        enabled: true
-                        hoverEnabled: true
 
-                        onEntered: {
-                            appControlWindow.keyboardActive = false;
-                            appControlWindow.modeRailFocused = false;
-                            appControlWindow.detailFocused = true;
-                            appControlWindow.selectedDetailActionIndex = 5;
-                        }
 
-                        onClicked: {
-                            appControlWindow.selectedDetailActionIndex = 5;
-                            appControlWindow.activateSelectedDetailAction();
-                        }
-                    }
-
-                    RectangularShadow {
-                        anchors.fill: parent
-                        spread: 5
-                        z: -1
-
-                        opacity: windowMuteAction.isHovered
-                                 || windowMuteAction.isSelected
-                                 ? 0.54
-                                 : 0.20
-
-                        color: Colors.green
-                    }
                 }
 
                 GridLayout {
@@ -27770,7 +27798,7 @@ PanelWindow {
                     }
                 }
 
-                Rectangle {
+                ActionButton {
                     id: runKillAction
 
                     visible: true
@@ -27780,27 +27808,54 @@ PanelWindow {
 
                     anchors.horizontalCenter: parent.horizontalCenter
 
-                    property bool isHovered:
-                        visible
-                        && !appControlWindow.keyboardActive
-                        && runKillActionMouse.containsMouse
-                    property bool isPressed:
-                        visible && runKillActionMouse.pressed
-                    property bool isSelected:
-                        visible
-                        && appControlWindow.detailFocused
+                    available: appControlWindow.runKillAvailable
+                    unavailableOpacity: 0.48
+                    suppressHover: appControlWindow.keyboardActive
+                    selected: appControlWindow.detailFocused
                         && appControlWindow.selectedDetailActionIndex === 5
+                    destructive: true
+                    showLabel: false
+                    pointerCursorShape: Qt.ArrowCursor
+                    acceptedButtons: Qt.LeftButton
 
-                    color:
-                        isPressed ? Colors.red
-                        : isHovered || isSelected ? Colors.yellow
-                        : Colors.black
+                    idleFillColor: Colors.black
+                    hoverFillColor: Colors.yellow
+                    selectedFillColor: Colors.yellow
+                    pressedFillColor: Colors.red
 
-                    opacity: appControlWindow.runKillAvailable ? 1.0 : 0.48
+                    idleBorderColor: Colors.red
+                    hoverBorderColor: Colors.red
+                    selectedBorderColor: Colors.red
+                    pressedBorderColor: Colors.black
+                    keyboardSelectedBorderColor: Colors.red
 
-                    border.width: 1
-                    border.color: isPressed ? Colors.black : Colors.red
+                    contentGlowEnabled: false
+                    softGlowEnabled: true
+                    softGlowSpread: 5
+                    softGlowMargin: 0
+                    idleSoftGlowColor: Colors.red
+                    hoverSoftGlowColor: Colors.red
+                    selectedSoftGlowColor: Colors.red
+                    pressedSoftGlowColor: Colors.red
+                    keyboardSelectedSoftGlowColor: Colors.red
+                    softGlowIdleOpacity: 0.22
+                    softGlowHoverOpacity: 0.78
+                    softGlowPressedOpacity: 0.92
+                    softGlowSelectedOpacity: 0.78
+                    softGlowKeyboardSelectedOpacity: 0.78
+                    wideGlowEnabled: false
 
+                    onHoverEntered: {
+                        appControlWindow.keyboardActive = false;
+                        appControlWindow.modeRailFocused = false;
+                        appControlWindow.detailFocused = true;
+                        appControlWindow.selectedDetailActionIndex = 5;
+                    }
+
+                    onTriggered: {
+                        appControlWindow.selectedDetailActionIndex = 5;
+                        appControlWindow.activateSelectedDetailAction();
+                    }
                     Row {
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
@@ -27822,19 +27877,19 @@ PanelWindow {
                                 text:
                                     !appControlWindow.runKillAvailable
                                     ? "(•_•)"
-                                    : runKillAction.isPressed
+                                    : runKillAction.pressed
                                     ? "(=ᗜ=)"
-                                    : runKillAction.isHovered
+                                    : runKillAction.hovered
                                     ? "ദ്ദി(-_•)"
                                     : "(-_•)"
 
                                 font.pixelSize: 14
 
-                                color: runKillAction.isPressed
+                                color: runKillAction.pressed
                                        ? Colors.black
                                        : Colors.red
 
-                                layer.enabled: !runKillAction.isPressed
+                                layer.enabled: !runKillAction.pressed
                                 layer.effect: DropShadow {
                                     horizontalOffset: 0
                                     verticalOffset: 0
@@ -27843,8 +27898,8 @@ PanelWindow {
                                     samples: 7
 
                                     opacity:
-                                        runKillAction.isHovered
-                                        || runKillAction.isSelected
+                                        runKillAction.hovered
+                                        || runKillAction.selected
                                         ? 0.82
                                         : 0.60
 
@@ -27865,11 +27920,11 @@ PanelWindow {
 
                                 font.pixelSize: 14
 
-                                color: runKillAction.isPressed
+                                color: runKillAction.pressed
                                        ? Colors.black
                                        : Colors.red
 
-                                layer.enabled: !runKillAction.isPressed
+                                layer.enabled: !runKillAction.pressed
                                 layer.effect: DropShadow {
                                     horizontalOffset: 0
                                     verticalOffset: 0
@@ -27878,8 +27933,8 @@ PanelWindow {
                                     samples: 7
 
                                     opacity:
-                                        runKillAction.isHovered
-                                        || runKillAction.isSelected
+                                        runKillAction.hovered
+                                        || runKillAction.selected
                                         ? 0.82
                                         : 0.60
 
@@ -27893,17 +27948,17 @@ PanelWindow {
 
                                 anchors.verticalCenter: parent.verticalCenter
 
-                                text: runKillAction.isPressed
+                                text: runKillAction.pressed
                                       ? " ๋࣭⭑"
                                       : ""
 
                                 font.pixelSize: 14
 
-                                color: runKillAction.isPressed
+                                color: runKillAction.pressed
                                        ? Colors.black
                                        : Colors.red
 
-                                layer.enabled: !runKillAction.isPressed
+                                layer.enabled: !runKillAction.pressed
                                 layer.effect: DropShadow {
                                     horizontalOffset: 0
                                     verticalOffset: 0
@@ -27912,8 +27967,8 @@ PanelWindow {
                                     samples: 7
 
                                     opacity:
-                                        runKillAction.isHovered
-                                        || runKillAction.isSelected
+                                        runKillAction.hovered
+                                        || runKillAction.selected
                                         ? 0.82
                                         : 0.60
 
@@ -27933,51 +27988,23 @@ PanelWindow {
                                   : "KILL  [NO TARGET]"
 
                             font.pixelSize: 14
-                            color: runKillAction.isPressed
+                            color: runKillAction.pressed
                                    ? Colors.black
                                    : Colors.red
                         }
                     }
 
 
-                    MouseArea {
-                        id: runKillActionMouse
 
-                        anchors.fill: parent
-                        enabled: appControlWindow.runKillAvailable
-                        hoverEnabled: true
 
-                        onEntered: {
-                            appControlWindow.keyboardActive = false;
-                            appControlWindow.modeRailFocused = false;
-                            appControlWindow.detailFocused = true;
-                            appControlWindow.selectedDetailActionIndex = 5;
-                        }
 
-                        onClicked: {
-                            appControlWindow.selectedDetailActionIndex = 5;
-                            appControlWindow.activateSelectedDetailAction();
-                        }
-                    }
-
-                    RectangularShadow {
-                        anchors.fill: parent
-
-                        spread: 5
-                        z: -1
-
-                        opacity: runKillAction.isPressed ? 0.92
-                                 : runKillAction.isHovered || runKillAction.isSelected
-                                 ? 0.78 : 0.22
-
-                        color: Colors.red
-                    }
 
                 
 
 
                     Item {
                         id: runKillActionFavoriteStar
+                        parent: runKillAction.interactionItem
 
                         anchors.right: parent.right
                         anchors.rightMargin: 6

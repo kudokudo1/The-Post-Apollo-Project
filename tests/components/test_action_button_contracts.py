@@ -355,3 +355,72 @@ require(run_toolbox_window, "available: canLaunch", "RUN toolbox ActionButton av
 require(run_toolbox_window, "unavailableOpacity: 0.48", "RUN toolbox unavailable fade")
 
 print("AppControl RUN ActionButton migration: PASS")
+
+
+# Fifth AppControl proof migration: hidden-command and application alternate
+# launch actions share ActionButton without flattening their accent identities.
+ALT_LAUNCH_ACTIONS = {
+    "hiddenActionButton": ("hiddenActionMouse", None),
+    "hiddenBottleAction": ("hiddenBottleActionMouse", None),
+    "hiddenToolboxAction": ("hiddenToolboxActionMouse", None),
+    "appBottleAction": ("appBottleActionMouse", "appBottleActionFavoriteStar"),
+    "appToolboxAction": ("appToolboxActionMouse", "appToolboxActionFavoriteStar"),
+}
+
+for control_id, (root_mouse, star_id) in ALT_LAUNCH_ACTIONS.items():
+    marker = f"id: {control_id}"
+    marker_pos = APPCONTROL.index(marker)
+    block_start = APPCONTROL.rfind("ActionButton {", 0, marker_pos)
+    assert block_start >= 0, f"{control_id} must be hosted by ActionButton"
+    window = APPCONTROL[block_start:marker_pos + 9000]
+    assert f"id: {root_mouse}" not in window, f"{control_id} reintroduced its root pointer engine"
+    require(window, "acceptedButtons: Qt.LeftButton", f"{control_id} left-click-only donor contract")
+    if star_id is not None:
+        require(window, f"id: {star_id}", f"{control_id} favorite star survives migration")
+        require(window, f"parent: {control_id}.interactionItem", f"{control_id} favorite star uses interaction overlay")
+
+hidden_marker = APPCONTROL.index("id: hiddenActionButton")
+hidden_window = APPCONTROL[hidden_marker:hidden_marker + 3900]
+require(hidden_window, "readonly property color haloColor:", "hidden action dynamic halo")
+require(hidden_window, "modelData.label === \"FLOAT\"", "hidden FLOAT cyan halo exception")
+require(hidden_window, "idleBorderColor: modelData.accent", "hidden action per-row accent border")
+
+hidden_bottle_marker = APPCONTROL.index("id: hiddenBottleAction")
+hidden_bottle_window = APPCONTROL[hidden_bottle_marker:hidden_bottle_marker + 3000]
+require(hidden_bottle_window, "property bool canRun:", "hidden BOTTLES availability state")
+require(hidden_bottle_window, "available: canRun", "hidden BOTTLES ActionButton availability")
+require(hidden_bottle_window, "unavailableOpacity: 0.38", "hidden BOTTLES unavailable fade")
+
+app_bottle_marker = APPCONTROL.index("id: appBottleAction")
+app_bottle_window = APPCONTROL[app_bottle_marker:app_bottle_marker + 4300]
+for needle in ("property var currentResult:", "property int detailIndex:", "property bool hasBottle:"):
+    require(app_bottle_window, needle, "application BOTTLES target state")
+require(app_bottle_window, "available: hasBottle && !appControlWindow.bottlesLoading", "application BOTTLES availability")
+
+app_toolbox_marker = APPCONTROL.index("id: appToolboxAction")
+app_toolbox_window = APPCONTROL[app_toolbox_marker:app_toolbox_marker + 4300]
+for needle in ("property var currentResult:", "property int detailIndex:", "property bool canLaunch:"):
+    require(app_toolbox_window, needle, "application TOOLBOX target state")
+require(app_toolbox_window, "available: canLaunch", "application TOOLBOX availability")
+
+# Every AppControl action migrated so far came from a default MouseArea, whose
+# acceptedButtons contract is left-click-only. Shared ActionButton defaults to
+# left+right, so each adapter must preserve the donor behavior explicitly.
+APPCONTROL_LEFT_ONLY_ACTIONS = (
+    "appFreezeAction", "tabFreezeAction", "windowFreezeAction",
+    "appKillAction", "tabCloseActionBelowFreeze", "windowKillAction",
+    "launchAction", "desktopActionButton",
+    "runAction", "runKittyAction", "runFloatAction", "runFullscreenAction", "runToolboxAction",
+    "hiddenActionButton", "hiddenBottleAction", "hiddenToolboxAction",
+    "appBottleAction", "appToolboxAction",
+)
+for control_id in APPCONTROL_LEFT_ONLY_ACTIONS:
+    marker_pos = APPCONTROL.index(f"id: {control_id}")
+    block_start = APPCONTROL.rfind("ActionButton {", 0, marker_pos)
+    root_prefix = APPCONTROL[block_start:marker_pos + 1800]
+    assert re.search(
+        r"pointerCursorShape:\s*Qt\.ArrowCursor\s*\n\s*acceptedButtons:\s*Qt\.LeftButton",
+        root_prefix,
+    ), f"{control_id} root accepted-buttons fidelity"
+
+print("AppControl alternate launch ActionButton migration: PASS")

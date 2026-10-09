@@ -659,7 +659,8 @@ for needle, message in (
     ("softGlowMargin: 4", "restart/freeze halo gutter preservation"),
     ("softGlowMargin: 5", "end-process halo gutter preservation"),
     ("id: taskLimitSlider", "LIMIT remains a dedicated continuous control"),
-    ("id: taskActionSafetyLockPlate", "safety lock remains a separate toggle family"),
+    ("required property Component safetyLockComponent", "safety lock remains an injected separate toggle family"),
+    ("sourceComponent:\n                                visible ? taskManagerBody.safetyLockComponent : undefined", "Task Manager preserves the safety-lock extraction seam"),
 ):
     require(TASK_MANAGER, needle, message)
 

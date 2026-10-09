@@ -568,12 +568,7 @@ Scope {
 
         return {
             allowed: true,
-            strategy:
-                mode === "keep-index"
-                ? "UNDO_STASH_CREATE_KEEP_INDEX"
-                : mode === "staged"
-                ? "UNDO_STASH_CREATE_STAGED"
-                : "UNDO_STASH_CREATE_ALL",
+            strategy: "UNDO_STASH_CREATE_EXACT",
             mode: mode,
             branch: branch,
             expectedHead: head,
@@ -796,7 +791,7 @@ Scope {
         common.allowed = true;
 
         if (kind === "CHANGES/STASH-APPLY") {
-            common.strategy = "UNDO_STASH_APPLY_CLEAN";
+            common.strategy = "UNDO_STASH_APPLY_REF";
             common.summary =
                 "UNDO " + normalizedRef + " APPLY // RESTORE CLEAN PRE-APPLY STATE";
         } else if (kind === "CHANGES/STASH-POP") {

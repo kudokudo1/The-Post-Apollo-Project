@@ -714,6 +714,85 @@ Scope {
         };
     }
 
+    function resetRecoveryPlan(record) {
+        const row = record || {};
+
+        if (String(row.kind || "") !== "HISTORY/RESET")
+            return null;
+
+        const mode = String(argument(row, 1) || "").toLowerCase();
+
+        if (mode === "hard")
+            return null;
+
+        if (mode !== "soft" && mode !== "mixed")
+            return refuse("RESET MODE DOES NOT HAVE EXACT AUTOMATIC UNDO");
+
+        const before = row.before || {};
+        const after = row.after || {};
+        const beforeIndex = before.index || {};
+        const afterIndex = after.index || {};
+        const afterWorking = after.workingState || {};
+        const beforeBranch = String(before.branch || "");
+        const afterBranch = String(after.branch || "");
+        const ref = "refs/heads/" + beforeBranch;
+        const restoreSha = refSha(before, ref);
+        const expectedSha = refSha(after, ref);
+        const expectedIndexTree = String(afterIndex.tree || "");
+        const beforeIndexTree = String(beforeIndex.tree || "");
+
+        if (String(before.recoveryClass || "") !== "REF_RECOVERABLE"
+                || !beforeBranch
+                || afterBranch !== beforeBranch
+                || !restoreSha
+                || !expectedSha
+                || restoreSha === expectedSha
+                || String(before.head || "") !== restoreSha
+                || String(after.head || "") !== expectedSha
+                || !beforeIndexTree
+                || !expectedIndexTree
+                || Number(afterWorking.conflictCount || 0) !== 0
+                || String(((before.operationState || {}).state) || "NONE")
+                   !== "NONE"
+                || String(((after.operationState || {}).state) || "NONE")
+                   !== "NONE") {
+            return refuse(
+                "SOFT/MIXED RESET TRANSITION IS NOT EXACT"
+            );
+        }
+
+        if (mode === "soft"
+                && expectedIndexTree !== beforeIndexTree) {
+            return refuse(
+                "SOFT RESET DID NOT PRESERVE THE PRE-RESET INDEX"
+            );
+        }
+
+        return {
+            allowed: true,
+            strategy: "UNDO_RESET_SOFT_OR_MIXED",
+            mode: mode,
+            branch: beforeBranch,
+            restoreSha: restoreSha,
+            expectedSha: expectedSha,
+            expectedIndexTree: expectedIndexTree,
+            expectedStatusBase64:
+                String(afterWorking.statusBase64 || ""),
+            expectedWorktreeHash:
+                String(afterWorking.worktreePatchHash || ""),
+            expectedUntrackedHash:
+                String(afterWorking.untrackedListHash || ""),
+            summary:
+                "UNDO RESET "
+                + mode.toUpperCase()
+                + " // RESTORE "
+                + beforeBranch
+                + " TO "
+                + restoreSha.slice(0, 12)
+                + " WITHOUT DISCARDING VERIFIED CONTENT"
+        };
+    }
+
     function preview(record) {
         const row = record || {};
         const kind = String(row.kind || "");
@@ -727,6 +806,10 @@ Scope {
 
         if (String(row.undoState || "") === "UNDONE")
             return refuse("OPERATION IS ALREADY UNDONE");
+
+        const resetPlan = resetRecoveryPlan(row);
+        if (resetPlan)
+            return resetPlan;
 
         const clonePlan = cloneRecoveryPlan(row);
         if (clonePlan)
@@ -1318,6 +1401,17 @@ Scope {
             a = String(plan.branch || "");
             b = String(plan.restoreSha || "");
             c = String(plan.expectedSha || "");
+        } else if (strategy === "UNDO_RESET_SOFT_OR_MIXED") {
+            a = String(plan.branch || "");
+            b = String(plan.restoreSha || "");
+            c = String(plan.expectedSha || "");
+            d = String(plan.mode || "");
+            e = String(plan.expectedIndexTree || "");
+            f = String(plan.expectedWorktreeHash || "");
+            g =
+                String(plan.expectedStatusBase64 || "")
+                + "\t"
+                + String(plan.expectedUntrackedHash || "");
         } else if (strategy === "UNDO_COMMIT_TO_STAGED") {
             a = String(plan.branch || "");
             b = String(plan.restoreSha || "");
@@ -1422,7 +1516,7 @@ Scope {
                 '  printf "REFUSED\\tNOT A GIT WORKTREE\\n"',
                 '  exit 21',
                 'fi',
-                'if [ "$strategy" != "UNDO_TRANSFER_CONTENT" ] && [ "$strategy" != "UNDO_COMMIT_TO_STAGED" ] && [ "$strategy" != "UNDO_STASH_CREATE_ALL" ] && [ "$strategy" != "UNDO_STASH_APPLY_CLEAN" ] && [ "$strategy" != "UNDO_STASH_POP_TOP" ] && [ "$strategy" != "UNDO_STASH_DROP_TOP" ]; then',
+                'if [ "$strategy" != "UNDO_TRANSFER_CONTENT" ] && [ "$strategy" != "UNDO_COMMIT_TO_STAGED" ] && [ "$strategy" != "UNDO_RESET_SOFT_OR_MIXED" ] && [ "$strategy" != "UNDO_STASH_CREATE_ALL" ] && [ "$strategy" != "UNDO_STASH_APPLY_CLEAN" ] && [ "$strategy" != "UNDO_STASH_POP_TOP" ] && [ "$strategy" != "UNDO_STASH_DROP_TOP" ]; then',
                 '  while IFS= read -r wt; do',
                 '    [ -n "$wt" ] || continue',
                 '    if [ -n "$(git -C "$wt" status --porcelain=v1 --untracked-files=all 2>/dev/null)" ]; then',
@@ -1660,6 +1754,69 @@ Scope {
                 '    fi',
                 '    git -C "$repo" update-ref "$ref" "$restore" "$expected" || { printf "REFUSED\\tGUARDED BACKGROUND PULL REF RESTORE FAILED\\n"; exit 190; }',
                 '    printf "OK\\tRESTORED PRE-PULL BACKGROUND BRANCH // FETCHED REMOTE REFS RETAINED // %s\\n" "$branch"',
+                '    ;;',
+                '  UNDO_RESET_SOFT_OR_MIXED)',
+                '    branch="$a"',
+                '    restore="$b"',
+                '    expected="$c"',
+                '    mode="$d"',
+                '    expected_index_tree="$e"',
+                '    expected_worktree_hash="$f"',
+                '    IFS="$(printf "\t")" read -r expected_status64 expected_untracked_hash <<<"$g"',
+                '    case "$mode" in soft|mixed) ;; *) printf "REFUSED\tINVALID RECORDED RESET MODE\n"; exit 191 ;; esac',
+                '    ref="refs/heads/$branch"',
+                '    head_ref="$(git -C "$repo" symbolic-ref -q HEAD 2>/dev/null || true)"',
+                '    [ "$head_ref" = "$ref" ] || { printf "REFUSED\tRESET BRANCH IS NOT CURRENTLY CHECKED OUT\n"; exit 192; }',
+                '    actual="$(git -C "$repo" rev-parse -q --verify "$ref" 2>/dev/null || true)"',
+                '    [ "$actual" = "$expected" ] || { printf "REFUSED\tRESET BRANCH MOVED SINCE OPERATION\n"; exit 193; }',
+                '    git -C "$repo" cat-file -e "$restore^{commit}" 2>/dev/null || { printf "REFUSED\tPRE-RESET COMMIT MISSING\n"; exit 194; }',
+                '    [ -z "$(git -C "$repo" ls-files -u 2>/dev/null)" ] || { printf "REFUSED\tCURRENT INDEX HAS CONFLICTS\n"; exit 195; }',
+                '    actual_index_tree="$(git -C "$repo" write-tree 2>/dev/null || true)"',
+                '    [ "$actual_index_tree" = "$expected_index_tree" ] || { printf "REFUSED\tINDEX CHANGED SINCE RESET\n"; exit 196; }',
+                '    actual_worktree_hash="$(git -C "$repo" diff --binary 2>/dev/null | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
+                '    [ "$actual_worktree_hash" = "$expected_worktree_hash" ] || { printf "REFUSED\tTRACKED WORKTREE CHANGED SINCE RESET\n"; exit 197; }',
+                '    actual_status64="$(git -C "$repo" status --porcelain=v1 --untracked-files=all 2>/dev/null | base64 -w0 2>/dev/null || true)"',
+                '    [ "$actual_status64" = "$expected_status64" ] || { printf "REFUSED\tWORKTREE STATUS CHANGED SINCE RESET\n"; exit 198; }',
+                '    actual_untracked_hash="$(git -C "$repo" ls-files --others --exclude-standard -z 2>/dev/null | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
+                '    [ "$actual_untracked_hash" = "$expected_untracked_hash" ] || { printf "REFUSED\tUNTRACKED SET CHANGED SINCE RESET\n"; exit 199; }',
+                '    expected_tree="$(git -C "$repo" rev-parse "$expected^{tree}" 2>/dev/null || true)"',
+                '    restore_tree="$(git -C "$repo" rev-parse "$restore^{tree}" 2>/dev/null || true)"',
+                '    [ -n "$expected_tree" ] && [ -n "$restore_tree" ] || { printf "REFUSED\tRESET TREE IDENTITY MISSING\n"; exit 200; }',
+                '    if [ "$mode" = "soft" ]; then',
+                '      [ "$expected_index_tree" = "$restore_tree" ] || { printf "REFUSED\tSOFT RESET INDEX NO LONGER MATCHES PRE-RESET TREE\n"; exit 201; }',
+                '    else',
+                '      [ "$expected_index_tree" = "$expected_tree" ] || { printf "REFUSED\tMIXED RESET INDEX NO LONGER MATCHES RESET TARGET TREE\n"; exit 202; }',
+                '    fi',
+                '    repo_top="$(git -C "$repo" rev-parse --show-toplevel 2>/dev/null || true)"',
+                '    while IFS= read -r wt; do',
+                '      [ -n "$wt" ] || continue',
+                '      [ "$(realpath "$wt" 2>/dev/null || printf %s "$wt")" = "$(realpath "$repo_top" 2>/dev/null || printf %s "$repo_top")" ] && continue',
+                '      [ -z "$(git -C "$wt" status --porcelain=v1 --untracked-files=all 2>/dev/null)" ] || { printf "REFUSED\tANOTHER WORKTREE CHANGED SINCE RESET\n"; exit 203; }',
+                '    done < <(git -C "$repo" worktree list --porcelain 2>/dev/null | sed -n "s/^worktree //p")',
+                '    tmp_index="$(mktemp)"',
+                '    rm -f "$tmp_index"',
+                '    GIT_INDEX_FILE="$tmp_index" git -C "$repo" read-tree "$restore" >/dev/null 2>&1 || { rm -f "$tmp_index"; printf "REFUSED\tRESET WORKTREE PREFLIGHT INDEX CREATE FAILED\n"; exit 204; }',
+                '    GIT_INDEX_FILE="$tmp_index" git -C "$repo" add -A -- . >/dev/null 2>&1 || { rm -f "$tmp_index"; printf "REFUSED\tRESET WORKTREE PREFLIGHT MATERIALIZATION FAILED\n"; exit 205; }',
+                '    worktree_tree="$(GIT_INDEX_FILE="$tmp_index" git -C "$repo" write-tree 2>/dev/null || true)"',
+                '    rm -f "$tmp_index"',
+                '    [ "$worktree_tree" = "$restore_tree" ] || { printf "REFUSED\tWORKTREE CONTENT NO LONGER MATCHES PRE-RESET TREE\n"; exit 206; }',
+                '    git -C "$repo" update-ref "$ref" "$restore" "$expected" || { printf "REFUSED\tGUARDED RESET HEAD RESTORE FAILED\n"; exit 207; }',
+                '    if [ "$mode" = "mixed" ]; then',
+                '      if ! git -C "$repo" reset --mixed "$restore" >/dev/null 2>&1; then',
+                '        git -C "$repo" update-ref "$ref" "$expected" "$restore" >/dev/null 2>&1 || { printf "REFUSED\tMIXED RESET UNDO FAILED // REF ROLLBACK FAILED\n"; exit 208; }',
+                '        git -C "$repo" read-tree "$expected" >/dev/null 2>&1 || true',
+                '        printf "REFUSED\tMIXED RESET UNDO FAILED // OPERATION ROLLED BACK\n"',
+                '        exit 209',
+                '      fi',
+                '    fi',
+                '    if [ -n "$(git -C "$repo" status --porcelain=v1 --untracked-files=all 2>/dev/null)" ]; then',
+                '      git -C "$repo" update-ref "$ref" "$expected" "$restore" >/dev/null 2>&1 || { printf "REFUSED\tRESET UNDO VERIFICATION FAILED // REF ROLLBACK FAILED\n"; exit 210; }',
+                '      if [ "$mode" = "mixed" ]; then git -C "$repo" read-tree "$expected" >/dev/null 2>&1 || true; fi',
+                '      printf "REFUSED\tRESET UNDO VERIFICATION FAILED // OPERATION ROLLED BACK\n"',
+                '      exit 211',
+                '    fi',
+                '    git -C "$repo" update-ref ORIG_HEAD "$expected" >/dev/null 2>&1 || true',
+                '    printf "OK\tRESTORED PRE-RESET HEAD + INDEX/WORKTREE // %s // %s\n" "$mode" "$branch"',
                 '    ;;',
                 '  RESTORE_REWRITTEN_BRANCH)',
                 '    branch="$a"',
@@ -2144,6 +2301,7 @@ Scope {
 
                 if (strategy !== "UNDO_TRANSFER_CONTENT"
                         && strategy !== "UNDO_COMMIT_TO_STAGED"
+                        && strategy !== "UNDO_RESET_SOFT_OR_MIXED"
                         && snapshotClass !== "REF_RECOVERABLE") {
                     root.failBeforeSnapshot(
                         "CURRENT REPOSITORY STATE IS NOT CLEAN REF-RECOVERABLE"

@@ -2,6 +2,7 @@
 """Contracts + runtime smoke tests for generalized HISTORY Undo."""
 
 from pathlib import Path
+import os
 import subprocess
 import tempfile
 
@@ -57,8 +58,28 @@ require(
 )
 require(
     RECOVERY,
+    'strategy: "UNDO_RESET_SOFT_OR_MIXED"',
+    "soft and mixed reset must use dedicated content-preserving recovery",
+)
+require(
+    RECOVERY,
+    "WORKTREE CONTENT NO LONGER MATCHES PRE-RESET TREE",
+    "soft/mixed reset Undo must refuse worktree drift including reset-created untracked files",
+)
+require(
+    RECOVERY,
+    "MIXED RESET INDEX NO LONGER MATCHES RESET TARGET TREE",
+    "mixed reset Undo must verify the recorded reset index exactly",
+)
+require(
+    RECOVERY,
+    "SOFT RESET INDEX NO LONGER MATCHES PRE-RESET TREE",
+    "soft reset Undo must verify the pre-reset index was preserved",
+)
+require(
+    RECOVERY,
     "OPERATION IS NOT CLEAN REF-RECOVERABLE",
-    "dirty reset outcomes must remain refused by the common recovery gate",
+    "unsupported dirty history outcomes must remain refused by the common recovery gate",
 )
 require(
     RECOVERY,
@@ -77,18 +98,19 @@ require(
 )
 
 
-def run(args, cwd=None, check=True):
+def run(args, cwd=None, check=True, env=None):
     return subprocess.run(
         args,
         cwd=cwd,
+        env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         check=check,
     )
 
 
-def git(repo: Path, *args: str, check=True):
-    return run(["git", "-C", str(repo), *args], check=check)
+def git(repo: Path, *args: str, check=True, env=None):
+    return run(["git", "-C", str(repo), *args], check=check, env=env)
 
 
 def commit_file(repo: Path, name: str, value: str, message: str):
@@ -185,14 +207,87 @@ def smoke_hard_reset_undo():
         assert (repo / "later.txt").read_text(encoding="utf-8") == "later\n"
 
 
-def smoke_mixed_reset_is_dirty():
+def materialized_worktree_tree(repo: Path, restore: str) -> str:
+    with tempfile.TemporaryDirectory(prefix="pa-reset-index-") as tmp:
+        index_path = Path(tmp) / "index"
+        env = dict(os.environ)
+        env["GIT_INDEX_FILE"] = str(index_path)
+        git(repo, "read-tree", restore, env=env)
+        git(repo, "add", "-A", "--", ".", env=env)
+        return git(repo, "write-tree", env=env).stdout.decode().strip()
+
+
+def guarded_restore_reset(
+    repo: Path,
+    branch: str,
+    restore: str,
+    expected: str,
+    mode: str,
+):
+    ref = f"refs/heads/{branch}"
+    assert git(repo, "rev-parse", ref).stdout.decode().strip() == expected
+
+    expected_tree = git(repo, "rev-parse", f"{expected}^{{tree}}").stdout.decode().strip()
+    restore_tree = git(repo, "rev-parse", f"{restore}^{{tree}}").stdout.decode().strip()
+    index_tree = git(repo, "write-tree").stdout.decode().strip()
+
+    if mode == "soft":
+        assert index_tree == restore_tree
+    elif mode == "mixed":
+        assert index_tree == expected_tree
+    else:
+        raise AssertionError(mode)
+
+    assert materialized_worktree_tree(repo, restore) == restore_tree
+
+    git(repo, "update-ref", ref, restore, expected)
+    if mode == "mixed":
+        git(repo, "reset", "--mixed", restore)
+
+    assert git(repo, "rev-parse", "HEAD").stdout.decode().strip() == restore
+    assert git(repo, "status", "--porcelain=v1", "--untracked-files=all").stdout == b""
+
+
+def smoke_soft_reset_undo():
+    with tempfile.TemporaryDirectory(prefix="pa-history-soft-reset-") as tmp:
+        repo, base, branch = make_repo(Path(tmp))
+        before = commit_file(repo, "later.txt", "later\n", "later")
+        git(repo, "reset", "--soft", base)
+        after = git(repo, "rev-parse", "HEAD").stdout.decode().strip()
+        assert after == base
+        assert git(repo, "diff", "--cached", "--name-only").stdout != b""
+        guarded_restore_reset(repo, branch, before, after, "soft")
+        assert (repo / "later.txt").read_text(encoding="utf-8") == "later\n"
+
+
+def smoke_mixed_reset_undo():
     with tempfile.TemporaryDirectory(prefix="pa-history-mixed-reset-") as tmp:
-        repo, base, _branch = make_repo(Path(tmp))
-        commit_file(repo, "later.txt", "later\n", "later")
+        repo, base, branch = make_repo(Path(tmp))
+        (repo / "base.txt").write_text("base changed\n", encoding="utf-8")
+        (repo / "later.txt").write_text("later\n", encoding="utf-8")
+        git(repo, "add", "-A")
+        git(repo, "commit", "-qm", "later")
+        before = git(repo, "rev-parse", "HEAD").stdout.decode().strip()
+
         git(repo, "reset", "--mixed", base)
-        # This is why snapshot classification must block generic ref recovery:
-        # the branch moved but content remains in the worktree.
-        assert git(repo, "status", "--porcelain=v1").stdout != b""
+        after = git(repo, "rev-parse", "HEAD").stdout.decode().strip()
+        status = git(repo, "status", "--porcelain=v1", "--untracked-files=all").stdout
+        assert b"base.txt" in status
+        assert b"later.txt" in status
+
+        guarded_restore_reset(repo, branch, before, after, "mixed")
+        assert (repo / "base.txt").read_text(encoding="utf-8") == "base changed\n"
+        assert (repo / "later.txt").read_text(encoding="utf-8") == "later\n"
+
+
+def smoke_mixed_reset_drift_is_refused():
+    with tempfile.TemporaryDirectory(prefix="pa-history-mixed-reset-drift-") as tmp:
+        repo, base, _branch = make_repo(Path(tmp))
+        before = commit_file(repo, "later.txt", "later\n", "later")
+        git(repo, "reset", "--mixed", base)
+        (repo / "later.txt").write_text("drifted after reset\n", encoding="utf-8")
+        restore_tree = git(repo, "rev-parse", f"{before}^{{tree}}").stdout.decode().strip()
+        assert materialized_worktree_tree(repo, before) != restore_tree
 
 
 def smoke_created_branch_undo():
@@ -234,7 +329,9 @@ smoke_merge_commit_undo()
 smoke_cherry_pick_undo()
 smoke_revert_undo()
 smoke_hard_reset_undo()
-smoke_mixed_reset_is_dirty()
+smoke_soft_reset_undo()
+smoke_mixed_reset_undo()
+smoke_mixed_reset_drift_is_refused()
 smoke_created_branch_undo()
 smoke_created_tag_undo()
 smoke_detach_switch_back()

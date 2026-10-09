@@ -2025,23 +2025,21 @@ Item {
 
             }
 
-            Rectangle {
+            SectionFrame {
                 id: inspector
 
                 width: parent.width - mapPane.width - parent.spacing
                 height: parent.height
-                color: Colors.dark
-                border.width: 1
-                border.color:
+                fillColor: Colors.dark
+                borderWidth: 1
+                borderColor:
                     root.selectedBranch
                     ? Colors.magenta
                     : Colors.cyan
+                inset: 10
 
                 Column {
-                    anchors {
-                        fill: parent
-                        margins: 10
-                    }
+                    anchors.fill: parent
                     spacing: 6
 
                     GohuText {
@@ -2740,24 +2738,22 @@ Item {
                                 accent: Colors.orange
                             }
 
-                            Rectangle {
+                            SectionFrame {
                                 width: parent.width
                                 height: 68
                                 visible: root.editMode === "PARENT"
-                                color: Colors.dark
-                                border.width: 1
-                                border.color:
+                                fillColor: Colors.dark
+                                borderWidth: 1
+                                borderColor:
                                     root.stackParentBlockReason(
                                         parentEditor.text
                                     )
                                     ? Colors.orange
                                     : Colors.green
+                                inset: 7
 
                                 Column {
-                                    anchors {
-                                        fill: parent
-                                        margins: 7
-                                    }
+                                    anchors.fill: parent
                                     spacing: 4
 
                                     GohuText {
@@ -2902,21 +2898,19 @@ Item {
                                 accent: Colors.green
                             }
 
-                            Rectangle {
+                            SectionFrame {
                                 width: parent.width
                                 height: 72
-                                color: Colors.dark
-                                border.width: 1
-                                border.color:
+                                fillColor: Colors.dark
+                                borderWidth: 1
+                                borderColor:
                                     root.newBranchBlockReason()
                                     ? Colors.orange
                                     : Colors.green
+                                inset: 7
 
                                 Column {
-                                    anchors {
-                                        fill: parent
-                                        margins: 7
-                                    }
+                                    anchors.fill: parent
                                     spacing: 4
 
                                     GohuText {
@@ -3249,18 +3243,16 @@ Item {
                                     }
                                 }
 
-                                Rectangle {
+                                SectionFrame {
                                     width: parent.width
                                     height: 72
-                                    color: Colors.dark
-                                    border.width: 1
-                                    border.color: Colors.blue
+                                    fillColor: Colors.dark
+                                    borderWidth: 1
+                                    borderColor: Colors.blue
+                                    inset: 7
 
                                     Column {
-                                        anchors {
-                                            fill: parent
-                                            margins: 7
-                                        }
+                                        anchors.fill: parent
                                         spacing: 4
 
                                         GohuText {
@@ -3369,24 +3361,22 @@ Item {
                             spacing: 8
                             visible: root.managementMode === "restack"
 
-                            Rectangle {
+                            SectionFrame {
                                 width: parent.width
                                 height: 86
-                                color: Colors.dark
-                                border.width: 1
-                                border.color:
+                                fillColor: Colors.dark
+                                borderWidth: 1
+                                borderColor:
                                     stackExecutor && stackExecutor.armed
                                     ? Colors.orange
                                     : stackPlanner
                                       && stackPlanner.invalidCount > 0
                                     ? Colors.red
                                     : Colors.cyan
+                                inset: 7
 
                                 Column {
-                                    anchors {
-                                        fill: parent
-                                        margins: 7
-                                    }
+                                    anchors.fill: parent
                                     spacing: 4
 
                                     FactRow {
@@ -4188,23 +4178,21 @@ Item {
                             }
                         }
 
-                        Rectangle {
+                        SectionFrame {
                             width: parent.width
                             height: 52
-                            color: Colors.dark
-                            border.width: 1
-                            border.color:
+                            fillColor: Colors.dark
+                            borderWidth: 1
+                            borderColor:
                                 root.managementMessage.indexOf("REFUSED") === 0
                                 ? Colors.red
                                 : root.managementMessage.indexOf("ARMED") === 0
                                 ? Colors.orange
                                 : Colors.cyan
+                            inset: 7
 
                             GohuText {
-                                anchors {
-                                    fill: parent
-                                    margins: 7
-                                }
+                                anchors.fill: parent
                                 text:
                                     root.managementMessage
                                     || (

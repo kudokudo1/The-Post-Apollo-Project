@@ -256,21 +256,21 @@ Rectangle {
             }
         }
 
-        Rectangle {
+        SectionFrame {
             width: parent.width
             height: 46
-            color: Colors.black
-            border.width: 1
-            border.color:
+            fillColor: Colors.black
+            borderWidth: 1
+            borderColor:
                 rebaseService.lastError
                 ? Colors.red
                 : rebaseService.armed
                 ? Colors.orange
                 : Colors.cyan
+            inset: 7
 
             Row {
                 anchors.fill: parent
-                anchors.margins: 7
                 spacing: 8
 
                 GohuText {
@@ -495,16 +495,16 @@ Rectangle {
                 }
             }
 
-            Rectangle {
+            SectionFrame {
                 width: parent.width - Math.floor(parent.width * 0.57) - 8
                 height: parent.height
-                color: Colors.black
-                border.width: 1
-                border.color: Colors.magenta
+                fillColor: Colors.black
+                borderWidth: 1
+                borderColor: Colors.magenta
+                inset: 8
 
                 Column {
                     anchors.fill: parent
-                    anchors.margins: 8
                     spacing: 7
 
                     GohuText {
@@ -627,16 +627,16 @@ Rectangle {
                             )
                     }
 
-                    Rectangle {
+                    SectionFrame {
                         width: parent.width
                         height: 58
-                        color: Colors.dark
-                        border.width: 1
-                        border.color: Colors.orange
+                        fillColor: Colors.dark
+                        borderWidth: 1
+                        borderColor: Colors.orange
+                        inset: 7
 
                         GohuText {
                             anchors.fill: parent
-                            anchors.margins: 7
                             text:
                                 "AVAILABLE // PICK · REWORD · SQUASH · "
                                 + "FIXUP · DROP · EDIT\n"
@@ -709,21 +709,21 @@ Rectangle {
             }
         }
 
-        Rectangle {
+        SectionFrame {
             width: parent.width
             height: 40
-            color: Colors.black
-            border.width: 1
-            border.color:
+            fillColor: Colors.black
+            borderWidth: 1
+            borderColor:
                 rebaseService.lastError
                 ? Colors.red
                 : rebaseService.armed
                 ? Colors.orange
                 : Colors.cyan
+            inset: 7
 
             GohuText {
                 anchors.fill: parent
-                anchors.margins: 7
                 verticalAlignment: Text.AlignVCenter
                 text:
                     rebaseService.lastError

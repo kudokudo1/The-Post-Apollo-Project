@@ -1458,18 +1458,16 @@ Item {
 }
                 }
 
-                Rectangle {
+                SectionFrame {
                     width: parent.width - 528
                     height: parent.height
-                    color: Colors.black
-                    border.width: 1
-                    border.color: Colors.orange
+                    fillColor: Colors.black
+                    borderWidth: 1
+                    borderColor: Colors.orange
+                    inset: 7
 
                     Column {
-                        anchors {
-                            fill: parent
-                            margins: 7
-                        }
+                        anchors.fill: parent
                         spacing: 5
 
                         Row {
@@ -1921,21 +1919,19 @@ Item {
                             }
                         }
 
-                        Rectangle {
+                        SectionFrame {
                             width: parent.width
                             height: 52
-                            color: Colors.black
-                            border.width: 1
-                            border.color:
+                            fillColor: Colors.black
+                            borderWidth: 1
+                            borderColor:
                                 root.queryHasFilters()
                                 ? Colors.green
                                 : Colors.cyan
+                            inset: 6
 
                             GohuText {
-                                anchors {
-                                    fill: parent
-                                    margins: 6
-                                }
+                                anchors.fill: parent
                                 text: root.queryFilterSummary()
                                 font.pixelSize: 9
                                 color:
@@ -2368,18 +2364,16 @@ Item {
                     }
                 }
 
-                Rectangle {
+                SectionFrame {
                     width: parent.width - 478
                     height: parent.height
-                    color: Colors.black
-                    border.width: 1
-                    border.color: Colors.cyan
+                    fillColor: Colors.black
+                    borderWidth: 1
+                    borderColor: Colors.cyan
+                    inset: 8
 
                     Column {
-                        anchors {
-                            fill: parent
-                            margins: 8
-                        }
+                        anchors.fill: parent
                         spacing: 7
 
                         SectionLabel {
@@ -2615,18 +2609,16 @@ Item {
                 spacing: 8
                 visible: root.subMode === "compare"
 
-                Rectangle {
+                SectionFrame {
                     width: 360
                     height: parent.height
-                    color: Colors.dark
-                    border.width: 1
-                    border.color: Colors.orange
+                    fillColor: Colors.dark
+                    borderWidth: 1
+                    borderColor: Colors.orange
+                    inset: 8
 
                     Column {
-                        anchors {
-                            fill: parent
-                            margins: 8
-                        }
+                        anchors.fill: parent
                         spacing: 8
 
                         SectionLabel {
@@ -2799,18 +2791,16 @@ Item {
                 spacing: 8
                 visible: root.subMode === "operate"
 
-                Rectangle {
+                SectionFrame {
                     width: 430
                     height: parent.height
-                    color: Colors.dark
-                    border.width: 1
-                    border.color: Colors.red
+                    fillColor: Colors.dark
+                    borderWidth: 1
+                    borderColor: Colors.red
+                    inset: 8
 
                     Column {
-                        anchors {
-                            fill: parent
-                            margins: 8
-                        }
+                        anchors.fill: parent
                         spacing: 7
 
                         SectionLabel {

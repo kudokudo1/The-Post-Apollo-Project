@@ -76,4 +76,14 @@ for needle, message in (
 assert "Rectangle {\n                id: queuePane" not in WORKFLOW_LIBRARY
 assert "Rectangle {\n            id: workflowPane" not in WORKFLOW_LIBRARY
 
+# Additional flat-workbench proof consumers preserve their original shell values.
+for needle, message in (
+    ("SectionFrame {\n                        id: procedureReport", "procedure report must use SectionFrame"),
+    ("fillColor: Colors.black\n                        borderWidth: 1\n                        borderColor:\n                            root.githubService.batchStepFailureCount > 0\n                            ? Colors.red\n                            : Colors.cyan\n                        inset: 5", "procedure report dynamic border and inset"),
+    ("fillColor: Colors.dark\n                borderWidth: 1\n                borderColor: Colors.blue\n                inset: 8", "saved sets pane visual/inset values"),
+):
+    require(WORKFLOW_LIBRARY, needle, message)
+
+assert "Rectangle {\n                        id: procedureReport" not in WORKFLOW_LIBRARY
+
 print("Section frame contracts: PASS")

@@ -244,7 +244,7 @@ Item {
                             : Colors.cyan
                     }
 
-                    Rectangle {
+                    SectionFrame {
                         id: procedureReport
 
                         width: parent.width
@@ -255,18 +255,16 @@ Item {
                         visible:
                             root.githubService.batchStepResults.length > 0
 
-                        color: Colors.black
-                        border.width: 1
-                        border.color:
+                        fillColor: Colors.black
+                        borderWidth: 1
+                        borderColor:
                             root.githubService.batchStepFailureCount > 0
                             ? Colors.red
                             : Colors.cyan
+                        inset: 5
 
                         Column {
-                            anchors {
-                                fill: parent
-                                margins: 5
-                            }
+                            anchors.fill: parent
                             spacing: 3
 
                             GohuText {
@@ -688,19 +686,17 @@ Item {
                 }
             }
 
-            Rectangle {
+            SectionFrame {
                 width: parent.width
                 height: parent.height - queuePane.height - 10
 
-                color: Colors.dark
-                border.width: 1
-                border.color: Colors.blue
+                fillColor: Colors.dark
+                borderWidth: 1
+                borderColor: Colors.blue
+                inset: 8
 
                 Column {
-                    anchors {
-                        fill: parent
-                        margins: 8
-                    }
+                    anchors.fill: parent
 
                     spacing: 6
 

@@ -413,6 +413,7 @@ APPCONTROL_LEFT_ONLY_ACTIONS = (
     "runAction", "runKittyAction", "runFloatAction", "runFullscreenAction", "runToolboxAction",
     "hiddenActionButton", "hiddenBottleAction", "hiddenToolboxAction",
     "appBottleAction", "appToolboxAction",
+    "hiddenKillAction", "appMuteAction", "windowMuteAction", "runKillAction",
 )
 for control_id in APPCONTROL_LEFT_ONLY_ACTIONS:
     marker_pos = APPCONTROL.index(f"id: {control_id}")
@@ -424,3 +425,73 @@ for control_id in APPCONTROL_LEFT_ONLY_ACTIONS:
     ), f"{control_id} root accepted-buttons fidelity"
 
 print("AppControl alternate launch ActionButton migration: PASS")
+
+
+# Sixth AppControl proof migration: remaining simple mute/kill surfaces share
+# ActionButton while preserving green audio identity and destructive red states.
+MUTE_KILL_ACTIONS = {
+    "hiddenKillAction": "hiddenKillActionMouse",
+    "appMuteAction": "appMuteActionMouse",
+    "windowMuteAction": "windowMuteActionMouse",
+    "runKillAction": "runKillActionMouse",
+}
+
+for control_id, root_mouse in MUTE_KILL_ACTIONS.items():
+    marker = f"id: {control_id}"
+    marker_pos = APPCONTROL.index(marker)
+    block_start = APPCONTROL.rfind("ActionButton {", 0, marker_pos)
+    assert block_start >= 0, f"{control_id} must be hosted by ActionButton"
+    window = APPCONTROL[block_start:marker_pos + 7800]
+    assert f"id: {root_mouse}" not in window, f"{control_id} reintroduced its root pointer engine"
+    assert re.search(
+        r"pointerCursorShape:\s*Qt\.ArrowCursor\s*\n\s*acceptedButtons:\s*Qt\.LeftButton",
+        window,
+    ), f"{control_id} left-click-only donor contract"
+
+hidden_kill_marker = APPCONTROL.index("id: hiddenKillAction")
+hidden_kill_window = APPCONTROL[hidden_kill_marker:hidden_kill_marker + 2600]
+for needle in (
+    "destructive: true",
+    "pressedFillColor: Colors.red",
+    "pressedBorderColor: Colors.black",
+    "softGlowMargin: 4",
+    "softGlowPressedOpacity: 0.92",
+):
+    require(hidden_kill_window, needle, "hidden KILL destructive fidelity")
+require(hidden_kill_window, "selectedDetailActionIndex === 6", "hidden KILL action index")
+
+app_mute_marker = APPCONTROL.index("id: appMuteAction")
+app_mute_window = APPCONTROL[app_mute_marker:app_mute_marker + 4400]
+for needle in (
+    "property var currentResult:",
+    "property int detailIndex:",
+    "property bool canMute:",
+    "available: canMute",
+    "unavailableOpacity: 0.42",
+    "idleSoftGlowColor: Colors.green",
+    "hoverSoftGlowColor: Colors.green",
+):
+    require(app_mute_window, needle, "application MUTE fidelity")
+
+window_mute_marker = APPCONTROL.index("id: windowMuteAction")
+window_mute_window = APPCONTROL[window_mute_marker:window_mute_marker + 3700]
+require(window_mute_window, "selectedDetailActionIndex === 5", "window MUTE action index")
+require(window_mute_window, "idleSoftGlowColor: Colors.green", "window MUTE green halo")
+require(window_mute_window, "hoverSoftGlowColor: Colors.green", "window MUTE hover halo")
+
+run_kill_marker = APPCONTROL.index("id: runKillAction")
+run_kill_window = APPCONTROL[run_kill_marker:run_kill_marker + 9000]
+for needle in (
+    "available: appControlWindow.runKillAvailable",
+    "unavailableOpacity: 0.48",
+    "destructive: true",
+    "pressedFillColor: Colors.red",
+    "pressedBorderColor: Colors.black",
+    "softGlowPressedOpacity: 0.92",
+    "selectedDetailActionIndex === 5",
+    "id: runKillActionFavoriteStar",
+    "parent: runKillAction.interactionItem",
+):
+    require(run_kill_window, needle, "RUN KILL fidelity")
+
+print("AppControl mute/kill ActionButton migration: PASS")

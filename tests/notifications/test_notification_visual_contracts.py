@@ -16,10 +16,10 @@ def require(text: str, needle: str, message: str) -> None:
 # glow from the orange border so translucent glass does not turn orange.
 for needle, message in (
     ("property int frameInset: 8", "hub frame gutter"),
-    ("property int frameCloseGlowRadius: 5", "hub close glow radius"),
-    ("property real frameCloseGlowOpacity: 0.34", "hub close glow strength"),
+    ("property int frameCloseGlowRadius: 6", "hub close glow radius"),
+    ("property real frameCloseGlowOpacity: 0.58", "hub close glow strength"),
     ("property int frameWideGlowRadius: 8", "hub wide glow radius"),
-    ("property real frameWideGlowOpacity: 0.08", "hub wide glow strength"),
+    ("property real frameWideGlowOpacity: 0.16", "hub wide glow strength"),
     ("Rectangle {\n            id: frameGlowSource", "hub border-only glow source"),
     ("safeSource: frameGlowSource", "hub border glow source wiring"),
     ("WindowPanelFrame {\n            id: frame", "shared hub chassis"),
@@ -51,13 +51,13 @@ assert "id: cardGlowSource" not in HUB
 assert "cardGlowRadius" not in HUB
 require(HUB, "clip: true", "history viewport clipping stays enabled")
 
-# Transient popup: preserve the visible 420x150 card and 20px right placement,
-# but move its top edge to exactly 2px and reserve side/bottom glow space.
+# Transient popup: preserve the visible 420x150 card, keep its top edge at
+# exactly 2px, and move it 3px farther right to a 17px visible-card margin.
 for needle, message in (
     ("implicitWidth: 444", "popup glow-host width"),
     ("implicitHeight: 164", "popup glow-host height"),
     ("top: 0", "popup native top margin"),
-    ("right: 8", "popup native right margin"),
+    ("right: 5", "popup native right margin"),
     ("topMargin: 2", "visible card two-pixel top placement"),
     ("leftMargin: 12", "popup left glow gutter"),
     ("rightMargin: 12", "popup right glow gutter"),

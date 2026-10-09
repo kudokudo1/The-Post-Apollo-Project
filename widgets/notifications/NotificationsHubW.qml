@@ -72,12 +72,12 @@ PanelWindow {
     // Outer window glow is border-sourced rather than a full-rectangle shadow.
     // This keeps orange light around the perimeter without tinting the
     // translucent purple glass through the center of the Hub.
-    property int frameCloseGlowRadius: 5
-    property int frameCloseGlowSamples: 7
-    property real frameCloseGlowOpacity: 0.34
+    property int frameCloseGlowRadius: 6
+    property int frameCloseGlowSamples: 9
+    property real frameCloseGlowOpacity: 0.58
     property int frameWideGlowRadius: 8
     property int frameWideGlowSamples: 11
-    property real frameWideGlowOpacity: 0.08
+    property real frameWideGlowOpacity: 0.16
 
     // History cards keep only a restrained local aura. Their combined
     // gutter/spacing is intentionally close to the old pre-glow density.
@@ -856,7 +856,11 @@ PanelWindow {
             anchors.margins: root.frameInset
 
             color: "transparent"
-            border.width: 2
+
+            // This border is only the effect source. Making it thicker gives
+            // the blur enough orange energy without changing the visible 2px
+            // frame rendered by WindowPanelFrame below.
+            border.width: 4
             border.color: Colors.orange
             z: -2
         }

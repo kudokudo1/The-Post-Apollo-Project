@@ -1036,6 +1036,22 @@ PanelWindow {
             return;
         }
 
+        if (target === "attention") {
+            root.openAttention();
+            return;
+        }
+
+        if (target === "merge_queue") {
+            const repo = String(githubService.repoSlug || "").trim();
+
+            if (/^[^/\s]+\/[^/\s]+$/.test(repo))
+                root.openAttentionQueue(repo, "");
+            else
+                root.openAttention();
+
+            return;
+        }
+
         if (target === "rounds") {
             root.openRounds();
             return;

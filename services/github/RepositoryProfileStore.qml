@@ -46,6 +46,75 @@ Scope {
         queue = [];
     }
 
+    function slugSet(values) {
+        const rows = Array.isArray(values) ? values : [];
+        const out = ({});
+
+        for (let i = 0; i < rows.length; ++i) {
+            const slug = String(rows[i] || "").trim();
+
+            if (slug)
+                out[slug] = true;
+        }
+
+        return out;
+    }
+
+    function pruneQueue(validSlugs) {
+        const valid = slugSet(validSlugs);
+        const before = queue.length;
+
+        queue = queue.filter(function(slug) {
+            return !!valid[String(slug || "").trim()];
+        });
+
+        return before - queue.length;
+    }
+
+    function pruneSet(record, validSlugs) {
+        if (!record)
+            return 0;
+
+        const index = setIndex(String(record.name || ""));
+
+        if (index < 0)
+            return 0;
+
+        const valid = slugSet(validSlugs);
+        const source = savedSets[index] || {};
+        const targets =
+            Array.isArray(source.targets)
+            ? source.targets
+            : [];
+        const kept = targets.filter(function(slug) {
+            return !!valid[String(slug || "").trim()];
+        });
+        const removed = targets.length - kept.length;
+
+        if (removed <= 0)
+            return 0;
+
+        const updated = {
+            name: String(source.name || ""),
+            targets: kept,
+            visibility: String(source.visibility || "keep"),
+            topicMode: String(source.topicMode || "add"),
+            topics: Array.isArray(source.topics)
+                ? source.topics.slice()
+                : [],
+            descriptionMode: String(source.descriptionMode || "keep"),
+            description: String(source.description || ""),
+            repositoryName: String(source.repositoryName || "")
+        };
+
+        const next = savedSets.slice();
+        next[index] = updated;
+        savedSets = next;
+        persistSets();
+
+        return removed;
+    }
+
     function setIndex(name) {
         const needle = String(name || "").trim();
 

@@ -10,6 +10,13 @@ WORKFLOW_LIBRARY = (ROOT / "widgets/WorkflowLibraryView.qml").read_text(encoding
 REPOSITORY_PROFILE = (ROOT / "widgets/RepositoryProfileView.qml").read_text(encoding="utf-8")
 HOSPITAL_CHARTS = (ROOT / "widgets/HospitalChartsView.qml").read_text(encoding="utf-8")
 GIT_REPOSITORY = (ROOT / "widgets/GitRepositoryView.qml").read_text(encoding="utf-8")
+GIT_CHANGES = (ROOT / "widgets/GitChangesView.qml").read_text(encoding="utf-8")
+GIT_TRANSFER = (ROOT / "widgets/GitChangeTransferView.qml").read_text(encoding="utf-8")
+GIT_CONFLICT_EDITOR = (ROOT / "widgets/GitConflictEditorView.qml").read_text(encoding="utf-8")
+GIT_OPERATIONS = (ROOT / "widgets/GitOperationsView.qml").read_text(encoding="utf-8")
+GITHUB_ISSUE = (ROOT / "widgets/GitHubIssueControlView.qml").read_text(encoding="utf-8")
+GITHUB_PROJECTS = (ROOT / "widgets/GitHubProjectsView.qml").read_text(encoding="utf-8")
+GITHUB_PR = (ROOT / "widgets/GitHubPullRequestControlView.qml").read_text(encoding="utf-8")
 
 
 def require(text: str, needle: str, message: str) -> None:
@@ -117,5 +124,23 @@ for needle, message in (
     ("SectionFrame {\n                    width: 560\n                    height: parent.height\n                    fillColor: Colors.dark\n                    borderWidth: 1\n                    borderColor: Colors.green\n                    inset: 7", "local config pane"),
 ):
     require(GIT_REPOSITORY, needle, message)
+
+# Broad flat-workbench rollout: representative values in every migrated view.
+for text_value, needle, message in (
+    (GIT_CHANGES, "height: 62\n            fillColor: Colors.dark\n            borderWidth: 1\n            borderColor: Colors.cyan\n            inset: 8", "Git Changes header"),
+    (GIT_CHANGES, "width: parent.width - 438\n                    height: parent.height\n                    fillColor: Colors.black\n                    borderWidth: 1\n                    borderColor: Colors.magenta\n                    inset: 7", "Git Changes diff shell"),
+    (GIT_TRANSFER, "height: 46\n            fillColor: Colors.black\n            borderWidth: 1\n            borderColor: Colors.orange\n            inset: 7", "transfer scope notice"),
+    (GIT_TRANSFER, "root.previewMatchesSelection\n                            ? Colors.green\n                            : Colors.cyan\n                        inset: 7", "transfer preview shell"),
+    (GIT_CONFLICT_EDITOR, "conflictService.unresolvedCount > 0\n                ? Colors.orange\n                : Colors.green\n            inset: 6", "conflict editor status shell"),
+    (GIT_OPERATIONS, "width: parent.width - operationList.parent.width - 8\n                height: parent.height\n                fillColor: Colors.dark\n                borderWidth: 1\n                borderColor: Colors.magenta\n                inset: 9", "operations detail shell"),
+    (GIT_OPERATIONS, "root.statusText.indexOf(\"REFUSED\") >= 0\n                ? Colors.red\n                : Colors.cyan\n            inset: 8", "operations footer shell"),
+    (GITHUB_ISSUE, "height: 52\n            fillColor: Colors.black\n            borderWidth: 1\n            borderColor: Colors.magenta\n            inset: 7", "issue header shell"),
+    (GITHUB_ISSUE, "visible: !root.createMode\n                    width: parent.width\n                    height: 80\n                    fillColor: Colors.black\n                    borderWidth: 1\n                    borderColor: Colors.red\n                    inset: 8", "issue close shell"),
+    (GITHUB_PROJECTS, "fillColor: Colors.dark\n                borderWidth: 1\n                borderColor: Colors.cyan\n                inset: 10", "projects primary shell"),
+    (GITHUB_PR, "height: 52\n            fillColor: Colors.black\n            borderWidth: 1\n            borderColor: Colors.magenta\n            inset: 7", "pull request header shell"),
+    (GITHUB_PR, "height: 78\n                    fillColor: Colors.black\n                    borderWidth: 1\n                    borderColor: Colors.red\n                    inset: 8", "pull request merge shell"),
+    (GITHUB_PR, "? Colors.orange\n                    : Colors.blue\n                inset: 8", "pull request preview shell"),
+):
+    require(text_value, needle, message)
 
 print("Section frame contracts: PASS")

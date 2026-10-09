@@ -28,6 +28,12 @@ GIT_BRANCHES = (ROOT / "widgets/GitBranchesView.qml").read_text(encoding="utf-8"
 GIT_HISTORY = (ROOT / "widgets/GitHistoryView.qml").read_text(encoding="utf-8")
 GITHUB_WORK_ITEMS = (ROOT / "widgets/GitHubWorkItemsView.qml").read_text(encoding="utf-8")
 GIT_REBASE = (ROOT / "widgets/GitInteractiveRebaseView.qml").read_text(encoding="utf-8")
+HOSPITAL_ARCHIVE = (ROOT / "widgets/HospitalArchiveView.qml").read_text(encoding="utf-8")
+HOSPITAL_ASSIGNMENTS = (ROOT / "widgets/HospitalAssignmentsView.qml").read_text(encoding="utf-8")
+HOSPITAL_CHART_SUGGESTIONS = (ROOT / "widgets/HospitalChartSuggestionsView.qml").read_text(encoding="utf-8")
+HOSPITAL_GITHUB_ATTENTION = (ROOT / "widgets/HospitalGitHubAttentionView.qml").read_text(encoding="utf-8")
+HOSPITAL_GITHUB_MERGE_QUEUE = (ROOT / "widgets/HospitalGitHubMergeQueueView.qml").read_text(encoding="utf-8")
+HOSPITAL_ROOM_REPORTS = (ROOT / "widgets/HospitalRoomReportsView.qml").read_text(encoding="utf-8")
 
 
 def require(text: str, needle: str, message: str) -> None:
@@ -181,6 +187,19 @@ for text_value, needle, message in (
     (GITHUB_WORK_ITEMS, "height: 54\n            fillColor: Colors.dark\n            borderWidth: 1\n            borderColor: Colors.cyan\n            inset: 8", "work items header shell"),
     (GIT_REBASE, "rebaseService.lastError\n                ? Colors.red\n                : rebaseService.armed\n                ? Colors.orange\n                : Colors.cyan\n            inset: 7", "interactive rebase status shell"),
     (GIT_REBASE, "width: parent.width - Math.floor(parent.width * 0.57) - 8\n                height: parent.height\n                fillColor: Colors.black\n                borderWidth: 1\n                borderColor: Colors.magenta\n                inset: 8", "interactive rebase control shell"),
+):
+    require(text_value, needle, message)
+
+# Collision-free Hospital flat-workbench rollout.
+for text_value, needle, message in (
+    (HOSPITAL_ARCHIVE, "height: 42\n            fillColor: Colors.dark\n            borderWidth: 1\n            borderColor: Colors.cyan\n            inset: 8", "Hospital archive header"),
+    (HOSPITAL_ARCHIVE, "root.selectedEvent\n                    ? root.attentionColor(root.selectedEvent)\n                    : Colors.cyan\n                inset: 9", "Hospital archive detail pane"),
+    (HOSPITAL_ASSIGNMENTS, "height: 52\n            fillColor: Colors.black\n            borderWidth: 1\n            borderColor: Colors.orange\n            inset: 7", "Hospital assignments header"),
+    (HOSPITAL_CHART_SUGGESTIONS, "height: 54\n            fillColor: Colors.black\n            borderWidth: 1\n            borderColor: Colors.orange\n            inset: 7", "Hospital chart suggestions header"),
+    (HOSPITAL_CHART_SUGGESTIONS, "root.selectedSuggestion\n                    ? Colors.orange\n                    : Colors.blue\n                inset: 10", "Hospital chart suggestion detail"),
+    (HOSPITAL_GITHUB_ATTENTION, "height: 54\n            fillColor: Colors.black\n            borderWidth: 1\n            borderColor: Colors.red\n            inset: 7", "Hospital GitHub attention header"),
+    (HOSPITAL_GITHUB_MERGE_QUEUE, "height: 56\n            fillColor: Colors.black\n            borderWidth: 1\n            borderColor: Colors.blue\n            inset: 7", "Hospital merge queue header"),
+    (HOSPITAL_ROOM_REPORTS, "root.selectedReport\n                    ? root.evidenceColor(root.selectedReport)\n                    : Colors.magenta\n                inset: 10", "Hospital room reports detail pane"),
 ):
     require(text_value, needle, message)
 

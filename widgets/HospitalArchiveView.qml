@@ -198,18 +198,16 @@ Item {
         anchors.fill: parent
         spacing: 8
 
-        Rectangle {
+        SectionFrame {
             width: parent.width
             height: 42
-            color: Colors.dark
-            border.width: 1
-            border.color: Colors.cyan
+            fillColor: Colors.dark
+            borderWidth: 1
+            borderColor: Colors.cyan
+            inset: 8
 
             Row {
-                anchors {
-                    fill: parent
-                    margins: 8
-                }
+                anchors.fill: parent
 
                 spacing: 12
 
@@ -504,23 +502,21 @@ Item {
                 }
             }
 
-            Rectangle {
+            SectionFrame {
                 width: parent.width
                     - Math.floor((parent.width - parent.spacing) * 0.58)
                     - parent.spacing
                 height: parent.height
-                color: Colors.dark
-                border.width: 1
-                border.color:
+                fillColor: Colors.dark
+                borderWidth: 1
+                borderColor:
                     root.selectedEvent
                     ? root.attentionColor(root.selectedEvent)
                     : Colors.cyan
+                inset: 9
 
                 Column {
-                    anchors {
-                        fill: parent
-                        margins: 9
-                    }
+                    anchors.fill: parent
 
                     spacing: 7
 

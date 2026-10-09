@@ -122,16 +122,16 @@ Rectangle {
         anchors.margins: 9
         spacing: 8
 
-        Rectangle {
+        SectionFrame {
             width: parent.width
             height: 54
-            color: Colors.black
-            border.width: 1
-            border.color: Colors.orange
+            fillColor: Colors.black
+            borderWidth: 1
+            borderColor: Colors.orange
+            inset: 7
 
             Row {
                 anchors.fill: parent
-                anchors.margins: 7
                 spacing: 7
 
                 Column {
@@ -305,23 +305,21 @@ Rectangle {
                 }
             }
 
-            Rectangle {
+            SectionFrame {
                 width: parent.width
                     - Math.max(300, parent.width * 0.42)
                     - parent.spacing
                 height: parent.height
-                color: Colors.dark
-                border.width: 1
-                border.color:
+                fillColor: Colors.dark
+                borderWidth: 1
+                borderColor:
                     root.selectedSuggestion
                     ? Colors.orange
                     : Colors.blue
+                inset: 10
 
                 Column {
-                    anchors {
-                        fill: parent
-                        margins: 10
-                    }
+                    anchors.fill: parent
                     spacing: 7
 
                     GohuText {

@@ -933,18 +933,16 @@ Item {
         anchors.fill: parent
         spacing: 8
 
-        Rectangle {
+        SectionFrame {
             width: parent.width
             height: 62
-            color: Colors.dark
-            border.width: 1
-            border.color: Colors.orange
+            fillColor: Colors.dark
+            borderWidth: 1
+            borderColor: Colors.orange
+            inset: 8
 
             Row {
-                anchors {
-                    fill: parent
-                    margins: 8
-                }
+                anchors.fill: parent
                 spacing: 8
 
                 Column {
@@ -1434,18 +1432,16 @@ Item {
                             }
                         }
 
-                        Rectangle {
+                        SectionFrame {
                             width: parent.width
                             height: 82
-                            color: Colors.dark
-                            border.width: 1
-                            border.color: Colors.magenta
+                            fillColor: Colors.dark
+                            borderWidth: 1
+                            borderColor: Colors.magenta
+                            inset: 7
 
                             Column {
-                                anchors {
-                                    fill: parent
-                                    margins: 7
-                                }
+                                anchors.fill: parent
                                 spacing: 4
 
                                 GohuText {
@@ -1836,41 +1832,37 @@ Item {
 }
                 }
 
-                Rectangle {
+                SectionFrame {
                     width: parent.width - 478
                     height: parent.height
-                    color: Colors.black
-                    border.width: 1
-                    border.color: Colors.magenta
+                    fillColor: Colors.black
+                    borderWidth: 1
+                    borderColor: Colors.magenta
+                    inset: 8
 
                     Column {
-                        anchors {
-                            fill: parent
-                            margins: 8
-                        }
+                        anchors.fill: parent
                         spacing: 7
 
                         SectionLabel {
                             text: "TAG OPERATIONS"
                         }
 
-                        Rectangle {
+                        SectionFrame {
                             width: parent.width
                             height: 88
-                            color: Colors.dark
-                            border.width: 1
-                            border.color:
+                            fillColor: Colors.dark
+                            borderWidth: 1
+                            borderColor:
                                 root.selectedTag
                                 ? root.tagKindColor(
                                     root.selectedTagRow()
                                   )
                                 : Colors.orange
+                            inset: 7
 
                             Column {
-                                anchors {
-                                    fill: parent
-                                    margins: 7
-                                }
+                                anchors.fill: parent
                                 spacing: 4
 
                                 GohuText {
@@ -2070,19 +2062,17 @@ Item {
                             }
                         }
 
-                        Rectangle {
+                        SectionFrame {
                             width: parent.width
                             height: 42
-                            color: Colors.dark
-                            border.width: 1
-                            border.color:
+                            fillColor: Colors.dark
+                            borderWidth: 1
+                            borderColor:
                                 root.tagRemoteStateColor()
+                            inset: 7
 
                             GohuText {
-                                anchors {
-                                    fill: parent
-                                    margins: 7
-                                }
+                                anchors.fill: parent
                                 verticalAlignment: Text.AlignVCenter
                                 text: root.tagRemoteStatusText()
                                 font.pixelSize: 9
@@ -2573,18 +2563,16 @@ Item {
                 spacing: 8
                 visible: root.subMode === "config"
 
-                Rectangle {
+                SectionFrame {
                     width: 560
                     height: parent.height
-                    color: Colors.dark
-                    border.width: 1
-                    border.color: Colors.green
+                    fillColor: Colors.dark
+                    borderWidth: 1
+                    borderColor: Colors.green
+                    inset: 7
 
                     Column {
-                        anchors {
-                            fill: parent
-                            margins: 7
-                        }
+                        anchors.fill: parent
                         spacing: 5
 
                         Row {

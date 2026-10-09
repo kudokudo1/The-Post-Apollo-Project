@@ -26,8 +26,8 @@ for needle, label in (
     ('"MEMORY SUGGESTIONS // "', "suggestion review header"),
     ('"DOCTOR MEMORY PROPOSAL // #"', "proposal detail"),
     ('"PROVENANCE // ROOM "', "proposal provenance"),
-    ('label: "PROMOTE"', "promotion control"),
-    ('label: "REJECT"', "rejection control"),
+    ('? "PROMOTING" : "PROMOTE"', "promotion control"),
+    ('? "REJECTING" : "REJECT"', "rejection control"),
     ("OPERATOR DECISION NOTE // OPTIONAL", "decision note"),
     ("onSuggestionDecision(operation, result)", "decision refresh"),
 ):

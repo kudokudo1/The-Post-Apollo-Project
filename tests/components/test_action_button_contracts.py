@@ -106,6 +106,7 @@ for needle, message in (
     ("readonly property bool hovered:", "hover state contract"),
     ("readonly property bool pressed:", "press state contract"),
     ("property Item contentGlowSource:", "exact content glow targeting"),
+    ("property real softGlowMargin: 0", "lossless halo-margin preservation"),
     ("property bool wideGlowEnabled: false", "optional richer second halo"),
     ("signal triggered(var mouseEvent)", "primary action signal"),
     ("signal leftClicked(var mouseEvent)", "left-click signal"),
@@ -229,3 +230,33 @@ for relative, needles in GIT_ACTIONBUTTON_BATCH2.items():
     assert "RectangularShadow {" not in block, f"{relative} reintroduced local {component_name} halo"
 
 print("Git ActionButton batch 2: PASS")
+
+
+# First AppControl proof migration: the three resource FREEZE/THAW controls
+# share ActionButton state/pointer/halo machinery without absorbing selectors
+# or changing their mode-specific detail indices and artwork.
+APPCONTROL = (ROOT / "widgets/AppControlW.qml").read_text(encoding="utf-8")
+
+for control_id in ("appFreezeAction", "tabFreezeAction", "windowFreezeAction"):
+    marker = f"id: {control_id}"
+    marker_pos = APPCONTROL.index(marker)
+    block_start = APPCONTROL.rfind("ActionButton {", 0, marker_pos)
+    assert block_start >= 0, f"{control_id} must be hosted by ActionButton"
+
+    # The nearest old Rectangle declaration must not sit between the shared
+    # shell and the id marker.
+    rectangle_start = APPCONTROL.rfind("Rectangle {", 0, marker_pos)
+    assert rectangle_start < block_start, f"{control_id} fell back to a private Rectangle"
+
+    require(APPCONTROL[block_start:marker_pos + 2400], "available: canFreeze", f"{control_id} availability")
+    require(APPCONTROL[block_start:marker_pos + 2400], "suppressHover: appControlWindow.keyboardActive", f"{control_id} keyboard/mouse separation")
+    require(APPCONTROL[block_start:marker_pos + 2400], "softGlowMargin: 4", f"{control_id} preserved halo geometry")
+
+for private_mouse in (
+    "id: appFreezeActionMouse",
+    "id: tabFreezeActionMouse",
+    "id: windowFreezeActionMouse",
+):
+    assert private_mouse not in APPCONTROL, f"AppControl reintroduced private freeze pointer engine: {private_mouse}"
+
+print("AppControl freeze ActionButton migration: PASS")

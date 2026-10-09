@@ -1665,6 +1665,72 @@ Scope {
             d = String(plan.expectedIndexTree || "");
             e = String(plan.expectedWorktreeHash || "");
             f = String(plan.expectedUntrackedHash || "");
+        } else if (strategy === "UNDO_STASH_CREATE_EXACT") {
+            a = String(plan.branch || "");
+            b = String(plan.expectedHead || "");
+            c = String(plan.stashSha || "");
+            d = String(plan.mode || "");
+            e = String(plan.expectedAfterIndexTree || "");
+            f = String(plan.expectedAfterWorktreeHash || "");
+            g =
+                String(plan.expectedAfterUntrackedHash || "")
+                + "\t"
+                + String(plan.expectedAfterUntrackedContentHash || "")
+                + "\t"
+                + String(plan.restoreIndexTree || "")
+                + "\t"
+                + String(plan.restoreWorktreeHash || "")
+                + "\t"
+                + String(plan.restoreUntrackedHash || "")
+                + "\t"
+                + String(plan.restoreUntrackedContentHash || "")
+                + "\t"
+                + (
+                    Array.isArray(plan.beforeStack)
+                    ? plan.beforeStack.join(",")
+                    : ""
+                  )
+                + "\t"
+                + (
+                    Array.isArray(plan.afterStack)
+                    ? plan.afterStack.join(",")
+                    : ""
+                  );
+        } else if (strategy === "UNDO_STASH_APPLY_REF"
+                || strategy === "UNDO_STASH_POP_REF"
+                || strategy === "UNDO_STASH_DROP_REF") {
+            a = String(plan.branch || "");
+            b = String(plan.expectedHead || "");
+            c = String(plan.selectedStashSha || "");
+            d = String(plan.selectedRef || "");
+            e = String(plan.expectedAfterIndexTree || "");
+            f = String(plan.expectedAfterWorktreeHash || "");
+            g =
+                String(plan.expectedAfterUntrackedHash || "")
+                + "\t"
+                + String(plan.expectedAfterUntrackedContentHash || "")
+                + "\t"
+                + String(plan.restoreIndexTree || "")
+                + "\t"
+                + String(plan.restoreWorktreeHash || "")
+                + "\t"
+                + String(plan.restoreUntrackedHash || "")
+                + "\t"
+                + String(plan.restoreUntrackedContentHash || "")
+                + "\t"
+                + (
+                    Array.isArray(plan.beforeStack)
+                    ? plan.beforeStack.join(",")
+                    : ""
+                  )
+                + "\t"
+                + (
+                    Array.isArray(plan.afterStack)
+                    ? plan.afterStack.join(",")
+                    : ""
+                  )
+                + "\t"
+                + (plan.useIndex ? "1" : "0");
         } else if (strategy === "UNDO_STASH_APPLY_CLEAN"
                 || strategy === "UNDO_STASH_POP_TOP"
                 || strategy === "UNDO_STASH_DROP_TOP") {

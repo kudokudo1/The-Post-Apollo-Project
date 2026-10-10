@@ -571,6 +571,69 @@ PanelWindow {
                     color: Colors.cyan
                     font.pixelSize: 16
                 }
+
+                // Temporary read-only evidence bench. PipeWire media.name
+                // often differs from an MPRIS track title, which must be
+                // inspected before attempting any more automatic matching.
+                // Do not infer browser-tab ownership from these observations.
+                Column {
+                    id: audioEvidenceRows
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.topMargin: 32
+                    spacing: 4
+                    visible: deck.transportMode === "mpris"
+                             && deck.audioTargetResolution.mode !== "AUTO_TITLE"
+
+                    GohuText {
+                        text: "STREAM EVIDENCE / READ ONLY"
+                              + (deck.audioCandidateInputs.length > 3
+                                 ? " / FIRST 3 OF " + deck.audioCandidateInputs.length
+                                 : "")
+                        color: Colors.orange
+                        font.pixelSize: 10
+                    }
+
+                    Repeater {
+                        model: deck.audioCandidateInputs.slice(0, 3)
+
+                        Column {
+                            id: candidateEvidenceRow
+                            required property var modelData
+                            width: audioEvidenceRows.width
+                            spacing: 0
+
+                            GohuText {
+                                width: parent.width
+                                text: "#" + candidateEvidenceRow.modelData.index
+                                      + "  MEDIA: "
+                                      + String((candidateEvidenceRow.modelData.properties || {})
+                                               ["media.name"] || "(none)")
+                                color: Colors.cyan
+                                font.pixelSize: 11
+                                elide: Text.ElideRight
+                            }
+
+                            GohuText {
+                                width: parent.width
+                                text: "APP: "
+                                      + String((candidateEvidenceRow.modelData.properties || {})
+                                               ["application.name"] || "(none)")
+                                      + "  /  BIN: "
+                                      + String((candidateEvidenceRow.modelData.properties || {})
+                                               ["application.process.binary"] || "(none)")
+                                      + "  /  PID: "
+                                      + String((candidateEvidenceRow.modelData.properties || {})
+                                               ["application.process.id"] || "(none)")
+                                color: Colors.white
+                                opacity: 0.75
+                                font.pixelSize: 10
+                                elide: Text.ElideRight
+                            }
+                        }
+                    }
+                }
             }
 
             // Zone C — first tactile transport test, not the final hardware.

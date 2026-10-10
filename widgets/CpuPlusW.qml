@@ -857,7 +857,9 @@ PanelWindow {
                                         return modeButton.contentColor;
                                     });
                                     item.glowColor = Qt.binding(function() {
-                                        return modeButton.isHovered
+                                        return modeButton.isSelected
+                                               ? Colors.magenta
+                                               : modeButton.isHovered
                                                ? Colors.orange
                                                : Colors.cyan;
                                     });
@@ -910,42 +912,53 @@ PanelWindow {
                                 minimumPixelSize: 10
 
                                 color: modeButton.contentColor
+                            }
 
-                                layer.enabled: !modeButton.isPressed
-                                layer.effect: DropShadow {
-                                    horizontalOffset: 0
-                                    verticalOffset: 0
-
-                                    radius:
-                                        modeButton.isHovered
-                                        ? 14
-                                        : modeButton.isSelected
-                                        ? 12
-                                        : 10
-                                    samples: 11
-
-                                    opacity:
-                                        modeButton.isHovered
-                                        ? 0.82
-                                        : 0.58
-
-                                    color:
-                                        modeButton.isHovered
-                                        ? Colors.orange
-                                        : Colors.cyan
-
-                                    transparentBorder: true
-                                }
+                            // AppControl's icon carries the strong state glow.
+                            // The sampled source is disconnected during reload.
+                            TextHashGlow {
+                                safeSource: textModeIcon
+                                foregroundColor: textModeIcon.color
+                                requestedVisible:
+                                    textModeIcon.visible && !modeButton.isPressed
+                                radius:
+                                    modeButton.isSelected ? 18
+                                    : modeButton.isHovered ? 14 : 10
+                                samples:
+                                    modeButton.isSelected ? 17
+                                    : modeButton.isHovered ? 9 : 7
+                                opacity:
+                                    modeButton.isSelected ? 1.0
+                                    : modeButton.isHovered ? 0.80 : 0.42
                             }
                         }
 
-                        GohuText {
+                        // AppControl hierarchy: secondary mode name stays dim
+                        // white while the icon takes the primary state color.
+                        QuietText {
+                            id: modeCaption
                             anchors.horizontalCenter: parent.horizontalCenter
 
                             text: modelData.name
-
                             font.pixelSize: 10
-                            color: modeButton.contentColor
+                            color: modeButton.isPressed
+                                   ? Colors.black : Colors.white
+                            quietOpacity:
+                                modeButton.isPressed ? 0.42
+                                : modeButton.isHovered || modeButton.isSelected
+                                ? 0.48 : 0.34
+                        }
+
+                        TextHashGlow {
+                            safeSource: modeCaption
+                            foregroundColor: modeCaption.color
+                            preferredGlowColor: Colors.white
+                            requestedVisible: !modeButton.isPressed
+                            radius: 5
+                            samples: 7
+                            opacity:
+                                modeButton.isHovered || modeButton.isSelected
+                                ? 0.10 : 0.06
                         }
                     }
 
@@ -966,53 +979,18 @@ PanelWindow {
                         }
                     }
 
-                    // Orange glow is invariant; only its reach/intensity changes.
-                    RectangularShadow {
-                        anchors.fill: parent
-
-                        spread:
-                            modeButton.isHovered
-                            ? 6
-                            : modeButton.isSelected
-                            ? 4
-                            : 2
-
-                        z: -1
-
-                        opacity:
-                            modeButton.isPressed
-                            ? 0.62
-                            : modeButton.isHovered
-                            ? 0.56
-                            : modeButton.isSelected
-                            ? 0.46
-                            : 0.10
-
-                        color: Colors.orange
+                    // MODE halo recipe: close orange perimeter behind the
+                    // face, wide wash IN FRONT, matching AppControl.
+                    ModeButtonCloseHalo {
+                        selected: modeButton.isSelected
+                        hovered: modeButton.isHovered
+                        pressed: modeButton.isPressed
                     }
 
-                    RectangularShadow {
-                        anchors.fill: parent
-
-                        spread:
-                            modeButton.isHovered
-                            ? 16
-                            : modeButton.isSelected
-                            ? 11
-                            : 7
-
-                        z: -2
-
-                        opacity:
-                            modeButton.isPressed
-                            ? 0.16
-                            : modeButton.isHovered
-                            ? 0.14
-                            : modeButton.isSelected
-                            ? 0.11
-                            : 0.035
-
-                        color: Colors.orange
+                    ModeButtonWideHalo {
+                        selected: modeButton.isSelected
+                        hovered: modeButton.isHovered
+                        pressed: modeButton.isPressed
                     }
                 }
             }

@@ -38,6 +38,14 @@ player/media session; audio mutations act only on the PipeWire target resolved b
   match may still represent application-level evidence rather than a real tab.
 - Brief text-to-speech output can add and remove sink-inputs during an experiment.
   Stream-count changes by themselves do not justify reassigning an audio target.
+- When automatic matching fails, the currently empty **CASSETTE BAY** displays a
+  temporary, read-only **STREAM EVIDENCE** panel with up to three matched
+  PipeWire streams. Each row shows the stream index, raw `media.name`,
+  application name, binary and PID. Compare those with the MPRIS title in
+  **DISPLAY / BROWSER**; a mismatch should be investigated, not worked around
+  by choosing the first stream. These are observations, not tab identities.
+  The evidence panel performs no mute or volume mutations and is hidden
+  when a unique automatic title match succeeds.
 
 ## Explicit, temporary stream tests
 

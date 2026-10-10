@@ -76,3 +76,26 @@ action description to QuietText simply because it was gray before.
 
 Do not automatically homogenize graph rendering, branded icons, special
 state treatments, notification backing surfaces, or error salience.
+
+## CPU++ main-mode pilot (review before wider adoption)
+
+The pilot changes **only** the four (data-driven) CPU++ main mode buttons in
+`widgets/CpuPlusW.qml`:
+
+- The two local mode halos become `ModeButtonCloseHalo` and
+  `ModeButtonWideHalo`, following AppControl's close-behind/wide-front rule.
+- The Gohu icon uses `TextHashGlow` with AppControl's idle/hover/selected
+  radius, samples and intensity. The specialized thermal icon keeps its
+  distinct four-glyph construction but now glows magenta when selected.
+- The small mode name uses `QuietText` and AppControl's subdued white
+  priority (0.34 idle, 0.48 active, 0.42 pressed). Its faint white glow is
+  configured independently.
+- CPU++'s original **90ms scaling**, hover/selection/press fill and border,
+  blinking faces, click callbacks and mode switching are unchanged.
+- **All other CPU++ controls, shared instrument bodies and chassis remain
+  untouched.** The chassis still uses its prior stronger glow until its own
+  separately approved rollout.
+
+Expected visible difference: a more prominent selected icon, much quieter
+mode name, subtle front-facing wash, and no idle mode-box perimeter glow.
+Screenshots are required before treating this pilot as visually approved.

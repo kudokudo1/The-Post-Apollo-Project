@@ -87,4 +87,29 @@ for name in names:
                       "Process {", "Keys.on"):
         assert forbidden not in source, (name, forbidden)
 
+# CPU++ pilot: migrate only the main mode face. The other selector,
+# submode, instrument and chassis appearances are intentionally unchanged.
+cpu = (ROOT / "widgets/CpuPlusW.qml").read_text(encoding="utf-8")
+mode_start = cpu.index("id: modeButton")
+mode_end = cpu.index("// TWO-BODY MONITOR ADAPTER", mode_start)
+mode = cpu[mode_start:mode_end]
+assert mode.count("ModeButtonCloseHalo {") == 1
+assert mode.count("ModeButtonWideHalo {") == 1
+assert "selected: modeButton.isSelected" in mode
+assert "hovered: modeButton.isHovered" in mode
+assert "pressed: modeButton.isPressed" in mode
+assert "TextHashGlow {" in mode
+assert "safeSource: textModeIcon" in mode
+assert "foregroundColor: textModeIcon.color" in mode
+assert "return modeButton.isSelected" in mode
+assert "? Colors.magenta" in mode
+assert "QuietText {" in mode
+assert "quietOpacity:" in mode
+assert "modeButton.isPressed ? 0.42" in mode
+assert "duration: 90" in mode
+assert "Easing.OutQuad" in mode
+assert "cpuPlusWindow.selectMode(index)" in mode
+assert "RectangularShadow {" not in mode
+assert "layer.effect: DropShadow {" not in mode
+
 print("Visual language semantic recipe contracts: PASS")

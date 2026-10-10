@@ -16,19 +16,23 @@
 The target is separate from MPRIS transport. Playback still controls the MPRIS
 player/media session; audio mutations act only on the PipeWire target resolved below.
 
-- **AUTO TARGET** removes an old manual selection and rechecks for exactly one
-  candidate whose raw PipeWire `media.name` matches the current MPRIS track
-  title. This is a narrow metadata correlation, **not certified tab ownership**.
-  If no unique exact match exists, the panel shows `NO AUDIO TARGET` and refuses
-  to arm an audio test. Never silently fall back to the first browser stream.
-- **NEXT STREAM** explicitly chooses a candidate. The manual choice is tied to
-  the current MPRIS player bus/title plus the selected stream index, PID, binary,
-  application ID and raw media-name observation. The 2-second stream refresh
-  must not silently switch that choice to another candidate.
-- If the manually selected stream disappears, its evidence changes, or a
-  different MPRIS media title becomes active, the audio target becomes
-  unavailable. Use **NEXT STREAM** to explicitly choose again or **AUTO TARGET**
-  to re-evaluate exact-title evidence.
+- **AUTO FOLLOW** is a persistent tracking mode, not a one-shot recheck.
+  It selects exactly one candidate only when raw PipeWire `media.name` matches
+  the current MPRIS track title. This is narrow metadata correlation,
+  **not certified tab ownership**. If the metadata does not uniquely match,
+  the panel shows `NO AUDIO TARGET` and refuses to arm an audio test. Never
+  silently fall back to the first browser stream.
+- **NEXT STREAM** explicitly overrides AUTO FOLLOW for the *current media
+  title*. The manual choice is tied to the current MPRIS player bus/title,
+  plus selected stream index, PID, binary, application ID and raw media name.
+  Its two-second refresh must not change this selection to another candidate.
+- When the MPRIS media title/player changes, the manual override expires and
+  the Hi-Fi returns to evidence-gated AUTO FOLLOW. Re-evaluation also runs on
+  audio discovery refreshes. The panel still fails closed when metadata is
+  missing or ambiguous; title changes are not proof of tab identity.
+- If a stream disappears or changes while **ARM TEST** is active, the next
+  experiment refuses to mutate a replacement stream. Use **ARM TEST** again
+  only after checking that the displayed target is correct.
 - The `TARGET:` line explains whether the result is a manually selected stream,
   a unique title match, stale, ambiguous, or unavailable. Even a unique title
   match may still represent application-level evidence rather than a real tab.
@@ -40,7 +44,7 @@ player/media session; audio mutations act only on the PipeWire target resolved b
 **CAUTION:** A stream may contain multiple browser tabs. These tests may therefore change the volume or mute of *both* tabs for three seconds. The probe attempts to restore original state, but a crash, forced kill, audio-device change, or conflicting policy could prevent restoration. Do not run it while relying on uninterrupted audio.
 
 - **NEXT STREAM** cycles manually among matched PipeWire sink-inputs. For cases with no exact-title auto match, select a stream before arming.
-- **ARM TEST** enables one next experiment, only with a resolved audio target. Selecting the action consumes the arm; tests never start automatically when the deck opens. A changed media session disarms the experiment.
+- **ARM TEST** enables one next experiment, only with a resolved audio target. Selecting the action consumes the arm; tests never start automatically when the deck opens. A changed media session disarms the experiment; a changed stream requires re-arming.
 - **MUTE / 3S** mutes the selected stream for three seconds and restores its previous mute state.
 - **VOLUME / 3S** temporarily halves the selected stream's original channel volumes for three seconds and restores the original values.
 - The experiment script validates the selected stream index against its observed PID/binary before touching it and before restoring it. It refuses to mutate streams whose identity cannot be checked. It does not claim this evidence identifies the browser tab.

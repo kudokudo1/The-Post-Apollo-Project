@@ -1,0 +1,19 @@
+import QtQuick
+import "../components"
+
+// Attach inside the chassis geometry as a sibling of its content. The
+// existing WindowPanelFrame keeps its own glow implementation for now;
+// migrate only after verifying stacking and surface opacity in runtime.
+Rectangle {
+    id: frame
+    width: 400
+    height: 300
+    color: Colors.black
+    border.width: 1
+    border.color: Colors.orange
+
+    ChassisGlow {
+        glowColor: Colors.orange
+        // Git's 6/.21 and 12/.05 are already the defaults.
+    }
+}

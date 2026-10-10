@@ -1,0 +1,82 @@
+import QtQuick
+import "../components"
+
+// Reference for a conventional mode button. For AppControl's BORDERLESS
+// rail set bordered: false and keep its particular icon/name hierarchy.
+// This is a template, NOT an automatic migration of any existing widget.
+Rectangle {
+    id: modeButton
+
+    property bool selected: false
+    property bool keyboardSelected: false
+    property bool bordered: true
+    readonly property bool hovered: pointer.containsMouse
+    readonly property bool pressed: pointer.pressed
+    readonly property color foregroundColor:
+        pressed ? Colors.black
+        : selected ? Colors.magenta
+        : hovered || keyboardSelected ? Colors.orange
+        : Colors.cyan
+
+    signal triggered()
+
+    implicitWidth: 112
+    implicitHeight: 55
+
+    color:
+        pressed ? Colors.magenta
+        : selected || hovered || keyboardSelected ? Colors.yellow
+        : Colors.black
+    border.width: bordered ? 1 : 0
+    border.color:
+        selected || hovered || pressed || keyboardSelected
+        ? Colors.orange : Colors.cyan
+
+    // The close halo is BEHIND and the wide halo is IN FRONT.
+    ModeButtonCloseHalo {
+        selected: modeButton.selected
+        hovered: modeButton.hovered
+        pressed: modeButton.pressed
+        keyboardSelected: modeButton.keyboardSelected
+    }
+    ModeButtonWideHalo {
+        selected: modeButton.selected
+        hovered: modeButton.hovered
+        pressed: modeButton.pressed
+        keyboardSelected: modeButton.keyboardSelected
+    }
+
+    GohuText {
+        id: glyph
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        anchors.topMargin: 8
+        text: "✦"
+        font.pixelSize: 17
+        color: modeButton.foregroundColor
+    }
+    TextHashGlow {
+        safeSource: glyph
+        foregroundColor: glyph.color
+        requestedVisible: !modeButton.pressed
+    }
+
+    QuietText {
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 5
+        text: "MODE"
+        quietOpacity: modeButton.selected || modeButton.hovered ? 0.48 : 0.34
+    }
+
+    MouseArea {
+        id: pointer
+        anchors.fill: parent
+        z: 10
+        hoverEnabled: true
+        onClicked: modeButton.triggered()
+    }
+
+    // Optional CPU++ style: scale 1.025 on hover, 1.01 selected,
+    // 0.99 pressed with 90ms OutQuad. It is NOT a required glow state.
+}

@@ -1,0 +1,22 @@
+import QtQuick
+import "../components"
+
+// TEXT IMPORTANCE is not the same thing as BUTTON AVAILABILITY.
+// No text role should automatically disable pointer interaction.
+Column {
+    spacing: 6
+
+    GohuText {
+        id: primary
+        text: "PULL TARGET // current branch"
+        font.pixelSize: 12
+        color: Colors.white
+    }
+    TextHashGlow {
+        safeSource: primary
+        foregroundColor: primary.color
+        // White foreground defaults to cyan glow. Magenta forces magenta.
+    }
+    SecondaryText { text: "Repository context" }
+    QuietText { text: "Diagnostic explanation, present but unobtrusive" }
+}

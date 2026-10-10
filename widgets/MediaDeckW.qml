@@ -79,10 +79,14 @@ PanelWindow {
         mediaAdapter.activePlayer
         ? String(mediaAdapter.activePlayer.trackTitle || "") : ""
 
+    // AUTO FOLLOW stays active across tracks; NEXT STREAM is a manual
+    // override for *this* MPRIS media title only.
+    property bool autoFollowEnabled: true
     property var manualAudioBinding: null
     readonly property var audioTargetResolution:
         AudioTarget.resolve(playerAudioBusName, playerAudioTitle,
-                            audioCandidateInputs, manualAudioBinding)
+                            audioCandidateInputs,
+                            autoFollowEnabled ? null : manualAudioBinding)
     readonly property var selectedAudioCandidate: audioTargetResolution.input
     readonly property int selectedAudioCandidatePosition:
         selectedAudioCandidate
@@ -98,36 +102,56 @@ PanelWindow {
            + "/" + audioCandidateInputs.length + ")")
         : "NO AUDIO TARGET"
 
-    // A changed MPRIS session must never inherit an armed prior experiment.
+    // A manual stream choice applies to one media session, not to every
+    // browser tab the player may subsequently represent. On a new track,
+    // expire the override and resume evidence-gated automatic following.
     readonly property string playerAudioSessionKey:
         playerAudioBusName + "|" + playerAudioTitle
-    onPlayerAudioSessionKeyChanged: audioTestArmed = false
+    onPlayerAudioSessionKeyChanged: {
+        audioTestArmed = false;
+        armedAudioFingerprint = null;
+        manualAudioBinding = null;
+        autoFollowEnabled = true;
+        audioTestStatus = "MEDIA CHANGED / AUTO FOLLOW";
+        if (menuOpen && transportMode === "mpris")
+            audioProbe.refresh();
+    }
 
     // This is an explicitly armed *stream-level* experiment, not per-tab
     // targeting. A browser stream may contain multiple tabs.
     property bool audioTestArmed: false
+    property var armedAudioFingerprint: null
     property string audioTestStatus: "NO EXPERIMENT RUN YET"
 
     function handleAudioExperiment(action) {
         if (action === "arm") {
             if (!selectedAudioCandidate) {
                 audioTestArmed = false;
-                audioTestStatus = "NO TARGET / USE NEXT STREAM FIRST";
+                armedAudioFingerprint = null;
+                audioTestStatus = "NO TARGET / " + audioTargetResolution.status;
                 return;
             }
             audioTestArmed = !audioTestArmed;
+            armedAudioFingerprint = audioTestArmed
+                ? AudioTarget.fingerprint(selectedAudioCandidate) : null;
+            audioTestStatus = audioTestArmed
+                ? "ARMED " + audioSelectionLabel : "EXPERIMENT DISARMED";
             return;
         }
 
         if (action === "auto") {
             audioTestArmed = false;
+            armedAudioFingerprint = null;
             manualAudioBinding = null;
-            audioTestStatus = "AUTO RECHECK / " + audioTargetResolution.status;
+            autoFollowEnabled = true;
+            audioTestStatus = "AUTO FOLLOW ON / " + audioTargetResolution.status;
+            audioProbe.refresh();
             return;
         }
 
         if (action === "next") {
             audioTestArmed = false;
+            armedAudioFingerprint = null;
             const inputs = audioCandidateInputs;
             if (inputs.length === 0) {
                 audioTestStatus = "NO AUDIO STREAMS TO SELECT";
@@ -145,6 +169,7 @@ PanelWindow {
             }
 
             manualAudioBinding = binding;
+            autoFollowEnabled = false;
             audioTestStatus = "MANUAL SELECTED " + (nextPosition + 1)
                               + "/" + inputs.length + " • #" + next.index;
             console.log("MediaDeck: manually selected PipeWire stream",
@@ -152,9 +177,20 @@ PanelWindow {
             return;
         }
 
-        if (!audioTestArmed || !selectedAudioCandidate
-                || audioExperimentProcess.running || transportMode !== "mpris")
+        if (!audioTestArmed || audioExperimentProcess.running
+                || transportMode !== "mpris")
             return;
+
+        // A target can disappear or be replaced after ARM, particularly when
+        // temporary TTS streams come and go. Never mutate the replacement.
+        if (!selectedAudioCandidate
+                || !AudioTarget.sameFingerprint(selectedAudioCandidate,
+                                                armedAudioFingerprint)) {
+            audioTestArmed = false;
+            armedAudioFingerprint = null;
+            audioTestStatus = "TARGET CHANGED / RE-ARM REQUIRED";
+            return;
+        }
 
         const input = selectedAudioCandidate;
         const props = input.properties || {};
@@ -167,6 +203,7 @@ PanelWindow {
         }
 
         audioTestArmed = false;
+        armedAudioFingerprint = null;
         audioTestStatus = "TESTING STREAM " + input.index + " / 3 SEC";
         audioExperimentProcess.exec([
             "/usr/bin/python3",
@@ -360,7 +397,9 @@ PanelWindow {
                     anchors.topMargin: 132
                     anchors.left: parent.left
                     anchors.right: parent.right
-                    text: "TARGET: " + deck.audioTargetResolution.status
+                    text: "TARGET: " + (deck.autoFollowEnabled
+                           ? "AUTO FOLLOW / " : "MANUAL / ")
+                           + deck.audioTargetResolution.status
                     color: deck.selectedAudioCandidate ? Colors.cyan : Colors.orange
                     font.pixelSize: 10
                     elide: Text.ElideRight
@@ -470,13 +509,13 @@ PanelWindow {
                         radius: 3
                         color: autoMouse.containsMouse ? "#39333E" : "#29252E"
                         border.width: 1
-                        border.color: deck.audioTargetResolution.mode === "AUTO_TITLE"
+                        border.color: deck.autoFollowEnabled
                                       ? Colors.orange : Colors.cyan
                         opacity: deck.transportMode === "mpris" ? 1 : 0.4
 
                         GohuText {
                             anchors.centerIn: parent
-                            text: "AUTO TARGET"
+                            text: "AUTO FOLLOW"
                             font.pixelSize: 11
                             color: Colors.white
                         }

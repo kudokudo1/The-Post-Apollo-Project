@@ -11,6 +11,38 @@
 4. Open a **second tab in the same browser** playing its own audible content. Both audio sources must actually be sounding simultaneously for the comparison to mean anything.
 5. Read the **AUDIO: N APP-MATCHED STREAM(S)** line in the Hi-Fi. It uses the extracted `services/audio/ApplicationAudioService.qml` `resolve()` and `pactl` observations. A candidate stream is only an *application match*: it does not prove a tab-specific route.
 
+## Browser/tab identity evidence snapshot
+
+The repository now has an optional, read-only operator probe:
+
+```bash
+python3 scripts/media/browser_audio_evidence.py
+```
+
+Run from the repository root with both Brave tabs playing. The probe reports
+MPRIS player/title observations, PipeWire sink-input index and app/media
+metadata, and **only existing** Chromium/Brave DevTools `/json/list` tab
+observations when the running browser already advertises a debugging port.
+It does not enable remote debugging, inspect page contents, connect to a
+DevTools WebSocket, open/close a tab, or change audio. If no endpoint exists,
+it says so; the current session should **not** be restarted just to force it.
+
+The output intentionally drops tab URLs (retaining only their hostname) and
+DevTools WebSocket URLs. **Review titles for private information before sharing**.
+AT-SPI tabs are not queried by the probe; those belong to Team 5's extracted
+`TabSurfaceProvider`, which is not yet a mainline Hi-Fi dependency.
+
+The probe's pure tests can be run without any active audio or browser:
+
+```bash
+python3 -m unittest discover -s tests/media -p 'test_browser_audio_evidence.py'
+```
+
+Recording an observable title in both outputs is **not** itself proof of
+tab→stream ownership. The identity and safety handoff is documented in
+`MODEL/contracts/media-tab-audio-identity-v0.md`. No automatic stream-to-tab
+mutation is authorized by this probe.
+
 ## Target-selection behavior (safety-gated)
 
 The target is separate from MPRIS transport. Playback still controls the MPRIS

@@ -62,4 +62,37 @@ const noIdentity = {index: 34, properties: {"media.name": "Video B"}};
 assert.equal(api.resolve("browser", "Video B", [noIdentity], null).input, null,
              "Stream mutation targets require process evidence");
 
-console.log("PASS: Hi-Fi resolver evidence, ambiguity, and fail-closed targeting");
+// Model successive observed media switches while AUTO FOLLOW is selected.
+// Each evaluation uses the current MPRIS track; the temporary third stream
+// is never chosen simply because it appeared in the list first.
+const threeSources = [tts, music, video];
+assert.equal(api.resolve("browser", "Music A", threeSources, null).input, music,
+             "Auto-follow music is selected by title evidence");
+assert.equal(api.resolve("browser", "Video B", threeSources, null).input, video,
+             "Switching to the video re-evaluates its target");
+assert.equal(api.resolve("browser", "Music A", [video, music], null).input, music,
+             "Returning to music does not require an extra manual selection");
+assert.equal(api.resolve("browser", "No Match", threeSources, null).input, null,
+             "Unknown titles must continue to fail closed");
+assert.equal(api.sameFingerprint(video, api.fingerprint(video)), true,
+             "An armed target fingerprint remains valid for the same stream");
+assert.equal(api.sameFingerprint(music, api.fingerprint(video)), false,
+             "An arm for one stream must not authorize another");
+
+// Wiring contracts. These checks cannot execute QML, but prevent accidental
+// removal of the persistent mode and the arm-to-mute identity guard.
+const deckSource = fs.readFileSync(
+    path.join(__dirname, "../../widgets/MediaDeckW.qml"), "utf8"
+);
+assert.match(deckSource, /property bool autoFollowEnabled: true/,
+             "AUTO FOLLOW is initially enabled");
+assert.match(deckSource, /autoFollowEnabled \? null : manualAudioBinding/,
+             "AUTO FOLLOW bypasses a stale manual binding");
+assert.match(deckSource, /onPlayerAudioSessionKeyChanged:\s*\{[^}]*manualAudioBinding = null;[^}]*autoFollowEnabled = true;/,
+             "Media changes must expire manual targeting and re-enable AUTO FOLLOW");
+assert.match(deckSource, /manualAudioBinding = binding;\s*autoFollowEnabled = false;/,
+             "NEXT STREAM must clearly enter current-track manual mode");
+assert.match(deckSource, /AudioTarget\.sameFingerprint\(selectedAudioCandidate,/,
+             "ARM must not authorize mutation of a replacement stream");
+
+console.log("PASS: Hi-Fi auto-follow evidence, mode handoff, and fail-closed targeting");

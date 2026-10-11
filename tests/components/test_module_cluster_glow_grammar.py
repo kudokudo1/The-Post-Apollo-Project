@@ -46,6 +46,12 @@ for name in ("Applauncher", "NotificationsHub", "Calendar", "Bluetooth", "Git"):
 
 volume = module("Volumebar")
 assert "contentGlowEnabled: false" in volume
+assert "readonly property bool hasFace: !root.ready || root.muted" in volume
+assert 'text: "("' in volume and 'text: ")"' in volume
+assert 'text: "ᴗ˳ᴗ"' not in volume  # switched by live face-state expression
+assert '"ᴗ˳ᴗ" : "｡•́︿•̀｡"' in volume
+assert 'safeSource: volumebarIcon' in volume
+
 assert 'text: "%"' in volume
 assert 'return root.vol.toString();' in volume
 assert 'return root.vol + "%";' not in volume

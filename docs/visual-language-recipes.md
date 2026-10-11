@@ -161,3 +161,55 @@ The pilot changes **only** the four (data-driven) CPU++ main mode buttons in
 Expected visible difference: a more prominent selected icon, much quieter
 mode name, subtle front-facing wash, and no idle mode-box perimeter glow.
 Screenshots are required before treating this pilot as visually approved.
+
+## Dock / module grammar — approved 2026-10-11
+
+Dock-only recipe; **not** the main-mode, action-button, or window-chassis recipe.
+Git is the overall construction/stacking reference, AppLauncher the ordinary
+interaction-color reference, and Wi-Fi the preferred outer **numerical**
+reference. Normal dock idle color is cyan (`Colors.cyan`, `#55CFCA`), NOT
+palette blue. Default glow identity: cyan idle, orange hover, magenta
+pressed/open. Open overrides pressed/hover; yellow open fill remains.
+
+| State | Rear halo (spread 3, z -1) | Front wash (spread 10, z +1) | Content opacity |
+| --- | ---: | ---: | ---: |
+| Idle | 0.40 | 0.07 | 0.75 |
+| Hover | 0.50 | 0.09 | 0.95 |
+| Pressed | 0.60 | 0.12 | 1.00 |
+| Open | 0.86 | 0.22 | 1.00 |
+
+**Content sample geometry:** radius 14 / 15 samples in all states as a
+*provisional*, deliberately undersampled/hash-like starting point. The
+operator must see the real Qt renderer before choosing final sample values;
+do not smooth the effect automatically. Content glows build in opacity with
+interaction. Wi-Fi's current anomalous inverted icon opacity (1/.8/.6)
+is **not** the model and Wi-Fi itself remains untouched pending explicit
+runtime review.
+
+**Source/cluster ownership:** attach one independent glow to each meaningful
+artwork/label/readout cluster, not a single effect over unrelated module
+contents. Wi-Fi independently glows icon, SSID, signal percentage, and speed;
+Clock and Volume have independent source-attached effects. One coherent
+compound mark can remain one cluster. New source-attached effects should
+use `SafeDropShadow`; separate them from the chassis rear/front effects.
+Isolated sources may reduce glyph effect-stacking issues, but this is not
+yet a verified Qt bug workaround.
+
+**Structural white with contextual glow:** %, :, ornamental slash/separator,
+stars, heartbeats and parentheses stay `Colors.white` in foreground while
+the glow follows their *surrounding cluster* color unless deliberately
+overridden. Decorative display separators ordinarily prefer `//` instead
+of `/`; do not mechanically replace functional single slashes in paths,
+URLs, code, math or meaningful separators. Mixed-glyph elements needing
+separate foreground colors require a careful source/layout split and visual
+verification; existing remaining widgets may not fully conform yet.
+
+**Special identities preserved:** Git keeps yellow perimeter/orange artwork,
+Hospital magenta, Social Omnitrix green, Weather orange; Clock, Volume and
+Network retain their telemetry/mode-dependent colors. How the specialty
+colors evolve on hover/pressed remains an operator decision, not license to
+invent a generic change. Power retains its historically distinct first
+Quickshell implementation and numbers; Workspaces and Tray remain composite
+families; Calendar is the intentionally rounded dock and planned central
+convenience bay. MediaPlayer stays dormant/unmounted. No new open behavior,
+menu wiring, or live reload is implied by this source-level normalization.

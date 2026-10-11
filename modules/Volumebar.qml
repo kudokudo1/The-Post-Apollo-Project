@@ -172,7 +172,7 @@ DockButton {
 
                 z: 2
 
-                opacity: volumebarDock.pressed ? 1.0 : volumebarDock.hovered ? 0.8 : 0.6
+                opacity: volumebarDock.pressed ? 1.0 : volumebarDock.hovered ? 0.95 : 0.75
 
                 color: !root.ready ? Colors.blue : root.muted ? Colors.yellow : root.vol <= 15 ? Colors.cyan : root.volumeColor
 
@@ -227,7 +227,7 @@ DockButton {
 
                 z: 2
 
-                opacity: volumebarDock.pressed ? 1.0 : volumebarDock.hovered ? 0.8 : 0.6
+                opacity: volumebarDock.pressed ? 1.0 : volumebarDock.hovered ? 0.95 : 0.75
 
                 color: !root.ready ? Colors.blue : root.muted ? Colors.yellow : root.vol <= 15 ? Colors.cyan : root.volumeColor
 

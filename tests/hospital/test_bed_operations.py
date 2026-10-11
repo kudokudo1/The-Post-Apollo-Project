@@ -143,7 +143,7 @@ class BedOperationsTests(unittest.TestCase):
         got = self.run_cmd("create", "--seed-path", self.seed,
                            "--repository", REPOSITORY, "--branch", "feature/seed",
                            "--bed-root", self.beds, success=False)
-        self.assertEqual(got["code"], "WORKTREE_CREATION_REFUSED")
+        self.assertEqual(got["code"], "BRANCH_ALREADY_OCCUPIED")
         self.assertEqual(list(self.beds.iterdir()), [],
                          "Refused move must not leave an unrequested Bed")
 

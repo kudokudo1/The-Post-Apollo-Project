@@ -2980,7 +2980,7 @@ PanelWindow {
         },
         {
             name: "REMOTE",
-            symbol: "⌁ ssh"
+            symbol: "⌁⋆˚☾⭒"
         },
         {
             name: "THERMAL",
@@ -17331,7 +17331,7 @@ PanelWindow {
                 spacing: 6
                 Repeater {
                     model: [
-                        { label: "⌁ CONFIG", value: appControlWindow.remoteViewConfigured, accent: Colors.cyan },
+                        { label: "⌁⋆˚☾⭒ CONFIG", value: appControlWindow.remoteViewConfigured, accent: Colors.cyan },
                         { label: "◇ KNOWN", value: appControlWindow.remoteViewKnown, accent: Colors.orange },
                         { label: "ALL", value: appControlWindow.remoteViewAll, accent: Colors.magenta }
                     ]
@@ -20299,8 +20299,13 @@ PanelWindow {
                                                  || selectedAppIdentity.showingRemote
                                         text: selectedAppIdentity.showingFile
                                               ? "⌯🗁๋࣭⭑"
-                                              : "⌁"
+                                              : "⌁⋆˚☾⭒"
                                         font.pixelSize: selectedAppIdentity.showingFile ? 28 : 31
+                                        // Fit the full Remote icon in the identity slot.
+                                        width: selectedAppIdentity.showingRemote ? parent.width : implicitWidth
+                                        fontSizeMode: selectedAppIdentity.showingRemote ? Text.HorizontalFit : Text.FixedSize
+                                        minimumPixelSize: 9
+                                        horizontalAlignment: Text.AlignHCenter
                                         color: selectedAppIdentity.showingRemote ? Colors.magenta : Colors.cyan
                                         layer.enabled: visible
                                         layer.effect: DropShadow {
@@ -21534,7 +21539,7 @@ PanelWindow {
                         Repeater {
                             id: remoteActionsRepeater
                             model: [
-                                { label: "CONNECT", icon: "⌁", accent: Colors.cyan },
+                                { label: "CONNECT", icon: "⌁⋆˚☾⭒", accent: Colors.cyan },
                                 { label: "COPY SSH COMMAND", icon: "⧉", accent: Colors.magenta },
                                 { label: "SFTP", icon: "⇅", accent: Colors.orange },
                                 { label: "TEST CONNECTION", icon: "◉", accent: Colors.omnitrix },

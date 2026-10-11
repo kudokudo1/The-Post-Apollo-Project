@@ -1,0 +1,30 @@
+name: Icon Grammar Contracts
+
+on:
+  pull_request:
+    paths:
+      - "widgets/AppControlW.qml"
+      - "widgets/GitW.qml"
+      - "widgets/appcontrol/HunterControls.qml"
+      - "tests/components/test_icon_grammar_contracts.py"
+      - ".github/workflows/icon-grammar-contracts.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "widgets/AppControlW.qml"
+      - "widgets/GitW.qml"
+      - "widgets/appcontrol/HunterControls.qml"
+      - "tests/components/test_icon_grammar_contracts.py"
+      - ".github/workflows/icon-grammar-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify icon and Hunter source contracts
+        run: python3 tests/components/test_icon_grammar_contracts.py

@@ -1870,6 +1870,13 @@ Item {
 
                 ActionButton {
                     id: taskEndAction
+                    property bool clickFirePulse: false
+                    Timer {
+                        id: taskEndFireTimer
+                        interval: 420
+                        repeat: false
+                        onTriggered: taskEndAction.clickFirePulse = false
+                    }
 
                     width: parent.width - 10
                     height: 36
@@ -1933,6 +1940,8 @@ Item {
                     }
 
                     onTriggered: {
+                        taskEndAction.clickFirePulse = true;
+                        taskEndFireTimer.restart();
                         host.setDetailActionIndex(2);
                         processController.requestTerminate();
                     }
@@ -1968,7 +1977,7 @@ Item {
 
                         GohuText {
                             text:
-                                taskEndAction.pressed
+                                (taskEndAction.pressed || taskEndAction.clickFirePulse)
                                 ? "(=ᗜ=)デ╾━ ๋࣭⭑"
                                 : taskEndAction.hovered || taskEndAction.selected
                                 ? "ദ്ദി(-_•)デ╾━"

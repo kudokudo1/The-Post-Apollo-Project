@@ -66,6 +66,14 @@ Item {
                             controller.killViewMode === modelData.view
                         property bool hovered: killViewMouse.containsMouse
                         property bool pressed: killViewMouse.pressed
+                        property bool clickFirePulse: false
+
+                        Timer {
+                            id: killViewFireTimer
+                            interval: 420
+                            repeat: false
+                            onTriggered: killViewButton.clickFirePulse = false
+                        }
 
                         color:
                             pressed ? Colors.magenta
@@ -81,9 +89,9 @@ Item {
                             width: parent.width - 8
                             horizontalAlignment: Text.AlignHCenter
                             text:
-                                (killViewButton.selected
-                                 || killViewButton.hovered
-                                 || killViewButton.pressed)
+                                (killViewButton.clickFirePulse || killViewButton.pressed)
+                                ? "(=ᗜ=)" + killViewButton.modelData.label + " ๋࣭⭑"
+                                : (killViewButton.selected || killViewButton.hovered)
                                 ? "ദ്ദി(-_•)" + killViewButton.modelData.label
                                 : "(-_•)" + killViewButton.modelData.label
                             font.pixelSize: killViewButton.modelData.key === "hunter" ? 13 : 14
@@ -114,6 +122,8 @@ Item {
                             anchors.fill: parent
                             hoverEnabled: true
                             onClicked: {
+                                killViewButton.clickFirePulse = true;
+                                killViewFireTimer.restart();
                                 controller.setKillViewMode(modelData.view);
                                 hunterControls.focusSearchRequested();
                             }
@@ -402,16 +412,25 @@ Item {
                     }
                     property bool hovered: killBottomMouse.containsMouse
                     property bool pressed: killBottomMouse.pressed
-                    readonly property bool operationFiring:
-                        controller.hunterOperationActive
-                        && (
-                            (modelData.key === "hogs"
-                             && controller.hunterOperationKind === "kill-hogs")
-                            || (modelData.key === "mice"
-                                && controller.hunterOperationKind === "kill-mice")
-                        )
+                    property bool clickFirePulse: false
+
+                    Timer {
+                        id: killBottomFireTimer
+                        interval: 420
+                        repeat: false
+                        onTriggered: killBottomButton.clickFirePulse = false
+                    }
+
+                    // A background hunt can outlive its window; only the visible
+                    // owned dialog holds the thumb-up expression after firing.
+                    readonly property string ownedConfirmKind:
+                        modelData.key === "all" ? "kill-all"
+                        : modelData.key === "hogs" ? "kill-hogs" : "kill-mice"
+                    readonly property bool menuOwned:
+                        controller.destructiveConfirmOpen
+                        && controller.destructiveConfirmKind === ownedConfirmKind
                     readonly property bool firing:
-                        pressed || operationFiring
+                        pressed || clickFirePulse
 
                     color:
                         firing ? Colors.red
@@ -454,14 +473,14 @@ Item {
                             if (killBottomButton.modelData.key === "all") {
                                 if (firing)
                                     return "(=ᗜ=)︻デ═一";
-                                if (killBottomButton.hovered)
+                                if (killBottomButton.hovered || killBottomButton.menuOwned)
                                     return "ദ്ദി(-_•)︻デ═一";
                                 return "(-_•)︻デ═一";
                             }
 
                             if (firing)
                                 return "(=ᗜ=)デ╾━ " + animal + " ๋࣭⭑";
-                            if (killBottomButton.hovered)
+                            if (killBottomButton.hovered || killBottomButton.menuOwned)
                                 return "ദ്ദി(-_•)デ╾━ " + animal;
                             return "(-_•)デ╾━ " + animal;
                         }
@@ -500,6 +519,8 @@ Item {
                         hoverEnabled: true
                         enabled: killBottomButton.canRun
                         onClicked: {
+                            killBottomButton.clickFirePulse = true;
+                            killBottomFireTimer.restart();
                             if (modelData.key === "all")
                                 controller.requestKillAllEligibleTasks();
                             else if (modelData.key === "hogs")

@@ -5300,37 +5300,37 @@ PanelWindow {
                                 {
                                     name: "CONTROL",
                                     key: "control",
-                                    symbol: "◎",
+                                    symbol: "🛠",
                                     available: true
                                 },
                                 {
                                     name: "BRANCHES",
                                     key: "branches",
-                                    symbol: "⇶",
+                                    symbol: "",
                                     available: true
                                 },
                                 {
                                     name: "CHANGES",
                                     key: "changes",
-                                    symbol: "Δ",
+                                    symbol: "⚖",
                                     available: true
                                 },
                                 {
                                     name: "HISTORY",
                                     key: "history",
-                                    symbol: "◴",
+                                    symbol: "࣪⋅˚🕮‧₊˚",
                                     available: true
                                 },
                                 {
                                     name: "REPOSITORY",
                                     key: "repository",
-                                    symbol: "◇",
+                                    symbol: "ﮩ٨✮ﮩ٨ـ",
                                     available: true
                                 },
                                 {
                                     name: "OPERATIONS",
                                     key: "operations",
-                                    symbol: "↶",
+                                    symbol: "🏗",
                                     available: true
                                 }
                             ]
@@ -5379,7 +5379,11 @@ PanelWindow {
                                         anchors.horizontalCenter:
                                             parent.horizontalCenter
                                         text: gitModeButton.modelData.symbol
+                                        width: gitModeButton.width - 10
+                                        horizontalAlignment: Text.AlignHCenter
                                         font.pixelSize: 16
+                                        fontSizeMode: Text.HorizontalFit
+                                        minimumPixelSize: 8
                                         color:
                                             gitModeButton.isPressed
                                             ? Colors.black
@@ -6668,32 +6672,32 @@ PanelWindow {
                                     {
                                         name: "CONTROL",
                                         key: "control",
-                                        symbol: "◎"
+                                        symbol: "🖨"
                                     },
                                     {
                                         name: "LIBRARY",
                                         key: "library",
-                                        symbol: "▤"
+                                        symbol: "🗄"
                                     },
                                     {
                                         name: "PROFILE",
                                         key: "profile",
-                                        symbol: "◇"
+                                        symbol: "✮˙๋࣭⭑"
                                     },
                                     {
                                         name: "PROJECTS",
                                         key: "projects",
-                                        symbol: "⌗"
+                                        symbol: "🗠"
                                     },
                                     {
                                         name: "ISSUES",
                                         key: "issues",
-                                        symbol: "!"
+                                        symbol: "⭒˗ˏˋ๋࣭⚠︎๋࣭⭑ˊ˗"
                                     },
                                     {
                                         name: "PULLS",
                                         key: "pulls",
-                                        symbol: "⇄"
+                                        symbol: "◀~~~~~~~~▶"
                                     }
                                 ]
 
@@ -6769,6 +6773,8 @@ PanelWindow {
                                             text: modelData.symbol
                                             horizontalAlignment: Text.AlignHCenter
                                             font.pixelSize: 19
+                                            fontSizeMode: Text.HorizontalFit
+                                            minimumPixelSize: 7
                                             color: githubModeButton.contentColor
                                         }
 

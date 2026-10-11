@@ -205,6 +205,8 @@ PanelWindow {
     }
 
     onSelectedModeIndexChanged: {
+        if (menuOpen && selectedModeIndex === killModeIndex)
+            fireKillRailOnce();
         scheduleRunKillProbe();
         scheduleWindowAudioProbe();
         scheduleAppAudioProbe();
@@ -223,6 +225,42 @@ PanelWindow {
 
     onSelectedAppWindowsChanged: {
         scheduleAppAudioProbe();
+    }
+
+    // Kill/Hunter expressions are event-driven, not blink cycles.
+    property bool killRailFirePulse: false
+    property bool favoritesKillFilterFirePulse: false
+    property int favoritesKillViewFireMode: -1
+
+    Timer {
+        id: killRailFireTimer
+        interval: 420
+        repeat: false
+        onTriggered: appControlWindow.killRailFirePulse = false
+    }
+
+    Timer {
+        id: favoritesKillFilterFireTimer
+        interval: 420
+        repeat: false
+        onTriggered: appControlWindow.favoritesKillFilterFirePulse = false
+    }
+
+    Timer {
+        id: favoritesKillViewFireTimer
+        interval: 420
+        repeat: false
+        onTriggered: appControlWindow.favoritesKillViewFireMode = -1
+    }
+
+    function fireKillRailOnce() {
+        killRailFirePulse = true;
+        killRailFireTimer.restart();
+    }
+
+    function fireFavoritesKillViewOnce(viewMode) {
+        favoritesKillViewFireMode = viewMode;
+        favoritesKillViewFireTimer.restart();
     }
 
     // FAVORITES rail-face state.
@@ -12835,7 +12873,12 @@ PanelWindow {
                                        ? "(˵-ᴗ-˵)"
                                        : modelData.symbol)
                                     : index === appControlWindow.killModeIndex
-                                    ? "(-_•)︻デ═一"
+                                    ? (modeButton.isPressed || appControlWindow.killRailFirePulse
+                                       ? "(=ᗜ=)デ╾━ ๋࣭⭑"
+                                       : modeButton.isHovered
+                                         || (appControlWindow.menuOpen && modeButton.isSelected)
+                                       ? "ദ്ദി(-_•)︻デ═一"
+                                       : "(-_•)︻デ═一")
                                     : modelData.symbol
 
                                 font.pixelSize:
@@ -13003,6 +13046,8 @@ PanelWindow {
                                 appControlWindow.favoritesFaceClickPulse = true;
                                 favoritesFaceClickPulseTimer.restart();
                             }
+                            if (index === appControlWindow.killModeIndex)
+                                appControlWindow.fireKillRailOnce();
 
                             appControlWindow.modeRailFocused = false;
                             appControlWindow.modeRailCursorIndex = index;
@@ -16297,7 +16342,13 @@ PanelWindow {
                                         ? "✦"
                                         : favoriteFilterButton.modelData
                                           === appControlWindow.killModeIndex
-                                        ? "デ╾━"
+                                        ? (favoriteFilterButton.isPressed
+                                           || appControlWindow.favoritesKillFilterFirePulse
+                                           ? "(=ᗜ=)デ╾━ ๋࣭⭑"
+                                           : favoriteFilterButton.isHovered
+                                             || favoriteFilterButton.isSelected
+                                           ? "ദ്ദി(-_•)デ╾━"
+                                           : "(-_•)デ╾━")
                                         : appControlWindow.favoritesFilterSymbol(
                                             favoriteFilterButton.modelData
                                         )
@@ -16311,6 +16362,14 @@ PanelWindow {
                                         : favoriteFilterButton.modelData
                                            === appControlWindow.systemModeIndex
                                         ? 14 : 9
+                                    fontSizeMode: favoriteFilterButton.modelData
+                                                  === appControlWindow.killModeIndex
+                                                  ? Text.Fit : Text.FixedSize
+                                    minimumPixelSize: 7
+                                    width: favoriteFilterButton.modelData
+                                           === appControlWindow.killModeIndex
+                                           ? parent.width - 4 : implicitWidth
+                                    horizontalAlignment: Text.AlignHCenter
                                     font.letterSpacing:
                                         favoriteFilterButton.modelData
                                         === appControlWindow.thermalModeIndex
@@ -16362,10 +16421,16 @@ PanelWindow {
                                     id: favoriteFilterMouse
                                     anchors.fill: parent
                                     hoverEnabled: true
-                                    onClicked:
+                                    onClicked: {
+                                        if (favoriteFilterButton.modelData
+                                                === appControlWindow.killModeIndex) {
+                                            appControlWindow.favoritesKillFilterFirePulse = true;
+                                            favoritesKillFilterFireTimer.restart();
+                                        }
                                         appControlWindow.setFavoritesFilterMode(
                                             favoriteFilterButton.modelData
-                                        )
+                                        );
+                                    }
                                 }
 
                                 RectangularShadow {
@@ -16453,7 +16518,12 @@ PanelWindow {
                                             visible: !modelData.thermalIcon && !modelData.fanIcon
                                             text:
                                                 modelData.group === "killView"
-                                                ? modelData.label
+                                                ? (appControlWindow.favoritesKillViewFireMode
+                                                   === modelData.value || parent.pressed
+                                                   ? "(=ᗜ=)" + modelData.label + " ๋࣭⭑"
+                                                   : parent.hovered || parent.selected
+                                                   ? "ദ്ദി(-_•)" + modelData.label
+                                                   : "(-_•)" + modelData.label)
                                                 : modelData.group === "appSource"
                                                   && modelData.value === appControlWindow.appSourceHidden
                                                 ? (favCopiedPrimaryMouse.containsMouse
@@ -16566,7 +16636,11 @@ PanelWindow {
                                             id: favCopiedPrimaryMouse
                                             anchors.fill: parent
                                             hoverEnabled: true
-                                            onClicked: appControlWindow.activateFavoritesSubmode(modelData)
+                                            onClicked: {
+                                                if (modelData.group === "killView")
+                                                    appControlWindow.fireFavoritesKillViewOnce(modelData.value);
+                                                appControlWindow.activateFavoritesSubmode(modelData);
+                                            }
                                         }
                                     }
                                 }
@@ -22617,6 +22691,14 @@ PanelWindow {
 
                     ActionButton {
                         id: hiddenKillAction
+                    // Keep firing visible after mouse release without delaying the action.
+                    property bool clickFirePulse: false
+                    Timer {
+                        id: hiddenKillActionFireTimer
+                        interval: 420
+                        repeat: false
+                        onTriggered: hiddenKillAction.clickFirePulse = false
+                    }
                         width: hiddenCommandActionsSection.width - 10
                         height: 36
                         anchors.horizontalCenter: parent.horizontalCenter
@@ -22663,12 +22745,14 @@ PanelWindow {
                     }
 
                     onTriggered: {
+                        hiddenKillAction.clickFirePulse = true;
+                        hiddenKillActionFireTimer.restart();
                         appControlWindow.selectedDetailActionIndex = 6;
                         appControlWindow.activateSelectedDetailAction();
                     }
                         Row {
                             anchors.left: parent.left; anchors.leftMargin: 10; anchors.verticalCenter: parent.verticalCenter; spacing: 8
-                            GohuText { text: hiddenKillAction.pressed ? "(=ᗜ=)デ╾━ ๋࣭⭑" : hiddenKillAction.hovered || hiddenKillAction.selected ? "ദ്ദി(-_•)デ╾━" : "(-_•)デ╾━"; font.pixelSize: 13; color: hiddenKillAction.pressed ? Colors.black : Colors.red; layer.enabled: !hiddenKillAction.pressed; layer.effect: DropShadow { radius: 8; samples: 7; opacity: 0.56; color: Colors.red; transparentBorder: true } }
+                            GohuText { text: hiddenKillAction.pressed || hiddenKillAction.clickFirePulse ? "(=ᗜ=)デ╾━ ๋࣭⭑" : hiddenKillAction.hovered || hiddenKillAction.selected ? "ദ്ദി(-_•)デ╾━" : "(-_•)デ╾━"; font.pixelSize: 13; color: hiddenKillAction.pressed ? Colors.black : Colors.red; layer.enabled: !hiddenKillAction.pressed; layer.effect: DropShadow { radius: 8; samples: 7; opacity: 0.56; color: Colors.red; transparentBorder: true } }
                             GohuText { text: "KILL COMMAND  [TERM]"; font.pixelSize: 13; color: hiddenKillAction.pressed ? Colors.black : Colors.red; layer.enabled: !hiddenKillAction.pressed; layer.effect: DropShadow { radius: 8; samples: 7; opacity: 0.56; color: Colors.red; transparentBorder: true } }
                         }
 
@@ -24206,6 +24290,14 @@ PanelWindow {
                     showLabel: false
                     pointerCursorShape: Qt.ArrowCursor
                     acceptedButtons: Qt.LeftButton
+                    // Keep firing visible after mouse release without delaying the action.
+                    property bool clickFirePulse: false
+                    Timer {
+                        id: appKillActionFireTimer
+                        interval: 420
+                        repeat: false
+                        onTriggered: appKillAction.clickFirePulse = false
+                    }
 
                     idleFillColor: Colors.black
                     hoverFillColor: Colors.yellow
@@ -24244,6 +24336,8 @@ PanelWindow {
                     }
 
                     onTriggered: {
+                        appKillAction.clickFirePulse = true;
+                        appKillActionFireTimer.restart();
                         appControlWindow.selectedDetailActionIndex =
                             appKillAction.detailIndex;
                         appControlWindow.terminateSelectedApplication();
@@ -24259,7 +24353,7 @@ PanelWindow {
                             id: appKillActionIcon
 
                             text:
-                                appKillAction.pressed
+                                appKillAction.pressed || appKillAction.clickFirePulse
                                 ? "(=ᗜ=)デ╾━ ๋࣭⭑"
                                 : appKillAction.hovered || appKillAction.selected
                                 ? "ദ്ദി(-_•)デ╾━"
@@ -25036,6 +25130,14 @@ PanelWindow {
 
                 ActionButton {
                     id: tabCloseActionBelowFreeze
+                    // Keep firing visible after mouse release without delaying the action.
+                    property bool clickFirePulse: false
+                    Timer {
+                        id: tabCloseActionBelowFreezeFireTimer
+                        interval: 420
+                        repeat: false
+                        onTriggered: tabCloseActionBelowFreeze.clickFirePulse = false
+                    }
 
                     readonly property int detailIndex:
                         appControlWindow.selectedTabCloseControlIndex()
@@ -25091,6 +25193,8 @@ PanelWindow {
                     }
 
                     onTriggered: {
+                        tabCloseActionBelowFreeze.clickFirePulse = true;
+                        tabCloseActionBelowFreezeFireTimer.restart();
                         if (tabCloseActionBelowFreeze.detailIndex < 0)
                             return;
 
@@ -25109,7 +25213,7 @@ PanelWindow {
 
                         GohuText {
                             text:
-                                tabCloseActionBelowFreeze.pressed
+                                tabCloseActionBelowFreeze.pressed || tabCloseActionBelowFreeze.clickFirePulse
                                 ? "(=ᗜ=)デ╾━ ๋࣭⭑"
                                 : tabCloseActionBelowFreeze.hovered
                                   || tabCloseActionBelowFreeze.selected
@@ -26140,6 +26244,14 @@ PanelWindow {
 
                 ActionButton {
                     id: windowKillAction
+                    // Keep firing visible after mouse release without delaying the action.
+                    property bool clickFirePulse: false
+                    Timer {
+                        id: windowKillActionFireTimer
+                        interval: 420
+                        repeat: false
+                        onTriggered: windowKillAction.clickFirePulse = false
+                    }
 
                     width: parent.width - 10
                     height: 34
@@ -26189,6 +26301,8 @@ PanelWindow {
                     }
 
                     onTriggered: {
+                        windowKillAction.clickFirePulse = true;
+                        windowKillActionFireTimer.restart();
                         appControlWindow.selectedDetailActionIndex = 7;
                         appControlWindow.activateSelectedDetailAction();
                     }
@@ -26205,7 +26319,7 @@ PanelWindow {
                             anchors.verticalCenter: parent.verticalCenter
 
                             text:
-                                windowKillAction.pressed
+                                windowKillAction.pressed || windowKillAction.clickFirePulse
                                 ? "(=ᗜ=)デ╾━ ๋࣭⭑"
                                 : windowKillAction.hovered || windowKillAction.selected
                                 ? "ദ്ദി(-_•)デ╾━"
@@ -27831,6 +27945,14 @@ PanelWindow {
 
                 ActionButton {
                     id: runKillAction
+                    // Keep firing visible after mouse release without delaying the action.
+                    property bool clickFirePulse: false
+                    Timer {
+                        id: runKillActionFireTimer
+                        interval: 420
+                        repeat: false
+                        onTriggered: runKillAction.clickFirePulse = false
+                    }
 
                     visible: true
 
@@ -27884,6 +28006,8 @@ PanelWindow {
                     }
 
                     onTriggered: {
+                        runKillAction.clickFirePulse = true;
+                        runKillActionFireTimer.restart();
                         appControlWindow.selectedDetailActionIndex = 5;
                         appControlWindow.activateSelectedDetailAction();
                     }
@@ -27908,7 +28032,7 @@ PanelWindow {
                                 text:
                                     !appControlWindow.runKillAvailable
                                     ? "(•_•)"
-                                    : runKillAction.pressed
+                                    : runKillAction.pressed || runKillAction.clickFirePulse
                                     ? "(=ᗜ=)"
                                     : runKillAction.hovered
                                     ? "ദ്ദി(-_•)"
@@ -29078,6 +29202,8 @@ PanelWindow {
 
             saveInputForMode(selectedModeIndex);
             selectedModeIndex = reopenMode;
+            if (selectedModeIndex === killModeIndex)
+                fireKillRailOnce();
             restoreInputForMode(selectedModeIndex);
 
             detailFocused = false;
@@ -29188,6 +29314,13 @@ PanelWindow {
 
             appControlWindow.hiddenFaceBlinking = false;
             appControlWindow.hiddenFaceDoubleBlinkPending = false;
+
+            killRailFireTimer.stop();
+            favoritesKillFilterFireTimer.stop();
+            favoritesKillViewFireTimer.stop();
+            appControlWindow.killRailFirePulse = false;
+            appControlWindow.favoritesKillFilterFirePulse = false;
+            appControlWindow.favoritesKillViewFireMode = -1;
         }
     }
 }

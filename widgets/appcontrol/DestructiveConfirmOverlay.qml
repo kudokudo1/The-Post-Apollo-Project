@@ -9,6 +9,29 @@ Rectangle {
     required property var controller
     anchors.fill: parent
     visible: controller.destructiveConfirmOpen
+    // Opening a destructive Kill menu gets one visible firing cycle,
+    // then its Hunter title holds thumbs-up while the menu is present.
+    property bool openingKillFirePulse: false
+    Timer {
+        id: openingKillFireTimer
+        interval: 420
+        repeat: false
+        onTriggered: destructiveConfirmOverlay.openingKillFirePulse = false
+    }
+    onVisibleChanged: {
+        if (visible && controller
+                && (controller.destructiveConfirmKind === "kill-hogs"
+                    || controller.destructiveConfirmKind === "kill-mice"
+                    || controller.destructiveConfirmKind === "kill-all")
+                && controller.hunterOperationPhase !== "running"
+                && controller.hunterOperationPhase !== "report") {
+            openingKillFirePulse = true;
+            openingKillFireTimer.restart();
+        } else if (!visible) {
+            openingKillFireTimer.stop();
+            openingKillFirePulse = false;
+        }
+    }
     color: Qt.rgba(
         Colors.dark.r, Colors.dark.g, Colors.dark.b, 0.88
     )
@@ -65,20 +88,24 @@ Rectangle {
 
         GohuText {
             id: destructiveConfirmTitleText
+            width: parent.width - 24
+            horizontalAlignment: Text.AlignHCenter
+            fontSizeMode: Text.HorizontalFit
+            minimumPixelSize: 10
             anchors.top: parent.top
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.topMargin: 22
             text: {
                 const kind = controller.destructiveConfirmKind;
                 if (!destructiveConfirmDialog.hunterStatusView
-                        && (kind === "kill-hogs" || kind === "kill-mice")) {
-                    const firing = destructiveConfirmDialog.confirmKillPressed;
-                    const armed = firing
-                                  ? "(=ᗜ=)デ╾━"
-                                  : (destructiveConfirmDialog.confirmKillHovered
-                                     || controller.destructiveConfirmChoice === 1)
-                                  ? "ദ്ദി(-_•)デ╾━"
-                                  : "(-_•)デ╾━";
+                        && (kind === "kill-hogs" || kind === "kill-mice"
+                            || kind === "kill-all")) {
+                    const firing = destructiveConfirmOverlay.openingKillFirePulse
+                                   || destructiveConfirmDialog.confirmKillPressed;
+                    const armed = firing ? "(=ᗜ=)デ╾━ ๋࣭⭑"
+                                         : "ദ്ദി(-_•)デ╾━";
+                    if (kind === "kill-all")
+                        return "⚠︎ " + armed + "  CONFIRM KILL ALL  ⚠︎";
                     const animal = kind === "kill-mice"
                                    ? (firing ? "(ᐢ××ᐢ)౨" : "(ᐢ..ᐢ)౨")
                                    : (firing ? "₍˄×⚇×˄₎" : "₍˄·͈⚇·͈˄₎");

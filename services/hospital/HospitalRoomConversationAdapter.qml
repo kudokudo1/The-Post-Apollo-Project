@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "HospitalBedRecoveryPolicy.js" as RecoveryPolicy
 
 Scope {
     id: adapter
@@ -902,11 +903,9 @@ Scope {
                 const detail = String(this.text || "").trim();
                 // Capture the backend refusal as a distinct event. Generic
                 // provider and PX errors must not open Bed Recovery.
-                const match = detail.match(
-                    /HOSPITAL TARGET REFUSED\s*\/\/\s*([A-Z0-9_]+)/
-                );
-                if (match)
-                    adapter.targetRefusalCode = String(match[1]);
+                const refusal = RecoveryPolicy.targetRefusalCode(detail);
+                if (refusal)
+                    adapter.targetRefusalCode = refusal;
                 if (detail)
                     adapter.sendError = adapter.compactPxError(
                         detail,

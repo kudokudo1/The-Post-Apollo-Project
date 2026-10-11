@@ -50,7 +50,7 @@ test("host clears recovery when leaving chat",host.includes('operationsSurface !
 test("host clears recovery when menu closes",host.includes("if (!root.menuOpen) {\n            root.clearBedRecovery();"));
 test("host requests explicit safe Bed creation",host.includes("bedOperationService.createNew("));
 test("host cannot launch forced move",host.includes("moveWorkerClearance: false"));
-test("modal enforces global worker clearance",modal.includes("operationActive || !moveWorkerClearance"));
+test("modal enforces global worker clearance",modal.includes("operationActive || operationBusy || !moveWorkerClearance"));
 test("composer clears only on success",feed.includes("if (pendingSendSerial >= 0 && sendSuccessSerial > pendingSendSerial)"));
 test("candidate selection never grants authority",source.includes("verification: \"CANDIDATE_UNVERIFIED\""));
 console.log("Hospital Bed Recovery chat bridge: PASS // "+passed+" checks");

@@ -1,0 +1,101 @@
+# How to Fix "Could not resolve host: github.com" Errors When Cloning or Pushing
+
+When Git reports **"fatal: Could not resolve host: github.com"** (or similar error messages), it usually means that your system cannot translate the domain **github.com** into an IP address. This is typically a DNS (Domain Name System) problem, but it can also be caused by network or proxy settings. Below is a quick checklist of things to try.
+
+---
+## 1. Verify Basic Network Connectivity
+- Open a terminal / command prompt and run `ping github.com`. If you get replies, the basic network works.
+- If you see *"ping: github.com: Name or service not known"* or *"Temporary failure in name resolution"*, DNS is the culprit.
+
+---
+## 2. Check Your DNS Settings
+### a) Use Public DNS Servers
+- Temporarily set your DNS to Google's public DNS: `8.8.8.8` and `8.8.8.8` (or `1.1.1.1`).
+  ```sh
+  # Linux / macOS
+  sudo nano /etc/resolv.conf
+  # Add:
+  nameserver 8.8.8.8
+  nameserver 8.8.8.8
+  ```
+  ```sh
+  # Windows (via UI)
+  Control Panel → Network and Sharing Center → Change adapter settings → Properties → IPv4 → Use the following DNS server addresses
+  ```
+### b) Flush DNS Cache
+- **Windows**: `ipconfig /flushdns`
+- **macOS**: `sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder`
+- **Linux (systemd-resolved)**: `sudo systemd-resolve --flush-caches`
+
+---
+## 3. Edit the Hosts File (Work‑around)
+If DNS is still failing, you can bypass it by adding an entry for GitHub’s known IP addresses.
+- **Linux / macOS**: `/etc/hosts`
+- **Windows**: `C:\Windows\System32\drivers\etc\hosts`
+Add:
+```
+# Official GitHub IP (as of 2025‑08‑24)
+140.82.114.4 github.com
+140.82.114.5 github.com
+140.82.114.6 github.com
+```
+You can also look up the current IPs via `dig github.com` or `nslookup github.com` and add them.
+
+---
+## 4. Verify `/etc/nsswitch.conf` (Linux)
+Make sure the `hosts:` line prefers `files dns` (or `dns files`). Example:
+```
+hosts:          files dns
+```
+This ensures the system checks `/etc/hosts` before querying DNS.
+
+---
+## 5. Check Proxy or VPN Configurations
+- If you use a proxy, ensure `http_proxy` / `https_proxy` includes the correct host and port, and that the proxy can reach the internet.
+- If you are on a company VPN, verify that the VPN client allows outbound DNS traffic.
+
+---
+## 6. Test with `curl`
+```sh
+$ curl -I https://github.com
+HTTP/1.1 200 OK
+```
+If `curl` succeeds but Git still fails, the problem is likely in Git’s own DNS resolver or proxy settings.
+
+---
+## 7. Git‑specific Settings
+- Ensure `git config --global url.https://github.com/.insteadOf git://github.com/` is set (if you’re using an older protocol).
+- Check that `git config --global http.proxy` (if set) points to a working proxy.
+
+---
+## 8. Restart Network Services
+Sometimes a simple network reset helps:
+- **Windows**: `netsh interface tcp set chimney disabled` then `ipconfig /flushdns`
+- **macOS**: `sudo killall -HUP mDNSResponder`
+- **Linux**: `sudo systemctl restart networking` or `sudo systemctl restart NetworkManager`
+
+---
+## 9. Reboot the Machine
+If all else fails, a reboot can clear stale network stacks and DNS caches.
+
+---
+## 10. Verify After Fixes
+Run the original Git command again:
+```sh
+$ git clone https://github.com/username/repo.git
+```
+or
+```sh
+$ git push
+```
+If it succeeds, the issue is resolved.
+
+---
+### Quick Reference Cheat‑Sheet
+| Symptom | Likely Cause | Fix |
+|---|---|---|
+| `ping github.com` fails | DNS / network | Change DNS to 8.8.8.8, flush cache, check /etc/hosts |
+| `curl` works but `git` fails | Git proxy / DNS resolver | Check `http.proxy`, set `url.https://github.com/.insteadOf` |
+| Random failures after weeks | Cache / stale routes | `ipconfig /flushdns` / `systemd-resolve --flush-caches` |
+
+Feel free to copy this guide into your notes or a wiki for quick reference.

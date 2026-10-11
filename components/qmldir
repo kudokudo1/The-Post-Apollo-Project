@@ -20,7 +20,7 @@ SurfaceFrame 1.0 SurfaceFrame.qml
 SectionFrame 1.0 SectionFrame.qml
 WindowPanelFrame 1.0 WindowPanelFrame.qml
 
-// Named visual-language effect and text recipes.
+# Named visual-language effect and text recipes.
 singleton VisualLanguage 1.0 VisualLanguage.qml
 HaloGlow 1.0 HaloGlow.qml
 ModeButtonCloseHalo 1.0 ModeButtonCloseHalo.qml

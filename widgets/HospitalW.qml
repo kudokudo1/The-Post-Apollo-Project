@@ -61,6 +61,18 @@ PanelWindow {
         || doctorRuntimeService.quickRunning
         || roomChatView.doctorTurnActive
 
+    onSelectedRoomTeamChanged: {
+        if (bedRecoveryDialog.recoveryOpen
+                && recoveryRoomId !== selectedRoomTeam)
+            clearBedRecovery();
+    }
+
+    onOperationsSurfaceChanged: {
+        if (bedRecoveryDialog.recoveryOpen
+                && operationsSurface !== "chat")
+            clearBedRecovery();
+    }
+
     function clearBedRecovery() {
         if (bedRecoveryDialog.recoveryOpen)
             bedRecoveryDialog.cancel();
@@ -1907,6 +1919,7 @@ PanelWindow {
 
     onMenuOpenChanged: {
         if (!root.menuOpen) {
+            root.clearBedRecovery();
             if (speechInputService.busy)
                 speechInputService.cancel();
 

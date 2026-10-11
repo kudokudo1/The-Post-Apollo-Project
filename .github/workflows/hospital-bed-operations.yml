@@ -5,6 +5,7 @@ on:
     paths:
       - scripts/hospital-bed-operations.py
       - tests/hospital/test_bed_operations.py
+      - tests/hospital/test_bed_operations_bridge.js
       - services/hospital/HospitalBedRecoveryOperationService.qml
       - widgets/HospitalBedRecoveryDialog.qml
       - widgets/HospitalW.qml
@@ -26,3 +27,5 @@ jobs:
           python3 -m py_compile tests/hospital/test_bed_operations.py
       - name: Run disposable Git worktree safety regressions
         run: python3 -m unittest discover -s tests/hospital -p test_bed_operations.py -v
+      - name: Test register/create UI operation bridge
+        run: node tests/hospital/test_bed_operations_bridge.js

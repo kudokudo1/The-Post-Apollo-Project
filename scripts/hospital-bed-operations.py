@@ -232,9 +232,9 @@ def create_worktree(
     command = ["git", "-C", str(seed_root), "worktree", "add"]
     if mode == "remote":
         command += ["-b", branch]
-    command += ["--", str(target)]
-    if mode == "remote":
-        command += [remote_ref]
+    # Always pass the exact requested branch/ref. Omitting this operand
+    # makes Git manufacture a branch from the target directory name.
+    command += ["--", str(target), branch if mode == "local" else remote_ref]
     try:
         result = subprocess.run(
             command, text=True, stdout=subprocess.PIPE,

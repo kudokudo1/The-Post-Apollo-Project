@@ -106,6 +106,19 @@ class BedOperationsTests(unittest.TestCase):
                            success=False)
         self.assertEqual(got["code"], "BED_MISSING")
 
+    def test_relative_bed_path_refused(self):
+        got = self.run_cmd("register", "--path", "seed",
+                           "--repository", REPOSITORY,
+                           "--branch", "feature/seed", success=False)
+        self.assertEqual(got["code"], "BED_PATH_NOT_ABSOLUTE")
+
+    def test_relative_destination_root_refused(self):
+        got = self.run_cmd("create", "--seed-path", self.seed,
+                           "--repository", REPOSITORY,
+                           "--branch", "feature/new-room",
+                           "--bed-root", "relative/path", success=False)
+        self.assertEqual(got["code"], "BED_ROOT_NOT_ABSOLUTE")
+
     def test_register_idempotent(self):
         for _ in range(2):
             self.run_cmd("register", "--path", self.seed,

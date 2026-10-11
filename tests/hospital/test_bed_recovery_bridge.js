@@ -35,7 +35,7 @@ test("adapter imports tested refusal parser",adapter.includes('import "HospitalB
 test("adapter calls refusal parser",adapter.includes("RecoveryPolicy.targetRefusalCode(detail)"));
 test("adapter provides target failure signal",adapter.includes("signal targetMismatchDetected(string roomId, string code, string detail)"));
 test("adapter sends refusal signal only when failed",adapter.includes("Number(code) !== 0 && adapter.targetRefusalCode"));
-test("adapter preserves failed Room before reset",adapter.indexOf("adapter.targetMismatchDetected(")<adapter.indexOf('adapter.pendingTurnBody = "";',adapter.indexOf("id: turnProcess")));
+test("adapter preserves failed Room before failure cleanup",adapter.indexOf("adapter.targetMismatchDetected(",adapter.indexOf("id: turnProcess")) < adapter.indexOf('adapter.pendingTurnBody = "";',adapter.indexOf("adapter.targetMismatchDetected(",adapter.indexOf("id: turnProcess"))));
 test("adapter never signals on provider success",adapter.indexOf("adapter.targetMismatchDetected(",adapter.indexOf("id: turnProcess")) > adapter.indexOf("adapter.sendSuccessSerial += 1;",adapter.indexOf("id: turnProcess")));
 test("view exposes scoped refusal",view.includes("signal targetMismatchDetected(string roomId, string code, string detail, string draft)"));
 test("view forwards unsent draft",view.includes('String(adapter.pendingTurnBody || "")'));

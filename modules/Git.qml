@@ -48,12 +48,13 @@ DockButton {
             }
         }
 
-        // Keep the cat a single shaped mark; its parenthesis stays white.
+        // Keep the cat shaped as one mark; the parenthesis is white closed,
+        // magenta on open, matching the shared DockButton foreground state.
         GohuText {
             id: gitCatMark
             anchors.verticalCenter: parent.verticalCenter
             textFormat: Text.StyledText
-            text: "≽<font color='" + Colors.white + "'>(</font>•⩊•マ≼"
+            text: "≽<font color='" + dock.foregroundColor + "'>(</font>•⩊•マ≼"
             font.pixelSize: 16
             color: dock.open ? dock.openForegroundColor : Colors.yellow
         }

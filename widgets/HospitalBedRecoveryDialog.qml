@@ -79,6 +79,11 @@ Item {
     }
 
     function cancel() {
+        if (operationBusy) {
+            actionError =
+                "BED OPERATION STILL RUNNING // WAIT FOR ITS RESULT";
+            return;
+        }
         moveArmed = false;
         createArmed = false;
         recoveryOpen = false;
@@ -503,8 +508,11 @@ Item {
 
                     RecoveryButton {
                         width: (parent.width - 8) / 2
-                        title: "CANCEL // KEEP DRAFT"
+                        title: root.operationBusy
+                               ? "BED OPERATION IN PROGRESS"
+                               : "CANCEL // KEEP DRAFT"
                         accent: Colors.red
+                        enabledAction: !root.operationBusy
                         onTriggered: root.cancel()
                     }
                 }

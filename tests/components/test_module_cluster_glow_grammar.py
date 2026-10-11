@@ -24,44 +24,45 @@ for state in ("contentGlowColor", "dockGlowColor"):
 assert "property color openGlowColor: Colors.magenta" in dock
 assert "property color openFillColor: Colors.yellow" in dock
 
-# Ordinary icon compositions keep their original sequence with structural
-# stars / separators / parentheses in white through all interaction states.
-for name, source, parts in (
-    ("Applauncher", "appmenuIcon", ('-⋆', '♱', '⋆-')),
-    ("NotificationsHub", "text", ('-⋆', '🗒', '⋆-')),
-    ("Calendar", "calendarText", (' ⌯⌲ ', '🗓', ' ⋆˙⟡ ')),
-    ("Bluetooth", "bluetoothText", ('(', '˓✟˒', ')')),
-    ("Git", "gitMark", ('≽', '(', '•⩊•マ≼')),
+# The icon is ONE text item, not multiple Row-positioned glyph fragments.
+# Color spans preserve structural white without changing the original glyph
+# runs or their implicit single-line dimensions.
+for name, glow_source, glyphs in (
+    ("Applauncher", "appmenuIcon", ("-⋆", "♱", "⋆-")),
+    ("NotificationsHub", "text", ("-⋆", "🗒", "⋆-")),
+    ("Calendar", "calendarText", (" ⌯⌲ ", "🗓", " ⋆˙⟡ ")),
+    ("Bluetooth", "bluetoothText", ("(", "˓✟˒", ")")),
+    ("Git", "gitMark", ("≽", "(", "•⩊•マ≼")),
 ):
     qml = module(name)
-    assert f"contentGlowSource: {source}" in qml, name
-    positions = [qml.index(f'text: "{part}"') for part in parts]
-    assert positions == sorted(positions), name
-    assert qml.count("color: Colors.white") >= (1 if name == "Git" else 2), name
+    assert f"contentGlowSource: {glow_source}" in qml, name
+    assert qml.count("textFormat: Text.StyledText") == 1, name
+    assert "anchors.centerIn: parent" in qml, name
+    assert "<font color='" in qml, name
+    assert "color: Colors.white" in qml, name
+    for glyph in glyphs:
+        assert glyph in qml, (name, glyph)
+    assert "SafeDropShadow {" not in qml, name
 
-# Single marks remain single glow clusters. The rows above are not a
-# pretext for three independent effects over fragments of one identity.
-for name in ("Applauncher", "NotificationsHub", "Calendar", "Bluetooth", "Git"):
-    assert "SafeDropShadow {" not in module(name), name
+for name in ("Applauncher", "NotificationsHub", "Calendar", "Bluetooth"):
+    assert "Row {" not in module(name), name
+assert module("Git").count("Row {") == 1, "Git retains one compound branch/cat layout"
+assert 'text: "≽<font color=\'" + Colors.white + "\'>(</font>•⩊•マ≼"' in module("Git")
 
 volume = module("Volumebar")
 assert "contentGlowEnabled: false" in volume
-assert "readonly property bool hasFace: !root.ready || root.muted" in volume
-assert 'text: "("' in volume and 'text: ")"' in volume
-assert 'text: "ᴗ˳ᴗ"' not in volume  # switched by live face-state expression
-assert '"ᴗ˳ᴗ" : "｡•́︿•̀｡"' in volume
+assert volume.count("textFormat: Text.StyledText") == 2
 assert 'safeSource: volumebarIcon' in volume
+assert 'safeSource: volumebarText' in volume
+assert 'safeSource: volumebarPercent' not in volume
+assert 'id: volumebarPercent' not in volume
+assert 'root.vol.toString() + "<font color=\'" + Colors.white + "\'>%</font>"' in volume
+assert 'text: "⊹˖"' not in volume
+assert 'return "<font color=\'" + Colors.white + "\'>⊹˖(</font>ᴗ˳ᴗ' in volume
+assert 'color: !root.ready' in volume
+assert 'root.muted\n                       ? Colors.white' in volume
+assert volume.count("opacity: volumebarDock.pressed ? 1.0 : volumebarDock.hovered ? 0.95 : 0.75") == 2
 
-assert 'text: "%"' in volume
-assert 'return root.vol.toString();' in volume
-assert 'return root.vol + "%";' not in volume
-assert "safeSource: volumebarText" in volume
-assert "safeSource: volumebarPercent" in volume
-percent = volume[volume.index("id: volumebarPercent"):volume.index("id: textGlow")]
-assert "visible: root.ready && !root.muted" in percent
-assert "color: Colors.white" in percent
-assert "opacity: volumebarDock.pressed ? 1.0 : volumebarDock.hovered ? 0.95 : 0.75" in volume
-assert "color: !root.ready ? Colors.blue : root.muted ? Colors.yellow" in volume
 
 tray = module("Tray")
 assert re.search(r"(?m)^\s*SafeDropShadow\s*\{", tray)

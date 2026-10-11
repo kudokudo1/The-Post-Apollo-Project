@@ -588,7 +588,9 @@ DockButton {
 
                 z: 2
 
-                opacity: networkDock.pressed ? 0.6 : networkDock.hovered ? 0.8 : 1.0
+                // Match the shared DockButton intensity while retaining Wi-Fi's
+                // separate icon source and signal-responsive glow color.
+                opacity: networkDock.contentGlowOpacity
 
                 color: root.networkGlowColor
 
@@ -639,6 +641,7 @@ DockButton {
 
                     radius: 10
                     samples: 15
+                    opacity: networkDock.contentGlowOpacity
 
                     color: root.networkGlowColor
                 }
@@ -692,6 +695,7 @@ DockButton {
 
                         radius: 8
                         samples: 15
+                        opacity: networkDock.contentGlowOpacity
 
                         color: root.networkGlowColor
                     }
@@ -719,6 +723,7 @@ DockButton {
 
                         radius: 8
                         samples: 15
+                        opacity: networkDock.contentGlowOpacity
 
                         color: root.networkGlowColor
                     }

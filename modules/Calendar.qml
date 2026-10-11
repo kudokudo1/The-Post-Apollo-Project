@@ -23,26 +23,13 @@ DockButton {
 
     contentGlowSource: calendarText
 
-    // Keep the full icon grammar, with independent structural-white ornaments.
-    Row {
+    // Do not split the Noto glyph sequence into independent QML items.
+    NotoText {
         id: calendarText
         anchors.centerIn: parent
-        spacing: 0
-
-        NotoText {
-            text: " ⌯⌲ "
-            font.pixelSize: 20
-            color: Colors.white
-        }
-        NotoText {
-            text: "🗓"
-            font.pixelSize: 20
-            color: calendarDock.foregroundColor
-        }
-        NotoText {
-            text: " ⋆˙⟡ "
-            font.pixelSize: 20
-            color: Colors.white
-        }
+        textFormat: Text.StyledText
+        text: " ⌯⌲ <font color='" + calendarDock.foregroundColor + "'>🗓</font> ⋆˙⟡ "
+        font.pixelSize: 20
+        color: Colors.white
     }
 }

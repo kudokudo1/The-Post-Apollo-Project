@@ -23,7 +23,6 @@ SURFACES = {
     "modules/Volumebar.qml": (
         "volumebarIcon",
         "volumebarText",
-        "volumebarPercent",
     ),
     "modules/Workspaces.qml": (
         "workspacesButtonBackground",

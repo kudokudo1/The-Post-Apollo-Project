@@ -30,27 +30,14 @@ DockButton {
 
     contentGlowSource: text
 
-    // Ornamental stars/separators keep white foreground through the open state.
-    Row {
+    // One original line keeps the decorated mark visually centered.
+    GohuText {
         id: text
         anchors.centerIn: parent
-        spacing: 0
-
-        GohuText {
-            text: "-⋆"
-            font.pixelSize: 25
-            color: Colors.white
-        }
-        GohuText {
-            text: "🗒"
-            font.pixelSize: 25
-            color: dock.foregroundColor
-        }
-        GohuText {
-            text: "⋆-"
-            font.pixelSize: 25
-            color: Colors.white
-        }
+        textFormat: Text.StyledText
+        text: "-⋆<font color='" + dock.foregroundColor + "'>🗒</font>⋆-"
+        font.pixelSize: 25
+        color: Colors.white
     }
 
     onLeftClicked: {

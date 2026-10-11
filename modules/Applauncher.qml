@@ -28,30 +28,15 @@ DockButton {
 
     contentGlowSource: appmenuIcon
 
-    // The compound launcher mark glows as one cluster; framing stars stay white.
-    Row {
+    // One original text run preserves glyph metrics; only the core recolors.
+    GohuText {
         id: appmenuIcon
         anchors.centerIn: parent
-        spacing: 0
-
-        GohuText {
-            text: "-⋆"
-            font.pixelSize: 19
-            font.weight: 700
-            color: Colors.white
-        }
-        GohuText {
-            text: "♱"
-            font.pixelSize: 19
-            font.weight: 700
-            color: appmenuRoot.foregroundColor
-        }
-        GohuText {
-            text: "⋆-"
-            font.pixelSize: 19
-            font.weight: 700
-            color: Colors.white
-        }
+        textFormat: Text.StyledText
+        text: "-⋆<font color='" + appmenuRoot.foregroundColor + "'>♱</font>⋆-"
+        font.pixelSize: 19
+        font.weight: 700
+        color: Colors.white
     }
 
     onLeftClicked: {

@@ -48,26 +48,14 @@ DockButton {
             }
         }
 
-        // The cat stays one semantic mark; its parenthesis is structural white.
-        Row {
+        // Keep the cat a single shaped mark; its parenthesis stays white.
+        GohuText {
+            id: gitCatMark
             anchors.verticalCenter: parent.verticalCenter
-            spacing: 0
-
-            GohuText {
-                text: "≽"
-                font.pixelSize: 16
-                color: dock.open ? dock.openForegroundColor : Colors.yellow
-            }
-            GohuText {
-                text: "("
-                font.pixelSize: 16
-                color: Colors.white
-            }
-            GohuText {
-                text: "•⩊•マ≼"
-                font.pixelSize: 16
-                color: dock.open ? dock.openForegroundColor : Colors.yellow
-            }
+            textFormat: Text.StyledText
+            text: "≽<font color='" + Colors.white + "'>(</font>•⩊•マ≼"
+            font.pixelSize: 16
+            color: dock.open ? dock.openForegroundColor : Colors.yellow
         }
     }
 

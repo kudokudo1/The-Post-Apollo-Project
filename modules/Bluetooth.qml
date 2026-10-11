@@ -22,26 +22,13 @@ DockButton {
 
     contentGlowSource: bluetoothText
 
-    // Parentheses are structural white even while the enclosed icon is open-magenta.
-    Row {
+    // Styled text preserves the exact original centered line geometry.
+    Text {
         id: bluetoothText
         anchors.centerIn: parent
-        spacing: 0
-
-        Text {
-            text: "("
-            font.pixelSize: 20
-            color: Colors.white
-        }
-        Text {
-            text: "˓✟˒"
-            font.pixelSize: 20
-            color: bluetoothDock.foregroundColor
-        }
-        Text {
-            text: ")"
-            font.pixelSize: 20
-            color: Colors.white
-        }
+        textFormat: Text.StyledText
+        text: "(<font color='" + bluetoothDock.foregroundColor + "'>˓✟˒</font>)"
+        font.pixelSize: 20
+        color: Colors.white
     }
 }

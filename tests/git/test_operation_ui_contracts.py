@@ -68,7 +68,7 @@ require_regex(
 )
 require_regex(
     "widgets/GitW.qml",
-    r'name: "OPERATIONS".*key: "operations".*symbol: "↶".*available: true',
+    r'name: "OPERATIONS".*key: "operations".*symbol: "🏗".*available: true',
     "Operations must be a first-class Git mode",
 )
 require_regex(

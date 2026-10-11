@@ -203,14 +203,23 @@ use `SafeDropShadow`; separate them from the chassis rear/front effects.
 Isolated sources may reduce glyph effect-stacking issues, but this is not
 yet a verified Qt bug workaround.
 
-**Structural white with contextual glow:** %, :, ornamental slash/separator,
-stars, heartbeats and parentheses stay `Colors.white` in foreground while
-the glow follows their *surrounding cluster* color unless deliberately
-overridden. Decorative display separators ordinarily prefer `//` instead
-of `/`; do not mechanically replace functional single slashes in paths,
-URLs, code, math or meaningful separators. Mixed-glyph elements needing
-separate foreground colors require a careful source/layout split and visual
-verification; existing remaining widgets may not fully conform yet.
+**State-responsive structural glyphs with contextual glow:** %, :, ornamental
+slash/separator, stars, heartbeats and parentheses are normally white, but
+**white is not an unconditional override**. They follow the owning module's
+foreground state, including turning **magenta foreground and magenta glow
+when the dock is open**, just like other glyphs. Bind structural spans to
+the dock's effective `foregroundColor` (or an equivalent explicitly
+state-aware color expression), not permanently to `Colors.white`.
+The surrounding cluster glow follows the module's actual state and semantic
+identity; the shared `DockButton` open-magenta override takes priority.
+This does **not** invent an open state for modules such as Clock, Calendar,
+Bluetooth, Network or Volume that currently have none. Preserve intentional
+non-open telemetry/status colors and unusual specialty effects.
+Decorative display separators ordinarily prefer `//` instead of `/`;
+do not mechanically replace functional single slashes in paths, URLs,
+code, math or meaningful separators. Retain single-text shaping and
+cluster ownership when coloring mixed glyphs; live Qt visual verification
+remains required.
 
 **Special identities preserved:** Git keeps yellow perimeter/orange artwork,
 Hospital magenta, Social Omnitrix green, Weather orange; Clock, Volume and
@@ -261,3 +270,19 @@ menu wiring, or live reload is implied by this source-level normalization.
 - Static contracts protect against multi-Row splits, but runtime screenshots
   are still the final acceptance authority for styled-text shaping. No global
   Qt glow radius, open-magenta priority, Wi-Fi effect or control wiring changed.
+
+
+### Nurse 3A state-dependent ornament correction (2026-10-11; operator directive)
+
+- Previous instructions accidentally froze stars, parentheses and heartbeat
+  marks to white even while their parent dock turned magenta on open. That
+  interpretation is superseded: the **effective state foreground is the
+  owner**. White is only the normal-state appearance, not an exemption from
+  `DockButton.open`.
+- AppLauncher, NotificationsHub, Git (cat parenthesis), and Hospital
+  (heartbeat marks) now explicitly follow the shared foreground state.
+  Calendar and Bluetooth bind their complete glyphs to their dock foreground
+  for consistency but do not gain imaginary open behavior.
+- A coherent mark still uses one glyph source and one cluster glow. This
+  correction does not split glyph runs again or change existing sampled
+  radius/opacity, Wi-Fi telemetry, mute semantics or color-role exceptions.

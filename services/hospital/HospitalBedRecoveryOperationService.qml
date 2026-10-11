@@ -58,7 +58,7 @@ Scope {
             return false;
         }
         return begin("register", [
-            "--path", directory, "--repository", repo, "--branch", expected
+            "--path", directory, "--repository", repo, "--branch=" + expected
         ]);
     }
 
@@ -71,7 +71,7 @@ Scope {
             return false;
         }
         return begin("create", [
-            "--seed-path", seed, "--repository", repo, "--branch", expected
+            "--seed-path", seed, "--repository", repo, "--branch=" + expected
         ]);
     }
 

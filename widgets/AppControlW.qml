@@ -24252,14 +24252,6 @@ PanelWindow {
 
                 ActionButton {
                     id: appKillAction
-                    // Keep firing visible after mouse release without delaying the action.
-                    property bool clickFirePulse: false
-                    Timer {
-                        id: appKillActionFireTimer
-                        interval: 420
-                        repeat: false
-                        onTriggered: appKillAction.clickFirePulse = false
-                    }
 
                     visible: {
                         const current =
@@ -24298,6 +24290,14 @@ PanelWindow {
                     showLabel: false
                     pointerCursorShape: Qt.ArrowCursor
                     acceptedButtons: Qt.LeftButton
+                    // Keep firing visible after mouse release without delaying the action.
+                    property bool clickFirePulse: false
+                    Timer {
+                        id: appKillActionFireTimer
+                        interval: 420
+                        repeat: false
+                        onTriggered: appKillAction.clickFirePulse = false
+                    }
 
                     idleFillColor: Colors.black
                     hoverFillColor: Colors.yellow

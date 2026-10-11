@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "HospitalBedRecoveryPolicy.js" as RecoveryPolicy
 
 Scope {
     id: adapter
@@ -38,6 +39,7 @@ Scope {
     property string pendingTurnBody: ""
     property string pendingTurnRoomId: ""
     property string turnBody: ""
+    property string targetRefusalCode: ""
     property var lastTurnResult: null
 
     property var liveStreamEvents: []
@@ -59,6 +61,7 @@ Scope {
     signal roomBound(var room)
     signal sessionResolved(string sessionId)
     signal turnCompleted(var result)
+    signal targetMismatchDetected(string roomId, string code, string detail)
 
     function pxArgs(args) {
         const suffix = Array.isArray(args) ? args : [];
@@ -369,6 +372,7 @@ Scope {
 
         turnBody = body;
         lastTurnResult = null;
+        targetRefusalCode = "";
         sendError = "";
 
         const args = [
@@ -897,6 +901,11 @@ Scope {
         stderr: StdioCollector {
             onStreamFinished: {
                 const detail = String(this.text || "").trim();
+                // Capture the backend refusal as a distinct event. Generic
+                // provider and PX errors must not open Bed Recovery.
+                const refusal = RecoveryPolicy.targetRefusalCode(detail);
+                if (refusal)
+                    adapter.targetRefusalCode = refusal;
                 if (detail)
                     adapter.sendError = adapter.compactPxError(
                         detail,
@@ -930,6 +939,15 @@ Scope {
                 adapter.sendError =
                     "PX HOSPITAL AGENT TURN EXIT " + String(code);
 
+            // Capture affected identity before clearing pending turn state.
+            if (Number(code) !== 0 && adapter.targetRefusalCode) {
+                adapter.targetMismatchDetected(
+                    String(adapter.pendingTurnRoomId || ""),
+                    adapter.targetRefusalCode,
+                    adapter.sendError
+                );
+            }
+            adapter.targetRefusalCode = "";
             adapter.pendingTurnBody = "";
             adapter.pendingTurnRoomId = "";
             adapter.turnBody = "";

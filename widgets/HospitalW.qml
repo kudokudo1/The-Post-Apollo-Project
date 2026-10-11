@@ -44,6 +44,105 @@ PanelWindow {
     property var pendingReceptionRoundsSelection: null
     property string selectedDoctorId: ""
     property string selectedProviderId: ""
+    // Bed Recovery is scoped to a failed turn, never to a global Room change.
+    property string recoveryRoomId: ""
+    property string recoveryDraft: ""
+    property string recoveryDetail: ""
+
+    readonly property bool recoveryOperationActive:
+        roomService.running
+        || roomService.rehearsing
+        || roomService.integrating
+        || roomService.postOpRunning
+        || roomService.armed
+        || floorService.moveRunning
+        || doctorRuntimeService.operating
+        || doctorRuntimeService.cancelling
+        || doctorRuntimeService.quickRunning
+        || roomChatView.doctorTurnActive
+
+    onSelectedRoomTeamChanged: {
+        if (bedRecoveryDialog.recoveryOpen
+                && recoveryRoomId !== selectedRoomTeam)
+            clearBedRecovery();
+    }
+
+    onOperationsSurfaceChanged: {
+        if (bedRecoveryDialog.recoveryOpen
+                && operationsSurface !== "chat")
+            clearBedRecovery();
+    }
+
+    function clearBedRecovery() {
+        if (bedRecoveryDialog.recoveryOpen)
+            bedRecoveryDialog.cancel();
+        recoveryRoomId = "";
+        recoveryDraft = "";
+        recoveryDetail = "";
+    }
+
+    function openBedRecovery(roomIdValue, code, detail, draft) {
+        const roomId = String(roomIdValue || "").trim();
+        if (!root.menuOpen || root.operationsSurface !== "chat"
+                || !roomId || roomId !== root.selectedRoomTeam)
+            return false;
+        // Explicitly no retry here: the original composer still owns draft.
+        recoveryRoomId = roomId;
+        recoveryDraft = String(draft || "");
+        recoveryDetail = String(detail || "");
+        bedRecoveryDialog.openFor(code);
+        return true;
+    }
+
+    function recoverWithKnownBed(candidate) {
+        if (!bedRecoveryDialog.recoveryOpen
+                || recoveryRoomId !== root.selectedRoomTeam) {
+            bedRecoveryDialog.actionError =
+                "ROOM CHANGED // RECOVERY CANCELLED";
+            return false;
+        }
+        const row = candidate || {};
+        const desired = String(row.path || "").trim();
+        if (!desired) {
+            bedRecoveryDialog.actionError = "NO BED SELECTED";
+            return false;
+        }
+
+        // Stay on the selected Patient/Floor. Switching Floors clears the
+        // selected Room in current HospitalW; that is never an implicit retry.
+        const beds = Array.isArray(floorService.allBeds)
+                     ? floorService.allBeds : [];
+        let current = null;
+        for (let i = 0; i < beds.length; ++i) {
+            if (String(beds[i].path || "") === desired) {
+                current = beds[i];
+                break;
+            }
+        }
+        if (!current || String(current.floorId || "") !==
+                       String(floorService.floorId || "")) {
+            bedRecoveryDialog.actionError =
+                "BED NOT ON SELECTED PATIENT FLOOR // RESELECT PATIENT";
+            return false;
+        }
+        const index = floorService.bedIndexOfPath(desired);
+        if (index < 0) {
+            bedRecoveryDialog.actionError =
+                "CANDIDATE CHANGED // SEARCH AGAIN";
+            return false;
+        }
+        if (String(floorService.bedPath || "") !== desired
+                && !floorService.selectBed(index)) {
+            bedRecoveryDialog.actionError = "BED SELECTION FAILED";
+            return false;
+        }
+
+        // The operator must explicitly press SEND again. The PX target
+        // guard—not this scan—is still authoritative at launch time.
+        clearBedRecovery();
+        return true;
+    }
+
 
     readonly property bool operationsOpen:
         root.operationsSurface.length > 0
@@ -1820,6 +1919,7 @@ PanelWindow {
 
     onMenuOpenChanged: {
         if (!root.menuOpen) {
+            root.clearBedRecovery();
             if (speechInputService.busy)
                 speechInputService.cancel();
 
@@ -6161,6 +6261,10 @@ PanelWindow {
 
             onCloseRequested: root.showSurgery()
 
+            onTargetMismatchDetected: function(roomId, code, detail, draft) {
+                root.openBedRecovery(roomId, code, detail, draft);
+            }
+
             onRichActionRequested: function(action, value, message) {
                 const route = String(action || "").toUpperCase();
                 const target = String(value || "").trim();
@@ -6184,6 +6288,55 @@ PanelWindow {
                     root.selectRoomIndex(roomIndex);
                     Qt.callLater(root.openRoomChat);
                 }
+            }
+        }
+
+        HospitalBedRecoveryDialog {
+            id: bedRecoveryDialog
+
+            z: 905
+            anchors.fill: roomChatView
+            floorService: floorService
+            roomId: root.recoveryRoomId
+            expectedRepository: githubService.repoSlug
+            expectedBranch: root.selectedRoomBranch
+            currentBedPath: floorService.bedPath
+            currentBedBranch: floorService.bedBranch
+            pendingDraft: root.recoveryDraft
+            operationActive: root.recoveryOperationActive
+
+            // No global authoritative cross-Room worker occupancy probe yet.
+            // Requesting "force" cannot skip this protection.
+            moveWorkerClearance: false
+
+            onSelectBedRequested: function(candidate) {
+                root.recoverWithKnownBed(candidate);
+            }
+
+            onCreateBedRequested: function(repository, branch) {
+                bedRecoveryDialog.actionError =
+                    "CREATE BED NOT YET WIRED // NO GIT CHANGES MADE";
+            }
+
+            onRegisterBedRequested: {
+                bedRecoveryDialog.actionError =
+                    "REGISTER BED NOT YET WIRED // NO FILES CHANGED";
+            }
+
+            onMoveBedRequested: function(path, branch) {
+                bedRecoveryDialog.actionError =
+                    "MOVE HELD // GLOBAL WORKER OCCUPANCY NOT VERIFIED";
+            }
+
+            onInspectOnlyRequested: {
+                root.clearBedRecovery();
+                root.openRoomReports();
+            }
+
+            onCancelled: {
+                root.recoveryRoomId = "";
+                root.recoveryDraft = "";
+                root.recoveryDetail = "";
             }
         }
 

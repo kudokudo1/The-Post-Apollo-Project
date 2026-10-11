@@ -16,6 +16,8 @@ Item {
     property string currentBedBranch: ""
     property string mismatchCode: ""
     property string pendingDraft: ""
+    property string actionError: ""
+    property bool moveWorkerClearance: false
     property bool operationActive: false
     property bool recoveryOpen: false
     property bool moveArmed: false
@@ -40,9 +42,12 @@ Item {
     }
     readonly property var movePolicy: RecoveryPolicy.moveEligibility(
         currentBed, expectedRepository, expectedBranch,
-        operationActive || Boolean(floorService && floorService.moveRunning)
+        operationActive || !moveWorkerClearance
+        || Boolean(floorService && floorService.moveRunning)
     )
     readonly property bool scanning: Boolean(floorService && floorService.discovering)
+    // An observed idle selected Doctor does not prove OTHER Rooms are idle.
+    // Host must provide affirmative global worker/Bed occupancy evidence.
 
     signal selectBedRequested(var candidate)
     signal createBedRequested(string repository, string branch)
@@ -63,6 +68,7 @@ Item {
         recoveryOpen = true;
         moveArmed = false;
         selectedPath = "";
+        actionError = "";
         scan();
         forceActiveFocus();
     }
@@ -353,6 +359,15 @@ Item {
                     wrapMode: Text.WordWrap
                 }
 
+                GohuText {
+                    width: parent.width
+                    visible: root.actionError.length > 0
+                    text: root.actionError
+                    color: Colors.red
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                }
+
                 RecoveryButton {
                     width: parent.width
                     title: root.selectedCandidate
@@ -410,7 +425,10 @@ Item {
                     width: parent.width
                     text: root.movePolicy.eligible
                           ? "Movement still requires a fresh dirty/occupancy/worker check. LIVE Beds require the existing second confirmation."
-                          : "MOVE UNAVAILABLE // " + root.movePolicy.reason
+                          : "MOVE UNAVAILABLE // "
+                            + (!root.moveWorkerClearance
+                               ? "ACTIVE WORKER CLEARANCE NOT YET VERIFIED"
+                               : root.movePolicy.reason)
                             + ". Create a separate Bed instead."
                     font.pixelSize: 9
                     wrapMode: Text.WordWrap

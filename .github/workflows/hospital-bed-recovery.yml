@@ -6,6 +6,10 @@ on:
       - widgets/HospitalBedRecoveryDialog.qml
       - services/hospital/HospitalBedRecoveryPolicy.js
       - tests/hospital/test_bed_recovery_policy.js
+      - tests/hospital/test_bed_recovery_bridge.js
+      - widgets/HospitalRoomChatView.qml
+      - widgets/HospitalW.qml
+      - services/hospital/HospitalRoomConversationAdapter.qml
       - .github/workflows/hospital-bed-recovery.yml
   workflow_dispatch:
 
@@ -22,5 +26,8 @@ jobs:
         run: |
           node --check services/hospital/HospitalBedRecoveryPolicy.js
           node --check tests/hospital/test_bed_recovery_policy.js
+          node --check tests/hospital/test_bed_recovery_bridge.js
       - name: Test candidate search, move eligibility and dialog contract
         run: node tests/hospital/test_bed_recovery_policy.js
+      - name: Test Room chat refusal to recovery bridge
+        run: node tests/hospital/test_bed_recovery_bridge.js

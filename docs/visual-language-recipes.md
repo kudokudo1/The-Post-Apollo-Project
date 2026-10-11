@@ -231,10 +231,12 @@ menu wiring, or live reload is implied by this source-level normalization.
 - Workspaces retains the independently colored, dual-layer active workspace
   glow and per-workspace controls. Only compatible exterior/front and text
   glow opacity values align to the shared numeric recipe.
-- Volume's numeric readout and white structural `%` are separately sampled,
-  with the percent's glow retaining the volume-level color. Launcher,
-  Notifications, Calendar, Bluetooth and Git keep their complete compound
-  marks while structural stars/parentheses remain white through open state.
+- Volume's numeric readout and white structural `%` are one coherent
+  sampled text cluster, retaining the volume-level glow color. Launcher,
+  Notifications, Calendar, Bluetooth and Git preserve complete compound marks
+  in a **single centered text item** with styled foreground spans for structural
+  stars/parentheses; fragmenting those marks into QML Rows caused observable
+  alignment regressions after PR #185.
 - Wi-Fi's legacy inverse icon opacity was subsequently normalized in
   PR #185 to shared rising content intensity for its four independent
   sampled clusters; their differing established radii and color semantics
@@ -243,3 +245,19 @@ menu wiring, or live reload is implied by this source-level normalization.
 - These source changes require operator review of actual Qt font shaping,
   adjacent fragment spacing, glyph glow intensity and sampled-source lifetime
   before being considered visually accepted.
+
+### Nurse 3A icon-layout regression correction (2026-10-11; operator screenshot)
+
+- PR #185's separate `Row` glyph fragments visibly displaced the decorative
+  icons (especially Calendar, Bluetooth, Git, Notifications, Volume mute).
+  Colorization must not change the original single-line centering, font
+  fallback or baseline geometry. Prefer one anchored `GohuText`, `NotoText`
+  or `Text` with `Text.StyledText` color spans for different foreground
+  colors **within one semantic glyph cluster**.
+- Muted Volume decorative stars `⊹˖` and ` ࣪ ˖ ` and all face parentheses
+  remain white; the face body retains its semantic status color. Mute/unready
+  glyph runs, the `%` suffix and the original two-source volume glow split
+  are maintained without additional Row positioners.
+- Static contracts protect against multi-Row splits, but runtime screenshots
+  are still the final acceptance authority for styled-text shaping. No global
+  Qt glow radius, open-magenta priority, Wi-Fi effect or control wiring changed.

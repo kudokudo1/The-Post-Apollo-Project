@@ -30,6 +30,8 @@ ok("host wires safe registration service", host.includes('bedOperationService.re
 ok("host wires safe create service", host.includes('bedOperationService.createNew('));
 ok("host keeps movement disabled", host.includes('moveWorkerClearance: false'));
 ok("create needs two clicks", dialog.includes('if (!root.createArmed)'));
+ok("cancel refuses during running Bed creation", dialog.includes('if (operationBusy) {') && dialog.includes('BED OPERATION STILL RUNNING'));
+ok("cancel control disables while running", dialog.includes('enabledAction: !root.operationBusy'));
 ok("registration is not auto-send", !service.includes('agent turn') && !service.includes('sendMessage('));
 ok("create backend uses worktree add", helper.includes('"worktree", "add"'));
 ok("backend includes exact requested ref", helper.includes('branch if mode == "local" else remote_ref'));

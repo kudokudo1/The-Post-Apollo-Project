@@ -77,9 +77,15 @@ assert workspaces.count("workspacesButtonMouse.containsMouse ? 0.95") == 2
 assert workspaces.count(": 0.75") >= 2
 assert "visible: workspacesWorkspaceButton.isActive" in workspaces
 
-# Preserve documented exceptions until runtime and operator acceptance:
-# Wi-Fi's inverted source icon glow, historical Power, dormant media dock.
-assert "networkDock.pressed ? 0.6 : networkDock.hovered ? 0.8 : 1.0" in module("Network")
+# Wi-Fi now shares the rising dock glow intensity without flattening the
+# icon, SSID, percentage, and speed into one sampled source.
+network = module("Network")
+assert network.count("opacity: networkDock.contentGlowOpacity") == 4
+assert "networkDock.pressed ? 0.6 : networkDock.hovered ? 0.8 : 1.0" not in network
+for field in ("networkIconRow", "networkText", "networkSignalText", "networkSpeedText"):
+    assert field in network, field
+
+# Preserve separately approved specialty behavior pending runtime review.
 assert "softGlowSpread: 1" in module("Power")
 assert "contentGlowSource: mediaArtwork" in module("Mediaplayer")
 

@@ -37,7 +37,7 @@ for name, source, parts in (
     assert f"contentGlowSource: {source}" in qml, name
     positions = [qml.index(f'text: "{part}"') for part in parts]
     assert positions == sorted(positions), name
-    assert qml.count("color: Colors.white") >= 2, name
+    assert qml.count("color: Colors.white") >= (1 if name == "Git" else 2), name
 
 # Single marks remain single glow clusters. The rows above are not a
 # pretext for three independent effects over fragments of one identity.

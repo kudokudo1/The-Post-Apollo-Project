@@ -90,7 +90,10 @@ def inspect(path_text: str, repository: str, branch: str = "") -> dict:
         branch = verify_branch(branch)
     if not str(path_text or "").strip():
         raise Refused("BED_PATH_MISSING")
-    bed = Path(path_text).expanduser().resolve()
+    raw_path = Path(path_text).expanduser()
+    if not raw_path.is_absolute():
+        raise Refused("BED_PATH_NOT_ABSOLUTE")
+    bed = raw_path.resolve()
     if not bed.is_dir():
         raise Refused("BED_MISSING")
     try:
@@ -199,6 +202,8 @@ def create_worktree(
     # Seed is allowed on another branch; its Patient identity is not.
     seed = inspect(seed_path, repository)
     seed_root = Path(seed["path"])
+    if bed_root and not Path(bed_root).expanduser().is_absolute():
+        raise Refused("BED_ROOT_NOT_ABSOLUTE")
     root = Path(bed_root).expanduser().resolve() if bed_root else (
         Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local/share")))
         / "post-apollo/hospital/beds"

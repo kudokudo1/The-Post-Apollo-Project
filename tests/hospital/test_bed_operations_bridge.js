@@ -1,0 +1,42 @@
+/* Source contract only. Does not substitute for live Quickshell UI QA. */
+"use strict";
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const root = path.resolve(__dirname, "../..");
+const read = f => fs.readFileSync(path.join(root, f), "utf8");
+const service = read("services/hospital/HospitalBedRecoveryOperationService.qml");
+const floor = read("services/hospital/HospitalFloorService.qml");
+const dialog = read("widgets/HospitalBedRecoveryDialog.qml");
+const host = read("widgets/HospitalW.qml");
+const helper = read("scripts/hospital-bed-operations.py");
+let checks = 0;
+function ok(label, condition) { assert.ok(condition, label); checks++; }
+
+ok("script in managed Quickshell shell path", service.includes('Quickshell.shellPath("scripts/hospital-bed-operations.py")'));
+ok("command arguments are arrays, not bash interpolation", service.includes('opProcess.exec(["python3", helperPath, action].concat(values))'));
+ok("service does not shell invoke Git", !service.includes('"bash"') && !service.includes('["git",'));
+ok("register requires explicit repo branch and path", service.includes('function registerExisting(path, repository, branch)'));
+ok("create requires explicit repo branch and seed", service.includes('function createNew(seedPath, repository, branch)'));
+ok("operation service registers only response candidate", service.includes('if (!bed || !bed.path || !bed.repository || !bed.branch)'));
+ok("operation service distinguishes create and register", service.includes('if (action === "register")') && service.includes('if (action === "create")'));
+ok("startup reads registry", host.includes('Component.onCompleted: loadKnown()'));
+ok("floor incorporates persisted entries", floor.includes('externallyRegisteredBeds') && floor.includes('function setExternalBeds(rows)'));
+ok("floor scanner wins on duplicate", floor.includes('const raw = pendingBeds.concat(externallyRegisteredBeds)'));
+ok("modal accepts a manual path", dialog.includes('property string manualBedPath: ""'));
+ok("modal emits explicit path registration", dialog.includes('signal registerBedRequested(string path)'));
+ok("modal calls path-aware signal", dialog.includes('root.registerBedRequested('));
+ok("host wires safe registration service", host.includes('bedOperationService.registerExisting('));
+ok("host wires safe create service", host.includes('bedOperationService.createNew('));
+ok("host keeps movement disabled", host.includes('moveWorkerClearance: false'));
+ok("create needs two clicks", dialog.includes('if (!root.createArmed)'));
+ok("cancel refuses during running Bed creation", dialog.includes('if (operationBusy) {') && dialog.includes('BED OPERATION STILL RUNNING'));
+ok("cancel control disables while running", dialog.includes('enabledAction: !root.operationBusy'));
+ok("registration is not auto-send", !service.includes('agent turn') && !service.includes('sendMessage('));
+ok("create backend uses worktree add", helper.includes('"worktree", "add"'));
+ok("backend includes exact requested ref", helper.includes('branch if mode == "local" else remote_ref'));
+ok("backend rejects arbitrary target filenames", helper.includes('BED_NAME_INVALID'));
+ok("backend rejects wrong Git Patient", helper.includes("PATIENT_REPOSITORY_MISMATCH"));
+ok("backend stores only metadata not authority", !helper.includes('permission_grant') && !helper.includes("assignment_activate"));
+ok("the post-operation instruction is manual SEND", host.includes("PRESS SEND AGAIN"));
+console.log("Hospital Bed Operations UI bridge: PASS // " + checks + " checks");

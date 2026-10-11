@@ -38,6 +38,8 @@ Scope {
 
     property var pendingBeds: []
     property var allBeds: []
+    // Validated user-registered checkout candidates; not execution authority.
+    property var externallyRegisteredBeds: []
     property var rememberedBedByFloor: ({})
 
     property alias floorModel: floorRows
@@ -217,13 +219,32 @@ Scope {
         }
     }
 
+    function setExternalBeds(rows) {
+        externallyRegisteredBeds = Array.isArray(rows) ? rows.slice() : [];
+        if (!discovering)
+            rebuild();
+    }
+
     function rebuild() {
         const previousFloorId = floorId;
         const previousBedPath = bedPath;
         const unique = {};
 
         floorRows.clear();
-        allBeds = pendingBeds.slice();
+        // Current scanner entries win over older registry metadata.
+        // Never treat the registry as proof of a live Git checkout.
+        const raw = pendingBeds.concat(externallyRegisteredBeds);
+        const seenPaths = {};
+        const uniqueBeds = [];
+        for (let n = 0; n < raw.length; ++n) {
+            const bedRow = raw[n] || {};
+            const bedPath = String(bedRow.path || "").trim();
+            if (!bedPath || seenPaths[bedPath])
+                continue;
+            seenPaths[bedPath] = true;
+            uniqueBeds.push(bedRow);
+        }
+        allBeds = uniqueBeds;
 
         for (let i = 0; i < allBeds.length; ++i) {
             const bed = allBeds[i];

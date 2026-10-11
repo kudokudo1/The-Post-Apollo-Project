@@ -39,7 +39,7 @@ for name, glow_source, glyphs in (
     assert qml.count("textFormat: Text.StyledText") == 1, name
     assert "anchors.centerIn: parent" in qml, name
     assert "<font color='" in qml, name
-    assert "color: Colors.white" in qml, name
+    assert ("color: Colors.white" in qml if name != "Git" else '" + Colors.white + "' in qml), name
     for glyph in glyphs:
         assert glyph in qml, (name, glyph)
     assert "SafeDropShadow {" not in qml, name

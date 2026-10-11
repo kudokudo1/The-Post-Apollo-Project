@@ -139,51 +139,25 @@ DockButton {
             implicitWidth: volumebarIcon.implicitWidth
             implicitHeight: volumebarIcon.implicitHeight
 
-            // Mute and unavailable faces keep their parenthesis glyphs white.
-            // The full face/bar remains one meaningful glow source.
-            Row {
+            // Original single-run face metrics + independently white ornaments.
+            // Both mute stars and all face parentheses remain white.
+            GohuText {
                 id: volumebarIcon
-                anchors.centerIn: parent
-                spacing: 0
-
-                readonly property bool hasFace: !root.ready || root.muted
-                readonly property color glyphColor: !root.ready
-                                                    ? Colors.blue
-                                                    : root.muted
-                                                    ? Colors.yellow
-                                                    : root.volumeColor
-
-                GohuText {
-                    visible: volumebarIcon.hasFace
-                    text: root.ready ? "⊹˖" : "ᓬ"
-                    font.pixelSize: 20
-                    color: volumebarIcon.glyphColor
+                anchors.fill: parent
+                textFormat: Text.StyledText
+                text: {
+                    if (!root.ready)
+                        return "ᓬ<font color='" + Colors.white + "'>(</font>｡•́︿•̀｡<font color='" + Colors.white + "'>)</font>";
+                    if (root.muted)
+                        return "<font color='" + Colors.white + "'>⊹˖(</font>ᴗ˳ᴗ<font color='" + Colors.white + "'>)</font>ᶻ𝗓";
+                    return root.icon;
                 }
-                GohuText {
-                    visible: volumebarIcon.hasFace
-                    text: "("
-                    font.pixelSize: 20
-                    color: Colors.white
-                }
-                GohuText {
-                    text: volumebarIcon.hasFace
-                          ? (root.ready ? "ᴗ˳ᴗ" : "｡•́︿•̀｡")
-                          : root.icon
-                    font.pixelSize: 20
-                    color: volumebarIcon.glyphColor
-                }
-                GohuText {
-                    visible: volumebarIcon.hasFace
-                    text: ")"
-                    font.pixelSize: 20
-                    color: Colors.white
-                }
-                GohuText {
-                    visible: root.muted
-                    text: "ᶻ𝗓"
-                    font.pixelSize: 20
-                    color: volumebarIcon.glyphColor
-                }
+                font.pixelSize: 20
+                color: !root.ready
+                       ? Colors.blue
+                       : root.muted
+                       ? Colors.yellow
+                       : root.volumeColor
             }
 
             SafeDropShadow {
@@ -207,93 +181,43 @@ DockButton {
             }
         }
 
-        // Value and structural percent are separate glyph sources. The percent
-        // remains white while its glow follows the surrounding volume color.
+        // The numeric value and its structural-white percent again share the
+        // original single Text metrics; one glow samples the readout cluster.
         Item {
             id: volumebarTextContainer
+            implicitWidth: volumebarText.implicitWidth
+            implicitHeight: volumebarText.implicitHeight
 
-            implicitWidth: volumeReadout.implicitWidth
-            implicitHeight: volumeReadout.implicitHeight
-
-            Row {
-                id: volumeReadout
-                anchors.centerIn: parent
-                spacing: 0
-
-                Text {
-                    id: volumebarText
-
-                    text: {
-                        if (!root.ready)
-                            return "ᕒ";
-
-                        if (root.muted)
-                            return " ࣪ ˖ ";
-
-                        return root.vol.toString();
-                    }
-
-                    font.pixelSize: 20
-
-                    color: {
-                        if (!root.ready)
-                            return Colors.blue;
-
-                        if (root.muted)
-                            return Colors.yellow;
-
-                        return root.volumeColor;
-                    }
+            Text {
+                id: volumebarText
+                anchors.fill: parent
+                textFormat: Text.StyledText
+                text: {
+                    if (!root.ready)
+                        return "ᕒ";
+                    if (root.muted)
+                        return " ࣪ ˖ ";
+                    return root.vol.toString() + "<font color='" + Colors.white + "'>%</font>";
                 }
-
-                Text {
-                    id: volumebarPercent
-
-                    visible: root.ready && !root.muted
-                    text: "%"
-                    font.pixelSize: 20
-                    color: Colors.white
-                }
+                font.pixelSize: 20
+                color: !root.ready
+                       ? Colors.blue
+                       : root.muted
+                       ? Colors.white
+                       : root.volumeColor
             }
 
             SafeDropShadow {
                 id: textGlow
-
                 anchors.fill: volumebarText
                 safeSource: volumebarText
                 horizontalOffset: 0
                 verticalOffset: 0
-
                 radius: 14
                 samples: 15
-
                 z: 2
-
                 opacity: volumebarDock.pressed ? 1.0 : volumebarDock.hovered ? 0.95 : 0.75
-
                 color: !root.ready ? Colors.blue : root.muted ? Colors.yellow : root.vol <= 15 ? Colors.cyan : root.volumeColor
-
-                transparentBorder: true
-            }
-
-            SafeDropShadow {
-                id: percentGlow
-
-                anchors.fill: volumebarPercent
-                safeSource: volumebarPercent
-                visible: volumebarPercent.visible
-                horizontalOffset: 0
-                verticalOffset: 0
-
-                radius: 14
-                samples: 15
-
-                z: 2
-
-                opacity: volumebarDock.pressed ? 1.0 : volumebarDock.hovered ? 0.95 : 0.75
-
-                color: !root.ready ? Colors.blue : root.muted ? Colors.yellow : root.vol <= 15 ? Colors.cyan : root.volumeColor
-
                 transparentBorder: true
             }
         }

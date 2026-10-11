@@ -139,23 +139,50 @@ DockButton {
             implicitWidth: volumebarIcon.implicitWidth
             implicitHeight: volumebarIcon.implicitHeight
 
-            GohuText {
+            // Mute and unavailable faces keep their parenthesis glyphs white.
+            // The full face/bar remains one meaningful glow source.
+            Row {
                 id: volumebarIcon
+                anchors.centerIn: parent
+                spacing: 0
 
-                anchors.fill: parent
+                readonly property bool hasFace: !root.ready || root.muted
+                readonly property color glyphColor: !root.ready
+                                                    ? Colors.blue
+                                                    : root.muted
+                                                    ? Colors.yellow
+                                                    : root.volumeColor
 
-                text: root.icon
-
-                font.pixelSize: 20
-
-                color: {
-                    if (!root.ready)
-                        return Colors.blue;
-
-                    if (root.muted)
-                        return Colors.yellow;
-
-                    return root.volumeColor;
+                GohuText {
+                    visible: volumebarIcon.hasFace
+                    text: root.ready ? "⊹˖" : "ᓬ"
+                    font.pixelSize: 20
+                    color: volumebarIcon.glyphColor
+                }
+                GohuText {
+                    visible: volumebarIcon.hasFace
+                    text: "("
+                    font.pixelSize: 20
+                    color: Colors.white
+                }
+                GohuText {
+                    text: volumebarIcon.hasFace
+                          ? (root.ready ? "ᴗ˳ᴗ" : "｡•́︿•̀｡")
+                          : root.icon
+                    font.pixelSize: 20
+                    color: volumebarIcon.glyphColor
+                }
+                GohuText {
+                    visible: volumebarIcon.hasFace
+                    text: ")"
+                    font.pixelSize: 20
+                    color: Colors.white
+                }
+                GohuText {
+                    visible: root.muted
+                    text: "ᶻ𝗓"
+                    font.pixelSize: 20
+                    color: volumebarIcon.glyphColor
                 }
             }
 

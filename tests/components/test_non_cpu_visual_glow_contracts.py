@@ -44,7 +44,7 @@ for relative, sources in SURFACES.items():
 
     for source in set(sources):
         expected = sources.count(source)
-        actual = qml.count(f"safeSource: {source}")
+        actual = len(re.findall(rf"(?m)^\s*safeSource:\s*{re.escape(source)}\s*$", qml))
         assert actual == expected, (
             f"{relative}: expected {expected} safeSource attachment(s) "
             f"for {source}, found {actual}"

@@ -79,7 +79,7 @@ DOCK_MODULES = {
     ),
     "modules/Clock.qml": (
         "DockButton {",
-        "implicitWidth: 151",
+        "Math.ceil(clockRow.implicitWidth)",
         "implicitHeight: 50",
         "contentGlowEnabled: false",
         "clockArea.is24Hour ? Colors.orange : Colors.cyan",

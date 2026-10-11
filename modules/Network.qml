@@ -576,26 +576,6 @@ DockButton {
                 }
             }
 
-            layer.enabled: true
-
-            layer.effect: DropShadow {
-                anchors.fill: networkIconRow
-
-                source: networkIconRow
-
-                radius: 14
-                samples: 15
-
-                z: 2
-
-                // Match the shared DockButton intensity while retaining Wi-Fi's
-                // separate icon source and signal-responsive glow color.
-                opacity: networkDock.contentGlowOpacity
-
-                color: root.networkGlowColor
-
-                transparentBorder: true
-            }
         }
 
         // =========================================
@@ -633,18 +613,6 @@ DockButton {
 
                 elide: Text.ElideNone
 
-                layer.enabled: true
-
-                layer.effect: DropShadow {
-                    horizontalOffset: 0
-                    verticalOffset: 0
-
-                    radius: 10
-                    samples: 15
-                    opacity: networkDock.contentGlowOpacity
-
-                    color: root.networkGlowColor
-                }
             }
 
             Text {
@@ -687,18 +655,6 @@ DockButton {
                     // Center the actual text inside the column.
                     horizontalAlignment: Text.AlignHCenter
 
-                    layer.enabled: true
-
-                    layer.effect: DropShadow {
-                        horizontalOffset: 0
-                        verticalOffset: 0
-
-                        radius: 8
-                        samples: 15
-                        opacity: networkDock.contentGlowOpacity
-
-                        color: root.networkGlowColor
-                    }
                 }
 
                 Text {
@@ -715,21 +671,103 @@ DockButton {
                     // Center the actual text inside the column.
                     horizontalAlignment: Text.AlignHCenter
 
-                    layer.enabled: true
-
-                    layer.effect: DropShadow {
-                        horizontalOffset: 0
-                        verticalOffset: 0
-
-                        radius: 8
-                        samples: 15
-                        opacity: networkDock.contentGlowOpacity
-
-                        color: root.networkGlowColor
-                    }
                 }
             }
         }
+    }
+
+    // Independent sampled glows sit outside the RowLayouts, so their opacity
+    // never modifies the source glyphs and they take no layout space.
+    // Glow-only overlay: the source Item/Text remains a fully opaque native
+    // glyph, unaffected by the interactive opacity of its sampled shadow.
+    SafeDropShadow {
+        id: networkIconRowGlow
+        readonly property point sourceOrigin: networkIconRow.mapToItem(parent, 0, 0)
+
+        x: sourceOrigin.x
+        y: sourceOrigin.y
+        width: networkIconRow.width
+        height: networkIconRow.height
+        safeSource: networkIconRow
+
+        horizontalOffset: 0
+        verticalOffset: 0
+        radius: 14
+        samples: 15
+        z: 2
+
+        opacity: networkDock.contentGlowOpacity
+        color: root.networkGlowColor
+        transparentBorder: true
+    }
+
+    // Glow-only overlay: the source Item/Text remains a fully opaque native
+    // glyph, unaffected by the interactive opacity of its sampled shadow.
+    SafeDropShadow {
+        id: networkTextGlow
+        readonly property point sourceOrigin: networkText.mapToItem(parent, 0, 0)
+
+        x: sourceOrigin.x
+        y: sourceOrigin.y
+        width: networkText.width
+        height: networkText.height
+        safeSource: networkText
+
+        horizontalOffset: 0
+        verticalOffset: 0
+        radius: 10
+        samples: 15
+        z: 2
+
+        opacity: networkDock.contentGlowOpacity
+        color: root.networkGlowColor
+        transparentBorder: true
+    }
+
+    // Glow-only overlay: the source Item/Text remains a fully opaque native
+    // glyph, unaffected by the interactive opacity of its sampled shadow.
+    SafeDropShadow {
+        id: networkSignalTextGlow
+        readonly property point sourceOrigin: networkSignalText.mapToItem(parent, 0, 0)
+
+        x: sourceOrigin.x
+        y: sourceOrigin.y
+        width: networkSignalText.width
+        height: networkSignalText.height
+        safeSource: networkSignalText
+
+        horizontalOffset: 0
+        verticalOffset: 0
+        radius: 8
+        samples: 15
+        z: 2
+
+        opacity: networkDock.contentGlowOpacity
+        color: root.networkGlowColor
+        transparentBorder: true
+    }
+
+    // Glow-only overlay: the source Item/Text remains a fully opaque native
+    // glyph, unaffected by the interactive opacity of its sampled shadow.
+    SafeDropShadow {
+        id: networkSpeedTextGlow
+        readonly property point sourceOrigin: networkSpeedText.mapToItem(parent, 0, 0)
+
+        x: sourceOrigin.x
+        y: sourceOrigin.y
+        width: networkSpeedText.width
+        height: networkSpeedText.height
+        safeSource: networkSpeedText
+
+        horizontalOffset: 0
+        verticalOffset: 0
+        radius: 8
+        samples: 15
+        z: 2
+
+        opacity: networkDock.contentGlowOpacity
+        color: root.networkGlowColor
+        transparentBorder: true
     }
 
     // =============================================

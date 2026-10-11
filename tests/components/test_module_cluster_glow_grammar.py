@@ -17,7 +17,7 @@ dock = (ROOT / "components/DockButton.qml").read_text(encoding="utf-8")
 # Operator-confirmed: open-magenta wins even for specialized yellow/green docks.
 for state in ("contentGlowColor", "dockGlowColor"):
     match = re.search(
-        rf"readonly property color {state}: open\\s*\\? openGlowColor",
+        rf"readonly property color {state}: open\s*\? openGlowColor",
         dock,
     )
     assert match, f"{state} must give open-magenta priority"
@@ -58,8 +58,8 @@ assert "opacity: volumebarDock.pressed ? 1.0 : volumebarDock.hovered ? 0.95 : 0.
 assert "color: !root.ready ? Colors.blue : root.muted ? Colors.yellow" in volume
 
 tray = module("Tray")
-assert re.search(r"(?m)^\\s*SafeDropShadow\\s*\\{", tray)
-assert not re.search(r"(?m)^\\s*DropShadow\\s*\\{", tray)
+assert re.search(r"(?m)^\s*SafeDropShadow\s*\{", tray)
+assert not re.search(r"(?m)^\s*DropShadow\s*\{", tray)
 assert "safeSource: trayIcon" in tray
 assert "trayButtonMouse.containsMouse ? 0.95 : 0.75" in tray
 assert "trayButtonHovered ? 0.09 : 0.07" in tray

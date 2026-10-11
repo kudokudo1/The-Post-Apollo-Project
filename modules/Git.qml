@@ -48,11 +48,26 @@ DockButton {
             }
         }
 
-        GohuText {
-            text: "≽(•⩊•マ≼"
-            font.pixelSize: 16
+        // The cat stays one semantic mark; its parenthesis is structural white.
+        Row {
             anchors.verticalCenter: parent.verticalCenter
-            color: dock.open ? dock.openForegroundColor : Colors.yellow
+            spacing: 0
+
+            GohuText {
+                text: "≽"
+                font.pixelSize: 16
+                color: dock.open ? dock.openForegroundColor : Colors.yellow
+            }
+            GohuText {
+                text: "("
+                font.pixelSize: 16
+                color: Colors.white
+            }
+            GohuText {
+                text: "•⩊•マ≼"
+                font.pixelSize: 16
+                color: dock.open ? dock.openForegroundColor : Colors.yellow
+            }
         }
     }
 

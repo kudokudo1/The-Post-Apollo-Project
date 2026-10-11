@@ -23,6 +23,7 @@ SURFACES = {
     "modules/Volumebar.qml": (
         "volumebarIcon",
         "volumebarText",
+        "volumebarPercent",
     ),
     "modules/Workspaces.qml": (
         "workspacesButtonBackground",
@@ -57,7 +58,7 @@ assert "visible: workspacesWorkspaceButton.isActive" in workspaces
 assert "color: Colors.cyan" in workspaces
 assert "color: workspacesText.workspaceColor" in workspaces
 assert "workspacesButtonMouse.pressed ? 1.0" in workspaces
-assert "workspacesButtonMouse.containsMouse ? 0.8" in workspaces
+assert "workspacesButtonMouse.containsMouse ? 0.95" in workspaces
 
 clock = (ROOT / "modules/Clock.qml").read_text(encoding="utf-8")
 for source in (

@@ -42,7 +42,7 @@ Rectangle {
 
         z: 1
 
-        opacity: trayButtonPressed ? 0.12 : trayButtonHovered ? 0.06 : 0.04
+        opacity: trayButtonPressed ? 0.12 : trayButtonHovered ? 0.09 : 0.07
 
         color: trayButtonPressed ? Colors.cyan : trayButtonHovered ? Colors.cyan : Colors.cyan
     }
@@ -96,12 +96,12 @@ Rectangle {
                         smooth: false
                     }
 
-                    DropShadow {
+                    SafeDropShadow {
                         id: trayIconGlow
 
                         anchors.fill: trayIcon
 
-                        source: trayIcon
+                        safeSource: trayIcon
 
                         horizontalOffset: 0
                         verticalOffset: 0
@@ -111,7 +111,7 @@ Rectangle {
 
                         z: 2
 
-                        opacity: trayButtonMouse.pressed ? 1.0 : trayButtonMouse.containsMouse ? 0.8 : 0.6
+                        opacity: trayButtonMouse.pressed ? 1.0 : trayButtonMouse.containsMouse ? 0.95 : 0.75
 
                         color: trayButton.clickTest ? Colors.magenta : trayButtonMouse.pressed ? Colors.cyan : trayButtonMouse.containsMouse ? Colors.orange : Colors.cyan
 

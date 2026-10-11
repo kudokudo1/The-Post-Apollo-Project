@@ -225,7 +225,11 @@ for name in ("Applauncher", "Bluetooth", "Calendar", "Cpu", "NotificationsHub"):
     assert "contentGlowHoverOpacity:" not in source
 
 network = (ROOT / "modules/Network.qml").read_text(encoding="utf-8")
-require(network, "networkDock.pressed ? 0.6 : networkDock.hovered ? 0.8 : 1.0", "Wi-Fi historical exception preserved")
+require(network, "opacity: networkDock.contentGlowOpacity", "Wi-Fi sampled glow uses the shared upward intensity")
+assert network.count("opacity: networkDock.contentGlowOpacity") == 4, (
+    "Wi-Fi icon, SSID, signal and speed must each inherit the same interactive energy"
+)
+assert "networkDock.pressed ? 0.6 : networkDock.hovered ? 0.8 : 1.0" not in network
 power = (ROOT / "modules/Power.qml").read_text(encoding="utf-8")
 require(power, "softGlowSpread: 1", "Power historical design exception")
 hospital = (ROOT / "modules/Hospital.qml").read_text(encoding="utf-8")

@@ -30,13 +30,27 @@ DockButton {
 
     contentGlowSource: text
 
-    GohuText {
+    // Ornamental stars/separators keep white foreground through the open state.
+    Row {
         id: text
         anchors.centerIn: parent
+        spacing: 0
 
-        text: "-⋆🗒⋆-"
-        font.pixelSize: 25
-        color: dock.foregroundColor
+        GohuText {
+            text: "-⋆"
+            font.pixelSize: 25
+            color: Colors.white
+        }
+        GohuText {
+            text: "🗒"
+            font.pixelSize: 25
+            color: dock.foregroundColor
+        }
+        GohuText {
+            text: "⋆-"
+            font.pixelSize: 25
+            color: Colors.white
+        }
     }
 
     onLeftClicked: {

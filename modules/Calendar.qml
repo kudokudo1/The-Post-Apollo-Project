@@ -23,12 +23,26 @@ DockButton {
 
     contentGlowSource: calendarText
 
-    NotoText {
+    // Keep the full icon grammar, with independent structural-white ornaments.
+    Row {
         id: calendarText
         anchors.centerIn: parent
+        spacing: 0
 
-        text: " ⌯⌲ 🗓 ⋆˙⟡ "
-        font.pixelSize: 20
-        color: calendarDock.foregroundColor
+        NotoText {
+            text: " ⌯⌲ "
+            font.pixelSize: 20
+            color: Colors.white
+        }
+        NotoText {
+            text: "🗓"
+            font.pixelSize: 20
+            color: calendarDock.foregroundColor
+        }
+        NotoText {
+            text: " ⋆˙⟡ "
+            font.pixelSize: 20
+            color: Colors.white
+        }
     }
 }

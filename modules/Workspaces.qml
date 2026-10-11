@@ -45,7 +45,7 @@ Rectangle {
         spread: 10
         z: 1
 
-        opacity: workspacesDockMouse.pressed || workspacesDock.workspacesButtonPressed ? 0.12 : workspacesDockMouse.containsMouse || workspacesDock.workspacesButtonHovered ? 0.06 : 0.04
+        opacity: workspacesDockMouse.pressed || workspacesDock.workspacesButtonPressed ? 0.12 : workspacesDockMouse.containsMouse || workspacesDock.workspacesButtonHovered ? 0.09 : 0.07
 
         color: workspacesDockMouse.pressed || workspacesDock.workspacesButtonPressed ? Colors.cyan : workspacesDockMouse.containsMouse || workspacesDock.workspacesButtonHovered ? Colors.orange : Colors.cyan
     }
@@ -193,8 +193,8 @@ Rectangle {
 
                         opacity:
                             workspacesButtonMouse.pressed ? 1.0
-                            : workspacesButtonMouse.containsMouse ? 0.8
-                            : 0.6
+                            : workspacesButtonMouse.containsMouse ? 0.95
+                            : 0.75
 
                         color: Colors.cyan
                         transparentBorder: true
@@ -215,8 +215,8 @@ Rectangle {
 
                         opacity:
                             workspacesButtonMouse.pressed ? 1.0
-                            : workspacesButtonMouse.containsMouse ? 0.8
-                            : 0.7
+                            : workspacesButtonMouse.containsMouse ? 0.95
+                            : 0.75
 
                         color: workspacesText.workspaceColor
                         transparentBorder: true

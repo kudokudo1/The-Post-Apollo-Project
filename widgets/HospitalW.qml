@@ -1996,6 +1996,37 @@ PanelWindow {
         }
     }
 
+    HospitalBedRecoveryOperationService {
+        id: bedOperationService
+
+        Component.onCompleted: loadKnown()
+
+        onRegistryLoaded: function(beds, stale) {
+            floorService.setExternalBeds(beds);
+            if (bedRecoveryDialog.recoveryOpen)
+                bedRecoveryDialog.rebuildCandidates();
+        }
+
+        onBedRegistered: function(bed) {
+            if (bedRecoveryDialog.recoveryOpen)
+                bedRecoveryDialog.actionError =
+                    "BED REGISTERED // SELECT MATCH ABOVE // PRESS SEND AGAIN";
+        }
+
+        onBedCreated: function(bed) {
+            if (bedRecoveryDialog.recoveryOpen)
+                bedRecoveryDialog.actionError =
+                    "NEW WORKTREE CREATED // SELECT MATCH ABOVE // PRESS SEND AGAIN";
+        }
+
+        onOperationFailed: function(action, code) {
+            if (bedRecoveryDialog.recoveryOpen)
+                bedRecoveryDialog.actionError =
+                    "BED " + String(action || "").toUpperCase()
+                    + " REFUSED // " + String(code || "UNKNOWN");
+        }
+    }
+
     HospitalRoundsService {
         id: roundsService
         floorService: floorService
@@ -6304,6 +6335,7 @@ PanelWindow {
             currentBedBranch: floorService.bedBranch
             pendingDraft: root.recoveryDraft
             operationActive: root.recoveryOperationActive
+            operationBusy: bedOperationService.busy
 
             // No global authoritative cross-Room worker occupancy probe yet.
             // Requesting "force" cannot skip this protection.
@@ -6314,13 +6346,40 @@ PanelWindow {
             }
 
             onCreateBedRequested: function(repository, branch) {
+                if (!bedRecoveryDialog.recoveryOpen
+                        || root.recoveryRoomId !== root.selectedRoomTeam) {
+                    bedRecoveryDialog.actionError =
+                        "ROOM CHANGED // CANCEL AND RETRY";
+                    return;
+                }
+                if (!bedOperationService.createNew(
+                        floorService.bedPath, repository, branch)) {
+                    bedRecoveryDialog.actionError =
+                        bedOperationService.lastError
+                        || "CREATE BED BUSY // TRY AGAIN";
+                    return;
+                }
                 bedRecoveryDialog.actionError =
-                    "CREATE BED NOT YET WIRED // NO GIT CHANGES MADE";
+                    "CREATING NEW WORKTREE // NO CURRENT BED MOVE";
             }
 
-            onRegisterBedRequested: {
+            onRegisterBedRequested: function(path) {
+                if (!bedRecoveryDialog.recoveryOpen
+                        || root.recoveryRoomId !== root.selectedRoomTeam) {
+                    bedRecoveryDialog.actionError =
+                        "ROOM CHANGED // CANCEL AND RETRY";
+                    return;
+                }
+                if (!bedOperationService.registerExisting(
+                        path, githubService.repoSlug,
+                        root.selectedRoomBranch)) {
+                    bedRecoveryDialog.actionError =
+                        bedOperationService.lastError
+                        || "REGISTER BED BUSY // TRY AGAIN";
+                    return;
+                }
                 bedRecoveryDialog.actionError =
-                    "REGISTER BED NOT YET WIRED // NO FILES CHANGED";
+                    "VERIFYING EXISTING CHECKOUT // NO PROVIDER START";
             }
 
             onMoveBedRequested: function(path, branch) {

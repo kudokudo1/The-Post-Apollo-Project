@@ -170,6 +170,11 @@ interaction-color reference, and Wi-Fi the preferred outer **numerical**
 reference. Normal dock idle color is cyan (`Colors.cyan`, `#55CFCA`), NOT
 palette blue. Default glow identity: cyan idle, orange hover, magenta
 pressed/open. Open overrides pressed/hover; yellow open fill remains.
+**Operator reaffirmation, 2026-10-11:** This open-magenta priority is
+**intentional for specialized modules too**, including Git, Hospital, and
+Sessions. The shared `DockButton.openGlowColor` wins over their distinctive
+idle/hover/pressed identities while the control is open; do not classify that
+as a regression or remove it during color normalization.
 
 | State | Rear halo (spread 3, z -1) | Front wash (spread 10, z +1) | Content opacity |
 | --- | ---: | ---: | ---: |
@@ -213,3 +218,22 @@ Quickshell implementation and numbers; Workspaces and Tray remain composite
 families; Calendar is the intentionally rounded dock and planned central
 convenience bay. MediaPlayer stays dormant/unmounted. No new open behavior,
 menu wiring, or live reload is implied by this source-level normalization.
+
+
+### Nurse 3A targeted follow-through (2026-10-11; source review)
+
+- Tray retains its multi-item construction and item activation while its front
+  wash and sampled icon opacity use the shared dock numbers. Its icon glow now
+  uses `SafeDropShadow`, without collapsing its per-item source attachment.
+- Workspaces retains the independently colored, dual-layer active workspace
+  glow and per-workspace controls. Only compatible exterior/front and text
+  glow opacity values align to the shared numeric recipe.
+- Volume's numeric readout and white structural `%` are separately sampled,
+  with the percent's glow retaining the volume-level color. Launcher,
+  Notifications, Calendar, Bluetooth and Git keep their complete compound
+  marks while structural stars/parentheses remain white through open state.
+- Wi-Fi's inverted icon opacity, Power's historical parameters, media-dock
+  mounting, and unreviewed control-family widgets remain out of scope.
+- These source changes require operator review of actual Qt font shaping,
+  adjacent fragment spacing, glyph glow intensity and sampled-source lifetime
+  before being considered visually accepted.

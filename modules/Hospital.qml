@@ -44,7 +44,8 @@ DockButton {
             text: "ﮩ٨ـﮩﮩ"
             font.pixelSize: dock.beatPixelSize
             verticalAlignment: Text.AlignVCenter
-            color: Colors.white
+            // Heartbeat glyphs follow the same foreground/open state as ⚚.
+            color: dock.foregroundColor
         }
 
         NotoText {
@@ -60,7 +61,8 @@ DockButton {
             text: "ﮩ٨ـﮩ"
             font.pixelSize: dock.beatPixelSize
             verticalAlignment: Text.AlignVCenter
-            color: Colors.white
+            // Heartbeat glyphs follow the same foreground/open state as ⚚.
+            color: dock.foregroundColor
         }
     }
 

@@ -22691,6 +22691,14 @@ PanelWindow {
 
                     ActionButton {
                         id: hiddenKillAction
+                    // Keep firing visible after mouse release without delaying the action.
+                    property bool clickFirePulse: false
+                    Timer {
+                        id: hiddenKillActionFireTimer
+                        interval: 420
+                        repeat: false
+                        onTriggered: hiddenKillAction.clickFirePulse = false
+                    }
                         width: hiddenCommandActionsSection.width - 10
                         height: 36
                         anchors.horizontalCenter: parent.horizontalCenter
@@ -22737,12 +22745,14 @@ PanelWindow {
                     }
 
                     onTriggered: {
+                        hiddenKillAction.clickFirePulse = true;
+                        hiddenKillActionFireTimer.restart();
                         appControlWindow.selectedDetailActionIndex = 6;
                         appControlWindow.activateSelectedDetailAction();
                     }
                         Row {
                             anchors.left: parent.left; anchors.leftMargin: 10; anchors.verticalCenter: parent.verticalCenter; spacing: 8
-                            GohuText { text: hiddenKillAction.pressed ? "(=ᗜ=)デ╾━ ๋࣭⭑" : hiddenKillAction.hovered || hiddenKillAction.selected ? "ദ്ദി(-_•)デ╾━" : "(-_•)デ╾━"; font.pixelSize: 13; color: hiddenKillAction.pressed ? Colors.black : Colors.red; layer.enabled: !hiddenKillAction.pressed; layer.effect: DropShadow { radius: 8; samples: 7; opacity: 0.56; color: Colors.red; transparentBorder: true } }
+                            GohuText { text: hiddenKillAction.pressed || hiddenKillAction.clickFirePulse ? "(=ᗜ=)デ╾━ ๋࣭⭑" : hiddenKillAction.hovered || hiddenKillAction.selected ? "ദ്ദി(-_•)デ╾━" : "(-_•)デ╾━"; font.pixelSize: 13; color: hiddenKillAction.pressed ? Colors.black : Colors.red; layer.enabled: !hiddenKillAction.pressed; layer.effect: DropShadow { radius: 8; samples: 7; opacity: 0.56; color: Colors.red; transparentBorder: true } }
                             GohuText { text: "KILL COMMAND  [TERM]"; font.pixelSize: 13; color: hiddenKillAction.pressed ? Colors.black : Colors.red; layer.enabled: !hiddenKillAction.pressed; layer.effect: DropShadow { radius: 8; samples: 7; opacity: 0.56; color: Colors.red; transparentBorder: true } }
                         }
 
@@ -24242,6 +24252,14 @@ PanelWindow {
 
                 ActionButton {
                     id: appKillAction
+                    // Keep firing visible after mouse release without delaying the action.
+                    property bool clickFirePulse: false
+                    Timer {
+                        id: appKillActionFireTimer
+                        interval: 420
+                        repeat: false
+                        onTriggered: appKillAction.clickFirePulse = false
+                    }
 
                     visible: {
                         const current =
@@ -24318,6 +24336,8 @@ PanelWindow {
                     }
 
                     onTriggered: {
+                        appKillAction.clickFirePulse = true;
+                        appKillActionFireTimer.restart();
                         appControlWindow.selectedDetailActionIndex =
                             appKillAction.detailIndex;
                         appControlWindow.terminateSelectedApplication();
@@ -24333,7 +24353,7 @@ PanelWindow {
                             id: appKillActionIcon
 
                             text:
-                                appKillAction.pressed
+                                appKillAction.pressed || appKillAction.clickFirePulse
                                 ? "(=ᗜ=)デ╾━ ๋࣭⭑"
                                 : appKillAction.hovered || appKillAction.selected
                                 ? "ദ്ദി(-_•)デ╾━"
@@ -25110,6 +25130,14 @@ PanelWindow {
 
                 ActionButton {
                     id: tabCloseActionBelowFreeze
+                    // Keep firing visible after mouse release without delaying the action.
+                    property bool clickFirePulse: false
+                    Timer {
+                        id: tabCloseActionBelowFreezeFireTimer
+                        interval: 420
+                        repeat: false
+                        onTriggered: tabCloseActionBelowFreeze.clickFirePulse = false
+                    }
 
                     readonly property int detailIndex:
                         appControlWindow.selectedTabCloseControlIndex()
@@ -25165,6 +25193,8 @@ PanelWindow {
                     }
 
                     onTriggered: {
+                        tabCloseActionBelowFreeze.clickFirePulse = true;
+                        tabCloseActionBelowFreezeFireTimer.restart();
                         if (tabCloseActionBelowFreeze.detailIndex < 0)
                             return;
 
@@ -25183,7 +25213,7 @@ PanelWindow {
 
                         GohuText {
                             text:
-                                tabCloseActionBelowFreeze.pressed
+                                tabCloseActionBelowFreeze.pressed || tabCloseActionBelowFreeze.clickFirePulse
                                 ? "(=ᗜ=)デ╾━ ๋࣭⭑"
                                 : tabCloseActionBelowFreeze.hovered
                                   || tabCloseActionBelowFreeze.selected
@@ -26214,6 +26244,14 @@ PanelWindow {
 
                 ActionButton {
                     id: windowKillAction
+                    // Keep firing visible after mouse release without delaying the action.
+                    property bool clickFirePulse: false
+                    Timer {
+                        id: windowKillActionFireTimer
+                        interval: 420
+                        repeat: false
+                        onTriggered: windowKillAction.clickFirePulse = false
+                    }
 
                     width: parent.width - 10
                     height: 34
@@ -26263,6 +26301,8 @@ PanelWindow {
                     }
 
                     onTriggered: {
+                        windowKillAction.clickFirePulse = true;
+                        windowKillActionFireTimer.restart();
                         appControlWindow.selectedDetailActionIndex = 7;
                         appControlWindow.activateSelectedDetailAction();
                     }
@@ -26279,7 +26319,7 @@ PanelWindow {
                             anchors.verticalCenter: parent.verticalCenter
 
                             text:
-                                windowKillAction.pressed
+                                windowKillAction.pressed || windowKillAction.clickFirePulse
                                 ? "(=ᗜ=)デ╾━ ๋࣭⭑"
                                 : windowKillAction.hovered || windowKillAction.selected
                                 ? "ദ്ദി(-_•)デ╾━"
@@ -27905,6 +27945,14 @@ PanelWindow {
 
                 ActionButton {
                     id: runKillAction
+                    // Keep firing visible after mouse release without delaying the action.
+                    property bool clickFirePulse: false
+                    Timer {
+                        id: runKillActionFireTimer
+                        interval: 420
+                        repeat: false
+                        onTriggered: runKillAction.clickFirePulse = false
+                    }
 
                     visible: true
 
@@ -27958,6 +28006,8 @@ PanelWindow {
                     }
 
                     onTriggered: {
+                        runKillAction.clickFirePulse = true;
+                        runKillActionFireTimer.restart();
                         appControlWindow.selectedDetailActionIndex = 5;
                         appControlWindow.activateSelectedDetailAction();
                     }
@@ -27982,7 +28032,7 @@ PanelWindow {
                                 text:
                                     !appControlWindow.runKillAvailable
                                     ? "(•_•)"
-                                    : runKillAction.pressed
+                                    : runKillAction.pressed || runKillAction.clickFirePulse
                                     ? "(=ᗜ=)"
                                     : runKillAction.hovered
                                     ? "ദ്ദി(-_•)"

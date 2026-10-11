@@ -9,6 +9,8 @@ ROOT = Path(__file__).resolve().parents[2]
 app = (ROOT / "widgets/AppControlW.qml").read_text(encoding="utf-8")
 git = (ROOT / "widgets/GitW.qml").read_text(encoding="utf-8")
 hunter = (ROOT / "widgets/appcontrol/HunterControls.qml").read_text(encoding="utf-8")
+overlay = (ROOT / "widgets/appcontrol/DestructiveConfirmOverlay.qml").read_text(encoding="utf-8")
+task_manager = (ROOT / "widgets/appcontrol/TaskManagerView.qml").read_text(encoding="utf-8")
 cpu = (ROOT / "widgets/CpuPlusW.qml").read_text(encoding="utf-8")
 
 
@@ -58,6 +60,20 @@ assert 'operationFiring' not in hunter
 assert 'controller.hunterOperationActive' in hunter  # running status still matters for eligibility
 for action in ("requestKillAllEligibleTasks()", "requestKillHogs()", "requestKillMice()"):
     assert 'controller.' + action in hunter
+
+# Individual destructive detail actions must retain a visible click pulse.
+for name in ("hiddenKillAction", "appKillAction", "windowKillAction",
+             "runKillAction", "tabCloseActionBelowFreeze"):
+    assert "id: " + name + "FireTimer" in app, name
+    assert name + ".clickFirePulse = true;" in app, name
+assert "id: taskEndFireTimer" in task_manager
+assert "taskEndAction.clickFirePulse = true;" in task_manager
+
+# The confirmation title carries the opening shot and stays armed afterward.
+assert 'property bool openingKillFirePulse: false' in overlay
+assert 'openingKillFireTimer.restart()' in overlay
+assert 'const armed = firing ? "(=ᗜ=)デ╾━' in overlay
+assert ' : "ദ്ദി(-_•)デ╾━"' in overlay
 
 # Preserve special cases: Kill-themed CLOSE TAB and CPU++ SWAP.
 assert 'text: "\\"CLOSE\\" TAB"' in app

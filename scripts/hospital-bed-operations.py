@@ -55,6 +55,16 @@ def repository_slug(text: str) -> str:
     return candidate.lower()
 
 
+def origin_slug(remote: str) -> str:
+    """Only anchored GitHub transports establish Patient remote identity."""
+    remote = str(remote or "").strip()
+    if remote.startswith("git@github.com:"):
+        return repository_slug(remote)
+    if re.match(r"^(?:https?|ssh)://(?:git@)?github\.com/", remote, re.I):
+        return repository_slug(remote)
+    return ""
+
+
 def verify_branch(branch: str) -> str:
     branch = str(branch or "").strip()
     if not branch or branch.startswith("-") or branch in ("HEAD", "DETACHED"):
@@ -95,7 +105,7 @@ def inspect(path_text: str, repository: str, branch: str = "") -> dict:
         raise Refused("BED_GIT_UNRESOLVED") from None
     if root != bed:
         raise Refused("BED_NOT_REPOSITORY_ROOT")
-    actual = repository_slug(origin)
+    actual = origin_slug(origin)
     if not actual or actual != expected:
         raise Refused("PATIENT_REPOSITORY_MISMATCH")
     if branch and current_branch != branch:

@@ -30,6 +30,7 @@ DockButton {
         textFormat: Text.StyledText
         text: " ⌯⌲ <font color='" + calendarDock.foregroundColor + "'>🗓</font> ⋆˙⟡ "
         font.pixelSize: 20
-        color: Colors.white
+        // Ornaments stay with the whole mark on future open-state changes.
+        color: calendarDock.foregroundColor
     }
 }

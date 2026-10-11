@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static contracts for the reusable Git-derived dock button grammar."""
+"""Static contracts for the shared dock button and approved numeric grammar."""
 
 from pathlib import Path
 
@@ -79,7 +79,7 @@ DOCK_MODULES = {
     ),
     "modules/Clock.qml": (
         "DockButton {",
-        "implicitWidth: 151",
+        "Math.ceil(clockRow.implicitWidth)",
         "implicitHeight: 50",
         "contentGlowEnabled: false",
         "clockArea.is24Hour ? Colors.orange : Colors.cyan",
@@ -115,7 +115,7 @@ DOCK_MODULES = {
         "implicitWidth: 130",
         "implicitHeight: 50",
         "open: menuOpen",
-        "normalForegroundColor: Colors.cyan",
+        "normalForegroundColor: Colors.white",
     ),
     "modules/Power.qml": (
         "DockButton {",
@@ -187,3 +187,51 @@ for path in (
     assert "DockButton {" not in source, (
         f"{path} should not be flattened into one root DockButton"
     )
+
+# Operator-selected dock defaults are distinct from mode/action/chassis defaults.
+for needle in (
+    "normalContentGlowColor: Colors.cyan",
+    "hoverContentGlowColor: Colors.orange",
+    "pressedContentGlowColor: Colors.magenta",
+    "normalDockGlowColor: Colors.cyan",
+    "hoverDockGlowColor: Colors.orange",
+    "pressedDockGlowColor: Colors.magenta",
+    "contentGlowIdleOpacity: 0.75",
+    "contentGlowHoverOpacity: 0.95",
+    "contentGlowActiveRadius: 14",
+    "contentGlowActiveSamples: 15",
+    "softGlowIdleOpacity: 0.40",
+    "softGlowHoverOpacity: 0.50",
+    "wideGlowIdleOpacity: 0.07",
+):
+    require(COMPONENT, needle, "operator-approved dock grammar")
+
+for needle in (
+    "normalContentGlowColor: Colors.orange",
+    "hoverContentGlowColor: Colors.orange",
+    "pressedContentGlowColor: Colors.orange",
+    "normalDockGlowColor: Colors.yellow",
+    "hoverDockGlowColor: Colors.yellow",
+    "pressedDockGlowColor: Colors.yellow",
+):
+    require(GIT, needle, "Git keeps distinct semantic colors")
+
+for name in ("Applauncher", "Bluetooth", "Calendar", "Cpu", "NotificationsHub"):
+    source = (ROOT / f"modules/{name}.qml").read_text(encoding="utf-8")
+    for state, color in (("normal", "cyan"), ("hover", "orange"), ("pressed", "magenta")):
+        require(source, f"{state}ContentGlowColor: Colors.{color}", "default icon glow state")
+        require(source, f"{state}DockGlowColor: Colors.{color}", "default chassis glow state")
+    assert "contentGlowIdleOpacity:" not in source
+    assert "contentGlowHoverOpacity:" not in source
+
+network = (ROOT / "modules/Network.qml").read_text(encoding="utf-8")
+require(network, "networkDock.pressed ? 0.6 : networkDock.hovered ? 0.8 : 1.0", "Wi-Fi historical exception preserved")
+power = (ROOT / "modules/Power.qml").read_text(encoding="utf-8")
+require(power, "softGlowSpread: 1", "Power historical design exception")
+hospital = (ROOT / "modules/Hospital.qml").read_text(encoding="utf-8")
+assert hospital.count("color: Colors.white") >= 2
+for path in ("modules/Clock.qml", "modules/Volumebar.qml"):
+    source = (ROOT / path).read_text(encoding="utf-8")
+    require(source, "contentGlowEnabled: false", "instrument per-cluster glow retained")
+    require(source, "0.75", "instrument idle content energy")
+    require(source, "0.95", "instrument hover content energy")

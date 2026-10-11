@@ -22,45 +22,45 @@ Rectangle {
     property color pressedForegroundColor: normalForegroundColor
     property color openForegroundColor: Colors.magenta
 
-    // Content glow and dock halo colors.
-    // Defaults are intentionally derived from the Git button.
-    property color normalContentGlowColor: Colors.orange
+    // Ordinary dock glow identity: AppLauncher cyan -> orange -> magenta.
+    // Specialized modules can override color while sharing numeric values.
+    property color normalContentGlowColor: Colors.cyan
     property color hoverContentGlowColor: Colors.orange
-    property color pressedContentGlowColor: Colors.orange
+    property color pressedContentGlowColor: Colors.magenta
 
-    property color normalDockGlowColor: Colors.yellow
-    property color hoverDockGlowColor: Colors.yellow
-    property color pressedDockGlowColor: Colors.yellow
+    property color normalDockGlowColor: Colors.cyan
+    property color hoverDockGlowColor: Colors.orange
+    property color pressedDockGlowColor: Colors.magenta
 
     property color openGlowColor: Colors.magenta
 
-    // Git-derived content glow values.
-    property real contentGlowIdleOpacity: 0.76
-    property real contentGlowHoverOpacity: 0.96
+    // Rising per-cluster content glow; sample texture is provisional.
+    property real contentGlowIdleOpacity: 0.75
+    property real contentGlowHoverOpacity: 0.95
     property real contentGlowPressedOpacity: 1.0
     property real contentGlowOpenOpacity: 1.0
 
     property real contentGlowIdleRadius: 14
-    property real contentGlowActiveRadius: 18
+    property real contentGlowActiveRadius: 14
     property real contentGlowHoverRadius: contentGlowActiveRadius
     property real contentGlowPressedRadius: contentGlowActiveRadius
     property real contentGlowOpenRadius: contentGlowActiveRadius
 
     property int contentGlowIdleSamples: 15
-    property int contentGlowActiveSamples: 21
+    property int contentGlowActiveSamples: 15
     property int contentGlowHoverSamples: contentGlowActiveSamples
     property int contentGlowPressedSamples: contentGlowActiveSamples
     property int contentGlowOpenSamples: contentGlowActiveSamples
 
-    // Git-derived tight rear halo.
-    property real softGlowIdleOpacity: 0.32
-    property real softGlowHoverOpacity: 0.48
+    // Wi-Fi-derived rear halo numerical standard.
+    property real softGlowIdleOpacity: 0.40
+    property real softGlowHoverOpacity: 0.50
     property real softGlowPressedOpacity: 0.60
     property real softGlowOpenOpacity: 0.86
     property real softGlowSpread: 3
 
-    // Git-derived wide front-facing wash.
-    property real wideGlowIdleOpacity: 0.06
+    // Wi-Fi-derived front wash numerical standard.
+    property real wideGlowIdleOpacity: 0.07
     property real wideGlowHoverOpacity: 0.09
     property real wideGlowPressedOpacity: 0.12
     property real wideGlowOpenOpacity: 0.22
@@ -70,8 +70,8 @@ Rectangle {
     property bool softGlowEnabled: true
     property bool wideGlowEnabled: true
 
-    // Optional exact artwork source for the content glow. Consumers with
-    // composite/custom marks should point this at the mark itself.
+    // Attach to one meaningful cluster, not an indiscriminate module-wide wash.
+    // Distinct semantic clusters may own separate SafeDropShadows.
     property Item contentGlowSource: contentHost
 
     readonly property bool hovered: interactive && mouse.containsMouse

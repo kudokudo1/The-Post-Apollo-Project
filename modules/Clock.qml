@@ -142,8 +142,8 @@ Item {
                             clockButton.pressed
                             ? 1.0
                             : clockButton.hovered
-                            ? 0.8
-                            : 0.6
+                            ? 0.95
+                            : 0.75
 
                         color:
                             clockArea.is24Hour
@@ -232,8 +232,8 @@ Item {
                             clockButton.pressed
                             ? 1.0
                             : clockButton.hovered
-                            ? 0.8
-                            : 0.6
+                            ? 0.95
+                            : 0.75
 
                         color:
                             clockArea.is24Hour
@@ -311,8 +311,8 @@ Item {
                             clockButton.pressed
                             ? 1.0
                             : clockButton.hovered
-                            ? 0.8
-                            : 0.6
+                            ? 0.95
+                            : 0.75
 
                         color:
                             clockArea.is24Hour
@@ -392,8 +392,8 @@ Item {
                             clockButton.pressed
                             ? 1.0
                             : clockButton.hovered
-                            ? 0.8
-                            : 0.6
+                            ? 0.95
+                            : 0.75
 
                         color:
                             clockArea.is24Hour

@@ -11,6 +11,16 @@ DockButton {
     property bool menuOpen: false
 
     open: menuOpen
+
+    // Keep Git's semantic yellow perimeter and orange artwork while its
+    // numerical intensity follows the new shared dock recipe.
+    normalContentGlowColor: Colors.orange
+    hoverContentGlowColor: Colors.orange
+    pressedContentGlowColor: Colors.orange
+    normalDockGlowColor: Colors.yellow
+    hoverDockGlowColor: Colors.yellow
+    pressedDockGlowColor: Colors.yellow
+
     contentGlowSource: gitMark
 
     signal toggleRequested()

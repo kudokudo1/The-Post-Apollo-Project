@@ -131,7 +131,8 @@ class BedOperationsTests(unittest.TestCase):
                            "--repository", REPOSITORY, "--branch", "feature/seed",
                            "--bed-root", self.beds, success=False)
         self.assertEqual(got["code"], "WORKTREE_CREATION_REFUSED")
-        self.assertFalse((self.beds/"feature-seed").exists())
+        self.assertEqual(list(self.beds.iterdir()), [],
+                         "Refused move must not leave an unrequested Bed")
 
     def test_create_rejects_nonexistent_branch_without_fetch(self):
         got = self.run_cmd("create", "--seed-path", self.seed,
@@ -165,7 +166,7 @@ class BedOperationsTests(unittest.TestCase):
     def test_invalid_branch_is_refused(self):
         for branch in ("", "../escape", "-f", "DETACHED", "HEAD"):
             data = self.run_cmd("create", "--seed-path", self.seed,
-                                "--repository", REPOSITORY, "--branch", branch,
+                                "--repository", REPOSITORY, "--branch=" + branch,
                                 "--bed-root", self.beds, success=False)
             self.assertEqual(data["code"], "BRANCH_UNRESOLVED", branch)
 

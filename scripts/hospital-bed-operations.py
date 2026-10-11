@@ -222,6 +222,10 @@ def create_worktree(
     target = root / directory
     if target.exists() or target.is_symlink():
         raise Refused("BED_DESTINATION_EXISTS")
+    # Human-readable early refusal; Git itself still guards against races.
+    worktree_index = git(seed_root, "worktree", "list", "--porcelain")
+    if ("branch refs/heads/" + branch) in worktree_index.splitlines():
+        raise Refused("BRANCH_ALREADY_OCCUPIED")
     local_ref = "refs/heads/" + branch
     remote_ref = "refs/remotes/origin/" + branch
     try:

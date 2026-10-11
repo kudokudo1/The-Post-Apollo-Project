@@ -213,6 +213,10 @@ PanelWindow {
 
         Tray {}
 
+        // Mediaplayer
+
+        Mediaplayer {}
+
         // Hospital
 
         Item {

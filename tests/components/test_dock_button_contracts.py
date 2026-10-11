@@ -229,6 +229,15 @@ require(network, "opacity: networkDock.contentGlowOpacity", "Wi-Fi sampled glow 
 assert network.count("opacity: networkDock.contentGlowOpacity") == 4, (
     "Wi-Fi icon, SSID, signal and speed must each inherit the same interactive energy"
 )
+# The four sampled content glows are now separate siblings; layer.effect used
+# to apply varying opacity to the entire original source glyph.
+for target in ("networkIconRow", "networkText", "networkSignalText", "networkSpeedText"):
+    require(network, f"safeSource: {target}", "Wi-Fi glow must sample an opaque independent source")
+    require(network, f"{target}.mapToItem(parent, 0, 0)", "Wi-Fi sampled overlay tracks layout geometry")
+assert network.count("SafeDropShadow {") == 4
+assert network.count("layer.effect: DropShadow {") == 1, (
+    "Only the unchanged Ethernet pulse may retain its legacy layer effect"
+)
 assert "networkDock.pressed ? 0.6 : networkDock.hovered ? 0.8 : 1.0" not in network
 power = (ROOT / "modules/Power.qml").read_text(encoding="utf-8")
 require(power, "softGlowSpread: 1", "Power historical design exception")

@@ -36,7 +36,8 @@ DockButton {
         text: "-⋆<font color='" + appmenuRoot.foregroundColor + "'>♱</font>⋆-"
         font.pixelSize: 19
         font.weight: 700
-        color: Colors.white
+        // Structural stars follow the same foreground state as the main glyph.
+        color: appmenuRoot.foregroundColor
     }
 
     onLeftClicked: {

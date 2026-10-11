@@ -25,8 +25,8 @@ assert "property color openGlowColor: Colors.magenta" in dock
 assert "property color openFillColor: Colors.yellow" in dock
 
 # The icon is ONE text item, not multiple Row-positioned glyph fragments.
-# Color spans preserve structural white without changing the original glyph
-# runs or their implicit single-line dimensions.
+# Decorative text foreground follows the DockButton state: white when closed,
+# magenta on open. Preserve the original single-line shaping and glow source.
 for name, glow_source, glyphs in (
     ("Applauncher", "appmenuIcon", ("-⋆", "♱", "⋆-")),
     ("NotificationsHub", "text", ("-⋆", "🗒", "⋆-")),
@@ -39,7 +39,19 @@ for name, glow_source, glyphs in (
     assert qml.count("textFormat: Text.StyledText") == 1, name
     assert "anchors.centerIn: parent" in qml, name
     assert "<font color='" in qml, name
-    assert ("color: Colors.white" in qml if name != "Git" else '" + Colors.white + "' in qml), name
+    state_foreground = {
+        "Applauncher": "appmenuRoot.foregroundColor",
+        "NotificationsHub": "dock.foregroundColor",
+        "Calendar": "calendarDock.foregroundColor",
+        "Bluetooth": "bluetoothDock.foregroundColor",
+        "Git": "dock.foregroundColor",
+    }[name]
+    if name == "Git":
+        assert '" + dock.foregroundColor + "' in qml, name
+        assert 'color: dock.open ? dock.openForegroundColor : Colors.yellow' in qml
+    else:
+        assert f"color: {state_foreground}" in qml, name
+        assert f'" + {state_foreground} + "' in qml, name
     for glyph in glyphs:
         assert glyph in qml, (name, glyph)
     assert "SafeDropShadow {" not in qml, name
@@ -47,7 +59,16 @@ for name, glow_source, glyphs in (
 for name in ("Applauncher", "NotificationsHub", "Calendar", "Bluetooth"):
     assert "Row {" not in module(name), name
 assert module("Git").count("Row {") == 1, "Git retains one compound branch/cat layout"
-assert 'text: "≽<font color=\'" + Colors.white + "\'>(</font>•⩊•マ≼"' in module("Git")
+assert 'text: "≽<font color=\'" + dock.foregroundColor + "\'>(</font>•⩊•マ≼"' in module("Git")
+hospital = module("Hospital")
+assert hospital.count("color: dock.foregroundColor") == 3
+assert "color: Colors.white" not in hospital
+assert "open: menuOpen" in hospital
+for name in ("Applauncher", "NotificationsHub", "Git"):
+    assert "open: menuOpen" in module(name), name
+# Structural marks must glow magenta in the open state through DockButton's
+# existing composite source and shared open-first glow priority.
+assert "contentGlowSource: hospitalMark" in hospital
 
 volume = module("Volumebar")
 assert "contentGlowEnabled: false" in volume

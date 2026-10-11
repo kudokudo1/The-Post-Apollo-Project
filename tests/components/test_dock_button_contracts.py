@@ -233,7 +233,10 @@ assert "networkDock.pressed ? 0.6 : networkDock.hovered ? 0.8 : 1.0" not in netw
 power = (ROOT / "modules/Power.qml").read_text(encoding="utf-8")
 require(power, "softGlowSpread: 1", "Power historical design exception")
 hospital = (ROOT / "modules/Hospital.qml").read_text(encoding="utf-8")
-assert hospital.count("color: Colors.white") >= 2
+assert hospital.count("color: dock.foregroundColor") == 3, (
+    "Hospital heartbeats must follow the center glyph foreground/open-state identity"
+)
+assert "color: Colors.white" not in hospital
 for path in ("modules/Clock.qml", "modules/Volumebar.qml"):
     source = (ROOT / path).read_text(encoding="utf-8")
     require(source, "contentGlowEnabled: false", "instrument per-cluster glow retained")

@@ -29,6 +29,7 @@ DockButton {
         textFormat: Text.StyledText
         text: "(<font color='" + bluetoothDock.foregroundColor + "'>˓✟˒</font>)"
         font.pixelSize: 20
-        color: Colors.white
+        // The parentheses inherit normal/hover/pressed/open foreground state.
+        color: bluetoothDock.foregroundColor
     }
 }

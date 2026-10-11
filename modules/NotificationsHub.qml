@@ -37,7 +37,8 @@ DockButton {
         textFormat: Text.StyledText
         text: "-⋆<font color='" + dock.foregroundColor + "'>🗒</font>⋆-"
         font.pixelSize: 25
-        color: Colors.white
+        // Open-state punctuation follows the module foreground and glow.
+        color: dock.foregroundColor
     }
 
     onLeftClicked: {

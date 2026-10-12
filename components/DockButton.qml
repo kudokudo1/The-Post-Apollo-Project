@@ -110,6 +110,24 @@ Rectangle {
                                                 ? contentGlowHoverOpacity
                                                 : contentGlowIdleOpacity
 
+    // Resolve the shared content-sample geometry once, so specialized
+    // per-cluster effects use exactly the same numbers and state priority.
+    readonly property real contentGlowRadius: open
+                                               ? contentGlowOpenRadius
+                                               : pressed
+                                               ? contentGlowPressedRadius
+                                               : hovered
+                                               ? contentGlowHoverRadius
+                                               : contentGlowIdleRadius
+
+    readonly property int contentGlowSamples: open
+                                              ? contentGlowOpenSamples
+                                              : pressed
+                                              ? contentGlowPressedSamples
+                                              : hovered
+                                              ? contentGlowHoverSamples
+                                              : contentGlowIdleSamples
+
     readonly property real softGlowOpacity: open
                                              ? softGlowOpenOpacity
                                              : pressed
@@ -172,21 +190,8 @@ Rectangle {
             horizontalOffset: 0
             verticalOffset: 0
 
-            radius: dockButton.open
-                    ? dockButton.contentGlowOpenRadius
-                    : dockButton.pressed
-                    ? dockButton.contentGlowPressedRadius
-                    : dockButton.hovered
-                    ? dockButton.contentGlowHoverRadius
-                    : dockButton.contentGlowIdleRadius
-
-            samples: dockButton.open
-                     ? dockButton.contentGlowOpenSamples
-                     : dockButton.pressed
-                     ? dockButton.contentGlowPressedSamples
-                     : dockButton.hovered
-                     ? dockButton.contentGlowHoverSamples
-                     : dockButton.contentGlowIdleSamples
+            radius: dockButton.contentGlowRadius
+            samples: dockButton.contentGlowSamples
 
             z: 2
             requestedVisible: dockButton.contentGlowEnabled

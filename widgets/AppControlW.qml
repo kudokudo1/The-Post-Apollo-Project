@@ -12819,32 +12819,52 @@ PanelWindow {
                         appControlWindow.systemModeIndex
                     )
 
-                Rectangle {
+                ModeButton {
                     id: modeButton
 
-                    property bool isSelected:
-                        index === appControlWindow.selectedModeIndex
-                    property bool isRailCursor:
-                        appControlWindow.modeRailFocused
-                        && index === appControlWindow.modeRailCursorIndex
-
-                    property bool isHovered:
-                        !appControlWindow.keyboardActive
-                        && modeMouse.containsMouse
-
-                    property bool isPressed: modeMouse.pressed
-
+                    customArtwork: true
+                    selected: index === appControlWindow.selectedModeIndex
+                    keyboardActive: appControlWindow.keyboardActive && appControlWindow.modeRailFocused
+                    keyboardSelected: isRailCursor
+                    customPrimaryGlowSource: modeSymbol
+                    customLabelGlowSource: modeLabel
+                    primaryGlowEnabled: index !== appControlWindow.thermalModeIndex
+                    bordered: false
+                    readonly property bool isSelected: selected
+                    readonly property bool isRailCursor: appControlWindow.modeRailFocused && index === appControlWindow.modeRailCursorIndex
+                    readonly property bool isHovered: hovered
+                    readonly property bool isPressed: pressed
                     width: parent.width
                     height: 55
 
-                    color:
-                        modeButton.isPressed
-                        ? Colors.magenta
-                        : modeButton.isHovered
-                          || modeButton.isSelected
-                          || modeButton.isRailCursor
-                        ? Colors.yellow
-                        : Colors.black
+                    onPointerMoved: {
+                        appControlWindow.keyboardActive = false;
+                        appControlWindow.detailFocused = false;
+                        appControlWindow.modeRailFocused = true;
+                        appControlWindow.modeRailHoveredIndex = index;
+                        appControlWindow.modeRailCursorIndex = index;
+                    }
+                    onPointerExited: {
+                        if (appControlWindow.modeRailHoveredIndex === index)
+                            appControlWindow.modeRailHoveredIndex = -1;
+                    }
+                    onWheel: function(wheel) {
+                        appControlWindow.enterModeRail();
+                        appControlWindow.moveModeRailCursor(wheel.angleDelta.y > 0 ? -1 : 1);
+                        wheel.accepted = true;
+                    }
+                    onTriggered: {
+                        if (index === appControlWindow.favoritesModeIndex) {
+                            appControlWindow.favoritesFaceClickPulse = true;
+                            favoritesFaceClickPulseTimer.restart();
+                        }
+                        if (index === appControlWindow.killModeIndex)
+                            appControlWindow.fireKillRailOnce();
+                        appControlWindow.modeRailFocused = false;
+                        appControlWindow.modeRailCursorIndex = index;
+                        appControlWindow.switchMode(index, false);
+                        searchInput.forceActiveFocus();
+                    }
 
                     Column {
                         anchors.centerIn: parent
@@ -12918,43 +12938,7 @@ PanelWindow {
                                 }
                             }
 
-                            DropShadow {
-                                anchors.fill: modeSymbol
-                                source: modeSymbol
-
-                                horizontalOffset: 0
-                                verticalOffset: 0
-
-                                radius: modeButton.isSelected
-                                        ? 18
-                                        : modeButton.isHovered
-                                        ? 14
-                                        : 10
-
-                                samples: modeButton.isSelected
-                                         ? 17
-                                         : modeButton.isHovered
-                                         ? 9
-                                         : 7
-
-                                z: 2
-
-                                visible: index !== appControlWindow.thermalModeIndex
-
-                                opacity: modeButton.isSelected
-                                         ? 1.0
-                                         : modeButton.isHovered
-                                         ? 0.8
-                                         : 0.42
-
-                                color: modeButton.isSelected
-                                       ? Colors.magenta
-                                       : modeButton.isHovered
-                                       ? Colors.orange
-                                       : Colors.cyan
-
-                                transparentBorder: true
-                            }
+                            
                         }
 
                         Item {
@@ -12987,114 +12971,20 @@ PanelWindow {
                                        : Colors.white
                             }
 
-                            DropShadow {
-                                anchors.fill: modeLabel
-                                source: modeLabel
-
-                                horizontalOffset: 0
-                                verticalOffset: 0
-
-                                radius: 5
-                                samples: 7
-
-                                z: 2
-
-                                opacity: modeButton.isPressed
-                                         ? 0.0
-                                         : modeButton.isHovered
-                                           || modeButton.isRailCursor
-                                           || modeButton.isSelected
-                                         ? 0.10
-                                         : 0.06
-
-                                color: Colors.white
-                                transparentBorder: true
-                            }
+                            
                         }
                     }
 
-                    MouseArea {
-                        id: modeMouse
+                    
 
-                        anchors.fill: parent
+                    
 
-                        hoverEnabled: true
-
-                        onEntered: {
-                            appControlWindow.keyboardActive = false;
-                            appControlWindow.detailFocused = false;
-                            appControlWindow.modeRailFocused = true;
-                            appControlWindow.modeRailHoveredIndex = index;
-                            appControlWindow.modeRailCursorIndex = index;
-                        }
-
-                        onExited: {
-                            if (appControlWindow.modeRailHoveredIndex === index)
-                                appControlWindow.modeRailHoveredIndex = -1;
-                        }
-
-                        onWheel: function(wheel) {
-                            appControlWindow.enterModeRail();
-                            appControlWindow.moveModeRailCursor(
-                                wheel.angleDelta.y > 0 ? -1 : 1
-                            );
-                            wheel.accepted = true;
-                        }
-
-                        onClicked: {
-                            if (index === appControlWindow.favoritesModeIndex) {
-                                appControlWindow.favoritesFaceClickPulse = true;
-                                favoritesFaceClickPulseTimer.restart();
-                            }
-                            if (index === appControlWindow.killModeIndex)
-                                appControlWindow.fireKillRailOnce();
-
-                            appControlWindow.modeRailFocused = false;
-                            appControlWindow.modeRailCursorIndex = index;
-                            appControlWindow.switchMode(index, false);
-
-                            searchInput.forceActiveFocus();
-                        }
-                    }
-
-                    RectangularShadow {
-                        anchors.fill: parent
-
-                        spread: 3
-                        z: -1
-
-                        // No idle rectangle glow. Inactive glow belongs to
-                        // the glyph and label themselves, not the button box.
-                        opacity:
-                            modeButton.isSelected
-                            || modeButton.isHovered
-                            || modeButton.isRailCursor
-                            ? 0.5
-                                 : 0.0
-
-                        color: Colors.orange
-                    }
-
-                    RectangularShadow {
-                        anchors.fill: parent
-
-                        spread: 10
-                        z: 1
-
-                        opacity:
-                            modeButton.isSelected
-                            || modeButton.isHovered
-                            || modeButton.isRailCursor
-                            ? 0.09
-                                 : 0.0
-
-                        color: Colors.orange
-                    }
+                    
                 }
             }
         }
 
-        Rectangle {
+        ModeButton {
             id: systemModeButton
 
             anchors.left: parent.left
@@ -13104,25 +12994,40 @@ PanelWindow {
 
             height: 55
 
-            property bool isSelected:
-                appControlWindow.selectedModeIndex
-                === appControlWindow.systemModeIndex
-            property bool isRailCursor:
-                appControlWindow.modeRailFocused
-                && appControlWindow.modeRailCursorIndex
-                   === appControlWindow.systemModeIndex
-            property bool isHovered:
-                !appControlWindow.keyboardActive
-                && systemModeMouse.containsMouse
-            property bool isPressed:
-                systemModeMouse.pressed
+            customArtwork: true
+            selected: appControlWindow.selectedModeIndex === appControlWindow.systemModeIndex
+            keyboardActive: appControlWindow.keyboardActive && appControlWindow.modeRailFocused
+            keyboardSelected: isRailCursor
+            customPrimaryGlowSource: systemModeSymbol
+            labelGlowEnabled: false
+            bordered: false
+            readonly property bool isSelected: selected
+            readonly property bool isRailCursor: appControlWindow.modeRailFocused && appControlWindow.modeRailCursorIndex === appControlWindow.systemModeIndex
+            readonly property bool isHovered: hovered
+            readonly property bool isPressed: pressed
 
-            color:
-                isPressed
-                ? Colors.magenta
-                : isHovered || isSelected || isRailCursor
-                ? Colors.yellow
-                : Colors.black
+            onPointerMoved: {
+                appControlWindow.keyboardActive = false;
+                appControlWindow.detailFocused = false;
+                appControlWindow.modeRailFocused = true;
+                appControlWindow.modeRailHoveredIndex = appControlWindow.systemModeIndex;
+                appControlWindow.modeRailCursorIndex = appControlWindow.systemModeIndex;
+            }
+            onPointerExited: {
+                if (appControlWindow.modeRailHoveredIndex === appControlWindow.systemModeIndex)
+                    appControlWindow.modeRailHoveredIndex = -1;
+            }
+            onWheel: function(wheel) {
+                appControlWindow.enterModeRail();
+                appControlWindow.moveModeRailCursor(wheel.angleDelta.y > 0 ? -1 : 1);
+                wheel.accepted = true;
+            }
+            onTriggered: {
+                appControlWindow.modeRailFocused = false;
+                appControlWindow.modeRailCursorIndex = appControlWindow.systemModeIndex;
+                appControlWindow.switchMode(appControlWindow.systemModeIndex, false);
+                searchInput.forceActiveFocus();
+            }
 
             Column {
                 anchors.centerIn: parent
@@ -13151,45 +13056,7 @@ PanelWindow {
                             : Colors.cyan
                     }
 
-                    DropShadow {
-                        anchors.fill: systemModeSymbol
-                        source: systemModeSymbol
-
-                        horizontalOffset: 0
-                        verticalOffset: 0
-
-                        radius:
-                            systemModeButton.isSelected
-                            ? 18
-                            : systemModeButton.isHovered
-                              || systemModeButton.isRailCursor
-                            ? 14
-                            : 10
-                        samples:
-                            systemModeButton.isSelected
-                            ? 17
-                            : systemModeButton.isHovered
-                              || systemModeButton.isRailCursor
-                            ? 9
-                            : 7
-                        opacity:
-                            systemModeButton.isSelected
-                            ? 1.0
-                            : systemModeButton.isHovered
-                              || systemModeButton.isRailCursor
-                            ? 0.8
-                            : 0.42
-
-                        color:
-                            systemModeButton.isSelected
-                            ? Colors.magenta
-                            : systemModeButton.isHovered
-                              || systemModeButton.isRailCursor
-                            ? Colors.orange
-                            : Colors.cyan
-
-                        transparentBorder: true
-                    }
+                    
                 }
 
                 GohuText {
@@ -13209,76 +13076,11 @@ PanelWindow {
                 }
             }
 
-            MouseArea {
-                id: systemModeMouse
-                anchors.fill: parent
-                hoverEnabled: true
+            
 
-                onEntered: {
-                    appControlWindow.keyboardActive = false;
-                    appControlWindow.detailFocused = false;
-                    appControlWindow.modeRailFocused = true;
-                    appControlWindow.modeRailHoveredIndex =
-                        appControlWindow.systemModeIndex;
-                    appControlWindow.modeRailCursorIndex =
-                        appControlWindow.systemModeIndex;
-                }
+            
 
-                onExited: {
-                    if (appControlWindow.modeRailHoveredIndex
-                            === appControlWindow.systemModeIndex)
-                        appControlWindow.modeRailHoveredIndex = -1;
-                }
-
-                onWheel: function(wheel) {
-                    appControlWindow.enterModeRail();
-                    appControlWindow.moveModeRailCursor(
-                        wheel.angleDelta.y > 0 ? -1 : 1
-                    );
-                    wheel.accepted = true;
-                }
-
-                onClicked: {
-                    appControlWindow.modeRailFocused = false;
-                    appControlWindow.modeRailCursorIndex =
-                        appControlWindow.systemModeIndex;
-                    appControlWindow.switchMode(
-                        appControlWindow.systemModeIndex,
-                        false
-                    );
-                    searchInput.forceActiveFocus();
-                }
-            }
-
-            RectangularShadow {
-                anchors.fill: parent
-                spread: 3
-                z: -1
-
-                opacity:
-                    systemModeButton.isSelected
-                    || systemModeButton.isHovered
-                    || systemModeButton.isRailCursor
-                    ? 0.5
-                    : 0.0
-
-                color: Colors.orange
-            }
-
-            RectangularShadow {
-                anchors.fill: parent
-                spread: 10
-                z: 1
-
-                opacity:
-                    systemModeButton.isSelected
-                    || systemModeButton.isHovered
-                    || systemModeButton.isRailCursor
-                    ? 0.09
-                    : 0.0
-
-                color: Colors.orange
-            }
+            
         }
 
     }

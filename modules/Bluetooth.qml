@@ -26,6 +26,9 @@ DockButton {
     Text {
         id: bluetoothText
         anchors.centerIn: parent
+        // The glyph's optical center sits below its font box center.
+        // Lift only this original text item; DockButton's sampled glow follows.
+        anchors.verticalCenterOffset: -2
         textFormat: Text.StyledText
         text: "(<font color='" + bluetoothDock.foregroundColor + "'>˓✟˒</font>)"
         font.pixelSize: 20

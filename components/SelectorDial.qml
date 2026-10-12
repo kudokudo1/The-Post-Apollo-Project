@@ -18,7 +18,7 @@ Item {
     property real maximumValue: 100
     property real currentValue: 0
     property real valueStep: 1
-    property int valueDecimals: 0
+    property int valueDecimals: 2
     property int currentIndex: 0
     readonly property real previewNumericValue: selectorMode === "continuous"
         ? valueForAngle(visualAngle) : currentValue
@@ -71,7 +71,8 @@ Item {
     property int dragDetentIndex: -1
     // Visual detent preview is independent of the externally committed index.
     property int previewIndex: -1
-    readonly property int indicatedIndex: previewIndex >= 0 ? previewIndex : currentIndex
+    readonly property int indicatedIndex: selectorMode === "continuous"
+        ? -1 : previewIndex >= 0 ? previewIndex : currentIndex
 
     signal selectionRequested(int index, string value)
     signal valueRequested(real value)

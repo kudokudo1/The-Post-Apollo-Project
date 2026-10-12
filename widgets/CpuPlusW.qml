@@ -19,12 +19,19 @@ PanelWindow {
     property int thermalSelectedIndex: 0
     property int systemSelectedIndex: 0
 
-    // TEMPORARY CPU++ ONLY GLOW PROBE. Default 0 retains existing visuals.
+    // TEMPORARY CPU++ ONLY GLOW PROBE.
+    // POST_APOLLO_CPU_GLOW_TEST=C|D selects the cold-start sampler BEFORE
+    // ModeButton instances are built. An absent/unrecognized value defaults
+    // to BASE (0). The in-menu selector remains changeable at runtime.
     // 0 BASE, 1 A: both off, 2 B: reattach after close,
     // 3 C: icon sampler only, 4 D: caption sampler only.
-    // This isolates independently sampled text effects; other halos/art
-    // and menu activation are intentionally unaffected.
-    property int modeGlowExperiment: 0
+    readonly property string glowStartupChoice:
+        String(Quickshell.env("POST_APOLLO_CPU_GLOW_TEST") || "")
+        .trim().toUpperCase()
+    property int modeGlowExperiment:
+        glowStartupChoice === "C" ? 3
+        : glowStartupChoice === "D" ? 4
+        : 0
 
     // Target-list submodes. THERMAL mirrors AppControl's TEMP/FAN split.
     // SYSTEM extends the same interaction pattern to hardware categories.

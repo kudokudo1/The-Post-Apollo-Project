@@ -12,7 +12,13 @@ mode = (ROOT / "components/ModeButton.qml").read_text(encoding="utf-8")
 safe = (ROOT / "components/SafeDropShadow.qml").read_text(encoding="utf-8")
 
 for token in (
-    "property int modeGlowExperiment: 0",
+    'Quickshell.env("POST_APOLLO_CPU_GLOW_TEST")',
+    "readonly property string glowStartupChoice:",
+    "property int modeGlowExperiment:",
+    'glowStartupChoice === "C" ? 3',
+    'glowStartupChoice === "D" ? 4',
+    ": 0",
+
     "id: sampledGlowTestControls",
     'text: "GLOW TEST //"',
     'label: "BASE"',
@@ -35,6 +41,11 @@ for token in (
     "labelGlowEnabled: sampledCaptionActive",
 ):
     assert token in cpu, f"CPU++ isolation diagnostic missing: {token}"
+
+# Confirm the cold-start choice is bound before any ModeButton delegate is
+# instantiated; runtime-only button clicks cannot prove cold-start isolation.
+assert cpu.index('Quickshell.env("POST_APOLLO_CPU_GLOW_TEST")') < cpu.index("Repeater {\\n                model: cpuPlusWindow.modes")
+assert "property int modeGlowExperiment: 0" not in cpu
 
 # Deliberately retain main-mode scale, semantic switching, thermal icon
 # effect and close/reopen visibility behavior throughout the experiment.

@@ -7,9 +7,27 @@ Item {
     property string labelText: "SELECT"
     property var options: []
     property var displayOptions: []
+    // "discrete" preserves the accepted Git behavior. "continuous" exposes
+    // a numerical range; "zones" assigns names to angular regions. Neither
+    // free-position variant snaps on pointer release.
+    property string selectorMode: "discrete"
+    property real arcStartAngle: -210
+    property real arcSweepAngle: 300
+    readonly property real boundedSweep: Math.max(1, Math.min(359, arcSweepAngle))
+    property real minimumValue: 0
+    property real maximumValue: 100
+    property real currentValue: 0
+    property real valueStep: 1
+    property int valueDecimals: 0
     property int currentIndex: 0
-    property string readoutText: selectedValue ? selectedValue.toUpperCase() : ""
-    property bool interactive: options && options.length > 1
+    readonly property real previewNumericValue: selectorMode === "continuous"
+        ? valueForAngle(visualAngle) : currentValue
+    property string readoutText: selectorMode === "continuous"
+        ? Number(previewNumericValue).toFixed(Math.max(0, Math.min(6, valueDecimals)))
+        : selectedValue ? selectedValue.toUpperCase() : ""
+    property bool interactive: selectorMode === "continuous"
+        ? maximumValue > minimumValue
+        : options && options.length > 1
     property bool keyboardSelected: false
     property var keyboardHost: null
 
@@ -43,6 +61,10 @@ Item {
     property bool motionActive: false
     property bool inertial: false
     property int pendingIndex: -1
+    property bool pendingNumeric: false
+    property real pendingNumericValue: 0
+    // Keep a free-position angle when its owning module echoes a zone commit.
+    property int echoZoneIndex: -1
     property real flickThreshold: 980 // deliberate release, tuned by live testing
     property real frictionPerFrame: 0.925
     property real settleThreshold: 36
@@ -52,6 +74,7 @@ Item {
     readonly property int indicatedIndex: previewIndex >= 0 ? previewIndex : currentIndex
 
     signal selectionRequested(int index, string value)
+    signal valueRequested(real value)
 
     width: 136
     height: 160
@@ -93,6 +116,53 @@ Item {
         return index === hoveredOptionIndex ? 0.76 : 0.22;
     }
 
+    function boundedAngle(angle) {
+        return Math.max(arcStartAngle,
+                        Math.min(arcStartAngle + boundedSweep, Number(angle)));
+    }
+
+    function valueForAngle(angle) {
+        const ratio = (boundedAngle(angle) - arcStartAngle) / boundedSweep;
+        return minimumValue + ratio * (maximumValue - minimumValue);
+    }
+
+    function angleForValue(value) {
+        const span = maximumValue - minimumValue;
+        if (span <= 0)
+            return arcStartAngle;
+        const fraction = Math.max(0, Math.min(1, (Number(value) - minimumValue) / span));
+        return arcStartAngle + fraction * boundedSweep;
+    }
+
+    function reportedValue(value) {
+        const decimals = Math.max(0, Math.min(6, valueDecimals));
+        return Number(Math.max(minimumValue, Math.min(maximumValue, value)).toFixed(decimals));
+    }
+
+    function finishFreePosition() {
+        const mode = selectorMode;
+        const target = boundedAngle(visualAngle);
+        visualAngle = target;
+        inertial = false;
+        inertiaTimer.stop();
+        pendingIndex = -1;
+        pendingNumeric = false;
+        motionActive = false;
+        previewIndex = -1;
+        if (mode === "continuous") {
+            const value = reportedValue(valueForAngle(target));
+            if (value !== reportedValue(currentValue))
+                valueRequested(value);
+        } else if (mode === "zones" && optionCount() > 0) {
+            const zone = indexForAngle(target);
+            echoZoneIndex = zone;
+            if (zone !== currentIndex)
+                selectionRequested(zone, String(options[zone]));
+            else
+                echoZoneIndex = -1;
+        }
+    }
+
     function optionCount() {
         return options ? options.length : 0;
     }
@@ -108,10 +178,14 @@ Item {
 
     function angleForIndex(index) {
         const count = optionCount();
-
+        if (selectorMode === "continuous") {
+            // Optional labels are reference marks across the numeric range.
+            return arcStartAngle + boundedSweep * (count <= 1 ? 0 : index / (count - 1));
+        }
+        if (selectorMode === "zones")
+            return arcStartAngle + boundedSweep * (index + 0.5) / Math.max(1, count);
         if (count <= 1)
             return -90;
-
         return -90 + (360 * normalizedIndex(index) / count);
     }
 
@@ -130,16 +204,16 @@ Item {
 
     function indexForAngle(angle) {
         const count = optionCount();
-
         if (count <= 1)
             return 0;
-
+        if (selectorMode === "zones") {
+            const fraction = (boundedAngle(angle) - arcStartAngle) / boundedSweep;
+            return Math.max(0, Math.min(count - 1, Math.floor(fraction * count)));
+        }
         const step = 360 / count;
         let wrapped = (Number(angle) + 90) % 360;
-
         if (wrapped < 0)
             wrapped += 360;
-
         return normalizedIndex(Math.round(wrapped / step));
     }
 
@@ -179,6 +253,8 @@ Item {
         // Clear the pending target before stopping animations so obsolete
         // requests cannot issue a late commit.
         pendingIndex = -1;
+        pendingNumeric = false;
+        echoZoneIndex = -1;
         inertial = false;
         motionActive = false;
         inertiaTimer.stop();
@@ -193,6 +269,10 @@ Item {
     function settleAtCurrentAngle() {
         inertial = false;
         inertiaTimer.stop();
+        if (selectorMode !== "discrete") {
+            finishFreePosition();
+            return;
+        }
         pendingIndex = indexForAngle(visualAngle);
         previewIndex = pendingIndex;
         pendingTargetAngle = nearestEquivalent(angleForIndex(pendingIndex), visualAngle);
@@ -204,16 +284,18 @@ Item {
 
     function requestIndex(index) {
         const count = optionCount();
-
-        if (count <= 0)
+        if (count <= 0 || !interactive || dragging)
             return;
-
-        const next = normalizedIndex(index);
-
-        if (!interactive || dragging)
+        if (selectorMode === "continuous") {
+            requestNumericValue(valueForAngle(angleForIndex(Math.max(0, Math.min(count - 1, index)))));
             return;
-
-        const destination = nearestEquivalent(angleForIndex(next), visualAngle);
+        }
+        const next = selectorMode === "zones"
+            ? Math.max(0, Math.min(count - 1, Number(index)))
+            : normalizedIndex(index);
+        const destination = selectorMode === "zones"
+            ? angleForIndex(next)
+            : nearestEquivalent(angleForIndex(next), visualAngle);
         stopMotion();
         pendingIndex = next;
         previewIndex = next;
@@ -225,22 +307,70 @@ Item {
         settleAnimation.start();
     }
 
+    function requestNumericValue(value) {
+        if (selectorMode !== "continuous" || !interactive || dragging)
+            return;
+        const next = Math.max(minimumValue, Math.min(maximumValue, Number(value)));
+        const destination = angleForValue(next);
+        stopMotion();
+        pendingNumeric = true;
+        pendingNumericValue = next;
+        motionActive = true;
+        pendingTargetAngle = destination;
+        settleAnimation.from = visualAngle;
+        settleAnimation.to = destination;
+        settleAnimation.duration = 115;
+        settleAnimation.start();
+    }
+
     function stepIndex(delta) {
         if (!interactive)
             return;
-
-        requestIndex((pendingIndex >= 0 ? pendingIndex : currentIndex) + Number(delta));
+        if (selectorMode === "continuous") {
+            const base = pendingNumeric ? pendingNumericValue : currentValue;
+            requestNumericValue(base + Number(delta) * Math.max(0.000001, valueStep));
+        } else {
+            requestIndex((pendingIndex >= 0 ? pendingIndex : currentIndex) + Number(delta));
+        }
     }
 
     function snapToCurrent() {
+        if (selectorMode === "continuous") {
+            visualAngle = angleForValue(currentValue);
+            return;
+        }
         if (optionCount() <= 0)
             return;
-
-        visualAngle = nearestEquivalent(angleForIndex(currentIndex), visualAngle);
+        visualAngle = selectorMode === "zones" ? angleForIndex(currentIndex)
+            : nearestEquivalent(angleForIndex(currentIndex), visualAngle);
     }
 
     onCurrentIndexChanged: {
-        if (!dragging && !motionActive)
+        if (selectorMode === "zones" && currentIndex === echoZoneIndex) {
+            echoZoneIndex = -1;
+            return;
+        }
+        echoZoneIndex = -1;
+        if (!dragging && !motionActive && selectorMode !== "continuous")
+            snapToCurrent();
+    }
+
+    onCurrentValueChanged: {
+        if (selectorMode === "continuous" && !dragging && !motionActive)
+            snapToCurrent();
+    }
+
+    onSelectorModeChanged: {
+        stopMotion();
+        dragging = false;
+        snapToCurrent();
+    }
+    onArcStartAngleChanged: {
+        if (selectorMode !== "discrete" && !dragging && !motionActive)
+            snapToCurrent();
+    }
+    onArcSweepAngleChanged: {
+        if (selectorMode !== "discrete" && !dragging && !motionActive)
             snapToCurrent();
     }
 
@@ -288,7 +418,18 @@ Item {
         easing.type: Easing.OutBack
         easing.overshoot: 0.42
         onFinished: {
-            if (!dialRoot.motionActive || dialRoot.pendingIndex < 0)
+            if (!dialRoot.motionActive)
+                return;
+            if (dialRoot.selectorMode === "continuous") {
+                const value = dialRoot.reportedValue(dialRoot.pendingNumericValue);
+                dialRoot.motionActive = false;
+                dialRoot.pendingNumeric = false;
+                dialRoot.previewIndex = -1;
+                if (value !== dialRoot.reportedValue(dialRoot.currentValue))
+                    dialRoot.valueRequested(value);
+                return;
+            }
+            if (dialRoot.pendingIndex < 0)
                 return;
             const finishedIndex = dialRoot.pendingIndex;
             dialRoot.motionActive = false;
@@ -309,8 +450,19 @@ Item {
                 return;
             }
             dialRoot.angularVelocity *= dialRoot.frictionPerFrame;
-            dialRoot.visualAngle += dialRoot.angularVelocity * interval / 1000;
-            dialRoot.previewIndex = dialRoot.indexForAngle(dialRoot.visualAngle);
+            const nextAngle = dialRoot.visualAngle
+                + dialRoot.angularVelocity * interval / 1000;
+            if (dialRoot.selectorMode !== "discrete") {
+                dialRoot.visualAngle = dialRoot.boundedAngle(nextAngle);
+                if (nextAngle !== dialRoot.visualAngle) {
+                    dialRoot.finishFreePosition();
+                    return;
+                }
+            } else {
+                dialRoot.visualAngle = nextAngle;
+            }
+            if (dialRoot.selectorMode !== "continuous")
+                dialRoot.previewIndex = dialRoot.indexForAngle(dialRoot.visualAngle);
             if (Math.abs(dialRoot.angularVelocity) < dialRoot.settleThreshold)
                 dialRoot.settleAtCurrentAngle();
         }
@@ -766,7 +918,9 @@ Item {
                 const angle = dialRoot.pointerAngle(mouse.x, mouse.y, width, height);
                 const delta = dialRoot.normalizeDelta(angle - dialRoot.lastPointerAngle);
 
-                dialRoot.visualAngle += delta;
+                dialRoot.visualAngle = dialRoot.selectorMode === "discrete"
+                    ? dialRoot.visualAngle + delta
+                    : dialRoot.boundedAngle(dialRoot.visualAngle + delta);
                 dialRoot.lastPointerAngle = angle;
                 const now = Date.now();
                 const elapsed = now - dialRoot.lastMoveTime;
@@ -777,11 +931,12 @@ Item {
                 }
                 dialRoot.lastMoveTime = now;
 
-                const detent = dialRoot.indexForAngle(dialRoot.visualAngle);
-
-                if (detent !== dialRoot.dragDetentIndex) {
-                    dialRoot.dragDetentIndex = detent;
-                    dialRoot.previewIndex = detent;
+                if (dialRoot.selectorMode !== "continuous") {
+                    const detent = dialRoot.indexForAngle(dialRoot.visualAngle);
+                    if (detent !== dialRoot.dragDetentIndex) {
+                        dialRoot.dragDetentIndex = detent;
+                        dialRoot.previewIndex = detent;
+                    }
                 }
             }
 
@@ -795,7 +950,8 @@ Item {
                 dialRoot.lastMoveTime = Date.now();
                 dialRoot.dragging = true;
                 dialRoot.dragDetentIndex = dialRoot.currentIndex;
-                dialRoot.previewIndex = dialRoot.currentIndex;
+                dialRoot.previewIndex = dialRoot.selectorMode === "continuous"
+                    ? -1 : dialRoot.currentIndex;
                 dialRoot.lastPointerAngle = dialRoot.pointerAngle(
                     mouse.x,
                     mouse.y,
@@ -814,7 +970,11 @@ Item {
                 // A stale velocity reading after holding the pointer still
                 // must not cause accidental inertia.
                 const recentlyMoving = Date.now() - dialRoot.lastMoveTime < 85;
-                if (recentlyMoving && Math.abs(dialRoot.angularVelocity) >= dialRoot.flickThreshold) {
+                const atBound = dialRoot.selectorMode !== "discrete"
+                    && (dialRoot.visualAngle <= dialRoot.arcStartAngle
+                        || dialRoot.visualAngle >= dialRoot.arcStartAngle + dialRoot.boundedSweep);
+                if (!atBound && recentlyMoving
+                        && Math.abs(dialRoot.angularVelocity) >= dialRoot.flickThreshold) {
                     dialRoot.inertial = true;
                     inertiaTimer.start();
                 } else {

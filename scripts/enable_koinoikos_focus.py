@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime
 import os
+import re
 from pathlib import Path
 import shutil
 import stat
@@ -47,7 +48,55 @@ def checked_config(config: Path, candidate_text: str, sway_bin: str) -> tuple[bo
         candidate.unlink(missing_ok=True)
 
 
-def enable(config: Path, sway_bin: str = "sway") -> tuple[bool, str]:
+def running_compositor_executable() -> str | None:
+    """Resolve the compositor that owns this session's Sway IPC socket.
+
+    Never assume that plain /usr/bin/sway understands the features of a
+    running SwayFX / SwayPX fork. Linux Sway sockets encode their owner's PID.
+    Match the current UID, require a live Unix socket and a Sway-family
+    executable, and validate with the *actual running executable*.
+    """
+    socket_path = os.environ.get("SWAYSOCK") or os.environ.get("I3SOCK") or ""
+    match = re.fullmatch(r"sway-ipc\.(\d+)\.(\d+)\.sock",
+                         Path(socket_path).name)
+    if match is None or int(match.group(1)) != os.getuid():
+        return None
+
+    if not Path(socket_path).is_socket():
+        return None
+
+    executable = Path("/proc") / match.group(2) / "exe"
+    try:
+        target_name = Path(os.readlink(executable).removesuffix(" (deleted)")).name.lower()
+    except (OSError, RuntimeError):
+        return None
+
+    if "sway" not in target_name:
+        return None
+
+    # /proc/<pid>/exe refers to the binary of the exact Sway session
+    # identified by SWAYSOCK, even when PATH contains stock sway instead.
+    return str(executable)
+
+
+def resolve_validator(sway_bin: str | None) -> tuple[str | None, str]:
+    if sway_bin:
+        return sway_bin, sway_bin
+    running = running_compositor_executable()
+    if running:
+        try:
+            description = os.readlink(running)
+        except OSError:
+            description = running
+        return running, description
+    return None, (
+        "Could not identify the running Sway/SwayFX/SwayPX executable from "
+        "SWAYSOCK. No config changed. Pass --sway /absolute/path/to/"
+        "your-running-compositor to validate explicitly."
+    )
+
+
+def enable(config: Path, sway_bin: str | None = None) -> tuple[bool, str]:
     # Sway dotfile managers often expose ~/.config/sway/config as a symlink
     # into their repository. Resolve its target, never os.replace() the link.
     # Keep the original config path when validating: an include in the
@@ -68,9 +117,15 @@ def enable(config: Path, sway_bin: str = "sway") -> tuple[bool, str]:
     if candidate == original:
         return True, "Focus Mode include already present; no changes made."
 
-    valid, evidence = checked_config(config, candidate, sway_bin)
+    validator, description = resolve_validator(sway_bin)
+    if validator is None:
+        return False, description
+
+    valid, evidence = checked_config(config, candidate, validator)
     if not valid:
-        return False, "Sway rejected the candidate; original untouched.\n" + evidence
+        return False, ("Running-compositor config validation failed "
+                       + "(" + description + "); original untouched.\n"
+                       + evidence)
 
     # A user or dotfile manager might edit or retarget the link during
     # validation. Refuse to clobber a newer version or another target.
@@ -104,7 +159,8 @@ def enable(config: Path, sway_bin: str = "sway") -> tuple[bool, str]:
         dest.unlink(missing_ok=True)
 
     suffix = " (symlink preserved)" if config.is_symlink() else ""
-    return True, ("Enabled after Sway -C validation" + suffix
+    return True, ("Enabled after compositor validation with "
+                  + description + suffix
                   + ". Original backed up at " + str(backup)
                   + "\nNo compositor reload performed. "
                   + "Restart Quickshell safely, then run: swaymsg reload")
@@ -115,8 +171,10 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--config", type=Path,
                         default=Path("~/.config/sway/config"),
                         help="Your actual Sway config (default: ~/.config/sway/config)")
-    parser.add_argument("--sway", default="sway",
-                        help="Sway/SwayPX binary used to validate; default: sway")
+    parser.add_argument("--sway", default=None,
+                        help="Explicit Sway/SwayPX validation binary; "
+                             "by default, detect the running compositor "
+                             "from SWAYSOCK and /proc/<pid>/exe")
     args = parser.parse_args(argv)
     success, message = enable(args.config, args.sway)
     print(message, file=sys.stdout if success else sys.stderr)

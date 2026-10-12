@@ -5,6 +5,8 @@ on:
     paths:
       - "components/ModeButton.qml"
       - "widgets/AppControlW.qml"
+      - "widgets/weather/WeatherStationW.qml"
+      - "tests/components/test_mode_button_weather_contracts.py"
       - "tests/components/test_mode_button_appcontrol_contracts.py"
       - "components/ModeButton.qml.template"
       - "components/ModeButtonCloseHalo.qml"
@@ -21,6 +23,8 @@ on:
     paths:
       - "components/ModeButton.qml"
       - "widgets/AppControlW.qml"
+      - "widgets/weather/WeatherStationW.qml"
+      - "tests/components/test_mode_button_weather_contracts.py"
       - "tests/components/test_mode_button_appcontrol_contracts.py"
       - "components/ModeButtonCloseHalo.qml"
       - "components/ModeButtonWideHalo.qml"
@@ -43,5 +47,7 @@ jobs:
         run: python3 tests/components/test_mode_button_contracts.py
       - name: Verify AppControl Main Mode migration
         run: python3 tests/components/test_mode_button_appcontrol_contracts.py
+      - name: Verify Weather DOMAIN / VIEW Main Modes
+        run: python3 tests/components/test_mode_button_weather_contracts.py
       - name: Preserve existing visual language recipes
         run: python3 tests/components/test_visual_language_recipes.py

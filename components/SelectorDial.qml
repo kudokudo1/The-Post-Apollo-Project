@@ -26,6 +26,9 @@ Item {
     property bool dragging: false
     property real lastPointerAngle: 0
     property int dragDetentIndex: -1
+    // Visual detent preview is independent of the externally committed index.
+    property int previewIndex: -1
+    readonly property int indicatedIndex: previewIndex >= 0 ? previewIndex : currentIndex
 
     signal selectionRequested(int index, string value)
 
@@ -471,22 +474,22 @@ Item {
                     anchors.centerIn: parent
                     text: dialRoot.optionDisplay(index)
                     font.pixelSize: dialRoot.optionCount() > 4 ? 6 : 7
-                    color: index === dialRoot.currentIndex
+                    color: index === dialRoot.indicatedIndex
                            ? dialRoot.markerColor
                            : dialRoot.labelColor
 
                     layer.enabled: true
                     layer.effect: MultiEffect {
                         shadowEnabled: true
-                        shadowColor: optionMark.index === dialRoot.currentIndex
+                        shadowColor: optionMark.index === dialRoot.indicatedIndex
                                      ? dialRoot.markerColor
                                      : dialRoot.labelColor
                         shadowOpacity:
-                            optionMark.index === dialRoot.currentIndex
+                            optionMark.index === dialRoot.indicatedIndex
                             ? 0.92
                             : 0.22
                         shadowBlur:
-                            optionMark.index === dialRoot.currentIndex
+                            optionMark.index === dialRoot.indicatedIndex
                             ? 0.72
                             : 0.28
                     }
@@ -566,7 +569,7 @@ Item {
 
                 if (detent !== dialRoot.dragDetentIndex) {
                     dialRoot.dragDetentIndex = detent;
-                    dialRoot.selectionRequested(detent, String(dialRoot.options[detent]));
+                    dialRoot.previewIndex = detent;
                 }
             }
 
@@ -577,6 +580,7 @@ Item {
                 dialRoot.forceActiveFocus();
                 dialRoot.dragging = true;
                 dialRoot.dragDetentIndex = dialRoot.currentIndex;
+                dialRoot.previewIndex = dialRoot.currentIndex;
                 dialRoot.lastPointerAngle = dialRoot.pointerAngle(
                     mouse.x,
                     mouse.y,
@@ -586,8 +590,17 @@ Item {
             }
 
             onReleased: {
+                if (!dialRoot.dragging)
+                    return;
+
+                const finalIndex = dialRoot.indexForAngle(dialRoot.visualAngle);
                 dialRoot.dragging = false;
-                dialRoot.snapToCurrent();
+                dialRoot.previewIndex = -1;
+                dialRoot.visualAngle = dialRoot.nearestEquivalent(
+                    dialRoot.angleForIndex(finalIndex), dialRoot.visualAngle
+                );
+                if (finalIndex !== dialRoot.currentIndex)
+                    dialRoot.selectionRequested(finalIndex, String(dialRoot.options[finalIndex]));
 
                 if (dialRoot.keyboardHost)
                     dialRoot.keyboardHost.restoreGitKeyboardFocus(false);
@@ -595,6 +608,7 @@ Item {
 
             onCanceled: {
                 dialRoot.dragging = false;
+                dialRoot.previewIndex = -1;
                 dialRoot.snapToCurrent();
 
                 if (dialRoot.keyboardHost)

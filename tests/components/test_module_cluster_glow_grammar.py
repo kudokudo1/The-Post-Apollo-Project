@@ -99,38 +99,30 @@ assert workspaces.count("workspacesButtonMouse.containsMouse ? 0.95") == 2
 assert workspaces.count(": 0.75") >= 2
 assert "visible: workspacesWorkspaceButton.isActive" in workspaces
 
-# All Wi-Fi foreground glyphs remain in their original RowLayouts. Overlays
-# are non-layout siblings on DockButton's content plane.
-# The SSID's structural parentheses share its contextual glow without moving.
+# Wi-Fi's Qt layer effects MUST remain attached to the original glyph
+# containers. Detached source-mapped copies visibly ghosted and displaced
+# the SSID/telemetry in the operator's screenshots.
 network = module("Network")
-assert network.count("SafeDropShadow {") == 6, "Six sources in four semantic clusters"
-assert network.count("layer.effect: DropShadow {") == 1, "Legacy Ethernet pulse only"
-assert network.count("opacity: networkDock.contentGlowOpacity") == 6
-assert "networkDock.pressed ? 0.6 : networkDock.hovered ? 0.8 : 1.0" not in network
-assert "contentGlowEnabled: false" in network  # no whole-module sampled glow
-for field in (
-    "networkIconRow", "networkOpen", "networkText", "networkClose",
-    "networkSignalText", "networkSpeedText",
+assert "SafeDropShadow {" not in network
+assert "mapToItem(parent, 0, 0)" not in network
+assert network.count("layer.effect: DropShadow {") == 7  # six + Ethernet pulse
+assert network.count("color: networkDock.sampledGlowColor") == 6
+assert network.count("radius: networkDock.contentGlowRadius") == 6
+assert network.count("samples: networkDock.contentGlowSamples") == 6
+assert network.count("layer.enabled: true") == 7
+assert "opacity: networkDock.contentGlowOpacity" not in network
+assert "readonly property color sampledGlowColor: Qt.rgba(" in network
+assert "root.networkGlowColor.a * networkDock.contentGlowOpacity" in network
+assert 'source: networkIconRow' in network  # original compound icon layer
+assert "color: Colors.cyan" in network  # fixed Ethernet pulse, unchanged
+for item, expected in (
+    ("networkOpen", '"("'),
+    ("networkClose", '")"'),
 ):
-    assert f"safeSource: {field}" in network, field
-    assert f"id: {field}Glow" in network, field
-    start = network.index(f"id: {field}Glow")
-    end = network.index("\n    }", start)
-    glow = network[start:end]
-    assert f"{field}.mapToItem(parent, 0, 0)" in glow, field
-    assert "readonly property point sourceOrigin: sourceAttached" in glow, field
-    assert f"width: sourceAttached ? {field}.width : 0" in glow, field
-    assert f"height: sourceAttached ? {field}.height : 0" in glow, field
-    assert "radius: networkDock.contentGlowRadius" in glow, field
-    assert "samples: networkDock.contentGlowSamples" in glow, field
-    assert "opacity: networkDock.contentGlowOpacity" in glow, field
-    assert "color: root.networkGlowColor" in glow, field
-    assert "z: 2" in glow, field
-
-for item, literal in (("networkOpen", '"("'), ("networkClose", '")"')):
-    field = network[network.index(f"id: {item}"):][:220]
-    assert f"text: {literal}" in field, item
-    assert "color: Colors.white" in field, item
+    block = network[network.index(f"id: {item}"):][:540]
+    assert f"text: {expected}" in block, item
+    assert "color: Colors.white" in block, item
+    assert "layer.effect: DropShadow {" in block, item
 
 assert 'text: root.signalPercent + "%"' in network
 assert 'text: root.linkSpeed + " Mb/s"' in network
@@ -141,12 +133,9 @@ assert "property color networkGlowColor:" in network
 assert 'Quickshell.execDetached(["nm-connection-editor"])' in network
 assert "root.ethernetMode = !root.ethernetMode" in network
 assert "root.signalWeak" in network and "root.signalStrong" in network
-
 dock_source = (ROOT / "components/DockButton.qml").read_text(encoding="utf-8")
 assert "readonly property real contentGlowRadius:" in dock_source
 assert "readonly property int contentGlowSamples:" in dock_source
-assert "radius: dockButton.contentGlowRadius" in dock_source
-assert "samples: dockButton.contentGlowSamples" in dock_source
 
 # Preserve separately approved specialty behavior pending runtime review.
 assert "softGlowSpread: 1" in module("Power")

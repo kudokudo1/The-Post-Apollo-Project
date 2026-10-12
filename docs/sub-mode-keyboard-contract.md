@@ -9,6 +9,28 @@ Sub Modes are subordinate choices **within** a selected Main Mode. A Main
 Mode change, a secondary filter change, a selection highlight, and execution
 of a selected item are different operations; keep their key bindings separate.
 
+## Cross-menu Main Mode versus Sub Mode key comparison
+
+**2026-10-12 source verification.** This is about **keyboard keys**, not
+visual button color, size or QML widget identity. "Main"/"Sub" below
+describes the navigation hierarchy; Hospital Floors and Beds are
+repository/checkout selectors, not literal instances of `ModeButton.qml`.
+
+| Menu | Main / primary context key | Sub / secondary context key | Important focus or meaning difference |
+| --- | --- | --- | --- |
+| **AppControl** | `Tab` next Main Mode, `Shift+Tab` previous when in ordinary selector context | `Shift+Left/Right` top/source selector; `Ctrl+Left/Right` bottom/launch selector | `Tab` instead moves within mode rail or between results while mode-rail/detail focus owns it |
+| **Git / GitHub** | `Shift+Left/Up` selects Git Local, `Shift+Right/Down` selects GitHub Remote | **GitHub Remote only:** `Alt+Left/Up` previous bottom mode, `Alt+Right/Down` next | Git Main Mode keys choose a **specific page**, not a generic next/previous cycle. Git Local `Alt+Left` means navigation **Back** if history exists; nested Git Local subModes have no matching global cycle shortcut |
+| **Hospital** | **Plain `Left/Right`** cycles repository **Floors** while in Room selector | `Shift+Left/Right` cycles local-checkout **Beds** | Plain arrows become navigation inside Room/Bed controls; no universal `Tab` main-mode key or `Ctrl+Left/Right` secondary key in audited Hospital root |
+
+### Collision to settle before normalizing shortcuts
+
+`Shift+Left/Right` already has **three incompatible meanings**:
+AppControl top Sub Mode, Git/GitHub primary page, Hospital Bed selection.
+A future shared keyboard grammar therefore **requires an operator-approved
+remapping plan**, not a mechanical reuse of Main Mode or Sub Mode QML
+components. Do not change any existing key bindings as part of documenting
+this audit.
+
 ## AppControl // dedicated top and bottom Sub Mode keys
 
 Source: [`widgets/AppControlW.qml`](../widgets/AppControlW.qml),
@@ -84,6 +106,37 @@ Git shortcuts use application-scope `Shortcut` entries gated by
 disabled while a text editor or dial owns focus. Git Local `Alt+Left` is
 only enabled when a navigation-back target exists and no text editor owns
 the input. GitHub `Alt` navigation requires the GitHub page.
+
+## Hospital // Floors, Beds and Room-control ownership
+
+Source: [`widgets/HospitalW.qml`](../widgets/HospitalW.qml).
+The root-level `Shortcut` declarations call `moveRoomControl(dx,dy)`
+for plain arrows, `cycleBed(delta)` for `Shift+Left/Right`, and
+`handleRoomEnter()` for `Enter/Return`.
+
+| Keys | Only when | Action |
+| --- | --- | --- |
+| **Left / Right** | Room selector, no nested Room/Bed control mode and no operations surface | Previous/next **Floor (repository)** via `moveRoomControl` → `cycleFloor` |
+| **Up / Down** | Room selector | Previous/next **Room** |
+| **Shift + Left / Right** | Hospital open, keyboard active, not typing in Intercom/Receptionist | Previous/next **Bed (local checkout)** via `cycleBed` |
+| **Arrow keys** | Room action grid or Bed-control focus | Navigate active controls / return to Room selection, **not** Floor switching |
+| **Enter / Return** | Room selector/controls | Enter or activate currently selected Room control; in Bed-control mode invokes Move Bed action if enabled |
+
+The **Floor** has separate mouse prev/next buttons and a persistent
+`SelectorSlider` that call `cycleFloor` / `selectFloor`; the **Bed**
+has mouse prev/next controls plus the keyboard Shift arrows. The Floor
+shortcut is **contextual plain Left/Right**, not a global `Shortcut`
+with the floor name. `floorSwitchEnabled` and `bedSwitchEnabled`
+block changes during unsupported/ongoing operations. Hospital's
+`Shortcut` keys require open menu and keyboard ownership, and ordinary
+movement keys are disabled while `intercomTyping` or
+`receptionistTyping`.
+
+**Do not treat Hospital's `Shift+Left/Right` as Main Mode navigation**
+just because the same keys select the Git primary page, or as generic
+Sub Mode navigation outside Beds just because AppControl uses them for
+its top selector. Also do not bind operation-confirmation actions to
+generic mode-navigation keys.
 
 ## Shared migration/verification rules
 

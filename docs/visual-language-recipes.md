@@ -346,3 +346,16 @@ interactive effect-level `opacity`, not merely count effects.
   colors, independent confirmation actions, process commands, and keyboard
   controls remain untouched. This is a source-verified cosmetic correction;
   operator live review remains the visual acceptance gate.
+
+
+### Nurse 3A // Tray activation parity (2026-10-11)
+
+System-tray icon activation must call the provider item's `activate()` without
+a locally invented open/selected state. The obsolete `clickTest` toggle was
+referenced even though its property was disabled, potentially blocking actual
+activation and producing a misleading magenta persistence. Removed only that
+orphaned test-state dependency. The independently sampled tray icon glow,
+hover/pressed colors and numeric values, tray item geometry, pointer button
+distinction and provider actions remain unchanged. A real provider-backed
+open state can be designed only after confirming the provider exposes it.
+Workspaces' independent active/inactive two-layer artwork remains separate.

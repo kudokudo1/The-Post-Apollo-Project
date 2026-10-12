@@ -65,8 +65,6 @@ Rectangle {
 
                 required property var modelData
 
-                //property bool clickTest: false
-
                 implicitWidth: 30
                 implicitHeight: 42
 
@@ -113,7 +111,9 @@ Rectangle {
 
                         opacity: trayButtonMouse.pressed ? 1.0 : trayButtonMouse.containsMouse ? 0.95 : 0.75
 
-                        color: trayButton.clickTest ? Colors.magenta : trayButtonMouse.pressed ? Colors.cyan : trayButtonMouse.containsMouse ? Colors.orange : Colors.cyan
+                        // Tray selection belongs to the external item; a local
+                        // click toggle cannot represent its menu/open state.
+                        color: trayButtonMouse.pressed ? Colors.cyan : trayButtonMouse.containsMouse ? Colors.orange : Colors.cyan
 
                         transparentBorder: true
                     }
@@ -152,8 +152,8 @@ Rectangle {
 
                     onClicked: function (mouse) {
                         if (mouse.button === Qt.LeftButton) {
-                            trayButton.clickTest = !trayButton.clickTest;
-
+                            // Activate the actual tray item; no undeclared
+                            // local test-state assignment may intercept this.
                             trayButton.modelData.activate();
                         }
 

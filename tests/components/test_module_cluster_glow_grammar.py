@@ -101,6 +101,16 @@ assert not re.search(r"(?m)^\s*DropShadow\s*\{", tray)
 assert "safeSource: trayIcon" in tray
 assert "trayButtonMouse.containsMouse ? 0.95 : 0.75" in tray
 assert "trayButtonHovered ? 0.09 : 0.07" in tray
+# No phantom local toggle can precede a real system-tray activation.
+# External application menu/open state is not inferred from a click.
+assert "clickTest" not in tray
+assert "trayButton.modelData.activate();" in tray
+assert "if (mouse.button === Qt.LeftButton)" in tray
+assert "if (mouse.button === Qt.RightButton)" in tray
+assert "color: trayButtonMouse.pressed ? Colors.cyan : trayButtonMouse.containsMouse ? Colors.orange : Colors.cyan" in tray
+assert "trayDock.trayButtonPressed = false;" in tray
+assert "trayDock.trayButtonHovered = false;" in tray
+assert 'model: SystemTray.items' in tray
 
 workspaces = module("Workspaces")
 assert workspaces.count("safeSource: workspacesText") == 2

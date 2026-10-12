@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Wayland
 import Quickshell.I3
 import Quickshell.Io
 import "../components"
@@ -34,6 +35,13 @@ PanelWindow {
     // ============================================================
 
     property bool menuOpen: false
+    property bool relationshipFocusModeActive: false
+    property bool relationshipFocused: false
+
+    onRelationshipFocusedChanged: {
+        if (relationshipFocusModeActive && relationshipFocused && menuOpen)
+            Qt.callLater(function() { searchInput.forceActiveFocus(); });
+    }
 
     // ============================================================
     // IPC / SWAY GLOBAL TOGGLE
@@ -12755,7 +12763,13 @@ PanelWindow {
 
     surfaceFormat.opaque: false
 
-    focusable: true
+    focusable: !relationshipFocusModeActive || relationshipFocused
+    WlrLayershell.keyboardFocus:
+        !menuOpen || (relationshipFocusModeActive && !relationshipFocused)
+        ? WlrKeyboardFocus.None
+        : relationshipFocusModeActive
+        ? WlrKeyboardFocus.Exclusive
+        : WlrKeyboardFocus.OnDemand
     visible: menuOpen
 
     // ============================================================
@@ -12775,9 +12789,11 @@ PanelWindow {
 
         glowColor: Colors.orange
         closeGlowSpread: 6
-        closeGlowOpacity: 0.38
+        closeGlowOpacity: relationshipFocusModeActive
+                          ? (relationshipFocused ? 0.68 : 0.12) : 0.38
         wideGlowSpread: 12
-        wideGlowOpacity: 0.12
+        wideGlowOpacity: relationshipFocusModeActive
+                         ? (relationshipFocused ? 0.22 : 0.03) : 0.12
 
         z: -20
     }

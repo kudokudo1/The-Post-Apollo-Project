@@ -226,15 +226,29 @@ for name in ("Applauncher", "Bluetooth", "Calendar", "Cpu", "NotificationsHub"):
 
 network = (ROOT / "modules/Network.qml").read_text(encoding="utf-8")
 require(network, "opacity: networkDock.contentGlowOpacity", "Wi-Fi sampled glow uses the shared upward intensity")
-assert network.count("opacity: networkDock.contentGlowOpacity") == 4, (
-    "Wi-Fi icon, SSID, signal and speed must each inherit the same interactive energy"
+assert network.count("opacity: networkDock.contentGlowOpacity") == 6, (
+    "Wi-Fi icon, SSID and both parentheses, signal and speed inherit shared energy"
 )
 # The four sampled content glows are now separate siblings; layer.effect used
 # to apply varying opacity to the entire original source glyph.
-for target in ("networkIconRow", "networkText", "networkSignalText", "networkSpeedText"):
-    require(network, f"safeSource: {target}", "Wi-Fi glow must sample an opaque independent source")
-    require(network, f"{target}.mapToItem(parent, 0, 0)", "Wi-Fi sampled overlay tracks layout geometry")
-assert network.count("SafeDropShadow {") == 4
+for target in (
+    "networkIconRow", "networkOpen", "networkText", "networkClose",
+    "networkSignalText", "networkSpeedText",
+):
+    require(network, f"safeSource: {target}", "Wi-Fi independent glow source")
+    require(network, f"{target}.mapToItem(parent, 0, 0)", "Wi-Fi original glyph coordinates")
+    require(network, f"id: {target}Glow", "Wi-Fi source owns its sampled overlay")
+assert network.count("SafeDropShadow {") == 6
+assert network.count("opacity: networkDock.contentGlowOpacity") == 6
+assert network.count("radius: networkDock.contentGlowRadius") == 6
+assert network.count("samples: networkDock.contentGlowSamples") == 6
+assert network.count("readonly property point sourceOrigin: sourceAttached") == 6
+assert network.count("width: sourceAttached ? ") == 6
+assert network.count("height: sourceAttached ? ") == 6
+assert "readonly property real contentGlowRadius:" in COMPONENT
+assert "readonly property int contentGlowSamples:" in COMPONENT
+require(COMPONENT, "radius: dockButton.contentGlowRadius", "shared sampled radius")
+require(COMPONENT, "samples: dockButton.contentGlowSamples", "shared sample count")
 assert network.count("layer.effect: DropShadow {") == 1, (
     "Only the unchanged Ethernet pulse may retain its legacy layer effect"
 )

@@ -333,3 +333,16 @@ renderer contract and restores the pre-regression layout structure. **The
 operator must still compare the repaired version live** before visual
 acceptance. CI tests must reject both detached `mapToItem` overlays and
 interactive effect-level `opacity`, not merely count effects.
+
+
+### Nurse 3A // Power confirmation-pair hover parity (2026-10-11)
+
+- The **Power dock trigger** deliberately retains its historical glow opacity,
+  spread, radius, samples, and absence of a closed-state front wash. This is
+  not permission to apply generic DockButton numbers to the power menu.
+- The separate **Reboot** and **Shutdown** confirmation buttons use the same
+  visual structure. Their rear button-hover halo should use the same opacity
+  (`0.55`) rather than Reboot's leftover `0.30`. Their distinct danger
+  colors, independent confirmation actions, process commands, and keyboard
+  controls remain untouched. This is a source-verified cosmetic correction;
+  operator live review remains the visual acceptance gate.

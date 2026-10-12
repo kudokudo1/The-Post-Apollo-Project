@@ -44,6 +44,17 @@ PanelWindow {
     property var gitKeyboardControls: []
     property var gitKeyboardControl: null
     property bool dialControlMode: false
+    // Explicit visual preview of SelectorDial's operation indicator.
+    // Never triggers workflow execution or changes factory configuration.
+    property bool dialFxDemoRunning: false
+    property int dialFxDemoStage: -1
+    readonly property string dialFxDemoLabel: !dialFxDemoRunning ? "DIAL FX // RUN"
+        : dialFxDemoStage === 0 ? "DIAL FX // SPIN"
+        : dialFxDemoStage === 1 ? "DIAL FX // 50%"
+        : dialFxDemoStage === 2 ? "DIAL FX // PASS"
+        : dialFxDemoStage === 3 ? "DIAL FX // FAIL"
+        : dialFxDemoStage === 4 ? "DIAL FX // HOLD"
+        : "DIAL FX // RUN"
     property string gitSelectorSource: "keyboard"
     property var gitNavigationStack: []
 
@@ -803,6 +814,70 @@ PanelWindow {
         root.localTargetMenuOpen = false;
         root.remoteTargetMenuOpen = false;
         root.menuOpen = false;
+    }
+
+    function stopDialFxDemo() {
+        dialFxDemoTimer.stop();
+        dialFxDemoRunning = false;
+        dialFxDemoStage = -1;
+        ignitionDial.loadingState = "idle";
+        ignitionDial.loadingProgress = -1;
+        ignitionDial.persistentFailure = false;
+    }
+
+    function nextDialFxDemoStage() {
+        if (!menuOpen || activePage !== "github" || githubView !== "control") {
+            stopDialFxDemo();
+            return;
+        }
+        dialFxDemoStage++;
+        ignitionDial.loadingState = "idle";
+        ignitionDial.loadingProgress = -1;
+        ignitionDial.persistentFailure = false;
+        if (dialFxDemoStage === 0) {
+            ignitionDial.loadingState = "loading";
+            dialFxDemoTimer.interval = 1800;
+        } else if (dialFxDemoStage === 1) {
+            ignitionDial.loadingProgress = 0.5;
+            ignitionDial.loadingState = "loading";
+            dialFxDemoTimer.interval = 1700;
+        } else if (dialFxDemoStage === 2) {
+            ignitionDial.loadingState = "success";
+            dialFxDemoTimer.interval = 1400;
+        } else if (dialFxDemoStage === 3) {
+            ignitionDial.loadingState = "error";
+            dialFxDemoTimer.interval = 1400;
+        } else if (dialFxDemoStage === 4) {
+            ignitionDial.persistentFailure = true;
+            ignitionDial.loadingState = "error";
+            dialFxDemoTimer.interval = 1700;
+        } else {
+            stopDialFxDemo();
+            return;
+        }
+        dialFxDemoTimer.restart();
+    }
+
+    function startDialFxDemo() {
+        stopDialFxDemo();
+        dialFxDemoRunning = true;
+        nextDialFxDemoStage();
+    }
+
+    Timer {
+        id: dialFxDemoTimer
+        repeat: false
+        onTriggered: root.nextDialFxDemoStage()
+    }
+
+    onActivePageChanged: {
+        if (activePage !== "github" && dialFxDemoRunning)
+            stopDialFxDemo();
+    }
+
+    onGithubViewChanged: {
+        if (githubView !== "control" && dialFxDemoRunning)
+            stopDialFxDemo();
     }
 
     function toggle() {
@@ -1877,6 +1952,8 @@ PanelWindow {
 
     onMenuOpenChanged: {
         if (!root.menuOpen) {
+            if (root.dialFxDemoRunning)
+                root.stopDialFxDemo();
             root.clearGitKeyboardControl();
             return;
         }
@@ -5657,6 +5734,46 @@ PanelWindow {
                                                                     font.pixelSize: 8
                                                                     color: Colors.white
                                                                     opacity: 0.72
+                                                                }
+
+                                                                // Visible in the actual GitHub Workflow Factory,
+                                                                // using its real IGNITION dial as a safe FX preview.
+                                                                Rectangle {
+                                                                    id: dialFxDemoButton
+                                                                    anchors {
+                                                                        horizontalCenter: parent.horizontalCenter
+                                                                        top: parent.top
+                                                                        topMargin: 4
+                                                                    }
+                                                                    width: 156
+                                                                    height: 22
+                                                                    radius: 3
+                                                                    color: dialFxDemoMouse.containsMouse
+                                                                           ? Colors.dark : Colors.black
+                                                                    border.width: 1
+                                                                    border.color: root.dialFxDemoRunning
+                                                                                  ? Colors.orange : Colors.cyan
+
+                                                                    GohuText {
+                                                                        anchors.centerIn: parent
+                                                                        text: root.dialFxDemoLabel
+                                                                        font.pixelSize: 9
+                                                                        color: root.dialFxDemoRunning
+                                                                               ? Colors.orange : Colors.cyan
+                                                                    }
+
+                                                                    MouseArea {
+                                                                        id: dialFxDemoMouse
+                                                                        anchors.fill: parent
+                                                                        hoverEnabled: true
+                                                                        cursorShape: Qt.PointingHandCursor
+                                                                        onClicked: {
+                                                                            if (root.dialFxDemoRunning)
+                                                                                root.stopDialFxDemo();
+                                                                            else
+                                                                                root.startDialFxDemo();
+                                                                        }
+                                                                    }
                                                                 }
 
                                                                 Row {

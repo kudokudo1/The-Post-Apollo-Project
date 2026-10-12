@@ -17,6 +17,7 @@ for token in (
     "property int modeGlowExperiment:",
     'glowStartupChoice === "C" ? 3',
     'glowStartupChoice === "D" ? 4',
+    'glowStartupChoice === "E" ? 5',
     ": 0",
 
     "id: sampledGlowTestControls",
@@ -26,6 +27,7 @@ for token in (
     'label: "B / REATTACH"',
     'label: "C / ICON"',
     'label: "D / LABEL"',
+    'label: "E / FIXED"',
     "onClicked: cpuPlusWindow.modeGlowExperiment = modelData.value",
     "readonly property bool sampledTextActive:",
     "cpuPlusWindow.modeGlowExperiment !== 1",
@@ -39,6 +41,8 @@ for token in (
     "sampledCaptionActive ? modeCaption : null",
     'sampledPrimaryActive && modelData.kind !== "thermal"',
     "labelGlowEnabled: sampledCaptionActive",
+    "cpuPlusWindow.modeGlowExperiment === 5",
+    "? 1.0",
 ):
     assert token in cpu, f"CPU++ isolation diagnostic missing: {token}"
 
@@ -65,4 +69,4 @@ assert 'customPrimaryGlowSource:' in cpu
 assert 'customLabelGlowSource:' in cpu
 assert 'SafeDropShadow {' in mode or "TextHashGlow {" in mode
 assert "source: sourceAttached ? safeSource : null" in safe
-print("CPU++ sampled-text glow A/B/C/D isolation diagnostics: PASS")
+print("CPU++ sampled-text glow A/B/C/D/E isolation diagnostics: PASS")

@@ -24,13 +24,15 @@ PanelWindow {
     // ModeButton instances are built. An absent/unrecognized value defaults
     // to BASE (0). The in-menu selector remains changeable at runtime.
     // 0 BASE, 1 A: both off, 2 B: reattach after close,
-    // 3 C: icon sampler only, 4 D: caption sampler only.
+    // 3 C: icon sampler only, 4 D: caption sampler only,
+    // 5 E: both sampled glows ON but whole-button scale locked at 1.0.
     readonly property string glowStartupChoice:
         String(Quickshell.env("POST_APOLLO_CPU_GLOW_TEST") || "")
         .trim().toUpperCase()
     property int modeGlowExperiment:
         glowStartupChoice === "C" ? 3
         : glowStartupChoice === "D" ? 4
+        : glowStartupChoice === "E" ? 5
         : 0
 
     // Target-list submodes. THERMAL mirrors AppControl's TEMP/FAN split.
@@ -563,7 +565,8 @@ PanelWindow {
                     { value: 1, label: "A / OFF" },
                     { value: 2, label: "B / REATTACH" },
                     { value: 3, label: "C / ICON" },
-                    { value: 4, label: "D / LABEL" }
+                    { value: 4, label: "D / LABEL" },
+                    { value: 5, label: "E / FIXED" }
                 ]
 
                 Rectangle {
@@ -679,8 +682,13 @@ PanelWindow {
 
                     height: parent.height
 
+                    // E tests whether scaling the button around a live
+                    // sampled text effect causes texture/geometry scattering.
+                    // It keeps BOTH icon + caption glows enabled.
                     scale:
-                        isPressed
+                        cpuPlusWindow.modeGlowExperiment === 5
+                        ? 1.0
+                        : isPressed
                         ? 0.99
                         : isHovered
                         ? 1.025

@@ -831,26 +831,30 @@ PanelWindow {
             return;
         }
         dialFxDemoStage++;
+        // Loop the preview while enabled so there is time to observe every
+        // phase in the actual Git menu; clicking the button stops it.
+        if (dialFxDemoStage >= 5)
+            dialFxDemoStage = 0;
         ignitionDial.loadingState = "idle";
         ignitionDial.loadingProgress = -1;
         ignitionDial.persistentFailure = false;
         if (dialFxDemoStage === 0) {
             ignitionDial.loadingState = "loading";
-            dialFxDemoTimer.interval = 1800;
+            dialFxDemoTimer.interval = 3000;
         } else if (dialFxDemoStage === 1) {
             ignitionDial.loadingProgress = 0.5;
             ignitionDial.loadingState = "loading";
-            dialFxDemoTimer.interval = 1700;
+            dialFxDemoTimer.interval = 2600;
         } else if (dialFxDemoStage === 2) {
             ignitionDial.loadingState = "success";
-            dialFxDemoTimer.interval = 1400;
+            dialFxDemoTimer.interval = 1800;
         } else if (dialFxDemoStage === 3) {
             ignitionDial.loadingState = "error";
-            dialFxDemoTimer.interval = 1400;
+            dialFxDemoTimer.interval = 1800;
         } else if (dialFxDemoStage === 4) {
             ignitionDial.persistentFailure = true;
             ignitionDial.loadingState = "error";
-            dialFxDemoTimer.interval = 1700;
+            dialFxDemoTimer.interval = 2500;
         } else {
             stopDialFxDemo();
             return;

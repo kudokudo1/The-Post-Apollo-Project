@@ -19,6 +19,12 @@ PanelWindow {
     property int thermalSelectedIndex: 0
     property int systemSelectedIndex: 0
 
+    // TEMPORARY CPU++ ONLY GL0W PROBE. Default 0 retains the existing UI.
+    // 0 = BASELINE, 1 = A: detach/disable sampled Main Mode text glows,
+    // 2 = B: sampled text active while open, detached when menu is hidden.
+    // The icon and caption samplers are tested together in this first pass.
+    property int modeGlowExperiment: 0
+
     // Target-list submodes. THERMAL mirrors AppControl's TEMP/FAN split.
     // SYSTEM extends the same interaction pattern to hardware categories.
     property int thermalSubMode: 0 // 0 = temperature, 1 = fans
@@ -525,6 +531,58 @@ PanelWindow {
             color: Colors.magenta
         }
 
+        // Temporary test controls; do not replace the normal Main Mode rail.
+        // Selecting B requires a close and reopen to exercise the detach.
+        Row {
+            id: sampledGlowTestControls
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.rightMargin: 12
+            anchors.topMargin: 6
+            spacing: 5
+            z: 5
+
+            GohuText {
+                anchors.verticalCenter: parent.verticalCenter
+                text: "GLOW TEST //"
+                font.pixelSize: 10
+                color: Colors.cyan
+            }
+
+            Repeater {
+                model: [
+                    { value: 0, label: "BASE" },
+                    { value: 1, label: "A / OFF" },
+                    { value: 2, label: "B / REATTACH" }
+                ]
+
+                Rectangle {
+                    required property var modelData
+                    width: Math.max(64, sampledGlowTestLabel.implicitWidth + 14)
+                    height: 20
+                    color: cpuPlusWindow.modeGlowExperiment === modelData.value
+                           ? Colors.yellow : Colors.black
+                    border.width: 1
+                    border.color: cpuPlusWindow.modeGlowExperiment === modelData.value
+                                  ? Colors.magenta : Colors.cyan
+
+                    GohuText {
+                        id: sampledGlowTestLabel
+                        anchors.centerIn: parent
+                        text: modelData.label
+                        font.pixelSize: 10
+                        color: cpuPlusWindow.modeGlowExperiment === modelData.value
+                               ? Colors.black : Colors.cyan
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: cpuPlusWindow.modeGlowExperiment = modelData.value
+                    }
+                }
+            }
+        }
+
         Rectangle {
             id: modeRailHeaderLine
 
@@ -575,9 +633,21 @@ PanelWindow {
                     selected: index === cpuPlusWindow.selectedModeIndex
                     bordered: true
                     customArtwork: true
-                    customPrimaryGlowSource: textModeIcon
-                    customLabelGlowSource: modeCaption
-                    primaryGlowEnabled: modelData.kind !== "thermal"
+
+                    // The source itself must be null, not merely visually
+                    // hidden, so SafeDropShadow actually detaches its sampler.
+                    // A: off throughout the test. B: detached while closed.
+                    readonly property bool sampledTextActive:
+                        cpuPlusWindow.modeGlowExperiment !== 1
+                        && (cpuPlusWindow.modeGlowExperiment !== 2
+                            || cpuPlusWindow.menuOpen)
+                    customPrimaryGlowSource:
+                        sampledTextActive ? textModeIcon : null
+                    customLabelGlowSource:
+                        sampledTextActive ? modeCaption : null
+                    primaryGlowEnabled:
+                        sampledTextActive && modelData.kind !== "thermal"
+                    labelGlowEnabled: sampledTextActive
                     readonly property bool isSelected: selected
                     readonly property bool isHovered: hovered
                     readonly property bool isPressed: pressed

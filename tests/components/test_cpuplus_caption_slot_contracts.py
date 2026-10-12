@@ -6,9 +6,9 @@ qml = (ROOT / "widgets/CpuPlusW.qml").read_text(encoding="utf-8")
 mode = qml[qml.index("id: modeButton\n"):qml.index("// TWO-BODY MONITOR ADAPTER")]
 assert "ModeButton {" in qml[:qml.index("id: modeButton\n")]
 for token in (
-    "customArtwork: true", "customPrimaryGlowSource: textModeIcon",
-    "customLabelGlowSource: modeCaption",
-    'primaryGlowEnabled: modelData.kind !== "thermal"',
+    "customArtwork: true", "sampledTextActive ? textModeIcon : null",
+    "sampledTextActive ? modeCaption : null",
+    'sampledTextActive && modelData.kind !== "thermal"',
     "id: modeIconSlot", "id: modeCaptionSlot",
     "id: textModeIcon", "id: modeCaption", "QuietText {",
     "width: modeCaption.implicitWidth",

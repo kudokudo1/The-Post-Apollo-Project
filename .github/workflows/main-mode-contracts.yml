@@ -18,6 +18,7 @@ on:
       - "components/qmldir"
       - "tests/components/test_mode_button_contracts.py"
       - "tests/components/test_mode_glow_plane_contracts.py"
+      - "tests/components/test_cpuplus_glow_ab_contracts.py"
       - "tests/components/test_visual_language_recipes.py"
       - ".github/workflows/main-mode-contracts.yml"
   push:
@@ -38,6 +39,7 @@ on:
       - "components/qmldir"
       - "tests/components/test_mode_button_contracts.py"
       - "tests/components/test_mode_glow_plane_contracts.py"
+      - "tests/components/test_cpuplus_glow_ab_contracts.py"
       - "tests/components/test_visual_language_recipes.py"
       - ".github/workflows/main-mode-contracts.yml"
 
@@ -59,5 +61,7 @@ jobs:
         run: python3 tests/components/test_mode_button_weather_contracts.py
       - name: Verify CPU++ Main Mode caption and artwork
         run: python3 tests/components/test_cpuplus_caption_slot_contracts.py
+      - name: Verify CPU++ A/B sampled-text glow source lifecycle
+        run: python3 tests/components/test_cpuplus_glow_ab_contracts.py
       - name: Preserve existing visual language recipes
         run: python3 tests/components/test_visual_language_recipes.py

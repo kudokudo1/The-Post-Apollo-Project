@@ -76,9 +76,11 @@ for name, token in (("QuietText", "quietTextOpacity"),
     assert "MouseArea {" not in source
     assert "DropShadow {" not in source
 
-for template in ("ModeButton", "ChassisGlow", "TextRoles"):
+for template in ("ChassisGlow", "TextRoles"):
     assert content(f"{template}.qml.template")
-assert "ModeButtonWideHalo {" in content("ModeButton.qml.template")
+assert content("ModeButton.qml")
+assert "ModeButton 1.0 ModeButton.qml" in QMLDIR
+assert "ModeButtonWideHalo {" in content("ModeButton.qml")
 assert "safeSource: primary" in content("TextRoles.qml.template")
 
 for name in names:

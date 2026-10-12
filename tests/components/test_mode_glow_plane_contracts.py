@@ -57,6 +57,6 @@ assert plane.count("id: defaultContentHost") == 1
 assert mode[:start].count("TextHashGlow {") == 0
 assert mode[end:].count("TextHashGlow {") == 0
 assert "z: 0" in plane
-assert "scale:" in cpu and "customPrimaryGlowSource:" in cpu and "sampledTextActive ? textModeIcon : null" in cpu
+assert "scale:" in cpu and "customPrimaryGlowSource:" in cpu and "sampledPrimaryActive ? textModeIcon : null" in cpu
 assert "TextHashGlow {" not in cpu[cpu.index("id: modeButton"):cpu.index("// TWO-BODY MONITOR ADAPTER")]
 print("ModeButton independent glow plane contracts: PASS")

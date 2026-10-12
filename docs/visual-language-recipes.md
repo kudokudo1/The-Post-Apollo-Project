@@ -359,3 +359,24 @@ hover/pressed colors and numeric values, tray item geometry, pointer button
 distinction and provider actions remain unchanged. A real provider-backed
 open state can be designed only after confirming the provider exposes it.
 Workspaces' independent active/inactive two-layer artwork remains separate.
+
+
+### Nurse 3A // Power confirmation keyboard isolation (2026-10-12 EDT)
+
+Power's Reboot/Shutdown confirmation overlays previously left the normal
+menu's keyboard handler active: `menuOpen` remained true, so arrow keys and
+Enter could act on hidden Lock/Logout selections even though a confirmation
+overlay was displayed. Escape set `menuOpen` false while a confirmation
+flag stayed true, potentially leaving exclusive keyboard focus with no active
+Escape handling. This is a source-verified UI/input isolation defect.
+
+**When either confirmation overlay is visible:** handle keyboard input
+*before* the main menu. Escape cancels both confirmation flags and restores
+the normal menu; other keys are consumed, so Enter never silently confirms
+power-off/reboot or triggers a hidden menu command. Visible mouse Cancel
+and CONFIRM! buttons and all power subprocess commands stay unchanged.
+Retain the existing Power-specific glow recipe and structural geometry.
+
+This is a behavior safeguard with static test coverage. Live Quickshell
+keyboard and mouse verification remains pending; do **not** claim operator
+runtime acceptance on the basis of source-level CI.

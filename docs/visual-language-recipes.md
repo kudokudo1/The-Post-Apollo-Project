@@ -286,3 +286,25 @@ menu wiring, or live reload is implied by this source-level normalization.
 - A coherent mark still uses one glyph source and one cluster glow. This
   correction does not split glyph runs again or change existing sampled
   radius/opacity, Wi-Fi telemetry, mute semantics or color-role exceptions.
+
+
+### Nurse 3A Wi-Fi glyph-opacity correction (2026-10-11)
+
+- A Wi-Fi content-opacity regression remained after PR #185: icon, SSID,
+  percentage and speed used `layer.effect: DropShadow` with the normalized
+  0.75/0.95/1.00 opacity on the effect output. The original glyph layer could
+  be dimmed alongside its shadow, contrary to the intent that only the neon
+  glow changes with interaction.
+- Keep all four original Wi-Fi glyph sources rendered separately at their
+  original foreground opacity. Four independent `SafeDropShadow` overlays
+  sample them instead; the overlays use `networkDock.contentGlowOpacity`
+  while the original text/icon remains unaffected. Attach the overlays
+  outside the existing RowLayouts and position them by mapping the original
+  sources into their shared dock content parent. This must not affect Wi-Fi
+  glyph composition, telemetry width, alignment, signal colors or click actions.
+- Preserve the existing source-specific radii (icon 14, SSID 10, percentage
+  8, speed 8) and 15 samples. The separate Ethernet pulse layer effect is
+  unchanged because it does not have interactive opacity.
+- Source contracts verify geometry/source ownership and lifetime-guarded
+  effects; live Qt runtime verification is still needed for any pixel-level
+  visual acceptance.

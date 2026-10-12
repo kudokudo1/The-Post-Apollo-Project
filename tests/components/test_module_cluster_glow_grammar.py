@@ -104,8 +104,33 @@ assert "visible: workspacesWorkspaceButton.isActive" in workspaces
 network = module("Network")
 assert network.count("opacity: networkDock.contentGlowOpacity") == 4
 assert "networkDock.pressed ? 0.6 : networkDock.hovered ? 0.8 : 1.0" not in network
-for field in ("networkIconRow", "networkText", "networkSignalText", "networkSpeedText"):
-    assert field in network, field
+assert network.count("SafeDropShadow {") == 4, "Four independent sampled overlays required"
+assert network.count("layer.effect: DropShadow {") == 1, "Legacy Ethernet pulse is the only remaining layer effect"
+for field, radius in (
+    ("networkIconRow", 14),
+    ("networkText", 10),
+    ("networkSignalText", 8),
+    ("networkSpeedText", 8),
+):
+    assert f"safeSource: {field}" in network, field
+    assert f"id: {field}Glow" in network, field
+    assert f"readonly property point sourceOrigin: {field}.mapToItem(parent, 0, 0)" in network, field
+    start = network.index(f"id: {field}Glow")
+    end = network.index("\n    }", start)
+    glow = network[start:end]
+    assert f"radius: {radius}" in glow, (field, radius)
+    assert "samples: 15" in glow, field
+    assert "opacity: networkDock.contentGlowOpacity" in glow, field
+    assert "color: root.networkGlowColor" in glow, field
+    assert "z: 2" in glow, field
+# Preserve all source containers, single-column telemetry geometry, and the
+# independent signal-aware colors. The effect children must not be Layout
+# children that claim row or column space.
+assert "anchors.fill: parent" in network
+assert "Layout.preferredWidth: 65" in network
+assert "Layout.alignment: Qt.AlignVCenter" in network
+assert "root.networkColor" in network
+assert "property color networkGlowColor:" in network
 
 # Preserve separately approved specialty behavior pending runtime review.
 assert "softGlowSpread: 1" in module("Power")

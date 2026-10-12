@@ -242,6 +242,33 @@ assert "readonly property real contentGlowRadius:" in COMPONENT
 assert "readonly property int contentGlowSamples:" in COMPONENT
 power = (ROOT / "modules/Power.qml").read_text(encoding="utf-8")
 require(power, "softGlowSpread: 1", "Power historical design exception")
+# Two visually parallel destructive confirmations share hover illumination.
+# This is a cosmetic parity check only; their separate command/cancel wiring
+# and the historical top-level Power recipe must remain unchanged.
+require(
+    power,
+    "opacity: confirmshutdownMouse.pressed ? 0.55 : confirmshutdownMouse.containsMouse ? 0.55 : 0",
+    "Shutdown confirmation hover glow",
+)
+require(
+    power,
+    "opacity: confirmrebootMouse.pressed ? 0.55 : confirmrebootMouse.containsMouse ? 0.55 : 0",
+    "Reboot confirmation hover glow parity",
+)
+for command, action in (
+    ('command: ["systemctl", "reboot"]', "rebootProcess.running = true"),
+    ('command: ["systemctl", "poweroff"]', "shutdownProcess.running = true"),
+    ('command: ["swaylock"]', "lockProcess.running = true"),
+    ('command: ["swaymsg", "exit"]', "logoutProcess.running = true"),
+):
+    require(power, command, "Power action command unchanged")
+    require(power, action, "Power action trigger unchanged")
+require(power, "confirmShutdown = false;", "Shutdown cancel pathway retained")
+require(power, "confirmReboot = false;", "Reboot cancel pathway retained")
+require(power, "contentGlowIdleOpacity: 0.30", "Power historical content intensity")
+require(power, "contentGlowIdleRadius: 19", "Power historical glow geometry")
+require(power, "softGlowSpread: 1", "Power historical perimeter recipe")
+require(power, "wideGlowIdleOpacity: 0.0", "Power historical absence of idle front wash")
 hospital = (ROOT / "modules/Hospital.qml").read_text(encoding="utf-8")
 assert hospital.count("color: dock.foregroundColor") == 3, (
     "Hospital heartbeats must follow the center glyph foreground/open-state identity"

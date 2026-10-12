@@ -862,7 +862,7 @@ PanelWindow {
 
                 color: confirmrebootMouse.pressed ? Colors.red : confirmrebootMouse.containsMouse ? Colors.orange : Colors.cyan
 
-                opacity: confirmrebootMouse.pressed ? 0.55 : confirmrebootMouse.containsMouse ? 0.3 : 0
+                opacity: confirmrebootMouse.pressed ? 0.55 : confirmrebootMouse.containsMouse ? 0.55 : 0
 
                 horizontalOffset: 0
                 verticalOffset: 0

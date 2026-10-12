@@ -11,7 +11,12 @@ Item {
     // a numerical range; "zones" assigns names to angular regions. Neither
     // free-position variant snaps on pointer release.
     property string selectorMode: "discrete"
-    property real arcStartAngle: -210
+    // QtQuick angles are screen-oriented: 0 = right, +90 = down.
+    // By default, center the unused portion of any bounded arc at 6 o'clock.
+    // With a 300° sweep the active interval is 120°..420°: the 60°
+    // dead zone runs from 60°..120°, centered at +90° (straight down).
+    // Owners may override arcStartAngle for deliberately asymmetric dials.
+    property real arcStartAngle: 90 + (360 - boundedSweep) / 2
     property real arcSweepAngle: 300
     readonly property real boundedSweep: Math.max(1, Math.min(359, arcSweepAngle))
     property real minimumValue: 0

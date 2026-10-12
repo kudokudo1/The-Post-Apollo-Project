@@ -89,34 +89,30 @@ for name in names:
                       "Process {", "Keys.on"):
         assert forbidden not in source, (name, forbidden)
 
-# CPU++ pilot: migrate only the main mode face. The other selector,
-# submode, instrument and chassis appearances are intentionally unchanged.
+# CPU++ Main Mode now delegates input and glow behavior to ModeButton.
 cpu = (ROOT / "widgets/CpuPlusW.qml").read_text(encoding="utf-8")
 mode_start = cpu.index("id: modeButton")
 mode_end = cpu.index("// TWO-BODY MONITOR ADAPTER", mode_start)
 mode = cpu[mode_start:mode_end]
-assert mode.count("ModeButtonCloseHalo {") == 1
-assert mode.count("ModeButtonWideHalo {") == 1
-assert "selected: modeButton.isSelected" in mode
-assert "hovered: modeButton.isHovered" in mode
-assert "pressed: modeButton.isPressed" in mode
-assert "TextHashGlow {" in mode
-assert "safeSource: textModeIcon" in mode
-assert "foregroundColor: textModeIcon.color" in mode
-# The THERMAL glyph is owned by the shared component rather than an
-# embedded copy in CpuPlusW. Color arrives through its iconColor binding.
-assert "ThermalIcon { }" in cpu
-assert "item.iconColor = Qt.binding" in mode
-assert "return modeButton.contentColor;" in mode
-assert "item.glowColor" not in cpu
-assert "? Colors.magenta" in mode
-assert "QuietText {" in mode
-assert "quietOpacity:" in mode
-assert "modeButton.isPressed ? 0.42" in mode
-assert "duration: 90" in mode
-assert "Easing.OutQuad" in mode
-assert "cpuPlusWindow.selectMode(index)" in mode
+assert "ModeButton {" in cpu[:mode_start]
+for token in (
+    "selected: index === cpuPlusWindow.selectedModeIndex",
+    "bordered: true", "customArtwork: true",
+    "customPrimaryGlowSource: textModeIcon",
+    "customLabelGlowSource: modeCaption",
+    'primaryGlowEnabled: modelData.kind !== "thermal"',
+    "readonly property color contentColor: primaryColor",
+    "QuietText {", "quietOpacity:",
+    "item.iconColor = Qt.binding",
+    "return modeButton.contentColor;",
+    "duration: 90", "Easing.OutQuad",
+    "cpuPlusWindow.selectMode(index)",
+):
+    assert token in mode, token
 assert "RectangularShadow {" not in mode
-assert "layer.effect: DropShadow {" not in mode
+assert "TextHashGlow {" not in mode
+assert "ModeButtonCloseHalo {" not in mode
+assert "ModeButtonWideHalo {" not in mode
+assert "MouseArea {" not in mode
 
 print("Visual language semantic recipe contracts: PASS")

@@ -1,8 +1,7 @@
 import QtQuick
 
-// MODE BUTTON wide wash: intentionally IN FRONT of the button face.
-// Keep as a direct child of the button Rectangle. A nested composite
-// cannot reliably reproduce this layer relative to the face.
+// MAIN MODE wide wash: in FRONT of button; fixed spread, weaker base strength.
+// Identical state multipliers preserve the close:wide glow ratio.
 HaloGlow {
     id: halo
     property bool selected: false
@@ -14,7 +13,12 @@ HaloGlow {
         selected || hovered || keyboardSelected || pressed
 
     spread: VisualLanguage.modeWideSpread
-    baseOpacity: energized ? VisualLanguage.modeWideActiveOpacity : 0.0
+    baseOpacity: VisualLanguage.modeWideActiveOpacity
+    glowStrength:
+        pressed ? VisualLanguage.modeHaloPressedStrength
+        : selected ? VisualLanguage.modeHaloSelectedStrength
+        : hovered || keyboardSelected ? VisualLanguage.modeHaloHoverStrength
+        : 0.0
     color: VisualLanguage.modeHaloColor
     z: 1
 }

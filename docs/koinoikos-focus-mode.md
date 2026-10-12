@@ -3,9 +3,10 @@
 **Owner:** SwayPX for compositor bindings/navigation; Post-Apollo Quickshell for
 layer-shell keyboard ownership, frame-glow intensity and eligible menu registry.
 
-**Operator intent:** Super + tilde (`~`) begins a persistent *relationship
-focus* mode. The tilde means relationship / ghost string / spiritual
-connection. Inside the mode, plain arrows and `h j k l` move spatial focus;
+**Operator intent:** Display the shortcut as **Super + ~** (the tilde
+symbolizes relationship / ghost string / spiritual connection), but trigger it
+using **Super + the unshifted grave/backtick key** (`Mod4+grave`), with no Shift.
+This begins a persistent *relationship focus* mode. Inside the mode, plain arrows and `h j k l` move spatial focus;
 the currently selected participant glows more strongly while other open
 windows remain visible. `Esc` returns to ordinary Sway.
 
@@ -91,9 +92,10 @@ include ~/.config/quickshell/config/sway/koinoikos-focus.conf
 ```
 
 This does **not** replace the operator's existing Sway configuration or
-`$mod`. The included binding uses explicit `Mod4+Shift+grave` for
-Super+tilde on a US layout. On other XKB layouts test the actual binding
-symbol before relying on it. Sway binding modes already handle `Esc`,
+`$mod`. The binding uses `Mod4+grave`: press **Super + the backtick
+key** without Shift on a US layout. Keep **Super + ~** as the visual label,
+not the literal Shift-modified key chord. On other XKB layouts verify the
+grave keysym before relying on it. Sway binding modes already handle `Esc`,
 `h j k l` and arrows natively; no global Python key listener is installed.
 The external Python router is executed once per Focus Mode movement.
 
@@ -137,8 +139,9 @@ python3 ~/.config/quickshell/scripts/koinoikos_focus.py snapshot
 swaymsg -t get_binding_state
 ```
 
-During mode: `Super+~` to enter; arrows or `h/j/k/l` to select a
-spatial neighbor; `Esc` to exit. If Quickshell IPC is absent, directional
+During mode: press **Super + unshifted backtick/grave** (displayed as
+**Super + ~**) to enter; use arrows or `h/j/k/l` to select a spatial
+neighbor; `Esc` exits. If Quickshell IPC is absent, directional
 keys fall back to native `swaymsg focus <direction>` and Escape still
 restores Sway's default binding mode.
 

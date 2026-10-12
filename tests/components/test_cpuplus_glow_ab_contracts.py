@@ -44,7 +44,7 @@ for token in (
 
 # Confirm the cold-start choice is bound before any ModeButton delegate is
 # instantiated; runtime-only button clicks cannot prove cold-start isolation.
-assert cpu.index('Quickshell.env("POST_APOLLO_CPU_GLOW_TEST")') < cpu.index("Repeater {\\n                model: cpuPlusWindow.modes")
+assert cpu.index('Quickshell.env("POST_APOLLO_CPU_GLOW_TEST")') < cpu.index("model: cpuPlusWindow.modes")
 assert "property int modeGlowExperiment: 0" not in cpu
 
 # Deliberately retain main-mode scale, semantic switching, thermal icon

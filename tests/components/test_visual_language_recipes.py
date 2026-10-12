@@ -91,7 +91,7 @@ for name in names:
 
 # CPU++ Main Mode now delegates input and glow behavior to ModeButton.
 cpu = (ROOT / "widgets/CpuPlusW.qml").read_text(encoding="utf-8")
-mode_start = cpu.index("id: modeButton")
+mode_start = cpu.index("id: modeButton\n")
 mode_end = cpu.index("// TWO-BODY MONITOR ADAPTER", mode_start)
 mode = cpu[mode_start:mode_end]
 assert "ModeButton {" in cpu[:mode_start]

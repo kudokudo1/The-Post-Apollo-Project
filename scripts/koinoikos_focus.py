@@ -174,8 +174,7 @@ def main(argv: list[str]) -> int:
     if args.action == "enter":
         # For this initial bridge, shell.qml still remembers the active
         # Git/Hospital keyboard owner. The IPC bridge checks availability.
-        data = snapshot()
-        _, output = qs("begin", (data or {}).get("owner", "native"))
+        _, output = qs("begin")
         return 0 if output.lower() == "true" else 1
     if args.action == "exit":
         qs("end")

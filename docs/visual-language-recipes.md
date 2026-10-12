@@ -201,8 +201,11 @@ an operator-certified rendering.
 artwork/label/readout cluster, not a single effect over unrelated module
 contents. Wi-Fi independently glows icon, SSID, signal percentage, and speed;
 Clock and Volume have independent source-attached effects. One coherent
-compound mark can remain one cluster. New source-attached effects should
-use `SafeDropShadow`; separate them from the chassis rear/front effects.
+compound mark can remain one cluster. Independent external sampled effects normally use `SafeDropShadow`,
+separate from the chassis rear/front effects. Where an existing source-local
+`layer.effect` is deliberately retained to prevent duplicate/misaligned
+rendering, change only shadow `color` alpha rather than the composited layer
+`opacity`.
 Isolated sources may reduce glyph effect-stacking issues, but this is not
 yet a verified Qt bug workaround.
 
@@ -291,53 +294,42 @@ menu wiring, or live reload is implied by this source-level normalization.
   radius/opacity, Wi-Fi telemetry, mute semantics or color-role exceptions.
 
 
-### Nurse 3A Wi-Fi glyph-opacity correction (2026-10-11)
+### Nurse 3A Wi-Fi sampled-glow rendering repair (2026-10-11; operator screenshots)
 
-- A Wi-Fi content-opacity regression remained after PR #185: icon, SSID,
-  percentage and speed used `layer.effect: DropShadow` with the normalized
-  0.75/0.95/1.00 opacity on the effect output. The original glyph layer could
-  be dimmed alongside its shadow, contrary to the intent that only the neon
-  glow changes with interaction.
-- Keep all four original Wi-Fi glyph sources rendered separately at their
-  original foreground opacity. Four independent `SafeDropShadow` overlays
-  sample them instead; the overlays use `networkDock.contentGlowOpacity`
-  while the original text/icon remains unaffected. Attach the overlays
-  outside the existing RowLayouts and position them by mapping the original
-  sources into their shared dock content parent. This must not affect Wi-Fi
-  glyph composition, telemetry width, alignment, signal colors or click actions.
-- Historical source-specific radii of icon 14, SSID 10, percentage 8, and
-  speed 8 were an intermediate preservation, **not** a permanent approved
-  semantic exception. All interactive Wi-Fi source glows now use the same
-  DockButton-resolved canonical radius 14 / samples 15. The separately
-  layered Ethernet pulse remains as a deliberately preserved fixed-opacity
-  self-colored accent; the surrounding icon cluster still has canonical glow.
-- Source contracts verify geometry/source ownership and lifetime-guarded
-  effects; live Qt runtime verification is still needed for any pixel-level
-  visual acceptance.
+**Live evidence overrides the previous source-only claims.** The operator's
+20:07 and 20:28 screenshots showed duplicated, displaced SSID/network text
+after PRs #189 and #190. Their six free-floating `SafeDropShadow` effect
+items sampled and repainted glyphs outside their original layout, resulting
+in ghosting/misalignment even though source assertions were green. Those
+**detached overlay implementations are superseded** and must not be treated
+as the approved Wi-Fi visual construction.
 
+Wi-Fi now restores the **original, position-stable** Qt `layer.effect:
+DropShadow` pattern owned by the glyph itself (the original icon container,
+SSID Text, signal percentage, and speed). The SSID's two separate structural
+parentheses receive the same source-local pattern without introducing any new
+RowLayout children or positioning. The original displayed glyphs, network
+functions, signal-dependent colors, thresholds, and layout remain untouched.
 
-### Nurse 3A full Wi-Fi dock-conformity pass (2026-10-11; operator directive)
+**Glow energy is applied to the shadow color alpha**, calculated as
+`root.networkGlowColor.a * networkDock.contentGlowOpacity`. Do not set the
+composited layer effect's `opacity`: that can dim its source glyph as well.
+The layer renders one source at its own original coordinates, avoiding the
+duplicate displaced rendering of external effect copies. Canonical
+`DockButton.contentGlowRadius` and `contentGlowSamples` are retained for
+all six state-responsive glow treatments (14/15 by default). The separate
+legacy Ethernet cyan pulse texture remains unchanged.
 
-The operator required end-to-end canon, not isolated opacity repairs.
-Wi-Fi uses **six** independently sampled `SafeDropShadow` sources in **four**
-semantic clusters: the staged satellite/connection icon; the SSID text and
-its two structural parentheses; the signal percentage including `%`; and
-the speed including the meaningful `Mb/s` slash. The SSID parenthesis
-foreground stays white (Wi-Fi has no persistent open/menu state), but each
-parenthesis receives the same signal-dependent glow color and interactive
-energy as its text cluster. All other contextual colors are preserved.
+Source-local `layer.effect` owns its lifecycle as part of the source item;
+the existing `SafeDropShadow` continues to be required when using **external
+sampled effect items**, which are no longer used for Wi-Fi. This is a bounded
+runtime-driven exception to the initial recommendation to use external
+`SafeDropShadow` for all independent samples; it is not permission to migrate
+the rest of the UI or flatten intentional multicolored layers.
 
-Each sampled overlay is a non-layout child of DockButton's content host,
-thus kept on the shared foreground/glow stacking plane below the front wash.
-It uses the established `SafeDropShadow` lifetime guard for the source,
-`sourceAttached`-guarded `mapToItem(parent)` and sampled bounds, and the
-existing shared DockButton's state-resolved radius/samples/opacities.
-The underlying Qt Text/RowLayouts remain full foreground opacity and keep
-their original positions, visual grammar, signal thresholds and clicks.
-
-The prior 14/10/8/8 implementation and unguarded mapping are superseded.
-The historical Ethernet ECG pulse's fixed-opacity extra cyan shadow remains
-untouched to preserve its layered visual character; it is not the interactive
-Wi-Fi content-glow path. Source-level CI checks these invariants. Operator
-visual approval in Quickshell is still required before declaring pixel-level
-rendering and exact glyph spacing accepted.
+Qt confirms that `DropShadow.color` controls the shadow's RGBA color and
+supports semi-transparent colors. This correction is supported by that
+renderer contract and restores the pre-regression layout structure. **The
+operator must still compare the repaired version live** before visual
+acceptance. CI tests must reject both detached `mapToItem` overlays and
+interactive effect-level `opacity`, not merely count effects.

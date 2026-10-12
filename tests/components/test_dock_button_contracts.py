@@ -225,34 +225,21 @@ for name in ("Applauncher", "Bluetooth", "Calendar", "Cpu", "NotificationsHub"):
     assert "contentGlowHoverOpacity:" not in source
 
 network = (ROOT / "modules/Network.qml").read_text(encoding="utf-8")
-require(network, "opacity: networkDock.contentGlowOpacity", "Wi-Fi sampled glow uses the shared upward intensity")
-assert network.count("opacity: networkDock.contentGlowOpacity") == 6, (
-    "Wi-Fi icon, SSID and both parentheses, signal and speed inherit shared energy"
-)
-# The four sampled content glows are now separate siblings; layer.effect used
-# to apply varying opacity to the entire original source glyph.
-for target in (
-    "networkIconRow", "networkOpen", "networkText", "networkClose",
-    "networkSignalText", "networkSpeedText",
-):
-    require(network, f"safeSource: {target}", "Wi-Fi independent glow source")
-    require(network, f"{target}.mapToItem(parent, 0, 0)", "Wi-Fi original glyph coordinates")
-    require(network, f"id: {target}Glow", "Wi-Fi source owns its sampled overlay")
-assert network.count("SafeDropShadow {") == 6
-assert network.count("opacity: networkDock.contentGlowOpacity") == 6
+# Restored source-local Qt layer effects preserve the original text geometry.
+# Crucially only the shadow COLOR alpha varies, not the composite layer opacity.
+assert network.count("layer.effect: DropShadow {") == 7
+assert "SafeDropShadow {" not in network
+assert "mapToItem(parent, 0, 0)" not in network
+assert network.count("color: networkDock.sampledGlowColor") == 6
 assert network.count("radius: networkDock.contentGlowRadius") == 6
 assert network.count("samples: networkDock.contentGlowSamples") == 6
-assert network.count("readonly property point sourceOrigin: sourceAttached") == 6
-assert network.count("width: sourceAttached ? ") == 6
-assert network.count("height: sourceAttached ? ") == 6
+assert "opacity: networkDock.contentGlowOpacity" not in network
+require(network, "root.networkGlowColor.a * networkDock.contentGlowOpacity", "shadow-only alpha")
+require(network, "source: networkIconRow", "historical icon layer")
+for target in ("networkOpen", "networkText", "networkClose", "networkSignalText", "networkSpeedText"):
+    require(network, f"id: {target}", "original network glyph source")
 assert "readonly property real contentGlowRadius:" in COMPONENT
 assert "readonly property int contentGlowSamples:" in COMPONENT
-require(COMPONENT, "radius: dockButton.contentGlowRadius", "shared sampled radius")
-require(COMPONENT, "samples: dockButton.contentGlowSamples", "shared sample count")
-assert network.count("layer.effect: DropShadow {") == 1, (
-    "Only the unchanged Ethernet pulse may retain its legacy layer effect"
-)
-assert "networkDock.pressed ? 0.6 : networkDock.hovered ? 0.8 : 1.0" not in network
 power = (ROOT / "modules/Power.qml").read_text(encoding="utf-8")
 require(power, "softGlowSpread: 1", "Power historical design exception")
 hospital = (ROOT / "modules/Hospital.qml").read_text(encoding="utf-8")

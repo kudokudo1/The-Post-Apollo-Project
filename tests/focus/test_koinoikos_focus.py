@@ -69,6 +69,8 @@ for expected in (
     "previousOwnerRestorationRequested",
 ):
     assert expected in broker, expected
+require_qmldir = (ROOT / "components/qmldir").read_text(encoding="utf-8")
+assert "RelationshipFocusBroker 1.0 RelationshipFocusBroker.qml" in require_qmldir
 assert 'id: relationshipFocus' in shell
 for label in ("appcontrol", "hospital", "git", "cpu", "weather"):
     assert label in broker, label

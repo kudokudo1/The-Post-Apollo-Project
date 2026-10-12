@@ -284,51 +284,20 @@ PanelWindow {
 
                 spacing: 6
 
-                Rectangle {
+                ModeButton {
                     id: homeButton
 
                     width: railColumn.width
                     height: 48
-
-                    readonly property bool selected: weatherStation.currentView === "home"
-
-                    color: homeMouse.pressed ? Colors.magenta : selected ? Colors.yellow : Colors.black
-
-                    Row {
-                        anchors.centerIn: parent
-                        spacing: 10
-
-                        Text {
-                            text: "⌂"
-
-                            font.family: "GohuFont 11 Nerd Font Mono"
-
-                            font.pixelSize: 18
-
-                            color: homeMouse.pressed ? Colors.black : homeButton.selected ? Colors.orange : homeMouse.containsMouse ? Colors.orange : Colors.cyan
-                        }
-
-                        Text {
-                            text: "HOME"
-
-                            font.family: "GohuFont 11 Nerd Font Mono"
-
-                            font.pixelSize: 18
-
-                            color: homeMouse.pressed ? Colors.black : homeButton.selected ? Colors.orange : homeMouse.containsMouse ? Colors.orange : Colors.cyan
-                        }
-                    }
-
-                    MouseArea {
-                        id: homeMouse
-
-                        anchors.fill: parent
-                        hoverEnabled: true
-
-                        onClicked: {
-                            weatherStation.currentView = "home";
-                        }
-                    }
+                    selected: weatherStation.currentView === "home"
+                    bordered: false
+                    horizontalContent: true
+                    contentSpacing: 10
+                    iconFontSize: 18
+                    labelFontSize: 18
+                    iconText: "⌂"
+                    labelText: "HOME"
+                    onTriggered: { weatherStation.currentView = "home"; }
                 }
 
                 Item {
@@ -351,54 +320,22 @@ PanelWindow {
                 Repeater {
                     model: weatherStation.domains
 
-                    delegate: Rectangle {
+                    delegate: ModeButton {
                         id: domainButton
-
                         required property int index
-                        required property var modelData
-
-                        readonly property bool selected: weatherStation.activeDomain === modelData.id
+                                                required property var modelData
 
                         width: railColumn.width
                         height: 48
-
-                        color: domainMouse.pressed ? Colors.magenta : selected ? Colors.yellow : Colors.black
-
-                        Row {
-                            anchors.centerIn: parent
-                            spacing: 10
-
-                            Text {
-                                text: domainButton.modelData.symbol
-
-                                font.family: "GohuFont 11 Nerd Font Mono"
-
-                                font.pixelSize: 18
-
-                                color: domainMouse.pressed ? Colors.black : domainButton.selected ? Colors.orange : domainMouse.containsMouse ? Colors.orange : Colors.cyan
-                            }
-
-                            Text {
-                                text: domainButton.modelData.name
-
-                                font.family: "GohuFont 11 Nerd Font Mono"
-
-                                font.pixelSize: 18
-
-                                color: domainMouse.pressed ? Colors.black : domainButton.selected ? Colors.orange : domainMouse.containsMouse ? Colors.orange : Colors.cyan
-                            }
-                        }
-
-                        MouseArea {
-                            id: domainMouse
-
-                            anchors.fill: parent
-                            hoverEnabled: true
-
-                            onClicked: {
-                                weatherStation.activeDomain = domainButton.modelData.id;
-                            }
-                        }
+                        selected: weatherStation.activeDomain === modelData.id
+                        bordered: false
+                        horizontalContent: true
+                        contentSpacing: 10
+                        iconFontSize: 18
+                        labelFontSize: 18
+                        iconText: modelData.symbol
+                        labelText: modelData.name
+                        onTriggered: { weatherStation.activeDomain = modelData.id; }
                     }
                 }
 
@@ -431,54 +368,22 @@ PanelWindow {
                 Repeater {
                     model: weatherStation.views
 
-                    delegate: Rectangle {
+                    delegate: ModeButton {
                         id: viewButton
-
                         required property int index
-                        required property var modelData
-
-                        readonly property bool selected: weatherStation.currentView === modelData.id
+                                                required property var modelData
 
                         width: railColumn.width
                         height: 48
-
-                        color: viewMouse.pressed ? Colors.magenta : selected ? Colors.yellow : Colors.black
-
-                        Row {
-                            anchors.centerIn: parent
-                            spacing: 10
-
-                            Text {
-                                text: viewButton.modelData.symbol
-
-                                font.family: "GohuFont 11 Nerd Font Mono"
-
-                                font.pixelSize: 18
-
-                                color: viewMouse.pressed ? Colors.black : viewButton.selected ? Colors.orange : viewMouse.containsMouse ? Colors.orange : Colors.cyan
-                            }
-
-                            Text {
-                                text: viewButton.modelData.name
-
-                                font.family: "GohuFont 11 Nerd Font Mono"
-
-                                font.pixelSize: 18
-
-                                color: viewMouse.pressed ? Colors.black : viewButton.selected ? Colors.orange : viewMouse.containsMouse ? Colors.orange : Colors.cyan
-                            }
-                        }
-
-                        MouseArea {
-                            id: viewMouse
-
-                            anchors.fill: parent
-                            hoverEnabled: true
-
-                            onClicked: {
-                                weatherStation.currentView = viewButton.modelData.id;
-                            }
-                        }
+                        selected: weatherStation.currentView === modelData.id
+                        bordered: false
+                        horizontalContent: true
+                        contentSpacing: 10
+                        iconFontSize: 18
+                        labelFontSize: 18
+                        iconText: modelData.symbol
+                        labelText: modelData.name
+                        onTriggered: { weatherStation.currentView = modelData.id; }
                     }
                 }
             }

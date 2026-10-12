@@ -15,6 +15,7 @@ QtObject {
     property bool active: false
     property string owner: "native"
     property string previousOwner: ""
+    property string hostOwner: ""
 
     signal previousOwnerRestorationRequested(string previous)
 
@@ -87,8 +88,8 @@ QtObject {
     property IpcHandler ipc: IpcHandler {
         target: "relationshipFocus"
 
-        function begin(previous: string): bool {
-            return broker.startMode(previous);
+        function begin(): bool {
+            return broker.startMode(broker.hostOwner);
         }
 
         function end(): void {

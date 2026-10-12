@@ -12,6 +12,7 @@ on:
       - "widgets/CpuPlusW.qml"
       - "widgets/weather/WeatherStationW.qml"
       - "scripts/koinoikos_focus.py"
+      - "scripts/enable_koinoikos_focus.py"
       - "config/sway/koinoikos-focus.conf"
       - "tests/focus/**"
       - ".github/workflows/koinoikos-focus-mode.yml"
@@ -22,6 +23,7 @@ on:
       - "components/RelationshipFocusBroker.qml"
       - "components/qmldir"
       - "scripts/koinoikos_focus.py"
+      - "scripts/enable_koinoikos_focus.py"
       - "config/sway/koinoikos-focus.conf"
       - "tests/focus/**"
   workflow_dispatch:
@@ -32,6 +34,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Python source compile
-        run: python3 -m py_compile scripts/koinoikos_focus.py tests/focus/test_koinoikos_focus.py
+        run: python3 -m py_compile scripts/koinoikos_focus.py scripts/enable_koinoikos_focus.py tests/focus/test_koinoikos_focus.py tests/focus/test_koinoikos_enable.py
       - name: Spatial-navigation and QML source contracts
-        run: python3 tests/focus/test_koinoikos_focus.py
+        run: |
+          python3 tests/focus/test_koinoikos_focus.py
+          python3 tests/focus/test_koinoikos_enable.py

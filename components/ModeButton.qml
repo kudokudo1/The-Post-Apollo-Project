@@ -36,6 +36,43 @@ Rectangle {
     property Item customLabelGlowSource: null
     property bool primaryGlowEnabled: true
     property bool labelGlowEnabled: true
+
+    // Source artwork and sampled glow remain distinct objects. By default the
+    // glow lives on a separate sibling effect plane, under the button's scale,
+    // but below the root-level front wash. A consumer may select a DIFFERENT
+    // independent host that shares an animated coordinate space with its icon.
+    // Never parent a glow under its sampled source (feedback/self-sampling).
+    property Item primaryGlowHost: null
+    property Item labelGlowHost: null
+    readonly property Item contentEffectPlane: contentLayer
+
+    function validGlowHost(candidate, sourceItem) {
+        if (candidate === null || sourceItem === null)
+            return candidate !== null;
+
+        // A sampled Item may not also contain its own effect host.
+        let ancestor = candidate;
+        while (ancestor !== null) {
+            if (ancestor === sourceItem)
+                return false;
+            ancestor = ancestor.parent;
+        }
+
+        // Do not project an effect into an unrelated Quickshell surface.
+        if (sourceItem.Window.window !== null
+            && candidate.Window.window !== null
+            && sourceItem.Window.window !== candidate.Window.window)
+            return false;
+
+        return true;
+    }
+
+    readonly property Item effectivePrimaryGlowHost:
+        validGlowHost(primaryGlowHost, primaryGlowSource)
+        ? primaryGlowHost : contentLayer
+    readonly property Item effectiveLabelGlowHost:
+        validGlowHost(labelGlowHost, labelGlowSource)
+        ? labelGlowHost : contentLayer
     property bool horizontalContent: false
     property bool textOnly: false
     property string iconText: "✦"
@@ -111,75 +148,86 @@ Rectangle {
         color: modeButton.perimeterGlowColor
     }
 
+    // Dedicated CONTENT/EFFECT plane. Both icon artwork and its independent
+    // shadow follow whole-button scale, while the front perimeter wash at z: 1
+    // still paints over the entire plane (just like DockButton).
     Item {
-        id: defaultContentHost
+        id: contentLayer
         anchors.fill: parent
-        visible: !modeButton.customArtwork
+        z: 0
 
-        Grid {
-            anchors.centerIn: parent
-            columns: modeButton.horizontalContent ? 2 : 1
-            rows: modeButton.horizontalContent ? 1 : 2
-            spacing: modeButton.contentSpacing
-
-            GohuText {
-                id: defaultIcon
-                visible: !modeButton.textOnly
-                text: modeButton.iconText
-                font.pixelSize: modeButton.iconFontSize
-                color: modeButton.primaryColor
-            }
-            QuietText {
-                id: defaultLabel
-                visible: modeButton.labelText.length > 0
-                text: modeButton.labelText
-                font.pixelSize: modeButton.labelFontSize
-                color: modeButton.textOnly
-                       ? modeButton.primaryColor : modeButton.labelColor
-                quietOpacity: modeButton.textOnly
-                              ? 1.0 : modeButton.labelOpacity
+        Item {
+            id: defaultContentHost
+            anchors.fill: parent
+            visible: !modeButton.customArtwork
+    
+            Grid {
+                anchors.centerIn: parent
+                columns: modeButton.horizontalContent ? 2 : 1
+                rows: modeButton.horizontalContent ? 1 : 2
+                spacing: modeButton.contentSpacing
+    
+                GohuText {
+                    id: defaultIcon
+                    visible: !modeButton.textOnly
+                    text: modeButton.iconText
+                    font.pixelSize: modeButton.iconFontSize
+                    color: modeButton.primaryColor
+                }
+                QuietText {
+                    id: defaultLabel
+                    visible: modeButton.labelText.length > 0
+                    text: modeButton.labelText
+                    font.pixelSize: modeButton.labelFontSize
+                    color: modeButton.textOnly
+                           ? modeButton.primaryColor : modeButton.labelColor
+                    quietOpacity: modeButton.textOnly
+                                  ? 1.0 : modeButton.labelOpacity
+                }
             }
         }
-    }
-
-    Item {
-        id: customContentHost
-        anchors.fill: parent
-        visible: modeButton.customArtwork
-    }
-
-    readonly property Item primaryGlowSource:
-        customArtwork ? customPrimaryGlowSource
-        : textOnly ? defaultLabel : defaultIcon
-    readonly property Item labelGlowSource:
-        customArtwork ? customLabelGlowSource
-        : textOnly ? null : defaultLabel
-
-    TextHashGlow {
-        safeSource: modeButton.primaryGlowSource
-        requestedVisible: modeButton.primaryGlowEnabled
-                          && modeButton.primaryGlowSource !== null
-                          && modeButton.primaryGlowSource.visible
-        foregroundColor: modeButton.primaryColor
-        preferredGlowColor: modeButton.primaryGlowColor
-        modeButtonRecipe: true
-        modeSelected: modeButton.selected
-        modeHovered: modeButton.hovered
-    }
-
-    TextHashGlow {
-        safeSource: modeButton.labelGlowSource
-        requestedVisible: modeButton.labelGlowEnabled
-                          && !modeButton.pressed
-                          && modeButton.labelGlowSource !== null
-                          && modeButton.labelGlowSource.visible
-        foregroundColor: modeButton.labelColor
-        preferredGlowColor: modeButton.labelGlowColor
-        radius: VisualLanguage.modeLabelGlowRadius
-        samples: VisualLanguage.modeLabelGlowSamples
-        opacity: modeButton.selected || modeButton.hovered
-                 ? VisualLanguage.modeLabelGlowActiveOpacity
-                 : VisualLanguage.modeLabelGlowIdleOpacity
+    
+        Item {
+            id: customContentHost
+            anchors.fill: parent
+            visible: modeButton.customArtwork
+        }
+    
+        readonly property Item primaryGlowSource:
+            customArtwork ? customPrimaryGlowSource
+            : textOnly ? defaultLabel : defaultIcon
+        readonly property Item labelGlowSource:
+            customArtwork ? customLabelGlowSource
+            : textOnly ? null : defaultLabel
+    
+        TextHashGlow {
+            parent: modeButton.effectivePrimaryGlowHost
+            safeSource: modeButton.primaryGlowSource
+            requestedVisible: modeButton.primaryGlowEnabled
+                              && modeButton.primaryGlowSource !== null
+                              && modeButton.primaryGlowSource.visible
+            foregroundColor: modeButton.primaryColor
+            preferredGlowColor: modeButton.primaryGlowColor
+            modeButtonRecipe: true
+            modeSelected: modeButton.selected
+            modeHovered: modeButton.hovered
+        }
+    
+        TextHashGlow {
+            parent: modeButton.effectiveLabelGlowHost
+            safeSource: modeButton.labelGlowSource
+            requestedVisible: modeButton.labelGlowEnabled
+                              && !modeButton.pressed
+                              && modeButton.labelGlowSource !== null
+                              && modeButton.labelGlowSource.visible
+            foregroundColor: modeButton.labelColor
+            preferredGlowColor: modeButton.labelGlowColor
+            radius: VisualLanguage.modeLabelGlowRadius
+            samples: VisualLanguage.modeLabelGlowSamples
+            opacity: modeButton.selected || modeButton.hovered
+                     ? VisualLanguage.modeLabelGlowActiveOpacity
+                     : VisualLanguage.modeLabelGlowIdleOpacity
+        }
     }
 
     MouseArea {

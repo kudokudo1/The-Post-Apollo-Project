@@ -269,6 +269,33 @@ require(power, "contentGlowIdleOpacity: 0.30", "Power historical content intensi
 require(power, "contentGlowIdleRadius: 19", "Power historical glow geometry")
 require(power, "softGlowSpread: 1", "Power historical perimeter recipe")
 require(power, "wideGlowIdleOpacity: 0.0", "Power historical absence of idle front wash")
+
+# Power confirmation overlays keep exclusive keyboard focus; never allow
+# Return/arrow keys to act on the hidden normal menu. Escape cancels only the
+# confirmation and restores the normal menu (not a power action).
+confirm_guard = power.index("if (confirmShutdown || confirmReboot) {")
+menu_guard = power.index("if (!menuOpen)", confirm_guard)
+normal_escape = power.index("if (event.key === Qt.Key_Escape)", menu_guard)
+assert confirm_guard < menu_guard < normal_escape, "Confirmation must preempt normal key handling"
+confirmation_keys = power[confirm_guard:menu_guard]
+for needle in (
+    "if (event.key === Qt.Key_Escape)",
+    "confirmShutdown = false;",
+    "confirmReboot = false;",
+    "menuOpen = true;",
+    "event.accepted = true;",
+    "return;",
+):
+    assert needle in confirmation_keys, ("Power confirmation keyboard isolation", needle)
+assert "Process.running" not in confirmation_keys
+assert "lockProcess.running" not in confirmation_keys
+assert "logoutProcess.running" not in confirmation_keys
+assert "shutdownProcess.running" not in confirmation_keys
+assert "rebootProcess.running" not in confirmation_keys
+for keyword in ("Qt.Key_Up", "Qt.Key_Down", "Qt.Key_Return", "Qt.Key_Enter"):
+    assert keyword not in confirmation_keys, "Destructive confirmation must not bind hidden-menu keys"
+
+
 hospital = (ROOT / "modules/Hospital.qml").read_text(encoding="utf-8")
 assert hospital.count("color: dock.foregroundColor") == 3, (
     "Hospital heartbeats must follow the center glyph foreground/open-state identity"

@@ -44,6 +44,12 @@ Rectangle {
     // Never parent a glow under its sampled source (feedback/self-sampling).
     property Item primaryGlowHost: null
     property Item labelGlowHost: null
+    readonly property Item primaryGlowSource:
+        customArtwork ? customPrimaryGlowSource
+        : textOnly ? defaultLabel : defaultIcon
+    readonly property Item labelGlowSource:
+        customArtwork ? customLabelGlowSource
+        : textOnly ? null : defaultLabel
     readonly property Item contentEffectPlane: contentLayer
 
     function validGlowHost(candidate, sourceItem) {
@@ -192,13 +198,6 @@ Rectangle {
             anchors.fill: parent
             visible: modeButton.customArtwork
         }
-    
-        readonly property Item primaryGlowSource:
-            customArtwork ? customPrimaryGlowSource
-            : textOnly ? defaultLabel : defaultIcon
-        readonly property Item labelGlowSource:
-            customArtwork ? customLabelGlowSource
-            : textOnly ? null : defaultLabel
     
         TextHashGlow {
             parent: modeButton.effectivePrimaryGlowHost

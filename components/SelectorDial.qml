@@ -540,8 +540,9 @@ Item {
                 Canvas {
                     id: progressCanvas
                     anchors.fill: parent
-                    property real sweep: dialRoot.loadingProgress < 0
-                        ? 95 : Math.max(0, Math.min(1, dialRoot.loadingProgress)) * 340
+                    property real sweep: dialRoot.loadingState !== "loading" ? 340
+                        : dialRoot.loadingProgress < 0 ? 95
+                        : Math.max(0, Math.min(1, dialRoot.loadingProgress)) * 340
                     onSweepChanged: requestPaint()
                     onPaint: {
                         const ctx = getContext("2d");

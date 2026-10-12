@@ -195,6 +195,20 @@ PanelWindow {
         focus: menuOpen || confirmShutdown || confirmReboot
 
         Keys.onPressed: function (event) {
+            // A confirmation overlay must not dispatch keyboard events to
+            // the hidden Lock/Logout/Reboot/Shutdown selection underneath.
+            // Escape cancels the overlay and returns to the ordinary menu;
+            // Enter must NOT become an implicit destructive confirmation.
+            if (confirmShutdown || confirmReboot) {
+                if (event.key === Qt.Key_Escape) {
+                    confirmShutdown = false;
+                    confirmReboot = false;
+                    menuOpen = true;
+                }
+                event.accepted = true;
+                return;
+            }
+
             if (!menuOpen)
                 return;
             if (event.key === Qt.Key_Escape) {

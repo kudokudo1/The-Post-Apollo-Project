@@ -25,7 +25,19 @@ Item {
     property real visualAngle: -90
     property bool dragging: false
     property real lastPointerAngle: 0
+    property real angularVelocity: 0 // degrees per second
+    property real lastMoveTime: 0
+    property real pendingTargetAngle: -90
+    property bool motionActive: false
+    property bool inertial: false
+    property int pendingIndex: -1
+    property real flickThreshold: 980 // deliberate release, tuned by live testing
+    property real frictionPerFrame: 0.925
+    property real settleThreshold: 36
     property int dragDetentIndex: -1
+    // Visual detent preview is independent of the externally committed index.
+    property int previewIndex: -1
+    readonly property int indicatedIndex: previewIndex >= 0 ? previewIndex : currentIndex
 
     signal selectionRequested(int index, string value)
 
@@ -115,6 +127,33 @@ Item {
         return String(options[index]).toUpperCase();
     }
 
+    function stopMotion() {
+        // Clear the pending target before stopping animations so obsolete
+        // requests cannot issue a late commit.
+        pendingIndex = -1;
+        inertial = false;
+        motionActive = false;
+        inertiaTimer.stop();
+        settleAnimation.stop();
+        previewIndex = -1;
+    }
+
+    function settleAnimationReset() {
+        settleAnimation.duration = 165;
+    }
+
+    function settleAtCurrentAngle() {
+        inertial = false;
+        inertiaTimer.stop();
+        pendingIndex = indexForAngle(visualAngle);
+        previewIndex = pendingIndex;
+        pendingTargetAngle = nearestEquivalent(angleForIndex(pendingIndex), visualAngle);
+        settleAnimation.duration = 165;
+        settleAnimation.from = visualAngle;
+        settleAnimation.to = pendingTargetAngle;
+        settleAnimation.start();
+    }
+
     function requestIndex(index) {
         const count = optionCount();
 
@@ -123,17 +162,26 @@ Item {
 
         const next = normalizedIndex(index);
 
-        selectionRequested(next, String(options[next]));
+        if (!interactive || dragging)
+            return;
 
-        if (!dragging)
-            visualAngle = nearestEquivalent(angleForIndex(next), visualAngle);
+        const destination = nearestEquivalent(angleForIndex(next), visualAngle);
+        stopMotion();
+        pendingIndex = next;
+        previewIndex = next;
+        motionActive = true;
+        pendingTargetAngle = destination;
+        settleAnimation.from = visualAngle;
+        settleAnimation.to = destination;
+        settleAnimation.duration = 115;
+        settleAnimation.start();
     }
 
     function stepIndex(delta) {
         if (!interactive)
             return;
 
-        requestIndex(currentIndex + Number(delta));
+        requestIndex((pendingIndex >= 0 ? pendingIndex : currentIndex) + Number(delta));
     }
 
     function snapToCurrent() {
@@ -144,13 +192,22 @@ Item {
     }
 
     onCurrentIndexChanged: {
-        if (!dragging)
+        if (!dragging && !motionActive)
             snapToCurrent();
     }
 
     onOptionsChanged: {
+        stopMotion();
         if (!dragging)
             snapToCurrent();
+    }
+
+    onInteractiveChanged: {
+        if (!interactive) {
+            stopMotion();
+            dragging = false;
+            snapToCurrent();
+        }
     }
 
     Component.onCompleted: snapToCurrent()
@@ -175,13 +232,39 @@ Item {
         event.accepted = true;
     }
 
-    Behavior on visualAngle {
-        enabled: !dialRoot.dragging
+    NumberAnimation {
+        id: settleAnimation
+        target: dialRoot
+        property: "visualAngle"
+        duration: 165
+        easing.type: Easing.OutBack
+        easing.overshoot: 0.42
+        onFinished: {
+            if (!dialRoot.motionActive || dialRoot.pendingIndex < 0)
+                return;
+            const finishedIndex = dialRoot.pendingIndex;
+            dialRoot.motionActive = false;
+            dialRoot.pendingIndex = -1;
+            dialRoot.previewIndex = -1;
+            if (finishedIndex !== dialRoot.currentIndex)
+                dialRoot.selectionRequested(finishedIndex, String(dialRoot.options[finishedIndex]));
+        }
+    }
 
-        NumberAnimation {
-            duration: 135
-            easing.type: Easing.OutBack
-            easing.overshoot: 0.8
+    Timer {
+        id: inertiaTimer
+        interval: 16
+        repeat: true
+        onTriggered: {
+            if (!dialRoot.inertial || !dialRoot.interactive) {
+                stop();
+                return;
+            }
+            dialRoot.angularVelocity *= dialRoot.frictionPerFrame;
+            dialRoot.visualAngle += dialRoot.angularVelocity * interval / 1000;
+            dialRoot.previewIndex = dialRoot.indexForAngle(dialRoot.visualAngle);
+            if (Math.abs(dialRoot.angularVelocity) < dialRoot.settleThreshold)
+                dialRoot.settleAtCurrentAngle();
         }
     }
 
@@ -471,22 +554,22 @@ Item {
                     anchors.centerIn: parent
                     text: dialRoot.optionDisplay(index)
                     font.pixelSize: dialRoot.optionCount() > 4 ? 6 : 7
-                    color: index === dialRoot.currentIndex
+                    color: index === dialRoot.indicatedIndex
                            ? dialRoot.markerColor
                            : dialRoot.labelColor
 
                     layer.enabled: true
                     layer.effect: MultiEffect {
                         shadowEnabled: true
-                        shadowColor: optionMark.index === dialRoot.currentIndex
+                        shadowColor: optionMark.index === dialRoot.indicatedIndex
                                      ? dialRoot.markerColor
                                      : dialRoot.labelColor
                         shadowOpacity:
-                            optionMark.index === dialRoot.currentIndex
+                            optionMark.index === dialRoot.indicatedIndex
                             ? 0.92
                             : 0.22
                         shadowBlur:
-                            optionMark.index === dialRoot.currentIndex
+                            optionMark.index === dialRoot.indicatedIndex
                             ? 0.72
                             : 0.28
                     }
@@ -561,12 +644,20 @@ Item {
 
                 dialRoot.visualAngle += delta;
                 dialRoot.lastPointerAngle = angle;
+                const now = Date.now();
+                const elapsed = now - dialRoot.lastMoveTime;
+                if (elapsed > 0 && elapsed < 120) {
+                    const instantaneous = delta * 1000 / elapsed;
+                    dialRoot.angularVelocity = dialRoot.angularVelocity * 0.35
+                                               + instantaneous * 0.65;
+                }
+                dialRoot.lastMoveTime = now;
 
                 const detent = dialRoot.indexForAngle(dialRoot.visualAngle);
 
                 if (detent !== dialRoot.dragDetentIndex) {
                     dialRoot.dragDetentIndex = detent;
-                    dialRoot.selectionRequested(detent, String(dialRoot.options[detent]));
+                    dialRoot.previewIndex = detent;
                 }
             }
 
@@ -575,8 +666,12 @@ Item {
                     dialRoot.keyboardHost.selectGitControlFromMouse(dialRoot);
 
                 dialRoot.forceActiveFocus();
+                dialRoot.stopMotion();
+                dialRoot.angularVelocity = 0;
+                dialRoot.lastMoveTime = Date.now();
                 dialRoot.dragging = true;
                 dialRoot.dragDetentIndex = dialRoot.currentIndex;
+                dialRoot.previewIndex = dialRoot.currentIndex;
                 dialRoot.lastPointerAngle = dialRoot.pointerAngle(
                     mouse.x,
                     mouse.y,
@@ -586,8 +681,21 @@ Item {
             }
 
             onReleased: {
+                if (!dialRoot.dragging)
+                    return;
+
                 dialRoot.dragging = false;
-                dialRoot.snapToCurrent();
+                dialRoot.motionActive = true;
+                // A stale velocity reading after holding the pointer still
+                // must not cause accidental inertia.
+                const recentlyMoving = Date.now() - dialRoot.lastMoveTime < 85;
+                if (recentlyMoving && Math.abs(dialRoot.angularVelocity) >= dialRoot.flickThreshold) {
+                    dialRoot.inertial = true;
+                    inertiaTimer.start();
+                } else {
+                    dialRoot.settleAnimationReset();
+                    dialRoot.settleAtCurrentAngle();
+                }
 
                 if (dialRoot.keyboardHost)
                     dialRoot.keyboardHost.restoreGitKeyboardFocus(false);
@@ -595,6 +703,7 @@ Item {
 
             onCanceled: {
                 dialRoot.dragging = false;
+                dialRoot.stopMotion();
                 dialRoot.snapToCurrent();
 
                 if (dialRoot.keyboardHost)

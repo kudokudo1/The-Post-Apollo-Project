@@ -1,12 +1,12 @@
 import QtQuick
 import qs.components
 
-// Manual fixture: embed this Item in a Quickshell test surface.
-// Deliberately not mounted by shell.qml or the live Git menu.
+// Isolated demo: loaded only when VARIANTS // VIEW is selected in GitW.
+// It changes only local fixture values and never executes Git operations.
 Item {
     id: root
     width: 288
-    height: 166
+    height: 160
 
     property real temperature: 187.25
     property int heatZoneIndex: 1

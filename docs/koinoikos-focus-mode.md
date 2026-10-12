@@ -39,6 +39,30 @@ The directory containing this repository's `shell.qml` must be the
 Quickshell directory used by the running `qs` instance. The example below
 assumes `~/.config/quickshell`; change it if using a different checkout.
 
+### One-command opt-in (preferred)
+
+After pulling the updated Quickshell repository into the installation
+directory and confirming that it is your active `shell.qml`, run:
+
+```bash
+python3 ~/.config/quickshell/scripts/enable_koinoikos_focus.py
+```
+
+This installer **does not ask for or replace the contents of your custom
+Sway config**. It appends only the explicit opt-in include, first creating a
+temporary candidate in the same folder and checking it with
+`sway -C -c`. If validation fails, your config stays untouched. On success
+it makes a timestamped `.bak` copy and atomically writes the validated
+candidate. A second run does not duplicate the include. It **does not**
+reload Sway or restart Quickshell. It refuses symlinked configs rather than
+replacing the symlink itself.
+
+If your repository or actual Sway config lives elsewhere, use
+`--config /path/to/config` or run the script from your actual checked-out
+repository; the include target is resolved from the script's own directory.
+
+### Manual include (equivalent)
+
 In the existing Sway config, add **one** include at the desired location:
 
 ```sway

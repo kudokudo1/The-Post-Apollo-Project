@@ -13,6 +13,8 @@ PanelWindow {
     property bool menuOpen: false
     property bool keyboardActive: true
     property bool keyboardLock: false
+    property bool relationshipFocusModeActive: false
+    property bool relationshipFocused: false
     signal keyboardOwnershipRequested()
 
     property string activePage: "git"
@@ -3302,7 +3304,10 @@ PanelWindow {
         anchors.fill: chassisGeometry
         spread: 6
         z: -20
-        opacity: root.menuOpen ? 0.21 : 0.0
+        opacity: root.menuOpen
+                 ? (root.relationshipFocusModeActive
+                    ? (root.relationshipFocused ? 0.46 : 0.09) : 0.21)
+                 : 0.0
         color: Colors.orange
     }
 
@@ -3310,7 +3315,10 @@ PanelWindow {
         anchors.fill: chassisGeometry
         spread: 12
         z: -21
-        opacity: root.menuOpen ? 0.05 : 0.0
+        opacity: root.menuOpen
+                 ? (root.relationshipFocusModeActive
+                    ? (root.relationshipFocused ? 0.14 : 0.02) : 0.05)
+                 : 0.0
         color: Colors.orange
     }
 

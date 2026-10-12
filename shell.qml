@@ -45,6 +45,25 @@ PanelWindow {
             : "hospital";
     }
 
+    // Sway owns Koinoikos directional navigation, Quickshell owns the
+    // focusable layer-shell menu registry and the selected menu keyboard.
+    RelationshipFocusBroker {
+        id: relationshipFocus
+        appControl: appControlWindow
+        hospital: hospitalWindow
+        git: gitWindow
+        cpu: cpuPlusWindow
+        weather: weatherStationWindow
+        hostOwner: shellRoot.controlKeyboardOwner
+
+        onPreviousOwnerRestorationRequested: function(previous) {
+            if (previous === "hospital" && hospitalWindow.menuOpen)
+                shellRoot.controlKeyboardOwner = "hospital";
+            else if (previous === "git" && gitWindow.menuOpen)
+                shellRoot.controlKeyboardOwner = "git";
+        }
+    }
+
     screen: Quickshell.screens.find(s => s.name === "DP-5")
 
     anchors {
@@ -71,7 +90,8 @@ PanelWindow {
     Shortcut {
         sequence: "Ctrl+Tab"
         context: Qt.ApplicationShortcut
-        enabled: hospitalWindow.menuOpen && gitWindow.menuOpen
+        enabled: !relationshipFocus.active
+                 && hospitalWindow.menuOpen && gitWindow.menuOpen
         onActivated: shellRoot.swapControlKeyboardOwner()
     }
 
@@ -202,6 +222,8 @@ PanelWindow {
 
                 systemTelemetry: sharedSystemTelemetry
                 fanControl: sharedFanControl
+                relationshipFocusModeActive: relationshipFocus.active
+                relationshipFocused: relationshipFocus.owner === "appcontrol"
             }
         }
 
@@ -239,10 +261,13 @@ PanelWindow {
                 id: hospitalWindow
 
                 screen: Quickshell.screens.find(s => s.name === "DP-5")
-                keyboardActive:
-                    shellRoot.controlKeyboardOwner === "hospital"
-                keyboardLock:
-                    hospitalWindow.menuOpen && gitWindow.menuOpen
+                keyboardActive: relationshipFocus.active
+                                ? relationshipFocus.owner === "hospital"
+                                : shellRoot.controlKeyboardOwner === "hospital"
+                keyboardLock: relationshipFocus.active
+                              || (hospitalWindow.menuOpen && gitWindow.menuOpen)
+                relationshipFocusModeActive: relationshipFocus.active
+                relationshipFocused: relationshipFocus.owner === "hospital"
 
                 onKeyboardOwnershipRequested:
                     shellRoot.controlKeyboardOwner = "hospital"
@@ -287,10 +312,13 @@ PanelWindow {
                 id: gitWindow
 
                 screen: Quickshell.screens.find(s => s.name === "DP-5")
-                keyboardActive:
-                    shellRoot.controlKeyboardOwner === "git"
-                keyboardLock:
-                    hospitalWindow.menuOpen && gitWindow.menuOpen
+                keyboardActive: relationshipFocus.active
+                                ? relationshipFocus.owner === "git"
+                                : shellRoot.controlKeyboardOwner === "git"
+                keyboardLock: relationshipFocus.active
+                              || (hospitalWindow.menuOpen && gitWindow.menuOpen)
+                relationshipFocusModeActive: relationshipFocus.active
+                relationshipFocused: relationshipFocus.owner === "git"
 
                 onKeyboardOwnershipRequested:
                     shellRoot.controlKeyboardOwner = "git"
@@ -365,6 +393,8 @@ PanelWindow {
                 appControlWindow: appControlWindow
                 systemTelemetry: sharedSystemTelemetry
                 fanControl: sharedFanControl
+                relationshipFocusModeActive: relationshipFocus.active
+                relationshipFocused: relationshipFocus.owner === "cpu"
             }
         }
 
@@ -389,6 +419,8 @@ PanelWindow {
 
                 weatherService: weatherService
                 spaceService: spaceService
+                relationshipFocusModeActive: relationshipFocus.active
+                relationshipFocused: relationshipFocus.owner === "weather"
             }
         }
 

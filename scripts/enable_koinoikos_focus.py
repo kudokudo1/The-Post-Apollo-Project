@@ -48,16 +48,22 @@ def checked_config(config: Path, candidate_text: str, sway_bin: str) -> tuple[bo
 
 
 def enable(config: Path, sway_bin: str = "sway") -> tuple[bool, str]:
+    # Sway dotfile managers often expose ~/.config/sway/config as a symlink
+    # into their repository. Resolve its target, never os.replace() the link.
+    # Keep the original config path when validating: an include in the
+    # config may be relative to the location Sway was asked to load.
     config = config.expanduser()
-    if config.is_symlink():
-        return False, "Refusing to rewrite symlinked Sway config; resolve your real config first."
-    if not config.is_file():
-        return False, "Sway config does not exist: " + str(config)
+    try:
+        target = config.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        return False, "Sway config path is missing or cannot be resolved: " + str(exc)
+    if not target.is_file():
+        return False, "Sway config is not a regular file: " + str(config)
     include = INCLUDE.resolve()
     if not include.is_file():
         return False, "Focus mode include not found: " + str(include)
 
-    original = config.read_text(encoding="utf-8")
+    original = target.read_text(encoding="utf-8")
     candidate = updated_text(original, include)
     if candidate == original:
         return True, "Focus Mode include already present; no changes made."
@@ -66,29 +72,41 @@ def enable(config: Path, sway_bin: str = "sway") -> tuple[bool, str]:
     if not valid:
         return False, "Sway rejected the candidate; original untouched.\n" + evidence
 
+    # A user or dotfile manager might edit or retarget the link during
+    # validation. Refuse to clobber a newer version or another target.
+    if config.resolve(strict=True) != target or target.read_text(encoding="utf-8") != original:
+        return False, "Sway config changed during validation; nothing overwritten."
+
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    backup = config.with_name(config.name + ".before-koinoikos-" + stamp + ".bak")
+    backup = target.with_name(target.name + ".before-koinoikos-" + stamp + ".bak")
     suffix = 2
     while backup.exists():
-        backup = config.with_name(
-            config.name + ".before-koinoikos-" + stamp + "-" + str(suffix) + ".bak")
+        backup = target.with_name(
+            target.name + ".before-koinoikos-" + stamp + "-" + str(suffix) + ".bak")
         suffix += 1
 
-    # Make backup first, then atomically replace real config.
-    shutil.copy2(config, backup)
+    # Back up the real file, then atomically replace it in its own folder.
+    # The original config symlink (including any relative link chain) stays
+    # exactly as it was, still pointing to this validated target.
+    shutil.copy2(target, backup)
     fd, name = tempfile.mkstemp(prefix=".koinoikos-write-", suffix=".conf",
-                                dir=str(config.parent), text=True)
+                                dir=str(target.parent), text=True)
     dest = Path(name)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as stream:
             stream.write(candidate)
-        os.chmod(dest, stat.S_IMODE(config.stat().st_mode))
-        os.replace(dest, config)
+        os.chmod(dest, stat.S_IMODE(target.stat().st_mode))
+        if config.resolve(strict=True) != target or target.read_text(encoding="utf-8") != original:
+            return False, ("Sway config changed before installation; original and "
+                           "its backup preserved, no replacement performed.")
+        os.replace(dest, target)
     finally:
         dest.unlink(missing_ok=True)
 
-    return True, ("Enabled after Sway -C validation. Original backed up at "
-                  + str(backup) + "\nNo compositor reload performed. "
+    suffix = " (symlink preserved)" if config.is_symlink() else ""
+    return True, ("Enabled after Sway -C validation" + suffix
+                  + ". Original backed up at " + str(backup)
+                  + "\nNo compositor reload performed. "
                   + "Restart Quickshell safely, then run: swaymsg reload")
 
 

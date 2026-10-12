@@ -49,10 +49,64 @@ with tempfile.TemporaryDirectory() as directory:
     assert path.read_text() == initial
     assert len(list(Path(directory).glob("config.before-koinoikos-*.bak"))) == 1
 
-    alias = Path(directory) / "config-link"
-    alias.symlink_to(path)
-    ok, message = installer.enable(alias)
-    assert not ok and "symlinked" in message
-    assert path.read_text() == initial
+    # Symlinks are standard for a user-managed Sway dotfiles checkout:
+    # the config link must survive unchanged and the resolved real file
+    # must receive the include, with a backup next to the real file.
+    dotfiles = Path(directory) / "dotfiles"
+    dotfiles.mkdir()
+    actual = dotfiles / "sway-config"
+    actual.write_text(initial)
+    sway_dir = Path(directory) / "live-sway"
+    sway_dir.mkdir()
+    alias = sway_dir / "config"
+    alias.symlink_to(Path("../dotfiles/sway-config"))  # relative target
+    original_link = alias.readlink()
+    with patch.object(installer.subprocess, "run", return_value=success) as run:
+        ok, message = installer.enable(alias)
+        assert ok and "symlink preserved" in message, message
+        validate_path = Path(run.call_args.args[0][3])
+        assert validate_path.parent == alias.parent
+    assert alias.is_symlink() and alias.readlink() == original_link
+    assert alias.resolve() == actual
+    assert "include " + str(installer.INCLUDE.resolve()) in actual.read_text()
+    backups = list(dotfiles.glob("sway-config.before-koinoikos-*.bak"))
+    assert len(backups) == 1 and backups[0].read_text() == initial
+    # A second install follows the symlink but does not duplicate or write.
+    with patch.object(installer.subprocess, "run") as run:
+        ok, message = installer.enable(alias)
+        assert ok and "already present" in message
+        run.assert_not_called()
+    assert len(list(dotfiles.glob("sway-config.before-koinoikos-*.bak"))) == 1
+
+    # Multi-link chains must not be atomically replaced at any link level.
+    chained = sway_dir / "chained"
+    chained.symlink_to("config")
+    assert chained.is_symlink()
+    with patch.object(installer.subprocess, "run") as run:
+        ok, message = installer.enable(chained)
+        assert ok and "already present" in message
+        run.assert_not_called()
+    assert chained.is_symlink() and chained.readlink() == Path("config")
+
+    # Refuse failed validation without changing the real target or link.
+    actual.write_text(initial)
+    with patch.object(installer.subprocess, "run", return_value=failed):
+        ok, message = installer.enable(chained)
+        assert not ok and "original untouched" in message
+    assert actual.read_text() == initial
+    assert alias.is_symlink() and chained.is_symlink()
+    assert len(list(dotfiles.glob("sway-config.before-koinoikos-*.bak"))) == 1
+
+    # Refuse broken targets and directories, preserving the link and content.
+    broken = sway_dir / "broken"
+    broken.symlink_to("missing")
+    ok, message = installer.enable(broken)
+    assert not ok and "cannot be resolved" in message
+    assert broken.is_symlink()
+
+    folder_link = sway_dir / "not-a-file"
+    folder_link.symlink_to(dotfiles, target_is_directory=True)
+    ok, message = installer.enable(folder_link)
+    assert not ok and "not a regular file" in message
 
 print("KOINOIKOS SAFE INSTALL // PASS")

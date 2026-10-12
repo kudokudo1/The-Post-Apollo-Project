@@ -1,7 +1,6 @@
 import QtQuick
 
-// MODE BUTTON close perimeter: rear layer, separate from the front wash.
-// Attach directly to the button Rectangle, not inside a wrapper Item.
+// MAIN MODE close halo: behind button; fixed spread, progressive strength.
 HaloGlow {
     id: halo
     property bool selected: false
@@ -13,7 +12,12 @@ HaloGlow {
         selected || hovered || keyboardSelected || pressed
 
     spread: VisualLanguage.modeCloseSpread
-    baseOpacity: energized ? VisualLanguage.modeCloseActiveOpacity : 0.0
+    baseOpacity: VisualLanguage.modeCloseActiveOpacity
+    glowStrength:
+        pressed ? VisualLanguage.modeHaloPressedStrength
+        : selected ? VisualLanguage.modeHaloSelectedStrength
+        : hovered || keyboardSelected ? VisualLanguage.modeHaloHoverStrength
+        : 0.0
     color: VisualLanguage.modeHaloColor
     z: -1
 }

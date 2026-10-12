@@ -21,6 +21,12 @@ SafeDropShadow {
         foregroundColor === Colors.magenta
         ? Colors.magenta : preferredGlowColor
 
+    // Opt-in MAIN MODE recipe. Existing non-mode consumers retain their
+    // original defaults; all radius/sample/opacity bindings remain overridable.
+    property bool modeButtonRecipe: false
+    property bool modeSelected: false
+    property bool modeHovered: false
+
     readonly property point sourceOrigin:
         sourceAttached && parent !== null
         ? safeSource.mapToItem(parent, 0, 0)
@@ -33,9 +39,18 @@ SafeDropShadow {
 
     horizontalOffset: 0
     verticalOffset: 0
-    radius: VisualLanguage.textHashRadius
-    samples: VisualLanguage.textHashSamples
-    opacity: VisualLanguage.textHashOpacity
+    radius: !modeButtonRecipe ? VisualLanguage.textHashRadius
+            : modeSelected ? VisualLanguage.modeIconSelectedRadius
+            : modeHovered ? VisualLanguage.modeIconHoverRadius
+            : VisualLanguage.modeIconIdleRadius
+    samples: !modeButtonRecipe ? VisualLanguage.textHashSamples
+             : modeSelected ? VisualLanguage.modeIconSelectedSamples
+             : modeHovered ? VisualLanguage.modeIconHoverSamples
+             : VisualLanguage.modeIconIdleSamples
+    opacity: !modeButtonRecipe ? VisualLanguage.textHashOpacity
+             : modeSelected ? VisualLanguage.modeIconSelectedOpacity
+             : modeHovered ? VisualLanguage.modeIconHoverOpacity
+             : VisualLanguage.modeIconIdleOpacity
     color: resolvedGlowColor
     transparentBorder: true
     z: 2

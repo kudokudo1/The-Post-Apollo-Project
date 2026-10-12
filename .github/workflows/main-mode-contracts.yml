@@ -1,0 +1,41 @@
+name: Main Mode shared component contracts
+
+on:
+  pull_request:
+    paths:
+      - "components/ModeButton.qml"
+      - "components/ModeButton.qml.template"
+      - "components/ModeButtonCloseHalo.qml"
+      - "components/ModeButtonWideHalo.qml"
+      - "components/TextHashGlow.qml"
+      - "components/VisualLanguage.qml"
+      - "components/qmldir"
+      - "tests/components/test_mode_button_contracts.py"
+      - "tests/components/test_visual_language_recipes.py"
+      - ".github/workflows/main-mode-contracts.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "components/ModeButton.qml"
+      - "components/ModeButtonCloseHalo.qml"
+      - "components/ModeButtonWideHalo.qml"
+      - "components/TextHashGlow.qml"
+      - "components/VisualLanguage.qml"
+      - "components/qmldir"
+      - "tests/components/test_mode_button_contracts.py"
+      - "tests/components/test_visual_language_recipes.py"
+      - ".github/workflows/main-mode-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Main Mode reusable component
+        run: python3 tests/components/test_mode_button_contracts.py
+      - name: Preserve existing visual language recipes
+        run: python3 tests/components/test_visual_language_recipes.py

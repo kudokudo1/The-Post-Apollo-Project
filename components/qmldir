@@ -11,6 +11,7 @@ BranchMap 1.0 BranchMap.qml
 IndexRail 1.0 IndexRail.qml
 SelectorSlider 1.0 SelectorSlider.qml
 ModeActuator 1.0 ModeActuator.qml
+ModeButton 1.0 ModeButton.qml
 
 NeonScrollBar 1.0 NeonScrollBar.qml
 DockButton 1.0 DockButton.qml

@@ -5,6 +5,8 @@ on:
     paths:
       - "components/ModeButton.qml"
       - "widgets/AppControlW.qml"
+      - "widgets/CpuPlusW.qml"
+      - "tests/components/test_cpuplus_caption_slot_contracts.py"
       - "widgets/weather/WeatherStationW.qml"
       - "tests/components/test_mode_button_weather_contracts.py"
       - "tests/components/test_mode_button_appcontrol_contracts.py"
@@ -23,6 +25,8 @@ on:
     paths:
       - "components/ModeButton.qml"
       - "widgets/AppControlW.qml"
+      - "widgets/CpuPlusW.qml"
+      - "tests/components/test_cpuplus_caption_slot_contracts.py"
       - "widgets/weather/WeatherStationW.qml"
       - "tests/components/test_mode_button_weather_contracts.py"
       - "tests/components/test_mode_button_appcontrol_contracts.py"
@@ -49,5 +53,7 @@ jobs:
         run: python3 tests/components/test_mode_button_appcontrol_contracts.py
       - name: Verify Weather DOMAIN / VIEW Main Modes
         run: python3 tests/components/test_mode_button_weather_contracts.py
+      - name: Verify CPU++ Main Mode caption and artwork
+        run: python3 tests/components/test_cpuplus_caption_slot_contracts.py
       - name: Preserve existing visual language recipes
         run: python3 tests/components/test_visual_language_recipes.py

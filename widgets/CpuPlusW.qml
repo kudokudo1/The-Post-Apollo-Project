@@ -566,29 +566,22 @@ PanelWindow {
             Repeater {
                 model: cpuPlusWindow.modes
 
-                Rectangle {
+                ModeButton {
                     id: modeButton
 
                     required property int index
                     required property var modelData
 
-                    readonly property bool isSelected:
-                        index === cpuPlusWindow.selectedModeIndex
-
-                    readonly property bool isHovered:
-                        modeMouse.containsMouse
-
-                    readonly property bool isPressed:
-                        modeMouse.pressed
-
-                    readonly property color contentColor:
-                        isPressed
-                        ? Colors.black
-                        : isSelected
-                        ? Colors.magenta
-                        : isHovered
-                        ? Colors.orange
-                        : Colors.cyan
+                    selected: index === cpuPlusWindow.selectedModeIndex
+                    bordered: true
+                    customArtwork: true
+                    customPrimaryGlowSource: textModeIcon
+                    customLabelGlowSource: modeCaption
+                    primaryGlowEnabled: modelData.kind !== "thermal"
+                    readonly property bool isSelected: selected
+                    readonly property bool isHovered: hovered
+                    readonly property bool isPressed: pressed
+                    readonly property color contentColor: primaryColor
 
                     width:
                         (
@@ -609,19 +602,6 @@ PanelWindow {
                         ? 1.01
                         : 1.0
 
-                    color:
-                        isPressed
-                        ? Colors.magenta
-                        : isHovered || isSelected
-                        ? Colors.yellow
-                        : Colors.black
-
-                    border.width: 1
-                    border.color:
-                        isHovered || isPressed || isSelected
-                        ? Colors.orange
-                        : Colors.cyan
-
                     // The close halo and front wash extend beyond the face.
                     clip: false
 
@@ -630,6 +610,14 @@ PanelWindow {
                             duration: 90
                             easing.type: Easing.OutQuad
                         }
+                    }
+
+                    onTriggered: {
+                        if (modelData.name === "FAVORITES") {
+                            cpuPlusWindow.favoritesFaceClickPulse = true;
+                            favoritesFaceClickPulseTimer.restart();
+                        }
+                        cpuPlusWindow.selectMode(index);
                     }
 
                     Column {
@@ -714,21 +702,7 @@ PanelWindow {
 
                             // AppControl's icon carries the strong state glow.
                             // The sampled source is disconnected during reload.
-                            TextHashGlow {
-                                safeSource: textModeIcon
-                                foregroundColor: textModeIcon.color
-                                requestedVisible:
-                                    textModeIcon.visible && !modeButton.isPressed
-                                radius:
-                                    modeButton.isSelected ? 18
-                                    : modeButton.isHovered ? 14 : 10
-                                samples:
-                                    modeButton.isSelected ? 17
-                                    : modeButton.isHovered ? 9 : 7
-                                opacity:
-                                    modeButton.isSelected ? 1.0
-                                    : modeButton.isHovered ? 0.80 : 0.42
-                            }
+                            
                         }
 
                         // AppControl hierarchy: secondary mode name stays dim
@@ -756,50 +730,17 @@ PanelWindow {
                                     ? 0.48 : 0.34
                             }
 
-                            TextHashGlow {
-                                safeSource: modeCaption
-                                foregroundColor: modeCaption.color
-                                preferredGlowColor: Colors.white
-                                requestedVisible: !modeButton.isPressed
-                                radius: 5
-                                samples: 7
-                                opacity:
-                                    modeButton.isHovered || modeButton.isSelected
-                                    ? 0.10 : 0.06
-                            }
+                            
                         }
                     }
 
-                    MouseArea {
-                        id: modeMouse
-
-                        anchors.fill: parent
-
-                        hoverEnabled: true
-
-                        onClicked: {
-                            if (modelData.name === "FAVORITES") {
-                                cpuPlusWindow.favoritesFaceClickPulse = true;
-                                favoritesFaceClickPulseTimer.restart();
-                            }
-
-                            cpuPlusWindow.selectMode(index);
-                        }
-                    }
+                    
 
                     // MODE halo recipe: close orange perimeter behind the
                     // face, wide wash IN FRONT, matching AppControl.
-                    ModeButtonCloseHalo {
-                        selected: modeButton.isSelected
-                        hovered: modeButton.isHovered
-                        pressed: modeButton.isPressed
-                    }
+                    
 
-                    ModeButtonWideHalo {
-                        selected: modeButton.isSelected
-                        hovered: modeButton.isHovered
-                        pressed: modeButton.isPressed
-                    }
+                    
                 }
             }
         }

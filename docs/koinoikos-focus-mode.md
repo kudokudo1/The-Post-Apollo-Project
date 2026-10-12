@@ -54,8 +54,17 @@ temporary candidate in the same folder and checking it with
 `sway -C -c`. If validation fails, your config stays untouched. On success
 it makes a timestamped `.bak` copy and atomically writes the validated
 candidate. A second run does not duplicate the include. It **does not**
-reload Sway or restart Quickshell. It refuses symlinked configs rather than
-replacing the symlink itself.
+reload Sway or restart Quickshell.
+
+**Symlinked Sway configs are supported.** If `~/.config/sway/config`
+points into your dotfiles repository (including relative or chained links),
+the installer follows the existing link to its final regular-file target.
+It validates using a temporary candidate beside the original config path,
+backs up the **real target file** next to that target, and atomically updates
+only the target. All original symlinks remain intact. Dangling links,
+non-file targets and failed Sway validation abort without modifying the
+config. If another process changes the target during validation, the
+installer refuses to overwrite newer content.
 
 If your repository or actual Sway config lives elsewhere, use
 `--config /path/to/config` or run the script from your actual checked-out

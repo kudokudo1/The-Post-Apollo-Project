@@ -58,6 +58,16 @@ for name, glow_source, glyphs in (
 
 for name in ("Applauncher", "NotificationsHub", "Calendar", "Bluetooth"):
     assert "Row {" not in module(name), name
+# Operator screenshot: Bluetooth is optically low even when its single
+# Text box is mathematically centered. A source-local -2px correction keeps
+# artwork and DockButton glow aligned without splitting glyphs or moving layout.
+bluetooth = module("Bluetooth")
+assert "anchors.centerIn: parent" in bluetooth
+assert "anchors.verticalCenterOffset: -2" in bluetooth
+assert "contentGlowSource: bluetoothText" in bluetooth
+assert "Row {" not in bluetooth
+assert bluetooth.count("textFormat: Text.StyledText") == 1
+
 assert module("Git").count("Row {") == 1, "Git retains one compound branch/cat layout"
 assert 'text: "≽<font color=\'" + dock.foregroundColor + "\'>(</font>•⩊•マ≼"' in module("Git")
 hospital = module("Hospital")

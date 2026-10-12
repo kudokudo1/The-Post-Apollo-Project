@@ -15,6 +15,14 @@ DockButton {
 
     contentGlowEnabled: false
 
+    // Modulate shadow COLOR alpha; the source layer never changes opacity.
+    readonly property color sampledGlowColor: Qt.rgba(
+        root.networkGlowColor.r,
+        root.networkGlowColor.g,
+        root.networkGlowColor.b,
+        root.networkGlowColor.a * networkDock.contentGlowOpacity
+    )
+
     normalDockGlowColor: root.networkGlowColor
     hoverDockGlowColor: root.networkGlowColor
     pressedDockGlowColor: root.networkGlowColor
@@ -576,6 +584,18 @@ DockButton {
                 }
             }
 
+            // Historical, layout-local effect; no detached copies to ghost.
+            layer.enabled: true
+            layer.effect: DropShadow {
+                anchors.fill: networkIconRow
+                source: networkIconRow
+                horizontalOffset: 0
+                verticalOffset: 0
+                radius: networkDock.contentGlowRadius
+                samples: networkDock.contentGlowSamples
+                color: networkDock.sampledGlowColor
+                transparentBorder: true
+            }
         }
 
         // =========================================
@@ -596,6 +616,17 @@ DockButton {
 
                 font.pixelSize: 20
                 color: Colors.white
+
+                // Structural punctuation glows in its existing text slot.
+                layer.enabled: true
+                layer.effect: DropShadow {
+                    horizontalOffset: 0
+                    verticalOffset: 0
+                    radius: networkDock.contentGlowRadius
+                    samples: networkDock.contentGlowSamples
+                    color: networkDock.sampledGlowColor
+                    transparentBorder: true
+                }
             }
 
             Text {
@@ -613,6 +644,17 @@ DockButton {
 
                 elide: Text.ElideNone
 
+                layer.enabled: true
+
+                layer.effect: DropShadow {
+                    horizontalOffset: 0
+                    verticalOffset: 0
+
+                    radius: networkDock.contentGlowRadius
+                    samples: networkDock.contentGlowSamples
+
+                    color: networkDock.sampledGlowColor
+                }
             }
 
             Text {
@@ -622,6 +664,17 @@ DockButton {
 
                 font.pixelSize: 20
                 color: Colors.white
+
+                // Structural punctuation glows in its existing text slot.
+                layer.enabled: true
+                layer.effect: DropShadow {
+                    horizontalOffset: 0
+                    verticalOffset: 0
+                    radius: networkDock.contentGlowRadius
+                    samples: networkDock.contentGlowSamples
+                    color: networkDock.sampledGlowColor
+                    transparentBorder: true
+                }
             }
 
             // =====================================
@@ -655,6 +708,17 @@ DockButton {
                     // Center the actual text inside the column.
                     horizontalAlignment: Text.AlignHCenter
 
+                    layer.enabled: true
+
+                    layer.effect: DropShadow {
+                        horizontalOffset: 0
+                        verticalOffset: 0
+
+                        radius: networkDock.contentGlowRadius
+                        samples: networkDock.contentGlowSamples
+
+                        color: networkDock.sampledGlowColor
+                    }
                 }
 
                 Text {
@@ -671,169 +735,20 @@ DockButton {
                     // Center the actual text inside the column.
                     horizontalAlignment: Text.AlignHCenter
 
+                    layer.enabled: true
+
+                    layer.effect: DropShadow {
+                        horizontalOffset: 0
+                        verticalOffset: 0
+
+                        radius: networkDock.contentGlowRadius
+                        samples: networkDock.contentGlowSamples
+
+                        color: networkDock.sampledGlowColor
+                    }
                 }
             }
         }
-    }
-
-    // The four semantic clusters (icon, SSID, signal, speed) use six
-    // independent sampled sources: the SSID's two structural parentheses
-    // share its state color/glow without moving any RowLayout item.
-    // Each glow follows DockButton's sample geometry and lifetime guard.
-    // Complete Wi-Fi icon cluster: satellite, white signal brackets and Ethernet
-    // The source remains in its existing RowLayout at full foreground opacity.
-    // This sibling effect lives on DockButton's original content plane.
-    SafeDropShadow {
-        id: networkIconRowGlow
-        readonly property point sourceOrigin: sourceAttached
-                                              ? networkIconRow.mapToItem(parent, 0, 0)
-                                              : Qt.point(0, 0)
-
-        x: sourceOrigin.x
-        y: sourceOrigin.y
-        width: sourceAttached ? networkIconRow.width : 0
-        height: sourceAttached ? networkIconRow.height : 0
-        safeSource: networkIconRow
-
-        horizontalOffset: 0
-        verticalOffset: 0
-        radius: networkDock.contentGlowRadius
-        samples: networkDock.contentGlowSamples
-        z: 2
-
-        opacity: networkDock.contentGlowOpacity
-        color: root.networkGlowColor
-        transparentBorder: true
-    }
-
-    // SSID opening parenthesis; structural white with the SSID's colored glow
-    // The source remains in its existing RowLayout at full foreground opacity.
-    // This sibling effect lives on DockButton's original content plane.
-    SafeDropShadow {
-        id: networkOpenGlow
-        readonly property point sourceOrigin: sourceAttached
-                                              ? networkOpen.mapToItem(parent, 0, 0)
-                                              : Qt.point(0, 0)
-
-        x: sourceOrigin.x
-        y: sourceOrigin.y
-        width: sourceAttached ? networkOpen.width : 0
-        height: sourceAttached ? networkOpen.height : 0
-        safeSource: networkOpen
-
-        horizontalOffset: 0
-        verticalOffset: 0
-        radius: networkDock.contentGlowRadius
-        samples: networkDock.contentGlowSamples
-        z: 2
-
-        opacity: networkDock.contentGlowOpacity
-        color: root.networkGlowColor
-        transparentBorder: true
-    }
-
-    // SSID text; independent glow from the glyph's foreground
-    // The source remains in its existing RowLayout at full foreground opacity.
-    // This sibling effect lives on DockButton's original content plane.
-    SafeDropShadow {
-        id: networkTextGlow
-        readonly property point sourceOrigin: sourceAttached
-                                              ? networkText.mapToItem(parent, 0, 0)
-                                              : Qt.point(0, 0)
-
-        x: sourceOrigin.x
-        y: sourceOrigin.y
-        width: sourceAttached ? networkText.width : 0
-        height: sourceAttached ? networkText.height : 0
-        safeSource: networkText
-
-        horizontalOffset: 0
-        verticalOffset: 0
-        radius: networkDock.contentGlowRadius
-        samples: networkDock.contentGlowSamples
-        z: 2
-
-        opacity: networkDock.contentGlowOpacity
-        color: root.networkGlowColor
-        transparentBorder: true
-    }
-
-    // SSID closing parenthesis; same glow as the SSID text
-    // The source remains in its existing RowLayout at full foreground opacity.
-    // This sibling effect lives on DockButton's original content plane.
-    SafeDropShadow {
-        id: networkCloseGlow
-        readonly property point sourceOrigin: sourceAttached
-                                              ? networkClose.mapToItem(parent, 0, 0)
-                                              : Qt.point(0, 0)
-
-        x: sourceOrigin.x
-        y: sourceOrigin.y
-        width: sourceAttached ? networkClose.width : 0
-        height: sourceAttached ? networkClose.height : 0
-        safeSource: networkClose
-
-        horizontalOffset: 0
-        verticalOffset: 0
-        radius: networkDock.contentGlowRadius
-        samples: networkDock.contentGlowSamples
-        z: 2
-
-        opacity: networkDock.contentGlowOpacity
-        color: root.networkGlowColor
-        transparentBorder: true
-    }
-
-    // Signal percentage; the structural percent shares the readout glow
-    // The source remains in its existing RowLayout at full foreground opacity.
-    // This sibling effect lives on DockButton's original content plane.
-    SafeDropShadow {
-        id: networkSignalTextGlow
-        readonly property point sourceOrigin: sourceAttached
-                                              ? networkSignalText.mapToItem(parent, 0, 0)
-                                              : Qt.point(0, 0)
-
-        x: sourceOrigin.x
-        y: sourceOrigin.y
-        width: sourceAttached ? networkSignalText.width : 0
-        height: sourceAttached ? networkSignalText.height : 0
-        safeSource: networkSignalText
-
-        horizontalOffset: 0
-        verticalOffset: 0
-        radius: networkDock.contentGlowRadius
-        samples: networkDock.contentGlowSamples
-        z: 2
-
-        opacity: networkDock.contentGlowOpacity
-        color: root.networkGlowColor
-        transparentBorder: true
-    }
-
-    // Connection speed; keep the functional Mb/s separator unchanged
-    // The source remains in its existing RowLayout at full foreground opacity.
-    // This sibling effect lives on DockButton's original content plane.
-    SafeDropShadow {
-        id: networkSpeedTextGlow
-        readonly property point sourceOrigin: sourceAttached
-                                              ? networkSpeedText.mapToItem(parent, 0, 0)
-                                              : Qt.point(0, 0)
-
-        x: sourceOrigin.x
-        y: sourceOrigin.y
-        width: sourceAttached ? networkSpeedText.width : 0
-        height: sourceAttached ? networkSpeedText.height : 0
-        safeSource: networkSpeedText
-
-        horizontalOffset: 0
-        verticalOffset: 0
-        radius: networkDock.contentGlowRadius
-        samples: networkDock.contentGlowSamples
-        z: 2
-
-        opacity: networkDock.contentGlowOpacity
-        color: root.networkGlowColor
-        transparentBorder: true
     }
 
     // =============================================

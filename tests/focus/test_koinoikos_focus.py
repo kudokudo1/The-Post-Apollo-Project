@@ -52,13 +52,14 @@ assert focus.nearest(native + menus, native[1], "right")["id"] == "hospital"
 
 sway = (ROOT / "config/sway/koinoikos-focus.conf").read_text()
 for expected in (
-    "Mod4+Shift+grave", 'mode "Koinoikos Focus"',
+    "Mod4+grave exec", 'mode "Koinoikos Focus"',
     "bindsym Escape", "swaymsg mode default",
     "bindsym h exec", "bindsym j exec", "bindsym k exec",
     "bindsym l exec", "bindsym Left", "bindsym Right",
     "bindsym Up", "bindsym Down",
 ):
     assert expected in sway, expected
+assert "Mod4+Shift+grave" not in sway, "Shift must not be required for Koinoikos entry"
 
 broker = (ROOT / "components/RelationshipFocusBroker.qml").read_text()
 shell = (ROOT / "shell.qml").read_text()

@@ -125,6 +125,26 @@ Use `QuietText` and `SecondaryText` only when those semantic roles
 are appropriate. Do not convert a product/app identity or consequential
 action description to QuietText simply because it was gray before.
 
+## Sub Mode keyboard ownership (source-verified 2026-10-12 EDT)
+
+**Sub Mode navigation is not the same as Main Mode navigation.** The visual
+button/halo components must preserve each host menu's existing key handling.
+The full AppControl / Git shortcut map, selector-family coverage,
+focus-routing caveats and Git Local differences are recorded in
+[Sub Mode keyboard-navigation contract](sub-mode-keyboard-contract.md).
+
+- **AppControl:** `Shift + Left/Right` moves the top Sub Mode/filter;
+  `Ctrl + Left/Right` moves the bottom launch/filter Sub Mode. Thermal
+  separately supports contextual `Ctrl + Tab` for Thermal/Fans.
+- **Git/GitHub:** `Shift + Left/Right` (also Up/Down) chooses the Git Local
+  or GitHub Remote **main page**. Within **GitHub**, `Alt + Left/Right`
+  (also Up/Down) cycles the bottom-mode pages. **Git Local** uses
+  `Alt + Left` for Back when history exists; its nested Sub Mode selectors
+  do not have an equivalent global cycle key in the audited source.
+- These are **existing source bindings**, not a proposed universal shortcut
+  scheme or a claim of on-device testing. Do not rewrite them to match the
+  reusable Main Mode `ModeButton` component.
+
 ## Controlled rollout
 
 1. Add these components, templates, and static contracts without changing

@@ -184,7 +184,10 @@ as a regression or remove it during color normalization.
 | Open | 0.86 | 0.22 | 1.00 |
 
 **Content sample geometry:** radius 14 / 15 samples in all states as a
-*provisional*, deliberately undersampled/hash-like starting point. The
+*provisional*, deliberately undersampled/hash-like starting point.
+`DockButton.contentGlowRadius` and `DockButton.contentGlowSamples` are
+read-only resolved state values for every sampled dock cluster. Modules
+with independent effects should bind these rather than duplicate constants. The
 operator must see the real Qt renderer before choosing final sample values;
 do not smooth the effect automatically. Content glows build in opacity with
 interaction. The legacy Wi-Fi inverted icon opacity (1/.8/.6) was **not**
@@ -302,9 +305,39 @@ menu wiring, or live reload is implied by this source-level normalization.
   outside the existing RowLayouts and position them by mapping the original
   sources into their shared dock content parent. This must not affect Wi-Fi
   glyph composition, telemetry width, alignment, signal colors or click actions.
-- Preserve the existing source-specific radii (icon 14, SSID 10, percentage
-  8, speed 8) and 15 samples. The separate Ethernet pulse layer effect is
-  unchanged because it does not have interactive opacity.
+- Historical source-specific radii of icon 14, SSID 10, percentage 8, and
+  speed 8 were an intermediate preservation, **not** a permanent approved
+  semantic exception. All interactive Wi-Fi source glows now use the same
+  DockButton-resolved canonical radius 14 / samples 15. The separately
+  layered Ethernet pulse remains as a deliberately preserved fixed-opacity
+  self-colored accent; the surrounding icon cluster still has canonical glow.
 - Source contracts verify geometry/source ownership and lifetime-guarded
   effects; live Qt runtime verification is still needed for any pixel-level
   visual acceptance.
+
+
+### Nurse 3A full Wi-Fi dock-conformity pass (2026-10-11; operator directive)
+
+The operator required end-to-end canon, not isolated opacity repairs.
+Wi-Fi uses **six** independently sampled `SafeDropShadow` sources in **four**
+semantic clusters: the staged satellite/connection icon; the SSID text and
+its two structural parentheses; the signal percentage including `%`; and
+the speed including the meaningful `Mb/s` slash. The SSID parenthesis
+foreground stays white (Wi-Fi has no persistent open/menu state), but each
+parenthesis receives the same signal-dependent glow color and interactive
+energy as its text cluster. All other contextual colors are preserved.
+
+Each sampled overlay is a non-layout child of DockButton's content host,
+thus kept on the shared foreground/glow stacking plane below the front wash.
+It uses the established `SafeDropShadow` lifetime guard for the source,
+`sourceAttached`-guarded `mapToItem(parent)` and sampled bounds, and the
+existing shared DockButton's state-resolved radius/samples/opacities.
+The underlying Qt Text/RowLayouts remain full foreground opacity and keep
+their original positions, visual grammar, signal thresholds and clicks.
+
+The prior 14/10/8/8 implementation and unguarded mapping are superseded.
+The historical Ethernet ECG pulse's fixed-opacity extra cyan shadow remains
+untouched to preserve its layered visual character; it is not the interactive
+Wi-Fi content-glow path. Source-level CI checks these invariants. Operator
+visual approval in Quickshell is still required before declaring pixel-level
+rendering and exact glyph spacing accepted.

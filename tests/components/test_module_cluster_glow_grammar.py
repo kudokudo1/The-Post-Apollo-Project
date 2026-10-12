@@ -99,38 +99,54 @@ assert workspaces.count("workspacesButtonMouse.containsMouse ? 0.95") == 2
 assert workspaces.count(": 0.75") >= 2
 assert "visible: workspacesWorkspaceButton.isActive" in workspaces
 
-# Wi-Fi now shares the rising dock glow intensity without flattening the
-# icon, SSID, percentage, and speed into one sampled source.
+# All Wi-Fi foreground glyphs remain in their original RowLayouts. Overlays
+# are non-layout siblings on DockButton's content plane.
+# The SSID's structural parentheses share its contextual glow without moving.
 network = module("Network")
-assert network.count("opacity: networkDock.contentGlowOpacity") == 4
+assert network.count("SafeDropShadow {") == 6, "Six sources in four semantic clusters"
+assert network.count("layer.effect: DropShadow {") == 1, "Legacy Ethernet pulse only"
+assert network.count("opacity: networkDock.contentGlowOpacity") == 6
 assert "networkDock.pressed ? 0.6 : networkDock.hovered ? 0.8 : 1.0" not in network
-assert network.count("SafeDropShadow {") == 4, "Four independent sampled overlays required"
-assert network.count("layer.effect: DropShadow {") == 1, "Legacy Ethernet pulse is the only remaining layer effect"
-for field, radius in (
-    ("networkIconRow", 14),
-    ("networkText", 10),
-    ("networkSignalText", 8),
-    ("networkSpeedText", 8),
+assert "contentGlowEnabled: false" in network  # no whole-module sampled glow
+for field in (
+    "networkIconRow", "networkOpen", "networkText", "networkClose",
+    "networkSignalText", "networkSpeedText",
 ):
     assert f"safeSource: {field}" in network, field
     assert f"id: {field}Glow" in network, field
-    assert f"readonly property point sourceOrigin: {field}.mapToItem(parent, 0, 0)" in network, field
     start = network.index(f"id: {field}Glow")
     end = network.index("\n    }", start)
     glow = network[start:end]
-    assert f"radius: {radius}" in glow, (field, radius)
-    assert "samples: 15" in glow, field
+    assert f"{field}.mapToItem(parent, 0, 0)" in glow, field
+    assert "readonly property point sourceOrigin: sourceAttached" in glow, field
+    assert f"width: sourceAttached ? {field}.width : 0" in glow, field
+    assert f"height: sourceAttached ? {field}.height : 0" in glow, field
+    assert "radius: networkDock.contentGlowRadius" in glow, field
+    assert "samples: networkDock.contentGlowSamples" in glow, field
     assert "opacity: networkDock.contentGlowOpacity" in glow, field
     assert "color: root.networkGlowColor" in glow, field
     assert "z: 2" in glow, field
-# Preserve all source containers, single-column telemetry geometry, and the
-# independent signal-aware colors. The effect children must not be Layout
-# children that claim row or column space.
-assert "anchors.fill: parent" in network
+
+for item, literal in (("networkOpen", '"("'), ("networkClose", '")"')):
+    field = network[network.index(f"id: {item}"):][:220]
+    assert f"text: {literal}" in field, item
+    assert "color: Colors.white" in field, item
+
+assert 'text: root.signalPercent + "%"' in network
+assert 'text: root.linkSpeed + " Mb/s"' in network
 assert "Layout.preferredWidth: 65" in network
 assert "Layout.alignment: Qt.AlignVCenter" in network
 assert "root.networkColor" in network
 assert "property color networkGlowColor:" in network
+assert 'Quickshell.execDetached(["nm-connection-editor"])' in network
+assert "root.ethernetMode = !root.ethernetMode" in network
+assert "root.signalWeak" in network and "root.signalStrong" in network
+
+dock_source = (ROOT / "components/DockButton.qml").read_text(encoding="utf-8")
+assert "readonly property real contentGlowRadius:" in dock_source
+assert "readonly property int contentGlowSamples:" in dock_source
+assert "radius: dockButton.contentGlowRadius" in dock_source
+assert "samples: dockButton.contentGlowSamples" in dock_source
 
 # Preserve separately approved specialty behavior pending runtime review.
 assert "softGlowSpread: 1" in module("Power")

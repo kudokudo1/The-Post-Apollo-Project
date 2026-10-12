@@ -29,7 +29,7 @@ classified Floor as Main and Bed as Sub; do not propagate that error.
 | --- | --- | --- | --- |
 | **AppControl** | `Tab` next Main Mode, `Shift+Tab` previous when in ordinary selector context | `Shift+Left/Right` top/source selector; `Ctrl+Left/Right` bottom/launch selector | `Tab` instead moves within mode rail or between results while mode-rail/detail focus owns it |
 | **Git / GitHub** | `Shift+Left/Up` selects Git Local, `Shift+Right/Down` selects GitHub Remote | **GitHub Remote only:** `Alt+Left/Up` previous bottom mode, `Alt+Right/Down` next | Git Main Mode keys choose a **specific page**, not a generic next/previous cycle. Git Local `Alt+Left` means navigation **Back** if history exists; nested Git Local subModes have no matching global cycle shortcut |
-| **Hospital** | Seven Main Mode tabs: **Reception / Surgery / Attention / Archive / Reports / Rounds / Staff**; **no dedicated cycling shortcut exists in audited Hospital root** | Floor/Room/Bed selectors are separate contextual navigation; `Shift+Left/Right` currently cycles Beds | Plain `Left/Right` cycles Floors **only while Room selector owns the arrows**; other arrow meanings depend on focus. No Hospital `Tab` Main Mode cycling shortcut is implemented yet |
+| **Hospital** | **`Tab`** next / **`Shift+Tab`** previous of seven Main Modes: Reception / Surgery / Attention / Archive / Reports / Rounds / Staff | Floor/Room/Bed selectors retain their own contextual keys; `Shift+Left/Right` still cycles Beds | Main Mode Tab shortcuts require Hospital's navigation anchor to own focus and are disabled during Intercom/Receptionist typing, overlays, and nested Room views. Plain `Left/Right` still cycles Floors only in Room-selector context |
 
 ### Collision to settle before normalizing shortcuts
 
@@ -128,17 +128,26 @@ The seven `HospitalModeTab` instances in `hospitalModeTabs` are:
 **RECEPTION, SURGERY, ATTENTION, ARCHIVE, REPORTS, ROUNDS, STAFF**.
 They call the corresponding `openReception()`, `showSurgery()`,
 `openAttention()`, `openArchive()`, `openReports()`, `openRounds()`,
-and `openStaff()` page actions. The existing root `Shortcut`
-declarations do **not** include Main Mode Tab/Shift+Tab cycling or an
-equivalent dedicated cycle shortcut. **Do not claim Hospital already has
-AppControl's Main Mode key behavior.**
+and `openStaff()` page actions. **Implemented in Hospital (operator approved 2026-10-12):**
+`Tab` advances and `Shift+Tab` reverses through these **seven
+Main Modes**, with cyclic wrap (Staff → Reception and Reception → Staff).
+`mainModeOrder` expresses the same order as the visible
+`hospitalModeTabs`; `cycleHospitalMainMode()` calls the **existing
+page-opening handlers**, including `showSurgery()` for the empty
+`operationsSurface`, rather than changing page state directly.
 
-**Proposed normalization direction, not implemented:** model Hospital's
-seven top-level tabs as the Main Mode family and evaluate AppControl's
-`Tab` / `Shift+Tab` cycle behavior with Hospital's own keyboard/focus
-guards. How Floor/Room/Bed selection relates to top/bottom Sub Mode keys
-is **not settled by the operator**. Preserve the actual existing
-navigation while reviewing that separately.
+The two `Shortcut` bindings are enabled only when Hospital is open,
+keyboard-active, and `keyboardFocusAnchor.activeFocus` is true; they
+do not intercept typing in the Intercom or Receptionist, open Phone/
+Intercom dropdowns, or nested Room/Doctor/Chat surfaces. This is a
+contextual AppControl-style Main Mode shortcut, **not** a global override
+of Tab in every editor. It has a static regression test in
+`tests/hospital/test_main_mode_keyboard_contracts.py`; verify actual
+Qt/Quickshell Tab delivery, Shift+Tab, wraparound, and input focus
+on the operator's desktop before marking it runtime accepted.
+
+How Floor/Room/Bed selection relates to any future generic top/bottom
+Sub Mode keys remains **unsettled**; preserve the existing behavior.
 
 ### Existing contextual selectors
 

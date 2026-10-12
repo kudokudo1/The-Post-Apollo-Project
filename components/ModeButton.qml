@@ -51,6 +51,8 @@ Rectangle {
     // Host resets keyboard-primary and synchronizes its navigation anchor to
     // this item on ACTUAL pointer motion. Stationary pointer does not steal it.
     signal pointerMoved()
+    signal pointerExited()
+    signal wheel(var wheelEvent)
 
     readonly property bool pointerInside: pointer.containsMouse
     readonly property bool primaryHovered:
@@ -188,6 +190,8 @@ Rectangle {
         enabled: modeButton.interactive
         acceptedButtons: Qt.LeftButton
         onPositionChanged: modeButton.pointerMoved()
+        onExited: modeButton.pointerExited()
+        onWheel: function(wheelEvent) { modeButton.wheel(wheelEvent); }
         onClicked: modeButton.triggered()
     }
 }

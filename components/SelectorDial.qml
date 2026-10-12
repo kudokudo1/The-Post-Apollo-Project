@@ -376,17 +376,23 @@ Item {
             }
         }
 
-        // Raised surrounding ring.
+        // Physical interaction ring: outside the cyan status ring.
+        // Keep the original dark chassis edge; glow indicates hover/rotation.
         Rectangle {
+            id: outerInteractionRing
             anchors.centerIn: parent
             width: 98
             height: 98
             radius: 49
             color: "#121018"
-
-            border {
-                width: 1
-                color: "#49414F"
+            border.width: 1
+            border.color: "#49414F"
+            layer.enabled: true
+            layer.effect: MultiEffect {
+                shadowEnabled: true
+                shadowColor: dialRoot.accentColor
+                shadowOpacity: dialRoot.ringGlowStrength * 0.56
+                shadowBlur: 0.72
             }
         }
 
@@ -454,8 +460,11 @@ Item {
                 }
             }
 
+            // The operator's middle cyan ring. At idle it retains its
+            // accepted appearance; during work it becomes a dim track for
+            // a visible loading/progress arc at the SAME circumference.
             Rectangle {
-                id: outerInteractionRing
+                id: centerStatusRing
                 anchors.centerIn: parent
                 width: 72
                 height: 72
@@ -463,11 +472,13 @@ Item {
                 color: "transparent"
                 border.width: 2
                 border.color: dialRoot.accentColor
+                opacity: dialRoot.loadingState === "idle" ? 1.0 : 0.16
                 layer.enabled: true
                 layer.effect: MultiEffect {
                     shadowEnabled: true
                     shadowColor: dialRoot.accentColor
-                    shadowOpacity: dialRoot.ringGlowStrength
+                    shadowOpacity: dialRoot.loadingState === "idle"
+                                   ? dialRoot.ringGlowStrength : 0.0
                     shadowBlur: 0.78
                 }
             }
@@ -529,38 +540,48 @@ Item {
                 }
             }
 
-            // Center-only feedback: actual progress, indeterminate spinner,
-            // cyan completion pulses or red failure pulses.
+            // Animated feedback ON the 72px middle cyan ring, not the
+            // white hub. The pointer stays in front of the ring.
             Item {
                 id: loadingCenter
                 anchors.centerIn: parent
-                width: 33
-                height: 33
+                width: 78
+                height: 78
                 visible: dialRoot.loadingState !== "idle"
+
                 Canvas {
                     id: progressCanvas
                     anchors.fill: parent
-                    property real sweep: dialRoot.loadingState !== "loading" ? 340
-                        : dialRoot.loadingProgress < 0 ? 95
-                        : Math.max(0, Math.min(1, dialRoot.loadingProgress)) * 340
+                    property real sweep: dialRoot.loadingState !== "loading" ? 360
+                        : dialRoot.loadingProgress < 0 ? 100
+                        : Math.max(0, Math.min(1, dialRoot.loadingProgress)) * 360
                     onSweepChanged: requestPaint()
                     onPaint: {
                         const ctx = getContext("2d");
                         ctx.reset();
                         ctx.clearRect(0, 0, width, height);
                         ctx.beginPath();
-                        ctx.arc(width / 2, height / 2, 13, -Math.PI / 2,
-                            -Math.PI / 2 + sweep * Math.PI / 180);
+                        ctx.arc(width / 2, height / 2, 34,
+                                -Math.PI / 2,
+                                -Math.PI / 2 + sweep * Math.PI / 180);
                         ctx.strokeStyle = dialRoot.loadingState === "error"
                             ? dialRoot.failureColor.toString()
                             : dialRoot.accentColor.toString();
-                        ctx.lineWidth = 3;
+                        ctx.lineWidth = 3.5;
                         ctx.lineCap = "round";
                         ctx.stroke();
                     }
-                    opacity: dialRoot.loadingState === "loading" ? 1
-                        : dialRoot.loadingState === "error" && dialRoot.persistentFailure ? 1
-                        : dialRoot.feedbackPulsePhase % 2 === 0 ? 1 : 0.14
+                    opacity: dialRoot.loadingState === "loading" ? 1.0
+                        : dialRoot.loadingState === "error" && dialRoot.persistentFailure ? 1.0
+                        : dialRoot.feedbackPulsePhase % 2 === 0 ? 1.0 : 0.12
+                    layer.enabled: true
+                    layer.effect: MultiEffect {
+                        shadowEnabled: true
+                        shadowColor: dialRoot.loadingState === "error"
+                            ? dialRoot.failureColor : dialRoot.accentColor
+                        shadowOpacity: 0.85
+                        shadowBlur: 0.72
+                    }
                     RotationAnimation on rotation {
                         from: 0
                         to: 360
@@ -568,6 +589,7 @@ Item {
                         loops: Animation.Infinite
                         running: dialRoot.loadingState === "loading"
                                  && dialRoot.loadingProgress < 0
+                        onStopped: progressCanvas.rotation = 0
                     }
                 }
             }

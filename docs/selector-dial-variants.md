@@ -38,6 +38,6 @@ Both free-position variants use a bounded arc, default `arcStartAngle: -210` and
 
 ## Manual visual fixture
 
-`tests/fixtures/SelectorDialVariants.qml` provides two locally controlled dials. Embed it in a temporary Quickshell test surface through a Loader or direct QML instantiation. It is intentionally **not mounted into `shell.qml`** and cannot operate Git or trigger workflows.
+`tests/fixtures/SelectorDialVariants.qml` provides two locally controlled dials. It is loaded on demand from **Git → GitHub → Workflow Factory → Mixer → VARIANTS // VIEW**. The original Git dials remain intact and return when the preview closes; the fixture operates only on its own local values, never Git settings or workflows. It is not mounted directly into `shell.qml`.
 
 Verify: the numeric pointer can stop between 0/150/300 labels; fractional readout updates; keys/wheel move the pointer and commit once; LOW/MED/HIGH zones highlight as the pointer passes; a release between labels remains at the release angle even after the owning fixture echoes a zone change. Repeat with mouse flick, click, interrupt, and disabled state. Live Qt visual acceptance remains distinct from source-level checks.

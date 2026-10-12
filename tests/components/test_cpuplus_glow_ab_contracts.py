@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CPU++ A/B sampled-text glow lifecycle diagnostic contracts.
+"""CPU++ sampled-text glow lifecycle and icon/caption isolation contracts.
 
 Static checks only: Qt/Wayland/NVIDIA rendering still needs an operator
 observation. These controls must not change the shared glow component.
@@ -18,17 +18,23 @@ for token in (
     'label: "BASE"',
     'label: "A / OFF"',
     'label: "B / REATTACH"',
+    'label: "C / ICON"',
+    'label: "D / LABEL"',
     "onClicked: cpuPlusWindow.modeGlowExperiment = modelData.value",
     "readonly property bool sampledTextActive:",
     "cpuPlusWindow.modeGlowExperiment !== 1",
     "cpuPlusWindow.modeGlowExperiment !== 2",
     "|| cpuPlusWindow.menuOpen",
-    "sampledTextActive ? textModeIcon : null",
-    "sampledTextActive ? modeCaption : null",
-    'sampledTextActive && modelData.kind !== "thermal"',
-    "labelGlowEnabled: sampledTextActive",
+    "readonly property bool sampledPrimaryActive:",
+    "readonly property bool sampledCaptionActive:",
+    "cpuPlusWindow.modeGlowExperiment !== 3",
+    "cpuPlusWindow.modeGlowExperiment !== 4",
+    "sampledPrimaryActive ? textModeIcon : null",
+    "sampledCaptionActive ? modeCaption : null",
+    'sampledPrimaryActive && modelData.kind !== "thermal"',
+    "labelGlowEnabled: sampledCaptionActive",
 ):
-    assert token in cpu, f"CPU++ A/B diagnostic missing: {token}"
+    assert token in cpu, f"CPU++ isolation diagnostic missing: {token}"
 
 # Deliberately retain main-mode scale, semantic switching, thermal icon
 # effect and close/reopen visibility behavior throughout the experiment.
@@ -48,4 +54,4 @@ assert 'customPrimaryGlowSource:' in cpu
 assert 'customLabelGlowSource:' in cpu
 assert 'SafeDropShadow {' in mode or "TextHashGlow {" in mode
 assert "source: sourceAttached ? safeSource : null" in safe
-print("CPU++ A/B sampled-text glow diagnostics: PASS")
+print("CPU++ sampled-text glow A/B/C/D isolation diagnostics: PASS")

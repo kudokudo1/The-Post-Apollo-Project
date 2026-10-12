@@ -98,9 +98,9 @@ assert "ModeButton {" in cpu[:mode_start]
 for token in (
     "selected: index === cpuPlusWindow.selectedModeIndex",
     "bordered: true", "customArtwork: true",
-    "sampledTextActive ? textModeIcon : null",
-    "sampledTextActive ? modeCaption : null",
-    'sampledTextActive && modelData.kind !== "thermal"',
+    "sampledPrimaryActive ? textModeIcon : null",
+    "sampledCaptionActive ? modeCaption : null",
+    'sampledPrimaryActive && modelData.kind !== "thermal"',
     "readonly property color contentColor: primaryColor",
     "QuietText {", "quietOpacity:",
     "item.iconColor = Qt.binding",

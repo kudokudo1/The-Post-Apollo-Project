@@ -19,10 +19,11 @@ PanelWindow {
     property int thermalSelectedIndex: 0
     property int systemSelectedIndex: 0
 
-    // TEMPORARY CPU++ ONLY GL0W PROBE. Default 0 retains the existing UI.
-    // 0 = BASELINE, 1 = A: detach/disable sampled Main Mode text glows,
-    // 2 = B: sampled text active while open, detached when menu is hidden.
-    // The icon and caption samplers are tested together in this first pass.
+    // TEMPORARY CPU++ ONLY GLOW PROBE. Default 0 retains existing visuals.
+    // 0 BASE, 1 A: both off, 2 B: reattach after close,
+    // 3 C: icon sampler only, 4 D: caption sampler only.
+    // This isolates independently sampled text effects; other halos/art
+    // and menu activation are intentionally unaffected.
     property int modeGlowExperiment: 0
 
     // Target-list submodes. THERMAL mirrors AppControl's TEMP/FAN split.
@@ -553,7 +554,9 @@ PanelWindow {
                 model: [
                     { value: 0, label: "BASE" },
                     { value: 1, label: "A / OFF" },
-                    { value: 2, label: "B / REATTACH" }
+                    { value: 2, label: "B / REATTACH" },
+                    { value: 3, label: "C / ICON" },
+                    { value: 4, label: "D / LABEL" }
                 ]
 
                 Rectangle {
@@ -634,20 +637,26 @@ PanelWindow {
                     bordered: true
                     customArtwork: true
 
-                    // The source itself must be null, not merely visually
-                    // hidden, so SafeDropShadow actually detaches its sampler.
-                    // A: off throughout the test. B: detached while closed.
+                    // Each inactive sampler loses its source reference;
+                    // merely setting its opacity to zero is insufficient.
+                    // B retains the original close/reopen detach experiment.
                     readonly property bool sampledTextActive:
                         cpuPlusWindow.modeGlowExperiment !== 1
                         && (cpuPlusWindow.modeGlowExperiment !== 2
                             || cpuPlusWindow.menuOpen)
+                    readonly property bool sampledPrimaryActive:
+                        sampledTextActive
+                        && cpuPlusWindow.modeGlowExperiment !== 4
+                    readonly property bool sampledCaptionActive:
+                        sampledTextActive
+                        && cpuPlusWindow.modeGlowExperiment !== 3
                     customPrimaryGlowSource:
-                        sampledTextActive ? textModeIcon : null
+                        sampledPrimaryActive ? textModeIcon : null
                     customLabelGlowSource:
-                        sampledTextActive ? modeCaption : null
+                        sampledCaptionActive ? modeCaption : null
                     primaryGlowEnabled:
-                        sampledTextActive && modelData.kind !== "thermal"
-                    labelGlowEnabled: sampledTextActive
+                        sampledPrimaryActive && modelData.kind !== "thermal"
+                    labelGlowEnabled: sampledCaptionActive
                     readonly property bool isSelected: selected
                     readonly property bool isHovered: hovered
                     readonly property bool isPressed: pressed

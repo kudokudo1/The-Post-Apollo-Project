@@ -16,6 +16,11 @@ Item {
     property color accentColor: Colors.cyan
     property color markerColor: Colors.orange
     property color labelColor: Colors.cyan
+    property bool dialHovered: false
+    property int hoveredOptionIndex: -1
+    readonly property bool rotating: dragging || motionActive
+    readonly property real ringGlowStrength: !interactive ? 0.10
+        : rotating ? 0.95 : dialHovered ? 0.64 : 0.28
 
     readonly property string selectedValue:
         options && options.length > 0 && currentIndex >= 0 && currentIndex < options.length
@@ -44,6 +49,14 @@ Item {
     width: 136
     height: 160
     activeFocusOnTab: true
+    opacity: interactive ? 1.0 : 0.42
+    Behavior on opacity { NumberAnimation { duration: 125 } }
+
+    function optionGlowStrength(index) {
+        if (index === indicatedIndex)
+            return rotating ? 1.0 : dialHovered ? 0.92 : 0.78;
+        return index === hoveredOptionIndex ? 0.76 : 0.22;
+    }
 
     function optionCount() {
         return options ? options.length : 0;
@@ -407,15 +420,20 @@ Item {
             }
 
             Rectangle {
+                id: outerInteractionRing
                 anchors.centerIn: parent
                 width: 72
                 height: 72
                 radius: 36
                 color: "transparent"
-
-                border {
-                    width: 2
-                    color: dialRoot.accentColor
+                border.width: 2
+                border.color: dialRoot.accentColor
+                layer.enabled: true
+                layer.effect: MultiEffect {
+                    shadowEnabled: true
+                    shadowColor: dialRoot.accentColor
+                    shadowOpacity: dialRoot.ringGlowStrength
+                    shadowBlur: 0.78
                 }
             }
 
@@ -564,14 +582,8 @@ Item {
                         shadowColor: optionMark.index === dialRoot.indicatedIndex
                                      ? dialRoot.markerColor
                                      : dialRoot.labelColor
-                        shadowOpacity:
-                            optionMark.index === dialRoot.indicatedIndex
-                            ? 0.92
-                            : 0.22
-                        shadowBlur:
-                            optionMark.index === dialRoot.indicatedIndex
-                            ? 0.72
-                            : 0.28
+                        shadowOpacity: dialRoot.optionGlowStrength(optionMark.index)
+                        shadowBlur: optionMark.index === dialRoot.indicatedIndex ? 0.85 : 0.46
                     }
                 }
 
@@ -583,8 +595,14 @@ Item {
                     cursorShape: Qt.PointingHandCursor
 
                     onEntered: {
+                        dialRoot.hoveredOptionIndex = optionMark.index;
                         if (dialRoot.keyboardHost)
                             dialRoot.keyboardHost.selectGitControlFromMouse(dialRoot);
+                    }
+
+                    onExited: {
+                        if (dialRoot.hoveredOptionIndex === optionMark.index)
+                            dialRoot.hoveredOptionIndex = -1;
                     }
 
                     onPositionChanged: {
@@ -621,8 +639,14 @@ Item {
                          : Qt.OpenHandCursor
 
             onEntered: {
+                dialRoot.dialHovered = true;
                 if (dialRoot.keyboardHost)
                     dialRoot.keyboardHost.selectGitControlFromMouse(dialRoot);
+            }
+
+            onExited: {
+                if (!dialRoot.dragging)
+                    dialRoot.dialHovered = false;
             }
 
             onPositionChanged: function(mouse) {
@@ -685,6 +709,7 @@ Item {
                     return;
 
                 dialRoot.dragging = false;
+                dialRoot.dialHovered = containsMouse;
                 dialRoot.motionActive = true;
                 // A stale velocity reading after holding the pointer still
                 // must not cause accidental inertia.
@@ -703,6 +728,7 @@ Item {
 
             onCanceled: {
                 dialRoot.dragging = false;
+                dialRoot.dialHovered = containsMouse;
                 dialRoot.stopMotion();
                 dialRoot.snapToCurrent();
 

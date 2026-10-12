@@ -50,9 +50,21 @@ python3 ~/.config/quickshell/scripts/enable_koinoikos_focus.py
 
 This installer **does not ask for or replace the contents of your custom
 Sway config**. It appends only the explicit opt-in include, first creating a
-temporary candidate in the same folder and checking it with
-`sway -C -c`. If validation fails, your config stays untouched. On success
-it makes a timestamped `.bak` copy and atomically writes the validated
+temporary candidate in the same folder. For validation, it resolves the
+**actual running Sway-family compositor** using the `SWAYSOCK` PID and
+`/proc/<pid>/exe`, then runs that compositor's `-C -c` parser.
+This matters when a custom **SwayFX / SwayPX** installation understands
+`animation_duration_ms`, `shadows` and other effects that stock `sway`
+would incorrectly report as unknown. The installer does **not** remove,
+filter, or suppress existing effects commands.
+
+If the running compositor cannot be identified, installation stops safely
+with an explanation. An explicit validator path can be supplied with
+`--sway /absolute/path/to/your/compositor`; a stock `sway` fallback is
+**not** guessed, and validation failures are never bypassed.
+
+If validation fails, your config stays untouched. On success, the installer
+makes a timestamped `.bak` copy and atomically writes the validated
 candidate. A second run does not duplicate the include. It **does not**
 reload Sway or restart Quickshell.
 
@@ -103,9 +115,13 @@ independent of this optional file.
 ### Preflight and reversible activation
 
 Before adding the include, or after editing a **copy** of the config,
-validate it against the installed compositor: `sway -C -c <config-path>`.
-This repository cannot inspect or modify the operator's installed config
-or validate a live Sway binary. Keep the prior config for easy rollback.
+validate with the **same binary running the Sway session**, not an unrelated
+stock `sway` binary. The installer automatically discovers that binary
+from the current `SWAYSOCK` and uses its `-C -c` mode. This repository
+cannot inspect or validate a live compositor in GitHub CI. Keep the prior
+config for easy rollback. If even the running compositor rejects the
+candidate, report the errors; never silently omit the user's own
+animation/shadow directives.
 
 After the operator chooses to activate it, Sway reload and a clean Quickshell
 restart are required; this repo intentionally disables Quickshell's hot

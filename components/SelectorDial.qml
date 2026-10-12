@@ -16,6 +16,13 @@ Item {
     property color accentColor: Colors.cyan
     property color markerColor: Colors.orange
     property color labelColor: Colors.cyan
+    // Operation state comes from the owning module, never inferred from a selection.
+    property string loadingState: "idle" // idle, loading, success, error
+    property real loadingProgress: -1 // -1: indeterminate; otherwise 0..1
+    property color failureColor: Colors.red
+    property bool persistentFailure: false
+    property int completionPulseCount: 3
+    property int feedbackPulsePhase: 0
     property bool dialHovered: false
     property int hoveredOptionIndex: -1
     readonly property bool rotating: dragging || motionActive
@@ -51,6 +58,34 @@ Item {
     activeFocusOnTab: true
     opacity: interactive ? 1.0 : 0.42
     Behavior on opacity { NumberAnimation { duration: 125 } }
+
+    onLoadingStateChanged: {
+        feedbackTimer.stop();
+        feedbackPulsePhase = 0;
+        if (loadingState === "success"
+                || (loadingState === "error" && !persistentFailure))
+            feedbackTimer.start();
+        progressCanvas.requestPaint();
+    }
+    onLoadingProgressChanged: progressCanvas.requestPaint()
+    onAccentColorChanged: progressCanvas.requestPaint()
+    onFailureColorChanged: progressCanvas.requestPaint()
+
+    Timer {
+        id: feedbackTimer
+        interval: 105
+        repeat: true
+        onTriggered: {
+            dialRoot.feedbackPulsePhase++;
+            if (dialRoot.feedbackPulsePhase >= dialRoot.completionPulseCount * 2) {
+                stop();
+                dialRoot.feedbackPulsePhase = 0;
+                if (dialRoot.loadingState === "success"
+                        || (dialRoot.loadingState === "error" && !dialRoot.persistentFailure))
+                    dialRoot.loadingState = "idle";
+            }
+        }
+    }
 
     function optionGlowStrength(index) {
         if (index === indicatedIndex)
@@ -491,6 +526,49 @@ Item {
                 border {
                     width: 1
                     color: "#A0B2B7"
+                }
+            }
+
+            // Center-only feedback: actual progress, indeterminate spinner,
+            // cyan completion pulses or red failure pulses.
+            Item {
+                id: loadingCenter
+                anchors.centerIn: parent
+                width: 33
+                height: 33
+                visible: dialRoot.loadingState !== "idle"
+                Canvas {
+                    id: progressCanvas
+                    anchors.fill: parent
+                    property real sweep: dialRoot.loadingState !== "loading" ? 340
+                        : dialRoot.loadingProgress < 0 ? 95
+                        : Math.max(0, Math.min(1, dialRoot.loadingProgress)) * 340
+                    onSweepChanged: requestPaint()
+                    onPaint: {
+                        const ctx = getContext("2d");
+                        ctx.reset();
+                        ctx.clearRect(0, 0, width, height);
+                        ctx.beginPath();
+                        ctx.arc(width / 2, height / 2, 13, -Math.PI / 2,
+                            -Math.PI / 2 + sweep * Math.PI / 180);
+                        ctx.strokeStyle = dialRoot.loadingState === "error"
+                            ? dialRoot.failureColor.toString()
+                            : dialRoot.accentColor.toString();
+                        ctx.lineWidth = 3;
+                        ctx.lineCap = "round";
+                        ctx.stroke();
+                    }
+                    opacity: dialRoot.loadingState === "loading" ? 1
+                        : dialRoot.loadingState === "error" && dialRoot.persistentFailure ? 1
+                        : dialRoot.feedbackPulsePhase % 2 === 0 ? 1 : 0.14
+                    RotationAnimation on rotation {
+                        from: 0
+                        to: 360
+                        duration: 950
+                        loops: Animation.Infinite
+                        running: dialRoot.loadingState === "loading"
+                                 && dialRoot.loadingProgress < 0
+                    }
                 }
             }
 

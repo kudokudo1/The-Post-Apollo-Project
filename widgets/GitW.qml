@@ -5958,6 +5958,7 @@ PanelWindow {
                                                                                 readoutText: "CURRENT REPO"
                                                                             }
                                                                         }
+                                                                        }
 
                                                                         Loader {
                                                                             id: dialVariantsPreviewLoader

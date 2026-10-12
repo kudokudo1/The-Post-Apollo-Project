@@ -824,6 +824,74 @@ PanelWindow {
         z: -1000
     }
 
+    // The seven actual Hospital Main Modes use AppControl's Tab/Shift+Tab
+    // navigation family. Floors, Rooms and Beds retain their own selectors.
+    readonly property var mainModeOrder: [
+        "reception", "surgery", "attention", "archive",
+        "reports", "rounds", "staff"
+    ]
+    readonly property bool mainModeKeysAvailable:
+        root.menuOpen
+        && root.keyboardActive
+        && keyboardFocusAnchor.activeFocus
+        && !root.intercomTyping
+        && !root.receptionistTyping
+        && !root.intercomMenuOpen
+        && !root.phoneMenuOpen
+        && (
+            root.operationsSurface === ""
+            || root.mainModeOrder.indexOf(root.operationsSurface) >= 0
+        )
+
+    function cycleHospitalMainMode(direction) {
+        if (!mainModeKeysAvailable)
+            return;
+
+        // The Surgery tab corresponds to the empty operationsSurface.
+        // Nested Room/Doctor/Chat surfaces are not top-level tabs: do not
+        // steal Tab from their own input/focus handlers.
+        const current = root.operationsSurface === ""
+                        ? "surgery" : root.operationsSurface;
+        const index = root.mainModeOrder.indexOf(current);
+        if (index < 0)
+            return;
+
+        const count = root.mainModeOrder.length;
+        const step = Number(direction || 0) < 0 ? -1 : 1;
+        const target = root.mainModeOrder[(index + step + count) % count];
+
+        // Call each existing page opener so its cleanup, service refresh,
+        // and receptionist-visit ownership remain exactly as for a click.
+        if (target === "reception")
+            root.openReception();
+        else if (target === "surgery")
+            root.showSurgery();
+        else if (target === "attention")
+            root.openAttention();
+        else if (target === "archive")
+            root.openArchive();
+        else if (target === "reports")
+            root.openReports();
+        else if (target === "rounds")
+            root.openRounds();
+        else if (target === "staff")
+            root.openStaff();
+    }
+
+    Shortcut {
+        sequence: "Tab"
+        context: Qt.ApplicationShortcut
+        enabled: root.mainModeKeysAvailable
+        onActivated: root.cycleHospitalMainMode(1)
+    }
+
+    Shortcut {
+        sequence: "Shift+Tab"
+        context: Qt.ApplicationShortcut
+        enabled: root.mainModeKeysAvailable
+        onActivated: root.cycleHospitalMainMode(-1)
+    }
+
     Shortcut {
         sequence: "Esc"
         context: Qt.ApplicationShortcut

@@ -676,24 +676,29 @@ DockButton {
         }
     }
 
-    // Independent sampled glows sit outside the RowLayouts, so their opacity
-    // never modifies the source glyphs and they take no layout space.
-    // Glow-only overlay: the source Item/Text remains a fully opaque native
-    // glyph, unaffected by the interactive opacity of its sampled shadow.
+    // The four semantic clusters (icon, SSID, signal, speed) use six
+    // independent sampled sources: the SSID's two structural parentheses
+    // share its state color/glow without moving any RowLayout item.
+    // Each glow follows DockButton's sample geometry and lifetime guard.
+    // Complete Wi-Fi icon cluster: satellite, white signal brackets and Ethernet
+    // The source remains in its existing RowLayout at full foreground opacity.
+    // This sibling effect lives on DockButton's original content plane.
     SafeDropShadow {
         id: networkIconRowGlow
-        readonly property point sourceOrigin: networkIconRow.mapToItem(parent, 0, 0)
+        readonly property point sourceOrigin: sourceAttached
+                                              ? networkIconRow.mapToItem(parent, 0, 0)
+                                              : Qt.point(0, 0)
 
         x: sourceOrigin.x
         y: sourceOrigin.y
-        width: networkIconRow.width
-        height: networkIconRow.height
+        width: sourceAttached ? networkIconRow.width : 0
+        height: sourceAttached ? networkIconRow.height : 0
         safeSource: networkIconRow
 
         horizontalOffset: 0
         verticalOffset: 0
-        radius: 14
-        samples: 15
+        radius: networkDock.contentGlowRadius
+        samples: networkDock.contentGlowSamples
         z: 2
 
         opacity: networkDock.contentGlowOpacity
@@ -701,22 +706,51 @@ DockButton {
         transparentBorder: true
     }
 
-    // Glow-only overlay: the source Item/Text remains a fully opaque native
-    // glyph, unaffected by the interactive opacity of its sampled shadow.
+    // SSID opening parenthesis; structural white with the SSID's colored glow
+    // The source remains in its existing RowLayout at full foreground opacity.
+    // This sibling effect lives on DockButton's original content plane.
     SafeDropShadow {
-        id: networkTextGlow
-        readonly property point sourceOrigin: networkText.mapToItem(parent, 0, 0)
+        id: networkOpenGlow
+        readonly property point sourceOrigin: sourceAttached
+                                              ? networkOpen.mapToItem(parent, 0, 0)
+                                              : Qt.point(0, 0)
 
         x: sourceOrigin.x
         y: sourceOrigin.y
-        width: networkText.width
-        height: networkText.height
+        width: sourceAttached ? networkOpen.width : 0
+        height: sourceAttached ? networkOpen.height : 0
+        safeSource: networkOpen
+
+        horizontalOffset: 0
+        verticalOffset: 0
+        radius: networkDock.contentGlowRadius
+        samples: networkDock.contentGlowSamples
+        z: 2
+
+        opacity: networkDock.contentGlowOpacity
+        color: root.networkGlowColor
+        transparentBorder: true
+    }
+
+    // SSID text; independent glow from the glyph's foreground
+    // The source remains in its existing RowLayout at full foreground opacity.
+    // This sibling effect lives on DockButton's original content plane.
+    SafeDropShadow {
+        id: networkTextGlow
+        readonly property point sourceOrigin: sourceAttached
+                                              ? networkText.mapToItem(parent, 0, 0)
+                                              : Qt.point(0, 0)
+
+        x: sourceOrigin.x
+        y: sourceOrigin.y
+        width: sourceAttached ? networkText.width : 0
+        height: sourceAttached ? networkText.height : 0
         safeSource: networkText
 
         horizontalOffset: 0
         verticalOffset: 0
-        radius: 10
-        samples: 15
+        radius: networkDock.contentGlowRadius
+        samples: networkDock.contentGlowSamples
         z: 2
 
         opacity: networkDock.contentGlowOpacity
@@ -724,22 +758,51 @@ DockButton {
         transparentBorder: true
     }
 
-    // Glow-only overlay: the source Item/Text remains a fully opaque native
-    // glyph, unaffected by the interactive opacity of its sampled shadow.
+    // SSID closing parenthesis; same glow as the SSID text
+    // The source remains in its existing RowLayout at full foreground opacity.
+    // This sibling effect lives on DockButton's original content plane.
     SafeDropShadow {
-        id: networkSignalTextGlow
-        readonly property point sourceOrigin: networkSignalText.mapToItem(parent, 0, 0)
+        id: networkCloseGlow
+        readonly property point sourceOrigin: sourceAttached
+                                              ? networkClose.mapToItem(parent, 0, 0)
+                                              : Qt.point(0, 0)
 
         x: sourceOrigin.x
         y: sourceOrigin.y
-        width: networkSignalText.width
-        height: networkSignalText.height
+        width: sourceAttached ? networkClose.width : 0
+        height: sourceAttached ? networkClose.height : 0
+        safeSource: networkClose
+
+        horizontalOffset: 0
+        verticalOffset: 0
+        radius: networkDock.contentGlowRadius
+        samples: networkDock.contentGlowSamples
+        z: 2
+
+        opacity: networkDock.contentGlowOpacity
+        color: root.networkGlowColor
+        transparentBorder: true
+    }
+
+    // Signal percentage; the structural percent shares the readout glow
+    // The source remains in its existing RowLayout at full foreground opacity.
+    // This sibling effect lives on DockButton's original content plane.
+    SafeDropShadow {
+        id: networkSignalTextGlow
+        readonly property point sourceOrigin: sourceAttached
+                                              ? networkSignalText.mapToItem(parent, 0, 0)
+                                              : Qt.point(0, 0)
+
+        x: sourceOrigin.x
+        y: sourceOrigin.y
+        width: sourceAttached ? networkSignalText.width : 0
+        height: sourceAttached ? networkSignalText.height : 0
         safeSource: networkSignalText
 
         horizontalOffset: 0
         verticalOffset: 0
-        radius: 8
-        samples: 15
+        radius: networkDock.contentGlowRadius
+        samples: networkDock.contentGlowSamples
         z: 2
 
         opacity: networkDock.contentGlowOpacity
@@ -747,22 +810,25 @@ DockButton {
         transparentBorder: true
     }
 
-    // Glow-only overlay: the source Item/Text remains a fully opaque native
-    // glyph, unaffected by the interactive opacity of its sampled shadow.
+    // Connection speed; keep the functional Mb/s separator unchanged
+    // The source remains in its existing RowLayout at full foreground opacity.
+    // This sibling effect lives on DockButton's original content plane.
     SafeDropShadow {
         id: networkSpeedTextGlow
-        readonly property point sourceOrigin: networkSpeedText.mapToItem(parent, 0, 0)
+        readonly property point sourceOrigin: sourceAttached
+                                              ? networkSpeedText.mapToItem(parent, 0, 0)
+                                              : Qt.point(0, 0)
 
         x: sourceOrigin.x
         y: sourceOrigin.y
-        width: networkSpeedText.width
-        height: networkSpeedText.height
+        width: sourceAttached ? networkSpeedText.width : 0
+        height: sourceAttached ? networkSpeedText.height : 0
         safeSource: networkSpeedText
 
         horizontalOffset: 0
         verticalOffset: 0
-        radius: 8
-        samples: 15
+        radius: networkDock.contentGlowRadius
+        samples: networkDock.contentGlowSamples
         z: 2
 
         opacity: networkDock.contentGlowOpacity

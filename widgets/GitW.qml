@@ -46,6 +46,7 @@ PanelWindow {
     property bool dialControlMode: false
     // Explicit visual preview of SelectorDial's operation indicator.
     // Never triggers workflow execution or changes factory configuration.
+    property bool dialVariantsPreviewOpen: false
     property bool dialFxDemoRunning: false
     property int dialFxDemoStage: -1
     readonly property string dialFxDemoLabel: !dialFxDemoRunning ? "DIAL FX // RUN"
@@ -875,13 +876,19 @@ PanelWindow {
     }
 
     onActivePageChanged: {
-        if (activePage !== "github" && dialFxDemoRunning)
-            stopDialFxDemo();
+        if (activePage !== "github") {
+            if (dialFxDemoRunning)
+                stopDialFxDemo();
+            dialVariantsPreviewOpen = false;
+        }
     }
 
     onGithubViewChanged: {
-        if (githubView !== "control" && dialFxDemoRunning)
-            stopDialFxDemo();
+        if (githubView !== "control") {
+            if (dialFxDemoRunning)
+                stopDialFxDemo();
+            dialVariantsPreviewOpen = false;
+        }
     }
 
     function toggle() {
@@ -1956,6 +1963,7 @@ PanelWindow {
 
     onMenuOpenChanged: {
         if (!root.menuOpen) {
+            root.dialVariantsPreviewOpen = false;
             if (root.dialFxDemoRunning)
                 root.stopDialFxDemo();
             root.clearGitKeyboardControl();
@@ -5726,7 +5734,9 @@ PanelWindow {
                                                                     text: "WORKFLOW FACTORY // MIXER"
                                                                 }
 
+                                                                // Explicit visual test: never sends a Git/GitHub command.
                                                                 GohuText {
+                                                                    id: dialVariantsPreviewToggle
                                                                     anchors {
                                                                         right: parent.right
                                                                         top: parent.top
@@ -5734,10 +5744,22 @@ PanelWindow {
                                                                         topMargin: 9
                                                                     }
 
-                                                                    text: "STATE → CONFIGURE → PREVIEW → SAVE"
-                                                                    font.pixelSize: 8
-                                                                    color: Colors.white
-                                                                    opacity: 0.72
+                                                                    text: root.dialVariantsPreviewOpen
+                                                                        ? "VARIANTS // CLOSE" : "VARIANTS // VIEW"
+                                                                    font.pixelSize: 9
+                                                                    color: root.dialVariantsPreviewOpen
+                                                                        ? Colors.orange : Colors.cyan
+
+                                                                    MouseArea {
+                                                                        anchors.fill: parent
+                                                                        cursorShape: Qt.PointingHandCursor
+                                                                        onClicked: {
+                                                                            if (!root.dialVariantsPreviewOpen && root.dialFxDemoRunning)
+                                                                                root.stopDialFxDemo();
+                                                                            root.dialVariantsPreviewOpen =
+                                                                                !root.dialVariantsPreviewOpen;
+                                                                        }
+                                                                    }
                                                                 }
 
                                                                 // Visible in the actual GitHub Workflow Factory,
@@ -5772,6 +5794,8 @@ PanelWindow {
                                                                         hoverEnabled: true
                                                                         cursorShape: Qt.PointingHandCursor
                                                                         onClicked: {
+                                                                            if (root.dialVariantsPreviewOpen)
+                                                                                root.dialVariantsPreviewOpen = false;
                                                                             if (root.dialFxDemoRunning)
                                                                                 root.stopDialFxDemo();
                                                                             else
@@ -5795,12 +5819,20 @@ PanelWindow {
                                                                     height: 160
                                                                     spacing: 10
 
-                                                                    Row {
-                                                                        id: dialBayRow
-
+                                                                    // Keep existing live factory dials untouched.
+                                                                    // The isolated numerical/zoned fixture is mounted
+                                                                    // only while the operator opens VARIANTS // VIEW.
+                                                                    Item {
+                                                                        id: dialBayArea
                                                                         width: 444
                                                                         height: parent.height
-                                                                        spacing: 8
+
+                                                                        Row {
+                                                                            id: dialBayRow
+                                                                            width: parent.width
+                                                                            height: parent.height
+                                                                            spacing: 8
+                                                                            visible: !root.dialVariantsPreviewOpen
 
                                                                         Rectangle {
                                                                             width: (dialBayRow.width - 16) / 3
@@ -5925,6 +5957,16 @@ PanelWindow {
                                                                                 interactive: false
                                                                                 readoutText: "CURRENT REPO"
                                                                             }
+                                                                        }
+
+                                                                        Loader {
+                                                                            id: dialVariantsPreviewLoader
+                                                                            anchors.centerIn: parent
+                                                                            width: 288
+                                                                            height: 160
+                                                                            active: root.dialVariantsPreviewOpen
+                                                                            visible: root.dialVariantsPreviewOpen
+                                                                            source: "../tests/fixtures/SelectorDialVariants.qml"
                                                                         }
                                                                     }
 

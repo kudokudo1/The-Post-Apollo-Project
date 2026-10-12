@@ -15,6 +15,8 @@ PanelWindow {
     required property var fanControl
 
     property bool menuOpen: false
+    property bool relationshipFocusModeActive: false
+    property bool relationshipFocused: false
     property int selectedModeIndex: 0
     property int thermalSelectedIndex: 0
     property int systemSelectedIndex: 0
@@ -467,7 +469,7 @@ PanelWindow {
 
     color: "transparent"
     surfaceFormat.opaque: false
-    focusable: true
+    focusable: !relationshipFocusModeActive || relationshipFocused
     visible: menuOpen
 
     // ============================================================
@@ -486,9 +488,11 @@ PanelWindow {
 
         glowColor: Colors.orange
         closeGlowSpread: 6
-        closeGlowOpacity: 0.38
+        closeGlowOpacity: relationshipFocusModeActive
+                          ? (relationshipFocused ? 0.68 : 0.12) : 0.38
         wideGlowSpread: 12
-        wideGlowOpacity: 0.12
+        wideGlowOpacity: relationshipFocusModeActive
+                         ? (relationshipFocused ? 0.22 : 0.03) : 0.12
 
         z: -20
     }

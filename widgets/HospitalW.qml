@@ -14,6 +14,8 @@ PanelWindow {
     property bool menuOpen: false
     property bool keyboardActive: true
     property bool keyboardLock: false
+    property bool relationshipFocusModeActive: false
+    property bool relationshipFocused: false
     signal keyboardOwnershipRequested()
     signal githubPullRequestRequested(string repository, int number)
 
@@ -2790,9 +2792,11 @@ PanelWindow {
         glowVisible: root.menuOpen
         glowColor: Colors.magenta
         closeGlowSpread: 6
-        closeGlowOpacity: 0.21
+        closeGlowOpacity: relationshipFocusModeActive
+                          ? (relationshipFocused ? 0.46 : 0.09) : 0.21
         wideGlowSpread: 12
-        wideGlowOpacity: 0.05
+        wideGlowOpacity: relationshipFocusModeActive
+                         ? (relationshipFocused ? 0.14 : 0.02) : 0.05
 
         HoverHandler {
             enabled: root.menuOpen

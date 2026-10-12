@@ -12,6 +12,8 @@ PanelWindow {
     property var spaceService: null
 
     property bool menuOpen: false
+    property bool relationshipFocusModeActive: false
+    property bool relationshipFocused: false
 
     property string activeDomain: "sky"
     property string currentView: "home"
@@ -94,9 +96,14 @@ PanelWindow {
 
     WlrLayershell.layer: WlrLayer.Overlay
 
-    // Weather Station ALWAYS owns keyboard focus
-    // while the menu is open.
-    WlrLayershell.keyboardFocus: weatherStation.menuOpen ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    // Outside Relationship Focus Mode preserve Weather's original policy.
+    // During it only the selected menu can hold exclusive layer input.
+    WlrLayershell.keyboardFocus:
+        !weatherStation.menuOpen ? WlrKeyboardFocus.None
+        : weatherStation.relationshipFocusModeActive
+        ? (weatherStation.relationshipFocused
+           ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None)
+        : WlrKeyboardFocus.Exclusive
 
     anchors {
         top: true
@@ -164,9 +171,11 @@ PanelWindow {
 
         glowColor: Colors.cyan
         closeGlowSpread: 4
-        closeGlowOpacity: 0.30
+        closeGlowOpacity: relationshipFocusModeActive
+                          ? (relationshipFocused ? 0.58 : 0.09) : 0.30
         wideGlowSpread: 14
-        wideGlowOpacity: 0.10
+        wideGlowOpacity: relationshipFocusModeActive
+                         ? (relationshipFocused ? 0.20 : 0.02) : 0.10
 
         // ─────────────────────────────────────────
         // HEADER

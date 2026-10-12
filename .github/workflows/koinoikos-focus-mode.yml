@@ -1,0 +1,37 @@
+name: Koinoikos Focus Mode Contracts
+
+on:
+  pull_request:
+    paths:
+      - "shell.qml"
+      - "components/RelationshipFocusBroker.qml"
+      - "components/qmldir"
+      - "widgets/AppControlW.qml"
+      - "widgets/HospitalW.qml"
+      - "widgets/GitW.qml"
+      - "widgets/CpuPlusW.qml"
+      - "widgets/weather/WeatherStationW.qml"
+      - "scripts/koinoikos_focus.py"
+      - "config/sway/koinoikos-focus.conf"
+      - "tests/focus/**"
+      - ".github/workflows/koinoikos-focus-mode.yml"
+  push:
+    branches: [main]
+    paths:
+      - "shell.qml"
+      - "components/RelationshipFocusBroker.qml"
+      - "components/qmldir"
+      - "scripts/koinoikos_focus.py"
+      - "config/sway/koinoikos-focus.conf"
+      - "tests/focus/**"
+  workflow_dispatch:
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python source compile
+        run: python3 -m py_compile scripts/koinoikos_focus.py tests/focus/test_koinoikos_focus.py
+      - name: Spatial-navigation and QML source contracts
+        run: python3 tests/focus/test_koinoikos_focus.py

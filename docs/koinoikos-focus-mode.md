@@ -1,0 +1,109 @@
+# Koinoikos // relationship-aware Focus Mode (pilot)
+
+**Owner:** SwayPX for compositor bindings/navigation; Post-Apollo Quickshell for
+layer-shell keyboard ownership, frame-glow intensity and eligible menu registry.
+
+**Operator intent:** Super + tilde (`~`) begins a persistent *relationship
+focus* mode. The tilde means relationship / ghost string / spiritual
+connection. Inside the mode, plain arrows and `h j k l` move spatial focus;
+the currently selected participant glows more strongly while other open
+windows remain visible. `Esc` returns to ordinary Sway.
+
+## Scope / stage
+
+This patch provides **opt-in source implementation**; it does not install
+or reload Sway on the operator's computer.
+
+- Native Sway focus targets: visible application leaf containers on visible
+  workspaces, selected via their compositor IDs, **not** fake Qt window names.
+- Quickshell surfaces in this pilot: **AppControl, Hospital, Git, CPU++,
+  Weather**. They publish geometry via typed `qs ipc call relationshipFocus
+  snapshot`. In Focus Mode nonowner registered menus stop owning the
+  keyboard, while the selected menu gets a stronger frame-glow opacity.
+- The router chooses eligible target centers in the indicated half-plane,
+  preferring short distance and direct horizontal/vertical alignment.
+  Closed QS menus and Sway clients on invisible workspaces are excluded.
+- Other QS surfaces, including **Notifications** (search focus) and
+  **Messaging** (currently explicitly non-focusable), are *not yet
+  registered*. Do **not** report universal-menu acceptance based on five
+  surfaces. Their on-boarding needs separate text-input focus policy.
+- Existing Git/Hospital `Ctrl+Tab` is temporarily retained outside
+  Koinoikos mode, not replaced with Alt+Tab. AppControl/Hospital
+  `Tab/Shift+Tab` and all existing Sub Mode keys stay unchanged.
+- This code has static/source unit tests; actual **Wlr layer-shell focus
+  handoffs and source coordinates require operator runtime verification**.
+
+## Opt-in setup (after checking paths on the operator's own machine)
+
+The directory containing this repository's `shell.qml` must be the
+Quickshell directory used by the running `qs` instance. The example below
+assumes `~/.config/quickshell`; change it if using a different checkout.
+
+In the existing Sway config, add **one** include at the desired location:
+
+```sway
+include ~/.config/quickshell/config/sway/koinoikos-focus.conf
+```
+
+This does **not** replace the operator's existing Sway configuration or
+`$mod`. The included binding uses explicit `Mod4+Shift+grave` for
+Super+tilde on a US layout. On other XKB layouts test the actual binding
+symbol before relying on it. Sway binding modes already handle `Esc`,
+`h j k l` and arrows natively; no global Python key listener is installed.
+The external Python router is executed once per Focus Mode movement.
+
+### Optional native-window glow
+
+SwayFX-compatible compositors can use an **additional separate include**:
+
+```sway
+include ~/.config/quickshell/config/sway/koinoikos-native-focus-glow.conf
+```
+
+**Optional:** This enables compositor shadows with a bright focused and quiet
+unfocused orange alpha. These native shadows also apply **outside Focus
+Mode**, because they are compositor appearance settings. If another worker
+or the operator already customized the compositor shadows, **do not include
+or overwrite that theme** without explicit acceptance. QS menu glows remain
+independent of this optional file.
+
+### Preflight and reversible activation
+
+Before adding the include, or after editing a **copy** of the config,
+validate it against the installed compositor: `sway -C -c <config-path>`.
+This repository cannot inspect or modify the operator's installed config
+or validate a live Sway binary. Keep the prior config for easy rollback.
+
+After the operator chooses to activate it, Sway reload and a clean Quickshell
+restart are required; this repo intentionally disables Quickshell's hot
+file watcher because Qt 6.11 sampled-glow teardown previously crashed.
+Use the project's safe restart instructions, not auto reload during file edits.
+
+### Diagnostics
+
+```bash
+qs ipc show
+qs ipc call relationshipFocus snapshot
+python3 ~/.config/quickshell/scripts/koinoikos_focus.py snapshot
+swaymsg -t get_binding_state
+```
+
+During mode: `Super+~` to enter; arrows or `h/j/k/l` to select a
+spatial neighbor; `Esc` to exit. If Quickshell IPC is absent, directional
+keys fall back to native `swaymsg focus <direction>` and Escape still
+restores Sway's default binding mode.
+
+### Runtime verification checkpoint
+
+Check ordinary native window-to-window focus first; then two registered QS
+menus, mixed native/QS, all five eligible menus, the DP-5 / HDMI-A-1
+coordinate boundary, overlapping windows, focus after closing a menu,
+Hospital Receptionist typing, Git nested editor/dial, and Escape after an
+IPC failure. The Sway compositor may not report layer window coordinates in
+the same global coordinate system as `QsWindow.x/y` on every output; verify
+the live `snapshot` geometry before calling multi-monitor routing accepted.
+
+Focus Mode is not a lock screen, Sway seat isolation mechanism, or
+permission gate. It should never trigger destructive controls merely by
+moving focus. Do not claim validated universal focus until every registered
+surface and the original keyboard ownership restoration pass live.

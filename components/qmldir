@@ -20,6 +20,7 @@ SafeDropShadow 1.0 SafeDropShadow.qml
 SurfaceFrame 1.0 SurfaceFrame.qml
 SectionFrame 1.0 SectionFrame.qml
 WindowPanelFrame 1.0 WindowPanelFrame.qml
+RelationshipFocusBroker 1.0 RelationshipFocusBroker.qml
 
 # Named visual-language effect and text recipes.
 singleton VisualLanguage 1.0 VisualLanguage.qml

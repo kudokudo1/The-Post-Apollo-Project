@@ -50,27 +50,27 @@ require(QMLDIR, "WindowPanelFrame 1.0 WindowPanelFrame.qml", "component registra
 for needle, message in (
     ("WindowPanelFrame {\n        id: background", "AppControl shared chassis"),
     ("anchors.margins: 12\n\n        // Geometry anchor for the outer border/glow only.", "AppControl 12px glow gutter"),
-    ("glowColor: Colors.orange\n        closeGlowSpread: 6\n        closeGlowOpacity: 0.38\n        wideGlowSpread: 12\n        wideGlowOpacity: 0.12", "AppControl glow values"),
+    ("glowColor: Colors.orange\n        closeGlowSpread: 6\n        closeGlowOpacity: relationshipFocusModeActive\n                          ? (relationshipFocused ? 0.68 : 0.12) : 0.38\n        wideGlowSpread: 12\n        wideGlowOpacity: relationshipFocusModeActive\n                         ? (relationshipFocused ? 0.22 : 0.03) : 0.12", "AppControl glow values"),
 ):
     require(APP_CONTROL, needle, message)
 
 for needle, message in (
     ("WindowPanelFrame {\n        id: frame", "Hospital shared chassis"),
     ("fillColor: Colors.black\n        borderWidth: 1\n        borderColor: Colors.magenta\n        surfaceOpacity: root.menuOpen ? 0.97 : 0.0", "Hospital surface values"),
-    ("glowVisible: root.menuOpen\n        glowColor: Colors.magenta\n        closeGlowSpread: 6\n        closeGlowOpacity: 0.21\n        wideGlowSpread: 12\n        wideGlowOpacity: 0.05", "Hospital glow values"),
+    ("glowVisible: root.menuOpen\n        glowColor: Colors.magenta\n        closeGlowSpread: 6\n        closeGlowOpacity: relationshipFocusModeActive\n                          ? (relationshipFocused ? 0.46 : 0.09) : 0.21\n        wideGlowSpread: 12\n        wideGlowOpacity: relationshipFocusModeActive\n                         ? (relationshipFocused ? 0.14 : 0.02) : 0.05", "Hospital glow values"),
 ):
     require(HOSPITAL, needle, message)
 assert "id: chassisGeometry" not in HOSPITAL
 
 for needle, message in (
     ("WindowPanelFrame {\n        id: background", "CPU++ shared chassis"),
-    ("glowColor: Colors.orange\n        closeGlowSpread: 6\n        closeGlowOpacity: 0.38\n        wideGlowSpread: 12\n        wideGlowOpacity: 0.12", "CPU++ glow values"),
+    ("glowColor: Colors.orange\n        closeGlowSpread: 6\n        closeGlowOpacity: relationshipFocusModeActive\n                          ? (relationshipFocused ? 0.68 : 0.12) : 0.38\n        wideGlowSpread: 12\n        wideGlowOpacity: relationshipFocusModeActive\n                         ? (relationshipFocused ? 0.22 : 0.03) : 0.12", "CPU++ glow values"),
 ):
     require(CPU_PLUS, needle, message)
 
 for needle, message in (
     ("WindowPanelFrame {\n        id: stationBackground", "Weather shared chassis"),
-    ("glowColor: Colors.cyan\n        closeGlowSpread: 4\n        closeGlowOpacity: 0.30\n        wideGlowSpread: 14\n        wideGlowOpacity: 0.10", "Weather glow values"),
+    ("glowColor: Colors.cyan\n        closeGlowSpread: 4\n        closeGlowOpacity: relationshipFocusModeActive\n                          ? (relationshipFocused ? 0.58 : 0.09) : 0.30\n        wideGlowSpread: 14\n        wideGlowOpacity: relationshipFocusModeActive\n                         ? (relationshipFocused ? 0.20 : 0.02) : 0.10", "Weather glow values"),
 ):
     require(WEATHER, needle, message)
 

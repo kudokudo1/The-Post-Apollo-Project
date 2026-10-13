@@ -34,7 +34,9 @@ For a pane whose scrollable viewport already accounts for endpoint clearance, se
 
 ## Content clearance is a host layout responsibility
 
-`reserveSpace: true` is the default, and `reservedExtent` exposes the visual width/height including glow padding and the edge inset. **A sibling scrollbar cannot safely rewrite its Flickable's anchors or margins.** The host should reserve the zone using anchors or padding, as AppControl's existing examples already do.
+`reserveSpace: true` is the default. Following the operator-approved width correction (audit 01/02), the **physical cross-axis width** remains **10 px** for bar style or **16 px** for star style, including the original 7/14 px handle artwork. Glow clearance must not enlarge the scrollbar or its pointer interaction region.
+
+The three independent measurements are `crossExtent` (physical scrollbar width), `effectiveGlowPadding` (effect-space recommendation, not physical width), and `reservedExtent` (what the host reserves for content). Default reservation is physical width plus the independent **4 px edge inset**: **14 px** for bar or **20 px** for star. `reserveGlowSpace: true` permits a host to reserve additional glow clearance without changing the scrollbar's physical width or input region. **A sibling scrollbar cannot safely rewrite its Flickable's anchors or margins.** The host should reserve the zone using anchors or padding, as AppControl's existing examples already do.
 
 ```qml
 // Bind an existing host pane's content edge to the scrollbar zone.
@@ -43,7 +45,7 @@ anchors.right: scrollbar.left
 anchors.rightMargin: 5
 ```
 
-Use `reserveSpace: false` only for an intentional overlay. The component does not automatically mutate host geometry. `containGlow: true` clips glow to its allocated visual zone; `glowPadding` allows host-specific adjustment. Review glow treatment in the runtime before accepting the sizing.
+Use `reserveSpace: false` for an intentional overlay. The component does not automatically mutate host geometry. **Audit issue 04 (extended rail clipping) is still undecided**: existing `containGlow: true` can clip a deliberate `trackTopExtension: 33`; the width fix intentionally does **not** decide or correct that separate behavior. Likewise, audit 06 (inactive fade) and audit 09 (whole-pane nested chaining) are still open for operator visual/behavioral review. Review effect clipping in the runtime before accepting the sizing.
 
 ## Visibility modes
 

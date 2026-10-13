@@ -584,7 +584,9 @@ Item {
                 anchors {
                     fill: parent
                     margins: 8
-                    rightMargin: 13
+                    // Keep row content clear of the newly starred indicator.
+                    // Star cross-axis footprint is larger than the old 4px rail.
+                    rightMargin: scrollTrack.width + 9
                 }
 
                 clip: true

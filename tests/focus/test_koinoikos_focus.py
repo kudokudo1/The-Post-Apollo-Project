@@ -180,16 +180,18 @@ assert 'id !== "git" && id !== "hospital"' in ownership
 shell = (ROOT / "shell.qml").read_text()
 assert "KeyboardOwnershipCoordinator {" in shell
 assert "property alias controlKeyboardOwner: keyboardOwnership.owner" in shell
-assert 'keyboardOwnership.claim("git", "open")' in shell
-assert 'keyboardOwnership.claim("hospital", "open")' in shell
-assert 'keyboardOwnership.claim("git", "pointer")' in shell
-assert 'keyboardOwnership.claim("hospital", "pointer")' in shell
+assert 'shellRoot.requestControlKeyboard("git", "open")' in shell
+assert 'shellRoot.requestControlKeyboard("hospital", "open")' in shell
+assert 'shellRoot.requestControlKeyboard("git", "pointer")' in shell
+assert 'shellRoot.requestControlKeyboard("hospital", "pointer")' in shell
 assert 'keyboardOwnership.release("git")' in shell
 assert 'keyboardOwnership.release("hospital")' in shell
 assert 'keyboardLock: keyboardOwnership.boostOwner === "git"' in shell
 assert 'keyboardLock: keyboardOwnership.boostOwner === "hospital"' in shell
 assert '|| (hospitalWindow.menuOpen && gitWindow.menuOpen)' not in shell
 assert 'keyboardOwnership.claim(owner, "koinoikos")' in shell
+assert "function requestControlKeyboard(id, reason)" in shell
+assert "relationshipFocus.selectOwner(id);" in shell
 
 for path in ("widgets/GitW.qml", "widgets/HospitalW.qml"):
     widget = (ROOT / path).read_text()

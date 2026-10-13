@@ -428,6 +428,12 @@ Rectangle {
                             }
                         }
                     }
+                    NeonScrollBar {
+                        flickable: worktreeScroll
+                        handleStyle: "star"
+                        mountingParent: worktreeScroll.parent.parent
+                        visible: worktreeScroll.visible && scrollable
+                    }
                 }
             }
 

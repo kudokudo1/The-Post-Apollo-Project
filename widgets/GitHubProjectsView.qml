@@ -395,6 +395,12 @@ Item {
                             }
                         }
                     }
+                    NeonScrollBar {
+                        flickable: projectList
+                        handleStyle: "star"
+                        mountingParent: projectList.parent.parent
+                        visible: projectList.visible && scrollable
+                    }
 
                     ProjectInput {
                         id: projectTitleInput
@@ -1009,6 +1015,12 @@ Item {
                                 }
                             }
                         }
+                    }
+                    NeonScrollBar {
+                        flickable: mapScroll
+                        handleStyle: "star"
+                        mountingParent: mapScroll.parent.parent
+                        visible: mapScroll.visible && scrollable
                     }
 
                     GitHubProjectsRoadmapView {

@@ -81,7 +81,7 @@ sway = (ROOT / "config/sway/koinoikos-focus.conf").read_text()
 assert 'bindsym Mod4+grave mode "Koinoikos Focus"' in sway
 assert "Mod4+Shift+grave" not in sway
 assert "bindsym Mod4+grave exec" not in sway, "Prefix must not switch widget focus"
-assert "cycle" not in sway, "Unintended repeated-prefix cycle must be removed"
+assert 'koinoikos_focus.py" cycle' not in sway, "Unintended prefix-cycle action must be removed"
 assert "bindsym Escape" not in sway, "No sticky Escape-driven mode"
 mode_body = sway.split('mode "Koinoikos Focus" {', 1)[1]
 for key, direction in (

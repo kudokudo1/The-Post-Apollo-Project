@@ -1,0 +1,33 @@
+name: Syntagma window opening lifecycle pilot
+
+on:
+  pull_request:
+    paths:
+      - "widgets/GitW.qml"
+      - "widgets/HospitalW.qml"
+      - "widgets/notifications/NotificationsHubW.qml"
+      - "widgets/messanger/MessagingW.qml"
+      - "docs/window-opening-lifecycle-pilot.md"
+      - "tests/components/test_window_opening_lifecycle_pilot.py"
+      - ".github/workflows/window-opening-lifecycle-pilot.yml"
+  push:
+    branches: [main]
+    paths:
+      - "widgets/GitW.qml"
+      - "widgets/HospitalW.qml"
+      - "widgets/notifications/NotificationsHubW.qml"
+      - "widgets/messanger/MessagingW.qml"
+      - "tests/components/test_window_opening_lifecycle_pilot.py"
+      - ".github/workflows/window-opening-lifecycle-pilot.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify opt-in defaults and protected exceptions
+        run: python3 tests/components/test_window_opening_lifecycle_pilot.py

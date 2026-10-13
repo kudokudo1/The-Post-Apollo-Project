@@ -178,6 +178,12 @@ Rectangle {
             : Colors.cyan
 
         Flickable {
+            id: nurse3rScroll0
+            NeonScrollBar {
+                flickable: nurse3rScroll0
+                handleStyle: "star"
+            }
+
             anchors.fill: parent
             anchors.margins: 6
             clip: true
@@ -314,6 +320,12 @@ Rectangle {
         }
 
         Flickable {
+            id: nurse3rScroll1
+            NeonScrollBar {
+                flickable: nurse3rScroll1
+                handleStyle: "star"
+            }
+
             width: parent.width
             height: parent.height - 104
             clip: true

@@ -60,6 +60,22 @@ QtObject {
         return false;
     }
 
+    function advanceWidget() {
+        if (!active)
+            return false;
+        // This is an independent widget focus cycle: only open/visible
+        // registered QS surfaces participate, never Sway application windows.
+        // The registry order is stable even when widget geometry changes.
+        const eligible = candidates();
+        if (eligible.length === 0) {
+            owner = "";
+            return false;
+        }
+        const index = eligible.findIndex(row => row.id === owner);
+        const next = eligible[(index + 1) % eligible.length];
+        return selectOwner(next.id);
+    }
+
     function startMode(previous) {
         if (active)
             return true;
@@ -88,6 +104,26 @@ QtObject {
 
         function begin(): bool {
             return broker.startMode(broker.hostOwner);
+        }
+
+        function beginAndAdvance(): bool {
+            // A first chord enters widget mode. If a registered widget
+            // already owned control focus, switch away from it immediately.
+            // Otherwise acquire the first eligible widget, not the second.
+            const hadMode = broker.active;
+            const hadWidgetOwner = broker.candidates().some(
+                row => row.id === broker.hostOwner);
+            if (!broker.startMode(broker.hostOwner))
+                return false;
+            if (hadMode || hadWidgetOwner)
+                broker.advanceWidget();
+            return true;
+        }
+
+        function advance(): bool {
+            // One IPC call owns selection so rapid presses cannot race on
+            // separate snapshot+select subprocesses.
+            return broker.advanceWidget();
         }
 
         function end(): void {

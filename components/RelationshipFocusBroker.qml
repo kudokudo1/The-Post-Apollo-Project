@@ -1,7 +1,7 @@
 import QtQuick
 import Quickshell.Io
 
-// Koinoikos: shared registry/keyboard-ownership bridge for Sway native mode.
+// Koinoikos: widget-only registry; ordinary Sway app focus remains independent.
 // This QtObject does NOT handle directional keys. Sway's binding mode owns them;
 // scripts/koinoikos_focus.py consumes these explicitly registered surfaces.
 QtObject {
@@ -13,7 +13,7 @@ QtObject {
     property var cpu: null
     property var weather: null
     property bool active: false
-    property string owner: "native"
+    property string owner: ""
     property string previousOwner: ""
     property string hostOwner: ""
 
@@ -50,10 +50,6 @@ QtObject {
     function selectOwner(id) {
         if (!active)
             return false;
-        if (id === "native") {
-            owner = "native";
-            return true;
-        }
         const visible = candidates();
         for (let i = 0; i < visible.length; ++i) {
             if (visible[i].id === id) {
@@ -69,10 +65,12 @@ QtObject {
             return true;
         previousOwner = previous;
         active = true;
-        // Preserve the menu that already owned the shared Git/Hospital
-        // keyboard, but never select a closed/unregistered surface.
-        if (!selectOwner(previous))
-            owner = "native";
+        // Preserve Git/Hospital ownership when eligible, otherwise start
+        // from a visible widget. Never anchor to a regular Sway window.
+        if (!selectOwner(previous)) {
+            const visible = candidates();
+            owner = visible.length > 0 ? visible[0].id : "";
+        }
         return true;
     }
 
@@ -80,7 +78,7 @@ QtObject {
         if (!active)
             return;
         active = false;
-        owner = "native";
+        owner = "";
         previousOwnerRestorationRequested(previousOwner);
         previousOwner = "";
     }

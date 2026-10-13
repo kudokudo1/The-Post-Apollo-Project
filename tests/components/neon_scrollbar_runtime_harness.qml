@@ -5,7 +5,7 @@ import "../../components" as Shared
 Window {
     id: root
     width: 370
-    height: 300
+    height: 385
     visible: true
     color: "#1B0623"
 
@@ -42,6 +42,23 @@ Window {
             nestedScrollMode: "contain"
             viewportHasEndpointClearance: false
         }
+    }
+
+    // Standalone horizontal instance of the same component family.
+    Flickable {
+        id: horizontalPane
+        objectName: "horizontalPane"
+        x: 12; y: 315; width: 290; height: 42
+        contentWidth: 890; contentHeight: height
+        boundsBehavior: Flickable.StopAtBounds
+        flickableDirection: Flickable.HorizontalFlick
+        Rectangle { width: 890; height: parent.height; color: "#16051F" }
+    }
+    Shared.NeonScrollBar {
+        id: horizontalBar
+        objectName: "horizontalBar"
+        flickable: horizontalPane
+        orientation: Qt.Horizontal
     }
 
     // Test target can be driven without direct QML context id lookup.

@@ -20,6 +20,24 @@ Item {
     property int transferLineIndex: -1
 
     property string subMode: "files"
+
+    // Source/secondary selector family. Mouse and keyboard use one opener.
+    readonly property var subModeOrder: ["files", "hunks", "stashes", "conflicts"]
+
+    function selectSubMode(key) {
+        if (subModeOrder.indexOf(key) < 0)
+            return;
+        subMode = key;
+        clearArm();
+    }
+
+    function cycleSubMode(direction) {
+        const current = Math.max(0, subModeOrder.indexOf(subMode));
+        const step = Number(direction) < 0 ? -1 : 1;
+        selectSubMode(subModeOrder[
+            (current + step + subModeOrder.length) % subModeOrder.length
+        ]);
+    }
     property string selectedPath: ""
     property string pendingFocusPath: ""
     property var selectedFile: null
@@ -894,10 +912,7 @@ Item {
                             + String(modelData.count)
                         accent: modelData.color
                         selected: root.subMode === modelData.key
-                        onTriggered: {
-                            root.subMode = modelData.key;
-                            root.clearArm();
-                        }
+                        onTriggered: root.selectSubMode(modelData.key)
                     }
                 }
 

@@ -1,0 +1,39 @@
+name: Syntagma unified widget key contracts
+
+on:
+  pull_request:
+    paths:
+      - "widgets/AppControlW.qml"
+      - "widgets/GitW.qml"
+      - "widgets/HospitalW.qml"
+      - "widgets/CpuPlusW.qml"
+      - "widgets/weather/WeatherStationW.qml"
+      - "widgets/notifications/NotificationsHubW.qml"
+      - "widgets/messanger/MessagingW.qml"
+      - "docs/unified-widget-keyboard-navigation.md"
+      - "tests/navigation/**"
+      - ".github/workflows/unified-widget-keys.yml"
+  push:
+    branches: [main]
+    paths:
+      - "widgets/GitW.qml"
+      - "widgets/CpuPlusW.qml"
+      - "widgets/weather/WeatherStationW.qml"
+      - "widgets/notifications/NotificationsHubW.qml"
+      - "widgets/messanger/MessagingW.qml"
+      - "docs/unified-widget-keyboard-navigation.md"
+      - "tests/navigation/**"
+      - ".github/workflows/unified-widget-keys.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-contracts:
+    name: Unified navigation source checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run read-only navigation source contracts
+        run: python3 tests/navigation/test_unified_widget_keys.py

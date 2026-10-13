@@ -61,6 +61,20 @@ PanelWindow {
     property string gitSelectorSource: "keyboard"
     property var gitNavigationStack: []
 
+    // Nurse 3c // Standard menu keys. Do not steal input from nested editors,
+    // modal controls, dial motion or an active history/inspection overlay.
+    readonly property bool standardModeKeysAvailable:
+        root.menuOpen && root.keyboardActive
+        && !root.activeTextEditor && !root.dialControlMode
+        && !root.workflowMenuOpen && !root.runInspectorOpen
+        && !root.localTargetMenuOpen && !root.remoteTargetMenuOpen
+        && !root.issueCreateMode && !root.pullRequestControlOpen
+        && !root.issueControlOpen && !root.blameOpen
+    readonly property bool topSubModeKeysAvailable:
+        root.standardModeKeysAvailable && root.activePage === "git"
+        && ["changes", "history", "repository"].indexOf(root.gitView) >= 0
+        && !(root.gitView === "changes" && gitChangesView.transferOpen)
+
     readonly property bool gitCanGoBack:
         gitNavigationStack.length > 0
 
@@ -214,31 +228,66 @@ PanelWindow {
         onActivated: root.activateGitKeyboardControl()
     }
 
+    // Shared navigation: Tab cycles the two primary Git/ GitHub pages.
+    // Ctrl+Left/Right cycles the visible lower mode rail. Local Back and
+    // nested context arrows remain owned by their original handlers.
     Shortcut {
-        sequence: "Shift+Left"
-        context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
-        onActivated: root.selectPrimaryMode(-1)
+        sequence: "Tab"
+        context: Qt.WindowShortcut
+        enabled: root.standardModeKeysAvailable
+        onActivated: root.cycleMainMode(1)
     }
 
     Shortcut {
+        sequence: "Shift+Tab"
+        context: Qt.WindowShortcut
+        enabled: root.standardModeKeysAvailable
+        onActivated: root.cycleMainMode(-1)
+    }
+
+    Shortcut {
+        sequence: "Ctrl+Left"
+        context: Qt.WindowShortcut
+        enabled: root.standardModeKeysAvailable
+        onActivated: root.cycleVisibleSubMode(-1)
+    }
+
+    Shortcut {
+        sequence: "Ctrl+Right"
+        context: Qt.WindowShortcut
+        enabled: root.standardModeKeysAvailable
+        onActivated: root.cycleVisibleSubMode(1)
+    }
+
+    // Shift horizontal arrows now own the *nested top Sub Mode* level,
+    // rather than accidentally repeating the Main Mode shortcut.
+    Shortcut {
+        sequence: "Shift+Left"
+        context: Qt.WindowShortcut
+        enabled: root.topSubModeKeysAvailable
+        onActivated: root.cycleTopSubMode(-1)
+    }
+
+    // Legacy Git primary-page aliases remain, but respect editor/overlay
+    // ownership just like the new Tab grammar.
+    Shortcut {
         sequence: "Shift+Up"
-        context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        context: Qt.WindowShortcut
+        enabled: root.standardModeKeysAvailable
         onActivated: root.selectPrimaryMode(-1)
     }
 
     Shortcut {
         sequence: "Shift+Right"
-        context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
-        onActivated: root.selectPrimaryMode(1)
+        context: Qt.WindowShortcut
+        enabled: root.topSubModeKeysAvailable
+        onActivated: root.cycleTopSubMode(1)
     }
 
     Shortcut {
         sequence: "Shift+Down"
-        context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        context: Qt.WindowShortcut
+        enabled: root.standardModeKeysAvailable
         onActivated: root.selectPrimaryMode(1)
     }
 
@@ -639,6 +688,53 @@ PanelWindow {
             showGitPage();
         else
             showGithubPage();
+
+        Qt.callLater(ensureGitKeyboardControl);
+        root.restoreGitKeyboardFocus(false);
+    }
+
+    function cycleMainMode(direction) {
+        // This top-level family has two pages. Both directions move to the
+        // other page; the existing opener performs the safe page handoff.
+        selectPrimaryMode(root.activePage === "git" ? 1 : -1);
+    }
+
+    function cycleTopSubMode(direction) {
+        if (!topSubModeKeysAvailable)
+            return;
+        if (root.gitView === "changes")
+            gitChangesView.cycleSubMode(direction);
+        else if (root.gitView === "history")
+            gitHistoryView.cycleSubMode(direction);
+        else if (root.gitView === "repository")
+            gitRepositoryView.cycleSubMode(direction);
+
+        Qt.callLater(ensureGitKeyboardControl);
+    }
+
+    function cycleVisibleSubMode(direction) {
+        if (root.activePage === "github") {
+            selectBottomMode(direction);
+            return;
+        }
+        if (root.activePage !== "git")
+            return;
+
+        const modes = [
+            "control", "branches", "changes",
+            "history", "repository", "operations"
+        ];
+        const current = Math.max(0, modes.indexOf(root.gitView));
+        const step = Number(direction) < 0 ? -1 : 1;
+        const target = modes[(current + step + modes.length) % modes.length];
+
+        clearGitKeyboardControl();
+        if (target === "control") showGitControl();
+        else if (target === "branches") showGitBranches();
+        else if (target === "changes") showGitChanges();
+        else if (target === "history") showGitHistory();
+        else if (target === "repository") showGitRepository();
+        else if (target === "operations") showGitOperations();
 
         Qt.callLater(ensureGitKeyboardControl);
         root.restoreGitKeyboardFocus(false);

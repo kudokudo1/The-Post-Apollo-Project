@@ -17,6 +17,30 @@ Item {
     property var keyboardHost: null
 
     property string subMode: "log"
+
+    // Preserve LOG/QUERY/REFLOG/COMPARE/OPERATE/REBASE/SURGERY order
+    // and the same side effects for pointer and keyboard selection.
+    readonly property var subModeOrder: [
+        "log", "query", "reflog", "compare",
+        "operate", "rebase", "surgery"
+    ]
+
+    function selectSubMode(key) {
+        if (subModeOrder.indexOf(key) < 0)
+            return;
+        subMode = key;
+        armedAction = "";
+        if (key === "reflog" && historyService)
+            historyService.loadReflog();
+    }
+
+    function cycleSubMode(direction) {
+        const current = Math.max(0, subModeOrder.indexOf(subMode));
+        const step = Number(direction) < 0 ? -1 : 1;
+        selectSubMode(subModeOrder[
+            (current + step + subModeOrder.length) % subModeOrder.length
+        ]);
+    }
     property string searchQuery: ""
     property int scopeIndex: 0
     property string pendingScopeRef: ""
@@ -1082,16 +1106,7 @@ Item {
                     label: modelData.label
                     accent: modelData.color
                     selected: root.subMode === modelData.key
-                    onTriggered: {
-                        root.subMode = modelData.key;
-                        root.armedAction = "";
-
-                        if (
-                            modelData.key === "reflog"
-                            && root.historyService
-                        )
-                            root.historyService.loadReflog();
-                    }
+                    onTriggered: root.selectSubMode(modelData.key)
                 }
             }
         }

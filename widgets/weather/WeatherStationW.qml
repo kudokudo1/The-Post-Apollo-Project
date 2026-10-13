@@ -17,6 +17,10 @@ PanelWindow {
 
     property string activeDomain: "sky"
     property string currentView: "home"
+    // A keyboard cursor previews rail controls; Enter activates it.
+    property int navigationIndex: 0
+    readonly property bool standardKeysAvailable:
+        menuOpen && (!relationshipFocusModeActive || relationshipFocused)
 
     readonly property var domains: [
         {
@@ -137,6 +141,93 @@ PanelWindow {
 
             intersection: Intersection.Subtract
         }
+    }
+
+
+    // The Home + VIEW pages are the Main Mode family. DOMAIN is a top
+    // Sub Mode family; arrow/Enter navigation follows the actual vertical rail.
+    function cycleMainMode(direction) {
+        const pages = ["home"].concat(views.map(function(v) { return v.id; }));
+        const current = Math.max(0, pages.indexOf(currentView));
+        const step = Number(direction) < 0 ? -1 : 1;
+        const next = (current + step + pages.length) % pages.length;
+        currentView = pages[next];
+        navigationIndex = next === 0 ? 0 : domains.length + next;
+    }
+
+    function cycleTopSubMode(direction) {
+        const current = Math.max(0, domains.findIndex(function(d) {
+            return d.id === activeDomain;
+        }));
+        const step = Number(direction) < 0 ? -1 : 1;
+        const index = (current + step + domains.length) % domains.length;
+        activeDomain = domains[index].id;
+        navigationIndex = 1 + index;
+    }
+
+    function moveNavigationCursor(direction) {
+        const count = 1 + domains.length + views.length;
+        const step = Number(direction) < 0 ? -1 : 1;
+        navigationIndex = (navigationIndex + step + count) % count;
+    }
+
+    function activateNavigationCursor() {
+        if (navigationIndex === 0) {
+            currentView = "home";
+        } else if (navigationIndex <= domains.length) {
+            activeDomain = domains[navigationIndex - 1].id;
+        } else {
+            currentView = views[navigationIndex - domains.length - 1].id;
+        }
+    }
+
+    Shortcut {
+        sequence: "Tab"
+        context: Qt.WindowShortcut
+        enabled: weatherStation.standardKeysAvailable
+        onActivated: weatherStation.cycleMainMode(1)
+    }
+    Shortcut {
+        sequence: "Shift+Tab"
+        context: Qt.WindowShortcut
+        enabled: weatherStation.standardKeysAvailable
+        onActivated: weatherStation.cycleMainMode(-1)
+    }
+    Shortcut {
+        sequence: "Shift+Left"
+        context: Qt.WindowShortcut
+        enabled: weatherStation.standardKeysAvailable
+        onActivated: weatherStation.cycleTopSubMode(-1)
+    }
+    Shortcut {
+        sequence: "Shift+Right"
+        context: Qt.WindowShortcut
+        enabled: weatherStation.standardKeysAvailable
+        onActivated: weatherStation.cycleTopSubMode(1)
+    }
+    Shortcut {
+        sequence: "Up"
+        context: Qt.WindowShortcut
+        enabled: weatherStation.standardKeysAvailable
+        onActivated: weatherStation.moveNavigationCursor(-1)
+    }
+    Shortcut {
+        sequence: "Down"
+        context: Qt.WindowShortcut
+        enabled: weatherStation.standardKeysAvailable
+        onActivated: weatherStation.moveNavigationCursor(1)
+    }
+    Shortcut {
+        sequence: "Return"
+        context: Qt.WindowShortcut
+        enabled: weatherStation.standardKeysAvailable
+        onActivated: weatherStation.activateNavigationCursor()
+    }
+    Shortcut {
+        sequence: "Enter"
+        context: Qt.WindowShortcut
+        enabled: weatherStation.standardKeysAvailable
+        onActivated: weatherStation.activateNavigationCursor()
     }
 
     function open() {
@@ -295,6 +386,9 @@ PanelWindow {
 
                 ModeButton {
                     id: homeButton
+                    keyboardActive: weatherStation.standardKeysAvailable
+                    keyboardSelected: weatherStation.navigationIndex === 0
+                    onPointerMoved: weatherStation.navigationIndex = 0
 
                     width: railColumn.width
                     height: 48
@@ -306,7 +400,10 @@ PanelWindow {
                     labelFontSize: 18
                     iconText: "⌂"
                     labelText: "HOME"
-                    onTriggered: { weatherStation.currentView = "home"; }
+                    onTriggered: {
+                        weatherStation.navigationIndex = 0;
+                        weatherStation.currentView = "home";
+                    }
                 }
 
                 Item {
@@ -331,6 +428,9 @@ PanelWindow {
 
                     delegate: ModeButton {
                         id: domainButton
+                        keyboardActive: weatherStation.standardKeysAvailable
+                        keyboardSelected: weatherStation.navigationIndex === 1 + index
+                        onPointerMoved: weatherStation.navigationIndex = 1 + index
                         required property int index
                                                 required property var modelData
 
@@ -344,7 +444,10 @@ PanelWindow {
                         labelFontSize: 18
                         iconText: modelData.symbol
                         labelText: modelData.name
-                        onTriggered: { weatherStation.activeDomain = modelData.id; }
+                        onTriggered: {
+                            weatherStation.navigationIndex = 1 + index;
+                            weatherStation.activeDomain = modelData.id;
+                        }
                     }
                 }
 
@@ -379,6 +482,11 @@ PanelWindow {
 
                     delegate: ModeButton {
                         id: viewButton
+                        keyboardActive: weatherStation.standardKeysAvailable
+                        keyboardSelected: weatherStation.navigationIndex
+                                          === 1 + weatherStation.domains.length + index
+                        onPointerMoved: weatherStation.navigationIndex =
+                            1 + weatherStation.domains.length + index
                         required property int index
                                                 required property var modelData
 
@@ -392,7 +500,11 @@ PanelWindow {
                         labelFontSize: 18
                         iconText: modelData.symbol
                         labelText: modelData.name
-                        onTriggered: { weatherStation.currentView = modelData.id; }
+                        onTriggered: {
+                            weatherStation.navigationIndex =
+                                1 + weatherStation.domains.length + index;
+                            weatherStation.currentView = modelData.id;
+                        }
                     }
                 }
             }

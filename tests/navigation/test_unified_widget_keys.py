@@ -116,7 +116,7 @@ def test_notifications_tab_cycles_every_real_mode_in_visual_order():
 
     # Compare the Tab cycle against the actual left-to-right button row.
     order_match = re.search(
-        r"readonly property var mainModeOrder:\\s*\\[([^\\]]+)\\]", src)
+        r"readonly property var mainModeOrder:\s*\[([^\]]+)\]", src)
     assert order_match
     order = re.findall(r'"([^"]+)"', order_match.group(1))
     assert order == expected

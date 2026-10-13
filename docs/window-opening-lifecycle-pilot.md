@@ -1,120 +1,105 @@
-# Syntagma // widget opening lifecycle: evidence and opt-in comparison
+# Syntagma // widget opening lifecycle: trial outcome and compatibility boundary
 
-**Status:** Stage 1 experiment, NOT a universalized rule or a runtime-verified
-migration. **Scope:** window presentation/mapping only. This document does
-not redefine keyboard focus ownership, Main/Sub Mode navigation or the
-Koinoikos compositor protocol. Based on current Post-Apollo source and
-the operator's October 13, 2026 instruction to compare demonstrated needs.
+**State: Stage 1 A/B trial closed — FAIL for visibility-controlled Git and
+Hospital.** **Operator runtime report:** October 13, 2026. **Scope:**
+window presentation/mapping, not keyboard ownership or Qt navigation.
 
-## The question
+## Observed result
 
-Does an ordinary interactive layer-shell menu require its surface to remain
-mapped while closed, or can it use `visible: menuOpen` without losing any
-functionality, responsiveness, keyboard-focus recovery or reopen stability?
+The operator exercised independently opt-in, visibility-controlled reopening
+of **Git** and **Hospital**. Both **crashed after several openings or rapid
+repeated clicks**. The operator remembers the same class of problem from
+earlier development. Exact crash logs, compositor stack, and crash cause
+were **not** collected, so this establishes the failed lifecycle behavior
+but not a proven root cause in Qt, Quickshell, SwayFX, or shader cleanup.
 
-**Mapping is not the same as keeping QML state alive.** Hiding the native
-surface does not necessarily destroy the QML object or reset its services.
-Likewise, a permanently mapped window with a zero input region is not
-necessarily the compositor's focused keyboard window.
-
-## Existing opening strategies (before any migration)
-
-| Widget | Existing presentation lifecycle | Evidence and legitimate difference | Stage 1 disposition |
+| Widget | Tested alternate lifecycle | Outcome | Current safe source policy |
 | --- | --- | --- | --- |
-| Git | Always mapped; on close `mask` has zero size | Source uses shared keyboard coordinator and a complex scene; no proven need for permanent mapping. Open triggers refreshes separately. | **A/B pilot:** keep permanent mapping by default; optionally unmap on close |
-| Hospital | Always mapped; zero input mask on close | Many nested surfaces and refreshes, but those alone do not establish a mapping requirement. | **A/B pilot:** keep permanent mapping by default; optionally unmap on close |
-| Notifications Hub | Always mapped; zero input mask on close | **Documented exception:** source records a native Qt/Quickshell second-open crash on repeated unmap/remap. | **Do not change** until crash history is reproduced/isolated |
-| AppControl | `visible: menuOpen` | Complex widget working with visibility-based lifecycle; keeps ordinary QML state and initializes selected mode/input on open | Comparison reference; no changes |
-| CPU++ | `visible: menuOpen` | Refreshes monitors/animates on open while using visibility lifecycle | Comparison reference; no changes |
-| Weather | Window object always visible; zero-width/height when closed, with specialized terminal mouse mask | Terminal exclusion/mouse pass-through is a real function, but evidence for zero-size opening strategy as a requirement is incomplete | Audit after the first pair |
-| Power | Persistent window containing **both the closed dock trigger and opened power menu**, interactive regions masked accordingly | Trigger must remain present when menu is closed in the current composition; this does not require all *separate* windows to stay mapped | Distinct composition, no change |
-| Social | Permanent nonfocusable/fully masked controller plus a visible native `FloatingWindow` | Provides ordinary Sway move/resize and separate Discord/Vesktop window handoffs | Native-window adapter exception; no change |
-| Media Deck | `visible: menuOpen` and no keyboard focus | Pointer-operated deck, naturally visibility-based | Comparison reference; no change |
-| Incoming notification toast | Visible only with active notifications | Passive event surface, not a Main Mode menu | Outside this pilot |
+| Git | Unmap on close via `visible: menuOpen` | **FAIL** — crash after repeated openings/spam clicks | Permanently mapped; zero-sized input mask on close |
+| Hospital | Same independent unmap/remap experiment | **FAIL** — crash after repeated openings/spam clicks | Permanently mapped; zero-sized input mask on close |
+| Notifications Hub | Unmap/remap **not** tested in this pilot | Earlier native Qt/Quickshell second-open crash documented in source | Permanently mapped, zero-sized input mask on close |
 
-**Source history:** Notifications carries an explicit crash comment;
-Social explains its `FloatingWindow` choice; the other rationales are
-inferences from current behavior, not proven original developer intent.
+The two experimental flags
+`POST_APOLLO_GIT_VISIBILITY_PILOT` and
+`POST_APOLLO_HOSPITAL_VISIBILITY_PILOT` have now been **removed from the
+application source** to prevent accidental reuse of a reproducibly
+crashing mode. The existing persistent-mapping behavior is explicitly
+preserved; other widget implementations were not migrated.
 
-## Pilot configuration // Git and Hospital only
+### Why the result matters
 
-The initial experiment is **off by default**. Only the surface's
-`visible` binding changes in opt-in mode. Mask, focus policy, input handlers,
-geometry, services, loading/refresh, menu state and animations are unmodified.
+This is now operator-level runtime evidence **against** making
+visibility-controlled unmapping the unconditional default for *all*
+complex layer-shell menus. It is not evidence that visibility-based
+opening is inherently invalid:
 
-| Mode | Git environment | Hospital environment | Effect |
+- **AppControl** and **CPU++** still use `visible: menuOpen`; their
+  own operation and stability must be assessed on their own merits.
+- Native surfaces, popups, and passive panels have different lifecycle
+  needs. A standardized **opening protocol** need not imply an identical
+  **native mapping strategy**.
+- The precise underlying crash mechanism remains **unverified**. If the
+  runtime problem is repaired later, a new controlled experiment may be
+  authorized with crash logging, without silently re-enabling this pilot.
+
+## Existing opening strategies // cross-widget inventory
+
+| Widget | Presentation lifecycle | Known evidence / reason | Normalization status |
 | --- | --- | --- | --- |
-| Existing baseline (default) | unset | unset | Both stay mapped; zero-size input mask when closed |
-| Git only | `POST_APOLLO_GIT_VISIBILITY_PILOT=1` | unset | Git unmaps when closed; Hospital baseline |
-| Hospital only | unset | `POST_APOLLO_HOSPITAL_VISIBILITY_PILOT=1` | Hospital unmaps when closed; Git baseline |
-| Combined stress test | `...GIT_VISIBILITY_PILOT=1` | `...HOSPITAL_VISIBILITY_PILOT=1` | Both use visibility-controlled opening; try only after independent trials |
+| Git | Always-mapped layer-shell panel; zero-size input mask when closed | **FAIL** on unmap/remap in October 13 runtime trial | Retain persistent mapping |
+| Hospital | Same always-mapped / closed masked panel | **FAIL** on unmap/remap in October 13 runtime trial | Retain persistent mapping |
+| Notifications Hub | Always mapped, masked closed | Historical native second-open crash recorded directly in widget source | Retain persistent mapping |
+| AppControl | `visible: menuOpen` | Visibility lifecycle, retained QML state and startup input behavior | Leave unchanged |
+| CPU++ | `visible: menuOpen` | Starts monitor refreshes/animations with menu lifecycle | Leave unchanged |
+| Weather | Always visible; zero dimensions when closed; terminal bay excluded from input mask | Specialized terminal pass-through is a real behavior; reason for zero-size mapping not proven | Separate future study |
+| Power | Persistent surface contains the launch button **and** menu | Closed launcher needs to remain available within that composition | Leave unchanged |
+| Social | Permanent nonfocusable masked controller + separately visible native `FloatingWindow` | Explicit choice for Sway move/resize, Discord native-focus handoff | Native-window adapter |
+| Media Deck | `visible: menuOpen`, `WlrKeyboardFocus.None` | Pointer-driven playback deck | Leave unchanged |
+| Incoming notification toast | Appears with active notifications | Passive event surface, not the Notifications history/control hub | Out of focusable-menu opening comparison |
 
-Anything other than the literal value `1` uses the original permanent
-mapping. The options are read when the QML window is instantiated; change
-them only via a **full Quickshell restart**, not a hot reload.
+## Restoration and safety
 
-### Optional on-device trial
+The prior pilot command was **relative to the Quickshell repository**, not
+to the unrelated `post-apollo-dev-runtime` directory. It did not operate
+from that unrelated working directory.
 
-Run these from a local checkout containing this change, **after** its files
-have been installed into the Quickshell configuration you actually launch.
-The existing safe restart script is intentionally used because Qt sampled
-glow destruction previously crashed during live QML hot reload:
+If running a local Quickshell configuration containing the old opt-in code,
+restart **without either pilot environment variable**. The safe restart
+script forcibly restarts Quickshell instead of using an in-process hot reload,
+because Qt sampled glow teardown has historically crashed during hot reload.
+Do not repeatedly exercise the failed variant merely to confirm it again.
+Preserve unsaved widget state before restarting.
 
 ```bash
-# Baseline: both menus retain the current lifecycle.
-scripts/restart_quickshell_safe.sh
-
-# Git-only test; leave Hospital on the baseline.
-POST_APOLLO_GIT_VISIBILITY_PILOT=1 scripts/restart_quickshell_safe.sh
-
-# Hospital-only test; leave Git on the baseline.
-POST_APOLLO_HOSPITAL_VISIBILITY_PILOT=1 scripts/restart_quickshell_safe.sh
-
-# Restore existing mapping without editing any files:
-scripts/restart_quickshell_safe.sh
+qsdir="$(readlink -f "${XDG_CONFIG_HOME:-$HOME/.config}/quickshell")"
+test -f "$qsdir/scripts/restart_quickshell_safe.sh" || {
+  echo "Safe restart script not found in $qsdir"; exit 1;
+}
+env -u POST_APOLLO_GIT_VISIBILITY_PILOT \
+    -u POST_APOLLO_HOSPITAL_VISIBILITY_PILOT \
+    bash "$qsdir/scripts/restart_quickshell_safe.sh" "$qsdir"
 ```
 
-If executing the script as a command is not permitted, use `bash
-scripts/restart_quickshell_safe.sh`. The script forcibly stops the previous
-Quickshell process; save any open widget edits or drafts before invoking it.
+The revised GitHub source ignores both removed environment flags entirely,
+but this alone does not update the user's local installation. Do not use
+`git reset --hard` or overwrite local Quickshell changes as part of recovery.
 
-### What to record for each widget
+## What we can standardize now
 
-1. After a fresh restart, open the menu, close it, and reopen it **at least
-   ten times**, especially after using editors, selectors and navigation.
-2. Check first key (Tab), later keys, keyboard focus acquisition, pointer
-   re-entry, and Koinoikos `Super+~` directional focus handoff if enabled.
-3. Open Git and Hospital together; click Kitty or another normal Sway app,
-   type and paste, then return. **No focus lockout** is acceptable.
-4. Check shader glow artifacts, unexpected animation resets, rendering
-   errors, stale content, content refresh, size/placement changes or second-
-   open crashes. Follow actual terminal logs.
-5. Compare perceived first-frame response and first-successful-key latency.
-   Do not attribute delays to the shared 120 ms **focus-release** timer:
-   it is not a 120 ms pre-open wait. Git's data-refresh path is separate.
-6. Perform baseline and opt-in runs after equivalent restarts; note date,
-   whether the tested file actually matches GitHub, device/Qt version,
-   and whether the difference reproduces on a second test.
+The **behavioral** opening protocol remains a candidate:
+**open request → present surface → request focus when appropriate →
+activate the Qt input target → refresh information independently**.
 
-**No shell access is available to this GitHub-only authoring workflow.**
-GitHub CI checks source conditions and cannot measure Wayland seat focus,
-Qt shader teardown or live opening speed.
+The **presentation mechanism** must remain an explicit, justified adapter.
+For these tested complex menus, always-mapped + closed input mask is the
+safety baseline. Social's native window and Power's in-panel launcher have
+different functional requirements. We should eliminate duplicated requests
+and unnecessary delays only in separate, scoped experiments where
+responsibility, crash safety, and focus recovery can be tested independently.
 
-## Decision gate (before selecting a universal default)
+**Decision:** no global migration to `visible: menuOpen`. Preserve the
+established opening mechanisms; continue cross-widget standardization at
+the shared behavioral contract rather than forcing one surface lifecycle.
 
-- If repeated visibility-controlled reopening retains function and stability
-  and does not worsen focus, promote it as an ordinary-menu default candidate.
-- If one widget breaks, capture the exact error, affected surface, and
-  reproduction sequence; retain persistent mapping only where evidence
-  justifies it.
-- Do **not** remove Notifications' known crash workaround, Social's native
-  Sway requirement, or Power's always-available trigger as a side effect.
-- Test whether the two widgets' current *duplicate* focus requests can be
-  consolidated in a **separate focus-ownership change** with its coordinator
-  worker. Do not conflate that with presentation-lifecycle testing.
-- Only after comparisons, discuss a reusable opening protocol with one
-  common sequence and an explicit, evidence-backed presentation policy.
-
-The proposed common sequence remains **request open → present surface →
-acquire keyboard when appropriate → activate Qt input target → refresh
-content independently**. Its implementation/default is **not yet approved**.
+**Evidence grade:** user-observed runtime crash on both tested alternatives;
+source-level regression checks; cause and broader portability unresolved.

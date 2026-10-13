@@ -1,0 +1,122 @@
+# Syntagma // Quickshell-wide responsiveness freeze: runtime evidence
+
+**Hospital staff:** Nurse 3c. **Date:** October 13, 2026.
+**Scope:** Quickshell performance under opening / interaction with large widgets.
+**State:** Proven sustained main-thread CPU saturation; exact hotspot unverified.
+**Change type:** Evidence checkpoint **only** — no QML changes, no focus or surface lifecycle changes.
+
+## Operator observation (primary signal)
+
+The operator reports that when opening/interacting with Git/Hospital, the
+*entire Quickshell* visibly lags: the compact MPD/CAVA spectrum in the dock
+stops animating as well. This is **not** merely keyboard Tab latency or
+window-mapping slowness. A first preliminary test included only **one open**;
+later tests allowed just **two or three opens** before the lag made further
+interaction difficult. Do not categorize those as successful stress tests.
+
+The compact visualizer at `modules/Mediaplayer.qml` runs `cava` as an
+independent process, parses frames with `SplitParser`, updates a 16-bar QML
+array, and animates height changes. A freeze of its *display* is therefore a
+useful shared-UI responsiveness symptom; it does not independently establish
+whether the audio pipeline itself also stalls.
+
+## Quantitative evidence
+
+The operator ran
+
+```bash
+pid="$(pgrep -n -x quickshell)"
+top -H -b -d 1 -n 12 -p "$pid" -o %CPU -w 220 \
+  > /tmp/post-apollo-qs-threads.log
+```
+
+at approximately 16:45:43–16:45:54 local time. TIDs and observed utilization:
+
+| Moment | Main/UI thread, TID 4070873, process PID | Other threads |
+| --- | ---: | --- |
+| 16:45:43 | 4.9% | QSGRenderThread 4073552 ~14.8% |
+| 16:45:45 | 26.9% | QSGRenderThread ~8% |
+| 16:45:47 | **98.7%** | Other shown threads at 0%; render thread not among top five |
+| 16:45:48 | **99.7%** | Other shown threads at 0% |
+| 16:45:49 | **99.7%** | Other shown threads at 0% |
+| 16:45:50 | **98.7%** | Other shown threads at 0% |
+| 16:45:51 | 35.9% | QSGRenderThread ~6% |
+| 16:45:54 | 6.0% | QSGRenderThread ~9%; separate GL/driver threads ~5%/2% |
+
+**Interpretation:** The Quickshell **main thread** consumed nearly one
+logical CPU continuously for ~4 seconds. This can stall unrelated QML
+animations and input processing even if the system as a whole has idle
+cores. Evidence favors a **main-thread workload** (JS/QML bindings,
+signal callbacks, item creation/layout, or synchronous C++ operations)
+*for this specific observed interval*, not a CPU-saturated
+`QSGRenderThread`. It does **not** prove which function ran, nor exclude
+a GPU/driver stall in a different interval. No frame-time instrumentation
+or time-aligned visual freeze marker was collected.
+
+An earlier process-level `top` sample showed the entire Quickshell process
+at ~100% of one CPU. It also showed multiple Brave processes at high CPU
+usage, so the system may have concurrent scheduling pressure. `vmstat 1 20`
+samples had very low swap-in/swap-out and generally low blocked-I/O
+counts, despite ~5 GB occupied swap. These observations do not support
+**active swap thrashing** as the leading cause.
+
+## Source leads; not proven hotspots
+
+In current source (`main` at
+`15ab87d2731d2d6b508ba15bb53a1854578a08bc`):
+
+- `widgets/GitW.qml`: `onMenuOpenChanged` invokes `gitService.refresh()`,
+  view-dependent refreshes, and possibly `githubService.refresh()`.
+  `Qt.callLater(ensureGitKeyboardControl)` also scans registered controls
+  and may call `mapToItem()`; measure before optimizing.
+- `widgets/HospitalW.qml`: `open()` calls
+  `refreshReceptionData()`, which synchronizes receptionist collections;
+  `onMenuOpenChanged` calls `ensureFirstRoomSelected()`,
+  `requestOpenAudit()` and `floorService.discover()`.
+  Staleness logic may initiate `auditService.runAudit(false)` and
+  `githubService.refresh()`. Asynchronous external processes can still
+  produce costly QML result/model updates.
+- Existing startup warnings include missing `DP-5` screen objects and
+  null record/property access in Hospital Reports and Git Blame. Those
+  bindings warrant safe correctness fixes, **but have not been shown to
+  fire repeatedly during the multi-second freeze**; do not present them
+  as the performance root cause on present evidence.
+
+## What is settled / not settled
+
+**Settled:**
+- Treat the issue as **Quickshell-wide GUI responsiveness**, not just
+  Git/Hospital keyboard acquisition.
+- The particular measured spike involved the main/UI thread, not the
+  render thread as the highest-CPU consumer.
+- Do **not** revive the Git/Hospital visibility-controlled unmap/remap
+  pilots, which separately crashed on repeated opens.
+- The 120 ms keyboard-focus boost-release timer is not a pre-open delay
+  and has no observed causal connection to the 4-second busy period.
+
+**Not settled:** Which QML function, binding, model change, C++ call or
+resource lifecycle consumed four seconds; whether the first/open and
+second/open paths have the same cause; effect of Brave scheduling
+competition; whether different freezes also have a rendering cause.
+
+## Next gated measurement
+
+Prefer **QML Profiler** (Qt Creator or supported CLI): capture JavaScript,
+binding/signal handlers, creation, and scenegraph for a **single normal**
+widget opening, if a compatible profiling-enabled Quickshell build is
+available. The Qt debug/profiler infrastructure is not proven present in
+the operator's live binary; check availability **before** giving any launch
+or attach commands. Do not blindly attach to an uninstrumented running
+process.
+
+If profiling is unavailable, use very small, opt-in, source-controlled,
+reversible timings around the **open-handler synchronous paths**, then
+service result callbacks. Keep the instrumentation read-only with respect
+to focus, mask, window visibility, animation, and business logic; avoid
+hot-reloading Qt shader-backed surfaces. Check Git and Hospital separately
+and collect one opening per trial, not spam clicks.
+
+**Safety:** This checkpoint changes no runtime code. It is compatible
+with active concurrent owners working on Git, Hospital, and widget
+components. Any implementation change requires re-checking current
+`main` and file ownership before writing.

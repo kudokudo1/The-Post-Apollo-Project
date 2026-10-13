@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Koinoikos spatial Focus Mode router.
+"""Koinoikos widget-only spatial Focus Mode router.
 
-Used only by the opt-in Sway binding mode. Default Sway keys remain intact.
+Used only by the opt-in Sway binding mode. Native application focus stays
+owned by Sway: this router never moves native windows or falls back to Sway.
 No service, injected keyboard daemon, persistent writes or extra dependency.
 """
 from __future__ import annotations
@@ -42,54 +43,6 @@ def snapshot() -> dict[str, Any] | None:
     if not isinstance(data, dict) or not isinstance(data.get("surfaces"), list):
         return None
     return data
-
-
-def sway_tree() -> dict[str, Any] | None:
-    code, raw = command("swaymsg", "-r", "-t", "get_tree")
-    if code:
-        return None
-    try:
-        tree = json.loads(raw)
-    except (json.JSONDecodeError, ValueError):
-        return None
-    return tree if isinstance(tree, dict) else None
-
-
-def native_windows(tree: dict[str, Any] | None) -> tuple[list[dict[str, Any]], Any]:
-    """Only real, visible client leaves on visible workspaces.
-
-    Do not include layer shells, inactive workspace clients, containers,
-    scratchpad contents, floating parent shells or invisible placeholders.
-    """
-    windows: list[dict[str, Any]] = []
-    current_id = None
-
-    def visit(node: dict[str, Any], visible: bool) -> None:
-        nonlocal current_id
-        typ = node.get("type")
-        if typ == "workspace":
-            visible = bool(node.get("visible"))
-        rect = node.get("rect") or {}
-        has_client = bool(node.get("app_id")) or node.get("window") is not None
-        if (visible and has_client and isinstance(node.get("id"), int)
-                and all(isinstance(rect.get(k), (int, float))
-                        for k in ("x", "y", "width", "height"))
-                and rect["width"] > 0 and rect["height"] > 0):
-            item = {"id": "native:" + str(node["id"]),
-                    "kind": "native", "con_id": node["id"],
-                    "x": rect["x"], "y": rect["y"],
-                    "w": rect["width"], "h": rect["height"]}
-            windows.append(item)
-            if node.get("focused"):
-                current_id = item["id"]
-        for kind in ("nodes", "floating_nodes"):
-            for child in node.get(kind, []):
-                if isinstance(child, dict):
-                    visit(child, visible)
-
-    if tree:
-        visit(tree, False)
-    return windows, current_id
 
 
 def menu_windows(data: dict[str, Any] | None) -> list[dict[str, Any]]:
@@ -136,33 +89,31 @@ def nearest(items: list[dict[str, Any]],
 
 
 def focus_target(target: dict[str, Any]) -> bool:
-    if target["kind"] == "menu":
-        code, result = qs("select", target["id"])
-        return code == 0 and result.strip().lower() == "true"
-    # First release exclusive layer-shell keyboard ownership, then ask
-    # Sway to focus a real container using its original compositor semantics.
-    qs("select", "native")
-    code, _ = command("swaymsg", f'[con_id={int(target["con_id"])}] focus')
-    return code == 0
+    """Select only registered Quickshell widgets, never a Sway container."""
+    code, result = qs("select", target["id"])
+    return code == 0 and result.strip().lower() == "true"
 
 
 def move(direction: str) -> bool:
     data = snapshot()
+    # If QS is unavailable, leave normal Sway window focus entirely alone.
+    # Escape in the Sway binding mode still works independently of QS.
     if data is None or not data.get("active"):
-        # Native-only fallback: Sway navigation stays useful even if QS
-        # cannot connect; do not strand the operator in the binding mode.
-        code, _ = command("swaymsg", "focus", direction)
-        return code == 0
-    native, focused_id = native_windows(sway_tree())
-    items = native + menu_windows(data)
-    owner = data.get("owner", "native")
-    wanted_id = focused_id if owner == "native" else owner
-    current = next((v for v in items if v["id"] == wanted_id), None)
-    if current is None:
-        current = next((v for v in items if v["id"] == focused_id), None)
-    if current is None:
         return False
+
+    items = menu_windows(data)
+    if not items:
+        return False
+    owner = data.get("owner", "")
+    current = next((item for item in items if item["id"] == owner), None)
+    if current is None:
+        # No selected widget (or last selected widget closed): choose a
+        # deterministic widget anchor, not a native focused window.
+        first = min(items, key=lambda item: (item["x"], item["y"], item["id"]))
+        return focus_target(first)
+
     target = nearest(items, current, direction)
+    # At the edge, stay put. Never drift into the ordinary Sway layer.
     return bool(target and focus_target(target))
 
 
@@ -180,7 +131,7 @@ def main(argv: list[str]) -> int:
         qs("end")
         return 0
     if args.action == "snapshot":
-        print(json.dumps({"qs": snapshot(), "native": native_windows(sway_tree())[0]}))
+        print(json.dumps({"qs": snapshot()}))
         return 0
     if not args.direction:
         parser.error("move requires direction")

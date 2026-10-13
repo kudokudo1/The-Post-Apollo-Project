@@ -215,6 +215,11 @@ Rectangle {
                 border.color: Colors.orange
 
                 ListView {
+                    id: suggestionListScroll
+                    NeonScrollBar {
+                        flickable: suggestionListScroll
+                        handleStyle: "star"
+                    }
                     anchors.fill: parent
                     anchors.margins: 6
                     clip: true

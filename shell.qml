@@ -31,18 +31,29 @@ PanelWindow {
         Quickshell.watchFiles = false;
     }
 
-    // Hospital and Git may be open together, but exactly one owns the
-    // shared keyboard vocabulary at a time.
-    property string controlKeyboardOwner: ""
+    // Single ownership coordinator for the initial Git/Hospital pilot.
+    // Existing property readers remain compatible with the shared owner.
+    KeyboardOwnershipCoordinator {
+        id: keyboardOwnership
+    }
+    property alias controlKeyboardOwner: keyboardOwnership.owner
+
+    function requestControlKeyboard(id, reason) {
+        // Koinoikos selection and ordinary menu ownership cannot diverge:
+        // a pointer-entry/open request in that mode must update both.
+        if (relationshipFocus.active && relationshipFocus.owner !== id)
+            relationshipFocus.selectOwner(id);
+        return keyboardOwnership.claim(id, reason);
+    }
 
     function swapControlKeyboardOwner() {
         if (!hospitalWindow.menuOpen || !gitWindow.menuOpen)
             return;
 
-        controlKeyboardOwner =
-            controlKeyboardOwner === "hospital"
-            ? "git"
-            : "hospital";
+        shellRoot.requestControlKeyboard(
+            controlKeyboardOwner === "hospital" ? "git" : "hospital",
+            "ctrl-tab"
+        );
     }
 
     // Sway owns Koinoikos directional navigation, Quickshell owns the
@@ -56,7 +67,14 @@ PanelWindow {
         weather: weatherStationWindow
         hostOwner: shellRoot.controlKeyboardOwner
 
+        onOwnerChanged: {
+            if (active && (owner === "git" || owner === "hospital"))
+                keyboardOwnership.claim(owner, "koinoikos");
+        }
+
         onPreviousOwnerRestorationRequested: function(previous) {
+            // The previous shared owner is remembered without forcing
+            // another compositor steal when the held gesture ends.
             if (previous === "hospital" && hospitalWindow.menuOpen)
                 shellRoot.controlKeyboardOwner = "hospital";
             else if (previous === "git" && gitWindow.menuOpen)
@@ -264,28 +282,28 @@ PanelWindow {
                 keyboardActive: relationshipFocus.active
                                 ? relationshipFocus.owner === "hospital"
                                 : shellRoot.controlKeyboardOwner === "hospital"
-                keyboardLock: relationshipFocus.active
-                              || (hospitalWindow.menuOpen && gitWindow.menuOpen)
+                // Even with both menus open, no indefinite Exclusive.
+                // Exclusive is only the coordinator's bounded acquisition.
+                keyboardLock: keyboardOwnership.boostOwner === "hospital"
                 relationshipFocusModeActive: relationshipFocus.active
                 relationshipFocused: relationshipFocus.owner === "hospital"
 
                 onKeyboardOwnershipRequested:
-                    shellRoot.controlKeyboardOwner = "hospital"
+                    shellRoot.requestControlKeyboard("hospital", "pointer")
 
                 onGithubPullRequestRequested: function(repository, number) {
                     gitWindow.openGithubPullRequest(
                         repository,
                         number
                     );
-                    shellRoot.controlKeyboardOwner = "git";
+                    shellRoot.requestControlKeyboard("git", "cross-widget");
                 }
 
                 onMenuOpenChanged: {
-                    if (!menuOpen
-                            && shellRoot.controlKeyboardOwner === "hospital") {
-                        shellRoot.controlKeyboardOwner =
-                            gitWindow.menuOpen ? "git" : "";
-                    }
+                    if (menuOpen)
+                        shellRoot.requestControlKeyboard("hospital", "open");
+                    else
+                        keyboardOwnership.release("hospital");
                 }
             }
         }
@@ -315,20 +333,18 @@ PanelWindow {
                 keyboardActive: relationshipFocus.active
                                 ? relationshipFocus.owner === "git"
                                 : shellRoot.controlKeyboardOwner === "git"
-                keyboardLock: relationshipFocus.active
-                              || (hospitalWindow.menuOpen && gitWindow.menuOpen)
+                keyboardLock: keyboardOwnership.boostOwner === "git"
                 relationshipFocusModeActive: relationshipFocus.active
                 relationshipFocused: relationshipFocus.owner === "git"
 
                 onKeyboardOwnershipRequested:
-                    shellRoot.controlKeyboardOwner = "git"
+                    shellRoot.requestControlKeyboard("git", "pointer")
 
                 onMenuOpenChanged: {
-                    if (!menuOpen
-                            && shellRoot.controlKeyboardOwner === "git") {
-                        shellRoot.controlKeyboardOwner =
-                            hospitalWindow.menuOpen ? "hospital" : "";
-                    }
+                    if (menuOpen)
+                        shellRoot.requestControlKeyboard("git", "open");
+                    else
+                        keyboardOwnership.release("git");
                 }
             }
         }

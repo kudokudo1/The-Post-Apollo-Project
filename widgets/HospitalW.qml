@@ -2802,7 +2802,10 @@ PanelWindow {
             enabled: root.menuOpen
 
             onHoveredChanged: {
-                if (hovered && !root.keyboardActive)
+                // Pointer entry is an intentional new focus request even if
+                // the previous intent still names this menu. Compositor seat
+                // focus may have moved to Kitty/Discord in the meantime.
+                if (hovered)
                     root.keyboardOwnershipRequested();
             }
         }

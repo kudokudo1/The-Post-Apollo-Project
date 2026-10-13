@@ -13,42 +13,63 @@ focus = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(focus)
 
 
-def node(con_id, x, y, focused=False):
-    return {
-        "type": "con", "id": con_id, "app_id": "kitty",
-        "window": None, "focused": focused,
-        "rect": {"x": x, "y": y, "width": 300, "height": 200},
-        "nodes": [], "floating_nodes": [],
-    }
-
-
-tree = {
-    "type": "root",
-    "nodes": [
-        {"type": "output", "nodes": [
-            {"type": "workspace", "visible": True,
-             "nodes": [node(11, 0, 0, True), node(12, 400, 0)],
-             "floating_nodes": [node(13, 0, 300)]},
-            {"type": "workspace", "visible": False,
-             "nodes": [node(14, 800, 0)], "floating_nodes": []},
-        ], "floating_nodes": []},
-    ], "floating_nodes": [],
-}
-native, selected = focus.native_windows(tree)
-assert selected == "native:11"
-assert [n["con_id"] for n in native] == [11, 12, 13]
-origin = native[0]
-assert focus.nearest(native, origin, "right")["con_id"] == 12
-assert focus.nearest(native, origin, "down")["con_id"] == 13
-assert focus.nearest(native, origin, "left") is None
-assert focus.nearest(native, origin, "up") is None
-
+# Only open, positive-size registered Quickshell surfaces are eligible.
 menus = focus.menu_windows({"surfaces": [
     {"id": "hospital", "x": 1200, "y": 0, "w": 500, "h": 700},
-    {"id": "bad", "x": 0, "y": 0, "w": -1, "h": 700},
+    {"id": "git", "x": 1900, "y": 0, "w": 400, "h": 700},
+    {"id": "hidden", "x": 0, "y": 0, "w": -1, "h": 700},
 ]})
-assert len(menus) == 1 and menus[0]["id"] == "hospital"
-assert focus.nearest(native + menus, native[1], "right")["id"] == "hospital"
+assert [m["id"] for m in menus] == ["hospital", "git"]
+assert focus.nearest(menus, menus[0], "right")["id"] == "git"
+assert focus.nearest(menus, menus[1], "right") is None
+
+# Runtime router contract: native Sway focus must NEVER be called, even when
+# QS disappears, the selected widget closes, or an arrow reaches the edge.
+seen = []
+saved_snapshot, saved_qs, saved_command = focus.snapshot, focus.qs, focus.command
+
+def spy_qs(method, *args):
+    seen.append((method, *args))
+    return 0, "true"
+
+def forbid_sway(*args, **kwargs):
+    raise AssertionError(f"Widget focus must not run Sway commands: {args}")
+
+focus.qs = spy_qs
+focus.command = forbid_sway
+try:
+    focus.snapshot = lambda: {"active": True, "owner": "hospital", "surfaces": menus}
+    assert focus.move("right")
+    assert seen == [("select", "git")], seen
+    seen.clear()
+
+    focus.snapshot = lambda: {"active": True, "owner": "git", "surfaces": menus}
+    assert not focus.move("right")
+    assert seen == [], seen
+
+    focus.snapshot = lambda: {"active": True, "owner": "native", "surfaces": menus}
+    assert focus.move("right")  # Legacy owner falls back to first widget ONLY.
+    assert seen == [("select", "hospital")], seen
+    seen.clear()
+
+    focus.snapshot = lambda: {"active": True, "owner": "closed", "surfaces": menus}
+    assert focus.move("right")
+    assert seen == [("select", "hospital")], seen
+    seen.clear()
+
+    focus.snapshot = lambda: {"active": True, "owner": "", "surfaces": []}
+    assert not focus.move("right")
+    assert seen == [], seen
+
+    focus.snapshot = lambda: None
+    assert not focus.move("right")  # No QS = no-op; not native focus.
+    assert seen == [], seen
+
+    focus.snapshot = lambda: {"active": False, "owner": "", "surfaces": menus}
+    assert not focus.move("right")
+    assert seen == [], seen
+finally:
+    focus.snapshot, focus.qs, focus.command = saved_snapshot, saved_qs, saved_command
 
 sway = (ROOT / "config/sway/koinoikos-focus.conf").read_text()
 for expected in (
@@ -60,6 +81,10 @@ for expected in (
 ):
     assert expected in sway, expected
 assert "Mod4+Shift+grave" not in sway, "Shift must not be required for Koinoikos entry"
+router_source = (ROOT / "scripts/koinoikos_focus.py").read_text()
+assert "swaymsg" not in router_source, "Widget focus must not invoke native Sway focus"
+assert "native_windows" not in router_source
+assert '"native":' not in router_source
 
 broker = (ROOT / "components/RelationshipFocusBroker.qml").read_text()
 shell = (ROOT / "shell.qml").read_text()
@@ -72,6 +97,9 @@ for expected in (
     assert expected in broker, expected
 require_qmldir = (ROOT / "components/qmldir").read_text(encoding="utf-8")
 assert "RelationshipFocusBroker 1.0 RelationshipFocusBroker.qml" in require_qmldir
+assert 'property string owner: ""' in broker
+assert 'owner = "native"' not in broker
+assert 'visible.length > 0 ? visible[0].id : ""' in broker
 assert 'id: relationshipFocus' in shell
 for label in ("appcontrol", "hospital", "git", "cpu", "weather"):
     assert label in broker, label

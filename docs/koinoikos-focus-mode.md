@@ -4,16 +4,12 @@
 Quickshell owns eligible widget selection, keyboard handoff, and widget
 frame-glow intensity. Ordinary Sway application focus is separate.
 
-**Operator intent:** Display the shortcut as **Super + ~** (the tilde
-symbolizes relationship / ghost string / spiritual connection), but trigger it
-using **Super + the unshifted grave/backtick key** (`Mod4+grave`), with no Shift.
-The first chord enters persistent widget-only focus mode and selects the next
-eligible widget if one was already selected. **Press the same Super + grave
-shortcut again to cycle among open eligible widgets** in stable registry
-order, wrapping to the beginning. In this mode, plain arrows and `h j k l`
-move spatially between widgets. The selected widget glows more strongly,
-and `Esc` returns to ordinary Sway. Neither action navigates normal Sway
-application windows.
+**Operator intent:** The visual label is **Super + ~**; the physical key
+is unshifted grave/backtick (`Mod4+grave`). **Hold Super and grave, THEN
+press an arrow** (or HJKL) to move focus among registered Quickshell widgets.
+Pressing the shortcut alone never cycles or selects. **Release Super or
+grave to exit immediately**, with no Escape key. Ordinary Sway application
+focus and Super+arrow bindings are independent.
 
 ## Scope / stage
 
@@ -27,14 +23,11 @@ or reload Sway on the operator's computer.
   Weather**. They publish geometry via typed `qs ipc call relationshipFocus
   snapshot`. In Focus Mode nonowner registered menus stop owning the
   keyboard, while the selected menu gets a stronger frame-glow opacity.
-- Only registered visible Quickshell widgets are candidates. The direction
-  router selects a nearby widget in the indicated half-plane, preferring
-  direct alignment. **Repeated Super+grave** cycles through eligible
-  widgets in registry order with wraparound. On first entry, an already
-  owned widget advances once; otherwise the first eligible widget is
-  selected. At spatial edges directional focus stays put instead of
-  moving into a normal application. With no eligible widgets, neither
-  shortcut changes regular Sway focus.
+- Only registered, visible Quickshell widgets are candidates. **Directional
+  presses while holding Super + grave** navigate spatially; the prefix alone
+  does not move anything. At spatial edges focus stays on the current widget.
+  With no eligible widget or absent QS IPC, native Sway focus stays unchanged.
+  Releasing either held key restores the default Sway keyboard bindings.
 - Other QS surfaces, including **Notifications** (search focus) and
   **Messaging** (currently explicitly non-focusable), are *not yet
   registered*. Do **not** report universal-menu acceptance based on five
@@ -106,9 +99,10 @@ This does **not** replace the operator's existing Sway configuration or
 `$mod`. The binding uses `Mod4+grave`: press **Super + the backtick
 key** without Shift on a US layout. Keep **Super + ~** as the visual label,
 not the literal Shift-modified key chord. On other XKB layouts verify the
-grave keysym before relying on it. Sway binding modes already handle `Esc`,
-`h j k l` and arrows natively; no global Python key listener is installed.
-The external Python router is executed once per Focus Mode movement.
+grave keysym before relying on it. The Sway mode is temporary: it dispatches only held
+`Mod4+grave+direction` chords and exits automatically on either key release.
+No Escape exit or global key listener is required. The Python router
+starts the Quickshell focus session on the FIRST directional press.
 
 ### Separate native-window appearance (not Koinoikos)
 
@@ -148,31 +142,29 @@ python3 ~/.config/quickshell/scripts/koinoikos_focus.py snapshot
 swaymsg -t get_binding_state
 ```
 
-Press **Super + unshifted backtick/grave** (displayed as **Super + ~**)
-to enter and select a widget; repeat the **same chord to cycle** to the next
-visible widget. Use arrows or `h/j/k/l` for directional navigation.
-`Esc` exits. If Quickshell IPC is absent, directional
-direction keys do **not** fall back to Sway application focus. They are a
-safe no-op until the Quickshell focus broker returns; Escape still restores
-the normal Sway binding mode.
+Hold **Super + unshifted backtick/grave** (displayed as **Super + ~**),
+then press **Left/Right/Up/Down** or **h/j/k/l** while both prefix keys are
+held. The prefix itself is inert; repeated directions move spatially and
+never cycle on the prefix. **Release Super or grave to end, no Esc.**
+On QS IPC failure this does not fall back to native Sway application focus.
 
-**Entry-command quoting:** Sway `binding` events confirm the chord fired,
-but do not prove the mode was entered. `swaymsg` re-parses its IPC command:
-keep the internal quotes around the multiword name. From a shell prompt use
-`swaymsg 'mode "Koinoikos Focus"'`; in the `sh -c` shortcut the equivalent is
-`swaymsg "mode \"Koinoikos Focus\""`. Do not split the command into
-`swaymsg mode "Koinoikos Focus"` or the embedded quotes are lost.
+**Recovery if a SwayFX build misses a release event:** run
+`swaymsg mode default` and
+`python3 ~/.config/quickshell/scripts/koinoikos_focus.py exit` manually,
+then report the key-release event trace. Runtime key-up acceptance is
+required before treating this as a finished hold gesture.
 
 ### Runtime verification checkpoint
 
-Verify the original focused Kitty/browser remains unchanged before, during,
-and after widget navigation; test two then all five registered Quickshell
-menus, repeat Super+grave through all widgets with wraparound (including rapid
-presses), DP-5 / HDMI-A-1 geometry, overlapping widgets, repeated directional
-presses at edges, closing the focused widget, Hospital Receptionist typing,
-Git nested editor/dial and Escape after Quickshell IPC failure. Verify
-the live widget `snapshot` geometry before calling multi-monitor routing
-accepted.
+Verify that holding Super+grave alone changes no widget selection, then
+press one arrow and inspect `relationshipFocus.snapshot.owner` and the
+focused glow. Test further directional presses and both key-release orders
+(grave released first; Super released first), each returning to
+`get_binding_state=default` without Esc. Confirm that the original
+Kitty/browser stays on the same native Sway focus and ordinary Super+arrows
+still work afterward. Test two then all five registered widgets, cross-output
+geometry, overlapping widgets, edge behavior, closed widgets, and
+Hospital/Git text input. No live acceptance from source CI alone.
 
 Focus Mode is not a lock screen, Sway seat isolation mechanism, or
 permission gate. It should never trigger destructive controls merely by

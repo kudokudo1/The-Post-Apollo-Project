@@ -398,11 +398,17 @@ Rectangle {
                     }
 
                     Flickable {
+                        id: proposalScroll
                         width: parent.width
                         height: Math.max(140, parent.height - 170)
                         clip: true
                         contentWidth: width
                         contentHeight: proposalBody.implicitHeight + 8
+
+                        NeonScrollBar {
+                            flickable: proposalScroll
+                            handleStyle: "star"
+                        }
 
                         GohuText {
                             id: proposalBody

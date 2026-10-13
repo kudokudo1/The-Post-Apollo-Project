@@ -10,6 +10,31 @@ PanelWindow {
     id: root
 
     property bool menuOpen: false
+    // Koinoikos / shared keyboard-owner compatibility. The menu remains
+    // mapped while closed; neither visibility nor visual selection is focus.
+    property bool keyboardActive: false
+    property bool keyboardLock: false
+    property bool relationshipFocusModeActive: false
+    property bool relationshipFocused: false
+    signal keyboardOwnershipRequested()
+
+    function restoreKeyboardNavigationAnchor() {
+        if (!menuOpen || !keyboardActive || searchInput.activeFocus)
+            return;
+        notificationKeyboardAnchor.forceActiveFocus();
+    }
+
+    onKeyboardActiveChanged: {
+        if (keyboardActive)
+            Qt.callLater(root.restoreKeyboardNavigationAnchor);
+    }
+
+    onMenuOpenChanged: {
+        if (menuOpen && keyboardActive)
+            Qt.callLater(root.restoreKeyboardNavigationAnchor);
+        else if (!menuOpen)
+            listKeyboardSelectionActive = false;
+    }
 
     // ===== QUICK CONFIG =========================================
     // Main panel geometry. These preserve the placement you already dialed in.
@@ -119,7 +144,7 @@ PanelWindow {
     property bool listKeyboardSelectionActive: false
     // Do not take mode keys from the search editor or destructive dialogs.
     readonly property bool standardKeysAvailable:
-        menuOpen && !searchInput.activeFocus
+        menuOpen && keyboardActive && !searchInput.activeFocus
         && pendingClearAllKey === "" && pendingClearAllSource === ""
 
     // History and Manager are primary contexts; the six history categories
@@ -300,6 +325,14 @@ PanelWindow {
     exclusiveZone: 0
 
     WlrLayershell.layer: WlrLayer.Overlay
+    // Same bounded acquisition pulse as the Git/Hospital owner pilot.
+    // Never hold Exclusive merely because this history window stays mapped.
+    WlrLayershell.keyboardFocus:
+        !root.menuOpen || !root.keyboardActive
+        ? WlrKeyboardFocus.None
+        : root.keyboardLock
+        ? WlrKeyboardFocus.Exclusive
+        : WlrKeyboardFocus.OnDemand
 
     color: "transparent"
 
@@ -319,6 +352,16 @@ PanelWindow {
 
         width: root.menuOpen ? root.width : 0
         height: root.menuOpen ? root.height : 0
+    }
+
+    // Keyboard anchor is separate from the SEARCH editor. The first Tab
+    // after opening switches actual Main Modes, not input-widget focus.
+    Item {
+        id: notificationKeyboardAnchor
+        anchors.fill: parent
+        enabled: root.menuOpen
+        focus: root.menuOpen && root.keyboardActive
+        z: -1000
     }
 
     // ===== LOCAL VISUAL TYPE: GLOW TEXT =========================
@@ -608,6 +651,7 @@ PanelWindow {
 
     function open() {
         menuOpen = true;
+        keyboardOwnershipRequested();
     }
 
     function close() {
@@ -616,6 +660,8 @@ PanelWindow {
 
     function toggle() {
         menuOpen = !menuOpen;
+        if (menuOpen)
+            keyboardOwnershipRequested();
     }
 
     // ===== APP STATE HELPERS ====================================
@@ -979,7 +1025,9 @@ PanelWindow {
             radius: root.frameCloseGlowRadius
             samples: root.frameCloseGlowSamples
             color: Colors.orange
-            opacity: root.frameCloseGlowOpacity
+            opacity: root.relationshipFocusModeActive
+                     ? (root.relationshipFocused ? 0.70 : 0.10)
+                     : root.frameCloseGlowOpacity
             z: -3
             transparentBorder: true
         }
@@ -1002,6 +1050,14 @@ PanelWindow {
 
             anchors.fill: parent
             anchors.margins: root.frameInset
+
+            HoverHandler {
+                enabled: root.menuOpen
+                onHoveredChanged: {
+                    if (hovered)
+                        root.keyboardOwnershipRequested();
+                }
+            }
 
             fillColor: Colors.black
             fillOpacity: root.backgroundOpacity

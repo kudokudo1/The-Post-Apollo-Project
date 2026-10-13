@@ -180,6 +180,11 @@ Item {
             inset: 8
 
             Flickable {
+                NeonScrollBar {
+                    flickable: tableScroll
+                    handleStyle: "star"
+                }
+
                 id: tableScroll
 
                 anchors.fill: parent

@@ -82,6 +82,11 @@ for expected in (
 ):
     assert expected in sway, expected
 assert "Mod4+Shift+grave" not in sway, "Shift must not be required for Koinoikos entry"
+
+# The same shortcut must also act inside the Koinoikos binding mode.
+assert sway.count("bindsym Mod4+grave exec") == 2
+mode_body = sway.split('mode "Koinoikos Focus" {', 1)[1]
+assert 'bindsym Mod4+grave exec python3 "$HOME/.config/quickshell/scripts/koinoikos_focus.py" cycle' in mode_body
 router_source = (ROOT / "scripts/koinoikos_focus.py").read_text()
 assert "swaymsg" not in router_source, "Widget focus must not invoke native Sway focus"
 assert "native_windows" not in router_source
@@ -95,6 +100,22 @@ assert wrapper[:2] == ["sh", "-c"], wrapper
 entry_argv = shlex.split(wrapper[2])
 assert entry_argv[:2] == ["swaymsg", 'mode "Koinoikos Focus"'], entry_argv
 assert "&& python3" in wrapper[2], "Do not begin QS mode when Sway entry fails"
+
+# First entry and repeated presses are single broker RPCs. They must not
+# perform snapshot + select as separate processes (rapid-repeat race).
+saved_qs = focus.qs
+calls = []
+def capture_qs(method, *args):
+    calls.append((method, *args))
+    return 0, "true"
+focus.qs = capture_qs
+try:
+    assert focus.main(["enter"]) == 0
+    assert focus.main(["cycle"]) == 0
+    assert calls == [("beginAndAdvance",), ("advance",)], calls
+finally:
+    focus.qs = saved_qs
+
 
 broker = (ROOT / "components/RelationshipFocusBroker.qml").read_text()
 shell = (ROOT / "shell.qml").read_text()
@@ -110,6 +131,13 @@ assert "RelationshipFocusBroker 1.0 RelationshipFocusBroker.qml" in require_qmld
 assert 'property string owner: ""' in broker
 assert 'owner = "native"' not in broker
 assert 'visible.length > 0 ? visible[0].id : ""' in broker
+assert "function advanceWidget()" in broker
+assert "const eligible = candidates();" in broker
+assert "const next = eligible[(index + 1) % eligible.length];" in broker
+assert "return selectOwner(next.id);" in broker
+assert "function beginAndAdvance(): bool" in broker
+assert "function advance(): bool" in broker
+assert "broker.advanceWidget();" in broker
 assert 'id: relationshipFocus' in shell
 for label in ("appcontrol", "hospital", "git", "cpu", "weather"):
     assert label in broker, label

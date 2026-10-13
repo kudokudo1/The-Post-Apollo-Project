@@ -119,14 +119,18 @@ def move(direction: str) -> bool:
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("enter", "move", "exit", "snapshot"))
+    parser.add_argument("action", choices=("enter", "cycle", "move", "exit", "snapshot"))
     parser.add_argument("direction", nargs="?", choices=DIRECTIONS)
     args = parser.parse_args(argv)
     if args.action == "enter":
-        # For this initial bridge, shell.qml still remembers the active
-        # Git/Hospital keyboard owner. The IPC bridge checks availability.
-        _, output = qs("begin")
-        return 0 if output.lower() == "true" else 1
+        # Entry and the first widget switch must be atomic in the broker.
+        code, output = qs("beginAndAdvance")
+        return 0 if code == 0 and output.strip().lower() == "true" else 1
+    if args.action == "cycle":
+        # Each repeated Super+grave performs exactly one serialized widget
+        # selection in QS; no Sway app focus and no Python read-modify race.
+        code, output = qs("advance")
+        return 0 if code == 0 and output.strip().lower() == "true" else 1
     if args.action == "exit":
         qs("end")
         return 0

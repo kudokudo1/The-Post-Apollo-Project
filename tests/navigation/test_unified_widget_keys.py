@@ -165,6 +165,40 @@ def test_notifications_non_destructive_list_navigation_stays_guarded():
     assert "list.positionViewAtIndex(index, ListView.Contain)" in src
 
 
+def test_notifications_focus_retry_and_key_delivery_guards():
+    src = read("widgets/notifications/NotificationsHubW.qml")
+    owner = read("components/KeyboardOwnershipCoordinator.qml")
+
+    # The retry is one-shot, only when the notification surface has not
+    # acquired real Qt window focus, and uses the existing bounded pulse.
+    assert "id: notificationOpenFocusRetry" in src
+    assert "interval: 48" in src
+    assert "repeat: false" in src
+    assert "notificationKeyboardAnchor.Window.active" in src
+    assert "root.keyboardOwnershipRequested();" in src
+    assert "notificationOpenFocusRetry.restart();" in src
+    assert "notificationOpenFocusRetry.stop();" in src
+    assert "root.menuOpen || !root.keyboardActive" in src
+    assert "releaseBoost.restart()" in owner
+    assert "interval: 120" in owner
+    assert 'property string boostOwner: ""' in owner
+
+    # Do not depend entirely on Qt.WindowShortcut: on a focused menu Qt
+    # may otherwise consume Tab for its focus chain first.
+    assert "id: notificationKeyboardAnchor" in src
+    assert "Keys.priority: Keys.BeforeItem" in src
+    assert "Keys.onShortcutOverride: function(event)" in src
+    assert "Keys.onPressed: function(event)" in src
+    assert "Qt.Key_Backtab" in src
+    assert "root.cycleMainMode(reverse ? -1 : 1);" in src
+    assert "event.accepted = true;" in src
+
+    # We don't enlarge the focus pulse or change notification action guards.
+    assert "WlrKeyboardFocus.OnDemand" in src
+    assert 'root.activeFilter !== "manager"' in src
+    assert "!searchInput.activeFocus" in src
+
+
 def test_social_main_app_modes_use_existing_activate_path_and_protect_chat():
     src = read("widgets/messanger/MessagingW.qml")
     assert "event.key === Qt.Key_Tab" in src

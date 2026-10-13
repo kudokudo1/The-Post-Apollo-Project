@@ -20,6 +20,14 @@ assert "SYNTAGMA_STARTUP_TRACE // git scan finished" in service
 assert "SYNTAGMA_STARTUP_TRACE // git refresh finished" in service
 assert "SYNTAGMA_STARTUP_TRACE // git slow refresh callback" in service
 assert "SYNTAGMA_STARTUP_TRACE // git DONE phases" in service
+assert "SYNTAGMA_STARTUP_TRACE // git publish phases" in service
+assert "publishParts = publishPendingModels();" in service
+assert "if (publishParts)" in service
+for name in ("metadata=", "clears=", "local=", "remote=", "topology=", "total="):
+    assert name in service
+assert service.count("localBranchRows.append({") == 1
+assert service.count("remoteBranchRows.append({") == 1
+assert "topologyRows.append(pendingTopology[i]);" in service
 for name in ("state=", "publish=", "localSelection=", "remoteSelection=",
              "revision=", "available=", "refreshedSignal=", "followup="):
     assert name in service

@@ -260,9 +260,15 @@ Item {
             || (effectiveVisibilityMode === "auto" && scrollable)
             || (effectiveVisibilityMode === "contextual" && contextVisible)
             || (effectiveVisibilityMode === "reveal" && scrollable && revealRendered))
+    // Legacy persistent consumers own per-layer fading. Applying a second
+    // whole-root fade changes Workflow Library / Repository Profile artwork.
+    // Explicit persistent mode opts into the shared disabled root opacity;
+    // empty visibilityMode keeps the existing autoHide:false appearance.
     opacity: effectiveVisibilityMode === "reveal"
         ? (revealOpaque ? 1 : 0)
-        : (scrollable ? 1 : inactiveOpacity)
+        : (effectiveVisibilityMode === "persistent"
+           && visibilityMode !== "" && !scrollable
+           ? inactiveOpacity : 1)
 
     Behavior on opacity {
         enabled: root.effectiveVisibilityMode === "reveal"

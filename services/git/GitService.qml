@@ -5,6 +5,28 @@ import Quickshell.Io
 Scope {
     id: gitService
 
+    // Diagnostic only. No extra polling, delayed initialization or changes
+    // to repo discovery. The measurements are dormant unless opted in.
+    readonly property bool syntagmaStartupTraceEnabled:
+        String(Quickshell.env("POST_APOLLO_GIT_STARTUP_TRACE") || "").trim() === "1"
+    property double traceRepoStartedMs: 0
+    property int traceRepoLines: 0
+    property double traceRepoSyncMs: 0
+    property double traceRepoPeakMs: 0
+    property double traceRepoSetupMs: 0
+    property double traceRefreshStartedMs: 0
+    property int traceRefreshLines: 0
+    property double traceRefreshSyncMs: 0
+    property double traceRefreshPeakMs: 0
+
+    // Normal-workload timestamps: wall time includes subprocess time, while
+    // callback sum and peak approximate synchronous QML processing. Neither
+    // metric is a function-stack profiler or CPU-time counter.
+    function syntagmaTraceLabel() {
+        return String(repoLabel || "GIT")
+            + " :: " + String(preferredRepoQuery || repoPath || "DEFAULT");
+    }
+
     property var operationJournal: null
     property var snapshotService: null
 
@@ -419,8 +441,22 @@ Scope {
         if (discoveringRepos)
             return;
 
+        const traceStart = syntagmaStartupTraceEnabled ? Date.now() : 0;
         discoveringRepos = true;
         repoRows.clear();
+
+        if (syntagmaStartupTraceEnabled) {
+            traceRepoStartedMs = traceStart;
+            traceRepoLines = 0;
+            traceRepoSyncMs = 0;
+            traceRepoPeakMs = 0;
+            traceRepoSetupMs = Date.now() - traceStart;
+            console.warn(
+                "SYNTAGMA_STARTUP_TRACE // git scan started // "
+                + syntagmaTraceLabel()
+                + " // setupSync=" + traceRepoSetupMs + "ms"
+            );
+        }
 
         repoScanProcess.exec([
             "bash",
@@ -969,6 +1005,13 @@ Scope {
     function refresh() {
         if (refreshing)
             return;
+
+        if (syntagmaStartupTraceEnabled) {
+            traceRefreshStartedMs = Date.now();
+            traceRefreshLines = 0;
+            traceRefreshSyncMs = 0;
+            traceRefreshPeakMs = 0;
+        }
 
         if (!repoIsLocal || String(repoPath || "").indexOf("remote://") === 0) {
             available = false;
@@ -2120,7 +2163,30 @@ Scope {
 
         stdout: SplitParser {
             onRead: function(line) {
+                if (!gitService.syntagmaStartupTraceEnabled) {
+                    gitService.consumeRepoLine(line);
+                    return;
+                }
+
+                const started = Date.now();
                 gitService.consumeRepoLine(line);
+                const duration = Date.now() - started;
+                gitService.traceRepoLines += 1;
+                gitService.traceRepoSyncMs += duration;
+                gitService.traceRepoPeakMs = Math.max(
+                    gitService.traceRepoPeakMs, duration
+                );
+
+                if (String(line || "").split("\t")[0] === "DONE") {
+                    console.warn(
+                        "SYNTAGMA_STARTUP_TRACE // git scan finished // "
+                        + gitService.syntagmaTraceLabel()
+                        + " // wall=" + (Date.now() - gitService.traceRepoStartedMs) + "ms"
+                        + " lines=" + gitService.traceRepoLines
+                        + " callbackSum=" + gitService.traceRepoSyncMs + "ms"
+                        + " callbackMax=" + gitService.traceRepoPeakMs + "ms"
+                    );
+                }
             }
         }
 
@@ -2138,7 +2204,30 @@ Scope {
 
         stdout: SplitParser {
             onRead: function(line) {
+                if (!gitService.syntagmaStartupTraceEnabled) {
+                    gitService.consumeRefreshLine(line);
+                    return;
+                }
+
+                const started = Date.now();
                 gitService.consumeRefreshLine(line);
+                const duration = Date.now() - started;
+                gitService.traceRefreshLines += 1;
+                gitService.traceRefreshSyncMs += duration;
+                gitService.traceRefreshPeakMs = Math.max(
+                    gitService.traceRefreshPeakMs, duration
+                );
+
+                if (String(line || "").split("\t")[0] === "DONE") {
+                    console.warn(
+                        "SYNTAGMA_STARTUP_TRACE // git refresh finished // "
+                        + gitService.syntagmaTraceLabel()
+                        + " // wall=" + (Date.now() - gitService.traceRefreshStartedMs) + "ms"
+                        + " lines=" + gitService.traceRefreshLines
+                        + " callbackSum=" + gitService.traceRefreshSyncMs + "ms"
+                        + " callbackMax=" + gitService.traceRefreshPeakMs + "ms"
+                    );
+                }
             }
         }
 

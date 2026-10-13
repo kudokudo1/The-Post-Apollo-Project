@@ -60,7 +60,7 @@ records the old AppControl, Git and Hospital keys and their focus caveats.
 | CPU++ | Add Tab four Main Modes; Shift+arrows for TEMP/FAN and SYSTEM submodes; Up/Down for monitor rows; no invented lower submode |
 | Weather Station | Add Tab HOME/MAP/NEWS/RADIO/TERMINAL; Shift+arrows for DOMAIN; vertical rail Up/Down preview plus Enter activation |
 | Power | Existing Up/Down, Enter, Escape and confirmation isolation; no artificial Main/Sub Mode |
-| Social/Messaging | Existing App/Contact/Chat local navigation. Embedded application focus and Main Mode meaning need a dedicated review before binding Tab to external app activation |
+| Social/Messaging | Add Tab/Shift+Tab to cycle the existing Sessions/Discord/Telegram main app choices through their normal opener; preserve App/Contact/Chat arrows/Enter and composer focus. Widget remains nonfocusable until separate ownership lane integrates it |
 | Notifications | Add Tab toggle for History/Manager, Shift+arrows for six category filters and Up/Down list selection; search/editor and confirmation guards included. Window still needs focus-owner registration and live delivery testing |
 | Media Deck | Dormant/unmounted, currently explicitly `WlrKeyboardFocus.None`; transport actions are not generic navigation; must not pretend source shortcuts create real keyboard focus |
 

@@ -153,6 +153,93 @@ PanelWindow {
         }
     }
 
+    // Nurse 3c // AppControl-based internal navigation. These keys are
+    // window-local and cannot take over another visible widget's controls.
+    readonly property bool standardKeysAvailable:
+        menuOpen && (!relationshipFocusModeActive || relationshipFocused)
+
+    function cycleMainMode(direction) {
+        const count = modes.length;
+        if (count < 1)
+            return;
+        const step = Number(direction) < 0 ? -1 : 1;
+        selectMode((selectedModeIndex + step + count) % count);
+    }
+
+    function cycleTopSubMode(direction) {
+        const choices = selectedModeIndex === 2
+            ? thermalSubModes
+            : selectedModeIndex === 3
+            ? systemSubModes.filter(function(choice) { return !choice.spacer; })
+            : [];
+        if (choices.length < 2)
+            return;
+        const value = selectedModeIndex === 2
+            ? String(thermalSubMode) : String(systemSubMode);
+        const current = Math.max(0, choices.findIndex(function(choice) {
+            return String(choice.key) === value;
+        }));
+        const step = Number(direction) < 0 ? -1 : 1;
+        const choice = choices[(current + step + choices.length) % choices.length];
+        if (selectedModeIndex === 2)
+            selectThermalSubMode(choice.key);
+        else
+            selectSystemSubMode(choice.key);
+    }
+
+    function cycleMonitorRow(direction) {
+        if (selectedModeIndex !== 2 && selectedModeIndex !== 3)
+            return;
+        const rows = selectedMonitorRows();
+        if (rows.length < 1)
+            return;
+        const step = Number(direction) < 0 ? -1 : 1;
+        selectMonitorRow((selectedMonitorIndex() + step + rows.length) % rows.length);
+    }
+
+    Shortcut {
+        sequence: "Tab"
+        context: Qt.WindowShortcut
+        enabled: cpuPlusWindow.standardKeysAvailable
+        onActivated: cpuPlusWindow.cycleMainMode(1)
+    }
+    Shortcut {
+        sequence: "Shift+Tab"
+        context: Qt.WindowShortcut
+        enabled: cpuPlusWindow.standardKeysAvailable
+        onActivated: cpuPlusWindow.cycleMainMode(-1)
+    }
+    Shortcut {
+        sequence: "Shift+Left"
+        context: Qt.WindowShortcut
+        enabled: cpuPlusWindow.standardKeysAvailable
+        onActivated: cpuPlusWindow.cycleTopSubMode(-1)
+    }
+    Shortcut {
+        sequence: "Shift+Right"
+        context: Qt.WindowShortcut
+        enabled: cpuPlusWindow.standardKeysAvailable
+        onActivated: cpuPlusWindow.cycleTopSubMode(1)
+    }
+    Shortcut {
+        sequence: "Up"
+        context: Qt.WindowShortcut
+        enabled: cpuPlusWindow.standardKeysAvailable
+        onActivated: cpuPlusWindow.cycleMonitorRow(-1)
+    }
+    Shortcut {
+        sequence: "Down"
+        context: Qt.WindowShortcut
+        enabled: cpuPlusWindow.standardKeysAvailable
+        onActivated: cpuPlusWindow.cycleMonitorRow(1)
+    }
+    Shortcut {
+        sequence: "Escape"
+        context: Qt.WindowShortcut
+        enabled: cpuPlusWindow.standardKeysAvailable
+        onActivated: cpuPlusWindow.close()
+    }
+
     function refreshSharedMonitors() {
         if (systemTelemetry)
             systemTelemetry.refresh();

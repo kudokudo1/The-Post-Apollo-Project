@@ -585,6 +585,11 @@ Item {
                     }
 
                     Flickable {
+                        id: chartDetailScroll
+                        NeonScrollBar {
+                            flickable: chartDetailScroll
+                            handleStyle: "star"
+                        }
                         width: parent.width
                         height: Math.max(
                             110,
@@ -997,6 +1002,10 @@ Item {
 
                     ListView {
                         id: suggestionList
+                        NeonScrollBar {
+                            flickable: suggestionList
+                            handleStyle: "star"
+                        }
                         anchors {
                             fill: parent
                             margins: 7

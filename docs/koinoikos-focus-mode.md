@@ -1,7 +1,8 @@
 # Koinoikos // relationship-aware Focus Mode (pilot)
 
-**Owner:** SwayPX for compositor bindings/navigation; Post-Apollo Quickshell for
-layer-shell keyboard ownership, frame-glow intensity and eligible menu registry.
+**Owner:** SwayFX owns only the independent keyboard mode and key dispatch;
+Quickshell owns eligible widget selection, keyboard handoff, and widget
+frame-glow intensity. Ordinary Sway application focus is separate.
 
 **Operator intent:** Display the shortcut as **Super + ~** (the tilde
 symbolizes relationship / ghost string / spiritual connection), but trigger it
@@ -15,15 +16,18 @@ windows remain visible. `Esc` returns to ordinary Sway.
 This patch provides **opt-in source implementation**; it does not install
 or reload Sway on the operator's computer.
 
-- Native Sway focus targets: visible application leaf containers on visible
-  workspaces, selected via their compositor IDs, **not** fake Qt window names.
+- **No ordinary Sway window targets.** Kitty, browsers, games, floating Sway
+  applications, and their existing native focus stay outside Koinoikos.
+  There is no Sway fallback when Quickshell does not answer.
 - Quickshell surfaces in this pilot: **AppControl, Hospital, Git, CPU++,
   Weather**. They publish geometry via typed `qs ipc call relationshipFocus
   snapshot`. In Focus Mode nonowner registered menus stop owning the
   keyboard, while the selected menu gets a stronger frame-glow opacity.
-- The router chooses eligible target centers in the indicated half-plane,
-  preferring short distance and direct horizontal/vertical alignment.
-  Closed QS menus and Sway clients on invisible workspaces are excluded.
+- Only registered visible Quickshell widgets are candidates. The router
+  selects a nearby widget in the indicated half-plane, preferring direct
+  alignment. On first entry or after a widget closes, it chooses an
+  eligible widget anchor; at a spatial edge it stays put rather than
+  moving focus into a normal application.
 - Other QS surfaces, including **Notifications** (search focus) and
   **Messaging** (currently explicitly non-focusable), are *not yet
   registered*. Do **not** report universal-menu acceptance based on five
@@ -99,7 +103,7 @@ grave keysym before relying on it. Sway binding modes already handle `Esc`,
 `h j k l` and arrows natively; no global Python key listener is installed.
 The external Python router is executed once per Focus Mode movement.
 
-### Optional native-window glow
+### Separate native-window appearance (not Koinoikos)
 
 SwayFX-compatible compositors can use an **additional separate include**:
 
@@ -107,12 +111,10 @@ SwayFX-compatible compositors can use an **additional separate include**:
 include ~/.config/quickshell/config/sway/koinoikos-native-focus-glow.conf
 ```
 
-**Optional:** This enables compositor shadows with a bright focused and quiet
-unfocused orange alpha. These native shadows also apply **outside Focus
-Mode**, because they are compositor appearance settings. If another worker
-or the operator already customized the compositor shadows, **do not include
-or overwrite that theme** without explicit acceptance. QS menu glows remain
-independent of this optional file.
+**Legacy appearance option only; not part of widget focus.** This would
+change ordinary SwayFX application shadows globally, even outside Koinoikos.
+Do not install this to enable widget-only focus or overwrite the operator's
+existing compositor effects. Quickshell widget glows remain independent.
 
 ### Preflight and reversible activation
 
@@ -142,18 +144,19 @@ swaymsg -t get_binding_state
 During mode: press **Super + unshifted backtick/grave** (displayed as
 **Super + ~**) to enter; use arrows or `h/j/k/l` to select a spatial
 neighbor; `Esc` exits. If Quickshell IPC is absent, directional
-keys fall back to native `swaymsg focus <direction>` and Escape still
-restores Sway's default binding mode.
+direction keys do **not** fall back to Sway application focus. They are a
+safe no-op until the Quickshell focus broker returns; Escape still restores
+the normal Sway binding mode.
 
 ### Runtime verification checkpoint
 
-Check ordinary native window-to-window focus first; then two registered QS
-menus, mixed native/QS, all five eligible menus, the DP-5 / HDMI-A-1
-coordinate boundary, overlapping windows, focus after closing a menu,
-Hospital Receptionist typing, Git nested editor/dial, and Escape after an
-IPC failure. The Sway compositor may not report layer window coordinates in
-the same global coordinate system as `QsWindow.x/y` on every output; verify
-the live `snapshot` geometry before calling multi-monitor routing accepted.
+Verify the original focused Kitty/browser remains unchanged before, during,
+and after widget navigation; test two then all five registered Quickshell
+menus, DP-5 / HDMI-A-1 geometry, overlapping widgets, repeated directional
+presses at edges, closing the focused widget, Hospital Receptionist typing,
+Git nested editor/dial and Escape after Quickshell IPC failure. Verify
+the live widget `snapshot` geometry before calling multi-monitor routing
+accepted.
 
 Focus Mode is not a lock screen, Sway seat isolation mechanism, or
 permission gate. It should never trigger destructive controls merely by

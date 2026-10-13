@@ -978,6 +978,7 @@ Item {
             }
 
             NeonScrollBar {
+                handleStyle: "star"
                 id: scrollTrack
 
                 flickable: sourceList

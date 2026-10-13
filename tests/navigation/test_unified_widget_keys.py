@@ -94,6 +94,16 @@ def test_notifications_non_destructive_context_and_filter_keys():
     assert "list.positionViewAtIndex(index, ListView.Contain)" in src
 
 
+def test_social_main_app_modes_use_existing_activate_path_and_protect_chat():
+    src = read("widgets/messanger/MessagingW.qml")
+    assert "event.key === Qt.Key_Tab" in src
+    assert "event.key === Qt.Key_Backtab" in src
+    assert "messagingWindow.focusZone !== messagingWindow.chatZone" in src
+    assert "appSelector.messagingApps.length" in src
+    assert "messagingWindow.activateApp(index);" in src
+    assert "focusable: false" in src  # Focus lane owns registration.
+
+
 def test_focus_router_and_broker_still_independently_own_window_focus():
     router = read("scripts/koinoikos_focus.py")
     broker = read("components/RelationshipFocusBroker.qml")

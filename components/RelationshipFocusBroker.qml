@@ -12,6 +12,7 @@ QtObject {
     property var git: null
     property var cpu: null
     property var weather: null
+    property var notifications: null
     property bool active: false
     property string owner: ""
     property string previousOwner: ""
@@ -28,7 +29,8 @@ QtObject {
             { id: "hospital", item: broker.hospital },
             { id: "git", item: broker.git },
             { id: "cpu", item: broker.cpu },
-            { id: "weather", item: broker.weather }
+            { id: "weather", item: broker.weather },
+            { id: "notifications", item: broker.notifications }
         ];
         const result = [];
 

@@ -20,7 +20,7 @@ or reload Sway on the operator's computer.
   applications, and their existing native focus stay outside Koinoikos.
   There is no Sway fallback when Quickshell does not answer.
 - Quickshell surfaces in this pilot: **AppControl, Hospital, Git, CPU++,
-  Weather**. They publish geometry via typed `qs ipc call relationshipFocus
+  Weather, Notifications**. They publish geometry via typed `qs ipc call relationshipFocus
   snapshot`. In Focus Mode nonowner registered menus stop owning the
   keyboard, while the selected menu gets a stronger frame-glow opacity.
 - Only registered, visible Quickshell widgets are candidates. **Directional
@@ -28,10 +28,13 @@ or reload Sway on the operator's computer.
   does not move anything. At spatial edges focus stays on the current widget.
   With no eligible widget or absent QS IPC, native Sway focus stays unchanged.
   Releasing either held key restores the default Sway keyboard bindings.
-- Other QS surfaces, including **Notifications** (search focus) and
-  **Messaging** (currently explicitly non-focusable), are *not yet
-  registered*. Do **not** report universal-menu acceptance based on five
-  surfaces. Their on-boarding needs separate text-input focus policy.
+- **Notifications Hub** is now enrolled in the six-surface source pilot:
+  its permanent-mapped history overlay is eligible only while `menuOpen`,
+  with Tab/Shift+Tab for History/Manager, and search-focus protection.
+  **Messaging/Social** still uses its own native `FloatingWindow` and is
+  not Koinoikos-registered by this change. Do **not** report universal-menu
+  runtime acceptance from source tests; actual Qt and compositor focus
+  handoffs require operator verification.
 - Existing Git/Hospital `Ctrl+Tab` is temporarily retained outside
   Koinoikos mode, not replaced with Alt+Tab. AppControl/Hospital
   `Tab/Shift+Tab` and all existing Sub Mode keys stay unchanged.
@@ -162,7 +165,7 @@ focused glow. Test further directional presses and both key-release orders
 (grave released first; Super released first), each returning to
 `get_binding_state=default` without Esc. Confirm that the original
 Kitty/browser stays on the same native Sway focus and ordinary Super+arrows
-still work afterward. Test two then all five registered widgets, cross-output
+still work afterward. Test two then all six registered widgets, cross-output
 geometry, overlapping widgets, edge behavior, closed widgets, and
 Hospital/Git text input. No live acceptance from source CI alone.
 

@@ -140,7 +140,17 @@ def test_social_main_app_modes_use_existing_activate_path_and_protect_chat():
     assert "messagingWindow.focusZone !== messagingWindow.chatZone" in src
     assert "appSelector.messagingApps.length" in src
     assert "messagingWindow.activateApp(index);" in src
-    assert "focusable: false" in src  # Focus lane owns registration.
+    assert "focusable: false" in src  # Controller layer, not Social FloatingWindow.
+    assert "id: socialWindow" in src
+    assert "restoreSelectorAfterDiscordShow" in src
+    assert "onExited: function(exitCode, exitStatus)" in src
+    assert "messagingWindow.syncSocialGeometry(true);" in src
+    assert "messagingWindow.focusAppSelector();" in src
+    assert "messagingWindow.activateApp(index, true);" in src
+    assert "function activateApp(index, retainSelectorFocus)" in src
+    assert "restoreSelectorAfterDiscordShow = false;" in src
+    # Pointer activation still uses the original native focus behavior.
+    assert "messagingWindow.activateApp(index);" in src
 
 
 def test_focus_router_and_broker_still_independently_own_window_focus():

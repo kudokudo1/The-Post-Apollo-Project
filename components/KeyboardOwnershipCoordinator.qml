@@ -15,7 +15,7 @@ QtObject {
     property string boostOwner: ""
 
     function claim(id, reason) {
-        if (id !== "git" && id !== "hospital")
+        if (id !== "git" && id !== "hospital" && id !== "notifications")
             return false;
         owner = id;
         boostOwner = id;

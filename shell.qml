@@ -65,10 +65,12 @@ PanelWindow {
         git: gitWindow
         cpu: cpuPlusWindow
         weather: weatherStationWindow
+        notifications: notificationsHubWindow
         hostOwner: shellRoot.controlKeyboardOwner
 
         onOwnerChanged: {
-            if (active && (owner === "git" || owner === "hospital"))
+            if (active && (owner === "git" || owner === "hospital"
+                           || owner === "notifications"))
                 keyboardOwnership.claim(owner, "koinoikos");
         }
 
@@ -79,6 +81,8 @@ PanelWindow {
                 shellRoot.controlKeyboardOwner = "hospital";
             else if (previous === "git" && gitWindow.menuOpen)
                 shellRoot.controlKeyboardOwner = "git";
+            else if (previous === "notifications" && notificationsHubWindow.menuOpen)
+                shellRoot.controlKeyboardOwner = "notifications";
         }
     }
 
@@ -508,6 +512,22 @@ PanelWindow {
                 id: notificationsHubWindow
 
                 screen: Quickshell.screens.find(s => s.name === "DP-5")
+                keyboardActive: relationshipFocus.active
+                                ? relationshipFocus.owner === "notifications"
+                                : shellRoot.controlKeyboardOwner === "notifications"
+                keyboardLock: keyboardOwnership.boostOwner === "notifications"
+                relationshipFocusModeActive: relationshipFocus.active
+                relationshipFocused: relationshipFocus.owner === "notifications"
+
+                onKeyboardOwnershipRequested:
+                    shellRoot.requestControlKeyboard("notifications", "pointer")
+
+                onMenuOpenChanged: {
+                    if (menuOpen)
+                        shellRoot.requestControlKeyboard("notifications", "open");
+                    else
+                        keyboardOwnership.release("notifications");
+                }
             }
         }
     }

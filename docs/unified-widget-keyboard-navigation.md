@@ -60,13 +60,15 @@ records the old AppControl, Git and Hospital keys and their focus caveats.
 | CPU++ | Add Tab four Main Modes; Shift+arrows for TEMP/FAN and SYSTEM submodes; Up/Down for monitor rows; no invented lower submode |
 | Weather Station | Add Tab HOME/MAP/NEWS/RADIO/TERMINAL; Shift+arrows for DOMAIN; vertical rail Up/Down preview plus Enter activation |
 | Power | Existing Up/Down, Enter, Escape and confirmation isolation; no artificial Main/Sub Mode |
-| Social/Messaging | Add Tab/Shift+Tab to cycle the existing Sessions/Discord/Telegram main app choices through their normal opener; preserve App/Contact/Chat arrows/Enter and composer focus. Widget remains nonfocusable until separate ownership lane integrates it |
-| Notifications | Tab toggles History/Manager; Shift+arrows cycle six history filters (disabled in Manager); Up/Down gives a visible bounded list cursor and Enter activates only an explicitly selected History app card, never a Manager/DND mutation. Search and confirmation guards remain. Focus-owner integration and live delivery pending |
+| Social/Messaging | Tab/Shift+Tab cycles Sessions/Discord/Telegram via their normal opener. Keyboard-initiated Discord opening now requests selector focus restoration on show completion; mouse clicking or entering the separate Discord window retains native application focus. Social is a normal FloatingWindow and remains outside the QS layer-shell Koinoikos registry pending separate native-window policy and live verification |
+| Notifications | **Koinoikos source-enrolled widget.** Tab toggles History/Manager; Shift+arrows cycle six history filters in History; Up/Down highlights a list item; Enter may activate only an explicitly selected History app card, never Manager/DND actions. The shared owner and bounded keyboard-focus pulse protect normal application focus. Search and confirmation guards remain; runtime focus/event delivery remains unverified |
 | Media Deck | Dormant/unmounted, currently explicitly `WlrKeyboardFocus.None`; transport actions are not generic navigation; must not pretend source shortcuts create real keyboard focus |
 
-**Outstanding:** Extend to the other eligible interactive windows, review
-specialized Git/Hospital collisions, and integrate Social/Notifications/Media
-only alongside their responsible focus and availability work. Static checks
+**Outstanding:** Extend to other eligible interactive windows and
+review specialized Git/Hospital collisions. Notifications has source
+registration but needs live Koinoikos selection, text-entry and external-click
+acceptance. Social's native FloatingWindow and dormant Media Deck require their
+own focus-policy decisions. Static checks
 must never be reported as compositor runtime acceptance. Other focus worker
 owns the Koinoikos broker, Sway binding and shared focus coordinator.
 

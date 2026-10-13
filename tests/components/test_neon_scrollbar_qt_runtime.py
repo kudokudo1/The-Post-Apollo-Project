@@ -31,7 +31,9 @@ app.processEvents()
 bar = root.findChild(QObject, "auditScrollBar")
 inner = root.findChild(QObject, "innerPane")
 outer = root.findChild(QObject, "outerPane")
-if any(obj is None for obj in (bar, inner, outer)):
+horizontal_bar = root.findChild(QObject, "horizontalBar")
+horizontal_pane = root.findChild(QObject, "horizontalPane")
+if any(obj is None for obj in (bar, inner, outer, horizontal_bar, horizontal_pane)):
     raise AssertionError("QML harness did not expose the three target objects")
 
 def near(value, expected, label):
@@ -73,9 +75,9 @@ try:
     near(inner.property("contentY"), 450, "inner scroll at its lower boundary")
     near(outer.property("contentY"), 0, "outer does not move through inner controls")
 
-    def send_wheel(y_angle):
-        # At (100,80), the pointer is over the INNER list, not the thin bar.
-        event = QWheelEvent(QPointF(100, 80), QPointF(100, 80),
+    def send_wheel(y_angle, x=100, y=80):
+        # Default point is over the INNER list, not the thin bar.
+        event = QWheelEvent(QPointF(x, y), QPointF(x, y),
                             QPoint(0, 0), QPoint(0, y_angle),
                             Qt.NoButton, Qt.NoModifier, Qt.ScrollUpdate, False)
         QCoreApplication.sendEvent(root, event)
@@ -91,6 +93,19 @@ try:
     send_wheel(-120)
     assert float(inner.property("contentY")) > 0, "inner list must scroll normally"
 
+    # The same QML component also works as a horizontal scrollbar.
+    assert horizontal_bar.property("horizontal") is True
+    near(horizontal_bar.property("height"), 10, "horizontal physical thickness")
+    near(horizontal_bar.property("width"), 280, "horizontal track endpoint insets")
+    assert bool(horizontal_bar.handleKey(0x01000014, 0)), "Right arrow should move horizontal pane"
+    assert float(horizontal_pane.property("contentX")) > 0, "horizontal right-arrow moved pane"
+    assert bool(horizontal_bar.handleKey(0x01000010, 0)), "Home resets horizontal pane"
+    near(horizontal_pane.property("contentX"), 0, "horizontal pane Home")
+    # Rule 018: vertical wheel over the *horizontal bar* scrolls right.
+    send_wheel(-120, x=160, y=349)
+    assert float(horizontal_pane.property("contentX")) > 0, (
+        "vertical wheel over horizontal scrollbar did not scroll right"
+    )
     print("NeonScrollBar Qt runtime smoke: PASS")
 finally:
     root.close()

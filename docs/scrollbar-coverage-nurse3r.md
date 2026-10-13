@@ -11,6 +11,10 @@
 - Where a previously non-glowing `NeonScrollBar` was meant as a display-only marker, restored a **restrained magenta handle glow** while keeping its dedicated opacity, source palette, dark unlit rail where deliberate, and `interactive: false` policy where established.
 - New scrollbar instances use the canonical `NeonScrollBar` glow defaults; no new global recoloring token is introduced.
 
+## Current owner-coordination blocker
+
+**AppControlW.qml** is an unusually large and actively shared widget (approximately 1.2 MB). The normal GitHub file reader returned an empty body, so a dedicated full-contents source check was necessary. That check found **three** scrollable surfaces: `resultList` and `detailFlickable` currently lack a position indicator; `resourceScopeFlick` already uses the interactive custom `resourceScopeScrollTrack`. This PR does **not** overwrite that concurrent-owner hotspot blindly. The new source coverage test calls this out explicitly as **two unresolved panes**, rather than falsely claiming universal completion. Coordinate those additions with the current AppControl owner before landing the entire migration.
+
 ## Intentional exceptions / follow-up
 
 | Surface | Existing treatment | Why not indiscriminately replace |

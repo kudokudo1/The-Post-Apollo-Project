@@ -94,7 +94,8 @@ Item {
         flickable && window
         && isChildOf(window.activeFocusItem, flickable)
     readonly property bool revealTriggerActive:
-        (triggerEnabled("hover") && paneHover.hovered)
+        (triggerEnabled("hover")
+            && (paneHover.hovered || handleMouse.containsMouse))
         || (triggerEnabled("scroll") && scrollPulse)
         || (triggerEnabled("focus") && focusWithinPane)
         || handleMouse.pressed

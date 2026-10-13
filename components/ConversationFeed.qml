@@ -6,6 +6,9 @@ import Qt5Compat.GraphicalEffects
 Rectangle {
     id: chatFeed
 
+    // Host semantic family: ordinary messaging bar; Hospital star.
+    property string scrollbarHandleStyle: "bar"
+
     property var conversation: null
     property var messages: []
     property bool loading: false
@@ -954,5 +957,11 @@ Rectangle {
         Qt.callLater(function () {
             messageInput.forceActiveFocus();
         });
+    }
+
+    NeonScrollBar {
+        flickable: messageList
+        handleStyle: chatFeed.scrollbarHandleStyle
+        visible: messageList.visible && scrollable
     }
 }

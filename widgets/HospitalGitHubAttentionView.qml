@@ -613,5 +613,11 @@ Rectangle {
                 opacity: 0.44
             }
         }
+        NeonScrollBar {
+            flickable: attentionList
+            handleStyle: "star"
+            mountingParent: attentionList.parent.parent
+            visible: attentionList.visible && scrollable
+        }
     }
 }

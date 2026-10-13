@@ -492,4 +492,8 @@ Rectangle {
             }
         }
     }
+    NeonScrollBar {
+        flickable: conversationList
+        visible: conversationList.visible && scrollable
+    }
 }

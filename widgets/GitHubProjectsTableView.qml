@@ -424,6 +424,8 @@ Item {
                     }
                 }
             }
+            NeonScrollBar { flickable: tableScroll; handleStyle: "star" }
+            NeonScrollBar { flickable: tableScroll; handleStyle: "star"; orientation: Qt.Horizontal }
         }
     }
 }

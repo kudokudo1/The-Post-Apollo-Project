@@ -767,6 +767,11 @@ Item {
                             }
                         }
                     }
+                    NeonScrollBar {
+                        flickable: reportList
+                        handleStyle: "star"
+                        visible: reportList.visible && scrollable
+                    }
                 }
 
                 Rectangle {
@@ -1018,6 +1023,11 @@ Item {
                                 wrapMode: Text.Wrap
                             }
                         }
+                    }
+                    NeonScrollBar {
+                        flickable: detailFlick
+                        handleStyle: "star"
+                        visible: detailFlick.visible && scrollable
                     }
                 }
             }

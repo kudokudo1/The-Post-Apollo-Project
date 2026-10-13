@@ -616,6 +616,7 @@ Item {
                     }
                 }
             }
+            NeonScrollBar { flickable: roadmapScroll; handleStyle: "star" }
         }
     }
 }

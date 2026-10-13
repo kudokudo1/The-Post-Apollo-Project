@@ -290,6 +290,7 @@ Item {
                             }
 
                             Flickable {
+                                id: syntagmaPane1
                                 width: parent.width
                                 height: parent.height - 22
                                 clip: true
@@ -344,6 +345,12 @@ Item {
                                         }
                                     }
                                 }
+                            }
+                            NeonScrollBar {
+                                flickable: syntagmaPane1
+                                handleStyle: "star"
+                                mountingParent: syntagmaPane1.parent.parent
+                                visible: syntagmaPane1.visible && scrollable
                             }
                         }
                     }
@@ -441,6 +448,7 @@ Item {
                     }
 
                     Flickable {
+                        id: syntagmaPane2
                         width: parent.width
                         height:
                             parent.height
@@ -538,6 +546,12 @@ Item {
                                 }
                             }
                         }
+                    }
+                    NeonScrollBar {
+                        flickable: syntagmaPane2
+                        handleStyle: "star"
+                        mountingParent: syntagmaPane2.parent.parent
+                        visible: syntagmaPane2.visible && scrollable
                     }
 
                     Row {
@@ -721,6 +735,7 @@ Item {
                     }
 
                     Flickable {
+                        id: syntagmaPane3
                         width: parent.width
                         height: parent.height - 28
 
@@ -874,6 +889,12 @@ Item {
                                 }
                             }
                         }
+                    }
+                    NeonScrollBar {
+                        flickable: syntagmaPane3
+                        handleStyle: "star"
+                        mountingParent: syntagmaPane3.parent.parent
+                        visible: syntagmaPane3.visible && scrollable
                     }
                 }
             }
@@ -1107,6 +1128,8 @@ Item {
                     }
 
                     NeonScrollBar {
+
+                        handleStyle: "star"
                         id: workflowScrollTrack
 
                         flickable: workflowFlick
@@ -1128,13 +1151,15 @@ Item {
                         railRadius: 0
                         railBorderWidth: 1
                         railBorderColor: Colors.orange
-                        railGlowEnabled: false
+                        railGlowEnabled: true
+                        railGlowOpacity: 0.20
+                        railGlowColor: Colors.orange
 
                         handleColor: Colors.magenta
                         handleOpacity: scrollable ? 0.92 : 0.0672
                         barHandleRadius: 0
                         handleBorderWidth: 0
-                        handleGlowEnabled: false
+                        handleGlowEnabled: true
 
                         interactive: scrollable
                         preserveDragOffset: true

@@ -500,6 +500,7 @@ Rectangle {
                 }
             }
         }
+        NeonScrollBar { flickable: transcript; handleStyle: "star" }
     }
 
     Rectangle {

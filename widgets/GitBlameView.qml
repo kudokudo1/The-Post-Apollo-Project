@@ -649,6 +649,7 @@ SectionFrame {
                     opacity: 0.42
                 }
             }
+            NeonScrollBar { flickable: provenanceList; handleStyle: "star" }
 
             Rectangle {
                 anchors {

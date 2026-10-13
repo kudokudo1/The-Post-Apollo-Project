@@ -635,6 +635,8 @@ Item {
                             }
 
                             NeonScrollBar {
+
+                                handleStyle: "star"
                                 id: catalogScrollTrack
 
                                 flickable: catalogScroll
@@ -656,13 +658,15 @@ Item {
                                 railRadius: 0
                                 railBorderWidth: 1
                                 railBorderColor: Colors.dark
-                                railGlowEnabled: false
+                                railGlowEnabled: true
+                                railGlowOpacity: 0.16
+                                railGlowColor: Colors.dark
 
                                 handleColor: Colors.magenta
                                 handleOpacity: scrollable ? 0.82 : 0.30
                                 barHandleRadius: 0
                                 handleBorderWidth: 0
-                                handleGlowEnabled: false
+                                handleGlowEnabled: true
 
                                 interactive: false
                                 wheelEnabled: false
@@ -731,6 +735,7 @@ Item {
                         }
 
                         Flickable {
+                            id: syntagmaPane1
                             width: parent.width
                             height: parent.height - 34
                             clip: true
@@ -799,6 +804,12 @@ Item {
                                     }
                                 }
                             }
+                        }
+                        NeonScrollBar {
+                            flickable: syntagmaPane1
+                            handleStyle: "star"
+                            mountingParent: syntagmaPane1.parent.parent
+                            visible: syntagmaPane1.visible && scrollable
                         }
                     }
                 }
@@ -898,6 +909,7 @@ Item {
                         }
 
                         Flickable {
+                            id: syntagmaPane2
                             width: parent.width
                             height: parent.height - 67
                             clip: true
@@ -1040,6 +1052,12 @@ Item {
                                     }
                                 }
                             }
+                        }
+                        NeonScrollBar {
+                            flickable: syntagmaPane2
+                            handleStyle: "star"
+                            mountingParent: syntagmaPane2.parent.parent
+                            visible: syntagmaPane2.visible && scrollable
                         }
                     }
                 }
@@ -1342,6 +1360,7 @@ Item {
                             clip: true
 
                             Flickable {
+                                id: syntagmaPane3
                                 anchors.fill: parent
                                 anchors.margins: 6
                                 clip: true
@@ -1373,6 +1392,11 @@ Item {
                                         ? Colors.red
                                         : Colors.white
                                 }
+                            }
+                            NeonScrollBar {
+                                flickable: syntagmaPane3
+                                handleStyle: "star"
+                                visible: syntagmaPane3.visible && scrollable
                             }
                         }
                     }

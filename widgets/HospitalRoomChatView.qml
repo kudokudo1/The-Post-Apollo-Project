@@ -165,6 +165,7 @@ Item {
 
     ConversationFeed {
         id: feed
+        scrollbarHandleStyle: "star"
 
         anchors.fill: parent
 

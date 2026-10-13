@@ -178,6 +178,7 @@ Rectangle {
             : Colors.cyan
 
         Flickable {
+            id: syntagmaPane1
             anchors.fill: parent
             anchors.margins: 6
             clip: true
@@ -205,6 +206,7 @@ Rectangle {
                 }
             }
         }
+        NeonScrollBar { flickable: syntagmaPane1; handleStyle: "star" }
     }
 
     Column {
@@ -314,6 +316,7 @@ Rectangle {
         }
 
         Flickable {
+            id: syntagmaPane2
             width: parent.width
             height: parent.height - 104
             clip: true
@@ -666,6 +669,12 @@ Rectangle {
                     }
                 }
             }
+        }
+        NeonScrollBar {
+            flickable: syntagmaPane2
+            handleStyle: "star"
+            mountingParent: syntagmaPane2.parent
+                            ? syntagmaPane2.parent.parent : null
         }
     }
 }

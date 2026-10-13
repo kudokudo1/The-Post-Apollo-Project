@@ -1156,6 +1156,7 @@ Item {
                             }
                         
                             NeonScrollBar {
+                                handleStyle: "star"
                                 flickable: changesScroll1
                             }
 }
@@ -1306,6 +1307,7 @@ Item {
                             }
                         
                             NeonScrollBar {
+                                handleStyle: "star"
                                 flickable: changesScroll2
                             }
 }
@@ -1496,6 +1498,7 @@ Item {
                             }
                         
                             NeonScrollBar {
+                                handleStyle: "star"
                                 flickable: changesScroll3
                             }
 }
@@ -1901,6 +1904,7 @@ Item {
                             }
 
                             NeonScrollBar {
+                                handleStyle: "star"
                                 flickable: changesScroll4
                             }
                         }
@@ -2025,6 +2029,7 @@ Item {
                         }
                     
                         NeonScrollBar {
+                            handleStyle: "star"
                             flickable: changesScroll5
                         }
 }
@@ -2145,6 +2150,7 @@ Item {
                             }
                         
                             NeonScrollBar {
+                                handleStyle: "star"
                                 flickable: changesScroll6
                             }
 }
@@ -2310,6 +2316,7 @@ Item {
                             }
                         
                             NeonScrollBar {
+                                handleStyle: "star"
                                 flickable: changesScroll7
                             }
 }

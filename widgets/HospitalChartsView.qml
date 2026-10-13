@@ -468,6 +468,11 @@ Item {
                         color: Colors.blue
                     }
                 }
+                NeonScrollBar {
+                    flickable: entryList
+                    handleStyle: "star"
+                    visible: entryList.visible && scrollable
+                }
             }
 
             SectionFrame {
@@ -581,6 +586,7 @@ Item {
                     }
 
                     Flickable {
+                        id: syntagmaPane2
                         width: parent.width
                         height: Math.max(
                             110,
@@ -604,6 +610,12 @@ Item {
                             color: Colors.white
                             wrapMode: Text.Wrap
                         }
+                    }
+                    NeonScrollBar {
+                        flickable: syntagmaPane2
+                        handleStyle: "star"
+                        mountingParent: syntagmaPane2.parent.parent
+                        visible: syntagmaPane2.visible && scrollable
                     }
 
                     Row {
@@ -1096,6 +1108,11 @@ Item {
                             color: Colors.magenta
                         }
                     }
+                    NeonScrollBar {
+                        flickable: suggestionList
+                        handleStyle: "star"
+                        visible: suggestionList.visible && scrollable
+                    }
                 }
 
                 SectionFrame {
@@ -1194,6 +1211,7 @@ Item {
                         }
 
                         Flickable {
+                            id: suggestionDetailScroll
                             width: parent.width
                             height: Math.max(120, parent.height - 238)
                             clip: true
@@ -1213,7 +1231,9 @@ Item {
                             }
 
                             NeonScrollBar {
-                                flickable: parent
+                                handleStyle: "star"
+                                flickable: suggestionDetailScroll
+                                mountingParent: suggestionDetailScroll.parent.parent
                             }
                         }
 

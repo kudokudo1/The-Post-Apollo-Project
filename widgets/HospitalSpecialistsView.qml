@@ -538,6 +538,11 @@ Item {
                             }
                         }
                     }
+                    NeonScrollBar {
+                        flickable: staffList
+                        handleStyle: "star"
+                        visible: staffList.visible && scrollable
+                    }
                 }
 
                 Rectangle {
@@ -774,6 +779,11 @@ Item {
                                 }
                             }
                         }
+                    }
+                    NeonScrollBar {
+                        flickable: detailFlick
+                        handleStyle: "star"
+                        visible: detailFlick.visible && scrollable
                     }
                 }
             }

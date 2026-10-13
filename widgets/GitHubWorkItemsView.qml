@@ -584,7 +584,9 @@ Item {
                 anchors {
                     fill: parent
                     margins: 8
-                    rightMargin: 13
+                    // Keep row content clear of the newly starred indicator.
+                    // Star cross-axis footprint is larger than the old 4px rail.
+                    rightMargin: scrollTrack.width + 9
                 }
 
                 clip: true
@@ -978,6 +980,7 @@ Item {
             }
 
             NeonScrollBar {
+                handleStyle: "star"
                 id: scrollTrack
 
                 flickable: sourceList
@@ -996,12 +999,13 @@ Item {
                 railColor: Colors.dark
                 railOpacity: 1.0
                 railRadius: 0
-                railGlowEnabled: false
+                railGlowEnabled: true
+                railGlowOpacity: 0.20
 
                 handleColor: Colors.magenta
                 barHandleRadius: 0
                 handleBorderWidth: 0
-                handleGlowEnabled: false
+                handleGlowEnabled: true
 
                 interactive: false
                 wheelEnabled: false

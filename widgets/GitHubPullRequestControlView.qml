@@ -294,6 +294,7 @@ Rectangle {
         border.color: editor.activeFocus ? Colors.magenta : accent
 
         Flickable {
+            id: syntagmaPane1
             anchors.fill: parent
             anchors.margins: 6
             clip: true
@@ -320,6 +321,11 @@ Rectangle {
                     opacity: 0.42
                 }
             }
+        }
+        NeonScrollBar {
+            flickable: syntagmaPane1
+            handleStyle: "star"
+            visible: syntagmaPane1.visible && scrollable
         }
     }
 
@@ -486,6 +492,7 @@ Rectangle {
         id: controlPane
 
         Flickable {
+            id: syntagmaPane2
             clip: true
             contentWidth: width
             contentHeight: controlColumn.height
@@ -992,6 +999,11 @@ Rectangle {
                 }
             }
         }
+        NeonScrollBar {
+            flickable: syntagmaPane2
+            handleStyle: "star"
+            visible: syntagmaPane2.visible && scrollable
+        }
     }
 
     Component {
@@ -1194,6 +1206,7 @@ Rectangle {
                 border.color: Colors.blue
 
                 ListView {
+                    id: syntagmaPane3
                     anchors.fill: parent
                     anchors.margins: 6
                     clip: true
@@ -1266,6 +1279,11 @@ Rectangle {
                             }
                         }
                     }
+                }
+                NeonScrollBar {
+                    flickable: syntagmaPane3
+                    handleStyle: "star"
+                    visible: syntagmaPane3.visible && scrollable
                 }
             }
         }
@@ -1422,6 +1440,12 @@ Rectangle {
                             }
                         }
                     }
+                    NeonScrollBar {
+                        flickable: threadList
+                        handleStyle: "star"
+                        mountingParent: threadList.parent.parent
+                        visible: threadList.visible && scrollable
+                    }
                 }
             }
 
@@ -1459,6 +1483,7 @@ Rectangle {
                     }
 
                     ListView {
+                        id: syntagmaPane5
                         width: parent.width
                         height: parent.height - 150
                         clip: true
@@ -1503,6 +1528,12 @@ Rectangle {
                                 }
                             }
                         }
+                    }
+                    NeonScrollBar {
+                        flickable: syntagmaPane5
+                        handleStyle: "star"
+                        mountingParent: syntagmaPane5.parent.parent
+                        visible: syntagmaPane5.visible && scrollable
                     }
 
                     MultiLineField {

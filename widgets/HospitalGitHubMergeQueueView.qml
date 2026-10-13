@@ -247,6 +247,7 @@ Rectangle {
         }
 
         ListView {
+            id: syntagmaPane1
             width: parent.width
             height: parent.height - 157
             clip: true
@@ -438,6 +439,12 @@ Rectangle {
                 color: Colors.white
                 opacity: 0.44
             }
+        }
+        NeonScrollBar {
+            flickable: syntagmaPane1
+            handleStyle: "star"
+            mountingParent: syntagmaPane1.parent.parent
+            visible: syntagmaPane1.visible && scrollable
         }
     }
 }

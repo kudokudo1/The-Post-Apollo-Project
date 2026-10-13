@@ -5,7 +5,7 @@ import "../../components" as Shared
 Window {
     id: root
     width: 370
-    height: 385
+    height: 475
     visible: true
     color: "#1B0623"
 
@@ -60,6 +60,37 @@ Window {
         flickable: horizontalPane
         orientation: Qt.Horizontal
     }
+
+    // Simulate a real menu Column. The bar is declaratively nested here,
+    // then mounted on the surrounding Rectangle to avoid taking a layout row.
+    Rectangle {
+        id: positionedHost
+        objectName: "positionedHost"
+        x: 14; y: 378; width: 320; height: 78
+        color: "#16051F"
+        Column {
+            id: positioner
+            objectName: "positioner"
+            x: 7; y: 11; width: 260
+            Flickable {
+                id: positionerPane
+                objectName: "positionerPane"
+                width: parent.width; height: 50
+                contentWidth: width; contentHeight: 240
+                boundsBehavior: Flickable.StopAtBounds
+            }
+            Shared.NeonScrollBar {
+                id: positionerBar
+                objectName: "positionerBar"
+                flickable: positionerPane
+                handleStyle: "star"
+                mountingParent: positionedHost
+            }
+        }
+    }
+
+    readonly property bool mountedOnHost: positionerBar.parent === positionedHost
+    readonly property bool columnKeptOneItem: positioner.children.length === 1
 
     // Test target can be driven without direct QML context id lookup.
     property alias innerPane: inner

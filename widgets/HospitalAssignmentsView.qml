@@ -361,6 +361,7 @@ Rectangle {
                 border.color: Colors.orange
 
                 ListView {
+                    id: syntagmaPane1
                     anchors.fill: parent
                     anchors.margins: 6
                     clip: true
@@ -443,6 +444,11 @@ Rectangle {
                         color: Colors.blue
                     }
                 }
+                NeonScrollBar {
+                    flickable: syntagmaPane1
+                    handleStyle: "star"
+                    visible: syntagmaPane1.visible && scrollable
+                }
             }
 
             Rectangle {
@@ -502,6 +508,7 @@ Rectangle {
                     }
 
                     Flickable {
+                        id: syntagmaPane2
                         width: parent.width
                         height:
                             editorPanel.visible
@@ -549,6 +556,12 @@ Rectangle {
                             color: Colors.white
                             wrapMode: Text.Wrap
                         }
+                    }
+                    NeonScrollBar {
+                        flickable: syntagmaPane2
+                        handleStyle: "star"
+                        mountingParent: syntagmaPane2.parent.parent
+                        visible: syntagmaPane2.visible && scrollable
                     }
 
                     Row {

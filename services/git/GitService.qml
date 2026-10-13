@@ -1277,6 +1277,7 @@ Scope {
 
             if (trace) {
                 const followupMs = Date.now() - started;
+                const reportStartedMs = Date.now();
                 console.warn(
                     "SYNTAGMA_STARTUP_TRACE // git DONE phases // "
                     + syntagmaTraceLabel()
@@ -1293,6 +1294,15 @@ Scope {
                     + " topologyRows=" + pendingTopology.length
                     + " stale=" + staleRead
                 );
+
+                // Capture the log-call cost and a final handler boundary.
+                // Read by the traced SplitParser wrapper only; no operational
+                // consumer uses this return value.
+                const reportFinishedMs = Date.now();
+                return {
+                    syntagmaDoneExitMs: reportFinishedMs,
+                    syntagmaDoneLogMs: reportFinishedMs - reportStartedMs
+                };
             }
         }
     }
@@ -2267,8 +2277,9 @@ Scope {
                 }
 
                 const started = Date.now();
-                gitService.consumeRefreshLine(line);
-                const duration = Date.now() - started;
+                const doneBoundary = gitService.consumeRefreshLine(line);
+                const finished = Date.now();
+                const duration = finished - started;
                 gitService.traceRefreshLines += 1;
                 gitService.traceRefreshSyncMs += duration;
                 gitService.traceRefreshPeakMs = Math.max(
@@ -2286,6 +2297,20 @@ Scope {
                 }
 
                 if (String(line || "").split("\t")[0] === "DONE") {
+                    if (doneBoundary && doneBoundary.syntagmaDoneExitMs) {
+                        const boundaryMs = Number(
+                            doneBoundary.syntagmaDoneExitMs
+                        );
+                        console.warn(
+                            "SYNTAGMA_STARTUP_TRACE // git DONE boundary // "
+                            + gitService.syntagmaTraceLabel()
+                            + " // handler=" + (boundaryMs - started) + "ms"
+                            + " afterReturn=" + (finished - boundaryMs) + "ms"
+                            + " log=" + Number(doneBoundary.syntagmaDoneLogMs) + "ms"
+                            + " outer=" + duration + "ms"
+                        );
+                    }
+
                     console.warn(
                         "SYNTAGMA_STARTUP_TRACE // git refresh finished // "
                         + gitService.syntagmaTraceLabel()

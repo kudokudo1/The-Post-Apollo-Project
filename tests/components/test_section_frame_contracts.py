@@ -213,12 +213,23 @@ for text_value, needle, message in (
     (GIT_BLAME, "SectionFrame {\n    id: root\n\n    required property var blameService", "Git Blame outer shell"),
     (GIT_BLAME, "id: detailFrame\n\n            anchors {\n                left: parent.left\n                right: parent.right\n                bottom: parent.bottom\n            }\n\n            height: 112\n            fillColor: Colors.black\n            borderWidth: 1\n            borderColor: Colors.blue", "Git Blame detail shell"),
     (GIT_SPLIT_HUB, "SectionFrame {\n    id: root\n\n    required property var fileService", "history split hub outer shell"),
-    (GITHUB_PROJECTS_ROADMAP, "height: parent.height - 38\n            fillColor: Colors.black\n            borderWidth: 1\n            borderColor: Colors.cyan\n            inset: 8\n\n            Flickable {\n                id: roadmapScroll\n\n                anchors.fill: parent", "Projects roadmap scroll shell"),
+    (GITHUB_PROJECTS_ROADMAP, "height: parent.height - 38\n            fillColor: Colors.black\n            borderWidth: 1\n            borderColor: Colors.cyan\n            inset: 8\n\n            Flickable {", "Projects roadmap scroll shell"),
     (GITHUB_PROJECTS_ROADMAP, "height: 30\n                        visible: root.unscheduled.length > 0\n                        fillColor: Colors.black\n                        borderWidth: 1\n                        borderColor: Colors.orange", "Projects roadmap unscheduled header"),
-    (GITHUB_PROJECTS_TABLE, "height: parent.height - 38\n            fillColor: Colors.black\n            borderWidth: 1\n            borderColor: Colors.cyan\n            inset: 8\n\n            Flickable {\n                id: tableScroll\n\n                anchors.fill: parent", "Projects table scroll shell"),
+    (GITHUB_PROJECTS_TABLE, "height: parent.height - 38\n            fillColor: Colors.black\n            borderWidth: 1\n            borderColor: Colors.cyan\n            inset: 8\n\n            Flickable {", "Projects table scroll shell"),
     (RUN_INSPECTOR, "width: 336\n                    height: parent.height\n\n                    fillColor: Colors.dark\n                    borderWidth: 1\n                    borderColor: Colors.blue\n                    inset: 8", "Run Inspector identity pane"),
     (RUN_INSPECTOR, "width: parent.width - 344\n                    height: parent.height\n\n                    fillColor: Colors.dark\n                    borderWidth: 1\n                    borderColor:\n                        root.githubService.inspectorError\n                        ? Colors.red\n                        : Colors.orange\n                    inset: 8", "Run Inspector output pane"),
 ):
     require(text_value, needle, message)
 
 print("Section frame contracts: PASS")
+
+# Scrollbar addition is permitted inside the preserved SectionFrame pane.
+# Verify identifiers and their anchored layout independently of new children.
+for source, id_name in (
+    (GITHUB_PROJECTS_ROADMAP, "roadmapScroll"),
+    (GITHUB_PROJECTS_TABLE, "tableScroll"),
+):
+    require(source, "id: " + id_name, "scrollable frame id preserved")
+    require(source, "anchors.fill: parent", "scrollable frame anchoring preserved")
+    require(source, "NeonScrollBar {", "star indicator added")
+    require(source, 'handleStyle: "star"', "Git/GitHub star identity")

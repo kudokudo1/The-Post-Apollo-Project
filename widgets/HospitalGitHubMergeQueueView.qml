@@ -151,13 +151,16 @@ Rectangle {
                     }
                 }
 
-                QueueButton {
+                HospitalActionButton {
+                    height: Math.min(35, parent.height)
+                    compactIcon: "←"
                     width: 82
                     label: "← ATTENTION"
                     onTriggered: root.closeRequested()
                 }
 
-                QueueButton {
+                HospitalActionButton {
+                    compactIcon: "↻"
                     width: 82
                     label:
                         root.queueProvider.busy
@@ -397,7 +400,9 @@ Rectangle {
                         }
                     }
 
-                    QueueButton {
+                    HospitalActionButton {
+                        height: Math.min(35, parent.height)
+                        compactIcon: "↗"
                         width: 100
                         anchors.verticalCenter: parent.verticalCenter
                         label: "OPEN PULLS"

@@ -692,6 +692,11 @@ Rectangle {
                     }
 
                     Flickable {
+                        NeonScrollBar {
+                            flickable: worktreeScroll
+                            handleStyle: "star"
+                        }
+
                         id: worktreeScroll
 
                         width: parent.width

@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Effects
+import QtQuick.Controls
 
 Item {
     id: root
@@ -29,7 +30,8 @@ Item {
         ? Math.max(glowPadding,
                    handleGlowEnabled
                    ? (dropHandleGlow ? handleDropGlowRadius
-                      : (starStyle ? starGlowPressedSpread : barGlowPressedSpread) + 2)
+                      : (starStyle ? effectiveStarPressedSpread
+                         : effectiveBarPressedSpread) + 2)
                    : 0,
                    railGlowEnabled ? railGlowSpread + 2 : 0)
         : 0
@@ -72,8 +74,13 @@ Item {
     property bool reverseWheelDirection: false
     property string horizontalWheelMode: "convert" // "directional" variant.
     property string trackClickMode: "jump" // "page" rare variant.
-    property bool scrollChaining: true
-    property var chainFlickable: null // Host identifies outer pane.
+    // Operator-approved #09: inner scrolling stops at its own boundary.
+    // Explicit opt-in "chain" is available for exceptional host surfaces.
+    property string nestedScrollMode: "contain" // "chain" is a variant.
+    readonly property bool scrollChaining: nestedScrollMode === "chain"
+    property var chainFlickable: null // Explicit host-owned outer pane.
+    property bool captureNestedPaneWheel: true // Scoped to real nested Flickables.
+    readonly property bool nestedPaneDetected: isNestedWithinFlickable()
     property bool keyboardEnabled: true
     property string interactionStyle: "progressive" // "distinct" variant.
     property color pressedHandleColor: handleColor
@@ -99,8 +106,8 @@ Item {
     property bool revealOpaque: false
     property bool scrollPulse: false
     readonly property bool focusWithinPane:
-        flickable && window
-        && isChildOf(window.activeFocusItem, flickable)
+        flickable && Window.activeFocusItem
+        && isChildOf(Window.activeFocusItem, flickable)
     readonly property bool revealTriggerActive:
         (triggerEnabled("hover")
             && (paneHover.hovered || handleMouse.containsMouse))
@@ -144,24 +151,45 @@ Item {
     property int handleDropGlowSamples: 13
     property real handleDropGlowIdleOpacity: 0.60
     property real handleDropGlowHoverOpacity: 0.60
-    property real handleDropGlowPressedOpacity: 0.76
-    property real handleDropGlowPressedRadius: 13
+    // -1 derives the pressed state from each consumer's existing idle/hover
+    // difference; a deliberately quiet hover stays quiet when pressed.
+    property real handleDropGlowPressedOpacity: -1
+    property real handleDropGlowPressedRadius: -1
+    readonly property real effectiveDropPressedOpacity:
+        handleDropGlowPressedOpacity >= 0 ? handleDropGlowPressedOpacity
+        : progressivePressedValue(handleDropGlowIdleOpacity,
+                                  handleDropGlowHoverOpacity)
+    readonly property real effectiveDropPressedRadius:
+        handleDropGlowPressedRadius >= 0 ? handleDropGlowPressedRadius
+        : handleDropGlowRadius
 
     // Normal bar glow.
     property real barGlowIdleSpread: 2
     property real barGlowHoverSpread: 4
     property real barGlowIdleOpacity: 0.42
     property real barGlowHoverOpacity: 0.60
-    property real barGlowPressedSpread: 5
-    property real barGlowPressedOpacity: 0.76
+    property real barGlowPressedSpread: -1
+    property real barGlowPressedOpacity: -1
+    readonly property real effectiveBarPressedSpread:
+        barGlowPressedSpread >= 0 ? barGlowPressedSpread
+        : progressivePressedValue(barGlowIdleSpread, barGlowHoverSpread)
+    readonly property real effectiveBarPressedOpacity:
+        barGlowPressedOpacity >= 0 ? barGlowPressedOpacity
+        : progressivePressedValue(barGlowIdleOpacity, barGlowHoverOpacity)
 
     // Star glow.
     property real starGlowIdleSpread: 3
     property real starGlowHoverSpread: 5
     property real starGlowIdleOpacity: 0.52
     property real starGlowHoverOpacity: 0.72
-    property real starGlowPressedSpread: 6
-    property real starGlowPressedOpacity: 0.86
+    property real starGlowPressedSpread: -1
+    property real starGlowPressedOpacity: -1
+    readonly property real effectiveStarPressedSpread:
+        starGlowPressedSpread >= 0 ? starGlowPressedSpread
+        : progressivePressedValue(starGlowIdleSpread, starGlowHoverSpread)
+    readonly property real effectiveStarPressedOpacity:
+        starGlowPressedOpacity >= 0 ? starGlowPressedOpacity
+        : progressivePressedValue(starGlowIdleOpacity, starGlowHoverOpacity)
 
     // Star geometry.
     property real starOuterRadius: starHandleSize * 0.443
@@ -238,6 +266,37 @@ Item {
     function clamp(value, low, high) {
         return Math.max(low, Math.min(high, value));
     }
+    function progressivePressedValue(idleValue, hoverValue) {
+        // Do not flatten deliberate same-intensity idle/hover recipes.
+        return hoverValue + Math.max(0, hoverValue - idleValue) * 0.5;
+    }
+    function isNestedWithinFlickable() {
+        if (!flickable) return false;
+        let item = flickable.parent;
+        while (item) {
+            if (item !== flickable
+                    && item.contentY !== undefined
+                    && item.contentHeight !== undefined
+                    && item.flickableDirection !== undefined)
+                return true;
+            item = item.parent;
+        }
+        return false;
+    }
+    function keyboardOwnedByTextInput() {
+        const focusItem = Window.activeFocusItem;
+        if (!focusItem || !isChildOf(focusItem, flickable))
+            return false;
+        return focusItem.readOnly !== undefined
+               || focusItem.inputMethodHints !== undefined;
+    }
+    function handleFocusedPaneKey(event) {
+        if (!focusWithinPane || keyboardOwnedByTextInput())
+            return false;
+        const consumed = handleKey(event.key, event.modifiers);
+        if (consumed) event.accepted = true;
+        return consumed;
+    }
     function isChildOf(item, ancestor) {
         while (item) {
             if (item === ancestor)
@@ -282,6 +341,28 @@ Item {
         target: root.flickable
         function onContentXChanged() { root.noteScrollActivity(); }
         function onContentYChanged() { root.noteScrollActivity(); }
+    }
+    // Full inner-list wheel capture only for actual nested Flickables.
+    // Non-nested lists keep Qt's existing native wheel handling.
+    WheelHandler {
+        id: nestedWheelGuard
+        parent: root.flickable
+        target: null
+        blocking: true
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        enabled: root.captureNestedPaneWheel && root.nestedPaneDetected
+                 && root.nestedScrollMode === "contain"
+        onWheel: function(event) {
+            if (!root.flickable) {
+                event.accepted = true;
+                return;
+            }
+            const amount = root.wheelDelta(event);
+            if (root.scrollable && amount !== 0)
+                root.moveBy(amount, false);
+            // No remaining delta can scroll an outer pane.
+            event.accepted = true;
+        }
     }
     Timer {
         id: scrollPulseTimer
@@ -389,10 +470,14 @@ Item {
             wheel.accepted = false;
             return;
         }
-        wheel.accepted = moveBy(delta, true);
+        // Containment consumes the wheel even when already at the end:
+        // never let the outer pane move. Chaining is a deliberate variant.
+        const moved = moveBy(delta, scrollChaining);
+        wheel.accepted = !scrollChaining || moved;
     }
     function handleKey(key, modifiers) {
-        if (!keyboardEnabled || !interactive || !scrollable)
+        if (!keyboardEnabled || !interactive || !scrollable
+                || (modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)))
             return false;
         const step = systemWheelStep();
         let delta = 0;
@@ -491,12 +576,13 @@ Item {
 
         horizontalOffset: 0
         verticalOffset: 0
-        radius: handleMouse.pressed ? root.handleDropGlowPressedRadius
-               : root.handleDropGlowRadius
+        radius: handleMouse.pressed && handleMouse.draggingHandle
+                ? root.effectiveDropPressedRadius : root.handleDropGlowRadius
         samples: root.handleDropGlowSamples
 
         color: root.effectiveHandleColor
-        opacity: handleMouse.pressed ? root.handleDropGlowPressedOpacity
+        opacity: handleMouse.pressed && handleMouse.draggingHandle
+                 ? root.effectiveDropPressedOpacity
                  : root.handleHovered ? root.handleDropGlowHoverOpacity
                  : root.handleDropGlowIdleOpacity
 
@@ -524,10 +610,12 @@ Item {
                     root.handleGlowEnabled
                     && !root.dropHandleGlow
 
-                spread: handleMouse.pressed ? root.barGlowPressedSpread
+                spread: handleMouse.pressed && handleMouse.draggingHandle
+                        ? root.effectiveBarPressedSpread
                         : root.handleHovered ? root.barGlowHoverSpread
                         : root.barGlowIdleSpread
-                opacity: handleMouse.pressed ? root.barGlowPressedOpacity
+                opacity: handleMouse.pressed && handleMouse.draggingHandle
+                         ? root.effectiveBarPressedOpacity
                          : root.handleHovered ? root.barGlowHoverOpacity
                          : root.barGlowIdleOpacity
                 color: root.effectiveHandleColor
@@ -606,10 +694,12 @@ Item {
                     root.handleGlowEnabled
                     && !root.dropHandleGlow
 
-                spread: handleMouse.pressed ? root.starGlowPressedSpread
+                spread: handleMouse.pressed && handleMouse.draggingHandle
+                        ? root.effectiveStarPressedSpread
                         : root.handleHovered ? root.starGlowHoverSpread
                         : root.starGlowIdleSpread
-                opacity: handleMouse.pressed ? root.starGlowPressedOpacity
+                opacity: handleMouse.pressed && handleMouse.draggingHandle
+                         ? root.effectiveStarPressedOpacity
                          : root.handleHovered ? root.starGlowHoverOpacity
                          : root.starGlowIdleOpacity
                 color: root.effectiveHandleColor

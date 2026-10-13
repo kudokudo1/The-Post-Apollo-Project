@@ -70,6 +70,10 @@ PanelWindow {
         && !root.localTargetMenuOpen && !root.remoteTargetMenuOpen
         && !root.issueCreateMode && !root.pullRequestControlOpen
         && !root.issueControlOpen && !root.blameOpen
+    readonly property bool topSubModeKeysAvailable:
+        root.standardModeKeysAvailable && root.activePage === "git"
+        && ["changes", "history", "repository"].indexOf(root.gitView) >= 0
+        && !(root.gitView === "changes" && gitChangesView.transferOpen)
 
     readonly property bool gitCanGoBack:
         gitNavigationStack.length > 0
@@ -255,31 +259,35 @@ PanelWindow {
         onActivated: root.cycleVisibleSubMode(1)
     }
 
+    // Shift horizontal arrows now own the *nested top Sub Mode* level,
+    // rather than accidentally repeating the Main Mode shortcut.
     Shortcut {
         sequence: "Shift+Left"
-        context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
-        onActivated: root.selectPrimaryMode(-1)
+        context: Qt.WindowShortcut
+        enabled: root.topSubModeKeysAvailable
+        onActivated: root.cycleTopSubMode(-1)
     }
 
+    // Legacy Git primary-page aliases remain, but respect editor/overlay
+    // ownership just like the new Tab grammar.
     Shortcut {
         sequence: "Shift+Up"
-        context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        context: Qt.WindowShortcut
+        enabled: root.standardModeKeysAvailable
         onActivated: root.selectPrimaryMode(-1)
     }
 
     Shortcut {
         sequence: "Shift+Right"
-        context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
-        onActivated: root.selectPrimaryMode(1)
+        context: Qt.WindowShortcut
+        enabled: root.topSubModeKeysAvailable
+        onActivated: root.cycleTopSubMode(1)
     }
 
     Shortcut {
         sequence: "Shift+Down"
-        context: Qt.ApplicationShortcut
-        enabled: root.menuOpen && root.keyboardActive
+        context: Qt.WindowShortcut
+        enabled: root.standardModeKeysAvailable
         onActivated: root.selectPrimaryMode(1)
     }
 
@@ -689,6 +697,19 @@ PanelWindow {
         // This top-level family has two pages. Both directions move to the
         // other page; the existing opener performs the safe page handoff.
         selectPrimaryMode(root.activePage === "git" ? 1 : -1);
+    }
+
+    function cycleTopSubMode(direction) {
+        if (!topSubModeKeysAvailable)
+            return;
+        if (root.gitView === "changes")
+            gitChangesView.cycleSubMode(direction);
+        else if (root.gitView === "history")
+            gitHistoryView.cycleSubMode(direction);
+        else if (root.gitView === "repository")
+            gitRepositoryView.cycleSubMode(direction);
+
+        Qt.callLater(ensureGitKeyboardControl);
     }
 
     function cycleVisibleSubMode(direction) {

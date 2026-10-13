@@ -163,7 +163,9 @@ Item {
                     elide: Text.ElideRight
                 }
 
-                ReportButton {
+                HospitalActionButton {
+                    height: Math.min(35, parent.height)
+                    compactIcon: "↻"
                     width: 86
                     anchors.verticalCenter: parent.verticalCenter
                     label:
@@ -175,7 +177,9 @@ Item {
                     onTriggered: reportService.refresh()
                 }
 
-                ReportButton {
+                HospitalActionButton {
+                    height: Math.min(35, parent.height)
+                    compactIcon: "▤"
                     width: 82
                     anchors.verticalCenter: parent.verticalCenter
                     label: "CHAT"
@@ -183,7 +187,8 @@ Item {
                     onTriggered: root.chatRequested()
                 }
 
-                ReportButton {
+                HospitalActionButton {
+                    compactIcon: "×"
                     width: 92
                     anchors.verticalCenter: parent.verticalCenter
                     label: "CLOSE"
@@ -641,7 +646,8 @@ Item {
                                     }
                                 }
 
-                                ReportButton {
+                                HospitalActionButton {
+                                    compactIcon: "!"
                                     width: 117
                                     height: parent.height
                                     anchors.verticalCenter: parent.verticalCenter

@@ -328,6 +328,11 @@ Item {
                         color: Colors.cyan
                     }
                 }
+                NeonScrollBar {
+                    flickable: reportList
+                    handleStyle: "star"
+                    visible: reportList.visible && scrollable
+                }
             }
 
             SectionFrame {
@@ -540,6 +545,12 @@ Item {
                                 }
                             }
                         }
+                    }
+                    NeonScrollBar {
+                        flickable: detailFlick
+                        handleStyle: "star"
+                        mountingParent: detailFlick.parent.parent
+                        visible: detailFlick.visible && scrollable
                     }
 
                     Rectangle {

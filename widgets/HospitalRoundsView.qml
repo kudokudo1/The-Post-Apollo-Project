@@ -610,6 +610,11 @@ Item {
                             }
                         }
                     }
+                    NeonScrollBar {
+                        flickable: roomBoard
+                        handleStyle: "star"
+                        visible: roomBoard.visible && scrollable
+                    }
                 }
 
                 Rectangle {

@@ -110,6 +110,19 @@ for rel in ("components/BranchMap.qml", "components/ConversationFeed.qml"):
         re.findall(r"\b(?:Flickable|ListView|GridView)\s*\{", content)
     ), f"{rel}: shared scroll pane without an indicator"
 
+# A QML Component has exactly one root object. Keep the added scrollbar
+# inside the controlPane Flickable; NeonScrollBar reparents itself to the
+# Flickable's parent so the overlay does not scroll with the content.
+pr_control = source("widgets/GitHubPullRequestControlView.qml")
+control_pane = pr_control.split("    Component {\n        id: controlPane", 1)[1].split(
+    "\n    Component {\n        id: queuePane", 1
+)[0]
+assert "        Flickable {\n            id: syntagmaPane2" in control_pane
+assert "            NeonScrollBar {\n                flickable: syntagmaPane2" in control_pane
+assert not re.search(r"(?m)^        NeonScrollBar \{", control_pane), (
+    "QML Component controlPane must not have a second visual root"
+)
+
 print(
     f"Scrollbar surface migration contracts: PASS "
     f"({starred_instances} Git/Hospital stars; "

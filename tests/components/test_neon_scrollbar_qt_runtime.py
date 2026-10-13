@@ -33,7 +33,12 @@ inner = root.findChild(QObject, "innerPane")
 outer = root.findChild(QObject, "outerPane")
 horizontal_bar = root.findChild(QObject, "horizontalBar")
 horizontal_pane = root.findChild(QObject, "horizontalPane")
-if any(obj is None for obj in (bar, inner, outer, horizontal_bar, horizontal_pane)):
+positioner_bar = root.findChild(QObject, "positionerBar")
+positioner_pane = root.findChild(QObject, "positionerPane")
+positioned_host = root.findChild(QObject, "positionedHost")
+positioner = root.findChild(QObject, "positioner")
+if any(obj is None for obj in (bar, inner, outer, horizontal_bar, horizontal_pane,
+                               positioner_bar, positioner_pane, positioned_host, positioner)):
     raise AssertionError("QML harness did not expose the three target objects")
 
 def near(value, expected, label):
@@ -106,6 +111,24 @@ try:
     assert float(horizontal_pane.property("contentX")) > 0, (
         "vertical wheel over horizontal scrollbar did not scroll right"
     )
+    # Verify a declaratively nested indicator actually escapes the Column.
+    assert positioner_bar.parentItem().objectName() == "positionedHost"
+    near(positioner_bar.property("width"), 16, "star overlay width")
+    near(positioner_bar.property("x"), 7 + 260 - 16 - 4, "mounted overlay x")
+    near(positioner_bar.property("y"), 11 + 5, "mounted overlay y")
+    assert len(positioner.childItems()) == 1, (
+        "Scrollbar should not become an extra row in the Column"
+    )
+
+    # Preserve legacy per-layer inactive fading unless explicitly requested.
+    assert bar.setProperty("autoHide", False)
+    assert inner.setProperty("contentHeight", inner.property("height"))
+    app.processEvents()
+    near(bar.property("opacity"), 1, "legacy persistent root remains full-opacity")
+    assert bar.setProperty("visibilityMode", "persistent")
+    app.processEvents()
+    near(bar.property("opacity"), 0.34, "explicit persistent root inactive opacity")
+
     print("NeonScrollBar Qt runtime smoke: PASS")
 finally:
     root.close()

@@ -168,3 +168,54 @@ without opening menus or running repeated unsafe experiments.
 This stage still measures the **existing** code only. Any
 optimization requires separate evidence and coordination with
 other workers touching Git or Hospital UI.
+
+
+## Third diagnostic gate // DONE body looks fast; callback remains slow
+
+**Operator's October 13, 2026 trace (before this proposed patch):**
+
+```text
+SYNTAGMA_LAG_PROBE // event-loop interval 2714ms (target 100ms) // git=false hospital=false notifications=false
+SYNTAGMA_STARTUP_TRACE // git slow refresh callback // LIVE QUICKSHELL :: /var/home/mapple/.config/quickshell // tag=DONE duration=2999ms
+SYNTAGMA_STARTUP_TRACE // git refresh finished // LIVE QUICKSHELL :: /var/home/mapple/.config/quickshell // wall=4167ms lines=376 callbackSum=3011ms callbackMax=2999ms
+SYNTAGMA_STARTUP_TRACE // git DONE phases // LIVE QUICKSHELL :: /var/home/mapple/.config/quickshell // state=0ms publish=1ms localSelection=1ms remoteSelection=1ms revision=0ms available=0ms refreshedSignal=0ms followup=0ms // localRows=25 remoteRows=292 topologyRows=48 stale=false
+```
+
+The `DONE` body measurements account for just a few milliseconds,
+yet the enclosing SplitParser callback takes roughly three seconds.
+**This does not demonstrate that model publication, signal emission,
+or branch-list processing individually took three seconds.** Work may
+be occurring during the diagnostic console emission or across the
+QML/JS return boundary, including engine bookkeeping and deferred
+binding work. This trace does not distinguish those possibilities.
+
+### Proposed opt-in boundary measurement
+
+The same `POST_APOLLO_GIT_STARTUP_TRACE=1` switch now also produces
+`SYNTAGMA_STARTUP_TRACE // git DONE boundary` with four fields:
+
+- `handler`: start of SplitParser's callback to last timestamp inside
+  `consumeRefreshLine`, including its diagnostic log;
+- `afterReturn`: last internal timestamp to first timestamp after
+  `consumeRefreshLine` returns to the SplitParser handler;
+- `log`: cost of emitting the existing `git DONE phases` warning;
+- `outer`: total synchronous callback duration, measured as before.
+
+Expect approximately `handler + afterReturn = outer`; minor
+rounding and clock granularity differences are possible.
+The `handler` value is an inclusive wall-clock span, not CPU-time.
+A long `log` points to diagnostic logging itself. A long
+`afterReturn` suggests expensive return-boundary/engine activity
+but **does not prove QML binding reevaluation**. A long `handler`
+with a short `log` suggests unmeasured work or a timing anomaly
+inside the function; profile before changing model logic.
+
+The boundary receipt is returned only in traced mode. No window
+lifecycle, model contents, Git commands, service scheduling, or UI
+behavior is changed. Source checks are not live-performance evidence.
+
+After this patch is merged and the operator's clean local checkout
+receives it, run the existing one-restart, menus-closed procedure.
+Collect the paired `DONE phases`, `DONE boundary`,
+`slow refresh callback` and event-loop lines from the **same**
+session. Do not diagnose from output truncated by terminal width.

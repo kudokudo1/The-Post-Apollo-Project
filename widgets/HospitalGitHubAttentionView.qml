@@ -385,6 +385,11 @@ Rectangle {
         }
 
         ListView {
+            NeonScrollBar {
+                flickable: attentionList
+                handleStyle: "star"
+            }
+
             id: attentionList
 
             width: parent.width

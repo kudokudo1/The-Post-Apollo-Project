@@ -662,7 +662,11 @@ Item {
                                 handleOpacity: scrollable ? 0.82 : 0.30
                                 barHandleRadius: 0
                                 handleBorderWidth: 0
-                                handleGlowEnabled: false
+                                // Restore a quiet magenta halo, preserving
+                                // the original layer-specific inactive fade.
+                                handleGlowEnabled: true
+                                barGlowIdleOpacity: scrollable ? 0.22 : 0.08
+                                barGlowHoverOpacity: scrollable ? 0.36 : 0.08
 
                                 interactive: false
                                 wheelEnabled: false

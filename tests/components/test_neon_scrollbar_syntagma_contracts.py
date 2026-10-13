@@ -27,6 +27,10 @@ CONTRACT = {
     'property bool reserveSpace: true': "reservation contract",
     'readonly property real reservedExtent:': "host reservation API",
     'property bool reserveGlowSpace: false': "glow reservation is independent and opt-in",
+    'property bool viewportHasEndpointClearance: false':
+        "host can avoid duplicate endpoint gaps",
+    'effectiveTopInset: viewportHasEndpointClearance ? 0 : topInset':
+        "host endpoint inset resolution",
     'starStyle ? starAreaWidth : barAreaWidth': "physical width remains 10/16 by default",
     'reserveGlowSpace ? 2 * effectiveGlowPadding : 0': "optional host-only glow clearance",
     'property bool containGlow: true': "contained glow",
@@ -48,16 +52,31 @@ CONTRACT = {
     'parent: root.flickable': "pane-scoped hover reveal",
     'function noteScrollActivity()': "scroll reveal",
     'readonly property bool focusWithinPane:': "focus reveal",
+    'Window.activeFocusItem': "QtQuick native active-focus property",
+    'function keyboardOwnedByTextInput()': "do not hijack editable text inputs",
+    'function handleFocusedPaneKey(event)': "host routes keys for focused pane",
+    'Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier':
+        "preserve existing shortcuts",
     # Interaction // 012–013, 015, 018–022
     'property string interactionStyle: "progressive"': "progressive glow default",
-    'property real barGlowPressedOpacity: 0.76': "pressed glow level",
-    'property real starGlowPressedOpacity: 0.86': "star pressed glow",
+    'property real barGlowPressedOpacity: -1': "pressed glow is derived by default",
+    'property real starGlowPressedOpacity: -1': "star pressed glow is derived",
+    'function progressivePressedValue(idleValue, hoverValue)': "preserve per-consumer glow identity",
+    'root.effectiveBarPressedOpacity': "bar uses derived pressed recipe",
+    'root.effectiveStarPressedOpacity': "star uses derived pressed recipe",
     'property string trackClickMode: "jump"': "click-to-jump default",
     'root.trackClickMode === "page"': "rare page-step variant",
     'readonly property bool handleHovered:': "handle-only hover",
     'handleMouse.mouseX >= handleLoader.x': "handle X hit zone",
     'handleMouse.mouseY >= handleLoader.y': "handle Y hit zone",
-    'property bool scrollChaining: true': "inner-first chaining",
+    'property string nestedScrollMode: "contain"': "operator-selected stop-at-end default",
+    'readonly property bool scrollChaining: nestedScrollMode === "chain"':
+        "optional explicit chain variant",
+    'property bool captureNestedPaneWheel: true': "nested wheel interception enabled",
+    'enabled: root.captureNestedPaneWheel && root.nestedPaneDetected':
+        "intercept only real nested pane surfaces",
+    'blocking: true': "whole-inner-pane boundary containment",
+    'event.accepted = true;': "contain wheel even at the inner boundary",
     'property var chainFlickable: null': "explicit outer ownership",
     'chainFlickable[axis] = clamp(outerBefore + remainder, 0, outerMax)':
         "boundary-only outer handoff",

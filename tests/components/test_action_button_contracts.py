@@ -682,3 +682,61 @@ assert "id: systemControlMouse" not in SYSTEM_MONITOR, (
 )
 
 print("Extracted AppControl action families: PASS")
+
+
+# Temperature/Fans: four discrete, safety-gated commands move to the
+# universal ActionButton. The continuous fan slider, safety lock, and
+# Thermal/System selectors retain their distinct control families.
+THERMAL = (ROOT / "widgets/appcontrol/ThermalMonitorView.qml").read_text(encoding="utf-8")
+FAN_LOCK = (ROOT / "widgets/thermal/FanSafetyLock.qml").read_text(encoding="utf-8")
+FAN_SECTION = THERMAL[THERMAL.index("id: fanActionFlow"):THERMAL.index(
+    "width: thermalContributorHeader.implicitWidth + 32"
+)]
+
+for needle, message in (
+    ("id: fanActionFlow", "fan action layout"),
+    ("minActionWidth: 48", "minimum viable fan action width"),
+    ("columnsCount:", "responsive action wrapping"),
+    ("actionWidth: Math.max(", "four-button space budget"),
+    ("height: rowCount * 35", "vertical wrap budget"),
+    ("ActionButton {", "reusable action family"),
+    ("height: 35", "preferred fan action height"),
+    ('action: "auto"', "automatic fan mode"),
+    ('action: "manual"', "manual fan boost mode"),
+    ('action: "boost"', "ten percent boost"),
+    ('action: "max"', "maximum fan command"),
+    ("available: canControl", "fan unlock/permission action gate"),
+    ("thermalController.fanControlUnlocked(", "safety-lock enforcement"),
+    ("safeSensor.controlWritable", "writable PWM guard"),
+    ("safeSensor.controlRequiresAuth", "authenticated PWM guard"),
+    ("Accessible.role: Accessible.Button", "action accessibility"),
+    ("fontSizeMode: Text.HorizontalFit", "text shrink fallback"),
+    ("minimumLabelMeasure.implicitWidth <= textBudget", "minimum fit measurement"),
+    ("compactIconMeasure.implicitWidth <= textBudget", "icon-only fallback"),
+    ("color: Colors.white", "white percent punctuation"),
+    ("contentGlowIdleOpacity: 0.35", "idle content glow"),
+    ("contentGlowHoverOpacity: 0.75", "hover content glow"),
+    ("contentGlowPressedOpacity: 1.0", "pressed content glow"),
+    ("softGlowIdleOpacity: 0.25", "idle perimeter glow"),
+    ("softGlowHoverOpacity: 0.55", "hover perimeter glow"),
+    ("softGlowPressedOpacity: 0.60", "pressed perimeter glow"),
+    ("wideGlowEnabled: false", "no wide halo overlap"),
+    ("onTriggered: {", "shared action trigger"),
+    ("thermalController.clearDesiredFanPercent(", "AUTO target clear"),
+    ("thermalController.setDesiredFanPercent(", "boost/MAX targets"),
+    ("thermalController.writeFanControl(", "fan command path"),
+):
+    require(FAN_SECTION, needle, message)
+
+assert FAN_SECTION.count("ActionButton {") == 1, (
+    "one shared delegate must render exactly four model actions"
+)
+assert "fanControlMouse" not in FAN_SECTION, (
+    "private fan action MouseArea must not return"
+)
+assert "id: thermalLoadSlider" in THERMAL, "continuous fan slider must remain"
+assert "id: fanSliderMouse" in THERMAL, "slider keeps separate pointer behavior"
+assert "toggleFanControlUnlocked(" in FAN_LOCK, "green safety lock must remain"
+assert "FanSafetyLock" not in FAN_SECTION, "lock cannot be flattened into an action"
+
+print("Temperature fan action family: PASS // four guarded shared actions")

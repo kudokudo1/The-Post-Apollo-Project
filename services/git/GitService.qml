@@ -831,6 +831,17 @@ Scope {
     }
 
     function publishPendingModels() {
+        // Read-only timing receipts, computed only during an opted-in trace.
+        // Return to the DONE handler rather than publishing an extra QML
+        // property or logging inside model mutation loops.
+        const trace = syntagmaStartupTraceEnabled;
+        let started = trace ? Date.now() : 0;
+        let metadataMs = 0;
+        let clearsMs = 0;
+        let localMs = 0;
+        let remoteMs = 0;
+        let topologyMs = 0;
+
         repoRoot = pendingRepoRoot;
         repository = pendingRepository;
         branch = pendingBranch;
@@ -842,9 +853,19 @@ Scope {
         ahead = pendingAhead;
         behind = pendingBehind;
 
+        if (trace) {
+            metadataMs = Date.now() - started;
+            started = Date.now();
+        }
+
         localBranchRows.clear();
         remoteBranchRows.clear();
         topologyRows.clear();
+
+        if (trace) {
+            clearsMs = Date.now() - started;
+            started = Date.now();
+        }
 
         for (let i = 0; i < pendingLocalBranches.length; ++i) {
             const localRow = pendingLocalBranches[i] || {};
@@ -855,6 +876,11 @@ Scope {
                 unpulledCount: Number(localRow.unpulledCount || 0),
                 lastChangedEpoch: Number(localRow.lastChangedEpoch || 0)
             });
+        }
+
+        if (trace) {
+            localMs = Date.now() - started;
+            started = Date.now();
         }
 
         for (let i = 0; i < pendingRemoteBranches.length; ++i) {
@@ -872,8 +898,24 @@ Scope {
             });
         }
 
+        if (trace) {
+            remoteMs = Date.now() - started;
+            started = Date.now();
+        }
+
         for (let i = 0; i < pendingTopology.length; ++i)
             topologyRows.append(pendingTopology[i]);
+
+        if (trace) {
+            topologyMs = Date.now() - started;
+            return {
+                metadataMs: metadataMs,
+                clearsMs: clearsMs,
+                localMs: localMs,
+                remoteMs: remoteMs,
+                topologyMs: topologyMs
+            };
+        }
     }
 
     function allocateLane(sha, parents) {
@@ -1223,6 +1265,7 @@ Scope {
             const trace = syntagmaStartupTraceEnabled;
             let started = trace ? Date.now() : 0;
             let publishMs = 0;
+            let publishParts = null;
             let localSelectionMs = 0;
             let remoteSelectionMs = 0;
             let revisionMs = 0;
@@ -1237,7 +1280,7 @@ Scope {
 
             if (!staleRead && !lastError) {
                 if (trace) started = Date.now();
-                publishPendingModels();
+                publishParts = publishPendingModels();
                 if (trace) {
                     publishMs = Date.now() - started;
                     started = Date.now();
@@ -1293,6 +1336,21 @@ Scope {
                     + " topologyRows=" + pendingTopology.length
                     + " stale=" + staleRead
                 );
+                if (publishParts) {
+                    console.warn(
+                        "SYNTAGMA_STARTUP_TRACE // git publish phases // "
+                        + syntagmaTraceLabel()
+                        + " // metadata=" + publishParts.metadataMs + "ms"
+                        + " clears=" + publishParts.clearsMs + "ms"
+                        + " local=" + publishParts.localMs + "ms"
+                        + " remote=" + publishParts.remoteMs + "ms"
+                        + " topology=" + publishParts.topologyMs + "ms"
+                        + " total=" + publishMs + "ms"
+                        + " // localRows=" + pendingLocalBranches.length
+                        + " remoteRows=" + pendingRemoteBranches.length
+                        + " topologyRows=" + pendingTopology.length
+                    );
+                }
             }
         }
     }

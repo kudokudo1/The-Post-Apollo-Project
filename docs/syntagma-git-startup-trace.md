@@ -168,3 +168,62 @@ without opening menus or running repeated unsafe experiments.
 This stage still measures the **existing** code only. Any
 optimization requires separate evidence and coordination with
 other workers touching Git or Hospital UI.
+
+
+## Third diagnostic gate // model publication consumes nearly the entire freeze
+
+**Operator session recovered from persisted `log.log` at 18:45 EDT,
+October 13, 2026.** The earlier terminal output truncated the crucial
+slow `DONE phases` line. These measurements are for the slow
+`LIVE QUICKSHELL` refresh, not the distinct, fast service instance:
+
+| Time | `publish` | `callbackMax` |
+|---|---:|---:|
+| 18:24:59 | 2,979 ms | 2,999 ms |
+| 18:29:34 | 3,057 ms | 3,091 ms |
+| 18:29:39 | 3,337 ms | 3,350 ms |
+| 18:34:10 | 2,789 ms | 2,812 ms |
+| 18:34:16 | 3,030 ms | 3,054 ms |
+
+Across these five events, the mean `publish` duration is ~3,038 ms.
+Each refreshed roughly 25 local branches, 292–294 remote branches,
+and 48 topology rows. This identifies the **model publication path**
+as the dominant synchronous measured phase, not which specific model
+mutation, QML binding, or delegate creation made it expensive.
+
+The implementation currently assigns repository metadata, clears three
+`ListModel` instances, and appends each pending local, remote,
+and topology record. A slow `append()` can include model-notification
+and binding costs; a large duration does not prove raw JS loops alone
+are the problem. The two LIVE QUICKSHELL service instances must not be
+conflated; one originally completed the DONE work in ~27 ms.
+
+### New opt-in subphase trace
+
+The same `POST_APOLLO_GIT_STARTUP_TRACE=1` gate now emits
+`SYNTAGMA_STARTUP_TRACE // git publish phases` **after**
+`publishPendingModels()` has completed, breaking down:
+
+- `metadata` — scalar repository/status property updates;
+- `clears` — clearing the three live QML models;
+- `local` — appending pending local branch rows;
+- `remote` — appending pending remote branch rows;
+- `topology` — appending pending topology rows;
+- `total` — enclosing publication time measured by the existing DONE trace.
+
+These durations should approximately add to `total`, modulo
+millisecond clock granularity. No extra signal, scheduler, additional
+refresh, model mutation, UI lifecycle or logging inside loops is added.
+In normal mode this returns no measurement object and emits no extra
+log lines. Runtime validation remains pending.
+
+**Next gate:** merge only after shared GitService ownership / CI review,
+pull into the actual clean Quickshell checkout, and collect exactly one
+normal startup, menus closed, with both trace flags set. Use the saved
+plain-text `log.log` or a wide file capture rather than cropped
+terminal output. If `remote` dominates, investigate repeated
+`ListModel` notifications and downstream recomputation, preserving
+all selectors, scrollbars, stars and existing glow semantics.
+Do not preemptively delete rows, defer hidden menus, or change mapping
+behavior. Continue to treat Qt/JS measured wall-time as **inclusive**,
+not function-stack profiling or CPU-time.

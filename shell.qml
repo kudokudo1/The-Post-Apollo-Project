@@ -38,11 +38,19 @@ PanelWindow {
     }
     property alias controlKeyboardOwner: keyboardOwnership.owner
 
+    function requestControlKeyboard(id, reason) {
+        // Koinoikos selection and ordinary menu ownership cannot diverge:
+        // a pointer-entry/open request in that mode must update both.
+        if (relationshipFocus.active && relationshipFocus.owner !== id)
+            relationshipFocus.selectOwner(id);
+        return keyboardOwnership.claim(id, reason);
+    }
+
     function swapControlKeyboardOwner() {
         if (!hospitalWindow.menuOpen || !gitWindow.menuOpen)
             return;
 
-        keyboardOwnership.claim(
+        shellRoot.requestControlKeyboard(
             controlKeyboardOwner === "hospital" ? "git" : "hospital",
             "ctrl-tab"
         );
@@ -281,19 +289,19 @@ PanelWindow {
                 relationshipFocused: relationshipFocus.owner === "hospital"
 
                 onKeyboardOwnershipRequested:
-                    keyboardOwnership.claim("hospital", "pointer")
+                    shellRoot.requestControlKeyboard("hospital", "pointer")
 
                 onGithubPullRequestRequested: function(repository, number) {
                     gitWindow.openGithubPullRequest(
                         repository,
                         number
                     );
-                    keyboardOwnership.claim("git", "cross-widget");
+                    shellRoot.requestControlKeyboard("git", "cross-widget");
                 }
 
                 onMenuOpenChanged: {
                     if (menuOpen)
-                        keyboardOwnership.claim("hospital", "open");
+                        shellRoot.requestControlKeyboard("hospital", "open");
                     else
                         keyboardOwnership.release("hospital");
                 }
@@ -330,11 +338,11 @@ PanelWindow {
                 relationshipFocused: relationshipFocus.owner === "git"
 
                 onKeyboardOwnershipRequested:
-                    keyboardOwnership.claim("git", "pointer")
+                    shellRoot.requestControlKeyboard("git", "pointer")
 
                 onMenuOpenChanged: {
                     if (menuOpen)
-                        keyboardOwnership.claim("git", "open");
+                        shellRoot.requestControlKeyboard("git", "open");
                     else
                         keyboardOwnership.release("git");
                 }

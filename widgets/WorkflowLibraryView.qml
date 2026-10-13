@@ -1149,7 +1149,10 @@ Item {
                         handleOpacity: scrollable ? 0.92 : 0.0672
                         barHandleRadius: 0
                         handleBorderWidth: 0
-                        handleGlowEnabled: false
+                        // Keep the existing per-layer disabled treatment.
+                        handleGlowEnabled: true
+                        barGlowIdleOpacity: scrollable ? 0.22 : 0.08
+                        barGlowHoverOpacity: scrollable ? 0.36 : 0.08
 
                         interactive: scrollable
                         preserveDragOffset: true

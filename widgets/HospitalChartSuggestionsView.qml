@@ -192,6 +192,7 @@ Rectangle {
                 }
 
                 HospitalActionButton {
+                    height: Math.min(35, parent.height)
                     compactIcon: "×"
                     width: 34
                     label: "X"

@@ -118,7 +118,7 @@ for name, needles in commands.items():
 # parent's actual height rather than force its 35px preferred height.
 for name in views:
     text = (ROOT / "widgets" / name).read_text(encoding="utf-8")
-    for found in re.finditer(r"(?m)^(\s*)HospitalActionButton \{\n", text):
+    for found in re.finditer(r"(?m)^([ \t]*)HospitalActionButton \{\n", text):
         body = text[found.end():]
         closing = re.search(rf"(?m)^{re.escape(found.group(1))}\}}\s*$", body)
         assert closing, (name, "unterminated action")

@@ -13,6 +13,14 @@ on:
       - "widgets/HospitalArchiveView.qml"
       - "tests/components/test_neon_scrollbar_contracts.py"
       - "tests/components/test_neon_scrollbar_syntagma_contracts.py"
+      - "tests/components/test_neon_scrollbar_surface_migration.py"
+      - "components/ConversationFeed.qml"
+      - "widgets/Git*.qml"
+      - "widgets/Hospital*.qml"
+      - "widgets/RepositoryProfileView.qml"
+      - "widgets/WorkflowLibraryView.qml"
+      - "widgets/RunInspectorDrawer.qml"
+      - "widgets/notifications/NotificationsHubW.qml"
       - "tests/components/test_neon_scrollbar_qt_runtime.py"
       - "tests/components/neon_scrollbar_runtime_harness.qml"
       - "docs/neon-scrollbar-syntagma-api.md"
@@ -26,6 +34,14 @@ on:
       - "widgets/HospitalArchiveView.qml"
       - "tests/components/test_neon_scrollbar_contracts.py"
       - "tests/components/test_neon_scrollbar_syntagma_contracts.py"
+      - "tests/components/test_neon_scrollbar_surface_migration.py"
+      - "components/ConversationFeed.qml"
+      - "widgets/Git*.qml"
+      - "widgets/Hospital*.qml"
+      - "widgets/RepositoryProfileView.qml"
+      - "widgets/WorkflowLibraryView.qml"
+      - "widgets/RunInspectorDrawer.qml"
+      - "widgets/notifications/NotificationsHubW.qml"
       - "tests/components/test_neon_scrollbar_qt_runtime.py"
       - "tests/components/neon_scrollbar_runtime_harness.qml"
       - "docs/neon-scrollbar-syntagma-api.md"
@@ -48,6 +64,9 @@ jobs:
 
       - name: Validate Syntagma scrollbar configuration contracts
         run: python3 tests/components/test_neon_scrollbar_syntagma_contracts.py
+
+      - name: Validate Git/Hospital star migration and glow contracts
+        run: python3 tests/components/test_neon_scrollbar_surface_migration.py
 
   runtime-smoke:
     name: Offscreen Qt scrollbar smoke

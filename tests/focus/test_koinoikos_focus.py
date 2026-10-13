@@ -162,4 +162,43 @@ assert 'onActivated: root.cycleBed(-1)' in hospital
 assert 'onActivated: root.cycleBed(1)' in hospital
 assert 'sequence: "Ctrl+Tab"' in shell
 assert '!relationshipFocus.active' in shell
+# Shared overlay-focus acquisition: open/cursor/Koinoikos choose one menu;
+# exclusive keyboard priority is a SHORT acquisition pulse, never a permanent
+# condition simply because Git and Hospital are simultaneously open.
+ownership = (ROOT / "components/KeyboardOwnershipCoordinator.qml").read_text()
+for required in (
+    'property string owner: ""',
+    'property string boostOwner: ""',
+    'function claim(id, reason)',
+    'function release(id)',
+    'releaseBoost.restart()',
+    'onTriggered: coordinator.boostOwner = ""',
+):
+    assert required in ownership, required
+assert 'interval: 120' in ownership
+assert 'id !== "git" && id !== "hospital"' in ownership
+shell = (ROOT / "shell.qml").read_text()
+assert "KeyboardOwnershipCoordinator {" in shell
+assert "property alias controlKeyboardOwner: keyboardOwnership.owner" in shell
+assert 'keyboardOwnership.claim("git", "open")' in shell
+assert 'keyboardOwnership.claim("hospital", "open")' in shell
+assert 'keyboardOwnership.claim("git", "pointer")' in shell
+assert 'keyboardOwnership.claim("hospital", "pointer")' in shell
+assert 'keyboardOwnership.release("git")' in shell
+assert 'keyboardOwnership.release("hospital")' in shell
+assert 'keyboardLock: keyboardOwnership.boostOwner === "git"' in shell
+assert 'keyboardLock: keyboardOwnership.boostOwner === "hospital"' in shell
+assert '|| (hospitalWindow.menuOpen && gitWindow.menuOpen)' not in shell
+assert 'keyboardOwnership.claim(owner, "koinoikos")' in shell
+
+for path in ("widgets/GitW.qml", "widgets/HospitalW.qml"):
+    widget = (ROOT / path).read_text()
+    assert 'onHoveredChanged: {' in widget
+    assert 'if (hovered)\n                    root.keyboardOwnershipRequested();' in widget
+    assert 'if (hovered && !root.keyboardActive)' not in widget
+    assert "WlrKeyboardFocus.OnDemand" in widget
+    assert "WlrKeyboardFocus.None" in widget
+    assert "WlrKeyboardFocus.Exclusive" in widget
+assert (ROOT / "docs/window-keyboard-focus-contract.md").is_file()
+
 print("KOINOIKOS FOCUS MODE CONTRACTS // PASS")

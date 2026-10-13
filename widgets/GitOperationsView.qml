@@ -161,6 +161,11 @@ Item {
                     anchors.fill: parent
                     anchors.margins: 6
                     clip: true
+
+                    NeonScrollBar {
+                        flickable: operationList
+                        handleStyle: "star"
+                    }
                     spacing: 4
                     model: root.entries
                     currentIndex: root.selectedIndex

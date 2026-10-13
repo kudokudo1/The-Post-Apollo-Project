@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import qs.components
+import qs.components as SharedComponents
 import "../services/git"
 import "../services/github"
 import QtQuick.Effects
@@ -2879,6 +2880,224 @@ PanelWindow {
         }
     }
 
+    // Main Git execution/read actions share the Syntagma ActionButton shell.
+    // Other controls retain their local selector/workflow implementations.
+    // The existing keyboard router still owns primary selection and activation.
+    component GitPrimaryAction: SharedComponents.ActionButton {
+        id: gitAction
+
+        property bool enabledAction: false
+        property bool selectedAction: false
+        property bool keyboardNavigable: true
+        property int keyboardRow: -1
+        property string leftIcon: ""
+        property string rightIcon: ""
+        property int iconPixelSize: 24
+        property int iconVerticalOffset: 0
+        property bool blueAccent: false
+        property bool orangeAccent: false
+        property bool redAccent: false
+
+        readonly property bool gitKeyboardSelector:
+            root.gitKeyboardControl === gitAction
+            && root.gitSelectorSource === "keyboard"
+        readonly property bool gitMouseSelector:
+            root.gitKeyboardControl === gitAction
+            && root.gitSelectorSource === "mouse"
+        readonly property color semanticAccent:
+            redAccent ? Colors.red
+            : orangeAccent ? Colors.orange
+            : blueAccent ? Colors.blue : Colors.cyan
+        readonly property real contentBudget: Math.max(0, width - 16)
+        readonly property real iconBudget:
+            (leftIcon.length > 0 ? iconPixelSize + 6 : 0)
+            + (rightIcon.length > 0 ? iconPixelSize + 6 : 0)
+        readonly property bool fullTextFits:
+            minimumLabelMeasure.implicitWidth <= contentBudget - iconBudget
+        readonly property bool standaloneTextFits:
+            minimumLabelMeasure.implicitWidth <= contentBudget
+        readonly property bool showCompactIcon:
+            !fullTextFits
+            && (leftIcon.length > 0 || rightIcon.length > 0)
+
+        Component.onCompleted: root.registerGitKeyboardControl(gitAction)
+        Component.onDestruction: root.unregisterGitKeyboardControl(gitAction)
+
+        onHoverEntered: root.selectGitControlFromMouse(gitAction)
+        onPointerMoved: root.selectGitControlFromMouse(gitAction)
+        onClicked: root.selectGitControlFromMouse(gitAction)
+
+        implicitWidth: 112
+        implicitHeight: 35
+        width: 112
+        height: 36
+        available: enabledAction
+        keyboardSelected: gitKeyboardSelector
+        selected: selectedAction
+        acceptedButtons: Qt.LeftButton
+        unavailableOpacity: 1.0
+        unavailableContentOpacity: 0.34
+        unavailableContentGlowOpacity: 0.10
+        unavailableSoftGlowOpacity: 0.06
+        unavailableWideGlowOpacity: 0.015
+        showLabel: false
+        contentItem.clip: true
+
+        Accessible.role: Accessible.Button
+        Accessible.name: label
+
+        scale:
+            pressed ? 0.99
+            : keyboardSelected || selected ? 1.01 : 1.0
+        Behavior on scale {
+            NumberAnimation {
+                duration: 90
+                easing.type: Easing.OutQuad
+            }
+        }
+
+        idleFillColor: Colors.black
+        hoverFillColor: Colors.yellow
+        selectedFillColor: Colors.yellow
+        keyboardSelectedFillColor: Colors.yellow
+        pressedFillColor: redAccent ? Colors.red : Colors.magenta
+
+        idleForegroundColor: semanticAccent
+        hoverForegroundColor: semanticAccent === Colors.cyan
+            ? Colors.orange : semanticAccent
+        selectedForegroundColor: Colors.magenta
+        keyboardSelectedForegroundColor: Colors.magenta
+        pressedForegroundColor: Colors.black
+
+        idleBorderColor: semanticAccent
+        hoverBorderColor: semanticAccent === Colors.cyan
+            ? Colors.orange : semanticAccent
+        selectedBorderColor: Colors.magenta
+        keyboardSelectedBorderColor: Colors.orange
+        pressedBorderColor: redAccent ? Colors.red : Colors.magenta
+        idleBorderWidth: gitMouseSelector ? 2 : 1
+        hoverBorderWidth: gitMouseSelector ? 2 : 1
+        selectedBorderWidth: gitMouseSelector ? 2 : 1
+        keyboardSelectedBorderWidth: 2
+        pressedBorderWidth: 1
+
+        contentGlowSource: gitArtwork
+        contentGlowEnabled: true
+        idleContentGlowColor: semanticAccent
+        hoverContentGlowColor: semanticAccent
+        selectedContentGlowColor: Colors.orange
+        keyboardSelectedContentGlowColor: Colors.orange
+        pressedContentGlowColor: semanticAccent
+        contentGlowIdleOpacity: 0.35
+        contentGlowHoverOpacity: 0.75
+        contentGlowSelectedOpacity: 0.75
+        contentGlowKeyboardSelectedOpacity: 0.75
+        contentGlowPressedOpacity: 1.0
+
+        softGlowEnabled: true
+        softGlowSpread: 3
+        idleSoftGlowColor: semanticAccent
+        hoverSoftGlowColor: semanticAccent
+        selectedSoftGlowColor: Colors.orange
+        keyboardSelectedSoftGlowColor: Colors.orange
+        pressedSoftGlowColor: semanticAccent
+        softGlowIdleOpacity: 0.25
+        softGlowHoverOpacity: 0.55
+        softGlowSelectedOpacity: 0.55
+        softGlowKeyboardSelectedOpacity: 0.55
+        softGlowPressedOpacity: 0.60
+
+        // Preserve Git's existing two-layered edge-glow identity.
+        wideGlowEnabled: true
+        wideGlowSpread: 10
+        idleWideGlowColor: semanticAccent
+        hoverWideGlowColor: semanticAccent
+        selectedWideGlowColor: Colors.orange
+        keyboardSelectedWideGlowColor: Colors.orange
+        pressedWideGlowColor: semanticAccent
+        wideGlowIdleOpacity: 0.015
+        wideGlowHoverOpacity: 0.075
+        wideGlowSelectedOpacity: 0.075
+        wideGlowKeyboardSelectedOpacity: 0.075
+        wideGlowPressedOpacity: 0.10
+
+        GohuText {
+            id: minimumLabelMeasure
+            visible: false
+            text: gitAction.label
+            font.pixelSize: 8
+        }
+
+        Item {
+            id: gitArtwork
+            anchors.fill: parent
+            clip: true
+
+            // Label-only actions shrink before falling back to a compact glyph.
+            GohuText {
+                anchors.centerIn: parent
+                width: gitAction.contentBudget
+                height: Math.max(0, parent.height - 8)
+                visible: gitAction.leftIcon.length === 0
+                    && gitAction.rightIcon.length === 0 && width > 0
+                text: gitAction.label
+                font.pixelSize: 11
+                fontSizeMode: Text.HorizontalFit
+                minimumPixelSize: 8
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                elide: Text.ElideNone
+                color: gitAction.foregroundColor
+            }
+
+            Row {
+                anchors.centerIn: parent
+                spacing: 6
+                visible:
+                    (gitAction.leftIcon.length > 0
+                     || gitAction.rightIcon.length > 0)
+                    && gitAction.fullTextFits
+
+                NotoText {
+                    visible: gitAction.leftIcon.length > 0
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.verticalCenterOffset: gitAction.iconVerticalOffset
+                    text: gitAction.leftIcon
+                    font.pixelSize: gitAction.iconPixelSize
+                    color: gitAction.foregroundColor
+                }
+                GohuText {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Math.max(0, gitAction.contentBudget - gitAction.iconBudget)
+                    text: gitAction.label
+                    font.pixelSize: 11
+                    fontSizeMode: Text.HorizontalFit
+                    minimumPixelSize: 8
+                    horizontalAlignment: Text.AlignHCenter
+                    elide: Text.ElideNone
+                    color: gitAction.foregroundColor
+                }
+                NotoText {
+                    visible: gitAction.rightIcon.length > 0
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.verticalCenterOffset: gitAction.iconVerticalOffset
+                    text: gitAction.rightIcon
+                    font.pixelSize: gitAction.iconPixelSize
+                    color: gitAction.foregroundColor
+                }
+            }
+
+            NotoText {
+                anchors.centerIn: parent
+                visible: gitAction.showCompactIcon
+                text: gitAction.leftIcon.length > 0
+                    ? gitAction.leftIcon : gitAction.rightIcon
+                font.pixelSize: Math.min(18, gitAction.iconPixelSize)
+                color: gitAction.foregroundColor
+            }
+        }
+    }
+
     component ActionButton: Rectangle {
         id: actionButton
 
@@ -5022,7 +5241,7 @@ PanelWindow {
                                     }
                                 }
 
-                                ActionButton {
+                                GitPrimaryAction {
                                     width: 94
                                     height: 36
                                     anchors.verticalCenter: parent.verticalCenter
@@ -5036,7 +5255,7 @@ PanelWindow {
                                     onTriggered: gitService.runSyncAction("fetch")
                                 }
 
-                                ActionButton {
+                                GitPrimaryAction {
                                     width: 104
                                     height: 36
                                     anchors.verticalCenter: parent.verticalCenter
@@ -5117,7 +5336,7 @@ PanelWindow {
                                     onTriggered: gitService.cyclePullMode()
                                 }
 
-                                ActionButton {
+                                GitPrimaryAction {
                                     width: 124
                                     height: 36
                                     anchors.verticalCenter: parent.verticalCenter
@@ -5154,7 +5373,7 @@ PanelWindow {
                             height: 36
                             spacing: 10
 
-                            ActionButton {
+                            GitPrimaryAction {
                                 width: 124
                                 height: 36
                                 label: "STATUS"
@@ -5164,7 +5383,7 @@ PanelWindow {
                                 onTriggered: gitService.runReadAction("status")
                             }
 
-                            ActionButton {
+                            GitPrimaryAction {
                                 width: 124
                                 height: 36
                                 label: "DIFF"
@@ -5174,7 +5393,7 @@ PanelWindow {
                                 onTriggered: gitService.runReadAction("diff")
                             }
 
-                            ActionButton {
+                            GitPrimaryAction {
                                 width: 124
                                 height: 36
                                 label: "LOG"
@@ -5184,7 +5403,7 @@ PanelWindow {
                                 onTriggered: gitService.runReadAction("log")
                             }
 
-                            ActionButton {
+                            GitPrimaryAction {
                                 width: 124
                                 height: 36
                                 label: "LAZYGIT"

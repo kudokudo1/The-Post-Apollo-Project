@@ -79,6 +79,21 @@ def test_weather_semantic_main_and_top_submode_and_arrow_preview():
     assert "context: Qt.WindowShortcut" in src
 
 
+def test_notifications_non_destructive_context_and_filter_keys():
+    src = read("widgets/notifications/NotificationsHubW.qml")
+    assert "function cycleMainMode()" in src
+    assert "function cycleTopSubMode(direction)" in src
+    assert "function moveCurrentList(direction)" in src
+    assert "lastHistoryFilter" in src
+    assert "!searchInput.activeFocus" in src
+    assert 'pendingClearAllKey === ""' in src
+    for key in ("Tab", "Shift+Tab", "Shift+Left", "Shift+Right",
+                "Up", "Down"):
+        assert 'sequence: "' + key + '"' in src
+    assert src.count("context: Qt.WindowShortcut") >= 6
+    assert "list.positionViewAtIndex(index, ListView.Contain)" in src
+
+
 def test_focus_router_and_broker_still_independently_own_window_focus():
     router = read("scripts/koinoikos_focus.py")
     broker = read("components/RelationshipFocusBroker.qml")

@@ -12,6 +12,10 @@ PanelWindow {
     id: root
 
     property bool menuOpen: false
+    // Experimental only: keep persistent mapping as the default until live
+    // multi-open/crash tests establish whether this widget can safely unmap.
+    readonly property bool visibilityLifecyclePilot:
+        String(Quickshell.env("POST_APOLLO_HOSPITAL_VISIBILITY_PILOT") || "").trim() === "1"
     property bool keyboardActive: true
     property bool keyboardLock: false
     property bool relationshipFocusModeActive: false
@@ -807,8 +811,10 @@ PanelWindow {
     color: "transparent"
     surfaceFormat.opaque: false
 
-    // Keep the real surface mapped. Closed state is invisible + click-through.
-    visible: true
+    // Pilot only: default is permanently mapped and masked on close.
+    // Explicit opt-in instead unmaps the window while closed. Retain the
+    // existing input mask either way and do not change keyboard ownership.
+    visible: !root.visibilityLifecyclePilot || root.menuOpen
 
     mask: Region {
         x: 0

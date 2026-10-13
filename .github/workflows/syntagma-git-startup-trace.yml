@@ -1,0 +1,29 @@
+name: Syntagma Git startup trace safety
+
+on:
+  pull_request:
+    paths:
+      - "services/git/GitService.qml"
+      - "widgets/GitW.qml"
+      - "widgets/HospitalW.qml"
+      - "shell.qml"
+      - "tests/components/test_syntagma_git_startup_trace.py"
+      - ".github/workflows/syntagma-git-startup-trace.yml"
+  push:
+    branches: [main]
+    paths:
+      - "services/git/GitService.qml"
+      - "tests/components/test_syntagma_git_startup_trace.py"
+      - ".github/workflows/syntagma-git-startup-trace.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert trace opt-in and preserved Git/Hospital lifecycle
+        run: python3 tests/components/test_syntagma_git_startup_trace.py

@@ -88,9 +88,12 @@ for key, direction in (
     ("Left", "left"), ("Right", "right"), ("Up", "up"), ("Down", "down"),
     ("h", "left"), ("l", "right"), ("k", "up"), ("j", "down"),
 ):
-    expected = f'bindsym --no-repeat Mod4+grave+{key} exec python3 '
-    assert expected in mode_body, expected
-    assert f'koinoikos_focus.py" move {direction}' in mode_body
+    matches = [
+        line for line in mode_body.splitlines()
+        if line.split()[:4] == ["bindsym", "--no-repeat", f"Mod4+grave+{key}", "exec"]
+        and line.rstrip().endswith(f'koinoikos_focus.py" move {direction}')
+    ]
+    assert len(matches) == 1, (key, direction, matches)
 for physical_release in ("Mod4+grave", "Super_L", "Super_R"):
     assert f"bindsym --release {physical_release} exec" in mode_body
 assert mode_body.count('koinoikos_focus.py" exit') == 3

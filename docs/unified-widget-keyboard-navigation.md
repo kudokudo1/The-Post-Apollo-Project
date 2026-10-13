@@ -61,7 +61,7 @@ records the old AppControl, Git and Hospital keys and their focus caveats.
 | Weather Station | Add Tab HOME/MAP/NEWS/RADIO/TERMINAL; Shift+arrows for DOMAIN; vertical rail Up/Down preview plus Enter activation |
 | Power | Existing Up/Down, Enter, Escape and confirmation isolation; no artificial Main/Sub Mode |
 | Social/Messaging | Add Tab/Shift+Tab to cycle the existing Sessions/Discord/Telegram main app choices through their normal opener; preserve App/Contact/Chat arrows/Enter and composer focus. Widget remains nonfocusable until separate ownership lane integrates it |
-| Notifications | Add Tab toggle for History/Manager, Shift+arrows for six category filters and Up/Down list selection; search/editor and confirmation guards included. Window still needs focus-owner registration and live delivery testing |
+| Notifications | Tab toggles History/Manager; Shift+arrows cycle six history filters (disabled in Manager); Up/Down gives a visible bounded list cursor and Enter activates only an explicitly selected History app card, never a Manager/DND mutation. Search and confirmation guards remain. Focus-owner integration and live delivery pending |
 | Media Deck | Dormant/unmounted, currently explicitly `WlrKeyboardFocus.None`; transport actions are not generic navigation; must not pretend source shortcuts create real keyboard focus |
 
 **Outstanding:** Extend to the other eligible interactive windows, review

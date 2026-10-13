@@ -321,7 +321,9 @@ Item {
                     }
                 }
 
-                RoundsButton {
+                HospitalActionButton {
+                    height: Math.min(35, parent.height)
+                    compactIcon: "↻"
                     width: 86
                     label:
                         root.roundsService.running
@@ -718,7 +720,9 @@ Item {
                             height: 6
                         }
 
-                        RoundsButton {
+                        HospitalActionButton {
+                            height: Math.min(35, parent.height)
+                            compactIcon: "↗"
                             width: parent.width
                             label: "OPEN ROOM"
                             enabledAction: !!root.selectedRoom

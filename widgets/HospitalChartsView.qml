@@ -318,7 +318,9 @@ Item {
                     }
                 }
 
-                ChartButton {
+                HospitalActionButton {
+                    height: Math.min(35, parent.height)
+                    compactIcon: "✦"
                     width: 96
                     anchors.verticalCenter: parent.verticalCenter
                     label:
@@ -335,7 +337,9 @@ Item {
                     onTriggered: root.openSuggestionPanel()
                 }
 
-                ChartButton {
+                HospitalActionButton {
+                    height: Math.min(35, parent.height)
+                    compactIcon: "↻"
                     width: 76
                     anchors.verticalCenter: parent.verticalCenter
                     label:
@@ -346,7 +350,9 @@ Item {
                     onTriggered: chartService.refreshAll()
                 }
 
-                ChartButton {
+                HospitalActionButton {
+                    height: Math.min(35, parent.height)
+                    compactIcon: "×"
                     width: 68
                     anchors.verticalCenter: parent.verticalCenter
                     label: "CLOSE"
@@ -834,7 +840,8 @@ Item {
                                     color: Colors.blue
                                 }
 
-                                ChartButton {
+                                HospitalActionButton {
+                                    compactIcon: "✓"
                                     width: 82
                                     height: parent.height
                                     label:
@@ -847,7 +854,8 @@ Item {
                                     onTriggered: root.saveEditor()
                                 }
 
-                                ChartButton {
+                                HospitalActionButton {
+                                    compactIcon: "×"
                                     width: 82
                                     height: parent.height
                                     label: "CANCEL"
@@ -941,7 +949,9 @@ Item {
                         }
                     }
 
-                    ChartButton {
+                    HospitalActionButton {
+                        height: Math.min(35, parent.height)
+                        compactIcon: "↻"
                         width: 78
                         anchors.verticalCenter: parent.verticalCenter
                         label:
@@ -956,7 +966,9 @@ Item {
                         onTriggered: chartService.refreshSuggestions()
                     }
 
-                    ChartButton {
+                    HospitalActionButton {
+                        height: Math.min(35, parent.height)
+                        compactIcon: "←"
                         width: 68
                         anchors.verticalCenter: parent.verticalCenter
                         label: "BACK"
@@ -1247,7 +1259,8 @@ Item {
                                 color: Colors.blue
                             }
 
-                            ChartButton {
+                            HospitalActionButton {
+                                compactIcon: "↑"
                                 width: 88
                                 height: parent.height
                                 label:
@@ -1263,7 +1276,9 @@ Item {
                                     root.promoteSelectedSuggestion()
                             }
 
-                            ChartButton {
+                            HospitalActionButton {
+                                compactIcon: "×"
+                                destructive: true
                                 width: 88
                                 height: parent.height
                                 label:

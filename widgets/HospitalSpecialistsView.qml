@@ -269,7 +269,9 @@ Item {
                     onTriggered: root.filterMode = "OFFLINE"
                 }
 
-                StaffButton {
+                HospitalActionButton {
+                    height: Math.min(35, parent.height)
+                    compactIcon: "↻"
                     width: 108
                     label:
                         root.registryService.probing

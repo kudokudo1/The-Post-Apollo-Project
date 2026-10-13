@@ -176,7 +176,9 @@ Rectangle {
                     }
                 }
 
-                SuggestionButton {
+                HospitalActionButton {
+                    height: Math.min(35, parent.height)
+                    compactIcon: "↻"
                     width: 70
                     label:
                         chartService.loading
@@ -189,7 +191,9 @@ Rectangle {
                     onTriggered: chartService.refreshSuggestions()
                 }
 
-                SuggestionButton {
+                HospitalActionButton {
+                    height: Math.min(35, parent.height)
+                    compactIcon: "×"
                     width: 34
                     label: "X"
                     accent: Colors.red
@@ -424,7 +428,8 @@ Rectangle {
                         height: 32
                         spacing: 8
 
-                        SuggestionButton {
+                        HospitalActionButton {
+                            compactIcon: "↑"
                             width: (parent.width - parent.spacing) / 2
                             height: parent.height
                             label:
@@ -443,7 +448,9 @@ Rectangle {
                                 )
                         }
 
-                        SuggestionButton {
+                        HospitalActionButton {
+                            compactIcon: "×"
+                            destructive: true
                             width: (parent.width - parent.spacing) / 2
                             height: parent.height
                             label:

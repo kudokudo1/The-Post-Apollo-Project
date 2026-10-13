@@ -287,7 +287,9 @@ Rectangle {
                     }
                 }
 
-                OrderButton {
+                HospitalActionButton {
+                    height: Math.min(35, parent.height)
+                    compactIcon: "↻"
                     width: 78
                     label:
                         assignmentService.loading
@@ -298,7 +300,9 @@ Rectangle {
                     onTriggered: assignmentService.refresh()
                 }
 
-                OrderButton {
+                HospitalActionButton {
+                    height: Math.min(35, parent.height)
+                    compactIcon: "▶"
                     width: 78
                     label:
                         assignmentService.orchestrating
@@ -311,7 +315,9 @@ Rectangle {
                     onTriggered: assignmentService.startAllReady()
                 }
 
-                OrderButton {
+                HospitalActionButton {
+                    height: Math.min(35, parent.height)
+                    compactIcon: "+"
                     width: 78
                     label: "NEW"
                     accent: Colors.green
@@ -319,7 +325,9 @@ Rectangle {
                     onTriggered: root.openEditor("NEW")
                 }
 
-                OrderButton {
+                HospitalActionButton {
+                    height: Math.min(35, parent.height)
+                    compactIcon: "✎"
                     width: 78
                     label: "EDIT"
                     accent: Colors.orange
@@ -329,7 +337,9 @@ Rectangle {
                     onTriggered: root.openEditor("EDIT")
                 }
 
-                OrderButton {
+                HospitalActionButton {
+                    height: Math.min(35, parent.height)
+                    compactIcon: "×"
                     width: 34
                     label: "X"
                     accent: Colors.red
@@ -750,7 +760,8 @@ Rectangle {
                                     height: 1
                                 }
 
-                                OrderButton {
+                                HospitalActionButton {
+                                    compactIcon: "✓"
                                     width: 82
                                     height: parent.height
                                     label:
@@ -765,7 +776,8 @@ Rectangle {
                                     onTriggered: root.saveEditor()
                                 }
 
-                                OrderButton {
+                                HospitalActionButton {
+                                    compactIcon: "×"
                                     width: 82
                                     height: parent.height
                                     label: "CANCEL"

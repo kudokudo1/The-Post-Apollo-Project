@@ -13,6 +13,8 @@ on:
       - "widgets/appcontrol/TaskManagerView.qml"
       - "components/ActionButton.qml.template"
       - "components/qmldir"
+      - "widgets/GitW.qml"
+      - "tests/git/test_primary_action_button_contracts.py"
       - "widgets/GitChangesView.qml"
       - "widgets/GitHistoryView.qml"
       - "widgets/GitRepositoryView.qml"
@@ -30,6 +32,8 @@ on:
       - "widgets/appcontrol/TaskManagerView.qml"
       - "components/ActionButton.qml.template"
       - "components/qmldir"
+      - "widgets/GitW.qml"
+      - "tests/git/test_primary_action_button_contracts.py"
       - "widgets/GitChangesView.qml"
       - "widgets/GitHistoryView.qml"
       - "widgets/GitRepositoryView.qml"
@@ -52,4 +56,6 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Validate reusable action-button contracts
-        run: python3 tests/components/test_action_button_contracts.py
+        run: |
+          python3 tests/components/test_action_button_contracts.py
+          python3 tests/git/test_primary_action_button_contracts.py

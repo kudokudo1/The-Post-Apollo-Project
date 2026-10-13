@@ -94,8 +94,8 @@ all_neon_bars = 0
 for path in (ROOT / "widgets").rglob("*.qml"):
     rel = path.relative_to(ROOT).as_posix()
     content = path.read_text(encoding="utf-8")
-    targets = len(re.findall(r"\\b(?:Flickable|ListView|GridView)\\s*\\{", content))
-    bars = len(re.findall(r"\\bNeonScrollBar\\s*\\{", content))
+    targets = len(re.findall(r"\b(?:Flickable|ListView|GridView)\s*\{", content))
+    bars = len(re.findall(r"\bNeonScrollBar\s*\{", content))
     exceptions = SPECIALIZED_SCROLL_TRACKS.get(rel, 0)
     assert targets <= bars + exceptions, (
         f"{rel}: {targets} scrollable panes but only {bars} NeonScrollBar "
@@ -106,8 +106,8 @@ for path in (ROOT / "widgets").rglob("*.qml"):
 
 for rel in ("components/BranchMap.qml", "components/ConversationFeed.qml"):
     content = source(rel)
-    assert len(re.findall(r"\\bNeonScrollBar\\s*\\{", content)) >= len(
-        re.findall(r"\\b(?:Flickable|ListView|GridView)\\s*\\{", content)
+    assert len(re.findall(r"\bNeonScrollBar\s*\{", content)) >= len(
+        re.findall(r"\b(?:Flickable|ListView|GridView)\s*\{", content)
     ), f"{rel}: shared scroll pane without an indicator"
 
 print(

@@ -24,16 +24,41 @@ PanelWindow {
         notificationKeyboardAnchor.forceActiveFocus();
     }
 
-    onKeyboardActiveChanged: {
-        if (keyboardActive)
+    // A permanent-mapped PanelWindow can receive the owner claim before
+    // the compositor has committed its newly opened input region. Retry that
+    // *initial* acquisition once after a frame only when Qt still reports
+    // that Notifications itself is NOT the active window. This invokes the
+    // existing bounded owner pulse; it never installs persistent Exclusive.
+    Timer {
+        id: notificationOpenFocusRetry
+        interval: 48
+        repeat: false
+        onTriggered: {
+            if (!root.menuOpen || !root.keyboardActive
+                    || notificationKeyboardAnchor.Window.active)
+                return;
+            root.keyboardOwnershipRequested();
             Qt.callLater(root.restoreKeyboardNavigationAnchor);
+        }
+    }
+
+    onKeyboardActiveChanged: {
+        if (keyboardActive && menuOpen) {
+            Qt.callLater(root.restoreKeyboardNavigationAnchor);
+            notificationOpenFocusRetry.restart();
+        } else {
+            notificationOpenFocusRetry.stop();
+        }
     }
 
     onMenuOpenChanged: {
-        if (menuOpen && keyboardActive)
+        if (menuOpen && keyboardActive) {
             Qt.callLater(root.restoreKeyboardNavigationAnchor);
-        else if (!menuOpen)
+            notificationOpenFocusRetry.restart();
+        } else if (!menuOpen) {
+            notificationOpenFocusRetry.stop();
             listKeyboardSelectionActive = false;
+        }
     }
 
     // ===== QUICK CONFIG =========================================
@@ -347,6 +372,27 @@ PanelWindow {
         enabled: root.menuOpen
         focus: root.menuOpen && root.keyboardActive
         z: -1000
+
+        // Qt may treat Tab as focus-chain navigation before a WindowShortcut
+        // fires. Keep a *local* KeyPress path on the navigation anchor; it
+        // only runs once the compositor really delivers keys to this window.
+        Keys.priority: Keys.BeforeItem
+        Keys.onShortcutOverride: function(event) {
+            if (!root.standardKeysAvailable)
+                return;
+            if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab)
+                event.accepted = true;
+        }
+        Keys.onPressed: function(event) {
+            if (!root.standardKeysAvailable)
+                return;
+            if (event.key !== Qt.Key_Tab && event.key !== Qt.Key_Backtab)
+                return;
+            const reverse = event.key === Qt.Key_Backtab
+                || (event.modifiers & Qt.ShiftModifier) !== 0;
+            root.cycleMainMode(reverse ? -1 : 1);
+            event.accepted = true;
+        }
     }
 
     // ===== LOCAL VISUAL TYPE: GLOW TEXT =========================

@@ -23,7 +23,7 @@ Item {
     // No mutation of the bound Flickable's anchors/margins occurs here.
     property bool reserveSpace: true
     property bool reserveGlowSpace: false // Optional host-side wider clearance.
-    property bool containGlow: true      // Rail extensions/clipping: audit 04 OPEN.
+    property bool containGlow: true      // Normal track; deliberate rail extensions retain legacy visibility.
     property int glowPadding: 7
     readonly property real effectiveGlowPadding: containGlow
         ? Math.max(glowPadding,
@@ -179,7 +179,12 @@ Item {
         ? flickable.parent
         : null
 
-    clip: containGlow
+    // Audit 04 // An explicitly extended rail (Git Repository: +33px)
+    // intentionally draws outside the normal viewport. Preserve that existing
+    // appearance instead of clipping off the extension. Standard tracks keep
+    // containment; hosts with extended rails remain responsible for their
+    // surrounding glow-safe area.
+    clip: containGlow && trackTopExtension <= 0
     width: horizontal
         ? (flickable ? Math.max(0, flickable.width - leftInset - rightEndInset) : 0)
         : crossExtent

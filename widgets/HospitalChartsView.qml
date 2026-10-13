@@ -351,6 +351,7 @@ Item {
                 }
 
                 HospitalActionButton {
+                    height: Math.min(35, parent.height)
                     compactIcon: "×"
                     width: 68
                     anchors.verticalCenter: parent.verticalCenter
@@ -966,6 +967,7 @@ Item {
                     }
 
                     HospitalActionButton {
+                        height: Math.min(35, parent.height)
                         compactIcon: "←"
                         width: 68
                         anchors.verticalCenter: parent.verticalCenter

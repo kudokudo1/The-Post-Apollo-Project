@@ -7,11 +7,14 @@ on:
       - main
     paths:
       - "components/NeonScrollBar.qml"
-      - "widgets/GitBranchesView.qml"
+      - "widgets/**/*.qml"
+      - "components/BranchMap.qml"
+      - "components/ConversationFeed.qml"
       - "widgets/GitHistoryView.qml"
       - "widgets/GitRepositoryView.qml"
       - "widgets/HospitalArchiveView.qml"
       - "tests/components/test_neon_scrollbar_contracts.py"
+      - "tests/components/test_scrollbar_coverage_contracts.py"
       - "tests/components/test_neon_scrollbar_syntagma_contracts.py"
       - "tests/components/test_neon_scrollbar_qt_runtime.py"
       - "tests/components/neon_scrollbar_runtime_harness.qml"
@@ -20,11 +23,14 @@ on:
   pull_request:
     paths:
       - "components/NeonScrollBar.qml"
-      - "widgets/GitBranchesView.qml"
+      - "widgets/**/*.qml"
+      - "components/BranchMap.qml"
+      - "components/ConversationFeed.qml"
       - "widgets/GitHistoryView.qml"
       - "widgets/GitRepositoryView.qml"
       - "widgets/HospitalArchiveView.qml"
       - "tests/components/test_neon_scrollbar_contracts.py"
+      - "tests/components/test_scrollbar_coverage_contracts.py"
       - "tests/components/test_neon_scrollbar_syntagma_contracts.py"
       - "tests/components/test_neon_scrollbar_qt_runtime.py"
       - "tests/components/neon_scrollbar_runtime_harness.qml"
@@ -48,6 +54,9 @@ jobs:
 
       - name: Validate Syntagma scrollbar configuration contracts
         run: python3 tests/components/test_neon_scrollbar_syntagma_contracts.py
+
+      - name: Validate every widget's source-level scroll indicator coverage
+        run: python3 tests/components/test_scrollbar_coverage_contracts.py
 
   runtime-smoke:
     name: Offscreen Qt scrollbar smoke

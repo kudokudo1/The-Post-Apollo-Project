@@ -379,6 +379,7 @@ Rectangle {
                         }
 
                         NeonScrollBar {
+                            handleStyle: "star"
                             flickable: conflictScroll
                         }
                     }

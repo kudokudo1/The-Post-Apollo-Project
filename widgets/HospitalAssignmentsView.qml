@@ -361,9 +361,15 @@ Rectangle {
                 border.color: Colors.orange
 
                 ListView {
+                    id: assignmentList
                     anchors.fill: parent
                     anchors.margins: 6
                     clip: true
+
+                    NeonScrollBar {
+                        flickable: assignmentList
+                        handleStyle: "star"
+                    }
                     spacing: 4
                     model: assignmentService.assignments
 
@@ -502,6 +508,11 @@ Rectangle {
                     }
 
                     Flickable {
+                        id: assignmentDetailScroll
+                        NeonScrollBar {
+                            flickable: assignmentDetailScroll
+                            handleStyle: "star"
+                        }
                         width: parent.width
                         height:
                             editorPanel.visible

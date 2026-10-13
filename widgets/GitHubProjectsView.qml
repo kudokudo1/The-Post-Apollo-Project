@@ -315,6 +315,11 @@ Item {
                     }
 
                     ListView {
+                        NeonScrollBar {
+                            flickable: projectList
+                            handleStyle: "star"
+                        }
+
                         id: projectList
 
                         width: parent.width
@@ -716,6 +721,11 @@ Item {
                     }
 
                     Flickable {
+                        NeonScrollBar {
+                            flickable: mapScroll
+                            handleStyle: "star"
+                        }
+
                         id: mapScroll
 
                         width: parent.width

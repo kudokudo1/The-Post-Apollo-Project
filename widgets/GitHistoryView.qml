@@ -1619,6 +1619,7 @@ Item {
                             }
                         
                             NeonScrollBar {
+                                handleStyle: "star"
                                 flickable: historyScroll2
                             }
 }
@@ -1727,6 +1728,7 @@ Item {
                             }
                         
                             NeonScrollBar {
+                                handleStyle: "star"
                                 flickable: historyScroll3
                             }
 }
@@ -2188,6 +2190,7 @@ Item {
                             }
 
                             NeonScrollBar {
+                                handleStyle: "star"
                                 flickable: historyScroll6
                             }
                         }
@@ -2611,6 +2614,7 @@ Item {
                             }
 
                             NeonScrollBar {
+                                handleStyle: "star"
                                 flickable: historyScroll8
                             }
                         }
@@ -2765,6 +2769,7 @@ Item {
                         }
                     
                         NeonScrollBar {
+                            handleStyle: "star"
                             flickable: historyScroll4
                         }
 }
@@ -3169,6 +3174,7 @@ Item {
                         }
                     
                         NeonScrollBar {
+                            handleStyle: "star"
                             flickable: historyScroll5
                         }
 }

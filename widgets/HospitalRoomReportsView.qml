@@ -212,6 +212,11 @@ Item {
                 border.color: Colors.blue
 
                 ListView {
+                    NeonScrollBar {
+                        flickable: reportList
+                        handleStyle: "star"
+                    }
+
                     id: reportList
 
                     anchors {
@@ -461,6 +466,11 @@ Item {
                     }
 
                     Flickable {
+                        NeonScrollBar {
+                            flickable: detailFlick
+                            handleStyle: "star"
+                        }
+
                         id: detailFlick
 
                         width: parent.width

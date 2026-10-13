@@ -31,6 +31,8 @@ Rectangle {
     property string sendLabel: "SEND"
     property string sendingLabel: "SENDING"
     property bool richMessageActions: false
+    // Generic conversations use bars; Hospital owners opt into stars.
+    property string scrollHandleStyle: "bar"
 
     function firstCodeBlock(value) {
         const text = String(value || "");
@@ -280,6 +282,11 @@ Rectangle {
 
     ListView {
         id: messageList
+
+        NeonScrollBar {
+            flickable: messageList
+            handleStyle: chatFeed.scrollHandleStyle
+        }
 
         anchors {
             fill: messageViewport

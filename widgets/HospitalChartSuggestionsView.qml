@@ -215,6 +215,11 @@ Rectangle {
                 border.color: Colors.orange
 
                 ListView {
+                    id: suggestionListScroll
+                    NeonScrollBar {
+                        flickable: suggestionListScroll
+                        handleStyle: "star"
+                    }
                     anchors.fill: parent
                     anchors.margins: 6
                     clip: true
@@ -398,11 +403,17 @@ Rectangle {
                     }
 
                     Flickable {
+                        id: proposalScroll
                         width: parent.width
                         height: Math.max(140, parent.height - 170)
                         clip: true
                         contentWidth: width
                         contentHeight: proposalBody.implicitHeight + 8
+
+                        NeonScrollBar {
+                            flickable: proposalScroll
+                            handleStyle: "star"
+                        }
 
                         GohuText {
                             id: proposalBody

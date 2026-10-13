@@ -451,6 +451,11 @@ SectionFrame {
             border.color: Colors.cyan
 
             ListView {
+                NeonScrollBar {
+                    flickable: provenanceList
+                    handleStyle: "star"
+                }
+
                 id: provenanceList
 
                 anchors {

@@ -294,6 +294,12 @@ Rectangle {
         border.color: editor.activeFocus ? Colors.magenta : accent
 
         Flickable {
+            id: nurse3rScroll0
+            NeonScrollBar {
+                flickable: nurse3rScroll0
+                handleStyle: "star"
+            }
+
             anchors.fill: parent
             anchors.margins: 6
             clip: true
@@ -486,6 +492,12 @@ Rectangle {
         id: controlPane
 
         Flickable {
+            id: nurse3rScroll1
+            NeonScrollBar {
+                flickable: nurse3rScroll1
+                handleStyle: "star"
+            }
+
             clip: true
             contentWidth: width
             contentHeight: controlColumn.height
@@ -1194,6 +1206,12 @@ Rectangle {
                 border.color: Colors.blue
 
                 ListView {
+                    id: nurse3rScroll2
+                    NeonScrollBar {
+                        flickable: nurse3rScroll2
+                        handleStyle: "star"
+                    }
+
                     anchors.fill: parent
                     anchors.margins: 6
                     clip: true
@@ -1323,6 +1341,11 @@ Rectangle {
                     }
 
                     ListView {
+                        NeonScrollBar {
+                            flickable: threadList
+                            handleStyle: "star"
+                        }
+
                         id: threadList
                         width: parent.width
                         height: parent.height - 36
@@ -1459,6 +1482,12 @@ Rectangle {
                     }
 
                     ListView {
+                        id: nurse3rScroll4
+                        NeonScrollBar {
+                            flickable: nurse3rScroll4
+                            handleStyle: "star"
+                        }
+
                         width: parent.width
                         height: parent.height - 150
                         clip: true

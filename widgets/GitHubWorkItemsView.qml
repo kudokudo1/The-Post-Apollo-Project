@@ -978,6 +978,7 @@ Item {
             }
 
             NeonScrollBar {
+                handleStyle: "star"
                 id: scrollTrack
 
                 flickable: sourceList
@@ -1001,7 +1002,11 @@ Item {
                 handleColor: Colors.magenta
                 barHandleRadius: 0
                 handleBorderWidth: 0
-                handleGlowEnabled: false
+                // Display-only bar still carries its magenta star halo.
+                // Retain the dark unlit rail and non-interactive behavior.
+                handleGlowEnabled: true
+                starGlowIdleOpacity: 0.42
+                starGlowHoverOpacity: 0.42
 
                 interactive: false
                 wheelEnabled: false

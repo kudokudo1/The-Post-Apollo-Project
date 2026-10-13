@@ -2658,6 +2658,14 @@ PanelWindow {
             anchors.bottom: parent.bottom
             color: Colors.magenta
             opacity: 0.74
+
+            RectangularShadow {
+                anchors.fill: parent
+                z: -1
+                spread: 2
+                opacity: 0.42
+                color: Colors.magenta
+            }
         }
     }
 
@@ -4786,6 +4794,14 @@ PanelWindow {
                                             color: Colors.magenta
                                             border.width: 1
                                             border.color: Colors.magenta
+
+                                            RectangularShadow {
+                                                anchors.fill: parent
+                                                z: -1
+                                                spread: 3
+                                                opacity: 0.48
+                                                color: Colors.magenta
+                                            }
                                         }
 
                                         MouseArea {
@@ -5489,6 +5505,11 @@ PanelWindow {
                             }
 
                             Flickable {
+                                id: gitLocalOutputScroll
+                                NeonScrollBar {
+                                    flickable: gitLocalOutputScroll
+                                    handleStyle: "star"
+                                }
                                 anchors {
                                     top: parent.top
                                     bottom: parent.bottom
@@ -6823,6 +6844,11 @@ PanelWindow {
                                                             }
 
                                                             Flickable {
+                                                                id: workflowMenuScroll
+                                                                NeonScrollBar {
+                                                                    flickable: workflowMenuScroll
+                                                                    handleStyle: "star"
+                                                                }
                                                                 anchors {
                                                                     fill: parent
                                                                     margins: 4

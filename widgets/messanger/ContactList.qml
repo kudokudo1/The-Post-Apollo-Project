@@ -297,6 +297,10 @@ Rectangle {
     // ============================================================
 
     ListView {
+        NeonScrollBar {
+            flickable: conversationList
+        }
+
         id: conversationList
 
         anchors {

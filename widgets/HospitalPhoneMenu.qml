@@ -115,6 +115,11 @@ Rectangle {
     }
 
     Flickable {
+        NeonScrollBar {
+            flickable: phoneStaffList
+            handleStyle: "star"
+        }
+
         id: phoneStaffList
 
         anchors {

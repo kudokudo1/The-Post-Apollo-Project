@@ -150,6 +150,11 @@ Item {
             inset: 8
 
             Flickable {
+                NeonScrollBar {
+                    flickable: roadmapScroll
+                    handleStyle: "star"
+                }
+
                 id: roadmapScroll
 
                 anchors.fill: parent

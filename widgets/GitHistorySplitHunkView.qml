@@ -271,6 +271,12 @@ Rectangle {
                     }
 
                     ListView {
+                        id: nurse3rScroll0
+                        NeonScrollBar {
+                            flickable: nurse3rScroll0
+                            handleStyle: "star"
+                        }
+
                         width: parent.width
                         height: parent.height - 28
                         clip: true

@@ -290,6 +290,11 @@ Item {
                             }
 
                             Flickable {
+                                id: nurse3rScroll0
+                                NeonScrollBar {
+                                    flickable: nurse3rScroll0
+                                }
+
                                 width: parent.width
                                 height: parent.height - 22
                                 clip: true
@@ -441,6 +446,11 @@ Item {
                     }
 
                     Flickable {
+                        id: nurse3rScroll1
+                        NeonScrollBar {
+                            flickable: nurse3rScroll1
+                        }
+
                         width: parent.width
                         height:
                             parent.height
@@ -721,6 +731,11 @@ Item {
                     }
 
                     Flickable {
+                        id: nurse3rScroll2
+                        NeonScrollBar {
+                            flickable: nurse3rScroll2
+                        }
+
                         width: parent.width
                         height: parent.height - 28
 
@@ -1134,7 +1149,10 @@ Item {
                         handleOpacity: scrollable ? 0.92 : 0.0672
                         barHandleRadius: 0
                         handleBorderWidth: 0
-                        handleGlowEnabled: false
+                        // Keep the existing per-layer disabled treatment.
+                        handleGlowEnabled: true
+                        barGlowIdleOpacity: scrollable ? 0.22 : 0.08
+                        barGlowHoverOpacity: scrollable ? 0.36 : 0.08
 
                         interactive: scrollable
                         preserveDragOffset: true

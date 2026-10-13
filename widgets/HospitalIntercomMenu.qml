@@ -451,6 +451,12 @@ Rectangle {
             boundsBehavior: Flickable.StopAtBounds
             clip: true
 
+            // Star scrollbar, hosted beside the transcript by NeonScrollBar.
+            NeonScrollBar {
+                flickable: transcript
+                handleStyle: "star"
+            }
+
             Column {
                 id: transcriptColumn
 

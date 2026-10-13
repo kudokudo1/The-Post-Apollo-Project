@@ -30,7 +30,9 @@ or reload Sway on the operator's computer.
   Releasing either held key restores the default Sway keyboard bindings.
 - **Notifications Hub** is now enrolled in the six-surface source pilot:
   its permanent-mapped history overlay is eligible only while `menuOpen`,
-  with Tab/Shift+Tab for History/Manager, and search-focus protection.
+  with Tab/Shift+Tab cycling its seven actual filter Main Modes
+  (ALL, APPS, SYSTEM, SOCIAL, APOLLO, WARNING, MANAGER), and search-focus
+  protection. Notifications has no separate Sub Mode row.
   **Messaging/Social** still uses its own native `FloatingWindow` and is
   not Koinoikos-registered by this change. Do **not** report universal-menu
   runtime acceptance from source tests; actual Qt and compositor focus

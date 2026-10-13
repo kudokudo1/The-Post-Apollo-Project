@@ -305,6 +305,118 @@ Item {
         }
     }
 
+
+    // Hospital Reports pilot: ordinary actions use the shared button shell.
+    // The compact state-filter arrows still use their existing ReportButton.
+    component ReportHeaderActionButton: ActionButton {
+        id: action
+
+        property string fullLabel: ""
+        property string compactIcon: ""
+        property string miniIcon: ""
+        property string actionDescription: fullLabel
+
+        readonly property real contentWidthBudget: Math.max(0, width - 12)
+        readonly property bool fullLabelFits:
+            labelMeasure.implicitWidth <= contentWidthBudget
+        readonly property bool compactIconFits:
+            iconMeasure.implicitWidth <= contentWidthBudget
+
+        height: 35
+        implicitHeight: 35
+        label: fullLabel
+        showLabel: false
+        contentItem.clip: true
+
+        Accessible.role: Accessible.Button
+        Accessible.name: actionDescription
+        acceptedButtons: Qt.LeftButton
+
+        // Ordinary actions. Keeping border thickness at 1 px until
+        // the operator's later border-normalization review.
+        idleFillColor: Colors.black
+        hoverFillColor: Colors.yellow
+        selectedFillColor: Colors.yellow
+        keyboardSelectedFillColor: Colors.yellow
+        pressedFillColor: Colors.magenta
+        idleForegroundColor: Colors.cyan
+        hoverForegroundColor: Colors.orange
+        selectedForegroundColor: Colors.orange
+        keyboardSelectedForegroundColor: Colors.orange
+        pressedForegroundColor: Colors.black
+        idleBorderColor: Colors.cyan
+        hoverBorderColor: Colors.orange
+        selectedBorderColor: Colors.orange
+        keyboardSelectedBorderColor: Colors.orange
+        pressedBorderColor: Colors.orange
+        idleBorderWidth: 1
+        hoverBorderWidth: 1
+        selectedBorderWidth: 1
+        keyboardSelectedBorderWidth: 1
+        pressedBorderWidth: 1
+
+        // Syntagma three-layer glow parity; wide halo remains optional.
+        contentGlowSource: actionText
+        contentGlowEnabled: true
+        idleContentGlowColor: Colors.cyan
+        hoverContentGlowColor: Colors.orange
+        selectedContentGlowColor: Colors.orange
+        keyboardSelectedContentGlowColor: Colors.orange
+        pressedContentGlowColor: Colors.orange
+        contentGlowIdleOpacity: 0.35
+        contentGlowHoverOpacity: 0.75
+        contentGlowSelectedOpacity: 0.75
+        contentGlowKeyboardSelectedOpacity: 0.75
+        contentGlowPressedOpacity: 1.0
+
+        softGlowEnabled: true
+        softGlowSpread: 3
+        idleSoftGlowColor: Colors.cyan
+        hoverSoftGlowColor: Colors.orange
+        selectedSoftGlowColor: Colors.orange
+        keyboardSelectedSoftGlowColor: Colors.orange
+        pressedSoftGlowColor: Colors.orange
+        softGlowIdleOpacity: 0.25
+        softGlowHoverOpacity: 0.55
+        softGlowSelectedOpacity: 0.55
+        softGlowKeyboardSelectedOpacity: 0.55
+        softGlowPressedOpacity: 0.60
+        wideGlowEnabled: false
+
+        // Full text → shrinking text → icon only → compact glyph.
+        GohuText {
+            id: labelMeasure
+            visible: false
+            text: action.fullLabel
+            font.pixelSize: 8
+        }
+        GohuText {
+            id: iconMeasure
+            visible: false
+            text: action.compactIcon
+            font.pixelSize: 11
+        }
+        GohuText {
+            id: actionText
+            anchors.centerIn: parent
+            width: action.contentWidthBudget
+            height: Math.max(0, action.height - 8)
+            visible: width > 0
+            text: action.fullLabelFits ? action.fullLabel
+                  : action.compactIconFits ? action.compactIcon
+                  : action.miniIcon
+            font.pixelSize: action.fullLabelFits ? 11
+                            : action.compactIconFits ? 11 : 9
+            fontSizeMode: Text.HorizontalFit
+            minimumPixelSize: action.fullLabelFits ? 8 : 7
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideNone
+            color: action.foregroundColor
+            opacity: action.available ? 1.0 : 0.34
+        }
+    }
+
     component EvidenceRow: Row {
         property string label: ""
         property string value: ""
@@ -353,12 +465,27 @@ Item {
             spacing: 8
 
             Row {
+                id: reportsActionRow
                 width: parent.width
-                height: 36
-                spacing: 8
+                height: 40
+                spacing: Math.min(8, Math.max(0, width * 0.05))
+
+                // Respect the header text, all three action widths, gaps,
+                // and an adjustable final clearance inside this row.
+                readonly property real edgeClearance: Math.min(8, width * 0.05)
+                readonly property real headingReserve: Math.min(140, width * 0.24)
+                readonly property real buttonBudget: Math.max(
+                    0, width - headingReserve - edgeClearance - 3 * spacing
+                )
+                readonly property real actionScale: Math.min(1, buttonBudget / 262)
 
                 GohuText {
-                    width: parent.width - 286
+                    width: Math.max(
+                        0,
+                        reportsActionRow.width - reportsActionRow.edgeClearance
+                        - 3 * reportsActionRow.spacing
+                        - 262 * reportsActionRow.actionScale
+                    )
                     anchors.verticalCenter: parent.verticalCenter
                     text:
                         "REPORTS // "
@@ -374,22 +501,31 @@ Item {
                     color: Colors.magenta
                 }
 
-                ReportButton {
-                    width: 82
-                    label: "TEAM ◀"
+                ReportHeaderActionButton {
+                    width: 82 * reportsActionRow.actionScale
+                    fullLabel: "TEAM ◀"
+                    compactIcon: "◀"
+                    miniIcon: "‹"
+                    actionDescription: "Previous team filter"
                     onTriggered: root.cycleTeam(-1)
                 }
 
-                ReportButton {
-                    width: 82
-                    label: "TEAM ▶"
+                ReportHeaderActionButton {
+                    width: 82 * reportsActionRow.actionScale
+                    fullLabel: "TEAM ▶"
+                    compactIcon: "▶"
+                    miniIcon: "›"
+                    actionDescription: "Next team filter"
                     onTriggered: root.cycleTeam(1)
                 }
 
-                ReportButton {
-                    width: 98
-                    label: "CLEAR FILTER"
-                    enabledAction:
+                ReportHeaderActionButton {
+                    width: 98 * reportsActionRow.actionScale
+                    fullLabel: "CLEAR FILTER"
+                    compactIcon: "×"
+                    miniIcon: "×"
+                    actionDescription: "Clear team and state filters"
+                    available:
                         root.teamFilter.length > 0
                         || root.stateFilter.length > 0
 
@@ -468,7 +604,7 @@ Item {
 
             Row {
                 width: parent.width
-                height: parent.height - 92
+                height: parent.height - 96
                 spacing: 10
 
                 Rectangle {

@@ -1,0 +1,31 @@
+name: Syntagma optional UI lag probe contracts
+
+on:
+  pull_request:
+    paths:
+      - "shell.qml"
+      - "widgets/GitW.qml"
+      - "widgets/HospitalW.qml"
+      - "tests/components/test_syntagma_ui_lag_probe.py"
+      - "docs/syntagma-ui-lag-probe.md"
+      - ".github/workflows/syntagma-ui-lag-probe.yml"
+  push:
+    branches: [main]
+    paths:
+      - "shell.qml"
+      - "widgets/GitW.qml"
+      - "widgets/HospitalW.qml"
+      - "tests/components/test_syntagma_ui_lag_probe.py"
+      - ".github/workflows/syntagma-ui-lag-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify opt-in diagnostics and preserved widget lifecycles
+        run: python3 tests/components/test_syntagma_ui_lag_probe.py

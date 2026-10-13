@@ -120,3 +120,53 @@ and collect one opening per trial, not spam clicks.
 with active concurrent owners working on Git, Hospital, and widget
 components. Any implementation change requires re-checking current
 `main` and file ownership before writing.
+
+
+## Follow-up: actual opt-in event-loop probe result
+
+**Operator runtime log, October 13, 2026, after PR #247**, with
+`POST_APOLLO_UI_LAG_PROBE=1` enabled:
+
+| Event at log emission | Reported duration |
+| --- | ---: |
+| 100 ms timer callback delayed while Git/Hospital/Notifications all showed `false` | **3,120 ms** |
+| Git dock toggle's synchronous `toggle()` call | **10 ms** |
+| Timer delay while Git showed `true` | **3,579 ms** |
+| Second timer delay while Git showed `true` | **5,499 ms** |
+| Further timer delay while Git showed `true` | **418 ms** |
+
+**Key interpretation:** The **immediate Git dock-toggle code** measured
+only 10 ms in this test. The long delayed timer callbacks occurred
+**elsewhere in the UI event loop**. This means a blanket claim that the
+toggle function itself blocks for several seconds is unsupported.
+
+**Important timing caveat:** The timer's `git/hospital/notifications`
+booleans are sampled **when the delayed callback finally runs**. The
+`false/false/false` gap does *not* by itself prove that those menus
+were closed for its entire 3.12 seconds; pending work from a prior menu
+or earlier callback is still possible. The result *does* establish that
+long timer delays can be logged at a point where no such menu is open.
+
+**Current hypotheses, not established causes:**
+- Synchronous JS/QML work or bindings from services/result callbacks,
+  potentially triggered by earlier events and processed later.
+- Recurring baseline work. Confirmed source examples include
+  `modules/Network.qml` polling several asynchronous processes
+  every 500 ms and `modules/Mediaplayer.qml` polling MPD status
+  every 2,000 ms; these intervals do not prove that either service
+  consumes seconds of main-thread time.
+- Rendering, compositor descheduling or other scheduling delay cannot be
+  categorically eliminated from timer observations alone. The separate
+  `top -H` 4-second near-100%-CPU main-thread sample makes expensive
+  main-thread execution a priority to profile.
+
+**Next safe comparative gate:** Use the existing opt-in probe with a
+freshly restarted shell and **no manual menu interactions** for a brief
+baseline observation, then perform one normal Git opening and compare
+the timestamps/delays. Preserve the full ordered log and test conditions.
+If closed-menu stalls persist, attribute background callbacks first,
+not window mapping or Git's `toggle()`. For a later scoped patch,
+measure specific service parsing/model callbacks without removing them.
+Never re-enable the previously crashing unmap/remap experiment.
+
+No production behavior changes were made as part of this observation.

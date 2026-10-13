@@ -15,23 +15,31 @@ Item {
         placement === "auto" || placement === ""
         ? (horizontal ? "bottom" : "right") : placement
 
-    // The host reserves this stable zone in its content layout (see reservedExtent).
+    // Three independent measurements (audit issues 01/02, operator-approved):
+    //   crossExtent: physical scrollbar width; never inflated by glow;
+    //   effectiveGlowPadding: a recommendation for effects outside that width;
+    //   reservedExtent: what the HOST reserves in its own layout.
+    // Neither reservation nor effect padding silently enlarges hit geometry.
     // No mutation of the bound Flickable's anchors/margins occurs here.
     property bool reserveSpace: true
-    property bool containGlow: true
+    property bool reserveGlowSpace: false // Optional host-side wider clearance.
+    property bool containGlow: true      // Rail extensions/clipping: audit 04 OPEN.
     property int glowPadding: 7
     readonly property real effectiveGlowPadding: containGlow
         ? Math.max(glowPadding,
                    handleGlowEnabled
                    ? (dropHandleGlow ? handleDropGlowRadius
-                      : Math.max(barGlowPressedSpread, starGlowPressedSpread) + 2)
+                      : (starStyle ? starGlowPressedSpread : barGlowPressedSpread) + 2)
                    : 0,
                    railGlowEnabled ? railGlowSpread + 2 : 0)
         : 0
     readonly property real crossExtent:
-        (starStyle ? starAreaWidth : barAreaWidth) + 2 * effectiveGlowPadding
+        starStyle ? starAreaWidth : barAreaWidth
     readonly property real reservedExtent:
-        reserveSpace ? crossExtent + edgeInset : 0
+        reserveSpace
+        ? crossExtent + edgeInset
+          + (reserveGlowSpace ? 2 * effectiveGlowPadding : 0)
+        : 0
 
     // Geometry.
     property int barAreaWidth: 10

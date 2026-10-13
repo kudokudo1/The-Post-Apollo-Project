@@ -1,4 +1,4 @@
-name: Syntagma window opening lifecycle pilot
+name: Syntagma window opening lifecycle compatibility
 
 on:
   pull_request:
@@ -29,5 +29,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Verify opt-in defaults and protected exceptions
+      - name: Reject crashed unmap pilot and protect persistent mapping
         run: python3 tests/components/test_window_opening_lifecycle_pilot.py

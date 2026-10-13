@@ -11,11 +11,6 @@ PanelWindow {
     id: root
 
     property bool menuOpen: false
-    // Experimental only: leave permanent mapping as the default. Opt into
-    // visibility-controlled unmapping for this widget independently of Hospital.
-    // Read once at shell start; restart the shell to change the experiment.
-    readonly property bool visibilityLifecyclePilot:
-        String(Quickshell.env("POST_APOLLO_GIT_VISIBILITY_PILOT") || "").trim() === "1"
     property bool keyboardActive: true
     property bool keyboardLock: false
     property bool relationshipFocusModeActive: false
@@ -144,9 +139,10 @@ PanelWindow {
 
     color: "transparent"
     surfaceFormat.opaque: false
-    // Pilot only: normal operation remains mapped+masked; when explicitly
-    // enabled, unmap the surface on close without changing its input mask.
-    visible: !root.visibilityLifecyclePilot || root.menuOpen
+    // Live opening/closing A/B test (October 13, 2026) reproduced crashes
+    // under repeated unmap/remap. Keep the surface mapped while closed.
+    // Closed interaction stays disabled via the zero-size input mask.
+    visible: true
 
     mask: Region {
         x: 0

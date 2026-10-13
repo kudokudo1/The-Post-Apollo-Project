@@ -56,7 +56,7 @@ records the old AppControl, Git and Hospital keys and their focus caveats.
 | --- | --- |
 | AppControl | Existing reference handlers; its Tab behavior is context-sensitive when the result/mode rail owns focus |
 | Hospital | Existing seven Main Mode Tab/Shift+Tab implementation; Floor/Room/Bed remain contextual, not artificial Sub Modes |
-| Git/GitHub | Add Tab primary Local/Remote switch and Ctrl+arrows for whichever six-option bottom mode rail is visible; preserve spatial arrows, Alt+Left Git Back and existing Shift primary aliases as **legacy exceptions pending a later collision review** |
+| Git/GitHub | Add Tab/Shift+Tab for Local/Remote main pages; Ctrl+Left/Right for the visible lower six-mode rail; Shift+Left/Right now cycles the true top Sub Mode in Git Changes, History, and Repository. Existing spatial arrows and Git Alt+Left Back remain. Shift+Up/Down are guarded **legacy primary-page aliases** pending operator acceptance |
 | CPU++ | Add Tab four Main Modes; Shift+arrows for TEMP/FAN and SYSTEM submodes; Up/Down for monitor rows; no invented lower submode |
 | Weather Station | Add Tab HOME/MAP/NEWS/RADIO/TERMINAL; Shift+arrows for DOMAIN; vertical rail Up/Down preview plus Enter activation |
 | Power | Existing Up/Down, Enter, Escape and confirmation isolation; no artificial Main/Sub Mode |

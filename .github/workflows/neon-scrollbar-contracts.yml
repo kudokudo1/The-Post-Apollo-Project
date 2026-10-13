@@ -37,3 +37,6 @@ jobs:
 
       - name: Validate reusable scrollbar contracts
         run: python3 tests/components/test_neon_scrollbar_contracts.py
+
+      - name: Validate Syntagma scrollbar configuration contracts
+        run: python3 tests/components/test_neon_scrollbar_syntagma_contracts.py

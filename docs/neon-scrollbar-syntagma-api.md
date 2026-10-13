@@ -45,7 +45,7 @@ anchors.right: scrollbar.left
 anchors.rightMargin: 5
 ```
 
-Use `reserveSpace: false` for an intentional overlay. The component does not automatically mutate host geometry. **Audit issue 04 (extended rail clipping) is still undecided**: existing `containGlow: true` can clip a deliberate `trackTopExtension: 33`; the width fix intentionally does **not** decide or correct that separate behavior. Likewise, audit 06 (inactive fade) and audit 09 (whole-pane nested chaining) are still open for operator visual/behavioral review. Review effect clipping in the runtime before accepting the sizing.
+Use `reserveSpace: false` for an intentional overlay. The component does not automatically mutate host geometry. **Audit issue 04 is operator-decided: preserve the original extended rail.** When `trackTopExtension > 0`, the component does not clip that intentionally protruding rail; standard tracks retain the `containGlow` policy. The host must still provide an appropriate surrounding glow-safe area. This exception preserves Git Repository's `trackTopExtension: 33` without changing the physical scrollbar width. Runtime rendering remains to be verified. Likewise, audit 06 (inactive fade) and audit 09 (whole-pane nested chaining) are still open for operator visual/behavioral review. Review effect clipping in the runtime before accepting the sizing.
 
 ## Visibility modes
 

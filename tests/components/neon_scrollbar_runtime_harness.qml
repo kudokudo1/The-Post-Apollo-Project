@@ -89,6 +89,9 @@ Window {
         }
     }
 
+    readonly property bool mountedOnHost: positionerBar.parent === positionedHost
+    readonly property bool columnKeptOneItem: positioner.children.length === 1
+
     // Test target can be driven without direct QML context id lookup.
     property alias innerPane: inner
     property alias outerPane: outer

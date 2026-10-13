@@ -115,6 +115,74 @@ PanelWindow {
 
     property string searchQuery: ""
     property string activeFilter: "all"
+    property string lastHistoryFilter: "all"
+    // Do not take mode keys from the search editor or destructive dialogs.
+    readonly property bool standardKeysAvailable:
+        menuOpen && !searchInput.activeFocus
+        && pendingClearAllKey === "" && pendingClearAllSource === ""
+
+    // History and Manager are primary contexts; the six history categories
+    // are secondary filters, not six invented Main Modes.
+    function cycleMainMode() {
+        activeFilter = activeFilter === "manager"
+            ? lastHistoryFilter : "manager";
+    }
+
+    function cycleTopSubMode(direction) {
+        const filters = ["all", "apps", "system", "social", "apollo", "warning"];
+        const chosen = activeFilter === "manager" ? lastHistoryFilter : activeFilter;
+        const current = Math.max(0, filters.indexOf(chosen));
+        const step = Number(direction) < 0 ? -1 : 1;
+        activeFilter = filters[(current + step + filters.length) % filters.length];
+    }
+
+    function moveCurrentList(direction) {
+        const list = activeFilter === "manager" ? dndManagerList : historyList;
+        if (list.count < 1)
+            return;
+        const step = Number(direction) < 0 ? -1 : 1;
+        const index = list.currentIndex < 0
+            ? 0 : (list.currentIndex + step + list.count) % list.count;
+        list.currentIndex = index;
+        list.positionViewAtIndex(index, ListView.Contain);
+    }
+
+    Shortcut {
+        sequence: "Tab"
+        context: Qt.WindowShortcut
+        enabled: root.standardKeysAvailable
+        onActivated: root.cycleMainMode()
+    }
+    Shortcut {
+        sequence: "Shift+Tab"
+        context: Qt.WindowShortcut
+        enabled: root.standardKeysAvailable
+        onActivated: root.cycleMainMode()
+    }
+    Shortcut {
+        sequence: "Shift+Left"
+        context: Qt.WindowShortcut
+        enabled: root.standardKeysAvailable
+        onActivated: root.cycleTopSubMode(-1)
+    }
+    Shortcut {
+        sequence: "Shift+Right"
+        context: Qt.WindowShortcut
+        enabled: root.standardKeysAvailable
+        onActivated: root.cycleTopSubMode(1)
+    }
+    Shortcut {
+        sequence: "Up"
+        context: Qt.WindowShortcut
+        enabled: root.standardKeysAvailable
+        onActivated: root.moveCurrentList(-1)
+    }
+    Shortcut {
+        sequence: "Down"
+        context: Qt.WindowShortcut
+        enabled: root.standardKeysAvailable
+        onActivated: root.moveCurrentList(1)
+    }
 
     property string pendingClearAllKey: ""
     property string pendingClearAllSource: ""
@@ -154,6 +222,8 @@ PanelWindow {
     }
 
     onActiveFilterChanged: {
+        if (activeFilter !== "manager")
+            lastHistoryFilter = activeFilter;
         root.scheduleFilteredModelRebuild();
     }
 

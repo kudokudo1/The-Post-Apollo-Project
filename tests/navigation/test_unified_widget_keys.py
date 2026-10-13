@@ -114,6 +114,16 @@ def test_notifications_non_destructive_context_and_filter_keys():
     assert "function cycleTopSubMode(direction)" in src
     assert "function moveCurrentList(direction)" in src
     assert "lastHistoryFilter" in src
+    assert "listKeyboardSelectionActive" in src
+    assert "function activateCurrentHistoryItem()" in src
+    assert "if (activeFilter === \"manager\")" in src
+    assert "root.activeFilter !== \"manager\"" in src
+    assert "const index = !listKeyboardSelectionActive || list.currentIndex < 0" in src
+    assert "historyList.currentIndex === notificationEntry.index" in src
+    assert "ListView.isCurrentItem ? 2 : 1" in src
+    assert "takeMeToApp(row.sourceId, row.source);" in src
+    for key in ("Enter", "Return"):
+        assert 'sequence: "' + key + '"' in src
     assert "!searchInput.activeFocus" in src
     assert 'pendingClearAllKey === ""' in src
     for key in ("Tab", "Shift+Tab", "Shift+Left", "Shift+Right",

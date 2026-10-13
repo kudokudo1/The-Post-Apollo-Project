@@ -40,6 +40,25 @@ PanelWindow {
     }
     Process {
         id: discordShowProcess
+
+        onExited: function(exitCode, exitStatus) {
+            // Opening the native Discord window necessarily causes Sway to
+            // focus Vesktop. Only a keyboard-initiated Main Mode switch
+            // requests the Social selector back. Mouse clicks still open
+            // Discord with normal application focus.
+            if (!messagingWindow.restoreSelectorAfterDiscordShow)
+                return;
+            messagingWindow.restoreSelectorAfterDiscordShow = false;
+            if (!messagingWindow.menuOpen || !messagingWindow.discordSelected)
+                return;
+            messagingWindow.focusZone = messagingWindow.appZone;
+            messagingWindow.syncSocialGeometry(true);
+            Qt.callLater(function() {
+                if (messagingWindow.menuOpen && messagingWindow.discordSelected
+                        && messagingWindow.focusZone === messagingWindow.appZone)
+                    messagingWindow.focusAppSelector();
+            });
+        }
     }
 
     Process {
@@ -208,6 +227,9 @@ PanelWindow {
     // ============================================================
 
     property bool menuOpen: false
+    // Tab navigation belongs to the Social selector, not the external
+    // Discord window. Only set while a keyboard Main Mode transition opens it.
+    property bool restoreSelectorAfterDiscordShow: false
 
     property int focusZone: 0
 
@@ -702,6 +724,7 @@ PanelWindow {
     }
 
     function hideDiscord() {
+        restoreSelectorAfterDiscordShow = false;
         discordRaiseDelay.stop();
         discordStartupFallback.stop();
         discordConfigured = false;
@@ -744,11 +767,17 @@ PanelWindow {
         chatFeed.focusMessageInput();
     }
 
-    function activateApp(index) {
+    function activateApp(index, retainSelectorFocus) {
         activeAppIndex = index;
         contactList.clearSelection();
 
+        if (retainSelectorFocus === true) {
+            focusZone = appZone;
+            appSelector.keyboardActive = true;
+        }
+
         if (index === 1) {
+            restoreSelectorAfterDiscordShow = retainSelectorFocus === true;
             showDiscord();
             return;
         }
@@ -842,7 +871,7 @@ PanelWindow {
                         const index = (messagingWindow.activeAppIndex
                                        + direction + count) % count;
                         appSelector.selectedIndex = index;
-                        messagingWindow.activateApp(index);
+                        messagingWindow.activateApp(index, true);
                     }
                     event.accepted = true;
                     return;

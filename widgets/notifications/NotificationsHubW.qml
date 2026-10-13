@@ -1914,6 +1914,10 @@ PanelWindow {
                     }
 
                     ListView {
+                        NeonScrollBar {
+                            flickable: dndManagerList
+                        }
+
                         id: dndManagerList
 
                         anchors {

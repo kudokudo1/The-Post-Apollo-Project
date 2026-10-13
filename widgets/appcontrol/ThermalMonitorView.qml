@@ -642,9 +642,24 @@ property alias loadSlider: thermalLoadSlider
                     }
                 }
 
-                Row {
-                    width: parent.width
-                    spacing: 6
+                // Fan controls are discrete actions; lock, slider and modes
+                // remain their own safety/interaction families.
+                Flow {
+                    id: fanActionFlow
+                    width: Math.max(0, parent.width - 16)
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    spacing: 8
+
+                    // Prefer four across, but wrap rather than overlap.
+                    readonly property real minActionWidth: 48
+                    readonly property int columnsCount:
+                        width >= 4 * minActionWidth + 3 * spacing ? 4
+                        : width >= 2 * minActionWidth + spacing ? 2 : 1
+                    readonly property real actionWidth: Math.max(
+                        0, (width - (columnsCount - 1) * spacing) / columnsCount
+                    )
+                    readonly property int rowCount: Math.ceil(4 / columnsCount)
+                    height: rowCount * 35 + (rowCount - 1) * spacing
 
                     Repeater {
                         model: [
@@ -654,90 +669,197 @@ property alias loadSlider: thermalLoadSlider
                             { label: "MAX", action: "max", accent: Colors.red }
                         ]
 
-                        Rectangle {
+                        ActionButton {
+                            id: fanAction
                             required property var modelData
+                            width: fanActionFlow.actionWidth
+                            height: 35
 
-                            width: (thermalMonitorBody.width - 18) / 4
-                            height: 32
-
-                            property bool canControl:
+                            readonly property bool canControl:
                                 !!thermalMonitorBody.currentSensor
                                 && thermalController.fanControlUnlocked(
                                        thermalMonitorBody.currentSensor
                                    )
                                 && !!(thermalMonitorBody.safeSensor.controlWritable
                                      || thermalMonitorBody.safeSensor.controlRequiresAuth)
+                            readonly property bool boostAction:
+                                modelData.action === "boost"
+                            readonly property color activeAccent:
+                                modelData.action === "auto"
+                                ? Colors.orange : modelData.accent
+                            readonly property string compactIcon:
+                                modelData.action === "auto" ? "◉"
+                                : modelData.action === "manual" ? "↑"
+                                : modelData.action === "boost" ? "+"
+                                : "▲"
+                            readonly property real textBudget: Math.max(0, width - 12)
+                            readonly property bool fullLabelFits:
+                                minimumLabelMeasure.implicitWidth <= textBudget
+                            readonly property bool compactIconFits:
+                                compactIconMeasure.implicitWidth <= textBudget
 
-                            color:
-                                fanControlMouse.pressed
-                                ? Colors.magenta
-                                : fanControlMouse.containsMouse
-                                ? Colors.yellow
-                                : Colors.black
-                            opacity: canControl ? 1.0 : 0.38
-                            border.width: 1
-                            border.color: modelData.accent
+                            available: canControl
+                            unavailableOpacity: 0.38
+                            accentColor: modelData.accent
+                            label: modelData.label
+                            showLabel: false
+                            contentItem.clip: true
+                            acceptedButtons: Qt.LeftButton
+                            Accessible.role: Accessible.Button
+                            Accessible.name:
+                                modelData.action === "auto"
+                                ? "Set fan to automatic control"
+                                : modelData.action === "manual"
+                                ? "Enable manual fan boost"
+                                : modelData.action === "boost"
+                                ? "Increase fan target by ten percent"
+                                : "Set fan to maximum speed"
 
-                            RectangularShadow {
-                                anchors.fill: parent
-                                spread: 3
-                                z: -1
-                                opacity:
-                                    fanControlMouse.containsMouse
-                                    ? 0.52
-                                    : 0.34
-                                color: modelData.accent
-                            }
+                            // Preserve the semantic accent independently of
+                            // ordinary yellow hover and magenta press.
+                            idleFillColor: Colors.black
+                            hoverFillColor: Colors.yellow
+                            selectedFillColor: Colors.yellow
+                            keyboardSelectedFillColor: Colors.yellow
+                            pressedFillColor: Colors.magenta
+                            idleForegroundColor: modelData.accent
+                            hoverForegroundColor: activeAccent
+                            selectedForegroundColor: activeAccent
+                            keyboardSelectedForegroundColor: activeAccent
+                            pressedForegroundColor: Colors.black
+                            idleBorderColor: modelData.accent
+                            hoverBorderColor: activeAccent
+                            selectedBorderColor: activeAccent
+                            keyboardSelectedBorderColor: activeAccent
+                            pressedBorderColor: activeAccent
+                            // Border thickness is intentionally still pending.
+                            idleBorderWidth: 1
+                            hoverBorderWidth: 1
+                            selectedBorderWidth: 1
+                            keyboardSelectedBorderWidth: 1
+                            pressedBorderWidth: 1
 
+                            contentGlowSource: fanArtwork
+                            contentGlowEnabled: true
+                            idleContentGlowColor: modelData.accent
+                            hoverContentGlowColor: activeAccent
+                            selectedContentGlowColor: activeAccent
+                            keyboardSelectedContentGlowColor: activeAccent
+                            pressedContentGlowColor: activeAccent
+                            contentGlowIdleOpacity: 0.35
+                            contentGlowHoverOpacity: 0.75
+                            contentGlowSelectedOpacity: 0.75
+                            contentGlowKeyboardSelectedOpacity: 0.75
+                            contentGlowPressedOpacity: 1.0
+                            softGlowEnabled: true
+                            softGlowSpread: 3
+                            idleSoftGlowColor: modelData.accent
+                            hoverSoftGlowColor: activeAccent
+                            selectedSoftGlowColor: activeAccent
+                            keyboardSelectedSoftGlowColor: activeAccent
+                            pressedSoftGlowColor: activeAccent
+                            softGlowIdleOpacity: 0.25
+                            softGlowHoverOpacity: 0.55
+                            softGlowSelectedOpacity: 0.55
+                            softGlowKeyboardSelectedOpacity: 0.55
+                            softGlowPressedOpacity: 0.60
+                            wideGlowEnabled: false
+
+                            // Measure at minimum readable size before
+                            // switching to icon-only / mini-icon fallback.
                             GohuText {
-                                anchors.centerIn: parent
-                                text: modelData.label
-                                font.pixelSize: 9
-                                color:
-                                    fanControlMouse.pressed
-                                    ? Colors.black
-                                    : fanControlMouse.containsMouse
-                                    ? Colors.orange
-                                    : modelData.accent
-
-                                layer.enabled: !fanControlMouse.pressed
-                                layer.effect: DropShadow {
-                                    radius: 5
-                                    samples: 5
-                                    opacity: 0.34
-                                    color: modelData.accent
-                                    transparentBorder: true
+                                id: minimumLabelMeasure
+                                visible: false
+                                text: fanAction.modelData.label
+                                font.pixelSize: 8
+                            }
+                            GohuText {
+                                id: compactIconMeasure
+                                visible: false
+                                text: fanAction.compactIcon
+                                font.pixelSize: 12
+                            }
+                            Item {
+                                id: fanArtwork
+                                anchors.fill: parent
+                                clip: true
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    width: fanAction.textBudget
+                                    height: Math.max(0, parent.height - 8)
+                                    visible:
+                                        fanAction.fullLabelFits
+                                        && !fanAction.boostAction && width > 0
+                                    text: fanAction.modelData.label
+                                    font.pixelSize: 11
+                                    fontSizeMode: Text.HorizontalFit
+                                    minimumPixelSize: 8
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                    elide: Text.ElideNone
+                                    color: fanAction.foregroundColor
+                                }
+                                // Syntagma punctuation: % always white,
+                                // with the adjacent green-family glow.
+                                Row {
+                                    anchors.centerIn: parent
+                                    visible:
+                                        fanAction.fullLabelFits
+                                        && fanAction.boostAction
+                                    spacing: 0
+                                    GohuText {
+                                        text: "+10"
+                                        font.pixelSize: 11
+                                        color: fanAction.foregroundColor
+                                    }
+                                    GohuText {
+                                        text: "%"
+                                        font.pixelSize: 11
+                                        color: Colors.white
+                                    }
+                                }
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    width: fanAction.textBudget
+                                    height: Math.max(0, parent.height - 8)
+                                    visible: !fanAction.fullLabelFits && width > 0
+                                    text:
+                                        fanAction.compactIconFits
+                                        ? fanAction.compactIcon : fanAction.compactIcon
+                                    font.pixelSize:
+                                        fanAction.compactIconFits ? 12 : 8
+                                    fontSizeMode: Text.HorizontalFit
+                                    minimumPixelSize: 7
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                    elide: Text.ElideNone
+                                    color: fanAction.foregroundColor
                                 }
                             }
 
-                            MouseArea {
-                                id: fanControlMouse
-                                anchors.fill: parent
-                                enabled: parent.canControl
-                                hoverEnabled: true
+                            onTriggered: {
+                                if (!canControl)
+                                    return;
 
-                                onClicked: {
-                                    if (modelData.action === "auto") {
-                                        thermalController.clearDesiredFanPercent(
-                                            thermalMonitorBody.currentSensor
-                                        );
-                                    } else if (modelData.action === "max") {
-                                        thermalController.setDesiredFanPercent(
-                                            thermalMonitorBody.currentSensor,
-                                            100
-                                        );
-                                    } else if (modelData.action === "boost") {
-                                        thermalController.setDesiredFanPercent(
-                                            thermalMonitorBody.currentSensor,
-                                            Math.min(100, thermalLoadSlider.activePercent() + 10)
-                                        );
-                                    }
-
-                                    thermalController.writeFanControl(
+                                if (modelData.action === "auto") {
+                                    thermalController.clearDesiredFanPercent(
+                                        thermalMonitorBody.currentSensor
+                                    );
+                                } else if (modelData.action === "max") {
+                                    thermalController.setDesiredFanPercent(
                                         thermalMonitorBody.currentSensor,
-                                        modelData.action
+                                        100
+                                    );
+                                } else if (modelData.action === "boost") {
+                                    thermalController.setDesiredFanPercent(
+                                        thermalMonitorBody.currentSensor,
+                                        Math.min(100, thermalLoadSlider.activePercent() + 10)
                                     );
                                 }
+                                thermalController.writeFanControl(
+                                    thermalMonitorBody.currentSensor,
+                                    modelData.action
+                                );
                             }
                         }
                     }

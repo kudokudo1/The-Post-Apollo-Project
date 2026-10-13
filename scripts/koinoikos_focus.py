@@ -96,10 +96,18 @@ def focus_target(target: dict[str, Any]) -> bool:
 
 def move(direction: str) -> bool:
     data = snapshot()
-    # If QS is unavailable, leave normal Sway window focus entirely alone.
-    # Escape in the Sway binding mode still works independently of QS.
-    if data is None or not data.get("active"):
+    # The held Sway chord activates the temporary widget session only when
+    # a directional key is actually pressed. Super+grave alone never selects
+    # or cycles widgets. No fallback to Sway application focus.
+    if data is None:
         return False
+    if not data.get("active"):
+        code, result = qs("begin")
+        if code != 0 or result.strip().lower() != "true":
+            return False
+        data = snapshot()
+        if data is None or not data.get("active"):
+            return False
 
     items = menu_windows(data)
     if not items:
@@ -107,10 +115,11 @@ def move(direction: str) -> bool:
     owner = data.get("owner", "")
     current = next((item for item in items if item["id"] == owner), None)
     if current is None:
-        # No selected widget (or last selected widget closed): choose a
-        # deterministic widget anchor, not a native focused window.
-        first = min(items, key=lambda item: (item["x"], item["y"], item["id"]))
-        return focus_target(first)
+        # The first direction must itself move focus where possible, not
+        # require a second arrow just to choose a starting widget.
+        current = min(items, key=lambda item: (item["x"], item["y"], item["id"]))
+        target = nearest(items, current, direction)
+        return focus_target(target or current)
 
     target = nearest(items, current, direction)
     # At the edge, stay put. Never drift into the ordinary Sway layer.
@@ -119,19 +128,12 @@ def move(direction: str) -> bool:
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("enter", "cycle", "move", "exit", "snapshot"))
+    parser.add_argument("action", choices=("move", "exit", "snapshot"))
     parser.add_argument("direction", nargs="?", choices=DIRECTIONS)
     args = parser.parse_args(argv)
-    if args.action == "enter":
-        # Entry and the first widget switch must be atomic in the broker.
-        code, output = qs("beginAndAdvance")
-        return 0 if code == 0 and output.strip().lower() == "true" else 1
-    if args.action == "cycle":
-        # Each repeated Super+grave performs exactly one serialized widget
-        # selection in QS; no Sway app focus and no Python read-modify race.
-        code, output = qs("advance")
-        return 0 if code == 0 and output.strip().lower() == "true" else 1
     if args.action == "exit":
+        # This is invoked automatically on release of grave or Super.
+        # The compositor binding mode returns to default independently.
         qs("end")
         return 0
     if args.action == "snapshot":

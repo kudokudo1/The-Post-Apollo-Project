@@ -54,7 +54,14 @@ Item {
     property int topInset: 5
     property int bottomInset: 5
     property int leftInset: 5       // Horizontal track's start inset.
-    property int rightEndInset: 5  // Horizontal track's end inset.
+    property int rightEndInset: 5   // Horizontal track's end inset.
+    // Hosts which already reserve endpoint gaps can disable a duplicate 5px
+    // insertion without overwriting the actual approved per-axis defaults.
+    property bool viewportHasEndpointClearance: false
+    readonly property int effectiveTopInset: viewportHasEndpointClearance ? 0 : topInset
+    readonly property int effectiveBottomInset: viewportHasEndpointClearance ? 0 : bottomInset
+    readonly property int effectiveLeftInset: viewportHasEndpointClearance ? 0 : leftInset
+    readonly property int effectiveRightEndInset: viewportHasEndpointClearance ? 0 : rightEndInset
     property int edgeInset: 4
     property int rightInset: edgeInset // Legacy right-edge override.
     property int leftEdgeInset: edgeInset
@@ -214,18 +221,18 @@ Item {
     // surrounding glow-safe area.
     clip: containGlow && trackTopExtension <= 0
     width: horizontal
-        ? (flickable ? Math.max(0, flickable.width - leftInset - rightEndInset) : 0)
+        ? (flickable ? Math.max(0, flickable.width - effectiveLeftInset - effectiveRightEndInset) : 0)
         : crossExtent
     height: horizontal
         ? crossExtent
-        : (flickable ? Math.max(0, flickable.height - topInset - bottomInset) : 0)
+        : (flickable ? Math.max(0, flickable.height - effectiveTopInset - effectiveBottomInset) : 0)
     x: !flickable ? 0
-       : horizontal ? flickable.x + leftInset
+       : horizontal ? flickable.x + effectiveLeftInset
        : resolvedPlacement === "left"
          ? flickable.x + leftEdgeInset
          : flickable.x + flickable.width - width - rightInset
     y: !flickable ? 0
-       : !horizontal ? flickable.y + topInset
+       : !horizontal ? flickable.y + effectiveTopInset
        : resolvedPlacement === "top"
          ? flickable.y + topEdgeInset
          : flickable.y + flickable.height - height - bottomEdgeInset

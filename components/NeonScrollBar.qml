@@ -359,8 +359,8 @@ Item {
         }
         if (rawPixel === 0 && rawAngle === 0)
             return 0;
-        const systemLines = useSystemScrollSensitivity && Qt.styleHints
-            ? Qt.styleHints.wheelScrollLines : 0;
+        const systemLines = useSystemScrollSensitivity && Application.styleHints
+            ? Application.styleHints.wheelScrollLines : 0;
         const step = systemLines > 0 ? systemLines * 14 : wheelStep;
         const delta = rawPixel !== 0 ? -rawPixel : -rawAngle / 120 * step;
         return reverseWheelDirection ? -delta : delta;
@@ -399,8 +399,8 @@ Item {
         return delta !== 0 ? moveBy(delta, false) : false;
     }
     function systemWheelStep() {
-        const lines = useSystemScrollSensitivity && Qt.styleHints
-            ? Qt.styleHints.wheelScrollLines : 0;
+        const lines = useSystemScrollSensitivity && Application.styleHints
+            ? Application.styleHints.wheelScrollLines : 0;
         return lines > 0 ? lines * 14 : wheelStep;
     }
     Keys.onPressed: function(event) {
@@ -622,8 +622,13 @@ Item {
             const pointer = root.horizontal ? mouse.x : mouse.y;
             const extent = root.activeHandleExtent();
             const handleStart = root.handleY();
+            const across = root.horizontal ? mouse.y : mouse.x;
+            const crossStart = root.horizontal ? handleLoader.y : handleLoader.x;
+            const crossEnd = crossStart
+                + (root.horizontal ? handleLoader.height : handleLoader.width);
             const insideHandle = pointer >= handleStart
-                && pointer <= handleStart + extent;
+                && pointer <= handleStart + extent
+                && across >= crossStart && across <= crossEnd;
             const pageMode = root.trackClickMode === "page";
             draggingHandle = insideHandle || (!pageMode && root.clickToJump);
             dragOffset = root.preserveDragOffset && insideHandle

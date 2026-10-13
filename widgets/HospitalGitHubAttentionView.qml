@@ -286,14 +286,18 @@ Rectangle {
                     }
                 }
 
-                AttnButton {
+                HospitalActionButton {
+                    height: Math.min(35, parent.height)
+                    compactIcon: "←"
                     width: 82
                     label: "← SURGERY"
                     enabledAction: !root.attentionProvider.busy
                     onTriggered: root.closeRequested()
                 }
 
-                AttnButton {
+                HospitalActionButton {
+                    height: Math.min(35, parent.height)
+                    compactIcon: "↻"
                     width: 82
                     label:
                         root.attentionProvider.busy
@@ -553,7 +557,9 @@ Rectangle {
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: 5
 
-                        AttnButton {
+                        HospitalActionButton {
+                            height: 28
+                            compactIcon: "↗"
                             width: parent.width
                             label: "OPEN PULLS"
                             accent:
@@ -568,7 +574,9 @@ Rectangle {
                                 )
                         }
 
-                        AttnButton {
+                        HospitalActionButton {
+                            height: 28
+                            compactIcon: "⇥"
                             width: parent.width
                             label: "QUEUE"
                             accent: Colors.blue

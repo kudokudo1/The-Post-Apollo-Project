@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-from PySide6.QtCore import QCoreApplication, QPoint, QPointF, Qt, QUrl
+from PySide6.QtCore import QCoreApplication, QObject, QPoint, QPointF, Qt, QUrl
 from PySide6.QtGui import QGuiApplication, QWheelEvent
 from PySide6.QtQml import QQmlComponent, QQmlEngine
 
@@ -26,9 +26,11 @@ if root is None:
     raise RuntimeError("QML instantiation: " + "; ".join(str(e) for e in component.errors()))
 app.processEvents()
 
-bar = root.property("auditBar")
-inner = root.property("innerPane")
-outer = root.property("outerPane")
+# PySide6 cannot convert a QML-defined strongly typed alias into a Python
+# wrapper automatically. Object names resolve through QObject instead.
+bar = root.findChild(QObject, "auditScrollBar")
+inner = root.findChild(QObject, "innerPane")
+outer = root.findChild(QObject, "outerPane")
 if any(obj is None for obj in (bar, inner, outer)):
     raise AssertionError("QML harness did not expose the three target objects")
 

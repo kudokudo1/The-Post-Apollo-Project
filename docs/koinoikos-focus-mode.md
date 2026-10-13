@@ -149,7 +149,7 @@ restores Sway's default binding mode.
 but do not prove the mode was entered. `swaymsg` re-parses its IPC command:
 keep the internal quotes around the multiword name. From a shell prompt use
 `swaymsg 'mode "Koinoikos Focus"'`; in the `sh -c` shortcut the equivalent is
-`swaymsg "mode \\"Koinoikos Focus\\""`. Do not split the command into
+`swaymsg "mode \"Koinoikos Focus\""`. Do not split the command into
 `swaymsg mode "Koinoikos Focus"` or the embedded quotes are lost.
 
 ### Runtime verification checkpoint

@@ -998,11 +998,11 @@ Rectangle {
                     }
                 }
             }
-        }
-        NeonScrollBar {
-            flickable: syntagmaPane2
-            handleStyle: "star"
-            visible: syntagmaPane2.visible && scrollable
+            NeonScrollBar {
+                flickable: syntagmaPane2
+                handleStyle: "star"
+                visible: syntagmaPane2.visible && scrollable
+            }
         }
     }
 

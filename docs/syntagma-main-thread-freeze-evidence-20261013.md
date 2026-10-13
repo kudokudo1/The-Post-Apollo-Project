@@ -170,3 +170,49 @@ measure specific service parsing/model callbacks without removing them.
 Never re-enable the previously crashing unmap/remap experiment.
 
 No production behavior changes were made as part of this observation.
+
+
+## Follow-up: clean idle baseline with music playing
+
+**Operator's next controlled run, October 13, 2026:** After a deliberate
+Quickshell restart with `POST_APOLLO_UI_LAG_PROBE=1`, the operator
+did **not manually open Git, Hospital, or other menus** during the short
+baseline. They explicitly reported that **music was playing**, so the
+compact MPD/CAVA visualizer continued as part of the default taskbar.
+
+The emitted `SYNTAGMA_LAG_PROBE` intervals were:
+
+| Reported timer interval | Sampled menu states when callback resumed |
+| ---: | --- |
+| **3,074 ms** | git=false; hospital=false; notifications=false |
+| **3,408 ms** | git=false; hospital=false; notifications=false |
+| **1,432 ms** | git=false; hospital=false; notifications=false |
+
+**Updated conclusion:** The Quickshell event loop has **multi-second
+missed deadlines in a normal no-manual-menu-opening scenario**.
+This weakens the hypothesis that Git or Hospital dock toggle is necessary
+to trigger the issue. It does not isolate which background workload or
+earlier startup callback consumed the time. The menu-state flags are
+still read when each delayed timer callback executes, not sampled
+continuously during the gap.
+
+**Music distinction:** `modules/Mediaplayer.qml` starts
+`cava` with `running: true`, collects frames with `SplitParser`,
+and reassigns `levels` to drive animated bar heights; separately it
+polls `mpc status` every 2 seconds. MPD/audio continuing to play
+is not proof the CAVA input or UI visualizer caused the stall.
+`modules/Network.qml` also initiates multiple network probes on a
+500 ms timer, while other services can update asynchronously.
+
+**Recommended next controlled isolation:** Compare one 20-second
+no-menu interval with CAVA's *visualization process* temporarily
+suspended (SIGSTOP/SIGCONT for the specific `cava` child), while
+music playback continues. Use a shell trap to resume the process
+automatically, and avoid broad `pkill` or permanent code edits.
+This merely tests whether CAVA frame delivery is *necessary* for
+the idle stalls; it cannot prove CAVA is sufficient or distinguish
+Qt/driver issues on its own. Re-enable CAVA after the short trial
+regardless of outcome.
+
+**No widget code, focus policy, renderer, or lifecycle modified**
+to record this runtime observation.

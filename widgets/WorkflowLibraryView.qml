@@ -1107,6 +1107,8 @@ Item {
                     }
 
                     NeonScrollBar {
+
+                        handleStyle: "star"
                         id: workflowScrollTrack
 
                         flickable: workflowFlick
@@ -1128,13 +1130,15 @@ Item {
                         railRadius: 0
                         railBorderWidth: 1
                         railBorderColor: Colors.orange
-                        railGlowEnabled: false
+                        railGlowEnabled: true
+                        railGlowOpacity: 0.20
+                        railGlowColor: Colors.orange
 
                         handleColor: Colors.magenta
                         handleOpacity: scrollable ? 0.92 : 0.0672
                         barHandleRadius: 0
                         handleBorderWidth: 0
-                        handleGlowEnabled: false
+                        handleGlowEnabled: true
 
                         interactive: scrollable
                         preserveDragOffset: true

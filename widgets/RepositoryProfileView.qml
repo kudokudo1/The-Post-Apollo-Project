@@ -635,6 +635,8 @@ Item {
                             }
 
                             NeonScrollBar {
+
+                                handleStyle: "star"
                                 id: catalogScrollTrack
 
                                 flickable: catalogScroll
@@ -656,13 +658,15 @@ Item {
                                 railRadius: 0
                                 railBorderWidth: 1
                                 railBorderColor: Colors.dark
-                                railGlowEnabled: false
+                                railGlowEnabled: true
+                                railGlowOpacity: 0.16
+                                railGlowColor: Colors.dark
 
                                 handleColor: Colors.magenta
                                 handleOpacity: scrollable ? 0.82 : 0.30
                                 barHandleRadius: 0
                                 handleBorderWidth: 0
-                                handleGlowEnabled: false
+                                handleGlowEnabled: true
 
                                 interactive: false
                                 wheelEnabled: false

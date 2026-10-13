@@ -2109,7 +2109,8 @@ Item {
                         railColor: taskProcessScopeInfo.border.color
                         railOpacity: 0.90
                         railRadius: 0
-                        railGlowEnabled: false
+                        railGlowEnabled: true
+                        railGlowOpacity: 0.20
 
                         handleColor: Colors.magenta
                         handleOpacity: 0.90

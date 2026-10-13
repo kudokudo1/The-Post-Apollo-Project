@@ -141,6 +141,7 @@ Item {
     property bool railGlowEnabled: true
     property real railGlowSpread: 2
     property real railGlowOpacity: 0.24
+    property color railGlowColor: railColor
 
     // Handle appearance.
     property color handleColor: Colors.magenta
@@ -551,7 +552,7 @@ Item {
             visible: root.railGlowEnabled
             spread: root.railGlowSpread
             opacity: root.railGlowOpacity
-            color: root.railColor
+            color: root.railGlowColor
         }
 
         Loader {

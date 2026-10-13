@@ -2551,7 +2551,8 @@ PanelWindow {
                     railColor: Colors.cyan
                     railOpacity: 0.52
                     railRadius: 0
-                    railGlowEnabled: false
+                    railGlowEnabled: true
+                    railGlowOpacity: 0.18
 
                     handleColor: Colors.magenta
                     barHandleRadius: 0

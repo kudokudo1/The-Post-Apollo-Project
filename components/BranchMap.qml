@@ -614,4 +614,10 @@ Rectangle {
             }
         }
     }
+
+    NeonScrollBar {
+        flickable: topologyFlick
+        handleStyle: "star"
+        visible: topologyFlick.visible && scrollable
+    }
 }

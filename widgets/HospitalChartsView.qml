@@ -1211,6 +1211,7 @@ Item {
                         }
 
                         Flickable {
+                            id: suggestionDetailScroll
                             width: parent.width
                             height: Math.max(120, parent.height - 238)
                             clip: true
@@ -1231,7 +1232,8 @@ Item {
 
                             NeonScrollBar {
                                 handleStyle: "star"
-                                flickable: parent
+                                flickable: suggestionDetailScroll
+                                mountingParent: suggestionDetailScroll.parent.parent
                             }
                         }
 

@@ -376,6 +376,10 @@ Item {
 
                 ListView {
                     id: entryList
+                    NeonScrollBar {
+                        flickable: entryList
+                        handleStyle: "star"
+                    }
                     anchors {
                         fill: parent
                         margins: 7

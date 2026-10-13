@@ -615,6 +615,11 @@ Item {
                     border.color: Colors.orange
 
                     Flickable {
+                        NeonScrollBar {
+                            flickable: reportList
+                            handleStyle: "star"
+                        }
+
                         id: reportList
                         anchors {
                             fill: parent
@@ -777,6 +782,11 @@ Item {
                     border.color: Colors.cyan
 
                     Flickable {
+                        NeonScrollBar {
+                            flickable: detailFlick
+                            handleStyle: "star"
+                        }
+
                         id: detailFlick
                         anchors {
                             fill: parent

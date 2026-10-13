@@ -496,6 +496,7 @@ Item {
                         }
 
                         Flickable {
+                            id: syntagmaPane1
                             width: parent.width
                             height: parent.height - 157
 
@@ -651,6 +652,12 @@ Item {
                                 }
                             }
                         }
+                        NeonScrollBar {
+                            flickable: syntagmaPane1
+                            handleStyle: "star"
+                            mountingParent: syntagmaPane1.parent.parent
+                            visible: syntagmaPane1.visible && scrollable
+                        }
                     }
                 }
 
@@ -767,6 +774,12 @@ Item {
                                     ? Colors.red
                                     : Colors.white
                             }
+                        }
+                        NeonScrollBar {
+                            flickable: logFlickable
+                            handleStyle: "star"
+                            mountingParent: logFlickable.parent.parent
+                            visible: logFlickable.visible && scrollable
                         }
                     }
                 }

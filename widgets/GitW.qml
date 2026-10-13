@@ -4649,6 +4649,11 @@ PanelWindow {
                                             }
                                         }
                                     }
+                                    NeonScrollBar {
+                                        flickable: localTargetFlick
+                                        handleStyle: "star"
+                                        visible: localTargetFlick.visible && scrollable
+                                    }
 
                                     Rectangle {
                                         id: localTargetScrollRail
@@ -5489,6 +5494,7 @@ PanelWindow {
                             }
 
                             Flickable {
+                                id: syntagmaPane2
                                 anchors {
                                     top: parent.top
                                     bottom: parent.bottom
@@ -5528,6 +5534,11 @@ PanelWindow {
                                         transparentBorder: true
                                     }
                                 }
+                            }
+                            NeonScrollBar {
+                                flickable: syntagmaPane2
+                                handleStyle: "star"
+                                visible: syntagmaPane2.visible && scrollable
                             }
                         }
                     }
@@ -6823,6 +6834,7 @@ PanelWindow {
                                                             }
 
                                                             Flickable {
+                                                                id: syntagmaPane3
                                                                 anchors {
                                                                     fill: parent
                                                                     margins: 4
@@ -6906,6 +6918,11 @@ PanelWindow {
                                                                         }
                                                                     }
                                                                 }
+                                                            }
+                                                            NeonScrollBar {
+                                                                flickable: syntagmaPane3
+                                                                handleStyle: "star"
+                                                                visible: syntagmaPane3.visible && scrollable
                                                             }
                                                         }
                             }

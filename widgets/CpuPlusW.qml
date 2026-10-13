@@ -1417,6 +1417,10 @@ PanelWindow {
                 }
             }
         }
+        NeonScrollBar {
+            flickable: sharedInstrumentScroll
+            visible: sharedInstrumentScroll.visible && scrollable
+        }
     }
 
     // ============================================================

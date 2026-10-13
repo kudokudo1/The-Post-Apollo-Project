@@ -5422,6 +5422,11 @@ PanelWindow {
 
             }
         }
+        NeonScrollBar {
+            flickable: hospitalScroll
+            handleStyle: "star"
+            visible: hospitalScroll.visible && scrollable
+        }
 
         MouseArea {
             id: phoneMenuShield

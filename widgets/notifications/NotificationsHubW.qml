@@ -2019,6 +2019,10 @@ PanelWindow {
                             }
                         }
                     }
+                    NeonScrollBar {
+                        flickable: dndManagerList
+                        visible: dndManagerList.visible && scrollable
+                    }
 
                     GlowText {
                         anchors.centerIn: dndManagerList

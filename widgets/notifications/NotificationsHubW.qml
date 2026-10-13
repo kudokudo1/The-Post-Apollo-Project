@@ -116,6 +116,7 @@ PanelWindow {
     property string searchQuery: ""
     property string activeFilter: "all"
     property string lastHistoryFilter: "all"
+    property bool listKeyboardSelectionActive: false
     // Do not take mode keys from the search editor or destructive dialogs.
     readonly property bool standardKeysAvailable:
         menuOpen && !searchInput.activeFocus
@@ -129,9 +130,11 @@ PanelWindow {
     }
 
     function cycleTopSubMode(direction) {
+        // Manager has no history-category submode. Do not silently leave it.
+        if (activeFilter === "manager")
+            return;
         const filters = ["all", "apps", "system", "social", "apollo", "warning"];
-        const chosen = activeFilter === "manager" ? lastHistoryFilter : activeFilter;
-        const current = Math.max(0, filters.indexOf(chosen));
+        const current = Math.max(0, filters.indexOf(activeFilter));
         const step = Number(direction) < 0 ? -1 : 1;
         activeFilter = filters[(current + step + filters.length) % filters.length];
     }
@@ -141,10 +144,27 @@ PanelWindow {
         if (list.count < 1)
             return;
         const step = Number(direction) < 0 ? -1 : 1;
-        const index = list.currentIndex < 0
-            ? 0 : (list.currentIndex + step + list.count) % list.count;
+        // Starting from a newly opened or switched page, the first arrow
+        // selects an actual visible item rather than skipping index zero.
+        const index = !listKeyboardSelectionActive || list.currentIndex < 0
+            ? (step < 0 ? list.count - 1 : 0)
+            : (list.currentIndex + step + list.count) % list.count;
+        listKeyboardSelectionActive = true;
         list.currentIndex = index;
         list.positionViewAtIndex(index, ListView.Contain);
+    }
+
+    function activateCurrentHistoryItem() {
+        // Manager allows explicit ALLOW clicks only; pressing Enter must
+        // never implicitly remove a DND policy.
+        if (!listKeyboardSelectionActive || activeFilter === "manager")
+            return;
+        const index = historyList.currentIndex;
+        if (index < 0 || index >= filteredNotifications.count)
+            return;
+        const row = filteredNotifications.get(index);
+        if (row)
+            takeMeToApp(row.sourceId, row.source);
     }
 
     Shortcut {
@@ -162,14 +182,28 @@ PanelWindow {
     Shortcut {
         sequence: "Shift+Left"
         context: Qt.WindowShortcut
-        enabled: root.standardKeysAvailable
+        enabled: root.standardKeysAvailable && root.activeFilter !== "manager"
         onActivated: root.cycleTopSubMode(-1)
     }
     Shortcut {
         sequence: "Shift+Right"
         context: Qt.WindowShortcut
-        enabled: root.standardKeysAvailable
+        enabled: root.standardKeysAvailable && root.activeFilter !== "manager"
         onActivated: root.cycleTopSubMode(1)
+    }
+    Shortcut {
+        sequence: "Enter"
+        context: Qt.WindowShortcut
+        enabled: root.standardKeysAvailable && root.listKeyboardSelectionActive
+                 && root.activeFilter !== "manager"
+        onActivated: root.activateCurrentHistoryItem()
+    }
+    Shortcut {
+        sequence: "Return"
+        context: Qt.WindowShortcut
+        enabled: root.standardKeysAvailable && root.listKeyboardSelectionActive
+                 && root.activeFilter !== "manager"
+        onActivated: root.activateCurrentHistoryItem()
     }
     Shortcut {
         sequence: "Up"
@@ -222,12 +256,14 @@ PanelWindow {
     }
 
     onActiveFilterChanged: {
+        listKeyboardSelectionActive = false;
         if (activeFilter !== "manager")
             lastHistoryFilter = activeFilter;
         root.scheduleFilteredModelRebuild();
     }
 
     onSearchQueryChanged: {
+        listKeyboardSelectionActive = false;
         root.scheduleFilteredModelRebuild();
     }
 
@@ -1819,8 +1855,13 @@ PanelWindow {
                             height: 64
 
                             color: "transparent"
-                            border.width: 1
-                            border.color: Colors.magenta
+                            // Keyboard selection is independently highlighted;
+                            // default DND semantic identity remains magenta.
+                            border.width:
+                                root.listKeyboardSelectionActive && ListView.isCurrentItem ? 2 : 1
+                            border.color:
+                                root.listKeyboardSelectionActive && ListView.isCurrentItem
+                                ? Colors.orange : Colors.magenta
 
                             Rectangle {
                                 anchors.fill: parent
@@ -2005,6 +2046,18 @@ PanelWindow {
 
                             borderWidth: 1
                             borderColor: notificationEntry.notificationColor
+
+                            // A separate orange outline shows where arrows
+                            // will act without overriding the card's own tone.
+                            Rectangle {
+                                anchors.fill: parent
+                                color: "transparent"
+                                border.width: 2
+                                border.color: Colors.orange
+                                z: 40
+                                visible: root.listKeyboardSelectionActive
+                                         && historyList.currentIndex === notificationEntry.index
+                            }
 
                             glowColor: notificationEntry.notificationColor
                             closeGlowSpread: root.cardCloseGlowSpread

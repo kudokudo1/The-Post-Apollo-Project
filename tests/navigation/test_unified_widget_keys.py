@@ -26,7 +26,16 @@ def test_git_main_and_visible_lower_mode_keys_are_window_local():
     assert "readonly property bool standardModeKeysAvailable" in src
     for key in ("Tab", "Shift+Tab", "Ctrl+Left", "Ctrl+Right"):
         assert 'sequence: "' + key + '"' in src
-    assert src.count("enabled: root.standardModeKeysAvailable") == 4
+    # Four standard Tab/Ctrl shortcuts plus two guarded legacy Up/Down aliases.
+    assert src.count("enabled: root.standardModeKeysAvailable") == 6
+    assert src.count("enabled: root.topSubModeKeysAvailable") == 2
+    assert "function cycleTopSubMode(direction)" in src
+    assert "gitChangesView.cycleSubMode(direction)" in src
+    assert "gitHistoryView.cycleSubMode(direction)" in src
+    assert "gitRepositoryView.cycleSubMode(direction)" in src
+    assert "root.selectPrimaryMode(-1)" in src   # Shift+Up legacy
+    assert "root.selectPrimaryMode(1)" in src    # Shift+Down legacy
+    assert "context: Qt.WindowShortcut" in src
     assert src.count("context: Qt.WindowShortcut") >= 4
     assert "function cycleMainMode(direction)" in src
     assert "function cycleVisibleSubMode(direction)" in src
@@ -42,6 +51,26 @@ def test_git_main_and_visible_lower_mode_keys_are_window_local():
     for guarded in ("!root.activeTextEditor", "!root.dialControlMode",
                     "!root.workflowMenuOpen", "!root.runInspectorOpen"):
         assert guarded in src
+
+
+def test_nested_git_top_sub_modes_match_their_pointer_paths():
+    for path, keys in (
+        ("widgets/GitChangesView.qml",
+         ["files", "hunks", "stashes", "conflicts"]),
+        ("widgets/GitHistoryView.qml",
+         ["log", "query", "reflog", "compare", "operate", "rebase", "surgery"]),
+        ("widgets/GitRepositoryView.qml",
+         ["remotes", "tags", "worktrees", "config", "files", "hooks", "health"]),
+    ):
+        src = read(path)
+        assert "function selectSubMode(key)" in src, path
+        assert "function cycleSubMode(direction)" in src, path
+        assert "onTriggered: root.selectSubMode(modelData.key)" in src, path
+        for key in keys:
+            assert '"' + key + '"' in src, (path, key)
+        assert "armedAction" in src or "clearArm()" in src, path
+    assert "historyService.loadReflog();" in read(
+        "widgets/GitHistoryView.qml")
 
 
 def test_cpu_mode_and_monitor_keys_are_window_local():

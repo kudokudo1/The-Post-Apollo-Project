@@ -112,11 +112,11 @@ try:
         "vertical wheel over horizontal scrollbar did not scroll right"
     )
     # Verify a declaratively nested indicator actually escapes the Column.
-    assert positioner_bar.parentItem().objectName() == "positionedHost"
+    assert root.property("mountedOnHost") is True, "scrollbar was not reparented to the layout host"
     near(positioner_bar.property("width"), 16, "star overlay width")
     near(positioner_bar.property("x"), 7 + 260 - 16 - 4, "mounted overlay x")
     near(positioner_bar.property("y"), 11 + 5, "mounted overlay y")
-    assert len(positioner.childItems()) == 1, (
+    assert root.property("columnKeptOneItem") is True, (
         "Scrollbar should not become an extra row in the Column"
     )
 

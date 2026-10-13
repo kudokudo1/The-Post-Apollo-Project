@@ -61,7 +61,7 @@ records the old AppControl, Git and Hospital keys and their focus caveats.
 | Weather Station | Add Tab HOME/MAP/NEWS/RADIO/TERMINAL; Shift+arrows for DOMAIN; vertical rail Up/Down preview plus Enter activation |
 | Power | Existing Up/Down, Enter, Escape and confirmation isolation; no artificial Main/Sub Mode |
 | Social/Messaging | Tab/Shift+Tab cycles Sessions/Discord/Telegram via their normal opener. Keyboard-initiated Discord opening now requests selector focus restoration on show completion; mouse clicking or entering the separate Discord window retains native application focus. Social is a normal FloatingWindow and remains outside the QS layer-shell Koinoikos registry pending separate native-window policy and live verification |
-| Notifications | **Koinoikos source-enrolled widget.** All seven visible filter buttons are Main Modes: ALL → APPS → SYSTEM → SOCIAL → APOLLO → WARNING → MANAGER (wrap). Tab advances one button and Shift+Tab reverses, continuing from a mouse-clicked filter. There is no separate top/bottom Sub Mode; Shift+arrows are not bound to these filters. Up/Down highlights history or Manager rows; Enter activates only explicitly selected History app cards, never Manager/DND actions. Shared ownership, search and confirmation guards remain; live compositor validation is pending |
+| Notifications | **Koinoikos source-enrolled widget.** All seven visible filter buttons are Main Modes: ALL → APPS → SYSTEM → SOCIAL → APOLLO → WARNING → MANAGER (wrap). Tab advances one button and Shift+Tab reverses, continuing from a mouse-clicked filter. There is no separate top/bottom Sub Mode; Shift+arrows are not bound to these filters. Up/Down highlights history or Manager rows; Enter activates only explicitly selected History app cards, never Manager/DND actions. Shared ownership, search and confirmation guards remain. A one-shot, active-window-guarded post-open focus request and a local Tab/Backtab key handler now address the previously unfocused layer-shell surface; compositor verification remains pending |
 | Media Deck | Dormant/unmounted, currently explicitly `WlrKeyboardFocus.None`; transport actions are not generic navigation; must not pretend source shortcuts create real keyboard focus |
 
 **Outstanding:** Extend to other eligible interactive windows and
@@ -83,3 +83,21 @@ owns the Koinoikos broker, Sway binding and shared focus coordinator.
 6. Transfer focus to another open widget with Super+~+direction and repeat.
 7. Click an ordinary Sway application, type/paste, and return to the widget.
 8. Release either held Koinoikos prefix key; no persistent focus lockout.
+
+### Notifications // keyboard-acquisition checkpoint
+
+If Tab goes to a window **under** the Notification Hub, the error is
+compositor keyboard ownership, *not* the seven Main Mode filter order.
+Qt `WindowShortcut` and `forceActiveFocus()` inside QML cannot alone
+acquire Wayland seat focus for a layer-shell surface.
+
+Notifications now retries an opening focus request **once** after 48 ms,
+only while its menu is open, it is still the shared keyboard owner, and
+its real Qt window is not yet active. This reuses the existing 120 ms
+bounded owner boost, and returns to `OnDemand`; it must never remain
+`Exclusive` while merely open. When Qt actually receives key events,
+its navigation anchor accepts Tab/Backtab before the focus chain and
+cycles the same seven visible options. On-device acceptance must verify
+the first and repeated Tab presses, reverse wrap, search input safety,
+and immediate native typing/paste recovery after clicking Kitty.
+Source CI alone cannot establish these focus transitions.

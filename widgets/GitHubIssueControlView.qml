@@ -670,6 +670,11 @@ Rectangle {
                 }
             }
         }
-        NeonScrollBar { flickable: syntagmaPane2; handleStyle: "star" }
+        NeonScrollBar {
+            flickable: syntagmaPane2
+            handleStyle: "star"
+            mountingParent: syntagmaPane2.parent
+                            ? syntagmaPane2.parent.parent : null
+        }
     }
 }

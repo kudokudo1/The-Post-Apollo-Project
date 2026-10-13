@@ -12,6 +12,27 @@ Item {
 
     property string subMode: "remotes"
 
+    // Repository's contextual top modes; reuse pointer activation policy.
+    readonly property var subModeOrder: [
+        "remotes", "tags", "worktrees", "config",
+        "files", "hooks", "health"
+    ]
+
+    function selectSubMode(key) {
+        if (subModeOrder.indexOf(key) < 0)
+            return;
+        subMode = key;
+        armedAction = "";
+    }
+
+    function cycleSubMode(direction) {
+        const current = Math.max(0, subModeOrder.indexOf(subMode));
+        const step = Number(direction) < 0 ? -1 : 1;
+        selectSubMode(subModeOrder[
+            (current + step + subModeOrder.length) % subModeOrder.length
+        ]);
+    }
+
     property int selectedRemoteIndex: -1
     property string selectedRemoteName: ""
     property string selectedRemoteBranch: ""
@@ -1026,10 +1047,7 @@ Item {
                     label: modelData.label
                     accent: modelData.color
                     selected: root.subMode === modelData.key
-                    onTriggered: {
-                        root.subMode = modelData.key;
-                        root.armedAction = "";
-                    }
+                    onTriggered: root.selectSubMode(modelData.key)
                 }
             }
         }

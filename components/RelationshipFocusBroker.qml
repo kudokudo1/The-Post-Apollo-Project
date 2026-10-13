@@ -15,6 +15,9 @@ QtObject {
     property bool active: false
     property string owner: ""
     property string previousOwner: ""
+    // Remember the selected widget across independent key holds, without
+    // taking over native Sway focus or selecting on the prefix alone.
+    property string lastWidgetOwner: ""
     property string hostOwner: ""
 
     signal previousOwnerRestorationRequested(string previous)
@@ -54,26 +57,11 @@ QtObject {
         for (let i = 0; i < visible.length; ++i) {
             if (visible[i].id === id) {
                 owner = id;
+                lastWidgetOwner = id;
                 return true;
             }
         }
         return false;
-    }
-
-    function advanceWidget() {
-        if (!active)
-            return false;
-        // This is an independent widget focus cycle: only open/visible
-        // registered QS surfaces participate, never Sway application windows.
-        // The registry order is stable even when widget geometry changes.
-        const eligible = candidates();
-        if (eligible.length === 0) {
-            owner = "";
-            return false;
-        }
-        const index = eligible.findIndex(row => row.id === owner);
-        const next = eligible[(index + 1) % eligible.length];
-        return selectOwner(next.id);
     }
 
     function startMode(previous) {
@@ -81,9 +69,10 @@ QtObject {
             return true;
         previousOwner = previous;
         active = true;
-        // Preserve Git/Hospital ownership when eligible, otherwise start
-        // from a visible widget. Never anchor to a regular Sway window.
-        if (!selectOwner(previous)) {
+        // Entered only on the FIRST held direction, never on prefix alone.
+        // Preserve live keyboard ownership first, then the last selected
+        // widget from the previous hold, then a stable visible fallback.
+        if (!selectOwner(previous) && !selectOwner(lastWidgetOwner)) {
             const visible = candidates();
             owner = visible.length > 0 ? visible[0].id : "";
         }
@@ -104,26 +93,6 @@ QtObject {
 
         function begin(): bool {
             return broker.startMode(broker.hostOwner);
-        }
-
-        function beginAndAdvance(): bool {
-            // A first chord enters widget mode. If a registered widget
-            // already owned control focus, switch away from it immediately.
-            // Otherwise acquire the first eligible widget, not the second.
-            const hadMode = broker.active;
-            const hadWidgetOwner = broker.candidates().some(
-                row => row.id === broker.hostOwner);
-            if (!broker.startMode(broker.hostOwner))
-                return false;
-            if (hadMode || hadWidgetOwner)
-                broker.advanceWidget();
-            return true;
-        }
-
-        function advance(): bool {
-            // One IPC call owns selection so rapid presses cannot race on
-            // separate snapshot+select subprocesses.
-            return broker.advanceWidget();
         }
 
         function end(): void {

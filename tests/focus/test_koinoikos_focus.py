@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
-import shlex
 
 ROOT = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location(
@@ -49,13 +48,13 @@ try:
     assert seen == [], seen
 
     focus.snapshot = lambda: {"active": True, "owner": "native", "surfaces": menus}
-    assert focus.move("right")  # Legacy owner falls back to first widget ONLY.
-    assert seen == [("select", "hospital")], seen
+    assert focus.move("right")  # Unknown owner anchors AND moves on first arrow.
+    assert seen == [("select", "git")], seen
     seen.clear()
 
     focus.snapshot = lambda: {"active": True, "owner": "closed", "surfaces": menus}
-    assert focus.move("right")
-    assert seen == [("select", "hospital")], seen
+    assert focus.move("right")  # Closed owner also moves on the first arrow.
+    assert seen == [("select", "git")], seen
     seen.clear()
 
     focus.snapshot = lambda: {"active": True, "owner": "", "surfaces": []}
@@ -66,43 +65,47 @@ try:
     assert not focus.move("right")  # No QS = no-op; not native focus.
     assert seen == [], seen
 
-    focus.snapshot = lambda: {"active": False, "owner": "", "surfaces": menus}
-    assert not focus.move("right")
-    assert seen == [], seen
+    # First held direction begins the QS session and actually navigates.
+    snapshots = iter([
+        {"active": False, "owner": "", "surfaces": menus},
+        {"active": True, "owner": "hospital", "surfaces": menus},
+    ])
+    focus.snapshot = lambda: next(snapshots)
+    assert focus.move("right")
+    assert seen == [("begin",), ("select", "git")], seen
+    seen.clear()
 finally:
     focus.snapshot, focus.qs, focus.command = saved_snapshot, saved_qs, saved_command
 
 sway = (ROOT / "config/sway/koinoikos-focus.conf").read_text()
-for expected in (
-    "Mod4+grave exec", 'mode "Koinoikos Focus"',
-    "bindsym Escape", "swaymsg mode default",
-    "bindsym h exec", "bindsym j exec", "bindsym k exec",
-    "bindsym l exec", "bindsym Left", "bindsym Right",
-    "bindsym Up", "bindsym Down",
-):
-    assert expected in sway, expected
-assert "Mod4+Shift+grave" not in sway, "Shift must not be required for Koinoikos entry"
-
-# The same shortcut must also act inside the Koinoikos binding mode.
-assert sway.count("bindsym Mod4+grave exec") == 2
+assert 'bindsym Mod4+grave mode "Koinoikos Focus"' in sway
+assert "Mod4+Shift+grave" not in sway
+assert "bindsym Mod4+grave exec" not in sway, "Prefix must not switch widget focus"
+assert 'koinoikos_focus.py" cycle' not in sway, "Unintended prefix-cycle action must be removed"
+assert "bindsym Escape" not in sway, "No sticky Escape-driven mode"
 mode_body = sway.split('mode "Koinoikos Focus" {', 1)[1]
-assert 'bindsym Mod4+grave exec python3 "$HOME/.config/quickshell/scripts/koinoikos_focus.py" cycle' in mode_body
+for key, direction in (
+    ("Left", "left"), ("Right", "right"), ("Up", "up"), ("Down", "down"),
+    ("h", "left"), ("l", "right"), ("k", "up"), ("j", "down"),
+):
+    matches = [
+        line for line in mode_body.splitlines()
+        if line.split()[:4] == ["bindsym", "--no-repeat", f"Mod4+grave+{key}", "exec"]
+        and line.rstrip().endswith(f'koinoikos_focus.py" move {direction}')
+    ]
+    assert len(matches) == 1, (key, direction, matches)
+for physical_release in ("Mod4+grave", "Super_L", "Super_R"):
+    assert f"bindsym --release {physical_release} exec" in mode_body
+assert mode_body.count('koinoikos_focus.py" exit') == 3
+
 router_source = (ROOT / "scripts/koinoikos_focus.py").read_text()
 assert "swaymsg" not in router_source, "Widget focus must not invoke native Sway focus"
 assert "native_windows" not in router_source
-assert '"native":' not in router_source
+assert "beginAndAdvance" not in router_source
+assert '"cycle"' not in router_source
 
-# swaymsg re-parses its command string: the internal quotes of a spaced mode
-# must survive both shell layers and arrive as ONE IPC command argument.
-entry = next(line for line in sway.splitlines() if line.startswith("bindsym Mod4+grave exec "))
-wrapper = shlex.split(entry.split(" exec ", 1)[1])
-assert wrapper[:2] == ["sh", "-c"], wrapper
-entry_argv = shlex.split(wrapper[2])
-assert entry_argv[:2] == ["swaymsg", 'mode "Koinoikos Focus"'], entry_argv
-assert "&& python3" in wrapper[2], "Do not begin QS mode when Sway entry fails"
-
-# First entry and repeated presses are single broker RPCs. They must not
-# perform snapshot + select as separate processes (rapid-repeat race).
+# No Sway or Qt action on Super+grave alone; first direction invokes begin
+# followed by selection, and release ends the transient broker session.
 saved_qs = focus.qs
 calls = []
 def capture_qs(method, *args):
@@ -110,12 +113,10 @@ def capture_qs(method, *args):
     return 0, "true"
 focus.qs = capture_qs
 try:
-    assert focus.main(["enter"]) == 0
-    assert focus.main(["cycle"]) == 0
-    assert calls == [("beginAndAdvance",), ("advance",)], calls
+    assert focus.main(["exit"]) == 0
+    assert calls == [("end",)], calls
 finally:
     focus.qs = saved_qs
-
 
 broker = (ROOT / "components/RelationshipFocusBroker.qml").read_text()
 shell = (ROOT / "shell.qml").read_text()
@@ -131,13 +132,11 @@ assert "RelationshipFocusBroker 1.0 RelationshipFocusBroker.qml" in require_qmld
 assert 'property string owner: ""' in broker
 assert 'owner = "native"' not in broker
 assert 'visible.length > 0 ? visible[0].id : ""' in broker
-assert "function advanceWidget()" in broker
-assert "const eligible = candidates();" in broker
-assert "const next = eligible[(index + 1) % eligible.length];" in broker
-assert "return selectOwner(next.id);" in broker
-assert "function beginAndAdvance(): bool" in broker
-assert "function advance(): bool" in broker
-assert "broker.advanceWidget();" in broker
+assert 'property string lastWidgetOwner: ""' in broker
+assert "lastWidgetOwner = id;" in broker
+assert "function advanceWidget()" not in broker
+assert "function beginAndAdvance(): bool" not in broker
+assert "function advance(): bool" not in broker
 assert 'id: relationshipFocus' in shell
 for label in ("appcontrol", "hospital", "git", "cpu", "weather"):
     assert label in broker, label

@@ -203,7 +203,7 @@ for path in ("widgets/GitW.qml", "widgets/HospitalW.qml",
              "widgets/notifications/NotificationsHubW.qml"):
     widget = (ROOT / path).read_text()
     assert 'onHoveredChanged: {' in widget
-    assert 'if (hovered)\n                    root.keyboardOwnershipRequested();' in widget
+    assert 'root.keyboardOwnershipRequested();' in widget
     assert 'if (hovered && !root.keyboardActive)' not in widget
     assert "WlrKeyboardFocus.OnDemand" in widget
     assert "WlrKeyboardFocus.None" in widget

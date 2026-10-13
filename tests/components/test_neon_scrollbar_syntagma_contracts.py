@@ -26,6 +26,9 @@ CONTRACT = {
     'property int rightEndInset: 5': "horizontal end inset",
     'property bool reserveSpace: true': "reservation contract",
     'readonly property real reservedExtent:': "host reservation API",
+    'property bool reserveGlowSpace: false': "glow reservation is independent and opt-in",
+    'starStyle ? starAreaWidth : barAreaWidth': "physical width remains 10/16 by default",
+    'reserveGlowSpace ? 2 * effectiveGlowPadding : 0': "optional host-only glow clearance",
     'property bool containGlow: true': "contained glow",
     'clip: containGlow': "glow boundary",
     # Availability / reveal // 005–011, 023
@@ -71,6 +74,11 @@ for snippet, meaning in CONTRACT.items():
 assert "handleMouse.containsMouse\n                    ?" not in SOURCE, (
     "full-root hover still directly drives an individual handle glow"
 )
+
+# Physical widths must never be inflated by glow or host reservation.
+physical = SOURCE.split('readonly property real crossExtent:', 1)[1].split('readonly property real reservedExtent:', 1)[0]
+assert 'effectiveGlowPadding' not in physical, 'physical scrollbar width was inflated by glow padding'
+assert 'starAreaWidth' in physical and 'barAreaWidth' in physical
 
 # Keep the existing extension interfaces intact.
 for preserved in (

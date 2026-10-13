@@ -7,6 +7,9 @@ Item {
 
     // Scroll target.
     property var flickable: null
+    // Positioner-owned content may mount its overlay into a non-positioning
+    // ancestor without counting the scrollbar as a Column/Row layout child.
+    property Item mountingParent: null
 
     // Syntagma // One configurable family for both axes.
     property int orientation: Qt.Vertical
@@ -211,9 +214,8 @@ Item {
     property alias handleItem: handleLoader
 
     parent:
-        flickable && flickable.parent
-        ? flickable.parent
-        : null
+        mountingParent ? mountingParent
+        : flickable && flickable.parent ? flickable.parent : null
 
     // Audit 04 // An explicitly extended rail (Git Repository: +33px)
     // intentionally draws outside the normal viewport. Preserve that existing
@@ -227,16 +229,20 @@ Item {
     height: horizontal
         ? crossExtent
         : (flickable ? Math.max(0, flickable.height - effectiveTopInset - effectiveBottomInset) : 0)
+    readonly property point mountOrigin:
+        flickable && mountingParent
+        ? flickable.mapToItem(mountingParent, 0, 0)
+        : Qt.point(flickable ? flickable.x : 0, flickable ? flickable.y : 0)
     x: !flickable ? 0
-       : horizontal ? flickable.x + effectiveLeftInset
+       : horizontal ? mountOrigin.x + effectiveLeftInset
        : resolvedPlacement === "left"
-         ? flickable.x + leftEdgeInset
-         : flickable.x + flickable.width - width - rightInset
+         ? mountOrigin.x + leftEdgeInset
+         : mountOrigin.x + flickable.width - width - rightInset
     y: !flickable ? 0
-       : !horizontal ? flickable.y + effectiveTopInset
+       : !horizontal ? mountOrigin.y + effectiveTopInset
        : resolvedPlacement === "top"
-         ? flickable.y + topEdgeInset
-         : flickable.y + flickable.height - height - bottomEdgeInset
+         ? mountOrigin.y + topEdgeInset
+         : mountOrigin.y + flickable.height - height - bottomEdgeInset
     z: 1000
 
     readonly property real trackLength: horizontal ? width : height

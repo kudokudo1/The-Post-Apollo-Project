@@ -53,7 +53,19 @@ for path in ROOT.rglob("*.qml"):
         star_users.append(str(rel))
 
 assert not legacy_users, "legacy starHandle usage remains: " + ", ".join(legacy_users)
-assert len(star_users) == 4, f"expected four star-handle consumer files, found {len(star_users)}: {star_users}"
+# Stars are the default for Git and Hospital scrollbar consumers.
+# Keep the four original star consumers and permit the approved expanded
+# coverage, rather than freezing a historical list length.
+original_star_files = {
+    "widgets/GitBranchesView.qml",
+    "widgets/GitHistoryView.qml",
+    "widgets/GitRepositoryView.qml",
+    "widgets/HospitalArchiveView.qml",
+}
+assert original_star_files.issubset(set(star_users)), (
+    "existing star-handle surfaces changed: " + str(sorted(original_star_files - set(star_users)))
+)
+assert len(star_users) >= 4, "star scrollbar coverage regressed"
 
 print("Neon scrollbar contracts: PASS")
 print("star-handle consumers:", ", ".join(star_users))

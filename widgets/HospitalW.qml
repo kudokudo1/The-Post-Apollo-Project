@@ -5368,6 +5368,11 @@ PanelWindow {
 
         // Only the operating-room selector/detail surface scrolls.
         Flickable {
+            NeonScrollBar {
+                flickable: hospitalScroll
+                handleStyle: "star"
+            }
+
             id: hospitalScroll
 
             visible: !root.operationsOpen

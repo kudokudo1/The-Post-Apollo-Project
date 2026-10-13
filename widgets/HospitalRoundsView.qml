@@ -429,6 +429,11 @@ Item {
                     border.color: Colors.orange
 
                     Flickable {
+                        NeonScrollBar {
+                            flickable: roomBoard
+                            handleStyle: "star"
+                        }
+
                         id: roomBoard
 
                         anchors {

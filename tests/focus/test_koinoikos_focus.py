@@ -129,6 +129,7 @@ for expected in (
     assert expected in broker, expected
 require_qmldir = (ROOT / "components/qmldir").read_text(encoding="utf-8")
 assert "RelationshipFocusBroker 1.0 RelationshipFocusBroker.qml" in require_qmldir
+assert "KeyboardOwnershipCoordinator 1.0 KeyboardOwnershipCoordinator.qml" in require_qmldir
 assert 'property string owner: ""' in broker
 assert 'owner = "native"' not in broker
 assert 'visible.length > 0 ? visible[0].id : ""' in broker

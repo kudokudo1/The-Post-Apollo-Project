@@ -216,3 +216,48 @@ regardless of outcome.
 
 **No widget code, focus policy, renderer, or lifecycle modified**
 to record this runtime observation.
+
+
+## Follow-up: 20-second CAVA suspension trial (operator observation)
+
+The operator executed the proposed local reversible test targeting the
+specific Quickshell-launched CAVA PID **839288**, temporarily issuing
+SIGSTOP, sleeping 20 seconds, then issuing SIGCONT. Their terminal printed:
+
+```text
+Temporarily suspending Quickshell CAVA PID 839288
+CAVA resumed
+```
+
+The `diff -u` between `qs log --tail 250 | grep SYNTAGMA_LAG_PROBE`
+captured immediately before and after produced **no output**.
+Thus, **no additional matching lag warnings were visible in those
+two captured log tails** during the suspension trial.
+
+Source verified on main (October 13, 2026):
+`modules/mediaplayer-cava.conf` configures `framerate = 30`,
+`bars = 16`, and raw ASCII output to stdout. `modules/Mediaplayer.qml`
+runs `cava` continuously, parses output with `SplitParser`,
+replaces a 16-value `levels` QML array for each frame, and binds
+each bar's height to `levels[index]` with a 45 ms `NumberAnimation`
+behavior. Its `mpc status` poll remains independent (2-second timer).
+SIGSTOP on the one `cava` child plausibly removes much of the spectrum
+QML update stream while MPD music continues.
+
+**Interpretation / evidence limit:** This is *supportive correlation*,
+not proof that CAVA causes the multi-second main-thread stalls. Only
+one short trial was conducted; absence of new warnings in a tailed
+log is weaker than a timed end-to-end trace; the prior control run
+was taken shortly after Quickshell restart and might include
+startup activity. The `diff` does not measure CAVA frame rate, QML
+execution time, or scenegraph work.
+
+**Next gated step:** Without another restart or menu opening,
+leave CAVA **resumed/running normally** and gather a comparable
+20-second log-before/log-after interval. Only if multi-second
+warnings reliably return with CAVA active should we introduce a
+*separately approved, reversible* frame-rate or QML frame-coalescing
+experiment; do not remove animations, neon glows, MPD transport,
+or other visual language on this result alone.
+
+No widget code was changed for this trial or report.

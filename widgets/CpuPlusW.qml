@@ -1353,6 +1353,10 @@ PanelWindow {
         }
 
         Flickable {
+            NeonScrollBar {
+                flickable: sharedInstrumentScroll
+            }
+
             id: sharedInstrumentScroll
 
             anchors.left: parent.left

@@ -52,11 +52,11 @@ Use `reserveSpace: false` for an intentional overlay. The component does not aut
 | `visibilityMode` | Behavior |
 | --- | --- |
 | `"auto"` | Visible whenever the associated content overflows; otherwise hidden (default effective policy) |
-| `"persistent"` | Always present; inactive `0.34` root opacity and no input when the content fits |
+| `"persistent"` | Always present; explicit mode uses inactive `0.34` root opacity and no input when the content fits |
 | `"reveal"` | Shown in response to enabled hover, scrolling, focus and active drag triggers |
 | `"contextual"` | Host sets `contextVisible` |
 
-`visibilityMode: ""` preserves the existing `autoHide` property: `true` means auto and `false` means persistent. This avoids breaking the seven migrated consumers that already set `autoHide`.
+`visibilityMode: ""` preserves the existing `autoHide` property: `true` means auto and `false` means persistent. In legacy `autoHide: false` mode, **no extra root-level inactive fade is applied** so existing Workflow Library and Repository Profile per-layer opacities remain unchanged. The shared root opacity (`0.34`) applies only when the host explicitly opts into `visibilityMode: "persistent"`; operator has deferred final visual selection for audit 06.
 
 For reveal-based scrollbars, `revealMode: "combined"` is the default. Alternatives include `"hover"`, `"scroll"`, `"focus"` or joined combinations such as `"hover+focus"`. Reveal areas and handle-only hover glow are intentionally distinct.
 

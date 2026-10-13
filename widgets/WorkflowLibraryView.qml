@@ -290,6 +290,11 @@ Item {
                             }
 
                             Flickable {
+                                id: nurse3rScroll0
+                                NeonScrollBar {
+                                    flickable: nurse3rScroll0
+                                }
+
                                 width: parent.width
                                 height: parent.height - 22
                                 clip: true
@@ -441,6 +446,11 @@ Item {
                     }
 
                     Flickable {
+                        id: nurse3rScroll1
+                        NeonScrollBar {
+                            flickable: nurse3rScroll1
+                        }
+
                         width: parent.width
                         height:
                             parent.height
@@ -721,6 +731,11 @@ Item {
                     }
 
                     Flickable {
+                        id: nurse3rScroll2
+                        NeonScrollBar {
+                            flickable: nurse3rScroll2
+                        }
+
                         width: parent.width
                         height: parent.height - 28
 

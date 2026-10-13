@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+import shlex
 
 ROOT = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location(
@@ -60,6 +61,15 @@ for expected in (
 ):
     assert expected in sway, expected
 assert "Mod4+Shift+grave" not in sway, "Shift must not be required for Koinoikos entry"
+
+# swaymsg re-parses its command string: the internal quotes of a spaced mode
+# must survive both shell layers and arrive as ONE IPC command argument.
+entry = next(line for line in sway.splitlines() if line.startswith("bindsym Mod4+grave exec "))
+wrapper = shlex.split(entry.split(" exec ", 1)[1])
+assert wrapper[:2] == ["sh", "-c"], wrapper
+entry_argv = shlex.split(wrapper[2])
+assert entry_argv[:2] == ["swaymsg", 'mode "Koinoikos Focus"'], entry_argv
+assert "&& python3" in wrapper[2], "Do not begin QS mode when Sway entry fails"
 
 broker = (ROOT / "components/RelationshipFocusBroker.qml").read_text()
 shell = (ROOT / "shell.qml").read_text()

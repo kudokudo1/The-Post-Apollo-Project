@@ -30,7 +30,7 @@ NeonScrollBar {
 }
 ```
 
-For a pane whose scrollable viewport already accounts for endpoint clearance, set `topInset: 0` and `bottomInset: 0` explicitly to avoid double spacing. Horizontal equivalent: `leftInset` and `rightEndInset`.
+For a pane whose scrollable viewport already accounts for endpoint clearance, configure **`viewportHasEndpointClearance: true`**. The scrollbar then does not insert duplicate insets, while preserving the **5px top/bottom defaults** (and horizontal **5px start/end defaults**) for panes without external endpoint clearance. Individual `topInset`, `bottomInset`, `leftInset`, and `rightEndInset` remain available for dedicated geometry.
 
 ## Content clearance is a host layout responsibility
 
@@ -45,7 +45,7 @@ anchors.right: scrollbar.left
 anchors.rightMargin: 5
 ```
 
-Use `reserveSpace: false` for an intentional overlay. The component does not automatically mutate host geometry. **Audit issue 04 is operator-decided: preserve the original extended rail.** When `trackTopExtension > 0`, the component does not clip that intentionally protruding rail; standard tracks retain the `containGlow` policy. The host must still provide an appropriate surrounding glow-safe area. This exception preserves Git Repository's `trackTopExtension: 33` without changing the physical scrollbar width. Runtime rendering remains to be verified. Likewise, audit 06 (inactive fade) and audit 09 (whole-pane nested chaining) are still open for operator visual/behavioral review. Review effect clipping in the runtime before accepting the sizing.
+Use `reserveSpace: false` for an intentional overlay. The component does not automatically mutate host geometry. **Audit issue 04 is operator-decided: preserve the original extended rail.** When `trackTopExtension > 0`, the component does not clip that intentionally protruding rail; standard tracks retain the `containGlow` policy. The host must still provide an appropriate surrounding glow-safe area. This exception preserves Git Repository's `trackTopExtension: 33` without changing the physical scrollbar width. Runtime rendering remains to be verified. Audit 06 (inactive fading) remains visually undecided by the operator; preserve surface-specific layered appearance pending actual Quickshell comparison. **Audit 09 is decided: containment throughout the inner list is the default, and chaining is an opt-in variant.** Review effect clipping in the runtime before accepting the sizing.
 
 ## Visibility modes
 
@@ -78,16 +78,19 @@ The scrollbar remains visible while any reveal trigger or active drag is present
 | --- | --- | --- |
 | `interactionStyle` | `"progressive"` | `"distinct"` with `pressedHandleColor` / `pressedHandleScale` |
 | `trackClickMode` | `"jump"` | `"page"` (rare) |
-| `scrollChaining` | `true` | `false` |
-| `chainFlickable` | `null` | Explicit outer Flickable for scroll-boundary handoff |
+| `nestedScrollMode` | `"contain"` | `"chain"` (explicit variant) |
+| `captureNestedPaneWheel` | `true` | `false` when the host already owns wheel routing |
+| `chainFlickable` | `null` | Explicit outer Flickable for opt-in scroll-boundary handoff |
 | `horizontalWheelMode` | `"convert"` | `"directional"` |
 | `reverseWheelDirection` | `false` | `true`, wheel direction only |
 | `useSystemScrollSensitivity` | `true` | `false` to use `wheelStep` |
 | `keyboardEnabled` | `true` | `false` |
 
-`chainFlickable` is **explicit**: the component must not guess ownership of arbitrary nested parents. The component's own wheel events consume as much movement as the inner Flickable can use, pass the remainder to the configured outer Flickable, and otherwise release the event at a boundary. It does **not** rewrite the Flickable's native scrolling outside the scrollbar zone; host coordination is still needed during integration.
+**Operator decision 09 — stop at the end:** When the scrollable pane is genuinely nested inside another Flickable, a scoped WheelHandler on that *inner pane* handles the wheel anywhere inside the list and always consumes the event, even when the inner content cannot move farther. The outer pane stays still. Standalone panes preserve Qt's native wheel behavior by default. `nestedScrollMode: "chain"` explicitly opts back into passing scroll remainder to `chainFlickable`; host-level full-pane chaining would need separate coordination. This is not permission to extend the invisible hit zone around the thin scrollbar.
 
-Keyboard `Keys.onPressed` supports arrows, Page Up/Down, Home/End **when the scrollbar itself owns focus**. Focus-owning panes can call `scrollbar.handleKey(event.key, event.modifiers)` while respecting native text inputs and other child controls. The component never force-focuses itself. Tab order remains the host's responsibility.
+Nested-pane pointer/wheel behavior depends on actual QML event dispatch. The static source contracts are insufficient to certify its runtime behavior: test event blocking at both top and bottom while a visible outer pane surrounds the list.
+
+Keyboard `Keys.onPressed` supports arrows, Page Up/Down, Home/End **when the scrollbar itself owns focus**. Focus-owning panes should call **`scrollbar.handleFocusedPaneKey(event)`**, which uses the official Qt `Window.activeFocusItem` attached property and skips text-input focus owners as well as Ctrl/Alt/Meta shortcuts. The component never force-focuses itself. Tab order remains the host's responsibility. Focus-reveal still watches the currently focused scrollable pane, not a global window.
 
 ## Geometry and backward compatibility
 
@@ -96,7 +99,7 @@ Keyboard `Keys.onPressed` supports arrows, Page Up/Down, Home/End **when the scr
 - `minimumHandleHeight` is capped by actual track length, including for very short tracks.
 - Bar/star style remains switchable through the existing `handleStyle` API.
 - Handle-hover glow requires pointer containment in the handle's X and Y bounds, not merely in the track.
-- Press/drag glow is stronger than hover. Specialized controls may opt into `"distinct"` visuals.
+- Press/drag glow uses each consumer's **own idle and hover recipe**, progressing upward only when idle-to-hover already increases. Equal idle/hover glow intentionally remains equal on press; an explicit positive pressed opacity/spread override remains possible. Specialized controls may opt into `"distinct"` visuals.
 - `autoHide`, `wheelStep`, `clickToJump`, `preserveDragOffset`, `handleGlowStyle`, `railDecoration`, and handle/rail aliases remain available.
 
 **Verification required before main:** run the existing `tests/components/test_neon_scrollbar_contracts.py`, the new `tests/components/test_neon_scrollbar_syntagma_contracts.py`, QML compilation/lint where supported, resize and fade tests, pointer and wheel tests in both orientations, keyboard focus isolation, and review of all legacy consumers. Static contract tests do not prove Qt runtime behavior.

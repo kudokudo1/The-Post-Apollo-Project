@@ -379,6 +379,11 @@ Item {
                     border.color: Colors.orange
 
                     Flickable {
+                        NeonScrollBar {
+                            flickable: staffList
+                            handleStyle: "star"
+                        }
+
                         id: staffList
 
                         anchors {
@@ -548,6 +553,11 @@ Item {
                     border.color: Colors.cyan
 
                     Flickable {
+                        NeonScrollBar {
+                            flickable: detailFlick
+                            handleStyle: "star"
+                        }
+
                         id: detailFlick
 
                         anchors {

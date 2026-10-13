@@ -508,6 +508,11 @@ Rectangle {
                     }
 
                     Flickable {
+                        id: assignmentDetailScroll
+                        NeonScrollBar {
+                            flickable: assignmentDetailScroll
+                            handleStyle: "star"
+                        }
                         width: parent.width
                         height:
                             editorPanel.visible

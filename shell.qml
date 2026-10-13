@@ -31,6 +31,53 @@ PanelWindow {
         Quickshell.watchFiles = false;
     }
 
+    // Nurse 3c // opt-in only. A missed QML Timer deadline reveals that the
+    // main event loop could not process this timer promptly; it is NOT a
+    // function profiler and does not attribute the cause of the delay.
+    // Keep this lightweight, dormant by default, and independent of focus.
+    readonly property bool syntagmaLagProbeEnabled:
+        String(Quickshell.env("POST_APOLLO_UI_LAG_PROBE") || "").trim() === "1"
+
+    Timer {
+        id: syntagmaEventLoopProbe
+        interval: 100
+        repeat: true
+        running: shellRoot.syntagmaLagProbeEnabled
+        property double previousTickMs: 0
+
+        onRunningChanged: {
+            if (running)
+                previousTickMs = Date.now();
+        }
+
+        onTriggered: {
+            const now = Date.now();
+            const elapsed = now - previousTickMs;
+            previousTickMs = now;
+
+            if (elapsed >= 350) {
+                console.warn(
+                    "SYNTAGMA_LAG_PROBE // event-loop interval "
+                    + elapsed + "ms (target 100ms)"
+                    + " // git=" + gitWindow.menuOpen
+                    + " hospital=" + hospitalWindow.menuOpen
+                    + " notifications=" + notificationsHubWindow.menuOpen
+                );
+            }
+        }
+    }
+
+    function reportSyntagmaToggleTime(widgetName, startMs, nowOpen) {
+        if (!syntagmaLagProbeEnabled)
+            return;
+
+        console.warn(
+            "SYNTAGMA_LAG_PROBE // " + widgetName
+            + " dock toggle synchronous=" + (Date.now() - startMs)
+            + "ms // nowOpen=" + nowOpen
+        );
+    }
+
     // Single ownership coordinator for the initial Git/Hospital pilot.
     // Existing property readers remain compatible with the shared owner.
     KeyboardOwnershipCoordinator {
@@ -275,7 +322,12 @@ PanelWindow {
                 menuOpen: hospitalWindow.menuOpen
 
                 onToggleRequested: {
+                    const startMs = shellRoot.syntagmaLagProbeEnabled
+                                    ? Date.now() : 0;
                     hospitalWindow.toggle();
+                    shellRoot.reportSyntagmaToggleTime(
+                        "hospital", startMs, hospitalWindow.menuOpen
+                    );
                 }
             }
 
@@ -326,7 +378,12 @@ PanelWindow {
                 menuOpen: gitWindow.menuOpen
 
                 onToggleRequested: {
+                    const startMs = shellRoot.syntagmaLagProbeEnabled
+                                    ? Date.now() : 0;
                     gitWindow.toggle();
+                    shellRoot.reportSyntagmaToggleTime(
+                        "git", startMs, gitWindow.menuOpen
+                    );
                 }
             }
 

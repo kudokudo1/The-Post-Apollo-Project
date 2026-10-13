@@ -20,6 +20,11 @@ assert "SYNTAGMA_STARTUP_TRACE // git scan finished" in service
 assert "SYNTAGMA_STARTUP_TRACE // git refresh finished" in service
 assert "SYNTAGMA_STARTUP_TRACE // git slow refresh callback" in service
 assert "SYNTAGMA_STARTUP_TRACE // git DONE phases" in service
+assert "SYNTAGMA_STARTUP_TRACE // git DONE boundary" in service
+assert "syntagmaDoneExitMs: reportFinishedMs" in service
+assert "syntagmaDoneLogMs: reportFinishedMs - reportStartedMs" in service
+assert "afterReturn=" in service and "outer=" in service
+assert "const doneBoundary = gitService.consumeRefreshLine(line);" in service
 for name in ("state=", "publish=", "localSelection=", "remoteSelection=",
              "revision=", "available=", "refreshedSignal=", "followup="):
     assert name in service
@@ -27,7 +32,7 @@ assert 'duration >= 100' in service
 assert 'String(line || "").split("\\t")[0]' in service
 assert "callbackSum=" in service and "callbackMax=" in service
 assert service.count("gitService.consumeRepoLine(line);") == 2
-assert service.count("gitService.consumeRefreshLine(line);") == 2
+assert service.count("gitService.consumeRefreshLine(line)") == 2
 assert "Component.onCompleted: discoverRepos()" in service
 assert 'repoScanProcess.exec([' in service
 assert 'refreshProcess.exec([' in service

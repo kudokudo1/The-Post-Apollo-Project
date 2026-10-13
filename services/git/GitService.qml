@@ -1217,25 +1217,82 @@ Scope {
             available = false;
             lastError = value;
         } else if (key === "DONE") {
+            // Measure the individual synchronous stages of the DONE callback
+            // only in the operator's opt-in diagnostic. Keep the ordering and
+            // operations exactly the same in normal and traced modes.
+            const trace = syntagmaStartupTraceEnabled;
+            let started = trace ? Date.now() : 0;
+            let publishMs = 0;
+            let localSelectionMs = 0;
+            let remoteSelectionMs = 0;
+            let revisionMs = 0;
+            let availableMs = 0;
+            let refreshedSignalMs = 0;
+
             const staleRead = refreshRepoPath !== repoPath;
 
             refreshing = false;
             refreshWatchdog.stop();
+            const stateMs = trace ? Date.now() - started : 0;
 
             if (!staleRead && !lastError) {
+                if (trace) started = Date.now();
                 publishPendingModels();
+                if (trace) {
+                    publishMs = Date.now() - started;
+                    started = Date.now();
+                }
                 ensureLocalSelection();
+                if (trace) {
+                    localSelectionMs = Date.now() - started;
+                    started = Date.now();
+                }
                 ensureRemoteSelection();
+                if (trace) {
+                    remoteSelectionMs = Date.now() - started;
+                    started = Date.now();
+                }
                 topologyRevision += 1;
+                if (trace) {
+                    revisionMs = Date.now() - started;
+                    started = Date.now();
+                }
                 available = true;
+                if (trace) {
+                    availableMs = Date.now() - started;
+                    started = Date.now();
+                }
                 refreshed();
+                if (trace)
+                    refreshedSignalMs = Date.now() - started;
             }
 
+            if (trace) started = Date.now();
             if (refreshPending || staleRead) {
                 refreshPending = false;
                 Qt.callLater(function() {
                     refresh();
                 });
+            }
+
+            if (trace) {
+                const followupMs = Date.now() - started;
+                console.warn(
+                    "SYNTAGMA_STARTUP_TRACE // git DONE phases // "
+                    + syntagmaTraceLabel()
+                    + " // state=" + stateMs + "ms"
+                    + " publish=" + publishMs + "ms"
+                    + " localSelection=" + localSelectionMs + "ms"
+                    + " remoteSelection=" + remoteSelectionMs + "ms"
+                    + " revision=" + revisionMs + "ms"
+                    + " available=" + availableMs + "ms"
+                    + " refreshedSignal=" + refreshedSignalMs + "ms"
+                    + " followup=" + followupMs + "ms"
+                    + " // localRows=" + pendingLocalBranches.length
+                    + " remoteRows=" + pendingRemoteBranches.length
+                    + " topologyRows=" + pendingTopology.length
+                    + " stale=" + staleRead
+                );
             }
         }
     }
@@ -2217,6 +2274,16 @@ Scope {
                 gitService.traceRefreshPeakMs = Math.max(
                     gitService.traceRefreshPeakMs, duration
                 );
+
+                // Report only the row *type*, never the raw Git payload.
+                if (duration >= 100) {
+                    console.warn(
+                        "SYNTAGMA_STARTUP_TRACE // git slow refresh callback // "
+                        + gitService.syntagmaTraceLabel()
+                        + " // tag=" + String(line || "").split("\t")[0]
+                        + " duration=" + duration + "ms"
+                    );
+                }
 
                 if (String(line || "").split("\t")[0] === "DONE") {
                     console.warn(

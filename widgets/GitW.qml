@@ -5489,6 +5489,11 @@ PanelWindow {
                             }
 
                             Flickable {
+                                id: gitLocalOutputScroll
+                                NeonScrollBar {
+                                    flickable: gitLocalOutputScroll
+                                    handleStyle: "star"
+                                }
                                 anchors {
                                     top: parent.top
                                     bottom: parent.bottom
@@ -6823,6 +6828,11 @@ PanelWindow {
                                                             }
 
                                                             Flickable {
+                                                                id: workflowMenuScroll
+                                                                NeonScrollBar {
+                                                                    flickable: workflowMenuScroll
+                                                                    handleStyle: "star"
+                                                                }
                                                                 anchors {
                                                                     fill: parent
                                                                     margins: 4

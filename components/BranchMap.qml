@@ -183,6 +183,11 @@ Rectangle {
         Flickable {
             id: topologyFlick
 
+            NeonScrollBar {
+                flickable: topologyFlick
+                handleStyle: "star"
+            }
+
             anchors {
                 top: header.bottom
                 topMargin: 4

@@ -1213,6 +1213,7 @@ Item {
                             }
 
                             NeonScrollBar {
+                                handleStyle: "star"
                                 flickable: parent
                             }
                         }

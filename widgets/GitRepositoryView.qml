@@ -1205,6 +1205,7 @@ Item {
                             }
                         
                             NeonScrollBar {
+                                handleStyle: "star"
                                 flickable: repositoryScroll1
                             }
 }
@@ -1698,6 +1699,7 @@ Item {
                             }
                         
                             NeonScrollBar {
+                                handleStyle: "star"
                                 flickable: repositoryScroll2
                             }
 }
@@ -1845,6 +1847,7 @@ Item {
                         }
                     
                         NeonScrollBar {
+                            handleStyle: "star"
                             flickable: repositoryScroll3
                         }
 }
@@ -2420,6 +2423,7 @@ Item {
                             }
                         
                             NeonScrollBar {
+                                handleStyle: "star"
                                 flickable: repositoryScroll4
                             }
 }
@@ -2568,6 +2572,7 @@ Item {
                             }
                         
                             NeonScrollBar {
+                                handleStyle: "star"
                                 flickable: repositoryScroll5
                             }
 }
@@ -3646,6 +3651,7 @@ Item {
                         }
                     
                         NeonScrollBar {
+                            handleStyle: "star"
                             flickable: repositoryScroll8
                         }
 }

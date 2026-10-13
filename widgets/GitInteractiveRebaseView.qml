@@ -489,6 +489,7 @@ Rectangle {
                         }
 
                         NeonScrollBar {
+                            handleStyle: "star"
                             flickable: planScroll
                         }
                     }

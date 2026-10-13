@@ -978,6 +978,7 @@ Item {
             }
 
             NeonScrollBar {
+                handleStyle: "star"
                 id: scrollTrack
 
                 flickable: sourceList
@@ -996,12 +997,13 @@ Item {
                 railColor: Colors.dark
                 railOpacity: 1.0
                 railRadius: 0
-                railGlowEnabled: false
+                railGlowEnabled: true
+                railGlowOpacity: 0.20
 
                 handleColor: Colors.magenta
                 barHandleRadius: 0
                 handleBorderWidth: 0
-                handleGlowEnabled: false
+                handleGlowEnabled: true
 
                 interactive: false
                 wheelEnabled: false

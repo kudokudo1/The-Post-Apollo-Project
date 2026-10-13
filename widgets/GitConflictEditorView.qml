@@ -372,6 +372,7 @@ Rectangle {
                 }
 
                 NeonScrollBar {
+                    handleStyle: "star"
                     flickable: sourceScroll
                 }
             }
@@ -434,6 +435,7 @@ Rectangle {
                 }
 
                 NeonScrollBar {
+                    handleStyle: "star"
                     flickable: resultScroll
                 }
             }

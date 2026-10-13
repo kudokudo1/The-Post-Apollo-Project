@@ -63,9 +63,12 @@ passive pointer-entry requests, Qt anchor restoration, release when superseded,
 and a short/bounded compositor acquisition pulse. Preserve all existing
 internal shortcut functions and theme geometry.
 
-**Next lanes:** Weather (currently perpetual Exclusive), AppControl,
-Power, and other menus. Their owners must review per-widget interaction
-semantics before applying the same contract. Do not regress input fields,
+**Next lanes:** Notifications Hub has been added in a separate *source-only*
+registration pilot with shared-owner + bounded Exclusive activation; live
+compositor validation remains mandatory. Weather (currently perpetual
+Exclusive), AppControl, Power, and other menus still need per-widget review.
+Social/Messaging is a normal FloatingWindow: native Discord focus and
+Koinoikos layer-shell routing remain independent. Do not regress input fields,
 nested selectors, launchers or notification editors.
 
 **Acceptance:** With two menus open, test focus after opening each; pointer

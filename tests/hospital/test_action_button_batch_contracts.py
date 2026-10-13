@@ -55,7 +55,7 @@ for name, (ordinary_count, selector_count, selector_type) in views.items():
     assert src.count("\n                HospitalActionButton {") <= ordinary_count
     import re
     actual_actions = re.findall(r"(?m)^\s*HospitalActionButton\s*\{", src)
-    actual_selectors = re.findall(rf"(?m)^\s*{selector_type}\s*\{{", src)
+    actual_selectors = re.findall(rf"(?m)^\s*(?:delegate:\s*)?{selector_type}\s*\{{", src)
     assert len(actual_actions) == ordinary_count, (name, len(actual_actions))
     assert len(actual_selectors) == selector_count, (name, len(actual_selectors))
     assert f"component {selector_type}: Rectangle {{" in src, name

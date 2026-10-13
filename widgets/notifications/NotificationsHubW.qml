@@ -140,28 +140,27 @@ PanelWindow {
 
     property string searchQuery: ""
     property string activeFilter: "all"
-    property string lastHistoryFilter: "all"
+    // These are the seven real buttons in filterStrip, left to right.
+    // They are Main Modes, not "History" plus six Sub Modes.
+    readonly property var mainModeOrder: [
+        "all", "apps", "system", "social", "apollo", "warning", "manager"
+    ]
     property bool listKeyboardSelectionActive: false
     // Do not take mode keys from the search editor or destructive dialogs.
     readonly property bool standardKeysAvailable:
         menuOpen && keyboardActive && !searchInput.activeFocus
         && pendingClearAllKey === "" && pendingClearAllSource === ""
 
-    // History and Manager are primary contexts; the six history categories
-    // are secondary filters, not six invented Main Modes.
-    function cycleMainMode() {
-        activeFilter = activeFilter === "manager"
-            ? lastHistoryFilter : "manager";
-    }
-
-    function cycleTopSubMode(direction) {
-        // Manager has no history-category submode. Do not silently leave it.
-        if (activeFilter === "manager")
+    // Tab cycles every real filter button in visual order; Shift+Tab
+    // reverses. A mouse click changes activeFilter, so the next key
+    // continues from the clicked button rather than switching to Manager.
+    function cycleMainMode(direction) {
+        const count = mainModeOrder.length;
+        if (count === 0)
             return;
-        const filters = ["all", "apps", "system", "social", "apollo", "warning"];
-        const current = Math.max(0, filters.indexOf(activeFilter));
+        const current = Math.max(0, mainModeOrder.indexOf(activeFilter));
         const step = Number(direction) < 0 ? -1 : 1;
-        activeFilter = filters[(current + step + filters.length) % filters.length];
+        activeFilter = mainModeOrder[(current + step + count) % count];
     }
 
     function moveCurrentList(direction) {
@@ -196,25 +195,13 @@ PanelWindow {
         sequence: "Tab"
         context: Qt.WindowShortcut
         enabled: root.standardKeysAvailable
-        onActivated: root.cycleMainMode()
+        onActivated: root.cycleMainMode(1)
     }
     Shortcut {
         sequence: "Shift+Tab"
         context: Qt.WindowShortcut
         enabled: root.standardKeysAvailable
-        onActivated: root.cycleMainMode()
-    }
-    Shortcut {
-        sequence: "Shift+Left"
-        context: Qt.WindowShortcut
-        enabled: root.standardKeysAvailable && root.activeFilter !== "manager"
-        onActivated: root.cycleTopSubMode(-1)
-    }
-    Shortcut {
-        sequence: "Shift+Right"
-        context: Qt.WindowShortcut
-        enabled: root.standardKeysAvailable && root.activeFilter !== "manager"
-        onActivated: root.cycleTopSubMode(1)
+        onActivated: root.cycleMainMode(-1)
     }
     Shortcut {
         sequence: "Enter"
@@ -282,8 +269,6 @@ PanelWindow {
 
     onActiveFilterChanged: {
         listKeyboardSelectionActive = false;
-        if (activeFilter !== "manager")
-            lastHistoryFilter = activeFilter;
         root.scheduleFilteredModelRebuild();
     }
 

@@ -7,9 +7,13 @@ frame-glow intensity. Ordinary Sway application focus is separate.
 **Operator intent:** Display the shortcut as **Super + ~** (the tilde
 symbolizes relationship / ghost string / spiritual connection), but trigger it
 using **Super + the unshifted grave/backtick key** (`Mod4+grave`), with no Shift.
-This begins a persistent *relationship focus* mode. Inside the mode, plain arrows and `h j k l` move spatial focus;
-the currently selected participant glows more strongly while other open
-windows remain visible. `Esc` returns to ordinary Sway.
+The first chord enters persistent widget-only focus mode and selects the next
+eligible widget if one was already selected. **Press the same Super + grave
+shortcut again to cycle among open eligible widgets** in stable registry
+order, wrapping to the beginning. In this mode, plain arrows and `h j k l`
+move spatially between widgets. The selected widget glows more strongly,
+and `Esc` returns to ordinary Sway. Neither action navigates normal Sway
+application windows.
 
 ## Scope / stage
 
@@ -23,11 +27,14 @@ or reload Sway on the operator's computer.
   Weather**. They publish geometry via typed `qs ipc call relationshipFocus
   snapshot`. In Focus Mode nonowner registered menus stop owning the
   keyboard, while the selected menu gets a stronger frame-glow opacity.
-- Only registered visible Quickshell widgets are candidates. The router
-  selects a nearby widget in the indicated half-plane, preferring direct
-  alignment. On first entry or after a widget closes, it chooses an
-  eligible widget anchor; at a spatial edge it stays put rather than
-  moving focus into a normal application.
+- Only registered visible Quickshell widgets are candidates. The direction
+  router selects a nearby widget in the indicated half-plane, preferring
+  direct alignment. **Repeated Super+grave** cycles through eligible
+  widgets in registry order with wraparound. On first entry, an already
+  owned widget advances once; otherwise the first eligible widget is
+  selected. At spatial edges directional focus stays put instead of
+  moving into a normal application. With no eligible widgets, neither
+  shortcut changes regular Sway focus.
 - Other QS surfaces, including **Notifications** (search focus) and
   **Messaging** (currently explicitly non-focusable), are *not yet
   registered*. Do **not** report universal-menu acceptance based on five
@@ -141,9 +148,10 @@ python3 ~/.config/quickshell/scripts/koinoikos_focus.py snapshot
 swaymsg -t get_binding_state
 ```
 
-During mode: press **Super + unshifted backtick/grave** (displayed as
-**Super + ~**) to enter; use arrows or `h/j/k/l` to select a spatial
-neighbor; `Esc` exits. If Quickshell IPC is absent, directional
+Press **Super + unshifted backtick/grave** (displayed as **Super + ~**)
+to enter and select a widget; repeat the **same chord to cycle** to the next
+visible widget. Use arrows or `h/j/k/l` for directional navigation.
+`Esc` exits. If Quickshell IPC is absent, directional
 direction keys do **not** fall back to Sway application focus. They are a
 safe no-op until the Quickshell focus broker returns; Escape still restores
 the normal Sway binding mode.
@@ -159,7 +167,8 @@ keep the internal quotes around the multiword name. From a shell prompt use
 
 Verify the original focused Kitty/browser remains unchanged before, during,
 and after widget navigation; test two then all five registered Quickshell
-menus, DP-5 / HDMI-A-1 geometry, overlapping widgets, repeated directional
+menus, repeat Super+grave through all widgets with wraparound (including rapid
+presses), DP-5 / HDMI-A-1 geometry, overlapping widgets, repeated directional
 presses at edges, closing the focused widget, Hospital Receptionist typing,
 Git nested editor/dial and Escape after Quickshell IPC failure. Verify
 the live widget `snapshot` geometry before calling multi-monitor routing

@@ -81,4 +81,38 @@ assert 'property string scrollbarHandleStyle: "bar"' in source("components/Conve
 assert 'scrollbarHandleStyle: "star"' in source("widgets/HospitalRoomChatView.qml")
 assert "flickable: suggestionDetailScroll" in source("widgets/HospitalChartsView.qml")
 
-print(f"Scrollbar surface migration contracts: PASS ({starred_instances} Git/Hospital stars)")
+# Inventory all source-declared Flickable/ListView/GridView widget panes.
+# Specialized existing indicators remain explicit, source-audited exceptions.
+# This is a structural census, NOT proof of rendered geometry or Qt hit targets.
+SPECIALIZED_SCROLL_TRACKS = {
+    "widgets/AppControlW.qml": 3,         # Results, resource scope, detail
+    "widgets/GitBranchesView.qml": 1,     # Existing horizontal branch strip
+    "widgets/GitW.qml": 1,                # Tiny horizontal status-value rail
+}
+all_scroll_targets = 0
+all_neon_bars = 0
+for path in (ROOT / "widgets").rglob("*.qml"):
+    rel = path.relative_to(ROOT).as_posix()
+    content = path.read_text(encoding="utf-8")
+    targets = len(re.findall(r"\\b(?:Flickable|ListView|GridView)\\s*\\{", content))
+    bars = len(re.findall(r"\\bNeonScrollBar\\s*\\{", content))
+    exceptions = SPECIALIZED_SCROLL_TRACKS.get(rel, 0)
+    assert targets <= bars + exceptions, (
+        f"{rel}: {targets} scrollable panes but only {bars} NeonScrollBar "
+        f"instances + {exceptions} explicitly reviewed custom indicators"
+    )
+    all_scroll_targets += targets
+    all_neon_bars += bars
+
+for rel in ("components/BranchMap.qml", "components/ConversationFeed.qml"):
+    content = source(rel)
+    assert len(re.findall(r"\\bNeonScrollBar\\s*\\{", content)) >= len(
+        re.findall(r"\\b(?:Flickable|ListView|GridView)\\s*\\{", content)
+    ), f"{rel}: shared scroll pane without an indicator"
+
+print(
+    f"Scrollbar surface migration contracts: PASS "
+    f"({starred_instances} Git/Hospital stars; "
+    f"{all_scroll_targets} widget scroll panes; {all_neon_bars} shared bars; "
+    f"{sum(SPECIALIZED_SCROLL_TRACKS.values())} bespoke exceptions)"
+)

@@ -139,7 +139,7 @@ assert "function advanceWidget()" not in broker
 assert "function beginAndAdvance(): bool" not in broker
 assert "function advance(): bool" not in broker
 assert 'id: relationshipFocus' in shell
-for label in ("appcontrol", "hospital", "git", "cpu", "weather"):
+for label in ("appcontrol", "hospital", "git", "cpu", "weather", "notifications"):
     assert label in broker, label
     assert 'relationshipFocus.owner === "' + label + '"' in shell
 
@@ -149,6 +149,7 @@ for path, expected in (
     ("widgets/CpuPlusW.qml", "relationshipFocused ? 0.68"),
     ("widgets/weather/WeatherStationW.qml", "relationshipFocused ? 0.58"),
     ("widgets/AppControlW.qml", "relationshipFocused ? 0.68"),
+    ("widgets/notifications/NotificationsHubW.qml", "root.relationshipFocused ? 0.70"),
 ):
     data = (ROOT / path).read_text(encoding="utf-8")
     assert "property bool relationshipFocusModeActive: false" in data, path
@@ -177,24 +178,29 @@ for required in (
 ):
     assert required in ownership, required
 assert 'interval: 120' in ownership
-assert 'id !== "git" && id !== "hospital"' in ownership
+assert 'id !== "git" && id !== "hospital" && id !== "notifications"' in ownership
 shell = (ROOT / "shell.qml").read_text()
 assert "KeyboardOwnershipCoordinator {" in shell
 assert "property alias controlKeyboardOwner: keyboardOwnership.owner" in shell
 assert 'shellRoot.requestControlKeyboard("git", "open")' in shell
 assert 'shellRoot.requestControlKeyboard("hospital", "open")' in shell
+assert 'shellRoot.requestControlKeyboard("notifications", "open")' in shell
 assert 'shellRoot.requestControlKeyboard("git", "pointer")' in shell
 assert 'shellRoot.requestControlKeyboard("hospital", "pointer")' in shell
+assert 'shellRoot.requestControlKeyboard("notifications", "pointer")' in shell
 assert 'keyboardOwnership.release("git")' in shell
 assert 'keyboardOwnership.release("hospital")' in shell
+assert 'keyboardOwnership.release("notifications")' in shell
 assert 'keyboardLock: keyboardOwnership.boostOwner === "git"' in shell
 assert 'keyboardLock: keyboardOwnership.boostOwner === "hospital"' in shell
+assert 'keyboardLock: keyboardOwnership.boostOwner === "notifications"' in shell
 assert '|| (hospitalWindow.menuOpen && gitWindow.menuOpen)' not in shell
 assert 'keyboardOwnership.claim(owner, "koinoikos")' in shell
 assert "function requestControlKeyboard(id, reason)" in shell
 assert "relationshipFocus.selectOwner(id);" in shell
 
-for path in ("widgets/GitW.qml", "widgets/HospitalW.qml"):
+for path in ("widgets/GitW.qml", "widgets/HospitalW.qml",
+             "widgets/notifications/NotificationsHubW.qml"):
     widget = (ROOT / path).read_text()
     assert 'onHoveredChanged: {' in widget
     assert 'if (hovered)\n                    root.keyboardOwnershipRequested();' in widget
@@ -202,6 +208,20 @@ for path in ("widgets/GitW.qml", "widgets/HospitalW.qml"):
     assert "WlrKeyboardFocus.OnDemand" in widget
     assert "WlrKeyboardFocus.None" in widget
     assert "WlrKeyboardFocus.Exclusive" in widget
+notifications = (ROOT / "widgets/notifications/NotificationsHubW.qml").read_text()
+assert "property bool keyboardActive: false" in notifications
+assert "property bool keyboardLock: false" in notifications
+assert "WlrKeyboardFocus.OnDemand" in notifications
+assert "WlrKeyboardFocus.None" in notifications
+assert "WlrKeyboardFocus.Exclusive" in notifications
+assert "id: notificationKeyboardAnchor" in notifications
+assert "notificationKeyboardAnchor.forceActiveFocus()" in notifications
+assert "menuOpen && keyboardActive && !searchInput.activeFocus" in notifications
+for shortcut in ('"Tab"', '"Shift+Tab"'):
+    assert 'sequence: ' + shortcut in notifications
+assert 'notifications: notificationsHubWindow' in shell
+assert 'notifications: null' in broker
+assert '{ id: "notifications", item: broker.notifications }' in broker
 assert (ROOT / "docs/window-keyboard-focus-contract.md").is_file()
 
 print("KOINOIKOS FOCUS MODE CONTRACTS // PASS")

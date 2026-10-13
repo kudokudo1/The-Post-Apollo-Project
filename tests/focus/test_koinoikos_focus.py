@@ -48,13 +48,13 @@ try:
     assert seen == [], seen
 
     focus.snapshot = lambda: {"active": True, "owner": "native", "surfaces": menus}
-    assert focus.move("right")  # Legacy owner falls back to first widget ONLY.
-    assert seen == [("select", "hospital")], seen
+    assert focus.move("right")  # Unknown owner anchors AND moves on first arrow.
+    assert seen == [("select", "git")], seen
     seen.clear()
 
     focus.snapshot = lambda: {"active": True, "owner": "closed", "surfaces": menus}
-    assert focus.move("right")
-    assert seen == [("select", "hospital")], seen
+    assert focus.move("right")  # Closed owner also moves on the first arrow.
+    assert seen == [("select", "git")], seen
     seen.clear()
 
     focus.snapshot = lambda: {"active": True, "owner": "", "surfaces": []}

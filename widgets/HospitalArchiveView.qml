@@ -194,6 +194,125 @@ Item {
         }
     }
 
+
+    // Syntagma pilot: ordinary Archive actions use the shared ActionButton.
+    // Source and attention filter controls remain the separate selector family.
+    component ArchiveActionButton: ActionButton {
+        id: action
+
+        property string fullLabel: ""
+        property string compactIcon: ""
+        property string miniIcon: compactIcon
+        property string actionDescription: fullLabel
+        property bool specialAction: false
+        property color specialHoverForeground: accentColor
+
+        readonly property real contentWidthBudget: Math.max(0, width - 12)
+        readonly property bool fullLabelFits:
+            minimumLabelMeasure.implicitWidth <= contentWidthBudget
+        readonly property bool compactIconFits:
+            compactIconMeasure.implicitWidth <= contentWidthBudget
+
+        height: 35
+        implicitHeight: 35
+        label: fullLabel
+        showLabel: false
+        contentItem.clip: true
+
+        Accessible.role: Accessible.Button
+        Accessible.name: actionDescription
+        acceptedButtons: Qt.LeftButton
+
+        idleFillColor: Colors.black
+        hoverFillColor: Colors.yellow
+        selectedFillColor: Colors.yellow
+        keyboardSelectedFillColor: Colors.yellow
+        pressedFillColor: Colors.magenta
+        idleForegroundColor: accentColor
+        hoverForegroundColor:
+            specialAction ? specialHoverForeground : Colors.orange
+        selectedForegroundColor: hoverForegroundColor
+        keyboardSelectedForegroundColor: hoverForegroundColor
+        pressedForegroundColor: Colors.black
+
+        // Accent is semantic, independent of yellow hover and magenta press.
+        idleBorderColor: accentColor
+        hoverBorderColor: specialAction ? accentColor : Colors.orange
+        selectedBorderColor: hoverBorderColor
+        keyboardSelectedBorderColor: hoverBorderColor
+        pressedBorderColor: specialAction ? accentColor : Colors.orange
+        // Border thickness normalization is still a separate decision.
+        idleBorderWidth: 1
+        hoverBorderWidth: 1
+        selectedBorderWidth: 1
+        keyboardSelectedBorderWidth: 1
+        pressedBorderWidth: 1
+
+        contentGlowSource: actionText
+        contentGlowEnabled: true
+        idleContentGlowColor: accentColor
+        hoverContentGlowColor:
+            specialAction ? accentColor : Colors.orange
+        selectedContentGlowColor: hoverContentGlowColor
+        keyboardSelectedContentGlowColor: hoverContentGlowColor
+        pressedContentGlowColor:
+            specialAction ? accentColor : Colors.orange
+        contentGlowIdleOpacity: 0.35
+        contentGlowHoverOpacity: 0.75
+        contentGlowSelectedOpacity: 0.75
+        contentGlowKeyboardSelectedOpacity: 0.75
+        contentGlowPressedOpacity: 1.0
+
+        softGlowEnabled: true
+        softGlowSpread: 3
+        idleSoftGlowColor: accentColor
+        hoverSoftGlowColor:
+            specialAction ? accentColor : Colors.orange
+        selectedSoftGlowColor: hoverSoftGlowColor
+        keyboardSelectedSoftGlowColor: hoverSoftGlowColor
+        pressedSoftGlowColor:
+            specialAction ? accentColor : Colors.orange
+        softGlowIdleOpacity: 0.25
+        softGlowHoverOpacity: 0.55
+        softGlowSelectedOpacity: 0.55
+        softGlowKeyboardSelectedOpacity: 0.55
+        softGlowPressedOpacity: 0.60
+
+        // Wide halo is optional; preserve clearance between the three actions.
+        wideGlowEnabled: false
+
+        GohuText {
+            id: minimumLabelMeasure
+            visible: false
+            text: action.fullLabel
+            font.pixelSize: 8
+        }
+        GohuText {
+            id: compactIconMeasure
+            visible: false
+            text: action.compactIcon
+            font.pixelSize: 12
+        }
+        GohuText {
+            id: actionText
+            anchors.centerIn: parent
+            width: action.contentWidthBudget
+            height: Math.max(0, action.height - 8)
+            visible: width > 0
+            text: action.fullLabelFits ? action.fullLabel
+                  : action.compactIconFits ? action.compactIcon
+                  : action.miniIcon
+            font.pixelSize: action.fullLabelFits ? 11
+                            : action.compactIconFits ? 12 : 9
+            fontSizeMode: Text.HorizontalFit
+            minimumPixelSize: action.fullLabelFits ? 8 : 7
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideNone
+            color: action.foregroundColor
+        }
+    }
+
     Column {
         anchors.fill: parent
         spacing: 8
@@ -582,7 +701,7 @@ Item {
                         height:
                             Math.max(
                                 52,
-                                parent.height - 158
+                                parent.height - 163
                             )
                         text:
                             root.selectedEvent
@@ -599,15 +718,23 @@ Item {
                     }
 
                     Row {
+                        id: archiveActionRow
                         width: parent.width
-                        height: 30
-                        spacing: 5
+                        height: 35
+                        spacing: Math.min(8, Math.max(5, width * 0.02))
 
-                        ArchiveButton {
-                            width: (parent.width - 10) / 3
-                            label: "OPEN"
-                            enabledAction:
-                                root.selectedEvent !== null
+                        // All three widths + two gaps must fit the inset panel.
+                        readonly property real actionWidth: Math.max(
+                            0, (width - 2 * spacing) / 3
+                        )
+
+                        ArchiveActionButton {
+                            width: archiveActionRow.actionWidth
+                            fullLabel: "OPEN"
+                            compactIcon: "↗"
+                            miniIcon: "↗"
+                            actionDescription: "Open selected archive event"
+                            available: root.selectedEvent !== null
 
                             onTriggered:
                                 root.eventActivated(
@@ -615,17 +742,30 @@ Item {
                                 )
                         }
 
-                        ArchiveButton {
-                            width: (parent.width - 10) / 3
-                            label:
+                        ArchiveActionButton {
+                            width: archiveActionRow.actionWidth
+                            fullLabel:
                                 root.selectedEvent
                                 && root.receptionistService
                                     .isPinned(root.selectedEvent)
                                 ? "UNFAVORITE"
                                 : "FAVORITE"
-                            accent: Colors.yellow
-                            enabledAction:
-                                root.selectedEvent !== null
+                            compactIcon:
+                                root.selectedEvent
+                                && root.receptionistService
+                                    .isPinned(root.selectedEvent)
+                                ? "★"
+                                : "☆"
+                            miniIcon: compactIcon
+                            actionDescription:
+                                fullLabel === "UNFAVORITE"
+                                ? "Remove selected archive event from favorites"
+                                : "Favorite selected archive event"
+                            accentColor: Colors.yellow
+                            specialAction: true
+                            // Orange lettering stays visible on yellow hover.
+                            specialHoverForeground: Colors.orange
+                            available: root.selectedEvent !== null
 
                             onTriggered: {
                                 root.receptionistService
@@ -635,12 +775,16 @@ Item {
                             }
                         }
 
-                        ArchiveButton {
-                            width: (parent.width - 10) / 3
-                            label: "EXPORT"
-                            accent: Colors.green
-                            enabledAction:
-                                root.filteredEvents.length > 0
+                        ArchiveActionButton {
+                            width: archiveActionRow.actionWidth
+                            fullLabel: "EXPORT"
+                            compactIcon: "⇧"
+                            miniIcon: "⇧"
+                            actionDescription: "Export filtered archive events"
+                            accentColor: Colors.green
+                            specialAction: true
+                            specialHoverForeground: Colors.green
+                            available: root.filteredEvents.length > 0
 
                             onTriggered:
                                 root.receptionistService

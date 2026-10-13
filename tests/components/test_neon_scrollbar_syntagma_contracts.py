@@ -30,7 +30,8 @@ CONTRACT = {
     'starStyle ? starAreaWidth : barAreaWidth': "physical width remains 10/16 by default",
     'reserveGlowSpace ? 2 * effectiveGlowPadding : 0': "optional host-only glow clearance",
     'property bool containGlow: true': "contained glow",
-    'clip: containGlow': "glow boundary",
+    'clip: containGlow && trackTopExtension <= 0':
+        "preserve intentional rail extensions outside the normal track bounds",
     # Availability / reveal // 005–011, 023
     'Math.min(trackLength, Math.max(minimumHandleHeight, proportional))':
         "short bar handles shrink rather than protrude",
@@ -74,6 +75,9 @@ for snippet, meaning in CONTRACT.items():
 assert "handleMouse.containsMouse\n                    ?" not in SOURCE, (
     "full-root hover still directly drives an individual handle glow"
 )
+
+# Audit 04: the legacy 33px rail extension must not be cut off by root clipping.
+assert 'clip: containGlow && trackTopExtension <= 0' in SOURCE
 
 # Physical widths must never be inflated by glow or host reservation.
 physical = SOURCE.split('readonly property real crossExtent:', 1)[1].split('readonly property real reservedExtent:', 1)[0]

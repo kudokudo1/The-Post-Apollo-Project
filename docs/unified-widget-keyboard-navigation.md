@@ -61,7 +61,7 @@ records the old AppControl, Git and Hospital keys and their focus caveats.
 | Weather Station | Add Tab HOME/MAP/NEWS/RADIO/TERMINAL; Shift+arrows for DOMAIN; vertical rail Up/Down preview plus Enter activation |
 | Power | Existing Up/Down, Enter, Escape and confirmation isolation; no artificial Main/Sub Mode |
 | Social/Messaging | Existing App/Contact/Chat local navigation. Embedded application focus and Main Mode meaning need a dedicated review before binding Tab to external app activation |
-| Notifications | Filter/Manager and search-input focus need an owner-safe keyboard policy; not yet Koinoikos-registered |
+| Notifications | Add Tab toggle for History/Manager, Shift+arrows for six category filters and Up/Down list selection; search/editor and confirmation guards included. Window still needs focus-owner registration and live delivery testing |
 | Media Deck | Dormant/unmounted, currently explicitly `WlrKeyboardFocus.None`; transport actions are not generic navigation; must not pretend source shortcuts create real keyboard focus |
 
 **Outstanding:** Extend to the other eligible interactive windows, review

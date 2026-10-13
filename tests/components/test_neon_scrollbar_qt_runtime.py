@@ -11,8 +11,8 @@ import sys
 from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-from PySide6.QtCore import QUrl
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtCore import QCoreApplication, QPoint, QPointF, Qt, QUrl
+from PySide6.QtGui import QGuiApplication, QWheelEvent
 from PySide6.QtQml import QQmlComponent, QQmlEngine
 
 app = QGuiApplication([])
@@ -70,6 +70,25 @@ try:
     app.processEvents()
     near(inner.property("contentY"), 450, "inner scroll at its lower boundary")
     near(outer.property("contentY"), 0, "outer does not move through inner controls")
+
+    def send_wheel(y_angle):
+        # At (100,80), the pointer is over the INNER list, not the thin bar.
+        event = QWheelEvent(QPointF(100, 80), QPointF(100, 80),
+                            QPoint(0, 0), QPoint(0, y_angle),
+                            Qt.NoButton, Qt.NoModifier, Qt.ScrollUpdate, False)
+        QCoreApplication.sendEvent(root, event)
+        app.processEvents()
+
+    send_wheel(-120)  # Already at inner end: outer must remain still.
+    near(inner.property("contentY"), 450, "inner wheel clamped at its bottom")
+    near(outer.property("contentY"), 0, "wheel in inner pane does not chain at bottom")
+    assert inner.setProperty("contentY", 0)
+    send_wheel(120)  # Already at inner top: outer must remain still.
+    near(inner.property("contentY"), 0, "inner wheel clamped at its top")
+    near(outer.property("contentY"), 0, "wheel in inner pane does not chain at top")
+    send_wheel(-120)
+    assert float(inner.property("contentY")) > 0, "inner list must scroll normally"
+
     print("NeonScrollBar Qt runtime smoke: PASS")
 finally:
     root.close()

@@ -112,3 +112,13 @@ def test_focus_router_and_broker_still_independently_own_window_focus():
     assert "def focus_target(" in router
     assert "function selectOwner(id)" in broker
     assert "Only one owner" in focus
+
+
+if __name__ == "__main__":
+    # Keep this runnable with stock Python in GitHub Actions and locally.
+    count = 0
+    for name, candidate in list(globals().items()):
+        if name.startswith("test_") and callable(candidate):
+            candidate()
+            count += 1
+    print(f"SYNTAGMA UNIFIED KEYS // {count} source contracts PASS")

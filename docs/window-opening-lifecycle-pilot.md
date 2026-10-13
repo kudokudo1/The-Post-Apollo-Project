@@ -72,12 +72,13 @@ Preserve unsaved widget state before restarting.
 
 ```bash
 qsdir="$(readlink -f "${XDG_CONFIG_HOME:-$HOME/.config}/quickshell")"
-test -f "$qsdir/scripts/restart_quickshell_safe.sh" || {
-  echo "Safe restart script not found in $qsdir"; exit 1;
-}
-env -u POST_APOLLO_GIT_VISIBILITY_PILOT \
-    -u POST_APOLLO_HOSPITAL_VISIBILITY_PILOT \
-    bash "$qsdir/scripts/restart_quickshell_safe.sh" "$qsdir"
+if test -f "$qsdir/scripts/restart_quickshell_safe.sh"; then
+  env -u POST_APOLLO_GIT_VISIBILITY_PILOT \
+      -u POST_APOLLO_HOSPITAL_VISIBILITY_PILOT \
+      bash "$qsdir/scripts/restart_quickshell_safe.sh" "$qsdir"
+else
+  echo "Safe restart script not found in $qsdir"
+fi
 ```
 
 The revised GitHub source ignores both removed environment flags entirely,

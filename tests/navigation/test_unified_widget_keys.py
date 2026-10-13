@@ -2,6 +2,7 @@
 
 These assertions do not replace live compositor/Qt keyboard-delivery tests.
 """
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -108,27 +109,58 @@ def test_weather_semantic_main_and_top_submode_and_arrow_preview():
     assert "context: Qt.WindowShortcut" in src
 
 
-def test_notifications_non_destructive_context_and_filter_keys():
+def test_notifications_tab_cycles_every_real_mode_in_visual_order():
     src = read("widgets/notifications/NotificationsHubW.qml")
-    assert "function cycleMainMode()" in src
-    assert "function cycleTopSubMode(direction)" in src
+    expected = ["all", "apps", "system", "social",
+                "apollo", "warning", "manager"]
+
+    # Compare the Tab cycle against the actual left-to-right button row.
+    order_match = re.search(
+        r"readonly property var mainModeOrder:\\s*\\[([^\\]]+)\\]", src)
+    assert order_match
+    order = re.findall(r'"([^"]+)"', order_match.group(1))
+    assert order == expected
+
+    strip = src.split("id: filterStrip", 1)[1].split(
+        "// New second header divider", 1)[0]
+    visible_buttons = re.findall(r'filterId: "([^"]+)"', strip)
+    assert visible_buttons == expected
+
+    assert "function cycleMainMode(direction)" in src
+    assert "mainModeOrder.indexOf(activeFilter)" in src
+    assert "Number(direction) < 0 ? -1 : 1" in src
+    assert "activeFilter = mainModeOrder[(current + step + count) % count];" in src
+    assert 'onActivated: root.cycleMainMode(1)' in src
+    assert 'onActivated: root.cycleMainMode(-1)' in src
+
+    # Clicked mode is the starting state; each key advances to a neighbor,
+    # and both directions wrap, rather than toggling back to Manager.
+    for start in range(len(expected)):
+        assert expected[(start + 1) % len(expected)] == order[
+            (start + 1) % len(order)]
+        assert expected[(start - 1) % len(expected)] == order[
+            (start - 1) % len(order)]
+    assert "lastHistoryFilter" not in src
+    assert "function cycleTopSubMode" not in src
+    assert 'sequence: "Shift+Left"' not in src
+    assert 'sequence: "Shift+Right"' not in src
+
+
+def test_notifications_non_destructive_list_navigation_stays_guarded():
+    src = read("widgets/notifications/NotificationsHubW.qml")
     assert "function moveCurrentList(direction)" in src
-    assert "lastHistoryFilter" in src
     assert "listKeyboardSelectionActive" in src
     assert "function activateCurrentHistoryItem()" in src
-    assert "if (activeFilter === \"manager\")" in src
-    assert "root.activeFilter !== \"manager\"" in src
+    assert 'activeFilter === "manager"' in src
+    assert 'root.activeFilter !== "manager"' in src
     assert "const index = !listKeyboardSelectionActive || list.currentIndex < 0" in src
     assert "historyList.currentIndex === notificationEntry.index" in src
     assert "ListView.isCurrentItem ? 2 : 1" in src
     assert "takeMeToApp(row.sourceId, row.source);" in src
-    for key in ("Enter", "Return"):
+    for key in ("Tab", "Shift+Tab", "Enter", "Return", "Up", "Down"):
         assert 'sequence: "' + key + '"' in src
     assert "!searchInput.activeFocus" in src
     assert 'pendingClearAllKey === ""' in src
-    for key in ("Tab", "Shift+Tab", "Shift+Left", "Shift+Right",
-                "Up", "Down"):
-        assert 'sequence: "' + key + '"' in src
     assert src.count("context: Qt.WindowShortcut") >= 6
     assert "list.positionViewAtIndex(index, ListView.Contain)" in src
 

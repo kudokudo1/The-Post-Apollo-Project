@@ -828,6 +828,26 @@ PanelWindow {
                 if (!messagingWindow.menuOpen)
                     return;
 
+                // Nurse 3c // Main Modes are the existing app-selector choices.
+                // Tab changes the active application just like its clicked mode
+                // button; chat/composer focus stays reserved to the editor.
+                if (messagingWindow.focusZone !== messagingWindow.chatZone
+                        && (event.key === Qt.Key_Tab
+                            || event.key === Qt.Key_Backtab)) {
+                    const count = appSelector.messagingApps.length;
+                    if (count > 1) {
+                        const reverse = event.key === Qt.Key_Backtab
+                            || (event.modifiers & Qt.ShiftModifier) !== 0;
+                        const direction = reverse ? -1 : 1;
+                        const index = (messagingWindow.activeAppIndex
+                                       + direction + count) % count;
+                        appSelector.selectedIndex = index;
+                        messagingWindow.activateApp(index);
+                    }
+                    event.accepted = true;
+                    return;
+                }
+
                 // ================================================
                 // APP SELECTOR
                 // ================================================

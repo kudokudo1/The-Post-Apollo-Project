@@ -270,6 +270,7 @@ Item {
                 }
 
                 HospitalActionButton {
+                    height: Math.min(35, parent.height)
                     compactIcon: "↻"
                     width: 108
                     label:

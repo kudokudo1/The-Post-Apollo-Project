@@ -15,8 +15,8 @@
 
 | Surface | Existing treatment | Why not indiscriminately replace |
 | --- | --- | --- |
-| `widgets/GitW.qml` — `ScrollingStatusValue` | 2px horizontal progress thumb | Tiny status glyph region, very different from a menu list; coordinate a compact star treatment rather than overlay a full-size 16px handle |
-| `widgets/GitW.qml` — `localTargetScrollRail` | Interactive 7px cyan rail with activity-point decorations and scrolling commands | Contains semantic event markers; preserve marker layout/hit regions during any future star migration |
+| `widgets/GitW.qml` — `ScrollingStatusValue` | 2px horizontal progress thumb; magenta glow restored | Tiny status glyph region, very different from a menu list; coordinate a compact star treatment rather than overlay a full-size 16px handle |
+| `widgets/GitW.qml` — `localTargetScrollRail` | Interactive 7px cyan rail, orange activity markers and magenta thumb; thumb glow restored | Contains semantic event markers; preserve marker layout/hit regions during any future star migration |
 | `widgets/GitBranchesView.qml` — `branchStripRail` | Interactive horizontal rail with drag/click controls | Replacing it requires retaining horizontal wheel routing, the compact 6px band, and branch navigation; don't stack a second independent rail |
 | `widgets/GitHubWorkItemsView.qml` | Display-only dark rail, magenta star | Glow restored to the magenta star handle, dark rail stays deliberately dark |
 | `widgets/WorkflowLibraryView.qml`, `widgets/RepositoryProfileView.qml` | Layer-specific inactive opacity | Existing 06 visual-review decision remains open; restore glow without adding another root-level fade |

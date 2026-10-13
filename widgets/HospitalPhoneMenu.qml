@@ -299,6 +299,7 @@ Rectangle {
             }
         }
     }
+    NeonScrollBar { flickable: phoneStaffList; handleStyle: "star" }
 
     GohuText {
         anchors {

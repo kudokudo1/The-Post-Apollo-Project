@@ -248,6 +248,7 @@ Item {
 
                     onCountChanged: root.refreshSelection()
                 }
+                NeonScrollBar { flickable: operationList; handleStyle: "star" }
             }
 
             SectionFrame {

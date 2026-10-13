@@ -1405,6 +1405,7 @@ Rectangle {
                     }
                 }
             }
+            NeonScrollBar { flickable: transcript; handleStyle: "star" }
         }
 
         Row {

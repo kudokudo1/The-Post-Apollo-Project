@@ -1360,6 +1360,11 @@ Rectangle {
             clip: true
 
             Flickable {
+                NeonScrollBar {
+                    flickable: transcript
+                    handleStyle: "star"
+                }
+
                 id: transcript
 
                 anchors.fill: parent

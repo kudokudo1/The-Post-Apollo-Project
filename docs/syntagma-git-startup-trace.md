@@ -119,3 +119,52 @@ safety contracts. **The probe is unverified at the user's live Qt
 runtime until a single opted-in restart is observed.** An optimization
 or timing-based deferral is not authorized by the measurement alone;
 coordinate any shared GitService behavioral change with its owner.
+
+
+## Second diagnostic gate // source-level callback identified as expensive
+
+**Operator trace on October 13, 2026, before this refinement:**
+
+```text
+SYNTAGMA_STARTUP_TRACE // git refresh finished // taskbars-post-apollo :: taskbars-post-apollo // wall=888ms lines=272 callbackSum=6ms callbackMax=3ms
+SYNTAGMA_STARTUP_TRACE // git refresh finished // LIVE QUICKSHELL :: /var/home/mapple/.config/quickshell // wall=4604ms lines=376 callbackSum=3409ms callbackMax=3398ms
+SYNTAGMA_STARTUP_TRACE // git refresh finished // LIVE QUICKSHELL :: /var/home/mapple/.config/quickshell // wall=4687ms lines=376 callbackSum=5ms callbackMax=2ms
+SYNTAGMA_LAG_PROBE // event-loop interval 3697ms (target 100ms) // git=false hospital=false notifications=false
+```
+
+The **3,398 ms maximum single callback**, within a 3,409 ms callback
+total, is strong evidence of a single synchronous QML refresh-result
+handler dominating the stalled interval. The similar two LIVE QUICKSHELL
+service identities have radically different costs; the first measurement
+does not identify which specific view's bindings were involved. A
+preceding 3,068 ms missed timer interval was also logged. Thus there
+may be **more than one expensive callback** or logging order/timing
+effect; do not assume the 3,398 ms callback explains every gap.
+
+**Refined opt-in trace (same environment flag):**
+- Any `consumeRefreshLine()` callback taking at least 100 ms logs
+  `SYNTAGMA_STARTUP_TRACE // git slow refresh callback` with its
+  **row-type tag only** (`DONE`, `COMMIT`, etc.) and duration. The
+  raw repository output is intentionally not logged.
+- For a `DONE` row, log
+  `SYNTAGMA_STARTUP_TRACE // git DONE phases` with synchronous
+  wall-clock cost of: finishing `refreshing` state; publishing
+  pending models; restoring local/remote selection; incrementing
+  topology revision; updating availability; calling the `refreshed()`
+  signal; and queuing any follow-up refresh. Report pending row
+  counts and whether the result was stale.
+- These timings execute only if `POST_APOLLO_GIT_STARTUP_TRACE=1`;
+  normal source ordering and business logic are preserved.
+
+**Interpretation:** If `tag=DONE` is slow and `publish` is large,
+the likely cost is rebuilding branch/topology rows or the synchronous
+QML bindings those model mutations trigger; do not assume the loops
+themselves are intrinsically expensive. If `refreshedSignal` is
+large, inspect consumers attached to `GitService.refreshed`.
+If a different tag is slow, investigate that row's QML processing
+path. Compare against the existing `SYNTAGMA_LAG_PROBE` lines
+without opening menus or running repeated unsafe experiments.
+
+This stage still measures the **existing** code only. Any
+optimization requires separate evidence and coordination with
+other workers touching Git or Hospital UI.

@@ -45,6 +45,8 @@ CONTRACT = {
     'property string revealMode: "combined"': "combined reveal default",
     'property int fadeDuration: 500': "shared hold/fade timing",
     'property real inactiveOpacity: 0.34': "shared unavailable intensity",
+    'visibilityMode !== "" && !scrollable': "explicit persistent-only root fade",
+    'effectiveVisibilityMode === "persistent"': "persistent mode distinguish legacy state",
     'function synchronizeReveal()': "cancelable reveal lifecycle",
     'holdTimer.restart()': "hold before fading",
     'fadeTimer.restart()': "fade completion",

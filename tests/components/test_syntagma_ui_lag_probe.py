@@ -20,8 +20,9 @@ assert "SYNTAGMA_LAG_PROBE // event-loop interval" in shell
 
 # The synchronous duration wraps each *existing* dock toggle. Nothing changes
 # about which QML handler is invoked or what data the widgets refresh.
-assert shell.count("hospitalWindow.toggle();") == 1
-assert shell.count("gitWindow.toggle();") == 1
+# Both original toggle sites remain: IPC and dock. Only dock is timed.
+assert shell.count("hospitalWindow.toggle();") == 2
+assert shell.count("gitWindow.toggle();") == 2
 assert 'reportSyntagmaToggleTime(\n                        "hospital"' in shell
 assert 'reportSyntagmaToggleTime(\n                        "git"' in shell
 

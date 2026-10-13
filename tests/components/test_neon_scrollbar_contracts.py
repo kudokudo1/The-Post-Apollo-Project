@@ -53,7 +53,19 @@ for path in ROOT.rglob("*.qml"):
         star_users.append(str(rel))
 
 assert not legacy_users, "legacy starHandle usage remains: " + ", ".join(legacy_users)
-assert len(star_users) == 4, f"expected four star-handle consumer files, found {len(star_users)}: {star_users}"
+assert len(star_users) >= 4, f"star-handle consumers disappeared: {star_users}"
+
+# Git and Hospital now default to stars, including GitHub submenus.
+# Match each QML scrollbar object rather than assuming a fixed number of files.
+for path in (ROOT / "widgets").rglob("*.qml"):
+    if not path.name.startswith(("Git", "Hospital")):
+        continue
+    source = path.read_text(encoding="utf-8")
+    for bar in re.finditer(r"\\bNeonScrollBar\\s*\\{", source):
+        block = source[bar.end():].split("}", 1)[0]
+        assert 'handleStyle: "star"' in block, (
+            f"{path.relative_to(ROOT)} contains a non-star Git/Hospital scrollbar"
+        )
 
 print("Neon scrollbar contracts: PASS")
 print("star-handle consumers:", ", ".join(star_users))

@@ -145,6 +145,13 @@ neighbor; `Esc` exits. If Quickshell IPC is absent, directional
 keys fall back to native `swaymsg focus <direction>` and Escape still
 restores Sway's default binding mode.
 
+**Entry-command quoting:** Sway `binding` events confirm the chord fired,
+but do not prove the mode was entered. `swaymsg` re-parses its IPC command:
+keep the internal quotes around the multiword name. From a shell prompt use
+`swaymsg 'mode "Koinoikos Focus"'`; in the `sh -c` shortcut the equivalent is
+`swaymsg "mode \"Koinoikos Focus\""`. Do not split the command into
+`swaymsg mode "Koinoikos Focus"` or the embedded quotes are lost.
+
 ### Runtime verification checkpoint
 
 Check ordinary native window-to-window focus first; then two registered QS

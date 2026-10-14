@@ -3793,9 +3793,9 @@ PanelWindow {
         // any repository/branch service migration.
         Rectangle {
             id: sliderIndexLabToggle
-            visible: root.menuOpen
-                && root.activePage === "git"
+            visible: root.activePage === "git"
                 && root.gitView === "control"
+                && root.menuOpen
             z: 260
             width: 176
             height: 24

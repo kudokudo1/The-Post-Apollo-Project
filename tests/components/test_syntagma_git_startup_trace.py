@@ -22,6 +22,12 @@ assert "SYNTAGMA_STARTUP_TRACE // git refresh finished" in service
 assert "SYNTAGMA_STARTUP_TRACE // git slow refresh callback" in service
 assert "SYNTAGMA_STARTUP_TRACE // git DONE phases" in service
 assert "SYNTAGMA_STARTUP_TRACE // git publish phases" in service
+assert "SYNTAGMA_STARTUP_TRACE // git refresh requested" in service
+assert "SYNTAGMA_STARTUP_TRACE // git refresh queued" in service
+assert 'caller = frames.slice(1, 5).join(" > ")' in service
+assert '" pendingAtDone=" + pendingAtDone' in service
+assert '" followupQueued=" + (pendingAtDone || staleRead)' in service
+assert 'if (syntagmaStartupTraceEnabled) {\n            let caller = "unavailable";' in service
 assert "publishParts = publishPendingModels();" in service
 assert "if (publishParts)" in service
 for name in ("metadata=", "clears=", "local=", "remote=", "topology=", "total="):

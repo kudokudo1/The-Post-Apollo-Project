@@ -351,3 +351,40 @@ DONE model publication coincides with the gap, investigate remaining
 model subscribers or secondary view refreshes. If neither coincides,
 investigate other startup or compositor/Qt work. Do not disturb the
 now-responsive Git dock or restart solely for these measurements.
+
+
+## Seventh diagnostic gate // recurring LIVE Git refresh callbacks despite fast dock toggle (Oct 14, 2026)
+
+Operator saved report for session 0xls3kmwmt accumulated 109 Git
+button toggles, 18 LIVE QUICKSHELL refresh-completion records,
+and 41 event-loop overruns. Last 12 toggle handlers were mostly
+1–2 ms with a single 13 ms outlier. The rapid-open interaction
+is substantially improved.
+
+From roughly 11:55:48 to 11:56:01, however, Git refreshes completed
+about 1.6–1.8 seconds apart, with 400–500 ms synchronous callback work,
+and 680–802 ms event-loop delays. The last recorded toggle before this
+burst was 11:55:30.676, and the next at 11:56:01.512, consistent with
+refreshes repeating while the menu remained open; no cause is proven.
+The previous startup-only 2685ms gap is separate.
+
+GitW caches a successful model for eight seconds on passive opening.
+No normal GitService timer refreshes every ~1.6 seconds. GitService
+refresh can originate from explicit actions/pages, repository discovery,
+selection, or a queued followup when refreshPending/staleRead are true.
+Two service instances can share the same LIVE QUICKSHELL display label.
+
+Opt-in source refinement: With POST_APOLLO_GIT_STARTUP_TRACE=1, emit
+SYNTAGMA_STARTUP_TRACE // git refresh requested with the caller's
+first few JavaScript Error.stack frames, and busy/pending state.
+Emit git refresh queued on repository selection while a refresh
+is already running. The DONE phases message gains pendingAtDone
+and followupQueued booleans. There are no new runtime refreshes,
+bindings, QML model changes, timers, or UI behavior changes.
+Normal executions do not create an Error stack or log these lines.
+
+Verification: review source and CI, then single operator-safe trace
+session when convenient. Open Git once for 15–25 seconds without
+manually refreshing; record requested and DONE phases lines.
+If request sources repeat or followupQueued remains true, identify
+that caller/feedback loop first. Do not guess or suppress refreshes.

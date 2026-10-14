@@ -519,7 +519,13 @@ Rectangle {
                 }
 
                 onWheel: function(wheel) {
-                    if (!slider.enabledSlider || (slider.indexPilot && pressed))
+                    // Never leak a wheel event through the test overlay
+                    // while a preview drag is owning pointer interaction.
+                    if (slider.indexPilot && pressed) {
+                        wheel.accepted = true;
+                        return;
+                    }
+                    if (!slider.enabledSlider)
                         return;
 
                     const step = wheel.angleDelta.y > 0 ? -1 : 1;

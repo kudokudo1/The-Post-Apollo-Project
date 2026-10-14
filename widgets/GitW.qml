@@ -3745,7 +3745,14 @@ PanelWindow {
             accentColor: Colors.orange
             handleGlowColor: Colors.cyan
             activityGlowColor: Colors.orange
-            activityPoints: root.remoteActivityPoints()
+            // The Git panel is kept alive while closed. Avoid repeatedly
+            // rescanning every remote row as GitService populates the model.
+            activityPoints:
+                root.menuOpen
+                && root.activePage === "git"
+                && root.gitView === "control"
+                ? root.remoteActivityPoints()
+                : []
             sideLabel: "REMOTE"
 
             onIndexRequested: function(index) {
@@ -4966,7 +4973,8 @@ PanelWindow {
 
                                     parent: gitLocalPage
                                     visible:
-                                        root.remoteTargetMenuOpen
+                                        root.menuOpen
+                                        && root.remoteTargetMenuOpen
                                         && root.remoteTargetResults(7).length > 0
                                     z: 1600
                                     x:
@@ -4979,8 +4987,9 @@ PanelWindow {
                                         + 63
                                     width: remoteTargetCard.width - 16
                                     height:
-                                        root.remoteTargetResults(7).length
-                                        * 30 + 8
+                                        root.menuOpen && root.remoteTargetMenuOpen
+                                        ? root.remoteTargetResults(7).length * 30 + 8
+                                        : 0
                                     color: Colors.black
                                     border.width: 1
                                     border.color: Colors.magenta
@@ -5001,7 +5010,13 @@ PanelWindow {
                                         }
 
                                         Repeater {
-                                            model: root.remoteTargetResults(7)
+                                            // Building suggestions while closed caused
+                                            // every remote-branch append to scan
+                                            // the growing model again.
+                                            model:
+                                                root.menuOpen && root.remoteTargetMenuOpen
+                                                ? root.remoteTargetResults(7)
+                                                : []
 
                                             Rectangle {
                                                 required property int index

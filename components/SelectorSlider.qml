@@ -14,7 +14,71 @@ Rectangle {
     property string sideLabel: ""
     property bool enabledSlider: count > 1
 
+    // F1 INDEX pilot is strictly opt-in. All existing Git/Hospital sliders
+    // remain on their original immediate-request semantics by default.
+    property string indexInteraction: "legacy" // "legacy" | "preview-release"
+    property var optionLabels: []
+    property int previewIndex: -1
+    property real previewHandleY: -1
+    property bool previewCancelled: false
+    readonly property bool indexPilot: indexInteraction === "preview-release"
+    readonly property bool previewActive: indexPilot && dragArea.pressed && !previewCancelled
+    readonly property int displayedIndex: previewActive && previewIndex >= 0
+        ? previewIndex : currentIndex
+
     signal indexRequested(int index)
+
+    activeFocusOnTab: indexPilot
+
+    function indexLabel(index) {
+        if (index < 0)
+            return "—";
+        const items = optionLabels || [];
+        return index < items.length ? String(items[index]) : String(index + 1);
+    }
+
+    function cancelIndexPreview() {
+        if (!indexPilot)
+            return;
+        previewCancelled = true;
+        previewIndex = -1;
+        previewHandleY = -1;
+    }
+
+    // Owner data changing during an unfinished drag invalidates its preview.
+    onCurrentIndexChanged: {
+        if (indexPilot && dragArea && dragArea.pressed)
+            cancelIndexPreview();
+    }
+    onCountChanged: {
+        if (indexPilot && dragArea && dragArea.pressed)
+            cancelIndexPreview();
+    }
+
+    Keys.onEscapePressed: function(event) {
+        if (!indexPilot || !dragArea.pressed)
+            return;
+        cancelIndexPreview();
+        event.accepted = true;
+    }
+
+    Keys.onUpPressed: function(event) {
+        if (!indexPilot || !enabledSlider)
+            return;
+        const next = clampedIndex(currentIndex - 1);
+        if (next !== currentIndex)
+            indexRequested(next);
+        event.accepted = true;
+    }
+
+    Keys.onDownPressed: function(event) {
+        if (!indexPilot || !enabledSlider)
+            return;
+        const next = clampedIndex(currentIndex + 1);
+        if (next !== currentIndex)
+            indexRequested(next);
+        event.accepted = true;
+    }
 
     width: 40
     radius: 2
@@ -50,12 +114,13 @@ Rectangle {
         return Math.max(0, slot.height - thumb.height);
     }
 
-    function handleYForIndex() {
-        if (count <= 1 || currentIndex < 0)
+    function handleYForIndex(index) {
+        const selected = index === undefined ? currentIndex : index;
+        if (count <= 1 || selected < 0)
             return 0;
 
         return handleTravel()
-            * clampedIndex(currentIndex)
+            * clampedIndex(selected)
             / Math.max(1, count - 1);
     }
 
@@ -260,7 +325,11 @@ Rectangle {
                 anchors.horizontalCenter: parent.horizontalCenter
                 z: 3
 
-                y: slider.handleYForIndex()
+                // During a direct pilot drag, follow actual pointer travel
+                // between discrete detents; only the requested index snaps.
+                y: slider.previewActive && dragArea.hasMoved
+                    ? slider.previewHandleY
+                    : slider.handleYForIndex(slider.displayedIndex)
 
                 scale: dragArea.pressed ? 0.97 : 1.0
                 color: dragArea.pressed ? Colors.yellow : Colors.white
@@ -321,7 +390,10 @@ Rectangle {
                 }
 
                 Behavior on y {
+                    // A track click animates toward the initial target.
+                    // The first real drag takes over at the visible position.
                     enabled: !dragArea.pressed
+                        || (slider.indexPilot && !dragArea.hasMoved)
 
                     NumberAnimation {
                         duration: 110
@@ -349,6 +421,7 @@ Rectangle {
 
                 width: slider.width
                 enabled: slider.count > 0
+                    && (!slider.indexPilot || slider.enabledSlider)
                 hoverEnabled: true
                 acceptedButtons: Qt.LeftButton
                 cursorShape: slider.enabledSlider
@@ -356,6 +429,8 @@ Rectangle {
                              : Qt.ArrowCursor
 
                 property real dragOffset: 0
+                property real pressStartY: 0
+                property bool hasMoved: false
 
                 onPressed: function(mouse) {
                     const localY = mapToItem(slot, mouse.x, mouse.y).y;
@@ -372,6 +447,16 @@ Rectangle {
                         localY - dragOffset
                     );
 
+                    if (slider.indexPilot) {
+                        slider.forceActiveFocus();
+                        slider.previewCancelled = false;
+                        hasMoved = false;
+                        pressStartY = localY;
+                        slider.previewHandleY = thumb.y;
+                        slider.previewIndex = index;
+                        return;
+                    }
+
                     if (index >= 0 && index !== slider.currentIndex)
                         slider.indexRequested(index);
                 }
@@ -381,6 +466,28 @@ Rectangle {
                         return;
 
                     const localY = mapToItem(slot, mouse.x, mouse.y).y;
+
+                    if (slider.indexPilot) {
+                        if (slider.previewCancelled)
+                            return;
+                        if (!hasMoved && Math.abs(localY - pressStartY) > 2) {
+                            // Capture thumb's live animated position rather
+                            // than jumping from an old or future index.
+                            const visibleY = thumb.y;
+                            slider.previewHandleY = visibleY;
+                            dragOffset = localY - visibleY;
+                            hasMoved = true;
+                        }
+                        if (hasMoved) {
+                            slider.previewHandleY = Math.max(
+                                0, Math.min(slider.handleTravel(),
+                                    localY - dragOffset));
+                            slider.previewIndex =
+                                slider.indexFromHandleY(slider.previewHandleY);
+                        }
+                        return;
+                    }
+
                     const index = slider.indexFromHandleY(
                         localY - dragOffset
                     );
@@ -389,7 +496,35 @@ Rectangle {
                         slider.indexRequested(index);
                 }
 
+                onReleased: {
+                    if (!slider.indexPilot)
+                        return;
+                    const finalIndex = slider.previewCancelled
+                        ? -1 : slider.previewIndex;
+                    // The owner receives exactly one request on release.
+                    // It alone acknowledges the committed index.
+                    if (finalIndex >= 0 && finalIndex !== slider.currentIndex)
+                        slider.indexRequested(finalIndex);
+                    slider.previewIndex = -1;
+                    slider.previewHandleY = -1;
+                    slider.previewCancelled = false;
+                    hasMoved = false;
+                }
+
+                onCanceled: {
+                    if (slider.indexPilot) {
+                        slider.cancelIndexPreview();
+                        hasMoved = false;
+                    }
+                }
+
                 onWheel: function(wheel) {
+                    // Never leak a wheel event through the test overlay
+                    // while a preview drag is owning pointer interaction.
+                    if (slider.indexPilot && pressed) {
+                        wheel.accepted = true;
+                        return;
+                    }
                     if (!slider.enabledSlider)
                         return;
 
@@ -406,6 +541,37 @@ Rectangle {
                 }
             }
         }
+    }
+
+    // The current value readout remains committed; preview floats beside
+    // the handle only while a different index is being explored.
+    GohuText {
+        visible: slider.previewActive
+            && slider.previewIndex >= 0
+            && slider.previewIndex !== slider.currentIndex
+        x: slider.width + 8
+        y: Math.max(38, Math.min(slider.height - height - 26,
+            scaleArea.y + thumb.y + thumb.height / 2 - height / 2))
+        text: "PRE // " + slider.indexLabel(slider.previewIndex)
+        font.pixelSize: 9
+        color: Colors.yellow
+        layer.enabled: visible
+        layer.effect: MultiEffect {
+            shadowEnabled: true
+            shadowColor: Colors.orange
+            shadowOpacity: 0.64
+            shadowBlur: 0.64
+        }
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        z: 12
+        visible: slider.indexPilot && slider.activeFocus
+        color: "transparent"
+        radius: slider.radius
+        border.width: 2
+        border.color: Colors.cyan
     }
 
     GohuText {

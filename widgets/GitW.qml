@@ -55,6 +55,8 @@ PanelWindow {
     // Explicit visual preview of SelectorDial's operation indicator.
     // Never triggers workflow execution or changes factory configuration.
     property bool dialVariantsPreviewOpen: false
+    // F1 live-look pilot. Local mock values only; never routes to GitService.
+    property bool sliderIndexLabOpen: false
     property bool dialFxDemoRunning: false
     property int dialFxDemoStage: -1
     readonly property string dialFxDemoLabel: !dialFxDemoRunning ? "DIAL FX // RUN"
@@ -87,6 +89,8 @@ PanelWindow {
     onGitViewChanged: {
         if (gitView !== "history")
             blameOpen = false;
+        if (gitView !== "control")
+            sliderIndexLabOpen = false;
     }
     readonly property string gitBackLabel:
         gitNavigationStack.length > 0
@@ -983,6 +987,8 @@ PanelWindow {
     }
 
     onActivePageChanged: {
+        if (activePage !== "git")
+            sliderIndexLabOpen = false;
         if (activePage !== "github") {
             if (dialFxDemoRunning)
                 stopDialFxDemo();
@@ -2070,6 +2076,7 @@ PanelWindow {
 
     onMenuOpenChanged: {
         if (!root.menuOpen) {
+            root.sliderIndexLabOpen = false;
             root.dialVariantsPreviewOpen = false;
             if (root.dialFxDemoRunning)
                 root.stopDialFxDemo();
@@ -3780,6 +3787,57 @@ PanelWindow {
                 gitService.selectRemote(index);
                 root.targetMatchSource = "remote";
             }
+        }
+
+        // Git-only F1 pilot: compare with two untouched live selectors before
+        // any repository/branch service migration.
+        Rectangle {
+            id: sliderIndexLabToggle
+            visible: root.activePage === "git"
+                && root.gitView === "control"
+                && root.menuOpen
+            z: 260
+            width: 176
+            height: 24
+            anchors {
+                horizontalCenter: parent.horizontalCenter
+                top: parent.top
+                topMargin: 147
+            }
+            color: labToggleMouse.containsMouse ? Colors.dark : Colors.black
+            border.width: 1
+            border.color: root.sliderIndexLabOpen ? Colors.orange : Colors.cyan
+
+            GohuText {
+                anchors.centerIn: parent
+                text: root.sliderIndexLabOpen
+                    ? "INDEX LAB // CLOSE" : "INDEX LAB // TEST"
+                font.pixelSize: 10
+                color: root.sliderIndexLabOpen ? Colors.orange : Colors.cyan
+            }
+
+            MouseArea {
+                id: labToggleMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.sliderIndexLabOpen = !root.sliderIndexLabOpen
+            }
+        }
+
+        Loader {
+            id: sliderIndexLabLoader
+            anchors {
+                horizontalCenter: parent.horizontalCenter
+                top: sliderIndexLabToggle.bottom
+                topMargin: 8
+            }
+            z: 259
+            width: 490
+            height: 330
+            visible: sliderIndexLabToggle.visible && root.sliderIndexLabOpen
+            active: visible
+            source: "../tests/fixtures/SelectorSliderIndexPilot.qml"
         }
 
         Column {

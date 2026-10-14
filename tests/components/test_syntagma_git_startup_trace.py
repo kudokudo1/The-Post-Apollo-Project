@@ -54,4 +54,20 @@ assert '&& root.gitView === "control"\n                ? root.remoteActivityPoin
 assert 'root.menuOpen && root.remoteTargetMenuOpen\n                                        ? root.remoteTargetResults(7)' in git_panel
 assert 'root.menuOpen && root.remoteTargetMenuOpen\n                                                ? root.remoteTargetResults(7)' in git_panel
 
+# Reopening a fresh Git menu must not rebuild the entire branch model.
+# Explicit/manual requests and different repo selections remain unaffected.
+assert "readonly property int passiveGitOpenFreshnessMs: 8000" in git_panel
+assert "property double lastGitPublishedAtMs: 0" in git_panel
+assert "property string lastGitPublishedRepoPath:" in git_panel
+assert "const elapsedSincePublish = Date.now() - root.lastGitPublishedAtMs;" in git_panel
+assert "root.lastGitPublishedRepoPath === gitService.repoPath" in git_panel
+assert "if (!recentSnapshot && !gitService.refreshing)" in git_panel
+assert "if (gitService.available && !gitService.lastError)" in git_panel
+assert "root.lastGitPublishedAtMs = Date.now();" in git_panel
+assert "root.lastGitPublishedRepoPath = gitService.repoPath;" in git_panel
+assert 'if (action === "REFRESH")' in git_panel
+assert "gitService.discoverRepos();" in git_panel
+assert "function selectRepo(index)" in service
+assert "function refresh()" in service
+
 print("SYNTAGMA GIT STARTUP TRACE // SOURCE GUARDS PASS; RUNTIME UNTESTED")

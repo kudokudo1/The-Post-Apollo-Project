@@ -266,3 +266,40 @@ source evidence. After a safe restart with the two POST_APOLLO trace
 flags enabled, compare remote= and lag-probe duration with
 2504ms / 3213ms baseline. If still slow, profile additional model
 consumers rather than attempting a broad UI rewrite.
+
+
+## Fifth diagnostic gate // repeated Git dock opening (October 14, 2026)
+
+**Operator test clarification:** Git was opened and closed repeatedly,
+with perceptible lag approximately every third opening. This is not
+idle-only sampling. Live session 8lcg2b9lwmt shows numerous local Git
+refreshes with publication about 365–478ms, and recurring event-loop
+gaps, after the previous 2907ms slow publication was reduced.
+
+GitW.onMenuOpenChanged previously called gitService.refresh()
+unconditionally on every opening even if an identical repository's
+model had just been published. The refresh runs a subprocess and
+rebuilds 25 local, 294 remote, 48 topology rows, about 1.4 seconds of
+total wall time, often with about 400ms of synchronous model publish.
+
+**Scoped mitigation:** GitW records its own successful GitService
+refreshed() timestamp and associated repoPath. A *passive dock-open*
+skips redundant GitService.refresh() if a successful snapshot for that
+same path was published less than 8 seconds ago; if old, missing,
+errored, or for another repository, refresh behaves as before.
+If a refresh is already running, the menu does not add another.
+Explicit hotkey Refresh/discovery, repo selection, Git actions,
+and view-specific refreshes retain original behavior. No timer,
+GitService modification, visual/style/layout, or extra restart.
+
+**Trade-off:** a rapid passive reopening can display repository data
+up to 8 seconds old, unless the operator explicitly refreshes. The
+old model remains fully interactive. This boundary is for the passive
+opening path only; it is not a global network polling policy.
+
+**Verification:** source/CI, then operator runtime stress-test
+with the previous flags enabled. Track count of Git refresh finished
+events, callback duration and lag-probe gaps over rapid openings,
+then exercise explicit refresh and repository switching. Reducing
+refresh frequency doesn't prove the unrelated 2809ms startup gap is
+fixed. No runtime result yet.

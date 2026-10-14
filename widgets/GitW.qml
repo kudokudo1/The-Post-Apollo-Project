@@ -12,6 +12,11 @@ PanelWindow {
     id: root
 
     property bool menuOpen: false
+    // Rapid passive reopenings reuse the most recently published Git data.
+    // Explicit refresh / repository selection / Git actions are unaffected.
+    readonly property int passiveGitOpenFreshnessMs: 8000
+    property double lastGitPublishedAtMs: 0
+    property string lastGitPublishedRepoPath: ""
     property bool keyboardActive: true
     property bool keyboardLock: false
     property bool relationshipFocusModeActive: false
@@ -2072,7 +2077,18 @@ PanelWindow {
             return;
         }
 
-        gitService.refresh();
+        // Avoid rebuilding every remote branch on each rapid open/close.
+        // The menu remains live; only redundant passive scans are skipped.
+        const elapsedSincePublish = Date.now() - root.lastGitPublishedAtMs;
+        const recentSnapshot =
+            gitService.available
+            && !gitService.lastError
+            && root.lastGitPublishedRepoPath === gitService.repoPath
+            && root.lastGitPublishedAtMs > 0
+            && elapsedSincePublish >= 0
+            && elapsedSincePublish < root.passiveGitOpenFreshnessMs;
+        if (!recentSnapshot && !gitService.refreshing)
+            gitService.refresh();
 
         if (root.activePage === "git"
                 && root.gitView === "branches")
@@ -2451,6 +2467,11 @@ PanelWindow {
         }
 
         function onRefreshed() {
+            // Store the timestamp only after successful model publication.
+            if (gitService.available && !gitService.lastError) {
+                root.lastGitPublishedAtMs = Date.now();
+                root.lastGitPublishedRepoPath = gitService.repoPath;
+            }
             if (root.activePage === "git"
                     && root.gitView === "branches")
                 branchWorkspaceService.refresh();

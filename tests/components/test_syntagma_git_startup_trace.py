@@ -10,6 +10,7 @@ service = (root / "services/git/GitService.qml").read_text(encoding="utf-8")
 shell = (root / "shell.qml").read_text(encoding="utf-8")
 git = (root / "widgets/GitW.qml").read_text(encoding="utf-8")
 hospital = (root / "widgets/HospitalW.qml").read_text(encoding="utf-8")
+git_panel = (root / "widgets/GitW.qml").read_text(encoding="utf-8")
 
 assert 'Quickshell.env("POST_APOLLO_GIT_STARTUP_TRACE")' in service
 assert 'trim() === "1"' in service
@@ -45,5 +46,12 @@ assert "running: shellRoot.syntagmaLagProbeEnabled" in shell
 for widget in (git, hospital):
     assert "visible: true" in widget
     assert "visibilityLifecyclePilot" not in widget
+
+# Avoid rescan of a growing remote-branch model while Git UI is closed.
+# The original widgets still compute activity and suggestions when opened.
+assert 'root.menuOpen\n                && root.activePage === "git"' in git_panel
+assert '&& root.gitView === "control"\n                ? root.remoteActivityPoints()' in git_panel
+assert 'root.menuOpen && root.remoteTargetMenuOpen\n                                        ? root.remoteTargetResults(7)' in git_panel
+assert 'root.menuOpen && root.remoteTargetMenuOpen\n                                                ? root.remoteTargetResults(7)' in git_panel
 
 print("SYNTAGMA GIT STARTUP TRACE // SOURCE GUARDS PASS; RUNTIME UNTESTED")

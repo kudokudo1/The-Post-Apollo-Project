@@ -227,3 +227,42 @@ all selectors, scrollbars, stars and existing glow semantics.
 Do not preemptively delete rows, defer hidden menus, or change mapping
 behavior. Continue to treat Qt/JS measured wall-time as **inclusive**,
 not function-stack profiling or CPU-time.
+
+
+## Fourth diagnostic gate // remote-row publication fan-out (October 14, 2026)
+
+**Operator live opt-in restart succeeded.** The new 'git publish phases'
+trace from session '4f2mngiwmt' shows LIVE QUICKSHELL with
+metadata=97ms, clears=0ms, local=52ms, remote=2504ms, topology=254ms,
+total=2907ms for 25 local branches, 294 remote branches, and 48
+topology rows. A lag-probe line immediately afterward recorded a
+3213 ms missed 100 ms timer interval with Git, Hospital and
+notifications closed. Two smaller refreshes publishing 204 remote
+rows each took about 1 ms total. Do not generalize from row count alone.
+
+**Candidate fix // gate closed Git view's remote rescans:**
+The Git panel deliberately remains alive while closed because of
+Qt 6.11 shader-source teardown crashes. Before this change its
+remoteSlider.activityPoints binding called remoteActivityPoints()
+repeatedly as 294 remote rows arrived, and the hidden
+remote-dropdown Repeater.model and height bindings called
+remoteTargetResults(7) on the growing model even while the
+dropdown was closed. Both routines access the live ListModel and
+scan rows. Repeated notification-driven rescans are a likely
+contributor, but individual bindings were not directly profiled.
+
+The scoped fix in widgets/GitW.qml gates activity-point computation
+behind the menu-open and Git control-page conditions, and gates
+remote-suggestion model and height behind menu-open and
+dropdown-open. The inactive dropdown has an empty Repeater model
+and zero height. Opening the same controls restores the original
+functions, ranking and visual effects. The GitService model contents,
+selection and actions are unchanged. No glow, icon, color, star,
+scrollbar, or selector geometry rules were changed.
+
+**Verification gate:** CI/source checks only until live Fedora/Sway
+testing. Do not claim that the 3-second stall is eliminated based on
+source evidence. After a safe restart with the two POST_APOLLO trace
+flags enabled, compare remote= and lag-probe duration with
+2504ms / 3213ms baseline. If still slow, profile additional model
+consumers rather than attempting a broad UI rewrite.

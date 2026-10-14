@@ -45,6 +45,16 @@ Rectangle {
         previewHandleY = -1;
     }
 
+    // Owner data changing during an unfinished drag invalidates its preview.
+    onCurrentIndexChanged: {
+        if (indexPilot && dragArea && dragArea.pressed)
+            cancelIndexPreview();
+    }
+    onCountChanged: {
+        if (indexPilot && dragArea && dragArea.pressed)
+            cancelIndexPreview();
+    }
+
     Keys.onEscapePressed: function(event) {
         if (!indexPilot || !dragArea.pressed)
             return;
@@ -464,9 +474,9 @@ Rectangle {
                             // Capture thumb's live animated position rather
                             // than jumping from an old or future index.
                             const visibleY = thumb.y;
-                            hasMoved = true;
-                            dragOffset = localY - visibleY;
                             slider.previewHandleY = visibleY;
+                            dragOffset = localY - visibleY;
+                            hasMoved = true;
                         }
                         if (hasMoved) {
                             slider.previewHandleY = Math.max(

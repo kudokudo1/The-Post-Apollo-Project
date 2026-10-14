@@ -303,3 +303,51 @@ events, callback duration and lag-probe gaps over rapid openings,
 then exercise explicit refresh and repository switching. Reducing
 refresh frequency doesn't prove the unrelated 2809ms startup gap is
 fixed. No runtime result yet.
+
+
+## Sixth diagnostic gate // rapid Git stress test accepted (October 14, 2026)
+
+**Operator assessment after PR #260 (commit 28c516e):**
+Rapid Git clicking is substantially smoother than the original
+baseline and the intermediate closed-view binding fix. The operator
+reports the dock opens and closes repeatedly with only minimal,
+ordinary-feeling lag; the former roughly-every-third-open hitch
+is no longer prominent. This is a meaningful runtime usability
+confirmation for bounded passive-open refresh reuse.
+
+**Session 0xls3kmwmt, 11:48 EDT:**
+- Two LIVE QUICKSHELL Git refresh-completion records in the short
+  reporter. Two separately instantiated GitServices use that same
+  label, so this is not the count of unique user-triggered openings.
+- Three event-loop timer overruns: 2685ms at 11:48:10.449 when
+  Git/Hospital/Notifications were closed; 645ms at 11:48:12.053
+  with all three closed; 737ms at 11:48:21.720 with Git open.
+- The timer timestamp indicates when it finally ran, and menu flags
+  are the state at that instant, NOT causal attribution. The initial
+  2685ms bootstrap gap remains unassigned.
+
+**Source inspection:** shell.qml already logs the Git dock's
+synchronous toggle time when the lag probe is enabled.
+GitService logs successful refresh-completion and model publication
+phase costs. These receipts can be correlated from one saved log
+without modifying QML or restarting Quickshell.
+
+**New local-only log reporter:**
+Run python3 scripts/syntagma_git_lag_report.py --session 0xls3kmwmt
+from the Quickshell checkout. It reads the saved log.log from that
+session and reports nearby button-toggle, model publication,
+Git refresh-completion, and event-loop-gap records. It never
+signals, reloads, restarts, talks to Quickshell, changes environment
+flags, or modifies any files. A --log /path/to/log.log option
+accepts an exact saved log; with no option it uses the latest
+session containing a readable log.log. Correlations are temporal,
+not attribution of cause. Synthetic tests cover known log ordering,
+missing diagnostic logs, and unsafe session IDs.
+
+**Next decision boundary:** inspect the existing toggle and refresh
+timeline around the 737ms event. If a slow synchronous toggle is
+recorded, investigate open-panel bindings. If toggle is fast but a
+DONE model publication coincides with the gap, investigate remaining
+model subscribers or secondary view refreshes. If neither coincides,
+investigate other startup or compositor/Qt work. Do not disturb the
+now-responsive Git dock or restart solely for these measurements.

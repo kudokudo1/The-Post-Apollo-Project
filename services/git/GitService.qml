@@ -596,6 +596,13 @@ Scope {
 
         if (refreshing) {
             refreshPending = true;
+            if (syntagmaStartupTraceEnabled) {
+                console.warn(
+                    "SYNTAGMA_STARTUP_TRACE // git refresh queued // "
+                    + syntagmaTraceLabel()
+                    + " // reason=selectRepo during active refresh"
+                );
+            }
             return;
         }
 
@@ -1045,6 +1052,26 @@ Scope {
     }
 
     function refresh() {
+        // Diagnostic only: capture the caller even if a scan is active.
+        // In ordinary runs no error stack or logging is produced.
+        if (syntagmaStartupTraceEnabled) {
+            let caller = "unavailable";
+            try {
+                const frames = String((new Error()).stack || "").split("\n");
+                caller = frames.slice(1, 5).join(" > ")
+                    .replace(/\s+/g, " ").slice(0, 350) || "unavailable";
+            } catch (ignored) {
+                caller = "unavailable";
+            }
+            console.warn(
+                "SYNTAGMA_STARTUP_TRACE // git refresh requested // "
+                + syntagmaTraceLabel()
+                + " // busy=" + refreshing
+                + " pending=" + refreshPending
+                + " // caller=" + caller
+            );
+        }
+
         if (refreshing)
             return;
 
@@ -1273,6 +1300,7 @@ Scope {
             let refreshedSignalMs = 0;
 
             const staleRead = refreshRepoPath !== repoPath;
+            const pendingAtDone = trace ? refreshPending : false;
 
             refreshing = false;
             refreshWatchdog.stop();
@@ -1335,6 +1363,8 @@ Scope {
                     + " remoteRows=" + pendingRemoteBranches.length
                     + " topologyRows=" + pendingTopology.length
                     + " stale=" + staleRead
+                    + " pendingAtDone=" + pendingAtDone
+                    + " followupQueued=" + (pendingAtDone || staleRead)
                 );
                 if (publishParts) {
                     console.warn(

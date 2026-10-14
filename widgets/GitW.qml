@@ -987,6 +987,8 @@ PanelWindow {
     }
 
     onActivePageChanged: {
+        if (activePage !== "git")
+            sliderIndexLabOpen = false;
         if (activePage !== "github") {
             if (dialFxDemoRunning)
                 stopDialFxDemo();
@@ -2074,6 +2076,7 @@ PanelWindow {
 
     onMenuOpenChanged: {
         if (!root.menuOpen) {
+            root.sliderIndexLabOpen = false;
             root.dialVariantsPreviewOpen = false;
             if (root.dialFxDemoRunning)
                 root.stopDialFxDemo();

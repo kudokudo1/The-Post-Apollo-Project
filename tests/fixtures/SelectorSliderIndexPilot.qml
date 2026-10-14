@@ -20,6 +20,14 @@ Item {
         radius: 3
     }
 
+    // Block accidental clicks/wheel actions on the Git controls underneath.
+    MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.AllButtons
+        onPressed: function(mouse) { mouse.accepted = true; }
+        onWheel: function(wheel) { wheel.accepted = true; }
+    }
+
     GohuText {
         anchors {
             top: parent.top

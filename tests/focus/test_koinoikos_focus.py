@@ -183,7 +183,7 @@ assert 'interval: 120' in ownership
 # Exclusive pulse; stage 1 must not force it onto Weather, CPU or AppControl.
 import re
 
-registered = set(re.findall(r'\\{ id: "([^"]+)", item: broker\\.', broker))
+registered = set(re.findall(r'\{ id: "([^"]+)", item: broker\.', broker))
 owner_list = ownership.split('readonly property var widgetIds: [', 1)[1].split(']', 1)[0]
 supported = set(re.findall(r'"([^"]+)"', owner_list))
 assert registered == supported, (registered, supported)

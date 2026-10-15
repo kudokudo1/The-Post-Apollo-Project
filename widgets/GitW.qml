@@ -60,6 +60,9 @@ PanelWindow {
     // Opt-in *real* REMOTE INDEX pilot; defaults off on every menu session.
     // This changes selected remote context only, never performs push/pull.
     property bool remoteIndexPilotEnabled: false
+    // F1 INDEX // Real REPO pilot. Default OFF because repo selection also
+    // switches service context and initiates a refresh.
+    property bool repoIndexPilotEnabled: false
     property bool dialFxDemoRunning: false
     property int dialFxDemoStage: -1
     readonly property string dialFxDemoLabel: !dialFxDemoRunning ? "DIAL FX // RUN"
@@ -95,6 +98,7 @@ PanelWindow {
         if (gitView !== "control") {
             sliderIndexLabOpen = false;
             remoteIndexPilotEnabled = false;
+            repoIndexPilotEnabled = false;
         }
     }
     readonly property string gitBackLabel:
@@ -995,6 +999,7 @@ PanelWindow {
         if (activePage !== "git") {
             sliderIndexLabOpen = false;
             remoteIndexPilotEnabled = false;
+            repoIndexPilotEnabled = false;
         }
         if (activePage !== "github") {
             if (dialFxDemoRunning)
@@ -2085,6 +2090,7 @@ PanelWindow {
         if (!root.menuOpen) {
             root.sliderIndexLabOpen = false;
             root.remoteIndexPilotEnabled = false;
+            root.repoIndexPilotEnabled = false;
             root.dialVariantsPreviewOpen = false;
             if (root.dialFxDemoRunning)
                 root.stopDialFxDemo();
@@ -3751,6 +3757,9 @@ PanelWindow {
 
             count: gitService.repoCount
             currentIndex: gitService.repoIndexOfPath(gitService.repoPath)
+            // Opt-in only; preserve original immediate-switching REPO default.
+            indexInteraction: root.repoIndexPilotEnabled
+                ? "preview-release" : "legacy"
             accentColor: Colors.magenta
             handleGlowColor: Colors.orange
             sideLabel: "REPO"
@@ -3836,8 +3845,45 @@ PanelWindow {
             }
         }
 
-        // Optional actual-service trial, distinct from the no-side-effect lab.
-        // The same existing onIndexRequested handler is used after release.
+        // Real REPO trial. Unlike REMOTE selection, this invokes GitService
+        // repo switching + refresh. Keep a separate default-OFF operator switch.
+        Rectangle {
+            id: repoIndexPilotToggle
+            visible: sliderIndexLabToggle.visible
+            z: 260
+            width: 194
+            height: 24
+            anchors {
+                horizontalCenter: parent.horizontalCenter
+                horizontalCenterOffset: -212
+                top: sliderIndexLabToggle.top
+            }
+            color: repoPilotMouse.containsMouse ? Colors.dark : Colors.black
+            border.width: 1
+            border.color: root.repoIndexPilotEnabled
+                ? Colors.orange : Colors.cyan
+
+            GohuText {
+                anchors.centerIn: parent
+                text: root.repoIndexPilotEnabled
+                    ? "LIVE REPO // ON" : "LIVE REPO // OFF"
+                font.pixelSize: 10
+                color: root.repoIndexPilotEnabled
+                    ? Colors.orange : Colors.cyan
+            }
+
+            MouseArea {
+                id: repoPilotMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.repoIndexPilotEnabled =
+                    !root.repoIndexPilotEnabled
+            }
+        }
+
+        // Optional actual-service REMOTE trial, distinct from mock INDEX LAB.
+        // Its existing selection handler is unchanged.
         Rectangle {
             id: remoteIndexPilotToggle
             visible: sliderIndexLabToggle.visible

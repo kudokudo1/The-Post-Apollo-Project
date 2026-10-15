@@ -41,6 +41,9 @@ PanelWindow {
     property bool receptionistTyping: false
     property string pendingRoundsRoomTeam: ""
     property int pendingRoundsFloorIndex: -1
+    // Opt-in F1 INDEX floor pilot, OFF on every menu session. Real floor
+    // switching has downstream room/audit/bed context consequences.
+    property bool floorIndexPilotEnabled: false
     property string pendingReceptionTeam: ""
     property string pendingPhoneAttachTeam: ""
     property var pendingReceptionRoundsSelection: null
@@ -1885,6 +1888,10 @@ PanelWindow {
     }
 
     onOperationsSurfaceChanged: {
+        // Floor slider exists only on the Surgery surface. Returning to
+        // another Hospital surface always restores the legacy default.
+        if (root.operationsOpen)
+            root.floorIndexPilotEnabled = false;
         if (root.operationsSurface !== "reception"
                 && speechInputService.busy)
             speechInputService.cancel();
@@ -1892,6 +1899,7 @@ PanelWindow {
 
     onMenuOpenChanged: {
         if (!root.menuOpen) {
+            root.floorIndexPilotEnabled = false;
             if (speechInputService.busy)
                 speechInputService.cancel();
 
@@ -2869,6 +2877,10 @@ PanelWindow {
 
             count: floorService.floorCount
             currentIndex: floorService.selectedFloorIndex
+            // Surgery FLOOR only; changes to current repository/bed/room
+            // context still flow through the existing selectFloor guard.
+            indexInteraction: root.floorIndexPilotEnabled
+                ? "preview-release" : "legacy"
             accentColor: Colors.cyan
             handleGlowColor: Colors.magenta
             sideLabel: "FLOOR"
@@ -3652,8 +3664,53 @@ PanelWindow {
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: 3
 
-                        SectionLabel {
-                            text: "FLOOR // REPOSITORY"
+                        Row {
+                            width: parent.width
+                            height: 20
+                            spacing: 12
+
+                            SectionLabel {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "FLOOR // REPOSITORY"
+                            }
+
+                            // Visible only with FLOOR // REPOSITORY; it does
+                            // not cover Hospital tabs or operating controls.
+                            Rectangle {
+                                id: floorIndexPilotToggle
+                                width: 172
+                                height: 20
+                                radius: 2
+                                anchors.verticalCenter: parent.verticalCenter
+                                color: floorPilotMouse.containsMouse
+                                    ? Colors.dark : Colors.black
+                                border.width: 1
+                                border.color: root.floorIndexPilotEnabled
+                                    ? Colors.orange : Colors.cyan
+                                opacity: root.floorSwitchEnabled
+                                    || root.floorIndexPilotEnabled ? 1 : 0.42
+
+                                GohuText {
+                                    anchors.centerIn: parent
+                                    text: root.floorIndexPilotEnabled
+                                        ? "LIVE FLOOR // ON" : "LIVE FLOOR // OFF"
+                                    font.pixelSize: 9
+                                    color: root.floorIndexPilotEnabled
+                                        ? Colors.orange : Colors.cyan
+                                }
+
+                                MouseArea {
+                                    id: floorPilotMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    enabled: root.floorSwitchEnabled
+                                        || root.floorIndexPilotEnabled
+                                    cursorShape: enabled
+                                        ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                    onClicked: root.floorIndexPilotEnabled =
+                                        !root.floorIndexPilotEnabled
+                                }
+                            }
                         }
 
                         GohuText {

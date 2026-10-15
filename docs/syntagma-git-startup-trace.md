@@ -388,3 +388,43 @@ session when convenient. Open Git once for 15–25 seconds without
 manually refreshing; record requested and DONE phases lines.
 If request sources repeat or followupQueued remains true, identify
 that caller/feedback loop first. Do not guess or suppress refreshes.
+
+
+## Ninth gate // passive Local ↔ Remote mode-switch refresh reuse (October 15, 2026)
+
+**Operator's ten-toggle acceptance:** Git window open/close remains
+consistent and smoother than AppControl, but rapid keyboard Tab switching
+between Git Local and GitHub Remote still hitches approximately every
+third switch. Source identified unconditional GitService.refresh() in
+both showGitPage() and showGithubPage(), plus an unconditional PX-backed
+GitHubService.refresh() in showGithubPage() and when reopening the
+dock on its GitHub page. Those requests are unnecessary when the same
+repository has a recent successful snapshot.
+
+**Scoped navigation fix:** GitW alone factors the existing eight-second
+Git snapshot freshness check into gitSnapshotFresh()/
+ensureGitSnapshot(), reused on dock-open and page transitions. A
+separate 15-second GitHub workflows/runs freshness check reuses completed
+data if both available and error-free for the same repoSlug. It tracks
+GitHub refresh starts/ends with the service's refreshing property,
+including background polling and explicit refreshes; an in-flight
+different-repo result cannot validate a new slug. A new/failed/stale
+repository and the manual REFRESH action remain refreshable.
+
+The existing 15-second timer while the GitHub page is open remains
+unchanged. Selection, operations, explicit Git and GitHub REFRESH,
+History/Repository/Branches/Changes subview refreshes, action callbacks
+and all visual/button/focus/glow/index interactions stay as they were.
+The inactive/invalid-origin GitHub page avoids repeatedly probing an
+already known invalid origin on every Tab, but retains the first
+"ORIGIN IS NOT A GITHUB REPOSITORY" result. Nothing is throttled globally.
+
+This change is **not** the draft topology reconciliation PR #267;
+no GitService, BranchMap, SelectorSlider or GitHubService file is edited.
+
+**Verification:** source/CI gates first, then operator should pull a
+clean main and restart once at a convenient time. Spam-switch Local/
+Remote (keyboard and page tabs), test a manual REFRESH, a different
+repository, workflow status and GitHub background timer (15s). Aim for
+no redundant immediate full refreshes during rapid switching. This
+does not guarantee removal of all main-thread rendering hitches.

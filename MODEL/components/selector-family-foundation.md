@@ -185,14 +185,22 @@ No slice automatically grants merge authorization. Check shared-file ownership, 
   INDEX LAB / LIVE REPO / LIVE REMOTE test buttons were removed (PR #274)
   and both Git selectors use immediate navigation again. Hospital's
   unobtrusive LIVE FLOOR test toggle was deliberately kept.
-- **F2 // VALUE:** opt-in vertical numeric mode under development; initial
-  slice is a bounded live owner-request signal, percentage and signed
-  numeric ranges, precision formatting, filled track, and wheel/keyboard
-  stepping. Standalone mock fixture; **Quickshell visual/runtime approval
-  is still required**. Existing Git/Hospital instances do not migrate.
+- **F2 // VALUE:** initial opt-in vertical numeric slider and mock
+  percentage/temperature fixtures implemented (PR #278). Standalone
+  Quickshell launch fixed in #279. The operator confirmed the demos work
+  and look right. This is a first-slice runtime PASS, not comprehensive
+  edge-case/device-integration certification.
+- **F3 // STEP:** initial opt-in numeric detent profile, standalone
+  mock, and source contracts implemented (PR #282). Operator runtime
+  PASS: smooth, subtle and individually perceptible detents, without
+  abrupt snapping. Preserve its accepted movement character.
+- **F4 // Dial parity:** read-only source audit documented in
+  `MODEL/components/selector-dial-slider-parity-20261015.md`. Common
+  selection/owner semantics align; Dial inertia, curved geometry and
+  settle-commit timing remain deliberately separate. No Dial code
+  refactor proposed.
 - **IndexRail:** read-only findings are in
   `MODEL/components/index-rail-audit-20261015.md`. No code migration.
-- **F3 // STEP, F4 // Dial parity:** pending separate slices.
 - **F5 // RANGE:** deferred. Decision 036 is still paused; do not invent
   interval-size constraints or deploy dual-handle behavior without a use case.
 

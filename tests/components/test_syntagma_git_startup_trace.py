@@ -71,6 +71,25 @@ assert "if (!recentSnapshot && !gitService.refreshing)" in git_panel
 assert "if (gitService.available && !gitService.lastError)" in git_panel
 assert "root.lastGitPublishedAtMs = Date.now();" in git_panel
 assert "root.lastGitPublishedRepoPath = gitService.repoPath;" in git_panel
+
+# Passive Git/GitHub mode changes must reuse successful fresh snapshots.
+# Explicit REFRESH and Git actions must still call service refresh directly.
+assert "function gitSnapshotFresh()" in git_panel
+assert "function ensureGitSnapshot()" in git_panel
+assert "function githubSnapshotFresh()" in git_panel
+assert "function ensureGithubSnapshot()" in git_panel
+assert "readonly property int passiveGithubPageFreshnessMs: 15000" in git_panel
+assert 'root.lastGithubPublishedRepoSlug === githubService.repoSlug' in git_panel
+assert 'root.githubRefreshStartedSlug === githubService.repoSlug' in git_panel
+assert 'function onRefreshingChanged()' in git_panel
+assert "root.lastGithubPublishedAtMs = Date.now();" in git_panel
+assert 'root.ensureGitSnapshot();' in git_panel
+assert 'root.ensureGithubSnapshot();' in git_panel
+assert 'if (githubService.refreshing || root.githubSnapshotFresh())' in git_panel
+assert 'root.activePage = "git";\n        root.ensureGitSnapshot();' in git_panel
+assert 'root.activePage = "github";\n        root.ensureGitSnapshot();\n        root.ensureGithubSnapshot();' in git_panel
+assert 'if (action === "REFRESH")' in git_panel
+assert "onTriggered: githubService.refresh()" in git_panel
 assert 'if (action === "REFRESH")' in git_panel
 assert "gitService.discoverRepos();" in git_panel
 assert "function selectRepo(index)" in service

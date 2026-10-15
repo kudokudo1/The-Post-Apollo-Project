@@ -19,6 +19,7 @@ EVIDENCE records observed results, screenshots, diagnostics, certification repor
 - surgery certification and diagnostics
 - visual evidence when captured
 - runtime verification results
+- [Quickshell main-thread freeze observations](./syntagma-main-thread-freeze-evidence-20261013.md) — measured runtime evidence
 
 ## 🧭 MAP // WHERE TO GO NEXT
 

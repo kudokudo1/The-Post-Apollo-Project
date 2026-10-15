@@ -739,29 +739,13 @@ PanelWindow {
         root.setAppFlag(appKey, flagName, current[flagName] !== true);
     }
 
-    // ===== CLEAN NOTIFICATION CLASSIFICATION ====================
+    // ===== CLASSIFICATION =========================================
     //
-    // filterGroup is mutually exclusive:
-    //
-    // warning
-    // apollo
-    // social
-    // system
-    // apps
-    //
-    // The visual tone is derived from that group:
-    //
-    // warning -> red
-    // apollo  -> orange
-    // social  -> Omnitrix green
-    // system  -> cyan
-    // apps    -> cyan
-    //
-    // Favorite is NOT another base category.
-    // Favorite is a magenta visual override.
+    // Source family and severity are different dimensions:
+    // Apollo / Social / System / Apps define the sender family.
+    // Warning is an overlapping severity view (not an origin group).
+    // A category like "important" or "reminder" is NOT an Apollo source.
 
-    // Warning is a severity facet, not an exclusive source family.
-    // A critical Hospital event remains an Apollo event AND appears in Warning.
     function isWarning(category, severity) {
         const c = String(category || "").trim().toLowerCase();
         const s = String(severity || "").trim().toLowerCase();
@@ -769,35 +753,68 @@ PanelWindow {
             || c === "warning" || c === "critical" || c === "emergency";
     }
 
+    // Sender name and desktop entry are best-effort identities supplied by
+    // the originating app. Do not look at private titles/message bodies to
+    // guess classification. Browser-only notifications with no site metadata
+    // correctly remain Apps.
+    function isCommunicationSource(source, sourceId) {
+        const sourceText = String(source || "").trim().toLowerCase();
+        const sourceIdText = String(sourceId || "").trim().toLowerCase();
+        const tokens = (sourceText + " " + sourceIdText).split(/[^a-z0-9]+/);
+        const known = [
+            "discord", "vesktop", "equibop", "session", "signal",
+            "telegram", "telegramdesktop", "element", "matrix",
+            "slack", "teams", "whatsapp", "thunderbird", "gmail",
+            "outlook", "protonmail", "skype", "zoom", "mattermost",
+            "mastodon", "bluesky", "youtube", "twitch", "reddit"
+        ];
+
+        if (sourceText === "proton mail" || sourceText === "proton-mail")
+            return true;
+
+        for (let i = 0; i < known.length; i++) {
+            if (tokens.indexOf(known[i]) !== -1)
+                return true;
+        }
+
+        return false;
+    }
+
     function classificationFor(source, sourceId, category, severity) {
         const sourceText = String(source || "").trim().toLowerCase();
         const sourceIdText = String(sourceId || "").trim().toLowerCase();
         const categoryText = String(category || "").trim().toLowerCase();
-        const severityText = String(severity || "").trim().toLowerCase();
+        const categoryFamily = categoryText.split(".")[0];
 
-        // Preserve internal widget origin even when its severity is warning.
+        // External desktop notifications often have no category hint.
+        // Named communication senders can still be recognized; other
+        // browser/app events remain in Apps unless their hint says otherwise.
         let group = "apps";
         if (sourceText.indexOf("apollo") !== -1
                 || sourceIdText.indexOf("apollo") !== -1
                 || sourceText === "hospital" || sourceText === "git"
                 || sourceText === "cpu++" || sourceText === "weather station"
                 || sourceText === "appcontrol"
-                || categoryText === "apollo" || categoryText === "internal"
-                || categoryText === "reminder" || categoryText === "important"
-                || severityText === "important" || severityText === "reminder") {
+                || categoryText === "apollo" || categoryText === "internal") {
             group = "apollo";
-        } else if (categoryText === "social" || categoryText === "friend"
+        } else if (root.isCommunicationSource(source, sourceId)
+                || categoryFamily === "email" || categoryFamily === "im"
+                || categoryFamily === "call" || categoryFamily === "presence"
+                || categoryText === "social" || categoryText === "friend"
                 || categoryText === "friends" || categoryText === "message"
                 || categoryText === "communication" || categoryText === "audio"
                 || categoryText === "voice" || categoryText === "media"
                 || categoryText === "fullscreen") {
             group = "social";
-        } else if (categoryText === "system" || categoryText === "technical"
-                || categoryText === "network" || categoryText === "hardware"
-                || categoryText === "resource" || categoryText === "telemetry") {
+        } else if (categoryFamily === "device" || categoryFamily === "network"
+                || categoryText === "system" || categoryText === "technical"
+                || categoryText === "hardware" || categoryText === "resource"
+                || categoryText === "telemetry") {
             group = "system";
         }
 
+        // A critical message from Signal stays Social, but also appears in
+        // the Warning view. Presentation color can reflect the urgency.
         const tone = root.isWarning(category, severity) ? "warning"
                    : group === "apollo" ? "apollo"
                    : group === "social" ? "social" : "system";

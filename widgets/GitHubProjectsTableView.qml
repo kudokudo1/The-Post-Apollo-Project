@@ -173,6 +173,7 @@ Item {
         }
 
         SectionFrame {
+            id: tableFrame
             width: parent.width
             height: parent.height - 38
             fillColor: Colors.black
@@ -183,7 +184,11 @@ Item {
             Flickable {
                 id: tableScroll
 
+                // The vertical star must have its own physical lane;
+                // reducing the viewport also keeps horizontal scroll controls
+                // away from the bottom-right corner.
                 anchors.fill: parent
+                anchors.rightMargin: 20
 
                 clip: true
                 contentWidth: Math.max(width, root.totalWidth)
@@ -440,7 +445,12 @@ Item {
                     }
                 }
             }
-            NeonScrollBar { flickable: tableScroll; handleStyle: "star" }
+            NeonScrollBar {
+                flickable: tableScroll
+                handleStyle: "star"
+                x: tableScroll.x + tableScroll.width
+                   + Math.round((20 + tableFrame.rightInset - width) / 2)
+            }
             NeonScrollBar { flickable: tableScroll; handleStyle: "star"; orientation: Qt.Horizontal }
         }
     }

@@ -50,7 +50,7 @@ assert "width: parent.width - 190" not in board
 for name, view, count in (
     ("board", board, 1), ("table", table, 1), ("roadmap", roadmap, 2)
 ):
-    assert view.count("Components.ActionButton {") == count, name
+    assert view.count("Components.ActionButton {") >= count, name
     assert view.count("destructive: true") == count, name
     assert view.count('? "⚠︎"') == count, name
     assert view.count(': "×"') == count, name

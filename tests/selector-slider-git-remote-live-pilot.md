@@ -1,5 +1,7 @@
 ✦︎✦︎✦︎ Meta Apollo Logos //
 
+> **ARCHIVED PILOT INSTRUCTIONS // 2026-10-15:** The Git INDEX LAB, LIVE REMOTE and LIVE REPO controls have been retired from the live Git UI by operator request. Git REPO/REMOTE continue to update the real repository and branch information immediately during dragging. This file documents the completed experiment; the reusable `SelectorSlider` preview-release mode and standalone lab fixture remain available for future work.
+
 # F1 INDEX // REAL GIT REMOTE PILOT
 
 > STATE // staged candidate; runtime verification required before wider rollout

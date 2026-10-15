@@ -27,6 +27,8 @@ Scope {
     // Keep the target identity until the CLI operation has actually exited.
     property string pendingRemovedItemId: ""
     property int pendingRemovedProjectNumber: 0
+    // Bind each asynchronous detail response to the project it queried.
+    property int activeDetailProjectNumber: 0
 
     property bool stdoutSeen: false
     property bool stderrSeen: false
@@ -623,7 +625,7 @@ Scope {
             return false;
         }
 
-        return startOperation(
+        const started = startOperation(
             "detail",
             [
                 "bash",
@@ -642,6 +644,11 @@ Scope {
             ],
             "READING OPERATING MAP"
         );
+
+        if (started)
+            activeDetailProjectNumber = number;
+
+        return started;
     }
 
     function createProject(title) {
@@ -1101,6 +1108,20 @@ Scope {
         busy = false;
         watchdog.stop();
 
+        // A project can change while a previous detail request is running.
+        // Never publish project A's cards underneath project B's heading.
+        if (finishedOperation === "detail") {
+            const requestedProject = activeDetailProjectNumber;
+            activeDetailProjectNumber = 0;
+            if (requestedProject !== selectedNumber()) {
+                stateText = "PROJECT CHANGED // REFRESHING SELECTED MAP";
+                Qt.callLater(function() {
+                    root.refreshSelectedProject();
+                });
+                return;
+            }
+        }
+
         if (exitCode !== 0) {
             if (finishedOperation === "remove-item") {
                 pendingRemovedItemId = "";
@@ -1113,6 +1134,16 @@ Scope {
                 + lastError
                 + (hint ? "\n" + hint : "");
             mutationFinished(false, finishedOperation);
+
+            // If an item was removed elsewhere, stale list data must be
+            // reconciled from GitHub, not silently hidden as a "success".
+            if (finishedOperation === "remove-item"
+                    && lastError.toLowerCase().indexOf(
+                        "does not exist in the project") >= 0) {
+                Qt.callLater(function() {
+                    root.refreshSelectedProject();
+                });
+            }
             return;
         }
 
@@ -1222,6 +1253,15 @@ Scope {
             if (finishedOperation === "remove-item") {
                 root.pendingRemovedItemId = "";
                 root.pendingRemovedProjectNumber = 0;
+            }
+            if (finishedOperation === "detail") {
+                const previousProject = root.activeDetailProjectNumber;
+                root.activeDetailProjectNumber = 0;
+                if (previousProject !== root.selectedNumber()) {
+                    Qt.callLater(function() {
+                        root.refreshSelectedProject();
+                    });
+                }
             }
             root.lastError = "GITHUB PROJECT OPERATION TIMEOUT";
             root.stateText = "ERROR // " + root.lastError;

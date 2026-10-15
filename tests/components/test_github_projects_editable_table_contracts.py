@@ -66,7 +66,7 @@ assert 'if (clearValue)' in command
 
 # UI intent and Syntagma default input grammar.
 for needle in (
-    "onDismissRequested", "onVisibleChanged",
+    "signal dismissRequested()", "onVisibleChanged",
     'text: "EDIT // " + root.fieldLabel',
     "font.family: \"GohuFont 11 Nerd Font Mono\"",
     "color: Colors.magenta",

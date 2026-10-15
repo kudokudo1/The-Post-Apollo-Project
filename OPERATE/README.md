@@ -19,6 +19,7 @@ OPERATE explains how to launch, configure, maintain, troubleshoot, and recover t
 - desktop startup and Quickshell operation
 - Sway / shell integration guidance
 - operator troubleshooting
+- [Optional UI event-loop lag probe](./syntagma-ui-lag-probe.md) — how to run and disable the diagnostic; no performance fix implied
 
 ## 🧭 MAP // WHERE TO GO NEXT
 

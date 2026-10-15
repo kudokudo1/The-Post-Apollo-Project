@@ -20,6 +20,7 @@ EVIDENCE records observed results, screenshots, diagnostics, certification repor
 - visual evidence when captured
 - runtime verification results
 - [Quickshell main-thread freeze observations](./syntagma-main-thread-freeze-evidence-20261013.md) — measured runtime evidence
+- [GitService startup and callback diagnostic record](./syntagma-git-startup-trace.md) — measured and investigative evidence, not a certified performance fix
 
 ## 🧭 MAP // WHERE TO GO NEXT
 

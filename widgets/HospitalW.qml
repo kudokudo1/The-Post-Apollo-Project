@@ -921,6 +921,20 @@ PanelWindow {
         if (index < 0)
             return;
 
+        // This method is called directly by the existing Tab shortcuts.
+        // Observe the actual navigation path; never replace their bindings.
+        const tracing = root.focusKeyTraceEnabled;
+        const started = tracing ? Date.now() : 0;
+        if (tracing)
+            console.warn("FOCUS_KEY_TRACE // hospital // tab-shortcut-activated"
+                         + " tsMs=" + started
+                         + " direction=" + direction
+                         + " from=" + current
+                         + " qtWindowActive=" + keyboardFocusAnchor.Window.active
+                         + " anchorActive=" + keyboardFocusAnchor.activeFocus
+                         + " keyboardActive=" + root.keyboardActive
+                         + " keyboardLock=" + root.keyboardLock);
+
         const count = root.mainModeOrder.length;
         const step = Number(direction || 0) < 0 ? -1 : 1;
         const target = root.mainModeOrder[(index + step + count) % count];
@@ -941,25 +955,6 @@ PanelWindow {
             root.openRounds();
         else if (target === "staff")
             root.openStaff();
-    }
-
-    // This logs actual Qt Shortcut activation; the existing Keys handlers
-    // on keyboardFocusAnchor need not see shortcuts consumed by Qt.
-    function traceMainModeShortcut(direction) {
-        const tracing = root.focusKeyTraceEnabled;
-        const started = tracing ? Date.now() : 0;
-        const before = root.operationsSurface === ""
-                       ? "surgery" : root.operationsSurface;
-        if (tracing)
-            console.warn("FOCUS_KEY_TRACE // hospital // tab-shortcut-activated"
-                         + " tsMs=" + started
-                         + " direction=" + direction
-                         + " from=" + before
-                         + " qtWindowActive=" + keyboardFocusAnchor.Window.active
-                         + " anchorActive=" + keyboardFocusAnchor.activeFocus
-                         + " keyboardActive=" + root.keyboardActive
-                         + " keyboardLock=" + root.keyboardLock);
-        root.cycleHospitalMainMode(direction);
         if (tracing)
             console.warn("FOCUS_KEY_TRACE // hospital // tab-shortcut-completed"
                          + " tsMs=" + Date.now()
@@ -972,14 +967,14 @@ PanelWindow {
         sequence: "Tab"
         context: Qt.ApplicationShortcut
         enabled: root.mainModeKeysAvailable
-        onActivated: root.traceMainModeShortcut(1)
+        onActivated: root.cycleHospitalMainMode(1)
     }
 
     Shortcut {
         sequence: "Shift+Tab"
         context: Qt.ApplicationShortcut
         enabled: root.mainModeKeysAvailable
-        onActivated: root.traceMainModeShortcut(-1)
+        onActivated: root.cycleHospitalMainMode(-1)
     }
 
     Shortcut {

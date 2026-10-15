@@ -23,6 +23,11 @@ Scope {
     property var fields: []
     property var items: []
 
+    // An accepted remote deletion should also leave the visible model now.
+    // Keep the target identity until the CLI operation has actually exited.
+    property string pendingRemovedItemId: ""
+    property int pendingRemovedProjectNumber: 0
+
     property bool stdoutSeen: false
     property bool stderrSeen: false
     property bool exitSeen: false
@@ -935,7 +940,7 @@ Scope {
             return false;
         }
 
-        return startOperation(
+        const started = startOperation(
             "remove-item",
             [
                 "bash",
@@ -948,6 +953,13 @@ Scope {
             ],
             "REMOVING WORK ITEM"
         );
+
+        if (started) {
+            pendingRemovedItemId = id;
+            pendingRemovedProjectNumber = number;
+        }
+
+        return started;
     }
 
     function linkRepository(repoSlug) {
@@ -1090,6 +1102,10 @@ Scope {
         watchdog.stop();
 
         if (exitCode !== 0) {
+            if (finishedOperation === "remove-item") {
+                pendingRemovedItemId = "";
+                pendingRemovedProjectNumber = 0;
+            }
             lastError = error || output || "GITHUB PROJECT OPERATION FAILED";
             const hint = authHint(lastError);
             stateText =
@@ -1137,7 +1153,25 @@ Scope {
             return;
         }
 
-        stateText = "COMPLETE // " + finishedOperation.toUpperCase();
+        if (finishedOperation === "remove-item") {
+            const removedId = pendingRemovedItemId;
+            const removedProject = pendingRemovedProjectNumber;
+            pendingRemovedItemId = "";
+            pendingRemovedProjectNumber = 0;
+
+            // The CLI reported success. Do not leave a stale card visible
+            // while the authoritative GitHub project refresh is in flight.
+            // Never hide a card when the deletion failed or a different
+            // project is now selected.
+            if (removedId && selectedNumber() === removedProject) {
+                items = items.filter(function(item) {
+                    return root.itemId(item) !== removedId;
+                });
+            }
+            stateText = "REMOVE ACCEPTED // REFRESHING PROJECT";
+        } else {
+            stateText = "COMPLETE // " + finishedOperation.toUpperCase();
+        }
         mutationFinished(true, finishedOperation);
 
         if (finishedOperation === "create-project") {
@@ -1185,6 +1219,10 @@ Scope {
         onTriggered: {
             const finishedOperation = root.operation;
             root.busy = false;
+            if (finishedOperation === "remove-item") {
+                root.pendingRemovedItemId = "";
+                root.pendingRemovedProjectNumber = 0;
+            }
             root.lastError = "GITHUB PROJECT OPERATION TIMEOUT";
             root.stateText = "ERROR // " + root.lastError;
             root.mutationFinished(false, finishedOperation);

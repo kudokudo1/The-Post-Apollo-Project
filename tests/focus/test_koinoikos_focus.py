@@ -394,7 +394,7 @@ assert (ROOT / "docs/git-hospital-cross-menu-focus-retry-20261015.md").is_file()
 # cycle method (the method is only invoked by the Main Mode shortcuts),
 # while preserving source contracts requiring the original onActivated.
 for rel, prefix, context, enabled, cycle_name in (
-    ("widgets/GitW.qml", "git", "Qt.WindowShortcut",
+    ("widgets/GitW.qml", "git", "Qt.ApplicationShortcut",
      "root.standardModeKeysAvailable", "cycleMainMode"),
     ("widgets/HospitalW.qml", "hospital", "Qt.ApplicationShortcut",
      "root.mainModeKeysAvailable", "cycleHospitalMainMode")

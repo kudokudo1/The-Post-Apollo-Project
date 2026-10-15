@@ -20,8 +20,8 @@ dock toggle occurs. No warning alone cannot rule out smaller freezes.
 
 Reuses the same existing, default-disabled `focusKeyTrace` IPC control.
 
-- Each **Git and Hospital Tab/Shift+Tab `Shortcut.onActivated`** now
-  emits `tab-shortcut-activated` with millisecond timestamp, direction,
+- Each **Git and Hospital existing Tab/Shift+Tab Main Mode cycle method**
+  (called directly by its existing `Shortcut.onActivated`) now emits `tab-shortcut-activated` with millisecond timestamp, direction,
   previous Main Mode, Qt anchor/window activity and bounded focus-lock
   state; calls the **same existing navigation method once**; then emits
   `tab-shortcut-completed` with synchronous elapsed milliseconds and
@@ -68,7 +68,8 @@ Stop after testing:
 qs ipc call focusKeyTrace stop
 ```
 
-**Safety:** No changes to keyboard ownership decisions, the 48ms retry,
+**Safety:** The original `Shortcut.onActivated` handlers stay exactly intact.
+No changes to keyboard ownership decisions, the 48ms retry,
 the 120ms boost, native SwayFX bindings, panel lifecycle, Shortcut contexts,
 Shortcut enable predicates, or Main Mode navigation behavior. Clicking
 Brave must still restore native typing. Source/CI success does not

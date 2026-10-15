@@ -78,6 +78,26 @@ PanelWindow {
         );
     }
 
+    // Opt-in, in-process diagnostic only. Disabled by default. Only
+    // navigation key codes and Qt focus-state metadata are logged, never text.
+    property bool focusKeyTraceEnabled: false
+
+    IpcHandler {
+        target: "focusKeyTrace"
+
+        function start(): void {
+            shellRoot.focusKeyTraceEnabled = true;
+        }
+
+        function stop(): void {
+            shellRoot.focusKeyTraceEnabled = false;
+        }
+
+        function status(): bool {
+            return shellRoot.focusKeyTraceEnabled;
+        }
+    }
+
     // Single ownership coordinator for the initial Git/Hospital pilot.
     // Existing property readers remain compatible with the shared owner.
     KeyboardOwnershipCoordinator {
@@ -336,6 +356,7 @@ PanelWindow {
 
             HospitalW {
                 id: hospitalWindow
+                focusKeyTraceEnabled: shellRoot.focusKeyTraceEnabled
 
                 screen: Quickshell.screens.find(s => s.name === "DP-5")
                 keyboardActive: relationshipFocus.active
@@ -392,6 +413,7 @@ PanelWindow {
 
             GitW {
                 id: gitWindow
+                focusKeyTraceEnabled: shellRoot.focusKeyTraceEnabled
 
                 screen: Quickshell.screens.find(s => s.name === "DP-5")
                 keyboardActive: relationshipFocus.active

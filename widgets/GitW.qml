@@ -300,16 +300,19 @@ PanelWindow {
     // Shared navigation: Tab cycles the two primary Git/ GitHub pages.
     // Ctrl+Left/Right cycles the visible lower mode rail. Local Back and
     // nested context arrows remain owned by their original handlers.
+    // Pilot: when the Git layer surface is Qt-inactive after a shared-owner
+    // handoff, WindowShortcut can miss Tab even if its anchor receives it.
+    // The owner/editor guard limits ApplicationShortcut to the selected menu.
     Shortcut {
         sequence: "Tab"
-        context: Qt.WindowShortcut
+        context: Qt.ApplicationShortcut
         enabled: root.standardModeKeysAvailable
         onActivated: root.cycleMainMode(1)
     }
 
     Shortcut {
         sequence: "Shift+Tab"
-        context: Qt.WindowShortcut
+        context: Qt.ApplicationShortcut
         enabled: root.standardModeKeysAvailable
         onActivated: root.cycleMainMode(-1)
     }

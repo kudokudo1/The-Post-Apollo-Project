@@ -199,4 +199,45 @@ require("modules/Notifications.qml", "NotificationsService.invokeExternalAction(
 require("modules/Notifications.qml", "nativeActionButton.modelData.identifier", "actions must be matched by identifier, not index")
 require(SERVICE, '"notificationId": String(eventId)', "popup delegate must receive a safe event ID role")
 
+# Hospital's first producer uses existing Room outcome signals only.
+# Status polls and read-only refreshes must not generate alert storms.
+HOSPITAL = "widgets/HospitalW.qml"
+ROOM = "services/hospital/HospitalRoomService.qml"
+require(HOSPITAL, "import qs.services.notifications", "Hospital must reuse the shared notification service")
+require(HOSPITAL, "function publishRoomOutcome(title, description, severity, eventType)", "single bounded Hospital producer")
+require(HOSPITAL, '"source": "HOSPITAL"', "Hospital events must retain Apollo origin")
+require(HOSPITAL, '"sourceId": "hospital"', "Hospital events must retain existing source policy identity")
+require(HOSPITAL, '"category": "internal"', "Hospital events must appear in Apollo")
+require(HOSPITAL, "NotificationsService.pushRich({", "Hospital events must enter shared policy and history pipeline")
+require_regex(
+    HOSPITAL,
+    r"function publishRoomOutcome\(.*?if \(!room \|\| !patient\)\s*return;.*?NotificationsService\.pushRich",
+    "Hospital must not create notifications without Room/Patient identity",
+)
+require_regex(
+    HOSPITAL,
+    r"function onIntegrationFailed\(reason, uncertain\).*?publishRoomOutcome\(.*?\"warning\"",
+    "refused integration is a Warning event",
+)
+require_regex(
+    HOSPITAL,
+    r"function onIntegrated\(\).*?publishRoomOutcome\(.*?\"normal\"",
+    "only the successful integrated signal sends a normal event",
+)
+require_regex(
+    HOSPITAL,
+    r"function onPostOpFinished\(\).*?patientService\.refresh\(\).*?VERIFY_FAILED.*?VERIFY_TIMEOUT.*?publishRoomOutcome\(.*?\"warning\"",
+    "post-op failures notify without changing existing patient refresh",
+)
+require(ROOM, 'if (status !== "POST_OP_CLEAN")', "integration success must be post-op verified")
+require_regex(
+    ROOM,
+    r"if \(status !== \"POST_OP_CLEAN\"\).*?integrated\(\);.*?postOpFinished\(\);",
+    "verified integration must precede successful post-op finished",
+)
+hospital_policy = read(HOSPITAL).split("function publishRoomOutcome(")[1].split("    // Permanent-mapped", 1)[0]
+assert "Quickshell.execDetached" not in hospital_policy, "notifications must never execute additional commands"
+assert "raw" not in hospital_policy.lower(), "notification payload must not include raw command stderr"
+assert "reason" not in hospital_policy.lower(), "notification payload must not leak operation errors"
+
 print("Notification policy contracts: PASS")

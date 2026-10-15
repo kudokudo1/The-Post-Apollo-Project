@@ -4,6 +4,7 @@ import Quickshell.Wayland
 import qs.components
 import "../services/git"
 import "../services/hospital"
+import qs.services.notifications
 import "../services/github"
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
@@ -17,6 +18,32 @@ PanelWindow {
     property bool relationshipFocusModeActive: false
     property bool relationshipFocused: false
     property bool focusKeyTraceEnabled: false
+
+    // Hospital event producers keep their own execution/authority paths.
+    // This is display-only fanout after confirmed Room operation signals.
+    function publishRoomOutcome(title, description, severity, eventType) {
+        const room = String(roomService.team || root.selectedRoomTeam || "").trim();
+        const patient = String(roomService.repository || "").trim();
+        if (!room || !patient)
+            return;
+
+        NotificationsService.pushRich({
+            "source": "HOSPITAL",
+            // Preserve the historical Hospital source-policy key. New
+            // notifications must obey existing DND, snooze, and Favorites.
+            "sourceId": "hospital",
+            "category": "internal",
+            "severity": severity,
+            "title": title,
+            "message": description + " // ROOM " + room,
+            "tags": ["hospital", "room", eventType],
+            "context": {
+                "repository": patient,
+                "roomId": room,
+                "eventType": eventType
+            }
+        });
+    }
 
     // Permanent-mapped overlay: initial owner claim may precede compositor
     // commitment of the changed keyboard input region. Notifications already
@@ -2539,8 +2566,41 @@ PanelWindow {
     Connections {
         target: roomService
 
+        function onIntegrationFailed(reason, uncertain) {
+            // Never surface raw PX stderr in a popup. The Room owns full
+            // diagnostics, including anything sensitive in the error text.
+            root.publishRoomOutcome(
+                "ROOM INTEGRATION REFUSED",
+                uncertain
+                    ? "Integration result uncertain. Review Hospital before retrying."
+                    : "Integration did not complete. Review Hospital for details.",
+                "warning",
+                "integration-refused"
+            );
+        }
+
+        function onIntegrated() {
+            // Emitted only after POST_OP_CLEAN, not merely PX exit code 0.
+            root.publishRoomOutcome(
+                "ROOM POST-OP VERIFIED",
+                "Integration completed and post-op verification passed.",
+                "normal",
+                "post-op-clean"
+            );
+        }
+
         function onPostOpFinished() {
             patientService.refresh();
+
+            const status = String(roomService.postOpStatus || "");
+            if (status === "VERIFY_FAILED" || status === "VERIFY_TIMEOUT") {
+                root.publishRoomOutcome(
+                    "ROOM POST-OP WARNING",
+                    "Post-op verification did not pass. Review Hospital before proceeding.",
+                    "warning",
+                    "post-op-failed"
+                );
+            }
         }
     }
 

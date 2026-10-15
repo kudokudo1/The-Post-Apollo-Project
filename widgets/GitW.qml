@@ -55,14 +55,6 @@ PanelWindow {
     // Explicit visual preview of SelectorDial's operation indicator.
     // Never triggers workflow execution or changes factory configuration.
     property bool dialVariantsPreviewOpen: false
-    // F1 live-look pilot. Local mock values only; never routes to GitService.
-    property bool sliderIndexLabOpen: false
-    // Opt-in *real* REMOTE INDEX pilot; defaults off on every menu session.
-    // This changes selected remote context only, never performs push/pull.
-    property bool remoteIndexPilotEnabled: false
-    // F1 INDEX // Real REPO pilot. Default OFF because repo selection also
-    // switches service context and initiates a refresh.
-    property bool repoIndexPilotEnabled: false
     property bool dialFxDemoRunning: false
     property int dialFxDemoStage: -1
     readonly property string dialFxDemoLabel: !dialFxDemoRunning ? "DIAL FX // RUN"
@@ -95,11 +87,6 @@ PanelWindow {
     onGitViewChanged: {
         if (gitView !== "history")
             blameOpen = false;
-        if (gitView !== "control") {
-            sliderIndexLabOpen = false;
-            remoteIndexPilotEnabled = false;
-            repoIndexPilotEnabled = false;
-        }
     }
     readonly property string gitBackLabel:
         gitNavigationStack.length > 0
@@ -996,11 +983,6 @@ PanelWindow {
     }
 
     onActivePageChanged: {
-        if (activePage !== "git") {
-            sliderIndexLabOpen = false;
-            remoteIndexPilotEnabled = false;
-            repoIndexPilotEnabled = false;
-        }
         if (activePage !== "github") {
             if (dialFxDemoRunning)
                 stopDialFxDemo();
@@ -2088,9 +2070,6 @@ PanelWindow {
 
     onMenuOpenChanged: {
         if (!root.menuOpen) {
-            root.sliderIndexLabOpen = false;
-            root.remoteIndexPilotEnabled = false;
-            root.repoIndexPilotEnabled = false;
             root.dialVariantsPreviewOpen = false;
             if (root.dialFxDemoRunning)
                 root.stopDialFxDemo();
@@ -3757,9 +3736,6 @@ PanelWindow {
 
             count: gitService.repoCount
             currentIndex: gitService.repoIndexOfPath(gitService.repoPath)
-            // Opt-in only; preserve original immediate-switching REPO default.
-            indexInteraction: root.repoIndexPilotEnabled
-                ? "preview-release" : "legacy"
             accentColor: Colors.magenta
             handleGlowColor: Colors.orange
             sideLabel: "REPO"
@@ -3787,9 +3763,6 @@ PanelWindow {
 
             count: gitService.remoteBranchCount
             currentIndex: gitService.selectedRemoteIndex
-            // Deliberately opt-in; REPO and Hospital FLOOR remain legacy.
-            indexInteraction: root.remoteIndexPilotEnabled
-                ? "preview-release" : "legacy"
             accentColor: Colors.orange
             handleGlowColor: Colors.cyan
             activityGlowColor: Colors.orange
@@ -3809,130 +3782,9 @@ PanelWindow {
             }
         }
 
-        // Git-only F1 pilot: compare with two untouched live selectors before
-        // any repository/branch service migration.
-        Rectangle {
-            id: sliderIndexLabToggle
-            visible: root.activePage === "git"
-                && root.gitView === "control"
-                && root.menuOpen
-            z: 260
-            width: 176
-            height: 24
-            anchors {
-                horizontalCenter: parent.horizontalCenter
-                top: parent.top
-                topMargin: 147
-            }
-            color: labToggleMouse.containsMouse ? Colors.dark : Colors.black
-            border.width: 1
-            border.color: root.sliderIndexLabOpen ? Colors.orange : Colors.cyan
-
-            GohuText {
-                anchors.centerIn: parent
-                text: root.sliderIndexLabOpen
-                    ? "INDEX LAB // CLOSE" : "INDEX LAB // TEST"
-                font.pixelSize: 10
-                color: root.sliderIndexLabOpen ? Colors.orange : Colors.cyan
-            }
-
-            MouseArea {
-                id: labToggleMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.sliderIndexLabOpen = !root.sliderIndexLabOpen
-            }
-        }
-
-        // Real REPO trial. Unlike REMOTE selection, this invokes GitService
-        // repo switching + refresh. Keep a separate default-OFF operator switch.
-        Rectangle {
-            id: repoIndexPilotToggle
-            visible: sliderIndexLabToggle.visible
-            z: 260
-            width: 194
-            height: 24
-            anchors {
-                horizontalCenter: parent.horizontalCenter
-                horizontalCenterOffset: -212
-                top: sliderIndexLabToggle.top
-            }
-            color: repoPilotMouse.containsMouse ? Colors.dark : Colors.black
-            border.width: 1
-            border.color: root.repoIndexPilotEnabled
-                ? Colors.orange : Colors.cyan
-
-            GohuText {
-                anchors.centerIn: parent
-                text: root.repoIndexPilotEnabled
-                    ? "LIVE REPO // ON" : "LIVE REPO // OFF"
-                font.pixelSize: 10
-                color: root.repoIndexPilotEnabled
-                    ? Colors.orange : Colors.cyan
-            }
-
-            MouseArea {
-                id: repoPilotMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.repoIndexPilotEnabled =
-                    !root.repoIndexPilotEnabled
-            }
-        }
-
-        // Optional actual-service REMOTE trial, distinct from mock INDEX LAB.
-        // Its existing selection handler is unchanged.
-        Rectangle {
-            id: remoteIndexPilotToggle
-            visible: sliderIndexLabToggle.visible
-            z: 260
-            width: 194
-            height: 24
-            anchors {
-                horizontalCenter: parent.horizontalCenter
-                horizontalCenterOffset: 212
-                top: sliderIndexLabToggle.top
-            }
-            color: remotePilotMouse.containsMouse ? Colors.dark : Colors.black
-            border.width: 1
-            border.color: root.remoteIndexPilotEnabled
-                ? Colors.orange : Colors.cyan
-
-            GohuText {
-                anchors.centerIn: parent
-                text: root.remoteIndexPilotEnabled
-                    ? "LIVE REMOTE // ON" : "LIVE REMOTE // OFF"
-                font.pixelSize: 10
-                color: root.remoteIndexPilotEnabled
-                    ? Colors.orange : Colors.cyan
-            }
-
-            MouseArea {
-                id: remotePilotMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.remoteIndexPilotEnabled =
-                    !root.remoteIndexPilotEnabled
-            }
-        }
-
-        Loader {
-            id: sliderIndexLabLoader
-            anchors {
-                horizontalCenter: parent.horizontalCenter
-                top: sliderIndexLabToggle.bottom
-                topMargin: 8
-            }
-            z: 259
-            width: 490
-            height: 330
-            visible: sliderIndexLabToggle.visible && root.sliderIndexLabOpen
-            active: visible
-            source: "../tests/fixtures/SelectorSliderIndexPilot.qml"
-        }
+        // Git selectors intentionally use the shared component's legacy
+        // immediate-selection mode: the actual repository/branch context and
+        // branch map update while dragging, without a release-to-commit gate.
 
         Column {
             anchors {

@@ -138,8 +138,12 @@ require(SERVICE, "function setFavorite(appKey, sourceId, source, enabled)", "Man
 require(SERVICE, "function toggleFavorite(appKey, sourceId, source)", "card stars must toggle backend source state")
 require(SERVICE, "function loadFavorites()", "favorites must restore after reload")
 require(SERVICE, "function favoriteDocument()", "favorites must save independent of message history")
-require_regex(SERVICE, r"function favoriteDocument\\(\\).*?\\\"appKey\\\".*?\\\"sourceId\\\"", "favorite persistence must use source identity")
-require_regex(SERVICE, r"function setFavorite\\(.*?favoriteSources\\.append\\(.*?favoriteSources\\.remove\\(index\\).*?scheduleFavoritesSave", "unfavoriting must not remove history")
+favorite_document = read(SERVICE).split("    function favoriteDocument()")[1].split("    function scheduleFavoritesSave()")[0]
+assert '"appKey"' in favorite_document and '"sourceId"' in favorite_document, "favorites must persist source identity"
+favorite_ops = read(SERVICE).split("    function setFavorite(")[1].split("    function policyIndex(")[0]
+assert "favoriteSources.append(" in favorite_ops, "starring must create a favorite"
+assert "favoriteSources.remove(index)" in favorite_ops, "UNFAV must remove the favorite"
+assert "scheduleFavoritesSave()" in favorite_ops, "favorite changes must persist"
 favorites_logic = read(SERVICE).split("    function setFavorite(")[1].split("    function policyIndex(")[0]
 assert "sourcePolicies" not in favorites_logic, "favoriting must never change DND policy"
 assert "notifications.remove" not in favorites_logic, "unfavoriting must never delete history"
@@ -164,7 +168,10 @@ require(HUB, 'label: "ALLOW"', "ALLOW policy control must remain intact")
 require(HUB, 'sequence: "Escape"', "Esc close shortcut")
 require(HUB, 'context: Qt.WindowShortcut', "Esc must not be global")
 require(HUB, 'enabled: root.menuOpen && root.keyboardActive', "Esc must not steal focus from other windows")
-require_regex(HUB, r"function handleEscape\\(\\).*?pendingClearAllKey.*?cancelClearAll\\(\\).*?close\\(\\)", "Esc cancels confirmation before closing")
+escape_logic = hub.split("    function handleEscape()")[1].split('    Shortcut {')[0]
+assert 'pendingClearAllKey' in escape_logic, "Esc must check destructive confirmation"
+assert 'cancelClearAll()' in escape_logic, "Esc must cancel confirmation"
+assert 'close()' in escape_logic, "Esc must close the hub"
 assert "WlrKeyboardFocus.OnDemand" in hub, "keep existing local window focus behavior"
 
 print("Notification policy contracts: PASS")

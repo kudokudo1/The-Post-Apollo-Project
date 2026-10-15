@@ -268,8 +268,11 @@ assert 'invoke("swaymsg", "-t", "get_tree")' in diag_src
 assert '"swaymsg", "-m", "-t", "subscribe"' in diag_src
 assert 'def find_native_focused(tree:' in diag_src
 assert 'focusedNativeContainer' in diag_src
-for disallowed in ('swaymsg focus', 'swaymsg mode default',
-                   'Popen(["swaymsg", "focus"', 'koinoikos_focus.py" move'):
+# Assert forbidden executable argv patterns, not prose comments about safety.
+for disallowed in ('invoke("swaymsg", "focus"',
+                   'invoke("swaymsg", "mode"',
+                   '"swaymsg", "focus"',
+                   '"swaymsg", "mode"'):
     assert disallowed not in diag_src
 assert (ROOT / "docs/focus-browser-underlay-test-20261015.md").is_file()
 

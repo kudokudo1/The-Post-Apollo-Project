@@ -27,7 +27,29 @@ PanelWindow {
     property bool keyboardLock: false
     property bool relationshipFocusModeActive: false
     property bool relationshipFocused: false
+    property bool focusKeyTraceEnabled: false
     signal keyboardOwnershipRequested()
+
+    // Passive diagnostics only: no printable keys, editor text or shortcuts
+    // are recorded. Keys handlers must NOT accept events or alter focus.
+    function traceFocusNavigation(phase, event) {
+        if (!focusKeyTraceEnabled || !menuOpen)
+            return;
+        const navigationKeys = [
+            Qt.Key_Tab, Qt.Key_Backtab, Qt.Key_Left, Qt.Key_Right,
+            Qt.Key_Up, Qt.Key_Down, Qt.Key_Return, Qt.Key_Enter
+        ];
+        if (navigationKeys.indexOf(event.key) < 0)
+            return;
+        console.warn("FOCUS_KEY_TRACE // git // " + phase
+                     + " key=" + event.key
+                     + " qtWindowActive=" + gitKeyboardFocusAnchor.Window.active
+                     + " anchorActive=" + gitKeyboardFocusAnchor.activeFocus
+                     + " keyboardActive=" + keyboardActive
+                     + " keyboardLock=" + keyboardLock
+                     + " koinoikosActive=" + relationshipFocusModeActive
+                     + " selected=" + relationshipFocused);
+    }
 
     property string activePage: "git"
     property string gitView: "control"
@@ -167,6 +189,21 @@ PanelWindow {
     // focus, but ordinary Git navigation always has somewhere to return.
     Item {
         id: gitKeyboardFocusAnchor
+
+        Keys.onShortcutOverride: function(event) {
+            root.traceFocusNavigation("shortcut-override", event);
+            event.accepted = false;
+        }
+        Keys.onPressed: function(event) {
+            root.traceFocusNavigation("pressed", event);
+            event.accepted = false;
+        }
+        onActiveFocusChanged: {
+            if (root.focusKeyTraceEnabled && root.menuOpen)
+                console.warn("FOCUS_KEY_TRACE // git // anchorFocus="
+                             + gitKeyboardFocusAnchor.activeFocus
+                             + " windowActive=" + gitKeyboardFocusAnchor.Window.active);
+        }
 
         anchors.fill: parent
         focus:

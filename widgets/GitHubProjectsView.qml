@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import qs.components
+import qs.components as Components
 
 Item {
     id: root
@@ -96,6 +97,8 @@ Item {
         property bool enabledAction: true
         property bool selectedAction: false
         property bool primaryBlue: false
+        property color accentColor: Colors.cyan
+        property bool preserveIdentity: false
 
         signal triggered()
 
@@ -107,24 +110,21 @@ Item {
             : Colors.black
         border.width: 1
         border.color:
-            selectedAction
-            ? Colors.orange
-            : mouse.containsMouse
-            ? Colors.orange
-            : primaryBlue
-            ? Colors.blue
-            : Colors.cyan
+            preserveIdentity ? accentColor
+            : selectedAction ? Colors.orange
+            : mouse.containsMouse ? Colors.orange
+            : primaryBlue ? Colors.blue
+            : accentColor
 
         GohuText {
             anchors.centerIn: parent
             text: button.label
-            font.pixelSize: 8
+            font.pixelSize: 10
             color:
-                button.selectedAction
-                ? Colors.magenta
-                : button.primaryBlue
-                ? Colors.blue
-                : Colors.cyan
+                button.preserveIdentity ? button.accentColor
+                : button.selectedAction ? Colors.magenta
+                : button.primaryBlue ? Colors.blue
+                : button.accentColor
             opacity: 1.0
         }
 
@@ -147,16 +147,14 @@ Item {
 
         property string placeholderText: ""
         property alias text: editor.text
+        property color accentColor: Colors.magenta
 
         signal edited()
 
         height: 30
         color: Colors.black
-        border.width: 1
-        border.color:
-            editor.activeFocus
-            ? Colors.magenta
-            : Colors.cyan
+        border.width: editor.activeFocus ? 2 : 1
+        border.color: field.accentColor
 
         GohuText {
             anchors {
@@ -167,9 +165,9 @@ Item {
 
             visible: editor.text.length === 0 && !editor.activeFocus
             text: field.placeholderText
-            font.pixelSize: 8
-            color: Colors.white
-            opacity: 0.42
+            font.pixelSize: 10
+            color: Colors.magenta
+            opacity: 0.76
         }
 
         TextInput {
@@ -185,8 +183,12 @@ Item {
             verticalAlignment: TextInput.AlignVCenter
             clip: true
             font.family: "GohuFont 11 Nerd Font Mono"
-            font.pixelSize: 9
-            color: Colors.white
+            font.pixelSize: 11
+            color: Colors.magenta
+            cursorDelegate: Rectangle {
+                width: 2
+                color: Colors.orange
+            }
             selectionColor: Colors.magenta
             selectedTextColor: Colors.black
 
@@ -266,7 +268,7 @@ Item {
             height: 26
             verticalAlignment: Text.AlignVCenter
             text: "PROJECTS // OPERATING MAP"
-            font.pixelSize: 8
+            font.pixelSize: 10
             color: Colors.magenta
             elide: Text.ElideRight
         }
@@ -300,8 +302,8 @@ Item {
                             text:
                                 "PROJECT INDEX // "
                                 + String(root.projectService.projects.length)
-                            font.pixelSize: 10
-                            color: Colors.cyan
+                            font.pixelSize: 11
+                            color: Colors.magenta
                             opacity: 0.82
                             elide: Text.ElideRight
                         }
@@ -361,7 +363,7 @@ Item {
                                         + String(root.projectService.projectNumber(projectCard.modelData))
                                         + " // "
                                         + root.projectService.projectTitle(projectCard.modelData)
-                                    font.pixelSize: 11
+                                    font.pixelSize: 12
                                     color:
                                         projectCard.selected
                                         ? Colors.magenta
@@ -377,7 +379,7 @@ Item {
                                             || projectCard.modelData.description
                                             || "OPERATING MAP"
                                         )
-                                    font.pixelSize: 8
+                                    font.pixelSize: 10
                                     color: Colors.cyan
                                     opacity: 0.72
                                     elide: Text.ElideRight
@@ -503,7 +505,7 @@ Item {
                                         || root.projectService.projectView.description
                                         || "SELECT A PROJECT TO OPEN ITS OPERATING MAP"
                                     )
-                                font.pixelSize: 7
+                                font.pixelSize: 9
                                 color: Colors.cyan
                                 opacity: 0.58
                                 elide: Text.ElideRight
@@ -514,6 +516,8 @@ Item {
                             width: 78
                             anchors.verticalCenter: parent.verticalCenter
                             label: "< PROJECT"
+                            accentColor: Colors.orange
+                            preserveIdentity: true
                             enabledAction:
                                 !root.projectService.busy
                                 && root.projectService.projects.length > 1
@@ -524,6 +528,8 @@ Item {
                             width: 78
                             anchors.verticalCenter: parent.verticalCenter
                             label: "PROJECT >"
+                            accentColor: Colors.orange
+                            preserveIdentity: true
                             enabledAction:
                                 !root.projectService.busy
                                 && root.projectService.projects.length > 1
@@ -554,7 +560,7 @@ Item {
                                 root.gitService.repoRemoteSlug
                                 ? "ACTIVE REPOSITORY // " + root.gitService.repoRemoteSlug
                                 : "ACTIVE REPOSITORY // NOT CONNECTED"
-                            font.pixelSize: 8
+                            font.pixelSize: 10
                             color:
                                 root.gitService.repoRemoteSlug
                                 ? Colors.blue
@@ -587,6 +593,8 @@ Item {
                             width: 46
                             height: parent.height
                             label: "WORK"
+                            accentColor: Colors.orange
+                            preserveIdentity: true
                             selectedAction: root.itemCreateMode === "work"
                             onTriggered: root.selectItemCreateMode("work")
                         }
@@ -595,6 +603,8 @@ Item {
                             width: 46
                             height: parent.height
                             label: "ISSUE"
+                            accentColor: Colors.red
+                            preserveIdentity: true
                             selectedAction: root.itemCreateMode === "issue"
                             onTriggered: root.selectItemCreateMode("issue")
                         }
@@ -603,6 +613,8 @@ Item {
                             width: 46
                             height: parent.height
                             label: "PR"
+                            accentColor: Colors.green
+                            preserveIdentity: true
                             selectedAction: root.itemCreateMode === "pr"
                             onTriggered: root.selectItemCreateMode("pr")
                         }
@@ -624,6 +636,7 @@ Item {
 
                         ProjectInput {
                             id: itemBodyInput
+                            accentColor: Colors.orange
                             visible: root.itemCreateMode !== "pr"
                             width:
                                 root.itemCreateMode === "pr"
@@ -737,7 +750,8 @@ Item {
                         Column {
                             id: laneColumn
 
-                            width: mapScroll.width
+                            // Reserve the existing star-scrollbar zone.
+                            width: Math.max(0, mapScroll.width - 20)
                             spacing: 8
 
                             Repeater {
@@ -787,7 +801,7 @@ Item {
                                                     lane.laneName.toUpperCase()
                                                     + " // "
                                                     + String(lane.laneItems.length)
-                                                font.pixelSize: 9
+                                                font.pixelSize: 11
                                                 color:
                                                     lane.laneName.toLowerCase().indexOf("done") >= 0
                                                     ? Colors.orange
@@ -802,7 +816,7 @@ Item {
                                                 anchors.verticalCenter: parent.verticalCenter
                                                 horizontalAlignment: Text.AlignRight
                                                 text: "WORK STATE"
-                                                font.pixelSize: 7
+                                                font.pixelSize: 9
                                                 color: Colors.white
                                                 opacity: 0.38
                                             }
@@ -845,7 +859,7 @@ Item {
                                                                 root.projectService.itemTitle(
                                                                     itemCard.modelData
                                                                 )
-                                                            font.pixelSize: 9
+                                                            font.pixelSize: 11
                                                             color: Colors.white
                                                             elide: Text.ElideRight
                                                         }
@@ -892,7 +906,7 @@ Item {
                                                                 )
                                                         }
 
-                                                        ActionButton {
+                                                        Components.ActionButton {
                                                             width: 24
                                                             height: 20
                                                             label:
@@ -900,9 +914,25 @@ Item {
                                                                     "remove",
                                                                     itemCard.modelData
                                                                 )
-                                                                ? "!"
-                                                                : "X"
-                                                            enabledAction:
+                                                                ? "⚠︎"
+                                                                : "×"
+                                                            labelPixelSize: 11
+                                                            destructive: true
+                                                            idleForegroundColor: Colors.red
+                                                            idleBorderColor: Colors.red
+                                                            idleContentGlowColor: Colors.red
+                                                            idleSoftGlowColor: Colors.red
+                                                            hoverForegroundColor: Colors.red
+                                                            hoverBorderColor: Colors.red
+                                                            hoverContentGlowColor: Colors.red
+                                                            hoverSoftGlowColor: Colors.red
+                                                            selected: root.itemActionArmed(
+                                                                "remove", itemCard.modelData)
+                                                            selectedForegroundColor: Colors.red
+                                                            selectedBorderColor: Colors.red
+                                                            selectedContentGlowColor: Colors.red
+                                                            selectedSoftGlowColor: Colors.red
+                                                            available:
                                                                 !root.projectService.busy
                                                                 && !!root.projectService.itemId(
                                                                     itemCard.modelData
@@ -927,7 +957,8 @@ Item {
                                                         spacing: 8
 
                                                         GohuText {
-                                                            width: parent.width - 190
+                                                            // Control widths + three 8px gaps require 198px.
+                                                            width: Math.max(0, parent.width - 198)
                                                             anchors.verticalCenter: parent.verticalCenter
                                                             text:
                                                                 root.projectService.itemType(
@@ -943,7 +974,7 @@ Item {
                                                                       )
                                                                     : ""
                                                                   )
-                                                            font.pixelSize: 7
+                                                            font.pixelSize: 9
                                                             color: Colors.cyan
                                                             opacity: 0.70
                                                             elide: Text.ElideMiddle
@@ -972,7 +1003,7 @@ Item {
                                                                     itemCard.modelData
                                                                 )
                                                                 || "NO STATUS"
-                                                            font.pixelSize: 7
+                                                            font.pixelSize: 9
                                                             color: Colors.magenta
                                                             elide: Text.ElideRight
                                                         }
@@ -1007,7 +1038,7 @@ Item {
                                             width: parent.width
                                             visible: lane.laneItems.length === 0
                                             text: "NO WORK IN THIS STATE"
-                                            font.pixelSize: 8
+                                            font.pixelSize: 10
                                             color: Colors.white
                                             opacity: 0.32
                                         }

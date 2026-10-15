@@ -1082,6 +1082,7 @@ Item {
                     }
 
                     GitHubProjectsTableView {
+                        keyboardHost: root.keyboardHost
                         width: parent.width
                         height:
                             root.projectCamera === "table"

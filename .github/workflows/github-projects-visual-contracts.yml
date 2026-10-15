@@ -1,0 +1,29 @@
+name: GitHub Projects visual contracts
+
+on:
+  pull_request:
+    paths:
+      - "widgets/GitHubProjectsView.qml"
+      - "widgets/GitHubProjectsTableView.qml"
+      - "widgets/GitHubProjectsRoadmapView.qml"
+      - "tests/components/test_github_projects_visual_contracts.py"
+      - ".github/workflows/github-projects-visual-contracts.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "widgets/GitHubProjectsView.qml"
+      - "widgets/GitHubProjectsTableView.qml"
+      - "widgets/GitHubProjectsRoadmapView.qml"
+      - "tests/components/test_github_projects_visual_contracts.py"
+      - ".github/workflows/github-projects-visual-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  projects-visual-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Projects visual roles and status-row sizing
+        run: python3 tests/components/test_github_projects_visual_contracts.py

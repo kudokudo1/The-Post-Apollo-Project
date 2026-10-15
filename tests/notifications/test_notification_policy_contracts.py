@@ -61,7 +61,7 @@ require_regex(
     "clear-all must remove source entries from history and active popups, then persist",
 )
 require(HUB, 'label: "CLEAR ALL"', "notification cards must expose a clear-all control")
-require(HUB, 'width: 108', "clear-all control should span roughly the ZZ/DND/X control length")
+require(HUB, 'width: 88', "clear-all control should use the approved compact width")
 require_regex(
     HUB,
     r'label: "CLEAR ALL".*?danger: true.*?requestClearAllForApp',

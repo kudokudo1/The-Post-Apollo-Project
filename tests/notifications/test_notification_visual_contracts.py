@@ -93,4 +93,44 @@ for needle, message in (
 ):
     require(POPUP, needle, message)
 
+# Eight compact filter controls follow the exact declared visual order;
+# the underlying 'all' ID remains COMBI's broad filter semantics.
+filter_strip = HUB.split('id: filterStrip')[1].split('// New second header divider')[0]
+assert '(width - (spacing * 7)) / 8' in filter_strip, "eight filters must fit the existing strip"
+expected_filters = [
+    ('all', 'COMBI', 'Colors.yellow'),
+    ('apps', 'APPS', 'Colors.cyan'),
+    ('social', 'SOCIAL', 'root.omnitrixGreen'),
+    ('apollo', 'APOLLO', 'Colors.orange'),
+    ('favorites', 'FAVS', 'Colors.magenta'),
+    ('system', 'SYSTEM', 'Colors.white'),
+    ('warning', 'WARNING', 'Colors.red'),
+    ('manager', 'MANAGER', 'Colors.magenta'),
+]
+import re
+actual_filters = re.findall(
+    r'filterId: "([^"]+)"\s+label: "([^"]+)"\s+accentColor: ([\w.]+)',
+    filter_strip,
+)
+assert actual_filters == expected_filters, f"filter identities/order drifted: {actual_filters!r}"
+assert '"all", "apps", "social", "apollo", "favorites", "system", "warning", "manager"' in HUB, "keyboard tabs must match visual order"
+
+# Favorites Manager shares screen space but cannot eliminate the existing
+# DND list, destructive confirmation, history list or scrollbars.
+for needle, description in (
+    ("id: managerSourceSections", "two-section manager layout"),
+    ("id: dndManagerSection", "DND manager section"),
+    ("id: favoriteManagerSection", "Favorites manager section"),
+    ("id: dndManagerList", "DND source manager"),
+    ("id: favoriteManagerList", "Favorites source manager"),
+    ("model: NotificationsService.favoriteSources", "persistent favorites manager model"),
+    ("id: removeFavoriteButton", "UNFAV control"),
+    ("activeColor: Colors.magenta", "favorite identity color"),
+    ("flickable: dndManagerList", "DND manager scrollbar"),
+    ("flickable: favoriteManagerList", "Favorites manager scrollbar"),
+    ("root.managerSelectionSection === \"favorites\"", "favorite keyboard selection state"),
+    ("root.managerSelectionSection === \"dnd\"", "DND keyboard selection state"),
+):
+    require(HUB, needle, description)
+
 print("Notification visual contracts: PASS")

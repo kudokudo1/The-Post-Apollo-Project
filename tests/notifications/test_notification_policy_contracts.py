@@ -129,4 +129,49 @@ assert 'categoryText === "important"' not in classification, "importance is not 
 assert 'categoryText === "reminder"' not in classification, "reminders are not Apollo provenance"
 assert 'severityText === "important"' not in classification, "severity must not identify Apollo origin"
 
+# Favorites are source-level UI state, not suppression policy and not
+# notification history. They must survive reload and work without history.
+require(SERVICE, "property ListModel favoriteSources: ListModel {}", "independent favorites model")
+require(SERVICE, 'path: Quickshell.dataPath("notification-favorites.json")', "favorites must persist")
+require(SERVICE, "function isFavorite(appKey)", "favorites must be queryable by source")
+require(SERVICE, "function setFavorite(appKey, sourceId, source, enabled)", "Manager needs an explicit unstar operation")
+require(SERVICE, "function toggleFavorite(appKey, sourceId, source)", "card stars must toggle backend source state")
+require(SERVICE, "function loadFavorites()", "favorites must restore after reload")
+require(SERVICE, "function favoriteDocument()", "favorites must save independent of message history")
+favorite_document = read(SERVICE).split("    function favoriteDocument()")[1].split("    function scheduleFavoritesSave()")[0]
+assert '"appKey"' in favorite_document and '"sourceId"' in favorite_document, "favorites must persist source identity"
+favorite_ops = read(SERVICE).split("    function setFavorite(")[1].split("    function policyIndex(")[0]
+assert "favoriteSources.append(" in favorite_ops, "starring must create a favorite"
+assert "favoriteSources.remove(index)" in favorite_ops, "UNFAV must remove the favorite"
+assert "scheduleFavoritesSave()" in favorite_ops, "favorite changes must persist"
+favorites_logic = read(SERVICE).split("    function setFavorite(")[1].split("    function policyIndex(")[0]
+assert "sourcePolicies" not in favorites_logic, "favoriting must never change DND policy"
+assert "notifications.remove" not in favorites_logic, "unfavoriting must never delete history"
+
+# COMBI is still the underlying 'all' filter; favorite is a separate
+# overlapping source preference, not another exclusive origin category.
+require(HUB, 'label: "COMBI"', "All must display as COMBI")
+require(HUB, 'filterId: "all"', "COMBI must retain all-source semantics")
+require(HUB, 'filterId: "favorites"', "hub must have a Favorites filter")
+require(HUB, 'label: "FAVS"', "compact Favorite filter fits eight buttons")
+require(HUB, 'root.activeFilter === "favorites"', "Favorites filter must be actionable")
+require(HUB, "NotificationsService.isFavorite(root.appKeyFor(sourceId, source))", "Favorites view must filter by source identity")
+require(HUB, "NotificationsService.toggleFavorite(notificationEntry.appKey, notificationEntry.sourceId, notificationEntry.source)", "card star must use persisted state")
+require(HUB, "model: NotificationsService.favoriteSources", "Manager must display all favorites, including sources without retained history")
+require(HUB, 'text: "FAVORITES  //  " + NotificationsService.favoriteSources.count', "Manager must display Favorites section")
+require(HUB, 'label: "UNFAV"', "Manager must allow removing a favorite")
+require(HUB, "NotificationsService.setFavorite(favoriteRule.appKey, favoriteRule.sourceId, favoriteRule.source, false)", "UNFAV must remove just favorite status")
+require(HUB, 'text: "DO NOT DISTURB  //  " + managerDndPolicies.count', "DND manager must remain available")
+require(HUB, 'label: "ALLOW"', "ALLOW policy control must remain intact")
+
+# The user's existing keyboard-owner protocol must remain authoritative.
+require(HUB, 'sequence: "Escape"', "Esc close shortcut")
+require(HUB, 'context: Qt.WindowShortcut', "Esc must not be global")
+require(HUB, 'enabled: root.menuOpen && root.keyboardActive', "Esc must not steal focus from other windows")
+escape_logic = hub.split("    function handleEscape()")[1].split('    Shortcut {')[0]
+assert 'pendingClearAllKey' in escape_logic, "Esc must check destructive confirmation"
+assert 'cancelClearAll()' in escape_logic, "Esc must cancel confirmation"
+assert 'close()' in escape_logic, "Esc must close the hub"
+assert "WlrKeyboardFocus.OnDemand" in hub, "keep existing local window focus behavior"
+
 print("Notification policy contracts: PASS")

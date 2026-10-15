@@ -165,12 +165,13 @@ PanelWindow {
 
     property string searchQuery: ""
     property string activeFilter: "all"
-    // These are the seven real buttons in filterStrip, left to right.
+    // Eight Main Mode buttons in filterStrip, in visual order.
     // They are Main Modes, not "History" plus six Sub Modes.
     readonly property var mainModeOrder: [
-        "all", "apps", "system", "social", "apollo", "warning", "manager"
+        "all", "apps", "social", "apollo", "favorites", "system", "warning", "manager"
     ]
     property bool listKeyboardSelectionActive: false
+    property string managerSelectionSection: "dnd"
     // Do not take mode keys from the search editor or destructive dialogs.
     readonly property bool standardKeysAvailable:
         menuOpen && keyboardActive && !searchInput.activeFocus
@@ -189,7 +190,9 @@ PanelWindow {
     }
 
     function moveCurrentList(direction) {
-        const list = activeFilter === "manager" ? dndManagerList : historyList;
+        const list = activeFilter === "manager"
+            ? (managerSelectionSection === "favorites" ? favoriteManagerList : dndManagerList)
+            : historyList;
         if (list.count < 1)
             return;
         const step = Number(direction) < 0 ? -1 : 1;
@@ -216,6 +219,41 @@ PanelWindow {
             takeMeToApp(row.sourceId, row.source);
     }
 
+    // Scope Escape to this window's active keyboard ownership.
+    function handleEscape() {
+        if (!menuOpen || !keyboardActive)
+            return;
+        if (pendingClearAllKey !== "") {
+            cancelClearAll();
+            return;
+        }
+        close();
+    }
+
+    Shortcut {
+        sequence: "Escape"
+        context: Qt.WindowShortcut
+        enabled: root.menuOpen && root.keyboardActive
+        onActivated: root.handleEscape()
+    }
+    Shortcut {
+        sequence: "Left"
+        context: Qt.WindowShortcut
+        enabled: root.standardKeysAvailable && root.activeFilter === "manager"
+        onActivated: {
+            root.managerSelectionSection = "dnd";
+            root.listKeyboardSelectionActive = false;
+        }
+    }
+    Shortcut {
+        sequence: "Right"
+        context: Qt.WindowShortcut
+        enabled: root.standardKeysAvailable && root.activeFilter === "manager"
+        onActivated: {
+            root.managerSelectionSection = "favorites";
+            root.listKeyboardSelectionActive = false;
+        }
+    }
     Shortcut {
         sequence: "Tab"
         context: Qt.WindowShortcut
@@ -290,10 +328,15 @@ PanelWindow {
         function onPolicyRevisionChanged() {
             root.rebuildManagerDndPolicies();
         }
+        function onFavoritesRevisionChanged() {
+            root.scheduleFilteredModelRebuild();
+        }
     }
 
     onActiveFilterChanged: {
         listKeyboardSelectionActive = false;
+        if (activeFilter === "manager")
+            managerSelectionSection = dndManagerList.count > 0 ? "dnd" : "favorites";
         root.scheduleFilteredModelRebuild();
     }
 
@@ -308,11 +351,7 @@ PanelWindow {
     }
 
     // ===== APP-WIDE CARD STATE ==================================
-    //
-    // Favorite remains a lightweight visual frontend state.
-    // Snooze and DND are persistent backend policy in NotificationsService.
-
-    property var appStates: ({})
+    // Favorite, DND and snooze are independent persistent service preferences.
 
     // ===== WINDOW ===============================================
 
@@ -380,10 +419,16 @@ PanelWindow {
         Keys.onShortcutOverride: function(event) {
             if (!root.standardKeysAvailable)
                 return;
-            if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab)
+            if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab
+                    || event.key === Qt.Key_Escape)
                 event.accepted = true;
         }
         Keys.onPressed: function(event) {
+            if (event.key === Qt.Key_Escape && root.menuOpen && root.keyboardActive) {
+                root.handleEscape();
+                event.accepted = true;
+                return;
+            }
             if (!root.standardKeysAvailable)
                 return;
             if (event.key !== Qt.Key_Tab && event.key !== Qt.Key_Backtab)
@@ -701,44 +746,6 @@ PanelWindow {
         return NotificationsService.sourceKey(sourceId, source);
     }
 
-    function stateForApp(appKey) {
-        var current = root.appStates[appKey];
-
-        if (current !== undefined)
-            return current;
-
-        return {
-            favorite: false
-        };
-    }
-
-    function setAppFlag(appKey, flagName, enabled) {
-        var nextStates = ({});
-
-        for (var existingKey in root.appStates)
-            nextStates[existingKey] = root.appStates[existingKey];
-
-        var current = root.stateForApp(appKey);
-
-        var nextState = {
-            favorite: current.favorite === true
-        };
-
-        nextState[flagName] = enabled === true;
-
-        nextStates[appKey] = nextState;
-
-        // Replace the WHOLE object so all cards from this app receive
-        // the state update at the same time.
-        root.appStates = nextStates;
-    }
-
-    function toggleAppFlag(appKey, flagName) {
-        var current = root.stateForApp(appKey);
-
-        root.setAppFlag(appKey, flagName, current[flagName] !== true);
-    }
-
     // ===== CLASSIFICATION =========================================
     //
     // Source family and severity are different dimensions:
@@ -859,7 +866,7 @@ PanelWindow {
         for (let i = 0; i < NotificationsService.notifications.count; i++) {
             const entry = NotificationsService.notifications.get(i);
             const classification = root.classificationFor(entry.source, entry.sourceId, entry.category, entry.severity);
-            if (!root.notificationMatches(entry.source, entry.title, entry.message, entry.category, entry.severity, classification.group))
+            if (!root.notificationMatches(entry.source, entry.sourceId, entry.title, entry.message, entry.category, entry.severity, classification.group))
                 continue;
             rows.push({
                 ordinal: i,
@@ -922,10 +929,13 @@ PanelWindow {
         return Math.round(milliseconds / 60000) + " MIN";
     }
 
-    function notificationMatches(source, title, message, category, severity, filterGroup) {
+    function notificationMatches(source, sourceId, title, message, category, severity, filterGroup) {
         // Warning is an overlapping severity view, not a source category.
         if (root.activeFilter === "warning") {
             if (!root.isWarning(category, severity))
+                return false;
+        } else if (root.activeFilter === "favorites") {
+            if (!NotificationsService.isFavorite(root.appKeyFor(sourceId, source)))
                 return false;
         } else if (root.activeFilter !== "all" && root.activeFilter !== filterGroup) {
             return false;
@@ -1318,6 +1328,12 @@ PanelWindow {
 
                         clip: true
 
+                        Keys.onPressed: function(event) {
+                            if (event.key === Qt.Key_Escape && root.menuOpen && root.keyboardActive) {
+                                root.handleEscape();
+                                event.accepted = true;
+                            }
+                        }
                         onTextChanged: {
                             if (root.searchQuery !== text)
                                 root.searchQuery = text;
@@ -1390,14 +1406,14 @@ PanelWindow {
 
                     spacing: root.filterButtonSpacing
 
-                    readonly property real buttonWidth: (width - (spacing * 6)) / 7
+                    readonly property real buttonWidth: (width - (spacing * 7)) / 8
 
                     FilterButton {
                         width: filterStrip.buttonWidth
                         height: filterStrip.height
                         filterId: "all"
-                        label: "ALL"
-                        accentColor: Colors.magenta
+                        label: "COMBI"
+                        accentColor: Colors.yellow
                     }
 
                     FilterButton {
@@ -1411,17 +1427,9 @@ PanelWindow {
                     FilterButton {
                         width: filterStrip.buttonWidth
                         height: filterStrip.height
-                        filterId: "system"
-                        label: "SYSTEM"
-                        accentColor: root.omnitrixGreen
-                    }
-
-                    FilterButton {
-                        width: filterStrip.buttonWidth
-                        height: filterStrip.height
                         filterId: "social"
                         label: "SOCIAL"
-                        accentColor: Colors.yellow
+                        accentColor: root.omnitrixGreen
                     }
 
                     FilterButton {
@@ -1430,6 +1438,22 @@ PanelWindow {
                         filterId: "apollo"
                         label: "APOLLO"
                         accentColor: Colors.orange
+                    }
+
+                    FilterButton {
+                        width: filterStrip.buttonWidth
+                        height: filterStrip.height
+                        filterId: "favorites"
+                        label: "FAVS"
+                        accentColor: Colors.magenta
+                    }
+
+                    FilterButton {
+                        width: filterStrip.buttonWidth
+                        height: filterStrip.height
+                        filterId: "system"
+                        label: "SYSTEM"
+                        accentColor: Colors.white
                     }
 
                     FilterButton {
@@ -1914,170 +1938,318 @@ PanelWindow {
                         }
                     }
 
-                    GlowText {
-                        id: dndManagerTitle
-
+                    // Separate source-management sections. Left/Right selects
+                    // the keyboard navigation list, but Enter never silently
+                    // changes policy or removes a favorite.
+                    Item {
+                        id: managerSourceSections
                         anchors {
                             top: snoozeSettings.bottom
-                            left: parent.left
-                            right: parent.right
-                        }
-
-                        anchors.topMargin: 14
-                        anchors.leftMargin: 4
-                        anchors.rightMargin: 4
-
-                        height: 24
-
-                        text: "DO NOT DISTURB  //  " + managerDndPolicies.count
-                        pixelSize: 13
-                        textColor: Colors.magenta
-                        glowColor: Colors.magenta
-                    }
-
-                    GohuText {
-                        anchors {
-                            top: dndManagerTitle.bottom
-                            left: parent.left
-                            right: parent.right
-                        }
-
-                        anchors.topMargin: 2
-                        anchors.leftMargin: 4
-                        anchors.rightMargin: 4
-
-                        height: 18
-
-                        text: "Sources stay suppressed until you explicitly ALLOW them again."
-                        font.pixelSize: 10
-                        color: Colors.white
-                        opacity: 0.72
-                    }
-
-                    ListView {
-                        id: dndManagerList
-
-                        anchors {
-                            top: dndManagerTitle.bottom
                             bottom: parent.bottom
                             left: parent.left
                             right: parent.right
                         }
+                        anchors.topMargin: 14
 
-                        anchors.topMargin: 28
-
-                        clip: true
-                        spacing: 8
-                        boundsBehavior: Flickable.StopAtBounds
-
-                        model: managerDndPolicies
-
-                        delegate: Rectangle {
-                            id: dndRule
-
-                            required property string appKey
-                            required property string source
-                            required property string sourceId
-
-                            width: dndManagerList.width
-                            height: 64
-
-                            color: "transparent"
-                            // Keyboard selection is independently highlighted;
-                            // default DND semantic identity remains magenta.
-                            border.width:
-                                root.listKeyboardSelectionActive && ListView.isCurrentItem ? 2 : 1
-                            border.color:
-                                root.listKeyboardSelectionActive && ListView.isCurrentItem
-                                ? Colors.orange : Colors.magenta
-
-                            Rectangle {
-                                anchors.fill: parent
-                                color: Colors.dark
-                                opacity: 0.52
-                                z: -1
+                        Item {
+                            id: dndManagerSection
+                            anchors {
+                                top: parent.top
+                                left: parent.left
+                                right: parent.right
                             }
+                            height: Math.max(0, (parent.height - 14) / 2)
 
                             GlowText {
+                                id: dndManagerTitle
                                 anchors {
                                     top: parent.top
                                     left: parent.left
-                                    right: allowDndButton.left
+                                    right: parent.right
                                 }
-
-                                anchors.topMargin: 9
-                                anchors.leftMargin: 12
-                                anchors.rightMargin: 10
-
-                                height: 20
-
-                                text: dndRule.source !== "" ? dndRule.source : dndRule.appKey
+                                anchors.leftMargin: 4
+                                anchors.rightMargin: 4
+                                height: 24
+                                text: "DO NOT DISTURB  //  " + managerDndPolicies.count
                                 pixelSize: 13
                                 textColor: Colors.magenta
                                 glowColor: Colors.magenta
-                                elideMode: Text.ElideRight
+                                MouseArea {
+                                    anchors.fill: parent
+                                    onClicked: {
+                                        root.managerSelectionSection = "dnd";
+                                        root.listKeyboardSelectionActive = false;
+                                    }
+                                }
                             }
 
                             GohuText {
                                 anchors {
-                                    bottom: parent.bottom
+                                    top: dndManagerTitle.bottom
                                     left: parent.left
-                                    right: allowDndButton.left
-                                }
-
-                                anchors.bottomMargin: 9
-                                anchors.leftMargin: 12
-                                anchors.rightMargin: 10
-
-                                height: 16
-
-                                text: dndRule.sourceId !== "" ? dndRule.sourceId : dndRule.appKey
-                                font.pixelSize: 9
-                                color: Colors.cyan
-                                elide: Text.ElideRight
-                            }
-
-                            MiniButton {
-                                id: allowDndButton
-
-                                anchors {
-                                    verticalCenter: parent.verticalCenter
                                     right: parent.right
                                 }
+                                anchors.topMargin: 2
+                                anchors.leftMargin: 4
+                                anchors.rightMargin: 4
+                                height: 18
+                                text: "Sources stay suppressed until explicitly ALLOWED."
+                                font.pixelSize: 10
+                                color: Colors.white
+                                opacity: 0.72
+                            }
 
-                                anchors.rightMargin: 10
+                            ListView {
+                                id: dndManagerList
+                                anchors {
+                                    top: dndManagerTitle.bottom
+                                    bottom: parent.bottom
+                                    left: parent.left
+                                    right: parent.right
+                                }
+                                anchors.topMargin: 28
+                                clip: true
+                                spacing: 8
+                                boundsBehavior: Flickable.StopAtBounds
+                                model: managerDndPolicies
 
-                                width: 72
-                                height: 30
+                                delegate: Rectangle {
+                                    id: dndRule
+                                    required property string appKey
+                                    required property string source
+                                    required property string sourceId
+                                    width: dndManagerList.width
+                                    height: 64
+                                    color: "transparent"
+                                    border.width: root.listKeyboardSelectionActive
+                                        && root.managerSelectionSection === "dnd" && ListView.isCurrentItem ? 2 : 1
+                                    border.color: root.listKeyboardSelectionActive
+                                        && root.managerSelectionSection === "dnd" && ListView.isCurrentItem
+                                        ? Colors.orange : Colors.magenta
 
-                                label: "ALLOW"
-                                labelPixelSize: 10
-                                active: false
-
-                                onTriggered: {
-                                    NotificationsService.setDnd(dndRule.appKey, dndRule.sourceId, dndRule.source, false);
+                                    Rectangle {
+                                        anchors.fill: parent
+                                        color: Colors.dark
+                                        opacity: 0.52
+                                        z: -1
+                                    }
+                                    GlowText {
+                                        anchors {
+                                            top: parent.top
+                                            left: parent.left
+                                            right: allowDndButton.left
+                                        }
+                                        anchors.topMargin: 9
+                                        anchors.leftMargin: 12
+                                        anchors.rightMargin: 10
+                                        height: 20
+                                        text: dndRule.source !== "" ? dndRule.source : dndRule.appKey
+                                        pixelSize: 13
+                                        textColor: Colors.magenta
+                                        glowColor: Colors.magenta
+                                        elideMode: Text.ElideRight
+                                    }
+                                    GohuText {
+                                        anchors {
+                                            bottom: parent.bottom
+                                            left: parent.left
+                                            right: allowDndButton.left
+                                        }
+                                        anchors.bottomMargin: 9
+                                        anchors.leftMargin: 12
+                                        anchors.rightMargin: 10
+                                        height: 16
+                                        text: dndRule.sourceId !== "" ? dndRule.sourceId : dndRule.appKey
+                                        font.pixelSize: 9
+                                        color: Colors.cyan
+                                        elide: Text.ElideRight
+                                    }
+                                    MiniButton {
+                                        id: allowDndButton
+                                        anchors {
+                                            verticalCenter: parent.verticalCenter
+                                            right: parent.right
+                                        }
+                                        anchors.rightMargin: 10
+                                        width: 72
+                                        height: 30
+                                        label: "ALLOW"
+                                        labelPixelSize: 10
+                                        active: false
+                                        onTriggered: {
+                                            NotificationsService.setDnd(dndRule.appKey, dndRule.sourceId, dndRule.source, false);
+                                        }
+                                    }
                                 }
                             }
+                            NeonScrollBar {
+                                flickable: dndManagerList
+                                y: dndManagerList.y
+                                x: parent.width - width
+                                height: dndManagerList.height
+                                visible: dndManagerList.visible && scrollable
+                            }
+                            GlowText {
+                                anchors.centerIn: dndManagerList
+                                visible: managerDndPolicies.count === 0
+                                width: dndManagerList.width - 40
+                                height: 30
+                                text: "NO SOURCES ON DND"
+                                pixelSize: 12
+                                textColor: Colors.cyan
+                                glowColor: Colors.cyan
+                                horizontalAlignment: Text.AlignHCenter
+                            }
                         }
-                    }
-                    NeonScrollBar {
-                        flickable: dndManagerList
-                        visible: dndManagerList.visible && scrollable
-                    }
 
-                    GlowText {
-                        anchors.centerIn: dndManagerList
+                        Item {
+                            id: favoriteManagerSection
+                            anchors {
+                                top: dndManagerSection.bottom
+                                bottom: parent.bottom
+                                left: parent.left
+                                right: parent.right
+                            }
+                            anchors.topMargin: 14
 
-                        visible: managerDndPolicies.count === 0
-
-                        width: dndManagerList.width - 40
-                        height: 30
-
-                        text: "NO SOURCES ON DND"
-                        pixelSize: 12
-                        textColor: Colors.cyan
-                        glowColor: Colors.cyan
-                        horizontalAlignment: Text.AlignHCenter
+                            GlowText {
+                                id: favoriteManagerTitle
+                                anchors {
+                                    top: parent.top
+                                    left: parent.left
+                                    right: parent.right
+                                }
+                                anchors.leftMargin: 4
+                                anchors.rightMargin: 4
+                                height: 24
+                                text: "FAVORITES  //  " + NotificationsService.favoriteSources.count
+                                pixelSize: 13
+                                textColor: Colors.magenta
+                                glowColor: Colors.magenta
+                                MouseArea {
+                                    anchors.fill: parent
+                                    onClicked: {
+                                        root.managerSelectionSection = "favorites";
+                                        root.listKeyboardSelectionActive = false;
+                                    }
+                                }
+                            }
+                            GohuText {
+                                anchors {
+                                    top: favoriteManagerTitle.bottom
+                                    left: parent.left
+                                    right: parent.right
+                                }
+                                anchors.topMargin: 2
+                                anchors.leftMargin: 4
+                                anchors.rightMargin: 4
+                                height: 18
+                                text: "UNFAV removes the star, not saved notifications."
+                                font.pixelSize: 10
+                                color: Colors.white
+                                opacity: 0.72
+                            }
+                            ListView {
+                                id: favoriteManagerList
+                                anchors {
+                                    top: favoriteManagerTitle.bottom
+                                    bottom: parent.bottom
+                                    left: parent.left
+                                    right: parent.right
+                                }
+                                anchors.topMargin: 28
+                                clip: true
+                                spacing: 8
+                                boundsBehavior: Flickable.StopAtBounds
+                                model: NotificationsService.favoriteSources
+                                delegate: Rectangle {
+                                    id: favoriteRule
+                                    required property string appKey
+                                    required property string source
+                                    required property string sourceId
+                                    width: favoriteManagerList.width
+                                    height: 64
+                                    color: "transparent"
+                                    border.width: root.listKeyboardSelectionActive
+                                        && root.managerSelectionSection === "favorites" && ListView.isCurrentItem ? 2 : 1
+                                    border.color: root.listKeyboardSelectionActive
+                                        && root.managerSelectionSection === "favorites" && ListView.isCurrentItem
+                                        ? Colors.orange : Colors.magenta
+                                    Rectangle {
+                                        anchors.fill: parent
+                                        color: Colors.dark
+                                        opacity: 0.52
+                                        z: -1
+                                    }
+                                    GlowText {
+                                        anchors {
+                                            top: parent.top
+                                            left: parent.left
+                                            right: removeFavoriteButton.left
+                                        }
+                                        anchors.topMargin: 9
+                                        anchors.leftMargin: 12
+                                        anchors.rightMargin: 10
+                                        height: 20
+                                        text: "✦  " + (favoriteRule.source !== "" ? favoriteRule.source : favoriteRule.appKey)
+                                        pixelSize: 13
+                                        textColor: Colors.magenta
+                                        glowColor: Colors.magenta
+                                        elideMode: Text.ElideRight
+                                    }
+                                    GohuText {
+                                        anchors {
+                                            bottom: parent.bottom
+                                            left: parent.left
+                                            right: removeFavoriteButton.left
+                                        }
+                                        anchors.bottomMargin: 9
+                                        anchors.leftMargin: 12
+                                        anchors.rightMargin: 10
+                                        height: 16
+                                        text: favoriteRule.sourceId !== "" ? favoriteRule.sourceId : favoriteRule.appKey
+                                        font.pixelSize: 9
+                                        color: Colors.cyan
+                                        elide: Text.ElideRight
+                                    }
+                                    MiniButton {
+                                        id: removeFavoriteButton
+                                        anchors {
+                                            verticalCenter: parent.verticalCenter
+                                            right: parent.right
+                                        }
+                                        anchors.rightMargin: 10
+                                        width: 72
+                                        height: 30
+                                        label: "UNFAV"
+                                        labelPixelSize: 10
+                                        active: true
+                                        activeColor: Colors.magenta
+                                        onTriggered: {
+                                            NotificationsService.setFavorite(favoriteRule.appKey, favoriteRule.sourceId, favoriteRule.source, false);
+                                        }
+                                    }
+                                }
+                            }
+                            NeonScrollBar {
+                                flickable: favoriteManagerList
+                                y: favoriteManagerList.y
+                                x: parent.width - width
+                                height: favoriteManagerList.height
+                                visible: favoriteManagerList.visible && scrollable
+                            }
+                            GlowText {
+                                anchors.centerIn: favoriteManagerList
+                                visible: NotificationsService.favoriteSources.count === 0
+                                width: favoriteManagerList.width - 40
+                                height: 30
+                                text: "NO FAVORITE SOURCES"
+                                pixelSize: 12
+                                textColor: Colors.cyan
+                                glowColor: Colors.cyan
+                                horizontalAlignment: Text.AlignHCenter
+                            }
+                        }
                     }
                 }
 
@@ -2132,7 +2304,7 @@ PanelWindow {
 
                         readonly property string appKey: root.appKeyFor(notificationEntry.sourceId, notificationEntry.source)
 
-                        readonly property var sharedAppState: root.stateForApp(notificationEntry.appKey)
+                        readonly property bool favorite: NotificationsService.favoritesRevision >= 0 && NotificationsService.isFavorite(notificationEntry.appKey)
 
                         readonly property bool snoozed: NotificationsService.policyRevision >= 0 && NotificationsService.isSnoozed(notificationEntry.appKey)
                         readonly property bool dnd: NotificationsService.policyRevision >= 0 && NotificationsService.isDnd(notificationEntry.appKey)
@@ -2146,9 +2318,9 @@ PanelWindow {
                         readonly property color baseColor: root.baseColorForTone(notificationEntry.baseTone)
 
                         // Favorite is a VISUAL OVERRIDE, not a base category.
-                        readonly property color notificationColor: notificationEntry.sharedAppState.favorite === true ? Colors.magenta : notificationEntry.baseColor
+                        readonly property color notificationColor: notificationEntry.favorite ? Colors.magenta : notificationEntry.baseColor
 
-                        readonly property color sourceColor: notificationEntry.sharedAppState.favorite === true ? Colors.magenta : notificationEntry.baseColor
+                        readonly property color sourceColor: notificationEntry.favorite ? Colors.magenta : notificationEntry.baseColor
 
                         readonly property url resolvedAppIcon: root.resolveAppIcon(notificationEntry.appIcon, notificationEntry.sourceId)
 
@@ -2270,7 +2442,7 @@ PanelWindow {
 
                                 z: 2
 
-                                active: notificationEntry.sharedAppState.favorite === true
+                                active: notificationEntry.favorite
 
                                 activeColor: Colors.magenta
 
@@ -2279,7 +2451,7 @@ PanelWindow {
                                 labelPixelSize: 17
 
                                 onTriggered: {
-                                    root.toggleAppFlag(notificationEntry.appKey, "favorite");
+                                    NotificationsService.toggleFavorite(notificationEntry.appKey, notificationEntry.sourceId, notificationEntry.source);
                                 }
                             }
 

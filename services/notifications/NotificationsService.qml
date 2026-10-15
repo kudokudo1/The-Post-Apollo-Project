@@ -12,6 +12,8 @@ Singleton {
     property ListModel notifications: ListModel {}
     property ListModel activeNotifications: ListModel {}
     property ListModel sourcePolicies: ListModel {}
+    // Independent from DND/snooze: starring a source never suppresses it.
+    property ListModel favoriteSources: ListModel {}
 
     property int normalTimeoutMs: 5000
     property int extendedTimeoutMs: 10000
@@ -35,6 +37,11 @@ Singleton {
     property int policyRevision: 0
     property int defaultSnoozeDurationMs: 24 * 60 * 60 * 1000
 
+    property int favoriteVersion: 1
+    property bool favoritesReady: false
+    property string favoritesStatus: "loading"
+    property int favoritesRevision: 0
+
     function markNotificationsChanged() {
         notificationsRevision += 1;
     }
@@ -50,6 +57,62 @@ Singleton {
             return sourceText;
 
         return "unknown";
+    }
+
+    // Favorites are source-wide, just like the card star, but are persisted
+    // separately from suppression policies and notification history.
+    function favoriteIndex(appKey) {
+        const key = String(appKey || "").trim().toLowerCase();
+        if (key === "")
+            return -1;
+        for (let i = 0; i < favoriteSources.count; i++) {
+            if (String(favoriteSources.get(i).appKey || "") === key)
+                return i;
+        }
+        return -1;
+    }
+
+    function isFavorite(appKey) {
+        return favoriteIndex(appKey) !== -1;
+    }
+
+    function setFavorite(appKey, sourceId, source, enabled) {
+        const key = String(appKey || sourceKey(sourceId, source)).trim().toLowerCase();
+        if (key === "")
+            return;
+        const index = favoriteIndex(key);
+        if (enabled === true) {
+            if (index === -1) {
+                favoriteSources.append({
+                    "appKey": key,
+                    "source": String(source || ""),
+                    "sourceId": String(sourceId || "")
+                });
+            } else {
+                // Preserve useful names for the Manager even when a newer
+                // notification updates an app's displayed identity.
+                const existing = favoriteSources.get(index);
+                const name = String(source || "");
+                const desktop = String(sourceId || "");
+                if (name === "" && desktop === "")
+                    return;
+                if (name !== "" && name !== String(existing.source || ""))
+                    favoriteSources.setProperty(index, "source", name);
+                if (desktop !== "" && desktop !== String(existing.sourceId || ""))
+                    favoriteSources.setProperty(index, "sourceId", desktop);
+                // No model change needed if identity is unchanged.
+            }
+        } else {
+            if (index === -1)
+                return;
+            favoriteSources.remove(index);
+        }
+        favoritesRevision += 1;
+        scheduleFavoritesSave();
+    }
+
+    function toggleFavorite(appKey, sourceId, source) {
+        setFavorite(appKey, sourceId, source, !isFavorite(appKey));
     }
 
     function policyIndex(appKey) {
@@ -771,6 +834,100 @@ Singleton {
         onTriggered: {
             root.saveHistory();
         }
+    }
+
+    // ===== FAVORITES STORAGE ====================================
+    // Keep favorite identities without storing message bodies, and do not
+    // mix preference state into DND/snooze policy records.
+
+    function favoriteDocument() {
+        const entries = [];
+        for (let i = 0; i < favoriteSources.count; i++) {
+            const entry = favoriteSources.get(i);
+            entries.push({
+                "appKey": String(entry.appKey || ""),
+                "source": String(entry.source || ""),
+                "sourceId": String(entry.sourceId || "")
+            });
+        }
+        return {
+            "version": favoriteVersion,
+            "savedAt": Date.now(),
+            "favorites": entries
+        };
+    }
+
+    function scheduleFavoritesSave() {
+        if (favoritesReady)
+            favoritesSaveTimer.restart();
+    }
+
+    function saveFavorites() {
+        if (!favoritesReady)
+            return;
+        favoritesStatus = "saving";
+        favoritesFile.setText(JSON.stringify(favoriteDocument(), null, 4) + "\n");
+    }
+
+    function loadFavorites() {
+        const raw = favoritesFile.text().trim();
+        if (raw === "")
+            return;
+        let document;
+        try {
+            document = JSON.parse(raw);
+        } catch (error) {
+            favoritesStatus = "parse-error";
+            return;
+        }
+        const entries = Array.isArray(document.favorites) ? document.favorites : [];
+        favoriteSources.clear();
+        for (let i = 0; i < entries.length; i++) {
+            const row = entries[i] || {};
+            const key = String(row.appKey || sourceKey(row.sourceId, row.source)).trim().toLowerCase();
+            if (key === "" || favoriteIndex(key) !== -1)
+                continue;
+            favoriteSources.append({
+                "appKey": key,
+                "source": String(row.source || ""),
+                "sourceId": String(row.sourceId || "")
+            });
+        }
+        favoritesRevision += 1;
+    }
+
+    FileView {
+        id: favoritesFile
+        path: Quickshell.dataPath("notification-favorites.json")
+        atomicWrites: true
+        printErrors: true
+
+        onLoaded: {
+            root.loadFavorites();
+            root.favoritesReady = true;
+            if (root.favoritesStatus !== "parse-error")
+                root.favoritesStatus = "ready";
+        }
+
+        onLoadFailed: function(error) {
+            root.favoritesReady = true;
+            if (error === FileViewError.FileNotFound) {
+                root.favoritesStatus = "new";
+                root.saveFavorites();
+            } else {
+                root.favoritesStatus = "load-error";
+            }
+        }
+
+        onSaved: root.favoritesStatus = "saved"
+        onSaveFailed: function(error) { root.favoritesStatus = "save-error"; }
+    }
+
+    Timer {
+        id: favoritesSaveTimer
+        interval: 250
+        repeat: false
+        onTriggered: root.saveFavorites()
     }
 
     // ===== POLICY STORAGE ======================================

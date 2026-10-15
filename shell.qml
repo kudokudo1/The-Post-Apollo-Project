@@ -116,8 +116,10 @@ PanelWindow {
         hostOwner: shellRoot.controlKeyboardOwner
 
         onOwnerChanged: {
-            if (active && (owner === "git" || owner === "hospital"
-                           || owner === "notifications"))
+            // Koinoikos selection and the shared logical keyboard owner must
+            // agree for EVERY registered widget. The coordinator grants an
+            // Exclusive pulse only to the adapters that already use it.
+            if (active && owner !== "")
                 keyboardOwnership.claim(owner, "koinoikos");
         }
 

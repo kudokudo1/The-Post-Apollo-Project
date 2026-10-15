@@ -6,6 +6,15 @@ import qs.services.notifications
 PanelWindow {
     id: notificationsWindow
 
+    // Display the latest activity time for a continuing event; ordinary
+    // notifications display their receipt time. Qt formats in local time.
+    function eventTimestamp(createdAt, updatedAt) {
+        const first = Number(createdAt || 0);
+        const last = Number(updatedAt || 0);
+        const time = last > first ? last : first;
+        return time > 0 ? Qt.formatDateTime(new Date(time), "MM/dd/yy  h:mm AP") : "TIME UNKNOWN";
+    }
+
     // ===== WINDOW ===============================================
 
     // The visible card remains 420x150. The native window is slightly larger
@@ -53,7 +62,8 @@ PanelWindow {
 
         onTriggered: {
             NotificationsService.pushRich({
-                "id": "apollo-structure-test",
+                // Each launch is a new occurrence, not an update to one
+                // permanent test ID. NotificationsService assigns a unique ID.
                 "source": "META APOLLO",
                 "title": "STRUCTURED DATA TEST",
                 "message": "Testing rich history data.",
@@ -113,6 +123,8 @@ PanelWindow {
                 required property string image
                 required property string category
                 required property string severity
+                required property double createdAt
+                required property double updatedAt
 
                 anchors.fill: parent
 
@@ -158,9 +170,18 @@ PanelWindow {
 
                     anchors.leftMargin: 15
                     anchors.rightMargin: 15
-                    anchors.topMargin: 13
+                    anchors.topMargin: 8
 
-                    spacing: 5
+                    spacing: 4
+
+                    GohuText {
+                        width: parent.width
+
+                        text: notificationsWindow.eventTimestamp(notificationCard.createdAt, notificationCard.updatedAt)
+                        color: Colors.cyan
+                        font.pixelSize: 10
+                        elide: Text.ElideRight
+                    }
 
                     Text {
                         width: parent.width

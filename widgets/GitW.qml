@@ -17,6 +17,12 @@ PanelWindow {
     readonly property int passiveGitOpenFreshnessMs: 8000
     property double lastGitPublishedAtMs: 0
     property string lastGitPublishedRepoPath: ""
+    // Workflow/run freshness is independent of local Git topology.
+    // The existing 15-second GitHub polling timer remains authoritative.
+    readonly property int passiveGithubPageFreshnessMs: 15000
+    property double lastGithubPublishedAtMs: 0
+    property string lastGithubPublishedRepoSlug: ""
+    property string githubRefreshStartedSlug: ""
     property bool keyboardActive: true
     property bool keyboardLock: false
     property bool relationshipFocusModeActive: false
@@ -1172,12 +1178,50 @@ PanelWindow {
         root.restoreGitNavigationContext(context);
     }
 
+    function gitSnapshotFresh() {
+        const elapsedSincePublish = Date.now() - root.lastGitPublishedAtMs;
+        return gitService.available
+            && !gitService.lastError
+            && root.lastGitPublishedRepoPath === gitService.repoPath
+            && root.lastGitPublishedAtMs > 0
+            && elapsedSincePublish >= 0
+            && elapsedSincePublish < root.passiveGitOpenFreshnessMs;
+    }
+
+    function ensureGitSnapshot() {
+        if (!root.gitSnapshotFresh() && !gitService.refreshing)
+            gitService.refresh();
+    }
+
+    function githubSnapshotFresh() {
+        const elapsedSincePublish = Date.now() - root.lastGithubPublishedAtMs;
+        return githubService.available
+            && !githubService.lastError
+            && root.lastGithubPublishedRepoSlug === githubService.repoSlug
+            && root.lastGithubPublishedAtMs > 0
+            && elapsedSincePublish >= 0
+            && elapsedSincePublish < root.passiveGithubPageFreshnessMs;
+    }
+
+    function ensureGithubSnapshot() {
+        if (githubService.refreshing || root.githubSnapshotFresh())
+            return;
+
+        // Do not repeatedly spawn PX probes for an invalid origin while
+        // someone switches tabs. A newly valid slug still refreshes.
+        if (!githubService.repoSlug
+                && githubService.lastError === "ORIGIN IS NOT A GITHUB REPOSITORY")
+            return;
+
+        githubService.refresh();
+    }
+
     function showGitPage() {
         root.workflowMenuOpen = false;
         root.localTargetMenuOpen = false;
         root.runInspectorOpen = false;
         root.activePage = "git";
-        gitService.refresh();
+        root.ensureGitSnapshot();
 
         if (root.gitView === "branches")
             branchWorkspaceService.refresh();
@@ -1614,8 +1658,8 @@ PanelWindow {
         root.localTargetMenuOpen = false;
         root.remoteTargetMenuOpen = false;
         root.activePage = "github";
-        gitService.refresh();
-        githubService.refresh();
+        root.ensureGitSnapshot();
+        root.ensureGithubSnapshot();
     }
 
     function showGithubControl() {
@@ -2077,18 +2121,8 @@ PanelWindow {
             return;
         }
 
-        // Avoid rebuilding every remote branch on each rapid open/close.
-        // The menu remains live; only redundant passive scans are skipped.
-        const elapsedSincePublish = Date.now() - root.lastGitPublishedAtMs;
-        const recentSnapshot =
-            gitService.available
-            && !gitService.lastError
-            && root.lastGitPublishedRepoPath === gitService.repoPath
-            && root.lastGitPublishedAtMs > 0
-            && elapsedSincePublish >= 0
-            && elapsedSincePublish < root.passiveGitOpenFreshnessMs;
-        if (!recentSnapshot && !gitService.refreshing)
-            gitService.refresh();
+        // Dock open and mode switching share the same bounded local cache.
+        root.ensureGitSnapshot();
 
         if (root.activePage === "git"
                 && root.gitView === "branches")
@@ -2106,7 +2140,7 @@ PanelWindow {
         }
 
         if (root.activePage === "github")
-            githubService.refresh();
+            root.ensureGithubSnapshot();
 
         Qt.callLater(root.ensureGitKeyboardControl);
         root.restoreGitKeyboardFocus(true);
@@ -2544,6 +2578,18 @@ PanelWindow {
 
     Connections {
         target: githubService
+
+        function onRefreshingChanged() {
+            if (githubService.refreshing) {
+                // Capture the identity at request start so completion of a
+                // previous repository cannot validate a new repository.
+                root.githubRefreshStartedSlug = githubService.repoSlug;
+            } else if (githubService.available && !githubService.lastError
+                    && root.githubRefreshStartedSlug === githubService.repoSlug) {
+                root.lastGithubPublishedAtMs = Date.now();
+                root.lastGithubPublishedRepoSlug = githubService.repoSlug;
+            }
+        }
 
         function onWorkflowsChanged() {
             if (githubService.workflows.length === 0)

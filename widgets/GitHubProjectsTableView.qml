@@ -384,6 +384,7 @@ Item {
 
                                     Components.ActionButton {
                                         width: 26
+                                        height: 26
                                         label:
                                             root.itemActionArmed(
                                                 "remove",

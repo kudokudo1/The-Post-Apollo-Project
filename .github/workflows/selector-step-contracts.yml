@@ -1,0 +1,33 @@
+name: Selector STEP Contracts
+
+on:
+  pull_request:
+    paths:
+      - "components/SelectorSlider.qml"
+      - "widgets/GitW.qml"
+      - "widgets/HospitalW.qml"
+      - "SelectorStepTest.qml"
+      - "tests/fixtures/SelectorSliderStepDemo.qml"
+      - "tests/components/test_selector_slider_step_profile.py"
+      - ".github/workflows/selector-step-contracts.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "components/SelectorSlider.qml"
+      - "widgets/GitW.qml"
+      - "widgets/HospitalW.qml"
+      - "SelectorStepTest.qml"
+      - "tests/fixtures/SelectorSliderStepDemo.qml"
+      - "tests/components/test_selector_slider_step_profile.py"
+      - ".github/workflows/selector-step-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  step-profile-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run STEP source and detent numeric contracts
+        run: python3 tests/components/test_selector_slider_step_profile.py

@@ -27,6 +27,12 @@ Rectangle {
     property real rangeStep: 1
     property color rangeLowerColor: Colors.magenta
     property color rangeUpperColor: Colors.orange
+    readonly property bool rangePreviewActive:
+        rangeMode && rangeSurface.previewActive
+    readonly property real rangePreviewLower: rangeMode
+        ? rangeSurface.displayLower : lowerValue
+    readonly property real rangePreviewUpper: rangeMode
+        ? rangeSurface.displayUpper : upperValue
     signal rangeRequested(real lower, real upper)
     property real minimumValue: 0
     property real maximumValue: 100

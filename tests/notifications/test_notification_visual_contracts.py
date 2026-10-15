@@ -133,4 +133,19 @@ for needle, description in (
 ):
     require(HUB, needle, description)
 
+# Native action controls are conditional: the existing 420x150 popup
+# geometry must not change for ordinary notifications.
+for needle, message in (
+    ("implicitWidth: 444", "native window glow gutter preserved"),
+    ("implicitHeight: 164", "native window height preserved"),
+    ("height: 150", "visible popup card height preserved"),
+    ("id: externalActionRow", "native action row exists"),
+    ("visible: notificationCard.externalActions.length > 0", "actions hidden when no live callbacks exist"),
+    ("model: notificationCard.externalActions", "actions are backed by live model"),
+    ("anchors.bottom: externalActionRow.visible ? externalActionRow.top : undefined", "text stops above actions"),
+    ("maximumLineCount: externalActionRow.visible ? 2 : 3", "message height adapts to action row"),
+    ("NotificationsService.invokeExternalAction(", "native action click is connected"),
+):
+    require(POPUP, needle, message)
+
 print("Notification visual contracts: PASS")

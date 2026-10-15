@@ -115,6 +115,7 @@ PanelWindow {
                 id: notificationCard
 
                 required property int index
+                required property string notificationId
                 required property string source
                 required property string sourceId
                 required property string title
@@ -125,6 +126,11 @@ PanelWindow {
                 required property string severity
                 required property double createdAt
                 required property double updatedAt
+
+                // Source-backed actions are displayed only while their
+                // originating native notification remains callable.
+                readonly property var externalActions: NotificationsService.externalActionsRevision >= 0
+                    ? NotificationsService.externalActionsFor(notificationCard.notificationId) : []
 
                 anchors.fill: parent
 
@@ -171,6 +177,9 @@ PanelWindow {
                     anchors.leftMargin: 15
                     anchors.rightMargin: 15
                     anchors.topMargin: 8
+                    anchors.bottom: externalActionRow.visible ? externalActionRow.top : undefined
+                    anchors.bottomMargin: externalActionRow.visible ? 4 : 0
+                    clip: externalActionRow.visible
 
                     spacing: 4
 
@@ -218,7 +227,7 @@ PanelWindow {
 
                         wrapMode: Text.Wrap
 
-                        maximumLineCount: 3
+                        maximumLineCount: externalActionRow.visible ? 2 : 3
 
                         elide: Text.ElideRight
                     }
@@ -226,11 +235,68 @@ PanelWindow {
                     Text {
                         width: parent.width
 
+                        visible: !externalActionRow.visible
                         text: "CATEGORY: " + notificationCard.category + "    SEVERITY: " + notificationCard.severity
 
                         color: Colors.cyan
 
                         font.pixelSize: 10
+                    }
+                }
+
+                // Native notification actions. Unlike historical metadata,
+                // these are forwarded to the original sender using the live
+                // QsNotification action objects held ONLY in the service.
+                Row {
+                    id: externalActionRow
+                    anchors {
+                        bottom: parent.bottom
+                        right: parent.right
+                    }
+                    anchors.bottomMargin: 9
+                    anchors.rightMargin: 13
+                    spacing: 6
+                    visible: notificationCard.externalActions.length > 0
+                    z: 3
+
+                    Repeater {
+                        model: notificationCard.externalActions
+                        delegate: Rectangle {
+                            id: nativeActionButton
+                            required property var modelData
+
+                            width: Math.min(106, Math.max(60, nativeActionLabel.implicitWidth + 16))
+                            height: 25
+                            radius: 2
+                            color: nativeActionMouse.containsMouse ? Colors.orange : Colors.black
+                            border.width: 1
+                            border.color: Colors.cyan
+
+                            GohuText {
+                                id: nativeActionLabel
+                                anchors.fill: parent
+                                anchors.margins: 3
+                                text: nativeActionButton.modelData.label
+                                color: nativeActionMouse.containsMouse ? Colors.black : Colors.cyan
+                                font.pixelSize: 10
+                                elide: Text.ElideRight
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                            MouseArea {
+                                id: nativeActionMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    NotificationsService.invokeExternalAction(
+                                        notificationCard.notificationId,
+                                        nativeActionButton.modelData.identifier
+                                    );
+                                }
+                            }
+                        }
                     }
                 }
 

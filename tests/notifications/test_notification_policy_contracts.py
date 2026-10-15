@@ -174,4 +174,29 @@ assert 'cancelClearAll()' in escape_logic, "Esc must cancel confirmation"
 assert 'close()' in escape_logic, "Esc must close the hub"
 assert "WlrKeyboardFocus.OnDemand" in hub, "keep existing local window focus behavior"
 
+# Chromium native notifications require the advertised actions capability.
+# This must have real, live-only invocation, never just a capability flag.
+require(SERVICE, "actionsSupported: true", "native action compatibility must be advertised")
+require(SERVICE, "bodySupported: true", "standard body capability must remain advertised")
+require(SERVICE, "function trackExternalNotification(eventId, nativeNotification, converted)", "native action lifetimes must be tracked")
+require(SERVICE, "nativeNotification.closed.connect(function(reason)", "sender closure must dispose native action references")
+require(SERVICE, "function releaseExternalNotification(eventId)", "native callback registry must be released")
+require(SERVICE, "function externalActionsFor(eventId)", "popup must be able to query live action labels")
+require(SERVICE, "function invokeExternalAction(eventId, actionIdentifier)", "actions must route by live event ID")
+require(SERVICE, "action.invoke();", "originating app must receive action click")
+require(SERVICE, "function expireExternalNotifications()", "orphaned native actions must expire")
+require(SERVICE, "live.notification.expire();", "expired native notifications must be signalled to sender")
+require(SERVICE, 'property var liveExternalNotifications: ({})', "native Qt objects must not enter persistent models")
+
+native_history = read(SERVICE).split("    function historySnapshot(")[1].split("    function historyDocument()")[0]
+assert "liveExternalNotifications" not in native_history, "live native objects must never enter persisted history"
+assert '"notification": nativeNotification' not in native_history, "persist only serializable history metadata"
+
+require("modules/Notifications.qml", "required property string notificationId", "popup must carry native event identity")
+require("modules/Notifications.qml", "id: externalActionRow", "popup must render live-action buttons")
+require("modules/Notifications.qml", "NotificationsService.externalActionsFor(notificationCard.notificationId)", "popup must resolve only live actions")
+require("modules/Notifications.qml", "NotificationsService.invokeExternalAction(", "popup action click must reach service")
+require("modules/Notifications.qml", "nativeActionButton.modelData.identifier", "actions must be matched by identifier, not index")
+require(SERVICE, '"notificationId": String(eventId)', "popup delegate must receive a safe event ID role")
+
 print("Notification policy contracts: PASS")

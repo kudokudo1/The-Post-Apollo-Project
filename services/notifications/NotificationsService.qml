@@ -11,6 +11,10 @@ Singleton {
 
     property ListModel notifications: ListModel {}
     property ListModel activeNotifications: ListModel {}
+    // Native notification/action objects must NEVER enter a ListModel or the
+    // persistent JSON history. They exist only while the sender is live.
+    property var liveExternalNotifications: ({})
+    property int externalActionsRevision: 0
     property ListModel sourcePolicies: ListModel {}
     // Independent from DND/snooze: starring a source never suppresses it.
     property ListModel favoriteSources: ListModel {}
@@ -299,23 +303,117 @@ Singleton {
         id: notificationServer
 
         keepOnReload: false
+        // Chromium requires the standard body + actions capabilities to
+        // select the desktop-native notifications backend.
+        bodySupported: true
+        actionsSupported: true
 
         onNotification: function (notification) {
             notification.tracked = true;
 
-            // root.pushConverted({
-            //     "source": "CONVERTER BYPASS",
-            //     "title": notification.summary,
-            //     "message": notification.body
-            // });
+            // Each native delivery gets an independent history ID. The live
+            // QObject remains exclusively in this service's transient map.
+            const eventId = root.makeNotificationId();
+            const converted = NotificationsBackend.NotificationsConverter.convert(notification);
+            converted.id = eventId;
+            root.pushConverted(converted);
+            root.trackExternalNotification(eventId, notification, converted);
+        }
+    }
 
-            // root.push(
-            //     "EXTERNAL",
-            //     notification.summary,
-            //     notification.body
-            // );
+    // ===== NATIVE ACTIONS =======================================
+    // Quickshell's NotificationAction.invoke() signals the originating
+    // application. Never serialize a QML/QObject callback into history.
+    // A saved or expired event MUST NOT be able to trigger an action.
 
-            root.pushConverted(NotificationsBackend.NotificationsConverter.convert(notification));
+    function trackExternalNotification(eventId, nativeNotification, converted) {
+        const id = String(eventId || "");
+        if (id === "")
+            return;
+
+        const next = Object.assign({}, liveExternalNotifications);
+        next[id] = {
+            "notification": nativeNotification,
+            "expiresAt": Date.now() + timeoutFor(normalize(converted))
+        };
+        liveExternalNotifications = next;
+        externalActionsRevision += 1;
+
+        // Release native objects before Qt destroys them. No destroyed
+        // QObject reference is ever retained for saved history.
+        nativeNotification.closed.connect(function(reason) {
+            root.releaseExternalNotification(id);
+        });
+    }
+
+    function releaseExternalNotification(eventId) {
+        const id = String(eventId || "");
+        if (!Object.prototype.hasOwnProperty.call(liveExternalNotifications, id))
+            return;
+        const next = Object.assign({}, liveExternalNotifications);
+        delete next[id];
+        liveExternalNotifications = next;
+        externalActionsRevision += 1;
+
+        // A sender-closed event should no longer have an active popup.
+        const activeIndex = indexOfNotification(activeNotifications, id);
+        if (activeIndex !== -1)
+            activeNotifications.remove(activeIndex);
+        // Do not remove the retained history item.
+    }
+
+    function externalActionsFor(eventId) {
+        const live = liveExternalNotifications[String(eventId || "")];
+        if (!live || live.expiresAt <= Date.now())
+            return [];
+        const nativeActions = live.notification.actions || [];
+        const result = [];
+        // Bound the popup control surface; no action ever fires by index.
+        for (let i = 0; i < nativeActions.length && result.length < 3; i++) {
+            const action = nativeActions[i];
+            if (!action)
+                continue;
+            const identifier = String(action.identifier || "");
+            if (identifier === "")
+                continue;
+            result.push({
+                "identifier": identifier,
+                "label": String(action.text || (identifier === "default" ? "OPEN" : "ACTION"))
+            });
+        }
+        return result;
+    }
+
+    function invokeExternalAction(eventId, actionIdentifier) {
+        const id = String(eventId || "");
+        const identifier = String(actionIdentifier || "");
+        const live = liveExternalNotifications[id];
+        if (!live || live.expiresAt <= Date.now() || identifier === "")
+            return false;
+
+        const nativeActions = live.notification.actions || [];
+        for (let i = 0; i < nativeActions.length; i++) {
+            const action = nativeActions[i];
+            if (action && String(action.identifier || "") === identifier) {
+                action.invoke();
+                // Quickshell closes nonresident native notifications itself.
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function expireExternalNotifications() {
+        const now = Date.now();
+        const ids = Object.keys(liveExternalNotifications);
+        for (let i = 0; i < ids.length; i++) {
+            const id = ids[i];
+            const live = liveExternalNotifications[id];
+            if (!live || Number(live.expiresAt || 0) > now)
+                continue;
+            // Forget first so a synchronous Qt close signal is harmless.
+            releaseExternalNotification(id);
+            live.notification.expire();
         }
     }
 
@@ -331,10 +429,13 @@ Singleton {
         const now = Date.now();
 
         const createdAt = notification.createdAt !== undefined ? Number(notification.createdAt) : now;
+        const eventId = notification.id || makeNotificationId();
 
         return {
             // Identity
-            "id": notification.id || makeNotificationId(),
+            "id": eventId,
+            // Alias for Repeater delegates where QML reserves the id keyword.
+            "notificationId": String(eventId),
 
             // Source
             "source": notification.source || "",
@@ -1116,6 +1217,8 @@ Singleton {
     // ===== EXPIRATION ===========================================
 
     function expireActiveNotifications() {
+        // Close expired native notifications as well as fading the UI.
+        expireExternalNotifications();
         const now = Date.now();
 
         for (let i = activeNotifications.count - 1; i >= 0; i--) {
@@ -1133,6 +1236,7 @@ Singleton {
         repeat: true
 
         running: root.activeNotifications.count > 0
+            || Object.keys(root.liveExternalNotifications).length > 0
 
         onTriggered: {
             root.expireActiveNotifications();

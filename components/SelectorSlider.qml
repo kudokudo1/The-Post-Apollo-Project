@@ -70,7 +70,7 @@ Rectangle {
     }
 
     function requestDragValue(handleY) {
-        if (!valueMode || !enabledSlider)
+        if (!valueMode || !enabledSlider || !validValueDomain)
             return;
         const next = reportedValue(valueForHandleY(handleY));
         if (next === lastDragRequestedValue
@@ -82,7 +82,7 @@ Rectangle {
     }
 
     function stepValue(direction) {
-        if (!valueMode || !enabledSlider
+        if (!valueMode || !enabledSlider || !validValueDomain
                 || !Number.isFinite(valueStep) || valueStep <= 0)
             return;
         const next = reportedValue(clampedValue(currentValue)

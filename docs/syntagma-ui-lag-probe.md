@@ -114,4 +114,4 @@ deferred callbacks, model signals, JS bindings, and service result
 processing. Do not infer the precise function from the gap alone.
 
 Existing evidence ledger:
-`docs/syntagma-main-thread-freeze-evidence-20261013.md`.
+`EVIDENCE/syntagma-main-thread-freeze-evidence-20261013.md`.

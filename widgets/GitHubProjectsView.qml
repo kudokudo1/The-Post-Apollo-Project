@@ -430,6 +430,7 @@ Item {
             }
 
         SectionFrame {
+                id: projectsFrame
                 x: root.projectExpanded ? 0 : 190
                 y: 0
                 width: root.projectExpanded ? parent.width : parent.width - 190
@@ -1060,12 +1061,12 @@ Item {
                         // its live Column y keeps the star rail beside the
                         // cards, not up among the project title/buttons.
                         mountingParent: mapScroll.parent.parent
-                        // Center the full star track in the gap reserved
-                        // between the Board cards and the viewport's right edge.
-                        // Uses the actual lane width and scrollbar width, not
-                        // a hard-coded inset that left-aligns the star.
+                        // The visible gap includes the content's 20px lane
+                        // AND SectionFrame's unused right inset. Center in
+                        // that full optical gap, without changing card widths.
                         x: mapScroll.parent.x + mapScroll.x + laneColumn.width
-                           + Math.round((mapScroll.width - laneColumn.width - width) / 2)
+                           + Math.round((mapScroll.width - laneColumn.width
+                                         + projectsFrame.rightInset - width) / 2)
                         y: mapScroll.parent.y + mapScroll.y + effectiveTopInset
                         visible: mapScroll.visible && scrollable
                     }

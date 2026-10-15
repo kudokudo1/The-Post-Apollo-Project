@@ -143,6 +143,7 @@ Item {
         }
 
         SectionFrame {
+            id: roadmapFrame
             width: parent.width
             height: parent.height - 38
             fillColor: Colors.black
@@ -162,7 +163,8 @@ Item {
                 Column {
                     id: roadmapColumn
 
-                    width: roadmapScroll.width
+                    // Keep the last action controls clear of the star.
+                    width: Math.max(0, roadmapScroll.width - 20)
                     spacing: 5
 
                     Row {
@@ -647,7 +649,14 @@ Item {
                     }
                 }
             }
-            NeonScrollBar { flickable: roadmapScroll; handleStyle: "star" }
+            NeonScrollBar {
+                flickable: roadmapScroll
+                handleStyle: "star"
+                // Use the complete visible lane, including frame padding.
+                x: roadmapScroll.x + roadmapColumn.width
+                   + Math.round((roadmapScroll.width - roadmapColumn.width
+                                 + roadmapFrame.rightInset - width) / 2)
+            }
         }
     }
 }

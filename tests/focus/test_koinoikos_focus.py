@@ -334,4 +334,34 @@ assert diag.summarize_event({"binding": {"command": 'mode "Koinoikos Focus"'}}) 
        == 'binding:mode "Koinoikos Focus"'
 assert diag.summarize_event({"change": "focus"}) == "window:focus"
 
+# Stage 2 optional navigation-event trace: default OFF, never consume keys.
+# This instrument is not evidence of seat ownership until the operator
+# observes the keyboard in an actual Quickshell session above Brave.
+assert 'property bool focusKeyTraceEnabled: false' in shell
+assert 'target: "focusKeyTrace"' in shell
+assert 'function start(): void' in shell
+assert 'function stop(): void' in shell
+for name, path in (
+    ("git", "widgets/GitW.qml"),
+    ("hospital", "widgets/HospitalW.qml")
+):
+    widget = (ROOT / path).read_text()
+    assert "property bool focusKeyTraceEnabled: false" in widget
+    assert "focusKeyTraceEnabled: shellRoot.focusKeyTraceEnabled" in shell
+    assert "function traceFocusNavigation(phase, event)" in widget
+    assert 'Qt.Key_Tab, Qt.Key_Backtab' in widget
+    assert 'Keys.onShortcutOverride: function(event)' in widget
+    assert 'Keys.onPressed: function(event)' in widget
+    assert 'onActiveFocusChanged: {' in widget
+    assert f'FOCUS_KEY_TRACE // {name} // ' in widget
+    # Each of the diagnostic event handlers relinquishes events to the
+    # previously existing keyboard and shortcut handlers.
+    anchor = "gitKeyboardFocusAnchor" if name == "git" else "keyboardFocusAnchor"
+    start = widget.index("id: " + anchor)
+    finish = widget.index("anchors.fill: parent", start)
+    handlers = widget[start:finish]
+    assert handlers.count("event.accepted = false;") == 2
+    assert 'Qt.Key_A' not in widget[start:start + 1900]
+assert (ROOT / "docs/focus-key-delivery-trace-20261015.md").is_file()
+
 print("KOINOIKOS FOCUS MODE CONTRACTS // PASS")

@@ -12,7 +12,92 @@ Rectangle {
     property color activityGlowColor: Colors.magenta
     property var activityPoints: []
     property string sideLabel: ""
-    property bool enabledSlider: count > 1
+    // F2 VALUE is opt-in. Existing INDEX users retain the exact default.
+    property string selectorProfile: "index" // "index" | "value"
+    readonly property bool valueMode: selectorProfile === "value"
+    property real minimumValue: 0
+    property real maximumValue: 100
+    property real currentValue: 0
+    property real valueStep: 1 // keyboard/wheel; pointer is continuous
+    property int valueDecimals: 0
+    property string valueSuffix: ""
+    property bool valueDragActive: false
+    property real valueDragHandleY: -1
+    property var lastDragRequestedValue: null
+    readonly property bool validValueDomain: Number.isFinite(minimumValue)
+        && Number.isFinite(maximumValue) && maximumValue > minimumValue
+    property bool enabledSlider: valueMode ? validValueDomain : count > 1
+
+    signal valueRequested(real value)
+
+    function clampedValue(value) {
+        if (!validValueDomain)
+            return Number.isFinite(minimumValue) ? minimumValue : 0;
+        const requested = Number(value);
+        const candidate = Number.isFinite(requested) ? requested : minimumValue;
+        return Math.max(minimumValue, Math.min(maximumValue, candidate));
+    }
+
+    function reportedValue(value) {
+        return Number(clampedValue(value)
+            .toFixed(Math.max(0, Math.min(6, valueDecimals))));
+    }
+
+    function valueText(value) {
+        const places = Math.max(0, Math.min(6, valueDecimals));
+        return clampedValue(value).toFixed(places)
+            + (valueSuffix ? " " + valueSuffix : "");
+    }
+
+    function handleYForValue(value) {
+        if (!validValueDomain)
+            return 0;
+        const ratio = (clampedValue(value) - minimumValue)
+            / (maximumValue - minimumValue);
+        // Higher values rise; the filled track grows up from minimum.
+        return handleTravel() * (1 - ratio);
+    }
+
+    function valueForHandleY(y) {
+        if (!validValueDomain)
+            return clampedValue(minimumValue);
+        const travel = handleTravel();
+        if (travel <= 0)
+            return clampedValue(currentValue);
+        const normalizedY = Math.max(0, Math.min(travel, y)) / travel;
+        return minimumValue + (1 - normalizedY)
+            * (maximumValue - minimumValue);
+    }
+
+    function requestDragValue(handleY) {
+        if (!valueMode || !enabledSlider)
+            return;
+        const next = reportedValue(valueForHandleY(handleY));
+        if (next === lastDragRequestedValue
+                || (lastDragRequestedValue === null
+                    && next === reportedValue(currentValue)))
+            return;
+        lastDragRequestedValue = next;
+        valueRequested(next);
+    }
+
+    function stepValue(direction) {
+        if (!valueMode || !enabledSlider
+                || !Number.isFinite(valueStep) || valueStep <= 0)
+            return;
+        const next = reportedValue(clampedValue(currentValue)
+            + direction * valueStep);
+        if (next !== reportedValue(currentValue))
+            valueRequested(next);
+    }
+
+    onSelectorProfileChanged: {
+        if (!valueMode) {
+            valueDragActive = false;
+            valueDragHandleY = -1;
+            lastDragRequestedValue = null;
+        }
+    }
 
     // F1 INDEX pilot is strictly opt-in. All existing Git/Hospital sliders
     // remain on their original immediate-request semantics by default.
@@ -33,7 +118,7 @@ Rectangle {
 
     signal indexRequested(int index)
 
-    activeFocusOnTab: indexPilot
+    activeFocusOnTab: indexPilot || valueMode
 
     function indexLabel(index) {
         if (index < 0)
@@ -79,6 +164,11 @@ Rectangle {
     }
 
     Keys.onUpPressed: function(event) {
+        if (valueMode) {
+            stepValue(1);
+            event.accepted = true;
+            return;
+        }
         if (!indexPilot || !enabledSlider)
             return;
         const next = clampedIndex(currentIndex - 1);
@@ -88,6 +178,11 @@ Rectangle {
     }
 
     Keys.onDownPressed: function(event) {
+        if (valueMode) {
+            stepValue(-1);
+            event.accepted = true;
+            return;
+        }
         if (!indexPilot || !enabledSlider)
             return;
         const next = clampedIndex(currentIndex + 1);
@@ -181,13 +276,15 @@ Rectangle {
         }
 
         Repeater {
-            model: Math.min(slider.count, 13)
+            model: slider.valueMode ? 5 : Math.min(slider.count, 13)
 
             Item {
                 width: scaleArea.width
                 height: 1
                 y:
-                    slider.count <= 1
+                    slider.valueMode
+                    ? (scaleArea.height - 1) * index / 4
+                    : slider.count <= 1
                     ? scaleArea.height / 2
                     : (
                         scaleArea.height - 1
@@ -249,11 +346,27 @@ Rectangle {
                 }
 
                 color: slider.accentColor
-                opacity: slider.count > 0 ? 0.48 : 0.14
+                opacity: (slider.valueMode || slider.count > 0)
+                    ? 0.48 : 0.14
+            }
+
+            // F2 VALUE: visual fill belongs to the live numeric position.
+            // This is not a claim that an external operation completed.
+            Rectangle {
+                id: valueFill
+                visible: slider.valueMode
+                width: 4
+                x: (parent.width - width) / 2
+                y: Math.max(0, Math.min(slot.height,
+                    thumb.y + thumb.height / 2))
+                height: Math.max(0, slot.height - y)
+                radius: 2
+                color: slider.accentColor
+                opacity: slider.enabledSlider ? 0.72 : 0.20
             }
 
             Repeater {
-                model: slider.activityPoints || []
+                model: slider.valueMode ? [] : (slider.activityPoints || [])
 
                 Item {
                     required property int index
@@ -343,7 +456,11 @@ Rectangle {
 
                 // During a direct pilot drag, follow actual pointer travel
                 // between discrete detents; only the requested index snaps.
-                y: slider.previewActive && dragArea.hasMoved
+                y: slider.valueMode
+                    ? (slider.valueDragActive && dragArea.hasMoved
+                        ? slider.valueDragHandleY
+                        : slider.handleYForValue(slider.currentValue))
+                    : slider.previewActive && dragArea.hasMoved
                     ? slider.previewHandleY
                     : slider.handleYForIndex(slider.displayedIndex)
 
@@ -409,7 +526,8 @@ Rectangle {
                     // A track click animates toward the initial target.
                     // The first real drag takes over at the visible position.
                     enabled: !dragArea.pressed
-                        || (slider.indexPilot && !dragArea.hasMoved)
+                        || ((slider.indexPilot || slider.valueMode)
+                            && !dragArea.hasMoved)
 
                     NumberAnimation {
                         duration: 110
@@ -436,8 +554,10 @@ Rectangle {
                 }
 
                 width: slider.width
-                enabled: slider.count > 0
-                    && (!slider.indexPilot || slider.enabledSlider)
+                enabled: slider.valueMode
+                    ? slider.enabledSlider
+                    : slider.count > 0
+                        && (!slider.indexPilot || slider.enabledSlider)
                 hoverEnabled: true
                 acceptedButtons: Qt.LeftButton
                 cursorShape: slider.enabledSlider
@@ -458,6 +578,17 @@ Rectangle {
                         && localY <= handleBottom
                         ? localY - handleTop
                         : thumb.height / 2;
+
+                    if (slider.valueMode) {
+                        slider.forceActiveFocus();
+                        hasMoved = false;
+                        pressStartY = localY;
+                        slider.valueDragHandleY = thumb.y;
+                        slider.lastDragRequestedValue = null;
+                        slider.valueDragActive = true;
+                        slider.requestDragValue(localY - dragOffset);
+                        return;
+                    }
 
                     const index = slider.indexFromHandleY(
                         localY - dragOffset
@@ -485,6 +616,22 @@ Rectangle {
                         return;
 
                     const localY = mapToItem(slot, mouse.x, mouse.y).y;
+
+                    if (slider.valueMode) {
+                        if (!hasMoved && Math.abs(localY - pressStartY) > 2) {
+                            const visibleY = thumb.y;
+                            slider.valueDragHandleY = visibleY;
+                            dragOffset = localY - visibleY;
+                            hasMoved = true;
+                        }
+                        if (hasMoved) {
+                            slider.valueDragHandleY = Math.max(
+                                0, Math.min(slider.handleTravel(),
+                                    localY - dragOffset));
+                            slider.requestDragValue(slider.valueDragHandleY);
+                        }
+                        return;
+                    }
 
                     if (slider.indexPilot) {
                         if (slider.previewCancelled)
@@ -516,6 +663,13 @@ Rectangle {
                 }
 
                 onReleased: {
+                    if (slider.valueMode) {
+                        slider.valueDragActive = false;
+                        slider.valueDragHandleY = -1;
+                        slider.lastDragRequestedValue = null;
+                        hasMoved = false;
+                        return;
+                    }
                     if (!slider.indexPilot)
                         return;
                     const finalIndex = slider.previewCancelled
@@ -534,13 +688,26 @@ Rectangle {
                 }
 
                 onCanceled: {
-                    if (slider.indexPilot) {
+                    if (slider.valueMode) {
+                        // Live numeric requests already acknowledged by the
+                        // owner are not undone by pointer cancellation.
+                        slider.valueDragActive = false;
+                        slider.valueDragHandleY = -1;
+                        slider.lastDragRequestedValue = null;
+                        hasMoved = false;
+                    } else if (slider.indexPilot) {
                         slider.cancelIndexPreview();
                         hasMoved = false;
                     }
                 }
 
                 onWheel: function(wheel) {
+                    if (slider.valueMode) {
+                        if (slider.enabledSlider)
+                            slider.stepValue(wheel.angleDelta.y > 0 ? 1 : -1);
+                        wheel.accepted = true;
+                        return;
+                    }
                     // Never leak a wheel event through the test overlay
                     // while a preview drag is owning pointer interaction.
                     if (slider.indexPilot && pressed) {
@@ -589,7 +756,8 @@ Rectangle {
     Rectangle {
         anchors.fill: parent
         z: 12
-        visible: slider.indexPilot && slider.activeFocus
+        visible: (slider.indexPilot || slider.valueMode)
+            && slider.activeFocus
         color: "transparent"
         radius: slider.radius
         border.width: 2
@@ -603,8 +771,9 @@ Rectangle {
             bottomMargin: 8
         }
 
-        text:
-            slider.currentIndex >= 0
+        text: slider.valueMode
+            ? slider.valueText(slider.currentValue)
+            : slider.currentIndex >= 0
             ? String(slider.currentIndex + 1)
             : "—"
         font.pixelSize: 8

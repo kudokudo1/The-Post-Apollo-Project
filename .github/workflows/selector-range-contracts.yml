@@ -1,0 +1,33 @@
+name: Selector RANGE Contracts
+
+on:
+  pull_request:
+    paths:
+      - "components/SelectorSlider.qml"
+      - "components/SelectorRangeSurface.qml"
+      - "components/qmldir"
+      - "SelectorRangeTest.qml"
+      - "tests/fixtures/SelectorSliderRangeDemo.qml"
+      - "tests/components/test_selector_slider_range_profile.py"
+      - ".github/workflows/selector-range-contracts.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "components/SelectorSlider.qml"
+      - "components/SelectorRangeSurface.qml"
+      - "components/qmldir"
+      - "SelectorRangeTest.qml"
+      - "tests/fixtures/SelectorSliderRangeDemo.qml"
+      - "tests/components/test_selector_slider_range_profile.py"
+      - ".github/workflows/selector-range-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  range-profile-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run RANGE source and numeric boundary contract
+        run: python3 tests/components/test_selector_slider_range_profile.py

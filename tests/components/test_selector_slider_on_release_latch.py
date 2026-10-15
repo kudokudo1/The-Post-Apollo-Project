@@ -43,17 +43,19 @@ assert "legacyReleaseGrace" not in slider
 assert "stabilizeLegacyRelease" not in git
 assert "property string indexInteraction: \"legacy\"" in slider
 
-# Only REMOTE opts into new mechanics; REPO and Hospital remain legacy.
+# The release-latch logic remains available for the opt-in Hospital pilot,
+# while both Git sliders use immediate live navigation with no test buttons.
 repo_block = git.split("id: repoSlider", 1)[1].split("id: remoteSlider", 1)[0]
 remote_block = git.split("id: remoteSlider", 1)[1].split(
-    "id: sliderIndexLabToggle", 1
-)[0]
+    "onIndexRequested:", 1
+)[1]
 floor_block = hospital.split("id: floorSlider", 1)[1].split(
     "onIndexRequested:", 1
 )[0]
 assert "indexInteraction:" not in repo_block
-assert "indexInteraction: root.remoteIndexPilotEnabled" in remote_block
+assert "indexInteraction:" not in remote_block
+assert "gitService.selectRepo(index);" in repo_block
 assert "gitService.selectRemote(index);" in remote_block
-assert "indexInteraction:" not in floor_block
+assert "indexInteraction: root.floorIndexPilotEnabled" in floor_block
 
 print("SELECTOR INDEX // ON RELEASE LATCH STATIC CONTRACT PASS")

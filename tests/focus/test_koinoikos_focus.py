@@ -417,4 +417,25 @@ assert 'FOCUS_KEY_TRACE // coordinator // owner-changed' in shell
 assert 'FOCUS_KEY_TRACE // coordinator // boost-changed' in shell
 assert (ROOT / "docs/focus-shortcut-owner-trace-20261015.md").is_file()
 
+# Git Tab-only shortcut-scope pilot: the operator's runtime trace showed
+# Git's Qt anchor receiving a Tab with Window.active=false while its
+# Qt.WindowShortcut did not activate. An application-scoped shortcut is
+# still gated by the selected-menu/editor/dial predicate; no new Sway
+# binding, persistent Exclusive grab or unrelated Git hotkey changes.
+git = (ROOT / "widgets/GitW.qml").read_text()
+for sequence, direction in (("Tab", 1), ("Shift+Tab", -1)):
+    expected = (
+        f'        sequence: "{sequence}"\\n'
+        '        context: Qt.ApplicationShortcut\\n'
+        '        enabled: root.standardModeKeysAvailable\\n'
+        f'        onActivated: root.cycleMainMode({direction})'
+    ).replace('\\n', '\n')
+    assert expected in git, f"Git {sequence} Main Mode application-scope pilot"
+assert 'root.menuOpen && root.keyboardActive' in git
+assert '!root.activeTextEditor' in git
+assert '!root.dialControlMode' in git
+assert 'WlrKeyboardFocus.OnDemand' in git
+assert 'WlrKeyboardFocus.Exclusive' in git
+assert 'interval: 48' in git
+
 print("KOINOIKOS FOCUS MODE CONTRACTS // PASS")

@@ -19,7 +19,6 @@ EVIDENCE records observed results, screenshots, diagnostics, certification repor
 - surgery certification and diagnostics
 - visual evidence when captured
 - runtime verification results
-- [Window opening/remapping A/B result](./window-opening-lifecycle-pilot.md) — observed repeated-open crashes; root cause not established
 - [Quickshell main-thread freeze observations](./syntagma-main-thread-freeze-evidence-20261013.md) — measured runtime evidence
 
 ## 🧭 MAP // WHERE TO GO NEXT

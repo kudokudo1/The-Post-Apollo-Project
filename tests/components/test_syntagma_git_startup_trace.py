@@ -34,7 +34,18 @@ for name in ("metadata=", "clears=", "local=", "remote=", "topology=", "total=")
     assert name in service
 assert service.count("localBranchRows.append({") == 1
 assert service.count("remoteBranchRows.append({") == 1
-assert "topologyRows.append(pendingTopology[i]);" in service
+# Preserve BranchMap delegates by SHA across repeated GitService publications.
+assert "function reconcileTopologyRows()" in service
+assert "const topologyDelta = reconcileTopologyRows();" in service
+assert "topologyRows.move(oldIndex, i, 1);" in service
+assert "topologyRows.insert(i, incoming);" in service
+assert "topologyRows.setProperty(i, role, incoming[role]);" in service
+assert "topologyRows.remove(topologyRows.count - 1);" in service
+assert "topologyDelta=" in service
+assert service.count("topologyRows.clear();") == 1
+assert "topologyRows.clear();" not in service.split(
+    "function publishPendingModels()", 1
+)[1].split("function allocateLane(", 1)[0]
 for name in ("state=", "publish=", "localSelection=", "remoteSelection=",
              "revision=", "available=", "refreshedSignal=", "followup="):
     assert name in service

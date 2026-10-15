@@ -590,6 +590,7 @@ Item {
 
                                     Components.ActionButton {
                                         width: 26
+                                        height: 24
                                         anchors.verticalCenter: parent.verticalCenter
                                         label:
                                             root.itemActionArmed(

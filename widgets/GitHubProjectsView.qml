@@ -400,7 +400,13 @@ Item {
                     NeonScrollBar {
                         flickable: projectList
                         handleStyle: "star"
+                        // The bar is mounted outside the Column, so align it
+                        // using reactive x/y properties, not a mapToItem()
+                        // snapshot that can become stale when Column relayouts.
                         mountingParent: projectList.parent.parent
+                        x: projectList.parent.x + projectList.x
+                           + projectList.width - width - rightInset
+                        y: projectList.parent.y + projectList.y + effectiveTopInset
                         visible: projectList.visible && scrollable
                     }
 
@@ -1050,7 +1056,13 @@ Item {
                     NeonScrollBar {
                         flickable: mapScroll
                         handleStyle: "star"
+                        // The board starts below the mode controls. Tracking
+                        // its live Column y keeps the star rail beside the
+                        // cards, not up among the project title/buttons.
                         mountingParent: mapScroll.parent.parent
+                        x: mapScroll.parent.x + mapScroll.x
+                           + mapScroll.width - width - rightInset
+                        y: mapScroll.parent.y + mapScroll.y + effectiveTopInset
                         visible: mapScroll.visible && scrollable
                     }
 

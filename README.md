@@ -12,6 +12,8 @@ The core desktop implementation of the Post-Apollo Family — shaping the relati
 
 **FAMILY //** [META APOLLO LOGOS](https://github.com/kudokudo1/Meta-Apollo-Logos) · [DEV EXP](https://github.com/kudokudo1/The-Post-Apollo-Dev-Exp) · [FOREST](https://github.com/kudokudo1/The-Post-Apollo-Forest-Project)
 
+**RULES //** [Syntagma AI/operator entry](https://github.com/kudokudo1/Meta-Apollo-Logos-How-I-Think/blob/main/AGENTS.md) · [Meta Apollo design grammar](https://github.com/kudokudo1/Meta-Apollo-Logos/blob/main/MODEL/Repo-Design-Language.md) · [Local agent guidance](./AGENTS.md)
+
 ### 🧭 MAP // REPOSITORY
 
 ![](BUILD/assets/design/chassis/nav-rail.svg)

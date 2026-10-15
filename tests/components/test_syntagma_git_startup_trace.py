@@ -81,6 +81,8 @@ assert "function ensureGithubSnapshot()" in git_panel
 assert "readonly property int passiveGithubPageFreshnessMs: 15000" in git_panel
 assert 'root.lastGithubPublishedRepoSlug === githubService.repoSlug' in git_panel
 assert 'root.githubRefreshStartedSlug === githubService.repoSlug' in git_panel
+assert 'function onRepoSlugChanged()' in git_panel
+assert 'root.githubRefreshStartedSlug !== githubService.repoSlug' in git_panel
 assert 'function onRefreshingChanged()' in git_panel
 assert "root.lastGithubPublishedAtMs = Date.now();" in git_panel
 assert 'root.ensureGitSnapshot();' in git_panel

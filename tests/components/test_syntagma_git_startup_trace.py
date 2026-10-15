@@ -67,7 +67,7 @@ assert "property double lastGitPublishedAtMs: 0" in git_panel
 assert "property string lastGitPublishedRepoPath:" in git_panel
 assert "const elapsedSincePublish = Date.now() - root.lastGitPublishedAtMs;" in git_panel
 assert "root.lastGitPublishedRepoPath === gitService.repoPath" in git_panel
-assert "if (!recentSnapshot && !gitService.refreshing)" in git_panel
+assert "if (!root.gitSnapshotFresh() && !gitService.refreshing)" in git_panel
 assert "if (gitService.available && !gitService.lastError)" in git_panel
 assert "root.lastGitPublishedAtMs = Date.now();" in git_panel
 assert "root.lastGitPublishedRepoPath = gitService.repoPath;" in git_panel

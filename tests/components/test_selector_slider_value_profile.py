@@ -12,7 +12,7 @@ slider = (ROOT / "components/SelectorSlider.qml").read_text(encoding="utf-8")
 git = (ROOT / "widgets/GitW.qml").read_text(encoding="utf-8")
 hospital = (ROOT / "widgets/HospitalW.qml").read_text(encoding="utf-8")
 demo = (ROOT / "tests/fixtures/SelectorSliderValueDemo.qml").read_text(encoding="utf-8")
-shell = (ROOT / "tests/selector-value/shell.qml").read_text(encoding="utf-8")
+shell = (ROOT / "SelectorValueTest.qml").read_text(encoding="utf-8")
 
 # Safe defaults: no existing selector silently migrates to numeric mode.
 assert 'property string selectorProfile: "index"' in slider
@@ -47,6 +47,18 @@ assert 'selectorProfile: "value"' in demo
 assert demo.count('selectorProfile: "value"') == 2
 assert 'Fixtures.SelectorSliderValueDemo' in shell
 assert 'GitService' not in demo and 'HospitalFloorService' not in demo
+
+# A separate shell under tests/selector-value used to make qmlscanner treat
+# that subdirectory as config root, rejecting sibling components/fixtures.
+# The explicit -p file must live at repo/config root.
+assert not (ROOT / "tests/selector-value/shell.qml").exists()
+assert (ROOT / "SelectorValueTest.qml").parent == ROOT
+assert 'import "components"' in shell
+assert 'import "tests/fixtures" as Fixtures' in shell
+assert (ROOT / "components/qmldir").exists()
+assert (ROOT / "tests/fixtures/SelectorSliderValueDemo.qml").exists()
+assert "quickshell -p" in (ROOT / "tests/selector-value/README.md").read_text()
+assert "SelectorValueTest.qml" in (ROOT / "tests/selector-value/README.md").read_text()
 
 # Legacy INDEX is still intact, including live change on pointer travel and
 # the selected REMOTE activity-point decorations.

@@ -2584,11 +2584,24 @@ PanelWindow {
                 // Capture the identity at request start so completion of a
                 // previous repository cannot validate a new repository.
                 root.githubRefreshStartedSlug = githubService.repoSlug;
-            } else if (githubService.available && !githubService.lastError
+                return;
+            }
+
+            if (githubService.available && !githubService.lastError
                     && root.githubRefreshStartedSlug === githubService.repoSlug) {
                 root.lastGithubPublishedAtMs = Date.now();
                 root.lastGithubPublishedRepoSlug = githubService.repoSlug;
+            } else if (root.menuOpen && root.activePage === "github"
+                    && root.githubRefreshStartedSlug !== githubService.repoSlug) {
+                // Repo changed while an old PX query was running. Fetch the
+                // new identity once the old in-flight request has completed.
+                root.ensureGithubSnapshot();
             }
+        }
+
+        function onRepoSlugChanged() {
+            if (root.menuOpen && root.activePage === "github")
+                root.ensureGithubSnapshot();
         }
 
         function onWorkflowsChanged() {

@@ -390,4 +390,31 @@ assert "root.activeTextEditor || root.dialControlMode" in git_retry
 assert "root.intercomTyping || root.receptionistTyping" in hospital_retry
 assert (ROOT / "docs/git-hospital-cross-menu-focus-retry-20261015.md").is_file()
 
+# Stage 3 opt-in tracing observes the existing Tab Shortcut's direct
+# cycle method (the method is only invoked by the Main Mode shortcuts),
+# while preserving source contracts requiring the original onActivated.
+for rel, prefix, context, enabled, cycle_name in (
+    ("widgets/GitW.qml", "git", "Qt.WindowShortcut",
+     "root.standardModeKeysAvailable", "cycleMainMode"),
+    ("widgets/HospitalW.qml", "hospital", "Qt.ApplicationShortcut",
+     "root.mainModeKeysAvailable", "cycleHospitalMainMode")
+):
+    widget = (ROOT / rel).read_text()
+    assert f"function {cycle_name}(direction)" in widget
+    assert f'FOCUS_KEY_TRACE // {prefix} // tab-shortcut-activated' in widget
+    assert f'FOCUS_KEY_TRACE // {prefix} // tab-shortcut-completed' in widget
+    assert "elapsedMs=" in widget and "tsMs=" in widget
+    assert 'const tracing = root.focusKeyTraceEnabled;' in widget
+    for sequence, direction in (("Tab", 1), ("Shift+Tab", -1)):
+        needle = ('sequence: "' + sequence + '"\\n'
+                  + '        context: ' + context + '\\n'
+                  + '        enabled: ' + enabled + '\\n'
+                  + '        onActivated: root.' + cycle_name
+                  + '(' + str(direction) + ')')
+        assert needle.replace('\\n', '\n') in widget, (rel, sequence)
+assert 'onOwnerChanged: {' in shell and 'onBoostOwnerChanged: {' in shell
+assert 'FOCUS_KEY_TRACE // coordinator // owner-changed' in shell
+assert 'FOCUS_KEY_TRACE // coordinator // boost-changed' in shell
+assert (ROOT / "docs/focus-shortcut-owner-trace-20261015.md").is_file()
+
 print("KOINOIKOS FOCUS MODE CONTRACTS // PASS")

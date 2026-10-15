@@ -3781,6 +3781,9 @@ PanelWindow {
             // Deliberately opt-in; REPO and Hospital FLOOR remain legacy.
             indexInteraction: root.remoteIndexPilotEnabled
                 ? "preview-release" : "legacy"
+            // Avoid a brief top-of-track jump if a legacy owner index
+            // becomes temporarily unavailable while releasing a drag.
+            stabilizeLegacyRelease: true
             accentColor: Colors.orange
             handleGlowColor: Colors.cyan
             activityGlowColor: Colors.orange

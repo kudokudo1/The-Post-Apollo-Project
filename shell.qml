@@ -102,6 +102,24 @@ PanelWindow {
     // Existing property readers remain compatible with the shared owner.
     KeyboardOwnershipCoordinator {
         id: keyboardOwnership
+
+        // Opt-in read-only trace: logical owner changes and temporary
+        // Exclusive acquisition start/end can be correlated with actual
+        // Git/Hospital Shortcut activation in the same Quickshell log.
+        onOwnerChanged: {
+            if (shellRoot.focusKeyTraceEnabled)
+                console.warn("FOCUS_KEY_TRACE // coordinator // owner-changed"
+                             + " tsMs=" + Date.now()
+                             + " owner=" + owner
+                             + " boost=" + boostOwner);
+        }
+        onBoostOwnerChanged: {
+            if (shellRoot.focusKeyTraceEnabled)
+                console.warn("FOCUS_KEY_TRACE // coordinator // boost-changed"
+                             + " tsMs=" + Date.now()
+                             + " owner=" + owner
+                             + " boost=" + boostOwner);
+        }
     }
     property alias controlKeyboardOwner: keyboardOwnership.owner
 

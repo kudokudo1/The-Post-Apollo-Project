@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import qs.components
+import qs.components as Components
 
 Item {
     id: root
@@ -83,7 +84,7 @@ Item {
         GohuText {
             anchors.centerIn: parent
             text: roadAction.label
-            font.pixelSize: 7
+            font.pixelSize: 9
             color: roadAction.destructive ? Colors.red : Colors.cyan
         }
 
@@ -114,7 +115,7 @@ Item {
                     + " SCHEDULED // "
                     + String(root.unscheduled.length)
                     + " UNSCHEDULED"
-                font.pixelSize: 9
+                font.pixelSize: 11
                 color: Colors.magenta
                 elide: Text.ElideRight
             }
@@ -132,7 +133,7 @@ Item {
                         + root.projectService.targetDateFieldName()
                       )
                     : "DATE FIELDS NOT FOUND"
-                font.pixelSize: 7
+                font.pixelSize: 9
                 color:
                     root.projectService.startDateFieldName()
                     ? Colors.cyan
@@ -184,7 +185,7 @@ Item {
                                 }
 
                                 text: "WORK ITEM"
-                                font.pixelSize: 8
+                                font.pixelSize: 10
                                 color: Colors.cyan
                             }
                         }
@@ -227,7 +228,7 @@ Item {
                                                 index / 4
                                             )
                                             || "—"
-                                        font.pixelSize: 7
+                                        font.pixelSize: 9
                                         color: Colors.white
                                         opacity: 0.68
                                         horizontalAlignment:
@@ -273,7 +274,7 @@ Item {
                                             root.projectService.itemTitle(
                                                 roadRow.modelData
                                             )
-                                        font.pixelSize: 8
+                                        font.pixelSize: 10
                                         color: Colors.white
                                         elide: Text.ElideRight
                                     }
@@ -296,7 +297,7 @@ Item {
                                                 )
                                                 || "NO STATUS"
                                             )
-                                        font.pixelSize: 7
+                                        font.pixelSize: 9
                                         color: Colors.cyan
                                         opacity: 0.66
                                         elide: Text.ElideRight
@@ -374,7 +375,7 @@ Item {
                                                       )
                                                     : ""
                                                   )
-                                            font.pixelSize: 7
+                                            font.pixelSize: 9
                                             color: Colors.white
                                             elide: Text.ElideRight
                                         }
@@ -428,7 +429,7 @@ Item {
                                             )
                                     }
 
-                                    RoadAction {
+                                    Components.ActionButton {
                                         width: 24
                                         anchors.verticalCenter: parent.verticalCenter
                                         label:
@@ -436,10 +437,24 @@ Item {
                                                 "remove",
                                                 roadRow.modelData
                                             )
-                                            ? "!"
-                                            : "X"
+                                            ? "⚠︎"
+                                            : "×"
                                         destructive: true
-                                        enabledAction:
+                                        labelPixelSize: 11
+                                        idleForegroundColor: Colors.red
+                                        idleBorderColor: Colors.red
+                                        idleContentGlowColor: Colors.red
+                                        idleSoftGlowColor: Colors.red
+                                        hoverForegroundColor: Colors.red
+                                        hoverBorderColor: Colors.red
+                                        hoverContentGlowColor: Colors.red
+                                        hoverSoftGlowColor: Colors.red
+                                        selected: root.itemActionArmed("remove", roadRow.modelData)
+                                        selectedForegroundColor: Colors.red
+                                        selectedBorderColor: Colors.red
+                                        selectedContentGlowColor: Colors.red
+                                        selectedSoftGlowColor: Colors.red
+                                        available:
                                             !root.projectService.busy
                                             && !!root.projectService.itemId(
                                                 roadRow.modelData
@@ -479,7 +494,7 @@ Item {
                             text:
                                 "UNSCHEDULED // "
                                 + String(root.unscheduled.length)
-                            font.pixelSize: 8
+                            font.pixelSize: 10
                             color: Colors.orange
                         }
                     }
@@ -511,7 +526,7 @@ Item {
                                         root.projectService.itemTitle(
                                             unscheduledRow.modelData
                                         )
-                                    font.pixelSize: 8
+                                    font.pixelSize: 10
                                     color: Colors.white
                                     elide: Text.ElideRight
                                 }
@@ -521,7 +536,7 @@ Item {
                                     anchors.verticalCenter: parent.verticalCenter
                                     horizontalAlignment: Text.AlignRight
                                     text: "NO DATE"
-                                    font.pixelSize: 7
+                                    font.pixelSize: 9
                                     color: Colors.orange
                                 }
 
@@ -572,7 +587,7 @@ Item {
                                             )
                                     }
 
-                                    RoadAction {
+                                    Components.ActionButton {
                                         width: 26
                                         anchors.verticalCenter: parent.verticalCenter
                                         label:
@@ -580,10 +595,24 @@ Item {
                                                 "remove",
                                                 unscheduledRow.modelData
                                             )
-                                            ? "!"
-                                            : "X"
+                                            ? "⚠︎"
+                                            : "×"
                                         destructive: true
-                                        enabledAction:
+                                        labelPixelSize: 11
+                                        idleForegroundColor: Colors.red
+                                        idleBorderColor: Colors.red
+                                        idleContentGlowColor: Colors.red
+                                        idleSoftGlowColor: Colors.red
+                                        hoverForegroundColor: Colors.red
+                                        hoverBorderColor: Colors.red
+                                        hoverContentGlowColor: Colors.red
+                                        hoverSoftGlowColor: Colors.red
+                                        selected: root.itemActionArmed("remove", unscheduledRow.modelData)
+                                        selectedForegroundColor: Colors.red
+                                        selectedBorderColor: Colors.red
+                                        selectedContentGlowColor: Colors.red
+                                        selectedSoftGlowColor: Colors.red
+                                        available:
                                             !root.projectService.busy
                                             && !!root.projectService.itemId(
                                                 unscheduledRow.modelData
@@ -609,7 +638,7 @@ Item {
                         width: parent.width
                         visible: root.projectService.items.length === 0
                         text: "NO WORK ITEMS"
-                        font.pixelSize: 9
+                        font.pixelSize: 11
                         color: Colors.white
                         opacity: 0.38
                         horizontalAlignment: Text.AlignHCenter

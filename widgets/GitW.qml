@@ -57,9 +57,6 @@ PanelWindow {
     property bool dialVariantsPreviewOpen: false
     // F1 live-look pilot. Local mock values only; never routes to GitService.
     property bool sliderIndexLabOpen: false
-    // Opt-in *real* REMOTE INDEX pilot; defaults off on every menu session.
-    // This changes selected remote context only, never performs push/pull.
-    property bool remoteIndexPilotEnabled: false
     property bool dialFxDemoRunning: false
     property int dialFxDemoStage: -1
     readonly property string dialFxDemoLabel: !dialFxDemoRunning ? "DIAL FX // RUN"
@@ -92,10 +89,8 @@ PanelWindow {
     onGitViewChanged: {
         if (gitView !== "history")
             blameOpen = false;
-        if (gitView !== "control") {
+        if (gitView !== "control")
             sliderIndexLabOpen = false;
-            remoteIndexPilotEnabled = false;
-        }
     }
     readonly property string gitBackLabel:
         gitNavigationStack.length > 0
@@ -992,10 +987,8 @@ PanelWindow {
     }
 
     onActivePageChanged: {
-        if (activePage !== "git") {
+        if (activePage !== "git")
             sliderIndexLabOpen = false;
-            remoteIndexPilotEnabled = false;
-        }
         if (activePage !== "github") {
             if (dialFxDemoRunning)
                 stopDialFxDemo();
@@ -2084,7 +2077,6 @@ PanelWindow {
     onMenuOpenChanged: {
         if (!root.menuOpen) {
             root.sliderIndexLabOpen = false;
-            root.remoteIndexPilotEnabled = false;
             root.dialVariantsPreviewOpen = false;
             if (root.dialFxDemoRunning)
                 root.stopDialFxDemo();
@@ -3778,12 +3770,6 @@ PanelWindow {
 
             count: gitService.remoteBranchCount
             currentIndex: gitService.selectedRemoteIndex
-            // Deliberately opt-in; REPO and Hospital FLOOR remain legacy.
-            indexInteraction: root.remoteIndexPilotEnabled
-                ? "preview-release" : "legacy"
-            // Avoid a brief top-of-track jump if a legacy owner index
-            // becomes temporarily unavailable while releasing a drag.
-            stabilizeLegacyRelease: true
             accentColor: Colors.orange
             handleGlowColor: Colors.cyan
             activityGlowColor: Colors.orange
@@ -3836,43 +3822,6 @@ PanelWindow {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: root.sliderIndexLabOpen = !root.sliderIndexLabOpen
-            }
-        }
-
-        // Optional actual-service trial, distinct from the no-side-effect lab.
-        // The same existing onIndexRequested handler is used after release.
-        Rectangle {
-            id: remoteIndexPilotToggle
-            visible: sliderIndexLabToggle.visible
-            z: 260
-            width: 194
-            height: 24
-            anchors {
-                horizontalCenter: parent.horizontalCenter
-                horizontalCenterOffset: 212
-                top: sliderIndexLabToggle.top
-            }
-            color: remotePilotMouse.containsMouse ? Colors.dark : Colors.black
-            border.width: 1
-            border.color: root.remoteIndexPilotEnabled
-                ? Colors.orange : Colors.cyan
-
-            GohuText {
-                anchors.centerIn: parent
-                text: root.remoteIndexPilotEnabled
-                    ? "LIVE REMOTE // ON" : "LIVE REMOTE // OFF"
-                font.pixelSize: 10
-                color: root.remoteIndexPilotEnabled
-                    ? Colors.orange : Colors.cyan
-            }
-
-            MouseArea {
-                id: remotePilotMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.remoteIndexPilotEnabled =
-                    !root.remoteIndexPilotEnabled
             }
         }
 

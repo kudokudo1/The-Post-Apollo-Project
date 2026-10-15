@@ -14,41 +14,6 @@ Rectangle {
     property string sideLabel: ""
     property bool enabledSlider: count > 1
 
-    // Narrow compatibility guard for legacy Git REMOTE. During a live
-    // selection gesture, an owner may briefly report no valid index while
-    // rebuilding rows. Hold the last valid physical handle position for
-    // one short post-release grace period instead of animating to y=0.
-    // OFF by default: no changes to REPO or Hospital FLOOR.
-    property bool stabilizeLegacyRelease: false
-    property bool legacyReleaseGrace: false
-    property bool hasStableLegacyFraction: false
-    property real stableLegacyFraction: 0
-
-    function cacheLegacyFraction() {
-        if (count > 1 && currentIndex >= 0 && currentIndex < count) {
-            stableLegacyFraction = currentIndex / (count - 1);
-            hasStableLegacyFraction = true;
-        }
-    }
-
-    function legacyHandleY() {
-        const invalid = count <= 1
-            || currentIndex < 0 || currentIndex >= count;
-        if (stabilizeLegacyRelease && legacyReleaseGrace
-                && invalid && hasStableLegacyFraction)
-            return handleTravel() * stableLegacyFraction;
-        return handleYForIndex();
-    }
-
-    Timer {
-        id: legacyReleaseTimer
-        interval: 350
-        repeat: false
-        onTriggered: slider.legacyReleaseGrace = false
-    }
-
-    Component.onCompleted: cacheLegacyFraction()
-
     // F1 INDEX pilot is strictly opt-in. All existing Git/Hospital sliders
     // remain on their original immediate-request semantics by default.
     property string indexInteraction: "legacy" // "legacy" | "preview-release"
@@ -80,15 +45,12 @@ Rectangle {
         previewHandleY = -1;
     }
 
-    // Keep the most recent valid legacy target during transient owner resets.
-    // Preview cancellation remains unchanged for the opt-in INDEX pilot.
+    // Owner data changing during an unfinished drag invalidates its preview.
     onCurrentIndexChanged: {
-        cacheLegacyFraction();
         if (indexPilot && dragArea && dragArea.pressed)
             cancelIndexPreview();
     }
     onCountChanged: {
-        cacheLegacyFraction();
         if (indexPilot && dragArea && dragArea.pressed)
             cancelIndexPreview();
     }
@@ -365,11 +327,9 @@ Rectangle {
 
                 // During a direct pilot drag, follow actual pointer travel
                 // between discrete detents; only the requested index snaps.
-                y: slider.indexPilot
-                    ? (slider.previewActive && dragArea.hasMoved
-                        ? slider.previewHandleY
-                        : slider.handleYForIndex(slider.displayedIndex))
-                    : slider.legacyHandleY()
+                y: slider.previewActive && dragArea.hasMoved
+                    ? slider.previewHandleY
+                    : slider.handleYForIndex(slider.displayedIndex)
 
                 scale: dragArea.pressed ? 0.97 : 1.0
                 color: dragArea.pressed ? Colors.yellow : Colors.white
@@ -473,11 +433,6 @@ Rectangle {
                 property bool hasMoved: false
 
                 onPressed: function(mouse) {
-                    if (!slider.indexPilot && slider.stabilizeLegacyRelease) {
-                        legacyReleaseTimer.stop();
-                        slider.cacheLegacyFraction();
-                        slider.legacyReleaseGrace = true;
-                    }
                     const localY = mapToItem(slot, mouse.x, mouse.y).y;
                     const handleTop = thumb.y;
                     const handleBottom = thumb.y + thumb.height;
@@ -542,11 +497,8 @@ Rectangle {
                 }
 
                 onReleased: {
-                    if (!slider.indexPilot) {
-                        if (slider.stabilizeLegacyRelease)
-                            legacyReleaseTimer.restart();
+                    if (!slider.indexPilot)
                         return;
-                    }
                     const finalIndex = slider.previewCancelled
                         ? -1 : slider.previewIndex;
                     // The owner receives exactly one request on release.
@@ -563,8 +515,6 @@ Rectangle {
                     if (slider.indexPilot) {
                         slider.cancelIndexPreview();
                         hasMoved = false;
-                    } else if (slider.stabilizeLegacyRelease) {
-                        legacyReleaseTimer.restart();
                     }
                 }
 

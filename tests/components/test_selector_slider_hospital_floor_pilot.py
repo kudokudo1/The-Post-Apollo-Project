@@ -41,9 +41,15 @@ assert '|| root.floorIndexPilotEnabled' in hospital
 assert 'property string indexInteraction: "legacy"' in slider
 assert 'property bool previewGestureActive: false' in slider
 assert 'stabilizeLegacyRelease' not in slider
-assert 'LIVE REPO // OFF' in git
-assert 'LIVE REMOTE // OFF' in git
-assert 'indexInteraction: root.repoIndexPilotEnabled' in git
-assert 'indexInteraction: root.remoteIndexPilotEnabled' in git
+# Only Hospital retains a live test toggle; Git reverts to its intended
+# immediate navigation behavior after the completed acceptance exercises.
+assert 'LIVE REPO //' not in git
+assert 'LIVE REMOTE //' not in git
+repo = git.split("id: repoSlider", 1)[1].split("id: remoteSlider", 1)[0]
+remote = git.split("id: remoteSlider", 1)[1].split("onIndexRequested:", 1)[1]
+assert 'indexInteraction:' not in repo
+assert 'indexInteraction:' not in remote
+assert 'gitService.selectRepo(index);' in repo
+assert 'gitService.selectRemote(index);' in remote
 
 print("SELECTOR INDEX // HOSPITAL FLOOR OPT-IN STATIC CONTRACT PASS")

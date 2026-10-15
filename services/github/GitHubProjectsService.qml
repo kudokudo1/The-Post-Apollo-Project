@@ -1047,6 +1047,174 @@ Scope {
         );
     }
 
+
+    // Project fields are editable only with identities returned by the
+    // selected project's own schema. Never synthesize option/iteration IDs.
+    function editableFieldName(kind) {
+        if (kind === "status")
+            return String((statusField() || {}).name || "");
+        if (kind === "priority")
+            return priorityFieldName();
+        if (kind === "iteration")
+            return iterationFieldName();
+        if (kind === "start")
+            return startDateFieldName();
+        if (kind === "target")
+            return targetDateFieldName();
+        return "";
+    }
+
+    function editableField(kind) {
+        const name = editableFieldName(kind);
+        for (let i = 0; i < fields.length; ++i) {
+            if (fieldName(fields[i]) === name && name)
+                return fields[i];
+        }
+        return null;
+    }
+
+    function isDraftItem(item) {
+        const type = itemType(item).replace(/[^A-Z]/g, "");
+        return type === "DRAFTISSUE";
+    }
+
+    function editableChoices(kind) {
+        const field = editableField(kind);
+        if (!field)
+            return [];
+        const type = fieldDataType(field);
+        let options = [];
+        if ((kind === "status" || kind === "priority")
+                && type.indexOf("SINGLE") >= 0)
+            options = Array.isArray(field.options) ? field.options : [];
+        else if (kind === "iteration" && type.indexOf("ITERATION") >= 0) {
+            const config = field.configuration || {};
+            const planned = Array.isArray(config.iterations) ? config.iterations : [];
+            const completed = Array.isArray(config.completedIterations)
+                ? config.completedIterations : [];
+            options = planned.concat(completed);
+        }
+        const result = [];
+        for (let i = 0; i < options.length; ++i) {
+            const option = options[i] || {};
+            const id = String(option.id || option.iterationId || "");
+            const label = String(option.name || option.title || "").trim();
+            if (id && label)
+                result.push({ id: id, label: label });
+        }
+        return result;
+    }
+
+    function editableValue(item, kind) {
+        if (kind === "title")
+            return itemTitle(item);
+        if (kind === "status")
+            return itemStatus(item);
+        if (kind === "priority")
+            return itemPriority(item);
+        if (kind === "iteration")
+            return itemIteration(item);
+        if (kind === "start")
+            return itemStartDate(item);
+        if (kind === "target")
+            return itemTargetDate(item);
+        return "";
+    }
+
+    function validCalendarDate(value) {
+        const text = String(value || "").trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(text))
+            return false;
+        const parsed = new Date(text + "T00:00:00Z");
+        return !isNaN(parsed.getTime())
+            && parsed.toISOString().slice(0, 10) === text;
+    }
+
+    // Only one field per operation. Backend uses positional shell arguments;
+    // user text never becomes an executable shell fragment.
+    function editItemField(item, kind, value, clearValue) {
+        const targetId = itemId(item);
+        const projectId = selectedProjectId();
+        if (busy || !selectedNumber() || !targetId || !projectId
+                || !items.some(function(row) { return itemId(row) === targetId; })) {
+            lastError = "EDIT UNAVAILABLE // REFRESH SELECTED PROJECT";
+            stateText = lastError;
+            return false;
+        }
+
+        const clean = String(value || "").trim();
+        if (kind === "title") {
+            if (!isDraftItem(item) || !clean || clearValue) {
+                lastError = "TITLE EDIT // ONLY NONEMPTY DRAFT TITLES HERE; OPEN LINKED ISSUES OR PRS";
+                stateText = lastError;
+                return false;
+            }
+            return startOperation(
+                "edit-title",
+                [
+                    "bash", "-lc",
+                    'exec gh project item-edit --id "$1" --project-id "$2" --title "$3" --format json',
+                    "pa-project-edit-title", targetId, projectId, clean
+                ],
+                "SAVING DRAFT TITLE"
+            );
+        }
+
+        if (["status", "priority", "iteration", "start", "target"].indexOf(kind) < 0) {
+            lastError = "EDIT UNAVAILABLE // FIELD NOT SUPPORTED";
+            stateText = lastError;
+            return false;
+        }
+
+        const field = editableField(kind);
+        const fieldId = String((field || {}).id || "");
+        const type = fieldDataType(field);
+        if (!fieldId) {
+            lastError = "EDIT UNAVAILABLE // FIELD NOT CONFIGURED IN PROJECT";
+            stateText = lastError;
+            return false;
+        }
+
+        let editFlag = "";
+        if (clearValue) {
+            editFlag = "--clear";
+        } else if (kind === "start" || kind === "target") {
+            // gh field-list reports ordinary DATE fields as ProjectV2Field
+            // on some CLI versions. Trust the matched field identity and
+            // validate the date value; GitHub still validates field type.
+            const dateCompatible = type.indexOf("DATE") >= 0
+                || type === "PROJECTV2FIELD" || !type;
+            if (!dateCompatible || !validCalendarDate(clean)) {
+                lastError = "DATE REQUIRED // USE YYYY-MM-DD";
+                stateText = lastError;
+                return false;
+            }
+            editFlag = "--date";
+        } else {
+            const choices = editableChoices(kind);
+            const match = choices.filter(function(choice) {
+                return choice.id === clean;
+            });
+            if (match.length !== 1) {
+                lastError = "EDIT UNAVAILABLE // CHOOSE A REAL PROJECT FIELD OPTION";
+                stateText = lastError;
+                return false;
+            }
+            editFlag = kind === "iteration"
+                ? "--iteration-id" : "--single-select-option-id";
+        }
+
+        return startOperation(
+            "edit-field",
+            [
+                "bash", "-lc",
+                'if [ "$4" = "--clear" ]; then exec gh project item-edit --id "$1" --project-id "$2" --field-id "$3" --clear --format json; else exec gh project item-edit --id "$1" --project-id "$2" --field-id "$3" "$4" "$5" --format json; fi',
+                "pa-project-edit-field", targetId, projectId, fieldId, editFlag, clean
+            ],
+            "SAVING " + kind.toUpperCase()
+        );
+    }
+
     function parseProjects(payload) {
         const parsed = JSON.parse(String(payload || "{}"));
         const rows = rowsFrom(parsed, "projects");

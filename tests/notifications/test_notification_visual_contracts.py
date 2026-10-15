@@ -70,4 +70,27 @@ for needle, message in (
 
 assert "RectangularShadow {" not in POPUP
 
+# Receipt/update time uses existing persisted timestamps. In history, the
+# time must be directly to the right of the icon and above the source label.
+for needle, message in (
+    ("id: receivedTimestamp", "history timestamp widget"),
+    ("top: appIconBox.top", "timestamp shares icon's top row"),
+    ("left: appIconBox.right", "timestamp sits beside app icon"),
+    ("top: receivedTimestamp.bottom", "source is directly below timestamp"),
+    ("required property double createdAt", "historical receipt timestamp role"),
+    ("required property double updatedAt", "historical update timestamp role"),
+    ("eventTimestamp(notificationEntry.createdAt, notificationEntry.updatedAt)", "history timestamp binding"),
+    ('"createdAt": Number(entry.createdAt || 0)', "history model carries receipt time"),
+    ('"updatedAt": Number(entry.updatedAt || 0)', "history model carries update time"),
+):
+    require(HUB, needle, message)
+
+for needle, message in (
+    ("function eventTimestamp(createdAt, updatedAt)", "popup time formatter"),
+    ("required property double createdAt", "popup receipt timestamp role"),
+    ("required property double updatedAt", "popup update timestamp role"),
+    ("text: notificationsWindow.eventTimestamp(notificationCard.createdAt, notificationCard.updatedAt)", "popup timestamp line"),
+):
+    require(POPUP, needle, message)
+
 print("Notification visual contracts: PASS")

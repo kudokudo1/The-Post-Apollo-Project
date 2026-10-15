@@ -1,6 +1,9 @@
 # Post-Apollo visual-language recipes (first additive pass)
 
-This is the approved semantic contract for the first visual-effect components.
+This is the Post-Apollo **technical effects and implementation recipe contract** for the first visual-effect components, including operator-approved numerical recipes and context-specific exceptions. [Syntagma's icon and symbol grammar](https://github.com/kudokudo1/Meta-Apollo-Logos-How-I-Think/blob/main/OPERATE/POST-APOLLO-ICON-GRAMMAR.md) governs shared semantic meaning; this project owns its QML effects, measured behavior, and local technical recipes. The two documents are complementary, not competing rule authorities.
+
+The dated follow-through sections record historical corrections and verification boundaries. Do not treat superseded techniques as current requirements or source-only checks as visual/runtime acceptance.
+
 It is not a directive to replace all QML shadows or normalize every widget.
 
 | Component | Responsibility | Canonical starting point |

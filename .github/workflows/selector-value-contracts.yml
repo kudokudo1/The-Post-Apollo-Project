@@ -8,7 +8,8 @@ on:
       - "widgets/HospitalW.qml"
       - "tests/components/test_selector_slider_value_profile.py"
       - "tests/fixtures/SelectorSliderValueDemo.qml"
-      - "tests/selector-value/shell.qml"
+      - "SelectorValueTest.qml"
+      - "tests/selector-value/README.md"
       - ".github/workflows/selector-value-contracts.yml"
   push:
     branches: ["main"]
@@ -18,7 +19,8 @@ on:
       - "widgets/HospitalW.qml"
       - "tests/components/test_selector_slider_value_profile.py"
       - "tests/fixtures/SelectorSliderValueDemo.qml"
-      - "tests/selector-value/shell.qml"
+      - "SelectorValueTest.qml"
+      - "tests/selector-value/README.md"
       - ".github/workflows/selector-value-contracts.yml"
 
 permissions:

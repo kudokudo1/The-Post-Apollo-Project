@@ -400,7 +400,7 @@ Item {
     }
 
     GohuText {
-        x: width + 6
+        x: range.width + 6
         width: 92
         y: rangeTrackArea.y + range.topForValue(range.displayUpper) + 6
         text: "HI // " + range.valueText(range.displayUpper)

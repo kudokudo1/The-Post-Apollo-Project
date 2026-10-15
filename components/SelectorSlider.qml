@@ -21,8 +21,13 @@ Rectangle {
     property int previewIndex: -1
     property real previewHandleY: -1
     property bool previewCancelled: false
+    // Do not derive the preview handoff from MouseArea.pressed:
+    // Qt clears pressed before onReleased processes the selection request.
+    // That briefly re-targeted the thumb toward the *old* committed index.
+    property bool previewGestureActive: false
     readonly property bool indexPilot: indexInteraction === "preview-release"
-    readonly property bool previewActive: indexPilot && dragArea.pressed && !previewCancelled
+    readonly property bool previewActive: indexPilot
+        && previewGestureActive && !previewCancelled
     readonly property int displayedIndex: previewActive && previewIndex >= 0
         ? previewIndex : currentIndex
 
@@ -41,8 +46,19 @@ Rectangle {
         if (!indexPilot)
             return;
         previewCancelled = true;
+        previewGestureActive = false;
         previewIndex = -1;
         previewHandleY = -1;
+    }
+
+    onIndexInteractionChanged: {
+        // A menu can turn the real REMOTE pilot OFF at any point.
+        // Abandon its preview before resuming the original legacy path.
+        if (!indexPilot) {
+            previewGestureActive = false;
+            previewIndex = -1;
+            previewHandleY = -1;
+        }
     }
 
     // Owner data changing during an unfinished drag invalidates its preview.
@@ -454,6 +470,9 @@ Rectangle {
                         pressStartY = localY;
                         slider.previewHandleY = thumb.y;
                         slider.previewIndex = index;
+                        // Latch independently of pressed until the release
+                        // handler finishes dispatching the commit request.
+                        slider.previewGestureActive = true;
                         return;
                     }
 
@@ -501,10 +520,13 @@ Rectangle {
                         return;
                     const finalIndex = slider.previewCancelled
                         ? -1 : slider.previewIndex;
-                    // The owner receives exactly one request on release.
-                    // It alone acknowledges the committed index.
+                    // Keep the preview's visual position latched WHILE the
+                    // owner handles the release request. GitService.selectRemote
+                    // acknowledges its new index synchronously, so when the
+                    // latch drops there is no frame targeting the old index.
                     if (finalIndex >= 0 && finalIndex !== slider.currentIndex)
                         slider.indexRequested(finalIndex);
+                    slider.previewGestureActive = false;
                     slider.previewIndex = -1;
                     slider.previewHandleY = -1;
                     slider.previewCancelled = false;

@@ -300,18 +300,42 @@ PanelWindow {
     // Shared navigation: Tab cycles the two primary Git/ GitHub pages.
     // Ctrl+Left/Right cycles the visible lower mode rail. Local Back and
     // nested context arrows remain owned by their original handlers.
+    // Trace the actual Qt Shortcut handler, not only Keys events on an
+    // anchor that may never see a key consumed by Qt's shortcut dispatcher.
+    // Instrumentation is dormant unless the existing focusKeyTrace IPC is on.
+    function traceMainModeShortcut(direction) {
+        const tracing = root.focusKeyTraceEnabled;
+        const started = tracing ? Date.now() : 0;
+        const before = root.activePage;
+        if (tracing)
+            console.warn("FOCUS_KEY_TRACE // git // tab-shortcut-activated"
+                         + " tsMs=" + started
+                         + " direction=" + direction
+                         + " from=" + before
+                         + " qtWindowActive=" + gitKeyboardFocusAnchor.Window.active
+                         + " anchorActive=" + gitKeyboardFocusAnchor.activeFocus
+                         + " keyboardActive=" + root.keyboardActive
+                         + " keyboardLock=" + root.keyboardLock);
+        root.cycleMainMode(direction);
+        if (tracing)
+            console.warn("FOCUS_KEY_TRACE // git // tab-shortcut-completed"
+                         + " tsMs=" + Date.now()
+                         + " elapsedMs=" + (Date.now() - started)
+                         + " to=" + root.activePage);
+    }
+
     Shortcut {
         sequence: "Tab"
         context: Qt.WindowShortcut
         enabled: root.standardModeKeysAvailable
-        onActivated: root.cycleMainMode(1)
+        onActivated: root.traceMainModeShortcut(1)
     }
 
     Shortcut {
         sequence: "Shift+Tab"
         context: Qt.WindowShortcut
         enabled: root.standardModeKeysAvailable
-        onActivated: root.cycleMainMode(-1)
+        onActivated: root.traceMainModeShortcut(-1)
     }
 
     Shortcut {

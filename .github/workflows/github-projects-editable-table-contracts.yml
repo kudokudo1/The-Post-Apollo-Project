@@ -1,0 +1,31 @@
+name: GitHub Projects editable table contracts
+
+on:
+  pull_request:
+    paths:
+      - "services/github/GitHubProjectsService.qml"
+      - "widgets/GitHubProjectsTableView.qml"
+      - "widgets/GitHubProjectsFieldEditor.qml"
+      - "widgets/GitHubProjectsView.qml"
+      - "tests/components/test_github_projects_editable_table_contracts.py"
+      - ".github/workflows/github-projects-editable-table-contracts.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "services/github/GitHubProjectsService.qml"
+      - "widgets/GitHubProjectsTableView.qml"
+      - "widgets/GitHubProjectsFieldEditor.qml"
+      - "widgets/GitHubProjectsView.qml"
+      - "tests/components/test_github_projects_editable_table_contracts.py"
+      - ".github/workflows/github-projects-editable-table-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  editable-table-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert bounded project field writes and modal UI controls
+        run: python3 tests/components/test_github_projects_editable_table_contracts.py

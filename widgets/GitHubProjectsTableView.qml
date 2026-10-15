@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import qs.components
+import qs.components as Components
 
 Item {
     id: root
@@ -124,7 +125,7 @@ Item {
         GohuText {
             anchors.centerIn: parent
             text: itemAction.label
-            font.pixelSize: 8
+            font.pixelSize: 10
             color: itemAction.destructive ? Colors.red : Colors.cyan
         }
 
@@ -153,7 +154,7 @@ Item {
                     + String(root.projectService.items.length)
                     + " WORK ITEM"
                     + (root.projectService.items.length === 1 ? "" : "S")
-                font.pixelSize: 11
+                font.pixelSize: 12
                 color: Colors.magenta
                 elide: Text.ElideRight
             }
@@ -165,7 +166,7 @@ Item {
                 text:
                     String(root.projectService.projectFieldNames().length)
                     + " PROJECT FIELDS"
-                font.pixelSize: 8
+                font.pixelSize: 10
                 color: Colors.cyan
                 opacity: 0.74
             }
@@ -381,17 +382,32 @@ Item {
                                             )
                                     }
 
-                                    ItemAction {
+                                    Components.ActionButton {
                                         width: 26
+                                        height: 26
                                         label:
                                             root.itemActionArmed(
                                                 "remove",
                                                 tableRow.modelData
                                             )
-                                            ? "!"
-                                            : "X"
+                                            ? "⚠︎"
+                                            : "×"
                                         destructive: true
-                                        enabledAction:
+                                        labelPixelSize: 11
+                                        idleForegroundColor: Colors.red
+                                        idleBorderColor: Colors.red
+                                        idleContentGlowColor: Colors.red
+                                        idleSoftGlowColor: Colors.red
+                                        hoverForegroundColor: Colors.red
+                                        hoverBorderColor: Colors.red
+                                        hoverContentGlowColor: Colors.red
+                                        hoverSoftGlowColor: Colors.red
+                                        selected: root.itemActionArmed("remove", tableRow.modelData)
+                                        selectedForegroundColor: Colors.red
+                                        selectedBorderColor: Colors.red
+                                        selectedContentGlowColor: Colors.red
+                                        selectedSoftGlowColor: Colors.red
+                                        available:
                                             !root.projectService.busy
                                             && !!root.projectService.itemId(
                                                 tableRow.modelData
@@ -417,7 +433,7 @@ Item {
                         width: tableScroll.width
                         visible: root.projectService.items.length === 0
                         text: "NO WORK ITEMS"
-                        font.pixelSize: 10
+                        font.pixelSize: 11
                         color: Colors.white
                         opacity: 0.38
                         horizontalAlignment: Text.AlignHCenter

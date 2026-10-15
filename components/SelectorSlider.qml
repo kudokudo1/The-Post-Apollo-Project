@@ -13,10 +13,21 @@ Rectangle {
     property var activityPoints: []
     property string sideLabel: ""
     // F2 VALUE is opt-in. Existing INDEX users retain the exact default.
-    property string selectorProfile: "index" // "index" | "value" | "step"
+    property string selectorProfile: "index" // "index" | "value" | "step" | "range"
     readonly property bool valueMode: selectorProfile === "value"
     readonly property bool stepMode: selectorProfile === "step"
+    readonly property bool rangeMode: selectorProfile === "range"
     readonly property bool numericMode: valueMode || stepMode
+
+    // RANGE uses a private dual-handle surface, leaving the existing INDEX,
+    // VALUE, and STEP pointer/ruler/thumb composition untouched. Real owner
+    // bounds must echo rangeRequested; preview is never an owner commit.
+    property real lowerValue: 25
+    property real upperValue: 75
+    property real rangeStep: 1
+    property color rangeLowerColor: Colors.magenta
+    property color rangeUpperColor: Colors.orange
+    signal rangeRequested(real lower, real upper)
     property real minimumValue: 0
     property real maximumValue: 100
     property real currentValue: 0
@@ -41,7 +52,8 @@ Rectangle {
     property real pendingStepValue: 0
     readonly property bool stepPreviewActive: stepMode
         && stepGestureActive && !stepCancelled
-    property bool enabledSlider: valueMode ? validValueDomain
+    property bool enabledSlider: rangeMode ? validValueDomain
+        : valueMode ? validValueDomain
         : stepMode ? validStepDomain : count > 1
 
     signal valueRequested(real value)
@@ -201,7 +213,7 @@ Rectangle {
 
     signal indexRequested(int index)
 
-    activeFocusOnTab: indexPilot || numericMode
+    activeFocusOnTab: !rangeMode && (indexPilot || numericMode)
 
     function indexLabel(index) {
         if (index < 0)
@@ -361,6 +373,7 @@ Rectangle {
 
     Item {
         id: scaleArea
+        visible: !slider.rangeMode
 
         anchors {
             top: parent.top
@@ -929,10 +942,34 @@ Rectangle {
         }
     }
 
+    // F5 RANGE lives on a separate internal visual surface, so legacy
+    // selectors never acquire additional MouseAreas or selection signals.
+    SelectorRangeSurface {
+        id: rangeSurface
+        anchors.fill: parent
+        z: 10
+        visible: slider.rangeMode
+        enabledControl: slider.enabledSlider && slider.rangeMode
+        minimumValue: slider.minimumValue
+        maximumValue: slider.maximumValue
+        lowerValue: slider.lowerValue
+        upperValue: slider.upperValue
+        rangeStep: slider.rangeStep
+        valueDecimals: slider.valueDecimals
+        valueSuffix: slider.valueSuffix
+        accentColor: slider.accentColor
+        lowerColor: slider.rangeLowerColor
+        upperColor: slider.rangeUpperColor
+        onRangeRequested: function(lower, upper) {
+            slider.rangeRequested(lower, upper);
+        }
+    }
+
     Rectangle {
         anchors.fill: parent
         z: 12
-        visible: (slider.indexPilot || slider.numericMode)
+        visible: !slider.rangeMode
+            && (slider.indexPilot || slider.numericMode)
             && slider.activeFocus
         color: "transparent"
         radius: slider.radius
@@ -941,6 +978,7 @@ Rectangle {
     }
 
     GohuText {
+        visible: !slider.rangeMode
         anchors {
             horizontalCenter: parent.horizontalCenter
             bottom: parent.bottom

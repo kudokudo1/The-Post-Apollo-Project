@@ -1,0 +1,25 @@
+name: GitHub Projects removal contracts
+
+on:
+  pull_request:
+    paths:
+      - "services/github/GitHubProjectsService.qml"
+      - "tests/git/test_github_projects_removal_contracts.py"
+      - ".github/workflows/github-projects-removal-contracts.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "services/github/GitHubProjectsService.qml"
+      - "tests/git/test_github_projects_removal_contracts.py"
+      - ".github/workflows/github-projects-removal-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  remove-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check acknowledged deletion and failure preservation
+        run: python3 tests/git/test_github_projects_removal_contracts.py

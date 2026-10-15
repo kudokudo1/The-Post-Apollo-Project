@@ -8,12 +8,21 @@ After syncing the tested branch or its eventual merge into a Quickshell
 working tree at `~/.config/quickshell`, run in a terminal:
 
 ```sh
-quickshell -p "$HOME/.config/quickshell/tests/selector-value/shell.qml"
+quickshell -p "$HOME/.config/quickshell/SelectorValueTest.qml"
 ```
 
-`-p` launches a configuration by QML path. This starts a separate test
-window, not a replacement for the main `shell.qml` configuration. Exit
-the test process with Ctrl+C in the terminal.
+`-p` launches a configuration by QML path. **The entry point must be
+at the root of `~/.config/quickshell`**, because Quickshell resolves
+`components/` and `tests/fixtures/` relative to its configuration root.
+The previous nested `tests/selector-value/shell.qml` path caused
+`qrc:/qs-blackhole` by placing both dependencies outside the config root.
+
+This runs a separate mock test window, not your regular `shell.qml`
+configuration. Exit the test process with Ctrl+C in the terminal.
+
+If the old command was copied previously, replace it with the exact one
+above after pulling updated `main`. If the shell still reports an error,
+send the complete `caused by` chain.
 
 ## Acceptance checklist
 

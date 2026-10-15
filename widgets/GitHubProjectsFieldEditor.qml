@@ -216,7 +216,13 @@ Item {
                 NeonScrollBar {
                     flickable: choiceScroll
                     handleStyle: "star"
-                    visible: scrollable
+                    // Reparent outside the popup's Column. Otherwise the
+                    // scrollbar becomes another layout row and shifts itself.
+                    mountingParent: panel
+                    x: choiceScroll.parent.x + choiceScroll.x
+                       + choiceScroll.width - width - rightInset
+                    y: choiceScroll.parent.y + choiceScroll.y + effectiveTopInset
+                    visible: choiceScroll.visible && scrollable
                 }
             }
 

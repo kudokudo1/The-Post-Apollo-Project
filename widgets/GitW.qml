@@ -28,6 +28,23 @@ PanelWindow {
     property bool relationshipFocusModeActive: false
     property bool relationshipFocused: false
     property bool focusKeyTraceEnabled: false
+
+    // Permanent-mapped overlay: initial owner claim may precede compositor
+    // commitment of the changed keyboard input region. Notifications already
+    // uses this one-shot, bounded retry. Never retry if focus changed away,
+    // a text editor/dial owns keys, or Qt reports our window active.
+    Timer {
+        id: gitOpenFocusRetry
+        interval: 48
+        repeat: false
+        onTriggered: {
+            if (!root.menuOpen || !root.keyboardActive
+                    || gitKeyboardFocusAnchor.Window.active || root.activeTextEditor || root.dialControlMode)
+                return;
+            root.keyboardOwnershipRequested();
+            root.restoreGitKeyboardFocus(false);
+        }
+    }
     signal keyboardOwnershipRequested()
 
     // Passive diagnostics only: no printable keys, editor text or shortcuts
@@ -2145,11 +2162,19 @@ PanelWindow {
     }
 
     onKeyboardActiveChanged: {
-        if (root.menuOpen && root.keyboardActive)
+        if (root.menuOpen && root.keyboardActive) {
+            gitOpenFocusRetry.restart();
             root.restoreGitKeyboardFocus(true);
+        } else {
+            gitOpenFocusRetry.stop();
+        }
     }
 
     onMenuOpenChanged: {
+        if (root.menuOpen && root.keyboardActive)
+            gitOpenFocusRetry.restart();
+        else if (!root.menuOpen)
+            gitOpenFocusRetry.stop();
         if (!root.menuOpen) {
             root.dialVariantsPreviewOpen = false;
             if (root.dialFxDemoRunning)

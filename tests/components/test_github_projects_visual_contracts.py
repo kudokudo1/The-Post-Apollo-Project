@@ -64,4 +64,21 @@ assert 'height: 20' in board
 assert 'height: 26' in table
 assert roadmap.count('Components.ActionButton {\n') == 2
 
+# The two star rails are reparented outside their positioned Columns. An
+# opaque mapToItem() call alone does not declare reactive x/y dependencies,
+# so the rail can remain at an initial pre-layout location (too high/left).
+# Each rail must explicitly follow its viewport's current Column offset.
+for flickable in ("projectList", "mapScroll"):
+    rail = board.split(
+        f"NeonScrollBar {{\n                        flickable: {flickable}", 1
+    )[1].split("visible:", 1)[0]
+    assert f"mountingParent: {flickable}.parent.parent" in rail
+    assert f"x: {flickable}.parent.x + {flickable}.x" in rail
+    assert f"+ {flickable}.width - width - rightInset" in rail
+    assert f"y: {flickable}.parent.y + {flickable}.y + effectiveTopInset" in rail
+    assert "mapToItem(" not in rail.split("mountingParent:", 1)[1]
+
+# Keep existing clearance rather than sliding cards back under the star rail.
+assert "width: Math.max(0, mapScroll.width - 20)" in board
+
 print("GITHUB PROJECTS // VISUAL GRAMMAR AND ARROW GEOMETRY PASS")

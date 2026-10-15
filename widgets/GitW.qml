@@ -300,42 +300,18 @@ PanelWindow {
     // Shared navigation: Tab cycles the two primary Git/ GitHub pages.
     // Ctrl+Left/Right cycles the visible lower mode rail. Local Back and
     // nested context arrows remain owned by their original handlers.
-    // Trace the actual Qt Shortcut handler, not only Keys events on an
-    // anchor that may never see a key consumed by Qt's shortcut dispatcher.
-    // Instrumentation is dormant unless the existing focusKeyTrace IPC is on.
-    function traceMainModeShortcut(direction) {
-        const tracing = root.focusKeyTraceEnabled;
-        const started = tracing ? Date.now() : 0;
-        const before = root.activePage;
-        if (tracing)
-            console.warn("FOCUS_KEY_TRACE // git // tab-shortcut-activated"
-                         + " tsMs=" + started
-                         + " direction=" + direction
-                         + " from=" + before
-                         + " qtWindowActive=" + gitKeyboardFocusAnchor.Window.active
-                         + " anchorActive=" + gitKeyboardFocusAnchor.activeFocus
-                         + " keyboardActive=" + root.keyboardActive
-                         + " keyboardLock=" + root.keyboardLock);
-        root.cycleMainMode(direction);
-        if (tracing)
-            console.warn("FOCUS_KEY_TRACE // git // tab-shortcut-completed"
-                         + " tsMs=" + Date.now()
-                         + " elapsedMs=" + (Date.now() - started)
-                         + " to=" + root.activePage);
-    }
-
     Shortcut {
         sequence: "Tab"
         context: Qt.WindowShortcut
         enabled: root.standardModeKeysAvailable
-        onActivated: root.traceMainModeShortcut(1)
+        onActivated: root.cycleMainMode(1)
     }
 
     Shortcut {
         sequence: "Shift+Tab"
         context: Qt.WindowShortcut
         enabled: root.standardModeKeysAvailable
-        onActivated: root.traceMainModeShortcut(-1)
+        onActivated: root.cycleMainMode(-1)
     }
 
     Shortcut {
@@ -787,9 +763,29 @@ PanelWindow {
     }
 
     function cycleMainMode(direction) {
+        // This method is called directly by the existing Tab shortcuts.
+        // Log the real navigation dispatch without replacing their bindings.
+        const tracing = root.focusKeyTraceEnabled;
+        const started = tracing ? Date.now() : 0;
+        const before = root.activePage;
+        if (tracing)
+            console.warn("FOCUS_KEY_TRACE // git // tab-shortcut-activated"
+                         + " tsMs=" + started
+                         + " direction=" + direction
+                         + " from=" + before
+                         + " qtWindowActive=" + gitKeyboardFocusAnchor.Window.active
+                         + " anchorActive=" + gitKeyboardFocusAnchor.activeFocus
+                         + " keyboardActive=" + root.keyboardActive
+                         + " keyboardLock=" + root.keyboardLock);
+
         // This top-level family has two pages. Both directions move to the
         // other page; the existing opener performs the safe page handoff.
         selectPrimaryMode(root.activePage === "git" ? 1 : -1);
+        if (tracing)
+            console.warn("FOCUS_KEY_TRACE // git // tab-shortcut-completed"
+                         + " tsMs=" + Date.now()
+                         + " elapsedMs=" + (Date.now() - started)
+                         + " to=" + root.activePage);
     }
 
     function cycleTopSubMode(direction) {

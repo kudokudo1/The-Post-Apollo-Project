@@ -256,7 +256,7 @@ assert "boostOwner: keyboardOwnership.boostOwner" in shell
 # Koinoikos candidate. Read-only native-tree focus does NOT establish which
 # layer-shell surface actually receives Tab.
 import re
-candidates = set(re.findall(r'\\{ id: "([^"]+)", item: broker\\.', broker))
+candidates = set(re.findall(r'\{ id: "([^"]+)", item: broker\.', broker))
 assert candidates == {"appcontrol", "hospital", "git", "cpu",
                       "weather", "notifications"}
 assert "brave" not in candidates

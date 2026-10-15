@@ -2444,7 +2444,7 @@ PanelWindow {
                                 }
 
                                 MiniButton {
-                                    width: 88
+                                    width: 60
                                     height: 28
 
                                     label: "CLEAR ALL"

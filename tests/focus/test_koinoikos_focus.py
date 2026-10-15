@@ -241,4 +241,59 @@ assert 'notifications: null' in broker
 assert '{ id: "notifications", item: broker.notifications }' in broker
 assert (ROOT / "docs/window-keyboard-focus-contract.md").is_file()
 
+# The focus diagnostic IPC is strictly observational: unlike the normal
+# router it must not set Koinoikos mode, select a widget, or move Sway focus.
+assert "function diagnose(): string" in broker
+assert "return broker.diagnosticSnapshot();" in broker
+assert "function diagnosticSnapshot()" in broker
+assert 'logicalKeyboardOwner: hostOwner' in broker
+assert 'focusBoostOwner: boostOwner' in broker
+assert 'qtWindowActive:' in broker
+assert 'qtActiveFocusItem:' in broker
+assert "boostOwner: keyboardOwnership.boostOwner" in shell
+
+# Brave under Git/Hospital is an ordinary native client, not a QS
+# Koinoikos candidate. Read-only native-tree focus does NOT establish which
+# layer-shell surface actually receives Tab.
+import re
+candidates = set(re.findall(r'\\{ id: "([^"]+)", item: broker\\.', broker))
+assert candidates == {"appcontrol", "hospital", "git", "cpu",
+                      "weather", "notifications"}
+assert "brave" not in candidates
+
+diag_path = ROOT / "scripts/focus_diagnostics.py"
+diag_src = diag_path.read_text()
+assert '("qs", "ipc", "call", "relationshipFocus", "diagnose")' in diag_src
+assert 'invoke("swaymsg", "-t", "get_tree")' in diag_src
+assert '"swaymsg", "-m", "-t", "subscribe"' in diag_src
+assert 'def find_native_focused(tree:' in diag_src
+assert 'focusedNativeContainer' in diag_src
+for disallowed in ('swaymsg focus', 'swaymsg mode default',
+                   'Popen(["swaymsg", "focus"', 'koinoikos_focus.py" move'):
+    assert disallowed not in diag_src
+assert (ROOT / "docs/focus-browser-underlay-test-20261015.md").is_file()
+
+diag_spec = importlib.util.spec_from_file_location("focus_diagnostics", diag_path)
+assert diag_spec and diag_spec.loader
+diag = importlib.util.module_from_spec(diag_spec)
+diag_spec.loader.exec_module(diag)
+tree_fixture = {
+    "id": 1, "focused": False,
+    "nodes": [
+        {"id": 2, "focused": False, "nodes": [], "floating_nodes": []},
+        {"id": 3, "focused": True, "app_id": "brave-browser",
+         "name": "Private page title must not be returned",
+         "window_properties": {"class": "Brave-browser"},
+         "nodes": [], "floating_nodes": []}
+    ], "floating_nodes": []
+}
+native = diag.find_native_focused(tree_fixture)
+assert native["app_id"] == "brave-browser"
+assert native["class"] == "Brave-browser"
+assert "name" not in native, native
+assert diag.find_native_focused({"nodes": [], "floating_nodes": []}) is None
+assert diag.summarize_event({"binding": {"command": 'mode "Koinoikos Focus"'}}) \
+       == 'binding:mode "Koinoikos Focus"'
+assert diag.summarize_event({"change": "focus"}) == "window:focus"
+
 print("KOINOIKOS FOCUS MODE CONTRACTS // PASS")

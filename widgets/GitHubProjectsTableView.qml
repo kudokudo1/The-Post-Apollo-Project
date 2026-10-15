@@ -181,12 +181,11 @@ Item {
             borderColor: Colors.cyan
             inset: 8
 
+            // The vertical star needs a dedicated lane; shortening the
+            // viewport also keeps horizontal controls out of its corner.
             Flickable {
                 id: tableScroll
 
-                // The vertical star must have its own physical lane;
-                // reducing the viewport also keeps horizontal scroll controls
-                // away from the bottom-right corner.
                 anchors.fill: parent
                 anchors.rightMargin: 20
 

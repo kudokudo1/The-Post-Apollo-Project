@@ -6,6 +6,15 @@ import QtQuick
 QtObject {
     id: coordinator
 
+    // Logical owner includes every eligible Koinoikos widget. Only the
+    // three proven adapter consumers below use the short Exclusive boost;
+    // other widgets retain their existing compositor focus policies until
+    // separately audited and verified on SwayFX.
+    readonly property var widgetIds: [
+        "appcontrol", "hospital", "git", "cpu", "weather", "notifications"
+    ]
+    readonly property var pulseIds: ["hospital", "git", "notifications"]
+
     // The currently selected Quickshell menu, not a native Sway window.
     property string owner: ""
 
@@ -15,11 +24,20 @@ QtObject {
     property string boostOwner: ""
 
     function claim(id, reason) {
-        if (id !== "git" && id !== "hospital" && id !== "notifications")
+        if (widgetIds.indexOf(id) < 0)
             return false;
+
+        // Selection for all six must be serial. A switch to CPU/Weather/
+        // AppControl must also revoke any previous Git/Hospital/Notifications
+        // acquisition pulse. This does not claim seat focus for other widgets.
         owner = id;
-        boostOwner = id;
-        releaseBoost.restart();
+        releaseBoost.stop();
+        if (pulseIds.indexOf(id) >= 0) {
+            boostOwner = id;
+            releaseBoost.restart();
+        } else {
+            boostOwner = "";
+        }
         return true;
     }
 

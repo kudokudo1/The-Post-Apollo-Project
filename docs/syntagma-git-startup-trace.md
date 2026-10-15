@@ -388,3 +388,51 @@ session when convenient. Open Git once for 15–25 seconds without
 manually refreshing; record requested and DONE phases lines.
 If request sources repeat or followupQueued remains true, identify
 that caller/feedback loop first. Do not guess or suppress refreshes.
+
+
+## Eighth candidate // preserve topology delegate identity on repeated Git refresh (October 15, 2026)
+
+The operator reports substantial everyday smoothness improvements across Git,
+browser tab switching, terminal output and multi-app use. This is an important
+perceived-UX observation, not proof that the Quickshell changes alone caused
+all system-level improvements. The long-running Post-Apollo target must avoid
+unbounded state growth and idle refresh work as more services (AI, social,
+notifications, weather, AppControl, Hospital) arrive.
+
+**Current evidence:** two LIVE QUICKSHELL full graph publishes had topology
+phases of 237ms/270ms (48 rows), while remote publication had fallen to
+14ms/49ms. The graph's BranchMap.qml subscribes through a Repeater to the
+GitService topologyModel, with per-row text, stars, glows, DropShadows and
+a Canvas. Previous publishPendingModels() cleared the topologyRows model,
+then appended all 48 records, re-instantiating the presentation delegates.
+
+**Scoped candidate:** reconcile topologyRows by stable commit SHA rather
+than unconditional clear+append. The algorithm reuses an identical row with
+zero ListModel write notifications; moves surviving commits into their new
+order, inserts newly discovered SHAs, updates only changed roles
+(shortSha/parents/refsText/epoch/author/subject/lane/isHead), and removes
+only rows no longer in the 48-row window. Revision signal, selection by SHA,
+Canvas repaint, all BranchMap visuals and remote-only empty-repo reset are
+retained. The opt-in git publish phases trace now prints a topologyDelta
+summary of inserted/moved/updated/removed/unchanged rows.
+
+**Expected behavior:** repeated scans of unchanged topology should avoid
+destroy/recreating the 48 visual row trees; newly inserted leading commits
+should only create new delegates and update moved/revised ones. This is a
+candidate performance optimization, **not** evidence of eliminated CPU
+stalls or a measured latency improvement until operator runtime testing.
+Initial construction of a fresh 48-row graph still costs work, and the
+other local/remote models remain unchanged. Never mask new commit content
+or remove stars/glows to improve benchmarks.
+
+**Concurrency:** GitService-only runtime code change (no BranchMap/
+GitW/SelectorSlider visual or behavioral edits). Team 3r's separate
+draft PR #252 includes BranchMap scroll/star work and must not be
+overwritten; the service model schema and public topology interfaces
+remain unchanged.
+
+**Runtime gate:** compare opt-in topologyMs/topologyDelta across an initial
+scan and subsequent explicit REFRESH of an unchanged repository (then
+a real new commit/branch update). Ensure graph order, SHA selection, lanes,
+star/glow preservation and scrolling remain correct. CI/source checks
+only cannot prove Qt ListModel delegate runtime behavior.

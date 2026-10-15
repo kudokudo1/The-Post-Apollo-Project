@@ -429,10 +429,13 @@ Singleton {
         const now = Date.now();
 
         const createdAt = notification.createdAt !== undefined ? Number(notification.createdAt) : now;
+        const eventId = notification.id || makeNotificationId();
 
         return {
             // Identity
-            "id": notification.id || makeNotificationId(),
+            "id": eventId,
+            // Alias for Repeater delegates where QML reserves the id keyword.
+            "notificationId": String(eventId),
 
             // Source
             "source": notification.source || "",

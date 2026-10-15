@@ -1123,7 +1123,7 @@ Scope {
 
     function validCalendarDate(value) {
         const text = String(value || "").trim();
-        if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(text))
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(text))
             return false;
         const parsed = new Date(text + "T00:00:00Z");
         return !isNaN(parsed.getTime())

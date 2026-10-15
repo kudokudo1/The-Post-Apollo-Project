@@ -37,6 +37,8 @@ PanelWindow {
     // Keep this lightweight, dormant by default, and independent of focus.
     readonly property bool syntagmaLagProbeEnabled:
         String(Quickshell.env("POST_APOLLO_UI_LAG_PROBE") || "").trim() === "1"
+    // Diagnostic correlation only: never drives widget state or focus.
+    property double syntagmaHospitalLastModeChangeMs: 0
 
     Timer {
         id: syntagmaEventLoopProbe
@@ -56,12 +58,17 @@ PanelWindow {
             previousTickMs = now;
 
             if (elapsed >= 350) {
+                const modeAgeMs = shellRoot.syntagmaHospitalLastModeChangeMs > 0
+                                  ? now - shellRoot.syntagmaHospitalLastModeChangeMs : -1;
                 console.warn(
                     "SYNTAGMA_LAG_PROBE // event-loop interval "
                     + elapsed + "ms (target 100ms)"
                     + " // git=" + gitWindow.menuOpen
                     + " hospital=" + hospitalWindow.menuOpen
                     + " notifications=" + notificationsHubWindow.menuOpen
+                    + " tsMs=" + now
+                    + " hospitalMode=" + (hospitalWindow.operationsSurface || "surgery")
+                    + " hospitalModeAgeMs=" + modeAgeMs
                 );
             }
         }
@@ -395,6 +402,19 @@ PanelWindow {
                         number
                     );
                     shellRoot.requestControlKeyboard("git", "cross-widget");
+                }
+
+                // Operator-enabled lag correlation: observe the existing
+                // Hospital view signal without altering or delaying its work.
+                onOperationsSurfaceChanged: {
+                    if (shellRoot.syntagmaLagProbeEnabled) {
+                        const now = Date.now();
+                        shellRoot.syntagmaHospitalLastModeChangeMs = now;
+                        console.warn("SYNTAGMA_LAG_PROBE // hospital mode-change"
+                                     + " tsMs=" + now
+                                     + " to=" + (operationsSurface || "surgery")
+                                     + " open=" + menuOpen);
+                    }
                 }
 
                 onMenuOpenChanged: {

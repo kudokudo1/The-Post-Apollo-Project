@@ -18,6 +18,20 @@ assert "interval: 100" in shell
 assert "if (elapsed >= 350)" in shell
 assert "SYNTAGMA_LAG_PROBE // event-loop interval" in shell
 
+# Hospital mode correlation is enabled only by the same existing env opt-in.
+# It observes the already-emitted signal on the shell instance, not Hospital
+# services. Mode names are static UI categories, never Room or Patient data.
+assert 'property double syntagmaHospitalLastModeChangeMs: 0' in shell
+assert 'if (shellRoot.syntagmaLagProbeEnabled) {' in shell
+assert 'onOperationsSurfaceChanged: {' in shell
+assert '"SYNTAGMA_LAG_PROBE // hospital mode-change"' in shell
+assert 'hospitalModeAgeMs=' in shell
+assert 'hospitalMode=' in shell
+assert 'tsMs=' in shell
+assert 'shellRoot.syntagmaHospitalLastModeChangeMs = now;' in shell
+assert shell.count("hospitalWindow.toggle();") == 2
+assert shell.count("gitWindow.toggle();") == 2
+
 # The synchronous duration wraps each *existing* dock toggle. Nothing changes
 # about which QML handler is invoked or what data the widgets refresh.
 # Both original toggle sites remain: IPC and dock. Only dock is timed.

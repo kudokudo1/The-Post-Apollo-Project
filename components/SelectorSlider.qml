@@ -13,8 +13,10 @@ Rectangle {
     property var activityPoints: []
     property string sideLabel: ""
     // F2 VALUE is opt-in. Existing INDEX users retain the exact default.
-    property string selectorProfile: "index" // "index" | "value"
+    property string selectorProfile: "index" // "index" | "value" | "step"
     readonly property bool valueMode: selectorProfile === "value"
+    readonly property bool stepMode: selectorProfile === "step"
+    readonly property bool numericMode: valueMode || stepMode
     property real minimumValue: 0
     property real maximumValue: 100
     property real currentValue: 0
@@ -26,7 +28,21 @@ Rectangle {
     property var lastDragRequestedValue: null
     readonly property bool validValueDomain: Number.isFinite(minimumValue)
         && Number.isFinite(maximumValue) && maximumValue > minimumValue
-    property bool enabledSlider: valueMode ? validValueDomain : count > 1
+    // STEP represents numeric detents spaced by valueStep from minimumValue.
+    // If maximumValue is not an exact multiple, its endpoint is a final
+    // shorter detent rather than silently becoming unreachable.
+    readonly property bool validStepDomain: validValueDomain
+        && Number.isFinite(valueStep) && valueStep > 0
+        && (maximumValue - minimumValue) / valueStep <= 10000
+    readonly property int stepDetentCount: !validStepDomain ? 0
+        : Math.ceil((maximumValue - minimumValue) / valueStep - 1e-9) + 1
+    property bool stepGestureActive: false
+    property bool stepCancelled: false
+    property real pendingStepValue: 0
+    readonly property bool stepPreviewActive: stepMode
+        && stepGestureActive && !stepCancelled
+    property bool enabledSlider: valueMode ? validValueDomain
+        : stepMode ? validStepDomain : count > 1
 
     signal valueRequested(real value)
 
@@ -91,12 +107,79 @@ Rectangle {
             valueRequested(next);
     }
 
+    function stepValueAtIndex(index) {
+        if (!validStepDomain)
+            return minimumValue;
+        const i = Math.max(0, Math.min(stepDetentCount - 1,
+            Math.round(Number(index) || 0)));
+        return reportedValue(Math.min(maximumValue,
+            minimumValue + i * valueStep));
+    }
+
+    function stepIndexForValue(value) {
+        if (!validStepDomain)
+            return 0;
+        const raw = Math.max(0, Math.min(stepDetentCount - 1,
+            Math.floor((clampedValue(value) - minimumValue) / valueStep)));
+        const upper = Math.min(stepDetentCount - 1, raw + 1);
+        const candidate = clampedValue(value);
+        return Math.abs(stepValueAtIndex(upper) - candidate)
+            < Math.abs(stepValueAtIndex(raw) - candidate) ? upper : raw;
+    }
+
+    function stepValueForHandleY(y) {
+        return stepValueAtIndex(stepIndexForValue(valueForHandleY(y)));
+    }
+
+    function beginStepPreview(handleY) {
+        if (!stepMode || !enabledSlider)
+            return;
+        stepCancelled = false;
+        pendingStepValue = stepValueForHandleY(handleY);
+        stepGestureActive = true;
+    }
+
+    function cancelStepPreview() {
+        stepCancelled = true;
+        stepGestureActive = false;
+    }
+
+    function requestStepDelta(direction) {
+        if (!stepMode || !enabledSlider)
+            return;
+        const base = stepIndexForValue(currentValue);
+        const next = stepValueAtIndex(base + direction);
+        if (next !== reportedValue(currentValue))
+            valueRequested(next);
+    }
+
     onSelectorProfileChanged: {
         if (!valueMode) {
             valueDragActive = false;
             valueDragHandleY = -1;
             lastDragRequestedValue = null;
         }
+        if (!stepMode) {
+            stepGestureActive = false;
+            stepCancelled = false;
+        }
+    }
+    onCurrentValueChanged: {
+        // External owner updates supersede an unfinished STEP candidate.
+        if (stepMode && stepGestureActive && dragArea && dragArea.pressed)
+            cancelStepPreview();
+    }
+    onMinimumValueChanged: {
+        if (stepMode && stepGestureActive)
+            cancelStepPreview();
+    }
+    onMaximumValueChanged: {
+        if (stepMode && stepGestureActive)
+            cancelStepPreview();
+    }
+    onValueStepChanged: {
+        if (stepMode && stepGestureActive)
+            cancelStepPreview();
     }
 
     // F1 INDEX pilot is strictly opt-in. All existing Git/Hospital sliders
@@ -118,7 +201,7 @@ Rectangle {
 
     signal indexRequested(int index)
 
-    activeFocusOnTab: indexPilot || valueMode
+    activeFocusOnTab: indexPilot || numericMode
 
     function indexLabel(index) {
         if (index < 0)
@@ -157,6 +240,11 @@ Rectangle {
     }
 
     Keys.onEscapePressed: function(event) {
+        if (stepMode && stepGestureActive) {
+            cancelStepPreview();
+            event.accepted = true;
+            return;
+        }
         if (!indexPilot || !dragArea.pressed)
             return;
         cancelIndexPreview();
@@ -164,6 +252,11 @@ Rectangle {
     }
 
     Keys.onUpPressed: function(event) {
+        if (stepMode) {
+            requestStepDelta(1);
+            event.accepted = true;
+            return;
+        }
         if (valueMode) {
             stepValue(1);
             event.accepted = true;
@@ -178,6 +271,11 @@ Rectangle {
     }
 
     Keys.onDownPressed: function(event) {
+        if (stepMode) {
+            requestStepDelta(-1);
+            event.accepted = true;
+            return;
+        }
         if (valueMode) {
             stepValue(-1);
             event.accepted = true;
@@ -276,13 +374,13 @@ Rectangle {
         }
 
         Repeater {
-            model: slider.valueMode ? 5 : Math.min(slider.count, 13)
+            model: slider.numericMode ? 5 : Math.min(slider.count, 13)
 
             Item {
                 width: scaleArea.width
                 height: 1
                 y:
-                    slider.valueMode
+                    slider.numericMode
                     ? (scaleArea.height - 1) * index / 4
                     : slider.count <= 1
                     ? scaleArea.height / 2
@@ -308,6 +406,43 @@ Rectangle {
                     anchors.right: parent.right
                     color: slider.accentColor
                     opacity: index % 4 === 0 ? 0.68 : 0.32
+                }
+            }
+        }
+
+        // F3 detent markings: tick and numeric label share the same
+        // physical value position as the thumb (not an evenly spaced lie).
+        Repeater {
+            model: slider.stepMode && slider.validStepDomain
+                ? Math.min(slider.stepDetentCount, 9) : 0
+
+            Item {
+                required property int index
+                readonly property int detentIndex: slider.stepDetentCount <= 1
+                    ? 0 : Math.round(index * (slider.stepDetentCount - 1)
+                        / Math.max(1, Math.min(slider.stepDetentCount, 9) - 1))
+                readonly property real tickValue:
+                    slider.stepValueAtIndex(detentIndex)
+                y: slot.y + slider.handleYForValue(tickValue)
+                    + thumb.height / 2 - 1
+                x: scaleArea.width - 5
+                width: 6
+                height: 2
+
+                Rectangle {
+                    width: 6
+                    height: 2
+                    color: slider.accentColor
+                    opacity: 0.80
+                }
+
+                GohuText {
+                    x: 10
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: slider.valueText(parent.tickValue)
+                    color: slider.accentColor
+                    font.pixelSize: 8
+                    opacity: 0.85
                 }
             }
         }
@@ -346,7 +481,7 @@ Rectangle {
                 }
 
                 color: slider.accentColor
-                opacity: (slider.valueMode || slider.count > 0)
+                opacity: (slider.numericMode || slider.count > 0)
                     ? 0.48 : 0.14
             }
 
@@ -354,7 +489,7 @@ Rectangle {
             // This is not a claim that an external operation completed.
             Rectangle {
                 id: valueFill
-                visible: slider.valueMode
+                visible: slider.numericMode
                 width: 4
                 x: (parent.width - width) / 2
                 y: Math.max(0, Math.min(slot.height,
@@ -366,7 +501,7 @@ Rectangle {
             }
 
             Repeater {
-                model: slider.valueMode ? [] : (slider.activityPoints || [])
+                model: slider.numericMode ? [] : (slider.activityPoints || [])
 
                 Item {
                     required property int index
@@ -456,7 +591,10 @@ Rectangle {
 
                 // During a direct pilot drag, follow actual pointer travel
                 // between discrete detents; only the requested index snaps.
-                y: slider.valueMode
+                y: slider.stepMode
+                    ? slider.handleYForValue(slider.stepPreviewActive
+                        ? slider.pendingStepValue : slider.currentValue)
+                    : slider.valueMode
                     ? (slider.valueDragActive && dragArea.hasMoved
                         ? slider.valueDragHandleY
                         : slider.handleYForValue(slider.currentValue))
@@ -525,14 +663,15 @@ Rectangle {
                 Behavior on y {
                     // A track click animates toward the initial target.
                     // The first real drag takes over at the visible position.
-                    enabled: !dragArea.pressed
+                    enabled: slider.stepMode || !dragArea.pressed
                         || ((slider.indexPilot || slider.valueMode)
                             && !dragArea.hasMoved)
 
                     NumberAnimation {
                         duration: 110
-                        easing.type: Easing.OutBack
-                        easing.overshoot: 0.7
+                        easing.type: slider.stepMode
+                            ? Easing.OutQuad : Easing.OutBack
+                        easing.overshoot: slider.stepMode ? 0 : 0.7
                     }
                 }
 
@@ -554,7 +693,7 @@ Rectangle {
                 }
 
                 width: slider.width
-                enabled: slider.valueMode
+                enabled: slider.numericMode
                     ? slider.enabledSlider
                     : slider.count > 0
                         && (!slider.indexPilot || slider.enabledSlider)
@@ -578,6 +717,14 @@ Rectangle {
                         && localY <= handleBottom
                         ? localY - handleTop
                         : thumb.height / 2;
+
+                    if (slider.stepMode) {
+                        slider.forceActiveFocus();
+                        hasMoved = false;
+                        pressStartY = localY;
+                        slider.beginStepPreview(localY - dragOffset);
+                        return;
+                    }
 
                     if (slider.valueMode) {
                         slider.forceActiveFocus();
@@ -616,6 +763,13 @@ Rectangle {
                         return;
 
                     const localY = mapToItem(slot, mouse.x, mouse.y).y;
+
+                    if (slider.stepMode) {
+                        if (!slider.stepCancelled && slider.stepGestureActive)
+                            slider.pendingStepValue = slider.stepValueForHandleY(
+                                localY - dragOffset);
+                        return;
+                    }
 
                     if (slider.valueMode) {
                         if (!hasMoved && Math.abs(localY - pressStartY) > 2) {
@@ -663,6 +817,19 @@ Rectangle {
                 }
 
                 onReleased: {
+                    if (slider.stepMode) {
+                        // Keep the detent preview latched while sending the
+                        // final request, preventing the old-index flick.
+                        const next = slider.stepCancelled
+                            ? null : slider.pendingStepValue;
+                        if (next !== null
+                                && next !== slider.reportedValue(slider.currentValue))
+                            slider.valueRequested(next);
+                        slider.stepGestureActive = false;
+                        slider.stepCancelled = false;
+                        hasMoved = false;
+                        return;
+                    }
                     if (slider.valueMode) {
                         slider.valueDragActive = false;
                         slider.valueDragHandleY = -1;
@@ -688,7 +855,10 @@ Rectangle {
                 }
 
                 onCanceled: {
-                    if (slider.valueMode) {
+                    if (slider.stepMode) {
+                        slider.cancelStepPreview();
+                        hasMoved = false;
+                    } else if (slider.valueMode) {
                         // Live numeric requests already acknowledged by the
                         // owner are not undone by pointer cancellation.
                         slider.valueDragActive = false;
@@ -702,6 +872,12 @@ Rectangle {
                 }
 
                 onWheel: function(wheel) {
+                    if (slider.stepMode) {
+                        if (slider.enabledSlider)
+                            slider.requestStepDelta(wheel.angleDelta.y > 0 ? 1 : -1);
+                        wheel.accepted = true;
+                        return;
+                    }
                     if (slider.valueMode) {
                         if (slider.enabledSlider)
                             slider.stepValue(wheel.angleDelta.y > 0 ? 1 : -1);
@@ -756,7 +932,7 @@ Rectangle {
     Rectangle {
         anchors.fill: parent
         z: 12
-        visible: (slider.indexPilot || slider.valueMode)
+        visible: (slider.indexPilot || slider.numericMode)
             && slider.activeFocus
         color: "transparent"
         radius: slider.radius
@@ -771,7 +947,7 @@ Rectangle {
             bottomMargin: 8
         }
 
-        text: slider.valueMode
+        text: slider.numericMode
             ? slider.valueText(slider.currentValue)
             : slider.currentIndex >= 0
             ? String(slider.currentIndex + 1)

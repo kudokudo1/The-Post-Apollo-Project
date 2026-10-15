@@ -178,7 +178,22 @@ for required in (
 ):
     assert required in ownership, required
 assert 'interval: 120' in ownership
-assert 'id !== "git" && id !== "hospital" && id !== "notifications"' in ownership
+# All Koinoikos candidates must be known to the same logical coordinator.
+# Only the three prior Wlr layer-shell consumers may receive the bounded
+# Exclusive pulse; stage 1 must not force it onto Weather, CPU or AppControl.
+import re
+
+registered = set(re.findall(r'\\{ id: "([^"]+)", item: broker\\.', broker))
+owner_list = ownership.split('readonly property var widgetIds: [', 1)[1].split(']', 1)[0]
+supported = set(re.findall(r'"([^"]+)"', owner_list))
+assert registered == supported, (registered, supported)
+pulse_list = ownership.split('readonly property var pulseIds: [', 1)[1].split(']', 1)[0]
+pulsed = set(re.findall(r'"([^"]+)"', pulse_list))
+assert pulsed == {"git", "hospital", "notifications"}, pulsed
+assert 'if (widgetIds.indexOf(id) < 0)' in ownership
+assert 'if (pulseIds.indexOf(id) >= 0)' in ownership
+assert 'releaseBoost.stop();' in ownership
+assert 'boostOwner = "";' in ownership
 shell = (ROOT / "shell.qml").read_text()
 assert "KeyboardOwnershipCoordinator {" in shell
 assert "property alias controlKeyboardOwner: keyboardOwnership.owner" in shell
@@ -196,6 +211,8 @@ assert 'keyboardLock: keyboardOwnership.boostOwner === "hospital"' in shell
 assert 'keyboardLock: keyboardOwnership.boostOwner === "notifications"' in shell
 assert '|| (hospitalWindow.menuOpen && gitWindow.menuOpen)' not in shell
 assert 'keyboardOwnership.claim(owner, "koinoikos")' in shell
+assert 'if (active && owner !== "")' in shell
+assert 'owner === "git" || owner === "hospital"' not in shell
 assert "function requestControlKeyboard(id, reason)" in shell
 assert "relationshipFocus.selectOwner(id);" in shell
 

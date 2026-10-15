@@ -103,3 +103,34 @@ Passive/dormant surfaces remain excluded unless actually interactive.
    delivery, including editors and confirmations.
 6. Preserve custom SwayFX, the symlinked config, and the known permanently
    mapped Git/Hospital/Notifications lifecycle. No runtime pass from CI alone.
+
+## Runtime finding // null coordinates // October 15, 2026
+
+The operator opened Git and Hospital above Brave and ran both `qs ipc
+call relationshipFocus snapshot` and the Python router's `snapshot`.
+Both agreed on the **eligible** windows, but returned:
+`hospital: {x:null, y:null, w:772, h:1346}` and
+`git: {x:null, y:null, w:1148, h:816}`.
+
+**Confirmed broken seam:** `RelationshipFocusBroker.candidates()` read
+`Math.round(w.x)` and `Math.round(w.y)` from Quickshell `PanelWindow`
+(`QsWindow`, not `QtQuick.Item`); those missing/non-finite coordinates
+become `null` in JSON. `scripts/koinoikos_focus.py.menu_windows()`
+correctly requires numeric x/y and filters out both. Thus a valid Super+
+grave+Left binding can fire with **zero navigable widget candidates**.
+This is separate from whether Brave receives stray Tab after the router fails.
+
+**Candidate repair:** draft geometry PR uses the `PanelWindow.screen`
+desktop origin/size, its edge `anchors`, its `margins` and actual
+window width/height to derive finite X/Y. Do not patch the Python filter to
+accept `null` or invent (0,0): doing so creates false spatial targeting.
+Do not modify native Sway focus or the already-working shortcut dispatch.
+
+**Runtime gate:** after the fix is installed, open both overlays and repeat
+`qs ipc call relationshipFocus snapshot`; all open candidates must have
+**numeric X and Y** (including nonzero screen origin on the DP-5 second
+monitor). Then test held Super+grave+Left/Right and Tab in each. Brave below
+must not become a Koinoikos target but must regain typing after clicking.
+Only after the coordinates pass can we conclude anything about Wayland
+keyboard acquisition. Keep the diagnostics draft PR #281 separate until
+the geometry fix has been reconciled with its broker edits.

@@ -2,7 +2,7 @@
 
 # SELECTOR FAMILY // FOUNDATION CONTRACT
 
-> **STATE //** proposed architecture foundation; operator-approved direction, not a runtime implementation  
+> **STATE //** approved architecture foundation; implementation evidence is tracked per slice below (updated 2026-10-15)  
 > **OWNER //** Nurse 3A / Team 3, subject to Hospital coordination and shared-file ownership  
 > **AUDIT //** 2026-10-14, default branch `main`  
 > **SCOPE //** `SelectorDial` + `SelectorSlider`; `IndexRail` is adjacent and **not** silently folded into this family  
@@ -26,7 +26,12 @@ Read against `main` on 2026-10-14:
 - `widgets/GitW.qml` (blob `352c022058949f49b69bf121fd31e963b91082fa`): REPO and REMOTE are the concrete live Slider users, mounted on the Git control page. REPO calls `gitService.selectRepo(index)` on `indexRequested`; REMOTE selects the chosen branch. Existing colors, geometry, immediate-change behavior, remote activity illumination, and service implications are compatibility constraints.
 - `tests/fixtures/SelectorDialVariants.qml` (blob `236084af5473016f6951d6511dc5672520e2b2e2`): current temperature numeric and named-zone demonstration variants.
 
-The above are code-level observations, **not** fresh operator-machine runtime certification.
+The above are the **2026-10-14 historical source snapshot**, not the
+current full implementation inventory. Subsequent operator runtime tests
+confirmed the Git REPO and REMOTE pilots and Hospital FLOOR interaction;
+Git experimental controls were later removed by operator request. Immediate
+repo/floor context updates while dragging remain the intended normal
+workflow. Do not reinterpret release-preview as a replacement default.
 
 ## 2 // FAMILY CONTRACT (CORE)
 
@@ -170,11 +175,31 @@ No slice automatically grants merge authorization. Check shared-file ownership, 
 - Dragging the whole interval preserves its width and clamps at track boundaries.
 - Handle-specific preview/commit and visual feedback stay distinguishable; pending Decision 036 is resolved first.
 
-## 9 // STATUS AND NEXT AUTHORIZED ACTION
+## 9 // IMPLEMENTATION STATUS // 2026-10-15
 
-- **Approved:** family-level architecture direction, preservation of the 35 decisions, pause of Decision 036, draft semantic profiles for review.
-- **Proposed in this document:** concrete profile recipes, layering, implementation slices and acceptance tests.
-- **Not done:** Slider redesign, Dial refactor, IndexRail migration, live runtime verification, changes to Git selection behavior.
-- **Next:** operator reviews the Foundation draft; only then prepare F1 INDEX implementation, checking fresh main and current ownership first.
+- **F0 // Foundation:** accepted architectural direction; this contract is
+  retained as a design reference, not a claim that all profiles exist.
+- **F1 // INDEX:** opt-in preview-release mechanics implemented and the
+  release flick corrected (PR #270). The operator verified Git REPO, REMOTE
+  and Hospital FLOOR pilot behavior. At the operator's direction, Git's
+  INDEX LAB / LIVE REPO / LIVE REMOTE test buttons were removed (PR #274)
+  and both Git selectors use immediate navigation again. Hospital's
+  unobtrusive LIVE FLOOR test toggle was deliberately kept.
+- **F2 // VALUE:** opt-in vertical numeric mode under development; initial
+  slice is a bounded live owner-request signal, percentage and signed
+  numeric ranges, precision formatting, filled track, and wheel/keyboard
+  stepping. Standalone mock fixture; **Quickshell visual/runtime approval
+  is still required**. Existing Git/Hospital instances do not migrate.
+- **IndexRail:** read-only findings are in
+  `MODEL/components/index-rail-audit-20261015.md`. No code migration.
+- **F3 // STEP, F4 // Dial parity:** pending separate slices.
+- **F5 // RANGE:** deferred. Decision 036 is still paused; do not invent
+  interval-size constraints or deploy dual-handle behavior without a use case.
 
-No decision marathon is required to use a selector: choose a profile for normal behavior, inherit the application's visual recipe, and override only demonstrated exceptions.
+**Operator priority:** moving a Git/Hospital index must continue to show the
+real repository, branch map, and floor context changing during the drag.
+An isolated preview number is not a substitute for that live information.
+
+No decision marathon is required to use a selector: choose a profile for
+normal behavior, inherit the application's visual recipe, and override
+only demonstrated exceptions.

@@ -760,49 +760,48 @@ PanelWindow {
     // Favorite is NOT another base category.
     // Favorite is a magenta visual override.
 
+    // Warning is a severity facet, not an exclusive source family.
+    // A critical Hospital event remains an Apollo event AND appears in Warning.
+    function isWarning(category, severity) {
+        const c = String(category || "").trim().toLowerCase();
+        const s = String(severity || "").trim().toLowerCase();
+        return s === "warning" || s === "critical" || s === "emergency"
+            || c === "warning" || c === "critical" || c === "emergency";
+    }
+
     function classificationFor(source, sourceId, category, severity) {
-        var sourceText = String(source || "").trim().toLowerCase();
-        var sourceIdText = String(sourceId || "").trim().toLowerCase();
-        var categoryText = String(category || "").trim().toLowerCase();
-        var severityText = String(severity || "").trim().toLowerCase();
+        const sourceText = String(source || "").trim().toLowerCase();
+        const sourceIdText = String(sourceId || "").trim().toLowerCase();
+        const categoryText = String(category || "").trim().toLowerCase();
+        const severityText = String(severity || "").trim().toLowerCase();
 
-        // Warning / caution always wins.
-        if (severityText === "warning" || severityText === "critical" || severityText === "emergency" || categoryText === "warning" || categoryText === "critical" || categoryText === "emergency") {
-            return {
-                group: "warning",
-                tone: "warning"
-            };
+        // Preserve internal widget origin even when its severity is warning.
+        let group = "apps";
+        if (sourceText.indexOf("apollo") !== -1
+                || sourceIdText.indexOf("apollo") !== -1
+                || sourceText === "hospital" || sourceText === "git"
+                || sourceText === "cpu++" || sourceText === "weather station"
+                || sourceText === "appcontrol"
+                || categoryText === "apollo" || categoryText === "internal"
+                || categoryText === "reminder" || categoryText === "important"
+                || severityText === "important" || severityText === "reminder") {
+            group = "apollo";
+        } else if (categoryText === "social" || categoryText === "friend"
+                || categoryText === "friends" || categoryText === "message"
+                || categoryText === "communication" || categoryText === "audio"
+                || categoryText === "voice" || categoryText === "media"
+                || categoryText === "fullscreen") {
+            group = "social";
+        } else if (categoryText === "system" || categoryText === "technical"
+                || categoryText === "network" || categoryText === "hardware"
+                || categoryText === "resource" || categoryText === "telemetry") {
+            group = "system";
         }
 
-        // Apollo itself speaking to the operator.
-        if (sourceText.indexOf("apollo") !== -1 || sourceIdText.indexOf("apollo") !== -1 || categoryText === "apollo" || categoryText === "internal" || categoryText === "reminder" || categoryText === "important" || severityText === "important" || severityText === "reminder") {
-            return {
-                group: "apollo",
-                tone: "apollo"
-            };
-        }
-
-        // Social / voice / audio / media / fullscreen.
-        if (categoryText === "social" || categoryText === "friend" || categoryText === "friends" || categoryText === "message" || categoryText === "communication" || categoryText === "audio" || categoryText === "voice" || categoryText === "media" || categoryText === "fullscreen") {
-            return {
-                group: "social",
-                tone: "social"
-            };
-        }
-
-        // Explicit technical/system classifications.
-        if (categoryText === "system" || categoryText === "technical" || categoryText === "network" || categoryText === "hardware" || categoryText === "resource" || categoryText === "telemetry") {
-            return {
-                group: "system",
-                tone: "system"
-            };
-        }
-
-        // Normal exterior application notification.
-        return {
-            group: "apps",
-            tone: "system"
-        };
+        const tone = root.isWarning(category, severity) ? "warning"
+                   : group === "apollo" ? "apollo"
+                   : group === "social" ? "social" : "system";
+        return { group: group, tone: tone };
     }
 
     function baseColorForTone(tone) {
@@ -820,6 +819,14 @@ PanelWindow {
 
     // ===== SEARCH / FILTER ======================================
 
+    // Latest receipt/update time, formatted in the local timezone.
+    function eventTimestamp(createdAt, updatedAt) {
+        const first = Number(createdAt || 0);
+        const last = Number(updatedAt || 0);
+        const time = last > first ? last : first;
+        return time > 0 ? Qt.formatDateTime(new Date(time), "MM/dd/yy  h:mm AP") : "TIME UNKNOWN";
+    }
+
     function scheduleFilteredModelRebuild() {
         filteredModelRefreshTimer.restart();
     }
@@ -830,25 +837,37 @@ PanelWindow {
         if (root.activeFilter === "manager")
             return;
 
-        for (var i = 0; i < NotificationsService.notifications.count; i++) {
-            var entry = NotificationsService.notifications.get(i);
-            var classification = root.classificationFor(entry.source, entry.sourceId, entry.category, entry.severity);
-
+        // Sort presentation only; do not reorder or rewrite durable history.
+        const rows = [];
+        for (let i = 0; i < NotificationsService.notifications.count; i++) {
+            const entry = NotificationsService.notifications.get(i);
+            const classification = root.classificationFor(entry.source, entry.sourceId, entry.category, entry.severity);
             if (!root.notificationMatches(entry.source, entry.title, entry.message, entry.category, entry.severity, classification.group))
                 continue;
-
-            filteredNotifications.append({
-                "notificationId": String(entry.id || ""),
-                "source": String(entry.source || ""),
-                "sourceId": String(entry.sourceId || ""),
-                "title": String(entry.title || ""),
-                "message": String(entry.message || ""),
-                "appIcon": String(entry.appIcon || ""),
-                "category": String(entry.category || "generic"),
-                "severity": String(entry.severity || "normal")
+            rows.push({
+                ordinal: i,
+                data: {
+                    "notificationId": String(entry.id || ""),
+                    "source": String(entry.source || ""),
+                    "sourceId": String(entry.sourceId || ""),
+                    "title": String(entry.title || ""),
+                    "message": String(entry.message || ""),
+                    "appIcon": String(entry.appIcon || ""),
+                    "category": String(entry.category || "generic"),
+                    "severity": String(entry.severity || "normal"),
+                    "createdAt": Number(entry.createdAt || 0),
+                    "updatedAt": Number(entry.updatedAt || 0)
+                }
             });
         }
 
+        rows.sort(function(a, b) {
+            const aTime = Math.max(a.data.updatedAt, a.data.createdAt);
+            const bTime = Math.max(b.data.updatedAt, b.data.createdAt);
+            return (bTime - aTime) || (b.ordinal - a.ordinal);
+        });
+        for (let j = 0; j < rows.length; j++)
+            filteredNotifications.append(rows[j].data);
     }
 
     function rebuildManagerDndPolicies() {
@@ -887,8 +906,13 @@ PanelWindow {
     }
 
     function notificationMatches(source, title, message, category, severity, filterGroup) {
-        if (root.activeFilter !== "all" && root.activeFilter !== filterGroup)
+        // Warning is an overlapping severity view, not a source category.
+        if (root.activeFilter === "warning") {
+            if (!root.isWarning(category, severity))
+                return false;
+        } else if (root.activeFilter !== "all" && root.activeFilter !== filterGroup) {
             return false;
+        }
 
         var query = String(root.searchQuery || "").trim().toLowerCase();
 
@@ -2086,6 +2110,8 @@ PanelWindow {
                         required property string appIcon
                         required property string category
                         required property string severity
+                        required property double createdAt
+                        required property double updatedAt
 
                         readonly property string appKey: root.appKeyFor(notificationEntry.sourceId, notificationEntry.source)
 
@@ -2292,32 +2318,47 @@ PanelWindow {
                                 }
                             }
 
+                            // ===== RECEIVED / UPDATED TIME =====
+                            // Right of the app icon and above the source.
+                            GlowText {
+                                id: receivedTimestamp
+                                anchors {
+                                    top: appIconBox.top
+                                    left: appIconBox.right
+                                    right: appControls.left
+                                }
+                                anchors.topMargin: -1
+                                anchors.leftMargin: 9
+                                anchors.rightMargin: 9
+                                height: 12
+                                z: 1
+                                text: root.eventTimestamp(notificationEntry.createdAt, notificationEntry.updatedAt)
+                                pixelSize: 9
+                                textColor: Colors.white
+                                glowColor: Colors.cyan
+                                glowRadius: root.tightGlowRadius
+                                glowSamples: root.tightGlowSamples
+                                elideMode: Text.ElideRight
+                            }
+
                             // ===== APP NAME ======================
 
                             GlowText {
                                 id: appName
-
                                 anchors {
-                                    top: parent.top
+                                    top: receivedTimestamp.bottom
                                     left: appIconBox.right
                                     right: appControls.left
                                 }
-
-                                anchors.topMargin: root.cardContentMargin
+                                anchors.topMargin: 1
                                 anchors.leftMargin: 9
                                 anchors.rightMargin: 9
-
-                                height: 20
-
+                                height: 16
                                 z: 1
-
                                 text: notificationEntry.source
-
                                 pixelSize: root.appNameFontSize
-
                                 textColor: notificationEntry.sourceColor
                                 glowColor: notificationEntry.sourceColor
-
                                 elideMode: Text.ElideRight
                             }
 
@@ -2333,7 +2374,7 @@ PanelWindow {
                                 anchors.leftMargin: 9
                                 anchors.rightMargin: 9
 
-                                height: 15
+                                height: 13
 
                                 z: 1
 

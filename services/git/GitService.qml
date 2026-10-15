@@ -837,6 +837,80 @@ Scope {
         pendingTopology = [];
     }
 
+    // Preserve delegate identity across a refresh when commits are unchanged.
+    // BranchMap subscribes to topologyModel through a Repeater: clear + append
+    // destroys/recreates every glow/text delegate, even for identical data.
+    // Reconcile by SHA instead; update only roles that actually changed.
+    function reconcileTopologyRows() {
+        const roles = [
+            "shortSha", "parents", "refsText", "epoch",
+            "author", "subject", "lane", "isHead"
+        ];
+        let inserted = 0;
+        let moved = 0;
+        let updated = 0;
+        let removed = 0;
+        let unchanged = 0;
+
+        for (let i = 0; i < pendingTopology.length; ++i) {
+            const incoming = pendingTopology[i];
+
+            if (i >= topologyRows.count) {
+                topologyRows.append(incoming);
+                inserted += 1;
+                continue;
+            }
+
+            if (String(topologyRows.get(i).sha) !== String(incoming.sha)) {
+                let oldIndex = -1;
+                for (let j = i + 1; j < topologyRows.count; ++j) {
+                    if (String(topologyRows.get(j).sha) === String(incoming.sha)) {
+                        oldIndex = j;
+                        break;
+                    }
+                }
+
+                if (oldIndex >= 0) {
+                    topologyRows.move(oldIndex, i, 1);
+                    moved += 1;
+                } else {
+                    topologyRows.insert(i, incoming);
+                    inserted += 1;
+                    continue;
+                }
+            }
+
+            const current = topologyRows.get(i);
+            let rowChanged = false;
+            for (let r = 0; r < roles.length; ++r) {
+                const role = roles[r];
+                if (current[role] === incoming[role])
+                    continue;
+
+                topologyRows.setProperty(i, role, incoming[role]);
+                rowChanged = true;
+            }
+
+            if (rowChanged)
+                updated += 1;
+            else
+                unchanged += 1;
+        }
+
+        while (topologyRows.count > pendingTopology.length) {
+            topologyRows.remove(topologyRows.count - 1);
+            removed += 1;
+        }
+
+        return {
+            inserted: inserted,
+            moved: moved,
+            updated: updated,
+            removed: removed,
+            unchanged: unchanged
+        };
+    }
+
     function publishPendingModels() {
         // Read-only timing receipts, computed only during an opted-in trace.
         // Return to the DONE handler rather than publishing an extra QML
@@ -867,7 +941,6 @@ Scope {
 
         localBranchRows.clear();
         remoteBranchRows.clear();
-        topologyRows.clear();
 
         if (trace) {
             clearsMs = Date.now() - started;
@@ -910,8 +983,7 @@ Scope {
             started = Date.now();
         }
 
-        for (let i = 0; i < pendingTopology.length; ++i)
-            topologyRows.append(pendingTopology[i]);
+        const topologyDelta = reconcileTopologyRows();
 
         if (trace) {
             topologyMs = Date.now() - started;
@@ -920,7 +992,8 @@ Scope {
                 clearsMs: clearsMs,
                 localMs: localMs,
                 remoteMs: remoteMs,
-                topologyMs: topologyMs
+                topologyMs: topologyMs,
+                topologyDelta: topologyDelta
             };
         }
     }
@@ -1375,6 +1448,7 @@ Scope {
                         + " local=" + publishParts.localMs + "ms"
                         + " remote=" + publishParts.remoteMs + "ms"
                         + " topology=" + publishParts.topologyMs + "ms"
+                        + " topologyDelta=" + JSON.stringify(publishParts.topologyDelta)
                         + " total=" + publishMs + "ms"
                         + " // localRows=" + pendingLocalBranches.length
                         + " remoteRows=" + pendingRemoteBranches.length

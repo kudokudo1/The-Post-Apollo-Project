@@ -135,6 +135,41 @@ assert 'owner = "native"' not in broker
 assert 'visible.length > 0 ? visible[0].id : ""' in broker
 assert 'property string lastWidgetOwner: ""' in broker
 assert "lastWidgetOwner = id;" in broker
+# Regression: QsWindow/PanelWindow has no trustworthy Item x/y property.
+# The actual operator IPC showed Git and Hospital x:null,y:null although
+# both surfaces were open and had nonzero dimensions. Python discarded both.
+# Derive coordinates from ShellScreen + anchors + margins, not window.x/y.
+assert "function panelRect(w)" in broker
+assert "const sx = Number(screen.x);" in broker
+assert "const sy = Number(screen.y);" in broker
+assert "const sw = Number(screen.width);" in broker
+assert "const sh = Number(screen.height);" in broker
+assert "const ml = Number(margins.left);" in broker
+assert "const mr = Number(margins.right);" in broker
+assert "const mt = Number(margins.top);" in broker
+assert "const mb = Number(margins.bottom);" in broker
+assert "anchors.left ? sx + ml" in broker
+assert "anchors.right ? sx + sw - ww - mr" in broker
+assert "anchors.top ? sy + mt" in broker
+assert "anchors.bottom ? sy + sh - wh - mb" in broker
+assert "const rect = panelRect(w);" in broker
+assert "if (!rect)\n                continue;" in broker
+assert "x: Math.round(w.x)" not in broker
+assert "y: Math.round(w.y)" not in broker
+# Python should remain strict. Null-geometry widgets are not valid targets;
+# the broker must produce valid finite anchored coordinates instead.
+assert focus.menu_windows({"surfaces": [
+    {"id": "git", "x": None, "y": None, "w": 1148, "h": 816},
+    {"id": "hospital", "x": None, "y": None, "w": 772, "h": 1346}
+]}) == []
+fixed = focus.menu_windows({"surfaces": [
+    {"id": "hospital", "x": 1540, "y": 30, "w": 772, "h": 1346},
+    {"id": "git", "x": 1370, "y": 20, "w": 1148, "h": 816}
+]})
+assert len(fixed) == 2
+assert focus.nearest(fixed, fixed[1], "left") is not None
+
+
 assert "function advanceWidget()" not in broker
 assert "function beginAndAdvance(): bool" not in broker
 assert "function advance(): bool" not in broker

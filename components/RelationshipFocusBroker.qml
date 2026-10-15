@@ -26,6 +26,56 @@ QtObject {
 
     signal previousOwnerRestorationRequested(string previous)
 
+    // PanelWindow is a QsWindow, not a positioned QtQuick Item. It does not
+    // expose reliable x/y properties. Derive its desktop-space rectangle from
+    // the actual attached ShellScreen, layer anchors and panel margins.
+    // Never serialize NaN: JSON.stringify turns NaN into null, after which
+    // the spatial Python router intentionally rejects the entire candidate.
+    function panelRect(w) {
+        if (!w || !w.screen || !w.anchors || !w.margins)
+            return null;
+
+        const screen = w.screen;
+        const anchors = w.anchors;
+        const margins = w.margins;
+        const sx = Number(screen.x);
+        const sy = Number(screen.y);
+        const sw = Number(screen.width);
+        const sh = Number(screen.height);
+        const ww = Number(w.width);
+        const wh = Number(w.height);
+        const ml = Number(margins.left);
+        const mr = Number(margins.right);
+        const mt = Number(margins.top);
+        const mb = Number(margins.bottom);
+
+        const numbers = [sx, sy, sw, sh, ww, wh, ml, mr, mt, mb];
+        for (let i = 0; i < numbers.length; ++i) {
+            if (!isFinite(numbers[i]))
+                return null;
+        }
+        if (sw <= 0 || sh <= 0 || ww <= 0 || wh <= 0)
+            return null;
+
+        // If both edges anchor a dimension, the window stretches from the
+        // leading edge. If neither is anchored, layer-shell centers it.
+        const x = anchors.left ? sx + ml
+                : anchors.right ? sx + sw - ww - mr
+                : sx + (sw - ww) / 2;
+        const y = anchors.top ? sy + mt
+                : anchors.bottom ? sy + sh - wh - mb
+                : sy + (sh - wh) / 2;
+        if (!isFinite(x) || !isFinite(y))
+            return null;
+
+        return {
+            x: Math.round(x),
+            y: Math.round(y),
+            w: Math.round(ww),
+            h: Math.round(wh)
+        };
+    }
+
     function candidates() {
         const windows = [
             { id: "appcontrol", item: broker.appControl },
@@ -44,12 +94,15 @@ QtObject {
                 || w.width <= 0 || w.height <= 0)
                 continue;
 
+            const rect = panelRect(w);
+            if (!rect)
+                continue;
             result.push({
                 id: row.id,
-                x: Math.round(w.x),
-                y: Math.round(w.y),
-                w: Math.round(w.width),
-                h: Math.round(w.height)
+                x: rect.x,
+                y: rect.y,
+                w: rect.w,
+                h: rect.h
             });
         }
         return result;

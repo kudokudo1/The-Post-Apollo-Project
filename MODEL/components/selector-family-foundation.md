@@ -201,8 +201,15 @@ No slice automatically grants merge authorization. Check shared-file ownership, 
   refactor proposed.
 - **IndexRail:** read-only findings are in
   `MODEL/components/index-rail-audit-20261015.md`. No code migration.
-- **F5 // RANGE:** deferred. Decision 036 is still paused; do not invent
-  interval-size constraints or deploy dual-handle behavior without a use case.
+- **F5 // RANGE:** first isolated dual-handle prototype implemented under
+  `selectorProfile: "range"` with an internal `SelectorRangeSurface`
+  and separate `SelectorRangeTest.qml` mock. Both endpoints can be moved
+  individually, or the whole interval moved without changing its width;
+  hard collision allows zero-width intervals. Owner request commits on
+  pointer release. **Operator Quickshell runtime acceptance is pending**.
+  Decision 036 remains paused: no additional minimum/maximum span imposed.
+  Push/cross collision alternatives and other advanced recipes are reserved,
+  **not implemented or implied to be approved**.
 
 **Operator priority:** moving a Git/Hospital index must continue to show the
 real repository, branch map, and floor context changing during the drag.

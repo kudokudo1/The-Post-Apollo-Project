@@ -75,14 +75,34 @@ for flickable in ("projectList", "mapScroll"):
     assert f"mountingParent: {flickable}.parent.parent" in rail
     assert f"x: {flickable}.parent.x + {flickable}.x" in rail
     if flickable == "mapScroll":
-        # Center the 16px star within the Board's existing 20px lane.
+        # Actual visual gap = 20px viewport lane + 10px frame inset.
+        # A 16px star therefore needs 7px from lane start, not 2px.
+        assert "id: projectsFrame" in board
         assert "+ mapScroll.x + laneColumn.width" in rail
-        assert "Math.round((mapScroll.width - laneColumn.width - width) / 2)" in rail
+        assert "+ projectsFrame.rightInset - width) / 2)" in rail
         assert "mapScroll.width - width - rightInset" not in rail
     else:
         assert f"+ {flickable}.width - width - rightInset" in rail
     assert f"y: {flickable}.parent.y + {flickable}.y + effectiveTopInset" in rail
     assert "mapToItem(" not in rail.split("mountingParent:", 1)[1]
+
+# Roadmap previously let rightmost Remove controls extend under its star.
+# Keep a dedicated 20px lane inside the viewport, and center the star
+# through the visible lane plus the right frame inset.
+assert "id: roadmapFrame" in roadmap
+assert "width: Math.max(0, roadmapScroll.width - 20)" in roadmap
+assert "x: roadmapScroll.x + roadmapColumn.width" in roadmap
+assert "+ roadmapFrame.rightInset - width) / 2)" in roadmap
+
+# Table content scrolls on two axes. Carve out a permanent vertical star lane
+# from the *viewport*, not from the scrollable fixed-width data columns.
+# The horizontal scrollbar then ends before the vertical star track.
+assert "id: tableFrame" in table
+assert "anchors.rightMargin: 20" in table
+assert "contentWidth: Math.max(width, root.totalWidth)" in table
+assert "x: tableScroll.x + tableScroll.width" in table
+assert "(20 + tableFrame.rightInset - width) / 2" in table
+assert "orientation: Qt.Horizontal" in table
 
 # Keep existing clearance rather than sliding cards back under the star rail.
 assert "width: Math.max(0, mapScroll.width - 20)" in board

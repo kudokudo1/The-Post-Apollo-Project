@@ -114,6 +114,7 @@ PanelWindow {
         weather: weatherStationWindow
         notifications: notificationsHubWindow
         hostOwner: shellRoot.controlKeyboardOwner
+        boostOwner: keyboardOwnership.boostOwner
 
         onOwnerChanged: {
             // Koinoikos selection and the shared logical keyboard owner must

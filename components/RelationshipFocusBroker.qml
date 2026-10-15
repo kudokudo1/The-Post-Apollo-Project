@@ -20,6 +20,9 @@ QtObject {
     // taking over native Sway focus or selecting on the prefix alone.
     property string lastWidgetOwner: ""
     property string hostOwner: ""
+    // Diagnostic only: short seat-acquisition intent from the existing
+    // coordinator. Kept independent from Koinoikos's selection policy.
+    property string boostOwner: ""
 
     signal previousOwnerRestorationRequested(string previous)
 
@@ -90,6 +93,48 @@ QtObject {
         previousOwner = "";
     }
 
+    // Read-only diagnostics. No bindings, focus changes, text or page titles.
+    // "active" and "activeFocusItem" are Qt-reported and may be unavailable;
+    // even when present they are NOT compositor seat-key delivery evidence.
+    function inspectWindow(id, w) {
+        if (!w)
+            return { id: id, present: false };
+        const item = w.activeFocusItem;
+        return {
+            id: id,
+            present: true,
+            open: w.menuOpen === true,
+            visible: w.visible === true,
+            qtWindowActive: typeof w.active === "boolean" ? w.active : null,
+            qtActiveFocusItem: item
+                               ? String(item.objectName || "<unnamed>") : null,
+            keyboardActive: typeof w.keyboardActive === "boolean"
+                            ? w.keyboardActive : null,
+            keyboardLock: typeof w.keyboardLock === "boolean"
+                          ? w.keyboardLock : null,
+            focusable: typeof w.focusable === "boolean" ? w.focusable : null
+        };
+    }
+
+    function diagnosticSnapshot() {
+        return JSON.stringify({
+            koinoikosActive: active,
+            koinoikosOwner: owner,
+            logicalKeyboardOwner: hostOwner,
+            focusBoostOwner: boostOwner,
+            previousWidgetOwner: previousOwner,
+            candidates: candidates(),
+            windows: [
+                inspectWindow("appcontrol", appControl),
+                inspectWindow("hospital", hospital),
+                inspectWindow("git", git),
+                inspectWindow("cpu", cpu),
+                inspectWindow("weather", weather),
+                inspectWindow("notifications", notifications)
+            ]
+        });
+    }
+
     property IpcHandler ipc: IpcHandler {
         target: "relationshipFocus"
 
@@ -107,6 +152,12 @@ QtObject {
                 owner: broker.owner,
                 surfaces: broker.candidates()
             });
+        }
+
+        // Observe focus state without modifying it. Do not replace the
+        // router-facing snapshot or imply that Qt focus proves seat focus.
+        function diagnose(): string {
+            return broker.diagnosticSnapshot();
         }
 
         function select(id: string): bool {

@@ -1,0 +1,33 @@
+name: Selector VALUE Contracts
+
+on:
+  pull_request:
+    paths:
+      - "components/SelectorSlider.qml"
+      - "widgets/GitW.qml"
+      - "widgets/HospitalW.qml"
+      - "tests/components/test_selector_slider_value_profile.py"
+      - "tests/fixtures/SelectorSliderValueDemo.qml"
+      - "tests/selector-value/shell.qml"
+      - ".github/workflows/selector-value-contracts.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "components/SelectorSlider.qml"
+      - "widgets/GitW.qml"
+      - "widgets/HospitalW.qml"
+      - "tests/components/test_selector_slider_value_profile.py"
+      - "tests/fixtures/SelectorSliderValueDemo.qml"
+      - "tests/selector-value/shell.qml"
+      - ".github/workflows/selector-value-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  value-profile-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run VALUE source and numerical boundary contract
+        run: python3 tests/components/test_selector_slider_value_profile.py

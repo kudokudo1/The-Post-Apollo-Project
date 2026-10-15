@@ -74,7 +74,13 @@ for flickable in ("projectList", "mapScroll"):
     )[1].split("visible:", 1)[0]
     assert f"mountingParent: {flickable}.parent.parent" in rail
     assert f"x: {flickable}.parent.x + {flickable}.x" in rail
-    assert f"+ {flickable}.width - width - rightInset" in rail
+    if flickable == "mapScroll":
+        # Center the 16px star within the Board's existing 20px lane.
+        assert "+ mapScroll.x + laneColumn.width" in rail
+        assert "Math.round((mapScroll.width - laneColumn.width - width) / 2)" in rail
+        assert "mapScroll.width - width - rightInset" not in rail
+    else:
+        assert f"+ {flickable}.width - width - rightInset" in rail
     assert f"y: {flickable}.parent.y + {flickable}.y + effectiveTopInset" in rail
     assert "mapToItem(" not in rail.split("mountingParent:", 1)[1]
 

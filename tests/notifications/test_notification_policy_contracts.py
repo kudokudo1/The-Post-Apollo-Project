@@ -80,4 +80,25 @@ hub = read(HUB)
 assert 'toggleAppFlag(notificationEntry.appKey, "snoozed")' not in hub, "ZZ must not be frontend-only state"
 assert 'toggleAppFlag(notificationEntry.appKey, "dnd")' not in hub, "DND must not be frontend-only state"
 
+# Source group and severity must remain independent: Apollo warnings appear
+# under both Apollo (source) and Warning (severity), without rewriting history.
+require(HUB, "function isWarning(category, severity)", "warning facet must be independent")
+require(HUB, 'root.activeFilter === "warning"', "warning must be an overlapping filter")
+require(HUB, "root.isWarning(category, severity)", "warning matching must use severity")
+require(HUB, 'group = "apollo"', "internal sources must keep the Apollo group")
+require_regex(
+    HUB,
+    r'function classificationFor\(.*?const tone = root\.isWarning\(category, severity\).*?return \{ group: group, tone: tone \}',
+    "warning must change presentation tone, not the source group",
+)
+
+# Durable history remains append/update-by-ID, but repeated startup events
+# must not masquerade as updates to the same historical occurrence.
+require(SERVICE, "const historyIndex = indexOfNotification(notifications, entry.id);", "stable IDs still update")
+require(HUB, "rows.sort(function(a, b)", "history presentation must sort newest first")
+require(HUB, "return (bTime - aTime) || (b.ordinal - a.ordinal);", "recent update must appear first")
+require(HUB, "filteredNotifications.append(rows[j].data);", "sorted view must not reorder stored history")
+popup = read("modules/Notifications.qml")
+assert '"id": "apollo-structure-test"' not in popup, "each startup test requires a distinct occurrence ID"
+
 print("Notification policy contracts: PASS")

@@ -17,6 +17,27 @@ PanelWindow {
     property bool relationshipFocusModeActive: false
     property bool relationshipFocused: false
     property bool focusKeyTraceEnabled: false
+
+    // Permanent-mapped overlay: initial owner claim may precede compositor
+    // commitment of the changed keyboard input region. Notifications already
+    // uses this one-shot, bounded retry. Never retry if focus changed away,
+    // a text editor/dial owns keys, or Qt reports our window active.
+    Timer {
+        id: hospitalOpenFocusRetry
+        interval: 48
+        repeat: false
+        onTriggered: {
+            if (!root.menuOpen || !root.keyboardActive
+                    || keyboardFocusAnchor.Window.active || root.intercomTyping || root.receptionistTyping)
+                return;
+            root.keyboardOwnershipRequested();
+            Qt.callLater(function() {
+                if (root.menuOpen && root.keyboardActive
+                        && !root.intercomTyping && !root.receptionistTyping)
+                    keyboardFocusAnchor.forceActiveFocus();
+            });
+        }
+    }
     signal keyboardOwnershipRequested()
 
     // Passive diagnostics only: no printable keys, editor text or shortcuts
@@ -1935,6 +1956,10 @@ PanelWindow {
     }
 
     onMenuOpenChanged: {
+        if (root.menuOpen && root.keyboardActive)
+            hospitalOpenFocusRetry.restart();
+        else if (!root.menuOpen)
+            hospitalOpenFocusRetry.stop();
         if (!root.menuOpen) {
             root.floorIndexPilotEnabled = false;
             if (speechInputService.busy)
@@ -1961,8 +1986,11 @@ PanelWindow {
     }
 
     onKeyboardActiveChanged: {
-        if (!root.menuOpen || !root.keyboardActive)
+        if (!root.menuOpen || !root.keyboardActive) {
+            hospitalOpenFocusRetry.stop();
             return;
+        }
+        hospitalOpenFocusRetry.restart();
 
         Qt.callLater(function() {
             if (!root.menuOpen || !root.keyboardActive)

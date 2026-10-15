@@ -364,4 +364,30 @@ for name, path in (
     assert 'Qt.Key_A' not in widget[start:start + 1900]
 assert (ROOT / "docs/focus-key-delivery-trace-20261015.md").is_file()
 
+# Git/Hospital shared-owner contention: opening the second persistent
+# layer-shell panel can leave the reselected first panel Qt-inactive.
+# Notifications already retries once at 48 ms. Git/Hospital must only
+# retry while they are still the logical owner and not in an editor.
+for rel, timer, anchor in (
+    ("widgets/GitW.qml", "gitOpenFocusRetry", "gitKeyboardFocusAnchor"),
+    ("widgets/HospitalW.qml", "hospitalOpenFocusRetry", "keyboardFocusAnchor")
+):
+    widget = (ROOT / rel).read_text()
+    assert f"id: {timer}" in widget, rel
+    assert "interval: 48" in widget, rel
+    assert "repeat: false" in widget, rel
+    assert f"{anchor}.Window.active" in widget, rel
+    assert "!root.menuOpen || !root.keyboardActive" in widget, rel
+    assert "root.keyboardOwnershipRequested();" in widget, rel
+    assert f"{timer}.restart();" in widget, rel
+    assert f"{timer}.stop();" in widget, rel
+    assert "WlrKeyboardFocus.OnDemand" in widget, rel
+    assert "WlrKeyboardFocus.Exclusive" in widget, rel
+    assert 'WlrLayershell.layer: WlrLayer.Overlay' in widget, rel
+git_retry = (ROOT / "widgets/GitW.qml").read_text()
+hospital_retry = (ROOT / "widgets/HospitalW.qml").read_text()
+assert "root.activeTextEditor || root.dialControlMode" in git_retry
+assert "root.intercomTyping || root.receptionistTyping" in hospital_retry
+assert (ROOT / "docs/git-hospital-cross-menu-focus-retry-20261015.md").is_file()
+
 print("KOINOIKOS FOCUS MODE CONTRACTS // PASS")

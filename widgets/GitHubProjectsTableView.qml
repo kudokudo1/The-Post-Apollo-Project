@@ -7,6 +7,26 @@ Item {
     id: root
 
     required property var projectService
+    property var keyboardHost: null
+
+    property bool editOpen: false
+    property var editItem: null
+    property string editKind: ""
+    property int editProjectNumber: 0
+
+    function beginEdit(item, kind) {
+        if (projectService.busy || !projectService.itemId(item))
+            return;
+        editItem = item;
+        editKind = kind;
+        editProjectNumber = projectService.selectedNumber();
+        editOpen = true;
+    }
+
+    function closeEditor() {
+        editOpen = false;
+        editItem = null;
+    }
 
     property string armedItemAction: ""
     property string armedItemId: ""
@@ -72,10 +92,20 @@ Item {
 
         function onMutationFinished(success, operation) {
             root.clearItemArm();
+            if (success && (operation === "edit-field"
+                            || operation === "edit-title"))
+                root.closeEditor();
         }
 
         function onProjectRefreshed() {
             root.clearItemArm();
+            root.closeEditor();
+        }
+
+        function onSelectedProjectIndexChanged() {
+            if (root.editOpen
+                    && root.projectService.selectedNumber() !== root.editProjectNumber)
+                root.closeEditor();
         }
     }
 
@@ -104,6 +134,36 @@ Item {
             color: cell.header ? cell.accent : Colors.white
             opacity: cell.value ? 1.0 : 0.34
             elide: Text.ElideRight
+        }
+    }
+
+    component EditableCell: Item {
+        id: editCell
+
+        property string value: ""
+        property color accent: Colors.magenta
+        signal triggered()
+
+        height: 38
+
+        Components.ActionButton {
+            anchors.fill: parent
+            label: (editCell.value || "—") + "  ✎"
+            labelPixelSize: 9
+            labelHorizontalAlignment: Text.AlignLeft
+            labelElide: Text.ElideRight
+            contentPadding: 10
+            idleFillColor: Colors.dark
+            hoverFillColor: Colors.yellow
+            idleForegroundColor: editCell.value ? Colors.white : Colors.magenta
+            hoverForegroundColor: Colors.magenta
+            idleBorderColor: editCell.accent
+            hoverBorderColor: Colors.orange
+            accentColor: editCell.accent
+            contentGlowEnabled: false
+            softGlowEnabled: false
+            available: !root.projectService.busy
+            onTriggered: editCell.triggered()
         }
     }
 
@@ -270,11 +330,23 @@ Item {
                             spacing: 0
 
                             Cell {
+                                visible: !root.projectService.isDraftItem(tableRow.modelData)
                                 width: root.titleWidth
                                 value:
                                     root.projectService.itemTitle(
                                         tableRow.modelData
                                     )
+                            }
+
+                            EditableCell {
+                                visible: root.projectService.isDraftItem(tableRow.modelData)
+                                width: root.titleWidth
+                                accent: Colors.magenta
+                                value:
+                                    root.projectService.itemTitle(
+                                        tableRow.modelData
+                                    )
+                                onTriggered: root.beginEdit(tableRow.modelData, "title")
                             }
 
                             Cell {
@@ -293,44 +365,54 @@ Item {
                                     )
                             }
 
-                            Cell {
+                            EditableCell {
                                 width: root.statusWidth
+                                accent: Colors.magenta
                                 value:
                                     root.projectService.itemStatus(
                                         tableRow.modelData
                                     )
+                                onTriggered: root.beginEdit(tableRow.modelData, "status")
                             }
 
-                            Cell {
+                            EditableCell {
                                 width: root.priorityWidth
+                                accent: Colors.orange
                                 value:
                                     root.projectService.itemPriority(
                                         tableRow.modelData
                                     )
+                                onTriggered: root.beginEdit(tableRow.modelData, "priority")
                             }
 
-                            Cell {
+                            EditableCell {
                                 width: root.iterationWidth
+                                accent: Colors.magenta
                                 value:
                                     root.projectService.itemIteration(
                                         tableRow.modelData
                                     )
+                                onTriggered: root.beginEdit(tableRow.modelData, "iteration")
                             }
 
-                            Cell {
+                            EditableCell {
                                 width: root.dateWidth
+                                accent: Colors.cyan
                                 value:
                                     root.projectService.itemStartDate(
                                         tableRow.modelData
                                     )
+                                onTriggered: root.beginEdit(tableRow.modelData, "start")
                             }
 
-                            Cell {
+                            EditableCell {
                                 width: root.dateWidth
+                                accent: Colors.cyan
                                 value:
                                     root.projectService.itemTargetDate(
                                         tableRow.modelData
                                     )
+                                onTriggered: root.beginEdit(tableRow.modelData, "target")
                             }
 
                             Rectangle {
@@ -451,4 +533,17 @@ Item {
             NeonScrollBar { flickable: tableScroll; handleStyle: "star"; orientation: Qt.Horizontal }
         }
     }
+    GitHubProjectsFieldEditor {
+        id: fieldEditor
+        anchors.fill: parent
+        z: 100
+        visible: root.editOpen
+        projectService: root.projectService
+        keyboardHost: root.keyboardHost
+        targetItem: root.editItem
+        targetProjectNumber: root.editProjectNumber
+        fieldKind: root.editKind
+        onDismissRequested: root.closeEditor()
+    }
+
 }

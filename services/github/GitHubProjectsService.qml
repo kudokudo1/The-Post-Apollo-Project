@@ -1179,7 +1179,12 @@ Scope {
         if (clearValue) {
             editFlag = "--clear";
         } else if (kind === "start" || kind === "target") {
-            if (type.indexOf("DATE") < 0 || !validCalendarDate(clean)) {
+            // gh field-list reports ordinary DATE fields as ProjectV2Field
+            // on some CLI versions. Trust the matched field identity and
+            // validate the date value; GitHub still validates field type.
+            const dateCompatible = type.indexOf("DATE") >= 0
+                || type === "PROJECTV2FIELD" || !type;
+            if (!dateCompatible || !validCalendarDate(clean)) {
                 lastError = "DATE REQUIRED // USE YYYY-MM-DD";
                 stateText = lastError;
                 return false;

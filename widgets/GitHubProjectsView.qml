@@ -1060,8 +1060,12 @@ Item {
                         // its live Column y keeps the star rail beside the
                         // cards, not up among the project title/buttons.
                         mountingParent: mapScroll.parent.parent
-                        x: mapScroll.parent.x + mapScroll.x
-                           + mapScroll.width - width - rightInset
+                        // Center the full star track in the gap reserved
+                        // between the Board cards and the viewport's right edge.
+                        // Uses the actual lane width and scrollbar width, not
+                        // a hard-coded inset that left-aligns the star.
+                        x: mapScroll.parent.x + mapScroll.x + laneColumn.width
+                           + Math.round((mapScroll.width - laneColumn.width - width) / 2)
                         y: mapScroll.parent.y + mapScroll.y + effectiveTopInset
                         visible: mapScroll.visible && scrollable
                     }

@@ -101,4 +101,32 @@ require(HUB, "filteredNotifications.append(rows[j].data);", "sorted view must no
 popup = read("modules/Notifications.qml")
 assert '"id": "apollo-structure-test"' not in popup, "each startup test requires a distinct occurrence ID"
 
+# Universal desktop intake must preserve standard sender category/urgency
+# metadata rather than silently treating all external events as generic/normal.
+CONVERTER = "services/notifications/NotificationsConverter.qml"
+require(CONVERTER, "import Quickshell.Services.Notifications", "converter must access the supported urgency enum")
+require(CONVERTER, 'const hints = notification.hints || {};', "converter must read client hints safely")
+require(CONVERTER, 'const category = hints["category"];', "converter must read the standard category hint")
+require(CONVERTER, 'NotificationUrgency.Critical', "critical urgency must survive conversion")
+require(CONVERTER, 'NotificationUrgency.Low', "low urgency must survive conversion")
+require(CONVERTER, '"category": root.categoryFor(notification)', "category must enter durable history")
+require(CONVERTER, '"severity": root.severityFor(notification)', "severity must enter durable history")
+require(CONVERTER, '"sourceId": String(notification.desktopEntry || "")', "original desktop entry must be kept for existing source policies")
+require(CONVERTER, '"source": String(notification.appName || notification.desktopEntry || "UNKNOWN APP")', "app name must have a safe fallback")
+
+# Explicit sender identity or standard type hints can classify external
+# notifications. Unknown browser notifications remain Apps without guessing.
+require(HUB, "function isCommunicationSource(source, sourceId)", "hub must recognize known communication senders")
+for family in ("email", "im", "call", "presence"):
+    require(HUB, f'categoryFamily === "{family}"', f"{family} hint family must reach Social")
+for family in ("device", "network"):
+    require(HUB, f'categoryFamily === "{family}"', f"{family} hint family must reach System")
+require(HUB, 'let group = "apps";', "unrecognized external sources must stay in Apps")
+require(HUB, 'root.isCommunicationSource(source, sourceId)', "source classification must use sender identity")
+require(HUB, 'const tone = root.isWarning(category, severity) ? "warning"', "critical external notifications must also qualify for Warning")
+classification = hub[hub.index("    function classificationFor("):hub.index("    function baseColorForTone(")]
+assert 'categoryText === "important"' not in classification, "importance is not Apollo provenance"
+assert 'categoryText === "reminder"' not in classification, "reminders are not Apollo provenance"
+assert 'severityText === "important"' not in classification, "severity must not identify Apollo origin"
+
 print("Notification policy contracts: PASS")

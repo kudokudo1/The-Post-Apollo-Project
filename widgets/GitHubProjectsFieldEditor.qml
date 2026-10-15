@@ -93,6 +93,12 @@ Item {
             event.accepted = true;
         }
 
+        // Blank space inside the popup is not an outside-dismiss click.
+        MouseArea {
+            anchors.fill: parent
+            onClicked: function(mouse) { mouse.accepted = true; }
+        }
+
         Column {
             anchors.fill: parent
             anchors.margins: 7

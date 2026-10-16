@@ -160,6 +160,10 @@ Item {
 
                     anchors.fill: parent
                     anchors.margins: 6
+                    // Reserve a full star-width lane outside the 66px
+                    // operation cards; never place the rail over their
+                    // selection/highlight or row hit targets.
+                    anchors.rightMargin: 6 + operationScrollTrack.reservedExtent
                     clip: true
                     spacing: 4
                     model: root.entries
@@ -248,7 +252,17 @@ Item {
 
                     onCountChanged: root.refreshSelection()
                 }
-                NeonScrollBar { flickable: operationList; handleStyle: "star" }
+                NeonScrollBar {
+                    id: operationScrollTrack
+                    flickable: operationList
+                    handleStyle: "star"
+                    // Mount against the surrounding panel, *after* the card
+                    // viewport. This keeps the reserved lane actually usable.
+                    x: parent.width - width - 6
+                    y: operationList.y + effectiveTopInset
+                    z: 2
+                    visible: operationList.visible && scrollable
+                }
             }
 
             SectionFrame {

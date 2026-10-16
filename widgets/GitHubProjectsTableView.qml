@@ -8,6 +8,11 @@ Item {
 
     required property var projectService
     property var keyboardHost: null
+    property Item editorHost: null
+
+    // The Table is a small, clipped pane. The modal belongs to the complete
+    // Projects surface, not to the Table viewport itself.
+    onVisibleChanged: { if (!visible) closeEditor(); }
 
     property bool editOpen: false
     property var editItem: null
@@ -148,7 +153,7 @@ Item {
 
         Components.ActionButton {
             anchors.fill: parent
-            label: (editCell.value || "—") + "  ✎"
+            label: editCell.value || "—"
             labelPixelSize: 9
             labelHorizontalAlignment: Text.AlignLeft
             labelElide: Text.ElideRight
@@ -164,6 +169,20 @@ Item {
             softGlowEnabled: false
             available: !root.projectService.busy
             onTriggered: editCell.triggered()
+        }
+
+        // Keep the pencil's relational yellow independent of the cell text,
+        // hover highlight, and selected field value.
+        GohuText {
+            anchors {
+                right: parent.right
+                verticalCenter: parent.verticalCenter
+                rightMargin: 6
+            }
+            text: "✎"
+            font.pixelSize: 13
+            color: Colors.yellow
+            z: 2
         }
     }
 
@@ -535,8 +554,9 @@ Item {
     }
     GitHubProjectsFieldEditor {
         id: fieldEditor
+        parent: root.editorHost ? root.editorHost : root
         anchors.fill: parent
-        z: 100
+        z: 2000
         visible: root.editOpen
         projectService: root.projectService
         keyboardHost: root.keyboardHost

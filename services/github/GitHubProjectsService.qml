@@ -1130,6 +1130,54 @@ Scope {
             && parsed.toISOString().slice(0, 10) === text;
     }
 
+    // Only create a missing schema field after a separate operator-owned
+    // confirmation in the editor. These defaults are editable in GitHub;
+    // never replace an existing field or guess an iteration configuration.
+    function setupMissingField(kind) {
+        const number = selectedNumber();
+        if (busy || !number || fields.length === 0
+                || editableField(kind)) {
+            lastError = "FIELD SETUP REFUSED // REFRESH PROJECT FIRST";
+            stateText = lastError;
+            return false;
+        }
+
+        let name = "";
+        let dataType = "";
+        let options = "";
+        if (kind === "priority") {
+            name = "Priority";
+            dataType = "SINGLE_SELECT";
+            options = "High,Medium,Low";
+        } else if (kind === "status") {
+            name = "Status";
+            dataType = "SINGLE_SELECT";
+            options = "Todo,In Progress,Done";
+        } else if (kind === "start" || kind === "target") {
+            name = kind === "start" ? "Start Date" : "Target Date";
+            dataType = "DATE";
+        } else {
+            lastError = "FIELD SETUP UNAVAILABLE // CREATE ITERATIONS IN GITHUB";
+            stateText = lastError;
+            return false;
+        }
+
+        return startOperation(
+            "create-field",
+            [
+                "bash", "-lc",
+                'if [ "$3" = "SINGLE_SELECT" ]; then exec gh project field-create "$1" --owner "$2" --name "$4" --data-type "$3" --single-select-options "$5" --format json; else exec gh project field-create "$1" --owner "$2" --name "$4" --data-type "$3" --format json; fi',
+                "pa-project-field-setup", String(number), owner,
+                dataType, name, options
+            ],
+            "CREATING " + name.toUpperCase() + " FIELD"
+        );
+    }
+
+    function selectedProjectUrl() {
+        return String(projectView.url || selectedProject.url || "");
+    }
+
     // Only one field per operation. Backend uses positional shell arguments;
     // user text never becomes an executable shell fragment.
     function editItemField(item, kind, value, clearValue) {

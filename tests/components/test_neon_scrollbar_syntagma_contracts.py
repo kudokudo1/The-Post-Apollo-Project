@@ -30,6 +30,9 @@ CONTRACT = {
     'boxSideGeometry ? Math.max(0, boxEnd - boxStart)': "box track spans usable side",
     'geometryMode !== "viewport"': "explicit viewport compatibility path",
     'trackTopExtension <= 0': "preserve protruding specialty rails",
+    'property bool hostIsScrollingContent:': "detect nested scrolling content hosts",
+    'effectiveGeometryHost.parent.contentItem === effectiveGeometryHost':
+        "prevent rail anchoring to a parent Flickable's virtual content area",
     'property int topInset: 5': "legacy viewport upper endpoint",
     'property int bottomInset: 5': "5px lower endpoint",
     'property int leftInset: 5': "horizontal start inset",

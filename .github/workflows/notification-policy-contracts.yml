@@ -52,3 +52,6 @@ jobs:
 
       - name: Validate CPU++ SYSTEM observational reporting
         run: python3 tests/notifications/test_cpu_plus_system_report.py
+
+      - name: Validate Network link transition producer
+        run: python3 tests/notifications/test_network_link_producer.py

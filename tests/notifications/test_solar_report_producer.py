@@ -91,9 +91,8 @@ denied({kpTime:'2026-10-15 02:00:00'});
 denied({solarWindTime:'2026-10-16 05:00:00'});
 denied({magneticFieldTime:'2026-10-16 15:00:00'});
 denied({solarFluxTime:'2026-10-12 20:00:00'});
-assert.strictEqual(ctx.snapshot(good,now),record===null?null:ctx.snapshot(good,now)
-    && ctx.snapshot(good,now).kp===4.7 ? null : null); // no-op removed below
+assert.strictEqual(ctx.snapshot(good, now).kp, 4.7);
 console.log('Daily Solar Report policy: PASS');
-""".replace('assert.strictEqual(ctx.snapshot(good,now),record===null?null:ctx.snapshot(good,now)\n    && ctx.snapshot(good,now).kp===4.7 ? null : null); // no-op removed below\n', '')
+"""
 subprocess.run(["node","-e",NODE,str(POLICY)], check=True)
 print("Daily Solar Report producer contracts: PASS")

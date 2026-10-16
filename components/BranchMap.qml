@@ -545,74 +545,9 @@ Rectangle {
             }
         }
 
-        Item {
-            id: scrollIndicator
+        // No second scrolling-only rail here: NeonScrollBar below is the
+        // sole topology indicator, with its own clickable star and track.
 
-            anchors {
-                top: header.bottom
-                topMargin: 4
-                bottom: parent.bottom
-                right: parent.right
-            }
-
-            width: 14
-            z: 50
-
-            readonly property bool canScroll:
-                topologyFlick.contentHeight > topologyFlick.height + 1
-            readonly property bool active:
-                canScroll
-                && (
-                    topologyFlick.moving
-                    || topologyFlick.dragging
-                    || topologyFlick.flicking
-                )
-
-            opacity: active ? 1.0 : 0.0
-
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: 120
-                }
-            }
-
-            Rectangle {
-                width: 1
-                anchors {
-                    top: parent.top
-                    bottom: parent.bottom
-                    horizontalCenter: parent.horizontalCenter
-                }
-
-                color: Colors.cyan
-                opacity: 0.62
-            }
-
-            NotoText {
-                width: parent.width
-                height: 16
-                x: 0
-
-                readonly property real scrollRange:
-                    Math.max(0.0001, 1.0 - topologyFlick.visibleArea.heightRatio)
-                readonly property real scrollFraction:
-                    Math.max(
-                        0.0,
-                        Math.min(
-                            1.0,
-                            topologyFlick.visibleArea.yPosition / scrollRange
-                        )
-                    )
-
-                y: scrollFraction * Math.max(0, parent.height - height)
-
-                text: "★"
-                font.pixelSize: 12
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
-                color: Colors.orange
-            }
-        }
     }
 
     NeonScrollBar {

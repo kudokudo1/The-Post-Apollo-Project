@@ -11,6 +11,65 @@ Item {
     // ancestor without counting the scrollbar as a Column/Row layout child.
     property Item mountingParent: null
 
+    // Track follows the usable side of its box by default, independently
+    // from the Flickable's content position. Explicit legacy/specialty rails
+    // can select "viewport", retaining their original geometry.
+    property string geometryMode: "box" // "box" | "viewport"
+    property Item geometryHost: null     // Optional explicit box/section bounds.
+    property int boxTopInset: 2
+    property int boxBottomInset: 2
+    property int boxLeftInset: 2
+    property int boxRightEndInset: 2
+    readonly property Item effectiveGeometryHost:
+        geometryHost ? geometryHost : parent
+    // Do not follow a parent Flickable's scrolling content or reinterpret
+    // intentional protruding rails as ordinary box-edge tracks.
+    readonly property bool boxSideGeometry:
+        geometryMode !== "viewport"
+        && effectiveGeometryHost
+        && (geometryHost || effectiveGeometryHost.flickableDirection === undefined)
+        && trackTopExtension <= 0
+
+    // Find the usable side between real header/footer siblings of the pane.
+    // No implicit 5px viewport inset is added to this box-side track.
+    function boxUsableBounds() {
+        const host = effectiveGeometryHost;
+        if (!host || !flickable)
+            return Qt.point(0, 0);
+        const length = horizontal ? host.width : host.height;
+        const origin = flickable.mapToItem(host, 0, 0);
+        const paneStart = horizontal ? origin.x : origin.y;
+        const paneEnd = paneStart + (horizontal ? flickable.width : flickable.height);
+        let start = 0;
+        let end = Math.max(0, length);
+        // Only direct siblings of the viewport delimit its local section.
+        // A mounted outer host can supply exact geometry via geometryHost.
+        if (flickable.parent === host) {
+            const peers = host.children;
+            for (let i = 0; i < peers.length; ++i) {
+                const item = peers[i];
+                if (!item || item === flickable || item === root
+                        || !item.visible || item.width <= 0 || item.height <= 0)
+                    continue;
+                const near = horizontal ? item.x : item.y;
+                const far = near + (horizontal ? item.width : item.height);
+                if (far <= paneStart + 0.5)
+                    start = Math.max(start, far);
+                else if (near >= paneEnd - 0.5)
+                    end = Math.min(end, near);
+            }
+        }
+        return Qt.point(start, Math.max(start, end));
+    }
+    readonly property point boxBounds: boxUsableBounds()
+    readonly property real boxStart: Math.max(0, boxBounds.x
+        + (horizontal ? boxLeftInset : boxTopInset))
+    readonly property real boxEnd: Math.max(boxStart, boxBounds.y
+        - (horizontal ? boxRightEndInset : boxBottomInset))
+    readonly property point boxOrigin:
+        effectiveGeometryHost && parent && effectiveGeometryHost !== parent
+        ? effectiveGeometryHost.mapToItem(parent, 0, 0) : Qt.point(0, 0)
+
     // Syntagma // One configurable family for both axes.
     property int orientation: Qt.Vertical
     readonly property bool horizontal: orientation === Qt.Horizontal
@@ -223,22 +282,35 @@ Item {
     // containment; hosts with extended rails remain responsible for their
     // surrounding glow-safe area.
     clip: containGlow && trackTopExtension <= 0
-    width: horizontal
-        ? (flickable ? Math.max(0, flickable.width - effectiveLeftInset - effectiveRightEndInset) : 0)
-        : crossExtent
-    height: horizontal
-        ? crossExtent
-        : (flickable ? Math.max(0, flickable.height - effectiveTopInset - effectiveBottomInset) : 0)
+    width: !flickable ? 0
+        : horizontal
+          ? (boxSideGeometry ? Math.max(0, boxEnd - boxStart)
+                             : Math.max(0, flickable.width - effectiveLeftInset - effectiveRightEndInset))
+          : crossExtent
+    height: !flickable ? 0
+        : horizontal ? crossExtent
+          : (boxSideGeometry ? Math.max(0, boxEnd - boxStart)
+                             : Math.max(0, flickable.height - effectiveTopInset - effectiveBottomInset))
     readonly property point mountOrigin:
         flickable && mountingParent
         ? flickable.mapToItem(mountingParent, 0, 0)
         : Qt.point(flickable ? flickable.x : 0, flickable ? flickable.y : 0)
+    // Box coordinates are independent from viewport margins and content rows.
+    // The viewport mode remains an explicit compatibility/exception path.
     x: !flickable ? 0
+       : boxSideGeometry
+         ? boxOrigin.x + (horizontal ? boxStart
+             : resolvedPlacement === "left" ? leftEdgeInset
+             : effectiveGeometryHost.width - width - rightInset)
        : horizontal ? mountOrigin.x + effectiveLeftInset
        : resolvedPlacement === "left"
          ? mountOrigin.x + leftEdgeInset
          : mountOrigin.x + flickable.width - width - rightInset
     y: !flickable ? 0
+       : boxSideGeometry
+         ? boxOrigin.y + (!horizontal ? boxStart
+             : resolvedPlacement === "top" ? topEdgeInset
+             : effectiveGeometryHost.height - height - bottomEdgeInset)
        : !horizontal ? mountOrigin.y + effectiveTopInset
        : resolvedPlacement === "top"
          ? mountOrigin.y + topEdgeInset

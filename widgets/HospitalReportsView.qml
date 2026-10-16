@@ -6,6 +6,8 @@ Item {
     id: root
 
     required property var historyService
+    // Read-only PX catalog supplements, not replaces, certification history.
+    property var catalogService: null
 
     // Live Hospital teams are supplied by HospitalW so Reports can filter to
     // rooms even before that room has produced a history event.
@@ -24,15 +26,48 @@ Item {
         "POST_OP",
         "IN_MAIN",
         "BLOCKED",
-        "REOPENED"
+        "REOPENED",
+        "RECORDED"
     ]
 
-    function buildTeamOptions() {
-        const history =
-            root.historyService
+    readonly property var catalogEvents: {
+        const entries = root.catalogService
+            && Array.isArray(root.catalogService.reports)
+            ? root.catalogService.reports : [];
+        return entries.map(function(report) {
+            const row = report || {};
+            const kind = String(row.kind || "DOCTOR_NOTE");
+            const preview = String(row.body || "");
+            return {
+                eventType: "ROOM REPORT // " + kind,
+                state: "RECORDED",
+                team: String(row.team || row.roomId || ""),
+                recordedAt: String(row.createdAt || ""),
+                details: {
+                    repository: String(row.repository || ""),
+                    branch: String(row.branch || ""),
+                    head: String(row.headSha || ""),
+                    reason: "REPORT TEXT // " + preview
+                        + (row.bodyTruncated ? "\n[PREVIEW TRUNCATED // OPEN ROOM REPORTS FOR FULL TEXT]" : ""),
+                    packet: {
+                        repository: String(row.repository || ""),
+                        branch: String(row.branch || ""),
+                        head: String(row.headSha || "")
+                    }
+                }
+            };
+        });
+    }
+
+    readonly property var combinedEvents: {
+        const history = root.historyService
             && Array.isArray(root.historyService.events)
-            ? root.historyService.events
-            : [];
+            ? root.historyService.events : [];
+        return history.concat(root.catalogEvents);
+    }
+
+    function buildTeamOptions() {
+        const history = root.combinedEvents;
         const live =
             Array.isArray(root.roomTeams)
             ? root.roomTeams
@@ -64,11 +99,7 @@ Item {
         buildTeamOptions()
 
     readonly property var filteredEvents: {
-        const source =
-            root.historyService
-            && Array.isArray(root.historyService.events)
-            ? root.historyService.events
-            : [];
+        const source = root.combinedEvents;
         const team = String(root.teamFilter || "");
         const state = String(root.stateFilter || "");
 
@@ -79,7 +110,15 @@ Item {
                     && (!state || String(row.state || "") === state);
             })
             .slice()
-            .reverse();
+            .sort(function(a, b) {
+                // PX SQLite timestamps use a space; local certification
+                // ISO timestamps use T. Normalize before comparing dates.
+                const newer = String((b || {}).recordedAt || "")
+                    .replace(" ", "T");
+                const older = String((a || {}).recordedAt || "")
+                    .replace(" ", "T");
+                return newer.localeCompare(older);
+            });
     }
 
     readonly property var selectedEvent: {
@@ -491,12 +530,7 @@ Item {
                         "REPORTS // "
                         + String(root.filteredEvents.length)
                         + " / "
-                        + String(
-                            root.historyService
-                            && Array.isArray(root.historyService.events)
-                            ? root.historyService.events.length
-                            : 0
-                        )
+                        + String(root.combinedEvents.length)
                     font.pixelSize: 13
                     color: Colors.magenta
                 }
@@ -758,8 +792,34 @@ Item {
 
                             GohuText {
                                 width: parent.width
+                                visible: root.catalogService
+                                    && (root.catalogService.loading
+                                        || root.catalogService.lastError.length > 0
+                                        || root.catalogService.scannedRooms < root.catalogService.totalRooms)
+                                text:
+                                    !root.catalogService
+                                    ? ""
+                                    : root.catalogService.loading
+                                    ? "PX ROOM REPORTS // LOADING"
+                                    : root.catalogService.lastError
+                                    ? root.catalogService.lastError
+                                    : "PX ROOM REPORTS // PARTIAL " + root.catalogService.scannedRooms
+                                      + " / " + root.catalogService.totalRooms + " ROOMS"
+                                font.pixelSize: 10
+                                color: root.catalogService && root.catalogService.lastError
+                                    ? Colors.red : Colors.orange
+                                wrapMode: Text.Wrap
+                            }
+
+                            GohuText {
+                                width: parent.width
                                 visible: root.filteredEvents.length === 0
-                                text: "NO REPORTS MATCH THIS FILTER"
+                                text:
+                                    root.catalogService && root.catalogService.loading
+                                    ? "LOADING PX ROOM REPORTS..."
+                                    : root.catalogService && root.catalogService.lastError
+                                    ? root.catalogService.lastError
+                                    : "NO CERTIFICATION EVENTS OR ROOM REPORTS MATCH THIS FILTER"
                                 font.pixelSize: 11
                                 color: Colors.cyan
                                 opacity: 0.52
@@ -818,11 +878,7 @@ Item {
                                 width: parent.width
                                 text:
                                     root.selectedEvent
-                                    ? "SURGICAL REPORT // "
-                                      + String(
-                                          detailColumn.event.eventType
-                                          || "EVENT"
-                                      )
+                                    ? String(detailColumn.event.eventType || "REPORT")
                                     : "SURGICAL REPORT // SELECT AN EVENT"
                                 font.pixelSize: 13
                                 color: Colors.magenta

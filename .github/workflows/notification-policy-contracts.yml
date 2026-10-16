@@ -46,3 +46,9 @@ jobs:
 
       - name: Validate CPU++ hardware thermal notifications
         run: python3 tests/notifications/test_cpu_plus_thermal_producer.py
+
+      - name: Validate origin/domain/severity classification
+        run: python3 tests/notifications/test_notification_facets.py
+
+      - name: Validate CPU++ SYSTEM observational reporting
+        run: python3 tests/notifications/test_cpu_plus_system_report.py

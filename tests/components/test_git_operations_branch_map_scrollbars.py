@@ -19,10 +19,17 @@ assert "anchors.margins: 6" in operations
 assert "anchors.rightMargin: 6 + operationScrollTrack.reservedExtent" in operations
 assert "width: operationList.width" in operations
 assert 'id: operationScrollTrack' in operations
+assert 'id: operationListFrame' in operations
 assert 'flickable: operationList' in operations
 assert 'handleStyle: "star"' in operations
-assert 'x: parent.width - width - 6' in operations
-assert 'y: operationList.y + effectiveTopInset' in operations
+assert 'geometryHost: operationListFrame' in operations
+assert 'rightInset: 6' in operations
+# The old y binding shifts a box-height track down beyond the lower border.
+ops_rail = operations.split('id: operationScrollTrack', 1)[1].split('\n                }', 1)[0]
+assert 'y: operationList.y + effectiveTopInset' not in ops_rail
+assert not __import__('re').search(r'(?m)^\s*[xy]:', ops_rail), (
+    "Operation track must follow its frame, not override box-side coordinates"
+)
 assert 'visible: operationList.visible && scrollable' in operations
 assert 'z: 2' in operations
 assert "NeonScrollBar { flickable: operationList; handleStyle: \"star\" }" not in operations
@@ -39,6 +46,12 @@ assert star_start - list_edge == 4
 assert 'property int starAreaWidth: 16' in shared
 assert 'readonly property real reservedExtent:' in shared
 
+# Operations box-side sizing must stay within the containing list frame.
+# The height is frame H - 2px at each endpoint, not the viewport height
+# offset by the old 5px top margin.
+frame_height = 210
+assert 0 <= 2 and 2 + (frame_height - 4) <= frame_height
+
 # The Branches page owns one BranchMap which draws Canvas/row topology.
 # Remove only the legacy on-scroll star overlay, not topology/repaint code
 # nor the independent horizontal branch-selector rail.
@@ -48,8 +61,16 @@ assert 'id: graphCanvas' in branch_map
 assert 'commitSelected(string sha)' in branch_map
 assert branch_map.count('NeonScrollBar {') == 1
 assert 'flickable: topologyFlick' in branch_map
+assert 'id: topologyScrollTrack' in branch_map
 assert 'handleStyle: "star"' in branch_map
+assert 'geometryHost: branchMap' in branch_map
 assert 'visible: topologyFlick.visible && scrollable' in branch_map
+assert 'anchors.rightMargin: topologyScrollTrack.reservedExtent + 4' in branch_map
+assert 'parent.width - x - 6\n                                - topologyScrollTrack.reservedExtent' in branch_map
+# The graph is framed outside its 10px inner wrapper, which must not
+# become the geometry host or leave another false top/bottom margin.
+assert 'margins: 10' in branch_map
+assert 'property string geometryMode: "box"' in shared
 assert 'id: scrollIndicator' not in branch_map
 assert 'topologyFlick.moving' not in branch_map
 assert 'topologyFlick.flicking' not in branch_map

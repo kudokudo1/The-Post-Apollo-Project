@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Wayland
 import qs.components
 import qs.services.notifications
+import "../../services/notifications/NotificationFacets.js" as NotificationFacets
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 
@@ -749,9 +750,10 @@ PanelWindow {
 
     // ===== CLASSIFICATION =========================================
     //
-    // Source family and severity are different dimensions:
-    // Apollo / Social / System / Apps define the sender family.
-    // Warning is an overlapping severity view (not an origin group).
+    // Legacy sender group remains the presentation/color-tone choice.
+    // Filters use independent origin/domain/severity facets below, so one
+    // Apollo SYSTEM warning appears in Apollo, System and Warning without
+    // duplicating or rewriting its history record.
     // A category like "important" or "reminder" is NOT an Apollo source.
 
     function isWarning(category, severity) {
@@ -941,8 +943,9 @@ PanelWindow {
         for (let i = 0; i < NotificationsService.notifications.count; i++) {
             const entry = NotificationsService.notifications.get(i);
             const classification = root.classificationFor(entry.source, entry.sourceId, entry.category, entry.severity);
+            const facets = NotificationFacets.facetsFor(entry);
             const reportKind = root.reportKindFor(entry);
-            if (!root.notificationMatches(entry.source, entry.sourceId, entry.title, entry.message, entry.category, entry.severity, classification.group))
+            if (!root.notificationMatches(entry.source, entry.sourceId, entry.title, entry.message, entry.category, entry.severity, classification.group, facets))
                 continue;
             rows.push({
                 ordinal: i,
@@ -1007,7 +1010,7 @@ PanelWindow {
         return Math.round(milliseconds / 60000) + " MIN";
     }
 
-    function notificationMatches(source, sourceId, title, message, category, severity, filterGroup) {
+    function notificationMatches(source, sourceId, title, message, category, severity, filterGroup, facets) {
         // Warning is an overlapping severity view, not a source category.
         if (root.activeFilter === "warning") {
             if (!root.isWarning(category, severity))
@@ -1015,7 +1018,8 @@ PanelWindow {
         } else if (root.activeFilter === "favorites") {
             if (!NotificationsService.isFavorite(root.appKeyFor(sourceId, source)))
                 return false;
-        } else if (root.activeFilter !== "all" && root.activeFilter !== filterGroup) {
+        } else if (root.activeFilter !== "all"
+                   && !NotificationFacets.matches(root.activeFilter, facets, false)) {
             return false;
         }
 

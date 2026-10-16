@@ -9,12 +9,14 @@ from typing import Any
 
 from headless_mpd import LocalMpdSource, MediaBackendError, MpdBackend
 from youtube_catalog import YouTubeCatalogSource
+from media_intent_store import IntentStore
 
 
 class MediaController:
     protocol_version = 1
 
-    def __init__(self, backend: MpdBackend | None = None):
+    def __init__(self, backend: MpdBackend | None = None,
+                 intent_store: IntentStore | None = None):
         mpd = backend if backend is not None else MpdBackend()
         self.backends = {mpd.id: mpd}
         local = LocalMpdSource(mpd)
@@ -26,6 +28,62 @@ class MediaController:
         self.active_backend: str | None = None
         self.owned_active_id: str | None = None
         self.generation = 0
+        self.intent_store = intent_store
+        self.persistence_error: str | None = None
+        if intent_store is not None:
+            self._restore_intent()
+
+    def _save_intent(self) -> None:
+        if self.intent_store is None:
+            return
+        try:
+            self.intent_store.save(self.selection, self.loaded)
+            self.persistence_error = None
+        except (OSError, ValueError, PermissionError):
+            # The MPD mutation may already have happened; never falsely report
+            # playback failure just because a subsequent state save failed.
+            self.persistence_error = "STATE_SAVE_FAILED"
+
+    def _restore_intent(self) -> None:
+        try:
+            saved = self.intent_store.load()
+        except (OSError, ValueError, PermissionError):
+            self.persistence_error = "STATE_LOAD_FAILED"
+            return
+        self.selection = saved.get("selection")
+        pending = saved.get("loaded")
+        # Never adopt control of the currently playing MPD song. A saved queue
+        # ID is only usable when it still matches the exact saved library URI.
+        if pending:
+            try:
+                matches = [x for x in self.backends["mpd"].queue()
+                           if str(x.get("queueId")) == pending["queueId"]
+                           and x.get("ref") == pending["ref"]]
+            except MediaBackendError:
+                matches = []
+            if len(matches) == 1:
+                self.loaded = {"ref": pending["ref"], "item": matches[0],
+                               "backend": "mpd", "queueId": pending["queueId"]}
+                self.active_backend = "mpd"
+        self.owned_active_id = None
+        if self.selection or self.loaded:
+            self._advance()
+
+    def _verify_loaded_queue(self) -> MpdBackend:
+        backend = self._bound_backend()
+        assert self.loaded is not None
+        target_id, target_ref = self.loaded["queueId"], self.loaded["ref"]
+        candidates = [x for x in backend.queue()
+                      if str(x.get("queueId")) == target_id and x.get("ref") == target_ref]
+        if len(candidates) != 1:
+            self.loaded = None
+            self.owned_active_id = None
+            self.active_backend = None
+            self._save_intent()
+            self._advance()
+            raise MediaBackendError("LOADED_TRACK_STALE",
+                                    "Saved MPD queue item disappeared or changed")
+        return backend
 
     def _advance(self) -> None:
         self.generation += 1
@@ -95,6 +153,8 @@ class MediaController:
     def snapshot(self) -> dict[str, Any]:
         return {
             "generation": self.generation,
+            "persistence": {"enabled": self.intent_store is not None,
+                            "error": self.persistence_error},
             "sources": [source.describe() for source in self.sources.values()],
             "browse": self.browse_context,
             "selection": self.selection,
@@ -158,6 +218,7 @@ class MediaController:
             item = self._source(ref["source"]).inspect(ref)
             self.selection = item["ref"].copy()
             self._advance()
+            self._save_intent()
             return {"selection": self.selection}
 
         if op == "load":
@@ -174,6 +235,7 @@ class MediaController:
                            "backend": backend.id, "queueId": queue_id}
             self.active_backend = backend.id
             self._advance()
+            self._save_intent()
             if autoplay:
                 backend.play_id(queue_id)
                 self.owned_active_id = queue_id
@@ -207,13 +269,14 @@ class MediaController:
                 self.loaded = None
                 self.active_backend = None
                 self.owned_active_id = None
+                self._save_intent()
             self._advance()
             return {"removed": queue_id, "commandIssued": True}
 
         if op == "play":
             if not self.loaded:
                 raise MediaBackendError("NO_LOADED_MEDIA", "Select and load music first")
-            backend = self._bound_backend()
+            backend = self._verify_loaded_queue()
             backend.play_id(self.loaded["queueId"])
             self.owned_active_id = self.loaded["queueId"]
             self._advance()

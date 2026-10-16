@@ -66,11 +66,15 @@ assert 'id: topologyScrollTrack' in branch_map
 assert 'handleStyle: "star"' in branch_map
 assert 'geometryHost: branchMap' in branch_map
 assert 'mountingParent: branchMap' in branch_map
+assert 'id: graphInset' in branch_map
+assert 'rightInset: edgeInset + graphInset.anchors.margins' in branch_map
+assert 'boxTopInset: graphInset.anchors.margins + header.height / 2' in branch_map
 assert 'visible: topologyFlick.visible && scrollable' in branch_map
 assert 'anchors.rightMargin: topologyScrollTrack.reservedExtent + 4' in branch_map
 assert 'parent.width - x - 6\n                                - topologyScrollTrack.reservedExtent' in branch_map
-# The graph is framed outside its 10px inner wrapper, which must not
-# become the geometry host or leave another false top/bottom margin.
+# The outer frame owns the rail geometry; the track is deliberately
+# shifted into the original 10px inset right-hand lane and aligned with
+# the COMMITS/REFS data row rather than the outer top border.
 assert 'margins: 10' in branch_map
 assert 'property string geometryMode: "box"' in shared
 assert 'id: scrollIndicator' not in branch_map

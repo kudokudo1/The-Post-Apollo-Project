@@ -162,9 +162,12 @@ try:
     assert graph_rail.property("boxSideGeometry") is True
     assert root.property("graphUsesOuterFrame") is True, "graph scrollbar must use outer frame"
     near(graph_rail.property("width"), 16, "graph star rail width")
-    near(root.property("graphRailFrameX"), 320 - 16 - 4, "graph rail x in outer frame")
-    near(root.property("graphRailFrameY"), 2, "graph rail top in outer frame")
-    near(graph_rail.property("height"), 190 - 4, "graph full frame side track")
+    near(root.property("graphRailFrameX"), 320 - 16 - 4 - 10,
+         "graph rail returns to original inset right-hand lane")
+    near(root.property("graphRailFrameY"), 10 + 28 / 2,
+         "graph rail reaches center of data fields")
+    near(graph_rail.property("height"), 190 - (10 + 28 / 2) - 2,
+         "graph rail stops inside bottom frame")
     near(graph_pane.property("y"), 28 + 4, "graph content stays below header")
     # Normal viewport compatibility is tested by section_bar above. This
     # remounted graph-specific test guards only its intended box-side mode.

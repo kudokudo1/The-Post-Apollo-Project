@@ -109,6 +109,7 @@ Rectangle {
     }
 
     Item {
+        id: graphInset
         anchors {
             fill: parent
             margins: 10
@@ -561,11 +562,13 @@ Rectangle {
         id: topologyScrollTrack
         flickable: topologyFlick
         handleStyle: "star"
-        // Mount and measure against the *same* outer graph frame.
-        // Otherwise the 10px inset wrapper shifts the actual rail away
-        // from its box-side geometry (even when geometryHost is correct).
+        // Keep the outer frame as the geometry owner, but place the rail
+        // in the original inset right-side lane. Start level with the
+        // COMMITS // REFS data row, not at the outer frame's top border.
         mountingParent: branchMap
         geometryHost: branchMap
+        rightInset: edgeInset + graphInset.anchors.margins
+        boxTopInset: graphInset.anchors.margins + header.height / 2
         visible: topologyFlick.visible && scrollable
     }
 }

@@ -792,7 +792,9 @@ Item {
                                         || root.catalogService.lastError.length > 0
                                         || root.catalogService.scannedRooms < root.catalogService.totalRooms)
                                 text:
-                                    root.catalogService.loading
+                                    !root.catalogService
+                                    ? ""
+                                    : root.catalogService.loading
                                     ? "PX ROOM REPORTS // LOADING"
                                     : root.catalogService.lastError
                                     ? root.catalogService.lastError

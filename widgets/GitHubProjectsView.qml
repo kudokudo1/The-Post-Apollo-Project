@@ -871,30 +871,10 @@ Item {
                                                             elide: Text.ElideRight
                                                         }
 
-                                                        ActionButton {
+                                                        GitHubProjectsArchiveButton {
                                                             width: 42
                                                             height: 20
-                                                            label: "OPEN"
-                                                            enabledAction:
-                                                                !!root.projectService.itemUrl(
-                                                                    itemCard.modelData
-                                                                )
-                                                            onTriggered:
-                                                                root.openProjectItem(
-                                                                    itemCard.modelData
-                                                                )
-                                                        }
-
-                                                        ActionButton {
-                                                            width: 70
-                                                            height: 20
-                                                            label:
-                                                                root.itemActionArmed(
-                                                                    "archive",
-                                                                    itemCard.modelData
-                                                                )
-                                                                ? "CONFIRM"
-                                                                : "ARCHIVE"
+                                                            armed: root.itemActionArmed("archive", itemCard.modelData)
                                                             enabledAction:
                                                                 !root.projectService.busy
                                                                 && !!root.projectService.itemId(

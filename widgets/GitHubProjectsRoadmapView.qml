@@ -389,30 +389,10 @@ Item {
                                     height: parent.height
                                     spacing: 5
 
-                                    RoadAction {
+                                    GitHubProjectsArchiveButton {
                                         width: 40
                                         anchors.verticalCenter: parent.verticalCenter
-                                        label: "OPEN"
-                                        enabledAction:
-                                            !!root.projectService.itemUrl(
-                                                roadRow.modelData
-                                            )
-                                        onTriggered:
-                                            root.openProjectItem(
-                                                roadRow.modelData
-                                            )
-                                    }
-
-                                    RoadAction {
-                                        width: 65
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        label:
-                                            root.itemActionArmed(
-                                                "archive",
-                                                roadRow.modelData
-                                            )
-                                            ? "CONFIRM"
-                                            : "ARCHIVE"
+                                        armed: root.itemActionArmed("archive", roadRow.modelData)
                                         enabledAction:
                                             !root.projectService.busy
                                             && !!root.projectService.itemId(
@@ -548,30 +528,10 @@ Item {
                                     height: parent.height
                                     spacing: 4
 
-                                    RoadAction {
+                                    GitHubProjectsArchiveButton {
                                         width: 40
                                         anchors.verticalCenter: parent.verticalCenter
-                                        label: "OPEN"
-                                        enabledAction:
-                                            !!root.projectService.itemUrl(
-                                                unscheduledRow.modelData
-                                            )
-                                        onTriggered:
-                                            root.openProjectItem(
-                                                unscheduledRow.modelData
-                                            )
-                                    }
-
-                                    RoadAction {
-                                        width: 76
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        label:
-                                            root.itemActionArmed(
-                                                "archive",
-                                                unscheduledRow.modelData
-                                            )
-                                            ? "CONFIRM"
-                                            : "ARCHIVE"
+                                        armed: root.itemActionArmed("archive", unscheduledRow.modelData)
                                         enabledAction:
                                             !root.projectService.busy
                                             && !!root.projectService.itemId(

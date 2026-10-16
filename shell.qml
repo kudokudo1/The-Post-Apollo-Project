@@ -348,6 +348,10 @@ PanelWindow {
 
         Workspaces {}
 
+        // Music / Hi-Fi dock
+
+        Mediaplayer {}
+
         // Tray
 
         Tray {}

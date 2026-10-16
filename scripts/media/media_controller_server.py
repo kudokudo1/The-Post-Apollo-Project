@@ -14,6 +14,7 @@ import stat
 import sys
 
 from media_controller import MediaController
+from media_intent_store import IntentStore
 
 
 def default_socket() -> Path:
@@ -90,7 +91,7 @@ def run(path: Path) -> None:
                 path.unlink()  # Stale private socket, while holding our server lock.
             else:
                 raise RuntimeError("Controller socket already has a live server")
-        with HiFiServer(str(path), MediaController()) as server:
+        with HiFiServer(str(path), MediaController(intent_store=IntentStore())) as server:
             os.chmod(path, 0o600)
             bound_inode = path.stat().st_ino
             def stop(_signal, _frame):

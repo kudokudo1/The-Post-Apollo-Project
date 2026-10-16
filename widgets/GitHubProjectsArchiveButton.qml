@@ -1,4 +1,5 @@
 import QtQuick
+import qs.components
 import qs.components as Components
 
 // The same archive action in Projects Board, Table and Roadmap.

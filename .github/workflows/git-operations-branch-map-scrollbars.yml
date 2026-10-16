@@ -1,0 +1,27 @@
+name: Git Operations and Branch Maps scrollbar contracts
+
+on:
+  pull_request:
+    paths:
+      - "widgets/GitOperationsView.qml"
+      - "components/BranchMap.qml"
+      - "tests/components/test_git_operations_branch_map_scrollbars.py"
+      - ".github/workflows/git-operations-branch-map-scrollbars.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "widgets/GitOperationsView.qml"
+      - "components/BranchMap.qml"
+      - "tests/components/test_git_operations_branch_map_scrollbars.py"
+      - ".github/workflows/git-operations-branch-map-scrollbars.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  operations-branch-map-scrollbars:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert operation row clearance and single Branch Map rail
+        run: python3 tests/components/test_git_operations_branch_map_scrollbars.py

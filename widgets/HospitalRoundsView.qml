@@ -621,6 +621,8 @@ Item {
                         id: roomBoardScrollbar
                         flickable: roomBoard
                         handleStyle: "star"
+                        // Optical correction inside the already reserved lane.
+                        rightInset: 2
                         visible: roomBoard.visible && scrollable
                     }
                 }

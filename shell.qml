@@ -13,6 +13,7 @@ import "widgets/notifications"
 
 import "services/weather"
 import "services/system"
+import qs.services.notifications
 
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
@@ -230,6 +231,11 @@ PanelWindow {
 
     WeatherService {
         id: weatherService
+    }
+
+    // Observe existing AQI readings without touching Weather Station fetching.
+    WeatherAqiNotificationProducer {
+        weatherService: weatherService
     }
 
     SpaceService {

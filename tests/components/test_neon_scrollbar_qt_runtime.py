@@ -162,8 +162,8 @@ try:
     assert graph_rail.property("boxSideGeometry") is True
     assert root.property("graphUsesOuterFrame") is True, "graph scrollbar must use outer frame"
     near(graph_rail.property("width"), 16, "graph star rail width")
-    near(root.property("graphRailFrameX"), 320 - 16 - 4 - 10 - 20,
-         "graph rail moves 20px left of its previous inset lane")
+    near(root.property("graphRailFrameX"), 320 - 16 - 4 - 10 - 28,
+         "graph rail matches the marked position, 28px left of its inset baseline")
     near(root.property("graphRailFrameY"), 10 + 28 / 2,
          "graph rail reaches center of data fields")
     near(graph_rail.property("height"), 190 - (10 + 28 / 2) - 2,

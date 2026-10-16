@@ -1,6 +1,6 @@
 # Syntagma // NeonScrollBar reusable API
 
-**Status:** implementation candidate on `nurse3r/syntagma-neon-scrollbar`. The operator-approved design intent remains the 23-rule scrollbar grammar, not this candidate alone.
+**Status:** reusable API on `main`; box-side alignment is the operator-approved default (2026-10-16). Earlier viewport-relative geometry and the 23-rule scrollbar grammar remain available for intentional exceptions.
 
 **Scope:** this document describes the shared component API. Existing consumer-specific colors, dimensions, shadows, decorations and display-only states must be retained during the separate consumer migration stage. Do not infer runtime acceptance from static checks.
 
@@ -16,7 +16,7 @@ NeonScrollBar {
 }
 ```
 
-The defaults are vertical, right edge, **4 px** edge spacing, **5 px** top/bottom insets, auto-hide without overflow, cyan rail, magenta handle, progressive interaction glow, and click-to-jump. The existing `handleStyle`, `handleGlowStyle`, opacity, geometry and decoration properties remain.
+The defaults are vertical, right edge, **box-side geometry**, **4 px** edge spacing, and **2 px** clearances at the usable box's top/bottom. Auto-hide, cyan rail, magenta handle, progressive interaction glow and click-to-jump are unchanged. The original **5 px viewport-relative** endpoint insets remain intact for deliberate `geometryMode: "viewport"` consumers. The existing `handleStyle`, `handleGlowStyle`, opacity and decorations remain.
 
 A horizontal instance uses the same component:
 
@@ -29,6 +29,29 @@ NeonScrollBar {
     reverseWheelDirection: false
 }
 ```
+
+## Track placement: box side versus content viewport
+
+The scrollbar now defaults to `geometryMode: "box"`: the **track** belongs to the usable side of the containing box, not to the rows/cards or the Flickable's padded viewport. It uses its mounting parent as the box by default, including when `mountingParent` moves the bar out of a Column. When the pane has direct visible header/footer siblings inside that box, the track begins after the header and ends before the footer. Otherwise it fills the box side with `boxTopInset: 2` / `boxBottomInset: 2` (and 2 px horizontal start/end clearances). Right/left edge spacing still uses the independent `edgeInset` family. Only the track changes extent; the moving handle still represents the Flickable's scroll position and range.
+
+For a more complex nested layout, set `geometryHost: someSection` to identify the exact usable box. If a parent is itself a scrolling Flickable, or `trackTopExtension > 0` is intentional, the safe legacy viewport behavior remains the fallback; `geometryMode: "viewport"` explicitly preserves it in any host. Horizontal rails use the same box-side policy. Do not choose the top of a large menu when it would cross unrelated headers or controls: supply the correct enclosing section or explicitly use the viewport mode.
+
+```qml
+NeonScrollBar {
+    flickable: cardList
+    geometryMode: "box"          // default; section side, not card height
+    boxTopInset: 2               // default, independent of viewport padding
+    boxBottomInset: 2
+}
+
+// Intentional compact/specialty indicator:
+NeonScrollBar {
+    flickable: compactList
+    geometryMode: "viewport"     // original 5px viewport endpoint policy
+}
+```
+
+**Content reservation stays with the host.** This change does not resize a Flickable, claim a new pointer hit area, or move the 10/16 px physical bar width. Host layouts must still reserve `reservedExtent` (plus chosen breathing room) next to their content. Custom rails, overlapping siblings, scrollable outer containers, and decorative extensions need live validation.
 
 For a pane whose scrollable viewport already accounts for endpoint clearance, configure **`viewportHasEndpointClearance: true`**. The scrollbar then does not insert duplicate insets, while preserving the **5px top/bottom defaults** (and horizontal **5px start/end defaults**) for panes without external endpoint clearance. Individual `topInset`, `bottomInset`, `leftInset`, and `rightEndInset` remain available for dedicated geometry.
 

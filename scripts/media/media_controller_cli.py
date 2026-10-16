@@ -37,7 +37,7 @@ def main() -> int:
     )
     parser.add_argument("--socket", type=Path, default=None)
     subs = parser.add_subparsers(dest="action", required=True)
-    for name in ("health", "sources", "snapshot", "queue", "play",
+    for name in ("health", "sources", "snapshot", "audio-evidence", "queue", "play",
                  "pause", "stop", "next", "previous"):
         subs.add_parser(name)
     search = subs.add_parser("search")

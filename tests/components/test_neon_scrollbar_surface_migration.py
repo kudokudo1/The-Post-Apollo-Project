@@ -72,6 +72,21 @@ for file_path in [
     assert "railGlowEnabled: true" in content, f"{file_path}: rail glow missing"
     assert "handleGlowEnabled: false" not in content, f"{file_path}: handle glow disabled"
 
+# Rounds owns viewport/card clearance because NeonScrollBar only reports
+# reservedExtent; it must never silently change the host Flickable geometry.
+rounds = source("widgets/HospitalRoundsView.qml")
+assert re.search(
+    r"id: roomColumn\s+.*?width:\s*Math\.max\(\s*0,\s*"
+    r"roomBoard\.width\s*-\s*roomBoardScrollbar\.reservedExtent\s*-\s*4\s*\)",
+    rounds,
+    re.DOTALL,
+), "Hospital Rounds room cards overlap the scrollbar's reserved lane"
+assert re.search(
+    r"NeonScrollBar\s*\{\s*id: roomBoardScrollbar\s+"
+    r"flickable: roomBoard\s+handleStyle: \"star\"",
+    rounds,
+), "Hospital Rounds must bind the reserved lane to its star scrollbar"
+
 shared = source("components/NeonScrollBar.qml")
 assert "property Item mountingParent: null" in shared
 assert "flickable.mapToItem(mountingParent, 0, 0)" in shared

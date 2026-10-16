@@ -8,3 +8,4 @@ SolarReportNotificationProducer 1.0 SolarReportNotificationProducer.qml
 WeatherReportNotificationProducer 1.0 WeatherReportNotificationProducer.qml
 CpuPlusThermalNotificationProducer 1.0 CpuPlusThermalNotificationProducer.qml
 CpuPlusSystemNotificationProducer 1.0 CpuPlusSystemNotificationProducer.qml
+NetworkLinkNotificationProducer 1.0 NetworkLinkNotificationProducer.qml

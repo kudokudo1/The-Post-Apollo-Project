@@ -78,7 +78,6 @@ for needle in (
     "destructive: true",
     "root.save(modelData.id, false)",
     'onAccepted: root.save(text, false)',
-    "mountingParent: panel",
     'NO ITERATION IDS EXPOSED',
 ):
     assert needle in editor, needle
@@ -140,5 +139,54 @@ assert '"SINGLE_SELECT"' in service
 assert '"DATE"' in service
 assert 'FIELD SETUP UNAVAILABLE // CREATE ITERATIONS IN GITHUB' in service
 assert 'label: "OPEN GITHUB PROJECT FIELDS"' in editor
+
+# Editor option rows now fill their entire area, without a reserved star
+# scrollbar lane. Scrolling continues through the Flickable itself.
+assert "width: choiceScroll.width" in editor
+assert "width: Math.max(0, choiceScroll.width - 20)" not in editor
+option_area = editor.split('id: choiceScroll', 1)[1].split('id: missingInfo', 1)[0]
+assert "NeonScrollBar {" not in option_area
+assert "flickable: choiceScroll" not in option_area
+for kind, color in (
+    ("status", "yellow"),
+    ("priority", "magenta"),
+    ("iteration", "orange"),
+):
+    assert f'fieldKind === "{kind}" ? Colors.{color}' in editor
+    assert f'accent: Colors.{color}' in table
+    assert f'value: "{kind.upper()}"' in table
+assert "accentColor: root.optionAccent" in editor
+assert "idleBorderColor: root.optionAccent" in editor
+assert "hoverBorderColor: root.optionAccent" in editor
+assert "selectedBorderColor: root.optionAccent" in editor
+assert "hoverBorderColor: editCell.accent" in table
+
+# Archive shares one explicit interaction grammar in all four places.
+roadmap = (root / "widgets/GitHubProjectsRoadmapView.qml").read_text()
+archive = (root / "widgets/GitHubProjectsArchiveButton.qml").read_text()
+for view, count in ((owner, 1), (table, 1), (roadmap, 2)):
+    assert view.count("GitHubProjectsArchiveButton {") == count
+    assert view.count('label: "OPEN"') == count
+    assert view.count('root.armOrRunItem(') >= count
+    assert view.count('root.projectService.archiveItem(') == count
+    # Never let replacement of Archive swallow its neighboring OPEN button.
+    assert view.count('root.openProjectItem(') >= count
+for rule in (
+    'label: root.armed ? "CONFIRM" : "ARCHIVE"',
+    "idleForegroundColor: Colors.white",
+    "hoverForegroundColor: Colors.white",
+    "pressedForegroundColor: Colors.white",
+    "selectedForegroundColor: Colors.white",
+    "keyboardSelectedForegroundColor: Colors.white",
+    "idleBorderColor: Colors.orange",
+    "selectedBorderColor: Colors.orange",
+    "height: 26",
+    "onTriggered: root.triggered()",
+):
+    assert rule in archive, rule
+assert "GitHubProjectsArchiveButton {\n                                                            width: 70\n                                                            height: 20" in owner
+assert "GitHubProjectsArchiveButton {\n                                        width: 76" in table
+assert roadmap.count('GitHubProjectsArchiveButton {') == 2
+assert roadmap.count('height: 24\n                                        anchors.verticalCenter: parent.verticalCenter\n                                        armed: root.itemActionArmed("archive"') == 2
 
 print("PROJECTS EDITABLE TABLE // CONTRACT PASS")

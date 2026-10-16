@@ -87,6 +87,9 @@ assert "AWAITING VERIFIED RESULT" in source
 assert "height: detail ? 94 : 38" in source
 assert "contentHeight: Math.max(height, statusText.implicitHeight + 4)" in source
 assert "wrapMode: Text.WrapAnywhere" in source
+assert 'flickable: statusScroll' in source
+assert 'visible: statusBox.detail && scrollable' in source
+assert "statusScroll.width - (statusBox.detail ? 20 : 0)" in source
 assert "detail: !!root.lifecycleService.lastError" in source
 assert "root.lifecycleService.lastError ? Colors.red" in source
 assert 'PR CLOSED // REOPEN TO REVIEW' in source

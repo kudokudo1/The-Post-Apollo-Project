@@ -24,9 +24,10 @@ and [media/audio identity boundary](../../MODEL/contracts/media-tab-audio-identi
   the same JSON-lines Unix socket that a future Quickshell adapter will use.
 - This first slice retains browsing/selection/loaded state while the
   controller process is alive. MPD retains actual playlist/playback according
-  to *MPD's* own configuration. Cold-start controller-state restoration,
-  subscription, multiple sources, permanent volume isolation and CAVA
-  PLAYER routing are **not implemented**.
+  to *MPD's* own configuration. Cold-start restoration now preserves selected and exact queue-verified loaded
+  MPD refs, but never adopts ongoing playback ownership automatically. Browsing
+  context remains process-local. Push subscription, permanent volume isolation,
+  and player-only CAVA routing remain **unimplemented**.
 
 ## Run a temporary developer session (no machine installation)
 
@@ -126,3 +127,26 @@ and future Quickshell consumer integration, **not** immediate shell changes.
 The next work phase is controller-state recovery/subscription and an authorized
 Hi-Fi/QML adapter. Streaming catalogs are separately capability-gated and must
 respect provider rules and approved playback methods.
+
+## v0.2 // Durable intent recovery (source-only, awaiting real MPD trial)
+
+When the optional user service eventually runs, the controller saves **only**
+selected media reference and loaded MPD queue ID/reference under
+`$XDG_STATE_HOME/post-apollo-media/controller-intent-v1.json` (defaulting to
+`~/.local/state/post-apollo-media/`). The file and dedicated directory are
+private, and writes replace a temporary file atomically. It does **not** save
+catalog queries, API keys, or audio output policies.
+
+On restart it reads that intent, checks that MPD still has exactly the saved
+queue ID **and** matching media URI, and restores the cassette label if so.
+It does **not** call `play` during startup or claim control of MPD's
+pre-existing playing song. An explicit new `play` command reasserts ownership.
+If the queue changed, the loaded cassette is left empty. If MPD is unavailable,
+no stale loaded track is reinstated. During normal operation, every new `play`
+revalidates queue ID plus URI before invoking MPD.
+
+A filesystem failure after a successful MPD queue mutation must not be reported
+as if the MPD command itself failed. `snapshot.persistence.error` exposes a
+non-secret diagnostic instead. Tests cover stale IDs, changed media, symlinks,
+private file permissions, offline MPD and no playback takeover. This is not
+an installed service: it takes effect only after explicit user-service setup.

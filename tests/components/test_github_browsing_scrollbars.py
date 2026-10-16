@@ -14,7 +14,8 @@ shared = (ROOT / "components/NeonScrollBar.qml").read_text(encoding="utf-8")
 
 
 def scrollbar_block(source, identity):
-    start = source.index("NeonScrollBar {", source.index(identity) - 42)
+    start = source.rfind("NeonScrollBar {", 0, source.index(identity))
+    assert start >= 0, f"Missing scroll control {identity}"
     depth, end = 0, 0
     for end in range(start, len(source)):
         if source[end] == "{":

@@ -23,6 +23,25 @@ Rectangle {
     property string mode: "control"
     property string armedAction: ""
     property int selectedThreadIndex: -1
+    property string activeLifecycleAction: ""
+    property string completedLifecycleAction: ""
+    property bool completedLifecycleSuccess: false
+    readonly property bool isOpen: String(pullRequestState || "").toUpperCase() === "OPEN"
+    readonly property bool isClosed: String(pullRequestState || "").toUpperCase() === "CLOSED"
+    readonly property bool isMerged: String(pullRequestState || "").toUpperCase() === "MERGED"
+
+    // The service's active operation, not an arbitrary countdown, owns the
+    // progress indicator. A command may dwell at 90% until verified.
+    function startLifecycleAction(token, callback) {
+        if (!hasTarget || lifecycleService.busy)
+            return false;
+        completedLifecycleAction = "";
+        activeLifecycleAction = token;
+        const accepted = callback();
+        if (!accepted)
+            activeLifecycleAction = "";
+        return accepted;
+    }
 
     readonly property bool hasTarget:
         repositorySlug.trim().length > 0
@@ -125,6 +144,8 @@ Rectangle {
     onPullRequestNumberChanged: {
         clearArm();
         selectedThreadIndex = -1;
+        activeLifecycleAction = "";
+        completedLifecycleAction = "";
     }
 
     onVisibleChanged: {
@@ -143,6 +164,10 @@ Rectangle {
             evidence
         ) {
             root.clearArm();
+            root.completedLifecycleSuccess =
+                mutationSucceeded && evidenceVerified;
+            root.completedLifecycleAction = root.activeLifecycleAction;
+            root.activeLifecycleAction = "";
 
             if (mutationSucceeded && evidenceVerified)
                 root.syncEvidence(evidence);
@@ -211,8 +236,63 @@ Rectangle {
         property color accent: Colors.cyan
         property bool enabledAction: true
         property bool selectedAction: false
+        property string actionToken: ""
+        property real loadingProgress: 0.0
+        property bool loadingComplete: false
+        readonly property bool loading:
+            actionToken.length > 0
+            && root.activeLifecycleAction === actionToken
+            && root.lifecycleService.busy
 
         signal triggered()
+
+        onLoadingChanged: {
+            if (loading) {
+                loadingComplete = false;
+                loadingProgress = 0.0;
+                progressSlow.restart();
+                progressFinish.stop();
+                progressReset.stop();
+            } else {
+                progressSlow.stop();
+                if (actionToken.length > 0
+                        && root.completedLifecycleAction === actionToken
+                        && root.completedLifecycleSuccess) {
+                    loadingComplete = true;
+                    progressFinish.restart();
+                } else {
+                    loadingComplete = false;
+                    loadingProgress = 0.0;
+                }
+            }
+        }
+
+        NumberAnimation {
+            id: progressSlow
+            target: button
+            property: "loadingProgress"
+            from: 0.0
+            to: 0.9
+            duration: 3600
+            easing.type: Easing.OutCubic
+        }
+        NumberAnimation {
+            id: progressFinish
+            target: button
+            property: "loadingProgress"
+            to: 1.0
+            duration: 260
+            onFinished: progressReset.restart()
+        }
+        Timer {
+            id: progressReset
+            interval: 1500
+            repeat: false
+            onTriggered: {
+                button.loadingComplete = false;
+                button.loadingProgress = 0.0;
+            }
+        }
 
         height: 29
         opacity: enabledAction ? 1.0 : 0.36
@@ -223,19 +303,36 @@ Rectangle {
         border.width: selectedAction ? 2 : 1
         border.color: selectedAction ? Colors.orange : accent
 
+        Rectangle {
+            id: progressFill
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.margins: 1
+            width: Math.max(0, (parent.width - 2) * button.loadingProgress)
+            visible: button.loading || button.loadingComplete
+                     || button.loadingProgress > 0
+            color: button.accent
+            opacity: 0.91
+            z: 1
+        }
+
         GohuText {
             anchors.centerIn: parent
             width: parent.width - 8
+            z: 2
             text: button.label
             horizontalAlignment: Text.AlignHCenter
             font.pixelSize: 9
-            color: button.accent
+            color: button.loading || button.loadingComplete
+                   ? Colors.black : button.accent
             elide: Text.ElideRight
         }
 
         MouseArea {
             id: mouse
             anchors.fill: parent
+            z: 3
             enabled: button.enabledAction
             hoverEnabled: true
             cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
@@ -330,22 +427,34 @@ Rectangle {
     }
 
     component StatusBox: Rectangle {
+        id: statusBox
         property string text: ""
         property color accent: Colors.cyan
+        property bool detail: false
 
-        height: 38
+        height: detail ? 94 : 38
         color: Colors.black
         border.width: 1
         border.color: accent
 
-        GohuText {
+        // Real errors should not disappear into a one-line ellipsis. Text
+        // wraps and can be scrolled when GitHub supplies a longer reason.
+        Flickable {
+            id: statusScroll
             anchors.fill: parent
-            anchors.margins: 7
-            verticalAlignment: Text.AlignVCenter
-            text: parent.text
-            font.pixelSize: 9
-            color: parent.accent
-            elide: Text.ElideRight
+            anchors.margins: 6
+            clip: true
+            contentWidth: width
+            contentHeight: Math.max(height, statusText.implicitHeight + 4)
+            boundsBehavior: Flickable.StopAtBounds
+            GohuText {
+                id: statusText
+                width: statusScroll.width
+                text: statusBox.text
+                font.pixelSize: detail ? 10 : 9
+                color: statusBox.accent
+                wrapMode: Text.WrapAnywhere
+            }
         }
     }
 
@@ -409,7 +518,7 @@ Rectangle {
                     width: 82
                     label: "← PULLS"
                     accent: Colors.cyan
-                    enabledAction: !root.anyBusy
+                    enabledAction: true
                     onTriggered: root.closeRequested()
                 }
 
@@ -439,7 +548,7 @@ Rectangle {
                     width: 90
                     label: root.anyBusy ? "WORKING" : "REFRESH"
                     accent: Colors.green
-                    enabledAction: root.hasTarget && !root.anyBusy
+                    enabledAction: root.hasTarget
                     onTriggered: root.refreshFacts()
                 }
             }
@@ -447,6 +556,8 @@ Rectangle {
 
         StatusBox {
             width: parent.width
+            detail: !!root.lifecycleService.lastError
+                    || root.lifecycleService.busy
             text:
                 root.armedAction
                 ? "ARMED // "
@@ -463,11 +574,17 @@ Rectangle {
                   )
                 : (
                     root.lifecycleService.lastError
-                    ? "PR ACTION // " + root.lifecycleService.lastError
+                    ? "GITHUB ERROR // " + root.lifecycleService.lastError
+                    : root.lifecycleService.busy
+                    ? "GITHUB WORKING // "
+                      + String(root.lifecycleService.operation || "").toUpperCase()
+                      + " // " + String(root.lifecycleService.phase || "")
+                      + " // AWAITING VERIFIED RESULT"
                     : String(root.lifecycleService.status || "READY")
                   )
             accent:
-                root.armedAction
+                root.lifecycleService.lastError ? Colors.red
+                : root.armedAction
                 ? Colors.orange
                 : root.mode === "threads"
                 ? Colors.magenta
@@ -499,7 +616,9 @@ Rectangle {
 
             Column {
                 id: controlColumn
-                width: parent.width
+                // Keep every PR form and its action buttons LEFT of the
+                // permanent star rail. The full 20px lane is intentional.
+                width: Math.max(0, syntagmaPane2.width - 20)
                 spacing: 7
 
                 Row {
@@ -627,7 +746,7 @@ Rectangle {
                     Item { width: 1; height: 1 }
 
                     GohuText {
-                        width: parent.width - 446
+                        width: Math.max(0, parent.width - 458)
                         anchors.verticalCenter: parent.verticalCenter
                         horizontalAlignment: Text.AlignRight
                         text:
@@ -751,7 +870,7 @@ Rectangle {
 
                     InputField {
                         id: metaInput
-                        width: parent.width - 574
+                        width: Math.max(0, parent.width - 103)
                         placeholder: "LABEL / ASSIGNEE / REVIEWER / MILESTONE"
                     }
 

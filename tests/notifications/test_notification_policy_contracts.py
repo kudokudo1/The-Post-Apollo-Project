@@ -270,6 +270,6 @@ require_regex(
 )
 publisher = read(GIT_VIEW).split("function publishGitHubOutcome(")[1].split("    // Permanent-mapped overlay:")[0]
 assert "Quickshell.execDetached" not in publisher, "notifications must not execute Git/GitHub mutations"
-assert "lastError" not in publisher and "stderr" not in publisher, "notifications must not copy raw gh error details"
+assert "lastError" not in publisher and "mutationStderrText" not in publisher and "mutationStdoutText" not in publisher, "notifications must not copy raw gh error details"
 
 print("Notification policy contracts: PASS")

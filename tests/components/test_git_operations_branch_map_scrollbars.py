@@ -65,6 +65,7 @@ assert 'flickable: topologyFlick' in branch_map
 assert 'id: topologyScrollTrack' in branch_map
 assert 'handleStyle: "star"' in branch_map
 assert 'geometryHost: branchMap' in branch_map
+assert 'mountingParent: branchMap' in branch_map
 assert 'visible: topologyFlick.visible && scrollable' in branch_map
 assert 'anchors.rightMargin: topologyScrollTrack.reservedExtent + 4' in branch_map
 assert 'parent.width - x - 6\n                                - topologyScrollTrack.reservedExtent' in branch_map

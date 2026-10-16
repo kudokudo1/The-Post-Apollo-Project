@@ -269,9 +269,10 @@ Item {
         }
 
         Components.ActionButton {
-            x: 8; y: 129
+            x: 8
+            y: root.isDate ? 150 : 129
             width: parent.width - 16
-            height: 32
+            height: root.isDate ? 30 : 32
             visible: root.canSetup
             label: root.setupArmed
                    ? "CONFIRM CREATE " + root.fieldLabel
@@ -308,10 +309,11 @@ Item {
 
         GohuText {
             x: 8
-            y: root.isDate ? 148 : 170
+            y: root.isDate ? 146 : 170
             width: parent.width - 16
             height: 24
             visible: root.projectService.lastError.length > 0
+                     && !root.canSetup
             wrapMode: Text.WordWrap
             font.pixelSize: 9
             color: Colors.red

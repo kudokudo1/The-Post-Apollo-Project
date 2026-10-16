@@ -819,7 +819,15 @@ Item {
                                     ? "LOADING PX ROOM REPORTS..."
                                     : root.catalogService && root.catalogService.lastError
                                     ? root.catalogService.lastError
-                                    : "NO CERTIFICATION EVENTS OR ROOM REPORTS MATCH THIS FILTER"
+                                    : root.catalogService && !root.catalogService.loaded
+                                    ? "PX ROOM REPORT CATALOG HAS NOT LOADED"
+                                    : root.catalogService && root.catalogService.totalRooms === 0
+                                    && root.combinedEvents.length === 0
+                                    ? "NO PERSISTENT PX ROOMS REGISTERED // NO CERTIFICATION EVENTS"
+                                    : root.catalogService && root.catalogService.reports.length === 0
+                                    && root.combinedEvents.length === 0
+                                    ? "PX ROOMS FOUND // NO STORED ROOM REPORTS OR CERTIFICATION EVENTS"
+                                    : "NO REPORTS MATCH THE SELECTED FILTER"
                                 font.pixelSize: 11
                                 color: Colors.cyan
                                 opacity: 0.52

@@ -87,7 +87,15 @@ class IntentTests(unittest.TestCase):
     def test_unrecognized_format_is_not_accepted(self):
         self.path.parent.mkdir(mode=0o700)
         self.path.write_text(json.dumps({"version": 89, "selection": ref()}))
+        self.path.chmod(0o600)
         self.assertEqual(self.store.load(), {})
+
+    def test_permissive_file_is_rejected(self):
+        self.path.parent.mkdir(mode=0o700)
+        self.path.write_text(json.dumps({"version": 1, "selection": ref()}))
+        self.path.chmod(0o644)
+        with self.assertRaises(PermissionError):
+            self.store.load()
 
     def test_symlink_file_refused_without_modifying_target(self):
         self.path.parent.mkdir(mode=0o700)

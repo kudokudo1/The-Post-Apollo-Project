@@ -643,15 +643,19 @@ Rectangle {
                             root.clearArm();
 
                             if (root.pullRequestDraft) {
-                                root.lifecycleService.markReady(
+                                root.startLifecycleAction("draft-toggle", function() {
+                                    return root.lifecycleService.markReady(
                                     root.repositorySlug,
                                     root.pullRequestNumber
                                 );
+                                });
                             } else {
-                                root.lifecycleService.convertToDraft(
+                                root.startLifecycleAction("draft-toggle", function() {
+                                    return root.lifecycleService.convertToDraft(
                                     root.repositorySlug,
                                     root.pullRequestNumber
                                 );
+                                });
                             }
                         }
                     }
@@ -672,12 +676,16 @@ Rectangle {
                         onTriggered: root.armOrRun(
                             "update-branch",
                             function() {
-                                root.lifecycleService.updateBranch(
+                                root.startLifecycleAction("update-branch", function() {
+                                    return root.startLifecycleAction("update-rebase", function() {
+                                    return root.lifecycleService.updateBranch(
                                     root.repositorySlug,
                                     root.pullRequestNumber,
                                     false,
                                     true
                                 );
+                                });
+                                });
                             }
                         )
                     }
@@ -727,23 +735,27 @@ Rectangle {
                             if (String(root.pullRequestState || "").toUpperCase()
                                     === "CLOSED") {
                                 root.clearArm();
-                                root.lifecycleService.reopenPullRequest(
+                                root.startLifecycleAction("close-reopen", function() {
+                                    return root.lifecycleService.reopenPullRequest(
                                     root.repositorySlug,
                                     root.pullRequestNumber,
                                     ""
                                 );
+                                });
                                 return;
                             }
 
                             root.armOrRun(
                                 "close",
                                 function() {
-                                    root.lifecycleService.closePullRequest(
+                                    root.startLifecycleAction("close-reopen", function() {
+                                    return root.lifecycleService.closePullRequest(
                                         root.repositorySlug,
                                         root.pullRequestNumber,
                                         true,
                                         ""
                                     );
+                                });
                                 }
                             );
                         }
@@ -791,13 +803,19 @@ Rectangle {
                             && !root.lifecycleService.busy
                         onTriggered: {
                             root.clearArm();
-                            root.lifecycleService.editPullRequest(
+                            root.startLifecycleAction("title", function() {
+                                    return root.startLifecycleAction("base", function() {
+                                    return root.startLifecycleAction("body", function() {
+                                    return root.lifecycleService.editPullRequest(
                                 root.repositorySlug,
                                 root.pullRequestNumber,
                                 titleInput.text.trim(),
                                 null,
                                 null
                             );
+                                });
+                                });
+                                });
                         }
                     }
                 }
@@ -890,12 +908,14 @@ Rectangle {
                         enabledAction:
                             metaInput.text.trim().length > 0
                             && !root.lifecycleService.busy
-                        onTriggered: root.lifecycleService.updateLabels(
+                        onTriggered: root.startLifecycleAction("label-add", function() {
+                            return root.lifecycleService.updateLabels(
                             root.repositorySlug,
                             root.pullRequestNumber,
                             [metaInput.text.trim()],
                             []
-                        )
+                        );
+                        })
                     }
 
                 }
@@ -915,12 +935,14 @@ Rectangle {
                         enabledAction:
                             metaInput.text.trim().length > 0
                             && !root.lifecycleService.busy
-                        onTriggered: root.lifecycleService.updateLabels(
+                        onTriggered: root.startLifecycleAction("label-remove", function() {
+                            return root.lifecycleService.updateLabels(
                             root.repositorySlug,
                             root.pullRequestNumber,
                             [],
                             [metaInput.text.trim()]
-                        )
+                        );
+                        })
                     }
 
                     ActionButton {
@@ -930,12 +952,14 @@ Rectangle {
                         enabledAction:
                             metaInput.text.trim().length > 0
                             && !root.lifecycleService.busy
-                        onTriggered: root.lifecycleService.updateAssignees(
+                        onTriggered: root.startLifecycleAction("assignee", function() {
+                            return root.lifecycleService.updateAssignees(
                             root.repositorySlug,
                             root.pullRequestNumber,
                             [metaInput.text.trim()],
                             []
-                        )
+                        );
+                        })
                     }
 
                     ActionButton {
@@ -945,12 +969,14 @@ Rectangle {
                         enabledAction:
                             metaInput.text.trim().length > 0
                             && !root.lifecycleService.busy
-                        onTriggered: root.lifecycleService.updateReviewers(
+                        onTriggered: root.startLifecycleAction("reviewer", function() {
+                            return root.lifecycleService.updateReviewers(
                             root.repositorySlug,
                             root.pullRequestNumber,
                             [metaInput.text.trim()],
                             []
-                        )
+                        );
+                        })
                     }
 
                     ActionButton {
@@ -960,11 +986,13 @@ Rectangle {
                         enabledAction:
                             metaInput.text.trim().length > 0
                             && !root.lifecycleService.busy
-                        onTriggered: root.lifecycleService.setMilestone(
+                        onTriggered: root.startLifecycleAction("milestone", function() {
+                            return root.lifecycleService.setMilestone(
                             root.repositorySlug,
                             root.pullRequestNumber,
                             metaInput.text.trim()
-                        )
+                        );
+                        })
                     }
 
                     ActionButton {
@@ -973,10 +1001,12 @@ Rectangle {
                         label: "CLEAR"
                         accent: Colors.red
                         enabledAction: !root.lifecycleService.busy
-                        onTriggered: root.lifecycleService.clearMilestone(
+                        onTriggered: root.startLifecycleAction("milestone-clear", function() {
+                            return root.lifecycleService.clearMilestone(
                             root.repositorySlug,
                             root.pullRequestNumber
-                        )
+                        );
+                        })
                     }
                 }
 
@@ -1019,11 +1049,13 @@ Rectangle {
                                 enabledAction:
                                     reviewInput.text.trim().length > 0
                                     && !root.lifecycleService.busy
-                                onTriggered: root.lifecycleService.commentPullRequest(
+                                onTriggered: root.startLifecycleAction("comment", function() {
+                            return root.lifecycleService.commentPullRequest(
                                     root.repositorySlug,
                                     root.pullRequestNumber,
                                     reviewInput.text.trim()
-                                )
+                                );
+                        })
                             }
 
                             ActionButton {
@@ -1032,12 +1064,14 @@ Rectangle {
                                 label: "APPROVE"
                                 accent: Colors.green
                                 enabledAction: !root.lifecycleService.busy
-                                onTriggered: root.lifecycleService.reviewPullRequest(
+                                onTriggered: root.startLifecycleAction("review-approve", function() {
+                            return root.lifecycleService.reviewPullRequest(
                                     root.repositorySlug,
                                     root.pullRequestNumber,
                                     "approve",
                                     reviewInput.text.trim()
-                                )
+                                );
+                        })
                             }
 
                             ActionButton {
@@ -1048,12 +1082,14 @@ Rectangle {
                                 enabledAction:
                                     reviewInput.text.trim().length > 0
                                     && !root.lifecycleService.busy
-                                onTriggered: root.lifecycleService.reviewPullRequest(
+                                onTriggered: root.startLifecycleAction("review-comment", function() {
+                            return root.lifecycleService.reviewPullRequest(
                                     root.repositorySlug,
                                     root.pullRequestNumber,
                                     "comment",
                                     reviewInput.text.trim()
-                                )
+                                );
+                        })
                             }
 
                             ActionButton {
@@ -1064,12 +1100,14 @@ Rectangle {
                                 enabledAction:
                                     reviewInput.text.trim().length > 0
                                     && !root.lifecycleService.busy
-                                onTriggered: root.lifecycleService.reviewPullRequest(
+                                onTriggered: root.startLifecycleAction("review-changes", function() {
+                            return root.lifecycleService.reviewPullRequest(
                                     root.repositorySlug,
                                     root.pullRequestNumber,
                                     "request-changes",
                                     reviewInput.text.trim()
-                                )
+                                );
+                        })
                             }
                         }
                     }
@@ -1130,7 +1168,8 @@ Rectangle {
                                 onTriggered: root.armOrRun(
                                     "merge-" + modelData,
                                     function() {
-                                        root.lifecycleService.mergePullRequest(
+                                        root.startLifecycleAction("merge-" + modelData, function() {
+                                    return root.lifecycleService.mergePullRequest(
                                             root.repositorySlug,
                                             root.pullRequestNumber,
                                             modelData,
@@ -1139,6 +1178,7 @@ Rectangle {
                                             "",
                                             ""
                                         );
+                                });
                                     }
                                 )
                             }

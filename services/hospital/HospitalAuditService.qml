@@ -82,7 +82,9 @@ Scope {
         auditProcess.exec([
             "bash",
             "-lc",
-            'exec "$HOME/.local/bin/px" audit "$1"',
+            'px="$HOME/.local/share/post-apollo-dev-runtime/bin/px"; '
+                + '[ -x "$px" ] || px="$HOME/.local/bin/px"; '
+                + 'exec "$px" audit "$1"',
             "px-audit",
             target
         ]);

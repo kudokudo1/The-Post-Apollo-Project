@@ -161,7 +161,7 @@ Window {
                 handleStyle: "star"
                 mountingParent: graphFrame
                 geometryHost: graphFrame
-                rightInset: edgeInset + graphInset.anchors.margins
+                rightInset: edgeInset + graphInset.anchors.margins + 20
                 boxTopInset: graphInset.anchors.margins + graphHeader.height / 2
             }
         }

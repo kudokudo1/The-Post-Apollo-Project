@@ -1768,12 +1768,12 @@ PanelWindow {
 
         const requestedTeam = String(teamValue || "");
 
-        reportsView.teamFilter =
-            requestedTeam
-            ? requestedTeam
-            : root.selectedRoomTeam;
+        // This is the Hospital-wide view: start with ALL ROOMS unless a
+        // caller explicitly requested a particular team.
+        reportsView.teamFilter = requestedTeam;
         reportsView.stateFilter = "";
         root.operationsSurface = "reports";
+        roomReportCatalogService.refresh();
     }
 
     function openRounds() {
@@ -2151,6 +2151,10 @@ PanelWindow {
         id: roomReportService
 
         roomId: root.selectedRoomTeam
+    }
+
+    HospitalRoomReportCatalogService {
+        id: roomReportCatalogService
     }
 
     HospitalChartService {
@@ -6957,6 +6961,7 @@ PanelWindow {
             z: 700
             visible: root.operationsSurface === "reports"
             historyService: certificationCoordinator.historyService
+            catalogService: roomReportCatalogService
             roomTeams: {
                 const seen = {};
                 const teams = [];

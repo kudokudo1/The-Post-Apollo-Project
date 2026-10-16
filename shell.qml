@@ -238,6 +238,11 @@ PanelWindow {
         weatherService: weatherService
     }
 
+    // Daily current-conditions brief from existing weather readings only.
+    WeatherReportNotificationProducer {
+        weatherService: weatherService
+    }
+
     SpaceService {
         id: spaceService
     }

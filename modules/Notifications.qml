@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import "../components"
 import qs.services.notifications
+import "../services/notifications/NotificationFacets.js" as NotificationFacets
 
 PanelWindow {
     id: notificationsWindow
@@ -126,6 +127,23 @@ PanelWindow {
                 required property string severity
                 required property double createdAt
                 required property double updatedAt
+                required property var context
+
+                // The popup chassis reflects the originating organization,
+                // not a mutually exclusive domain or warning severity.
+                // One Apollo SYSTEM warning is still an orange Apollo popup.
+                readonly property var organizationFacets: NotificationFacets.facetsFor({
+                    "source": notificationCard.source,
+                    "sourceId": notificationCard.sourceId,
+                    "category": notificationCard.category,
+                    "severity": notificationCard.severity,
+                    "context": notificationCard.context
+                })
+                readonly property color organizationColor:
+                    organizationFacets.origin === "apollo" ? Colors.orange
+                    : organizationFacets.domain === "social" ? Colors.omnitrix
+                    : organizationFacets.domain === "system" ? Colors.white
+                    : Colors.cyan
 
                 // Source-backed actions are displayed only while their
                 // originating native notification remains callable.
@@ -139,9 +157,9 @@ PanelWindow {
                 fillColor: Colors.black
 
                 borderWidth: 1
-                borderColor: Colors.cyan
+                borderColor: notificationCard.organizationColor
 
-                glowColor: Colors.cyan
+                glowColor: notificationCard.organizationColor
                 closeGlowSpread: 4
                 closeGlowOpacity: 0.55
                 wideGlowSpread: 12

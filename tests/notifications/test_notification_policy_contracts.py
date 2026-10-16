@@ -240,4 +240,36 @@ assert "Quickshell.execDetached" not in hospital_policy, "notifications must nev
 assert "raw" not in hospital_policy.lower(), "notification payload must not include raw command stderr"
 assert "reason" not in hospital_policy.lower(), "notification payload must not leak operation errors"
 
+# GitHub PR/merge queue fanout: only completed operations may notify.
+# Polls, passive refreshes, previews, and ordinary metadata edits are silent.
+GIT_VIEW = "widgets/GitW.qml"
+require(GIT_VIEW, "import qs.services.notifications", "Git UI must reuse existing notification service")
+require(GIT_VIEW, "function publishGitHubOutcome(repository, number, title, message, severity, eventType)", "bounded GitHub producer")
+require(GIT_VIEW, '"source": "GITHUB"', "GitHub event source must be stable")
+require(GIT_VIEW, '"sourceId": "github"', "GitHub source policies must remain stable")
+require(GIT_VIEW, '"category": "internal"', "GitHub events must classify as Apollo")
+require(GIT_VIEW, "NotificationsService.pushRich({", "GitHub notifications must use shared policy and history path")
+require(GIT_VIEW, "function reportPullRequestMutation(succeeded, verified, operation, evidence)", "PR mutation handler")
+require(GIT_VIEW, "function reportMergeQueueMutation(succeeded, verified, operation, evidence)", "merge queue handler")
+require(GIT_VIEW, '["create", "close", "reopen"].indexOf(action) < 0', "ordinary PR edits must not notify")
+require(GIT_VIEW, 'const isMerge = action.indexOf("merge-") === 0;', "all PR merge methods must be covered")
+require(GIT_VIEW, "state === expectedState", "PR notification must verify actual requested state")
+require(GIT_VIEW, "succeeded && verified", "success must require mutation plus verification")
+require(GIT_VIEW, "Boolean(result.queued) === (action === \"enqueue\")", "queue result must match requested action")
+require(GIT_VIEW, '"warning", "pr-" + action + "-attention"', "unverified PR mutations must warn, not claim success")
+require(GIT_VIEW, '"warning", "queue-" + action + "-attention"', "unverified queue mutations must warn")
+require_regex(
+    GIT_VIEW,
+    r"target: githubPullRequestLifecycleService\s+function onMutationFinished\(.*?root\.reportPullRequestMutation\(",
+    "PR notifications must observe mutation completion, not polling",
+)
+require_regex(
+    GIT_VIEW,
+    r"target: githubMergeQueueLifecycleService\s+function onMutationFinished\(.*?root\.reportMergeQueueMutation\(",
+    "queue notifications must observe mutation completion, not previews",
+)
+publisher = read(GIT_VIEW).split("function publishGitHubOutcome(")[1].split("    // Permanent-mapped overlay:")[0]
+assert "Quickshell.execDetached" not in publisher, "notifications must not execute Git/GitHub mutations"
+assert "lastError" not in publisher and "stderr" not in publisher, "notifications must not copy raw gh error details"
+
 print("Notification policy contracts: PASS")

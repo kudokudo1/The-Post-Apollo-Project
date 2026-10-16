@@ -1,0 +1,26 @@
+name: GitHub PULLS large-payload regression
+
+on:
+  pull_request:
+    paths:
+      - "services/github/GitHubWorkItemsService.qml"
+      - "tests/git/test_github_pulls_large_payload_contracts.py"
+      - ".github/workflows/github-pulls-large-payload.yml"
+  push:
+    branches: [main]
+    paths:
+      - "services/github/GitHubWorkItemsService.qml"
+      - "tests/git/test_github_pulls_large_payload_contracts.py"
+      - ".github/workflows/github-pulls-large-payload.yml"
+
+jobs:
+  github-pulls-payload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Test real embedded PR loader with synthetic >128-KiB JSON
+        run: python tests/git/test_github_pulls_large_payload_contracts.py

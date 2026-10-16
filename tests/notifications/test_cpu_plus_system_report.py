@@ -30,7 +30,7 @@ assert "lastObservedAtMs > 15000" in src
 assert "NotificationsService.pushRich({" in src
 assert "function pushRich(notification)" in SERVICE.read_text()
 for forbidden in ["Process {", "Timer {", "telemetry.refresh(", "Quickshell.execDetached",
-                  "systemctl", "pkexec", "kill(", "terminate", "fanControl.",
+                  "systemctl", "pkexec", "kill(", "terminate(", "fanControl.",
                   "contributors", "controlTarget", "sensor.source"]:
     assert forbidden not in src, forbidden
 

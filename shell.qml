@@ -267,6 +267,11 @@ PanelWindow {
         telemetry: sharedSystemTelemetry
     }
 
+    // Informational SYSTEM report from the same existing sample stream.
+    CpuPlusSystemNotificationProducer {
+        telemetry: sharedSystemTelemetry
+    }
+
     FanControl {
         id: sharedFanControl
 

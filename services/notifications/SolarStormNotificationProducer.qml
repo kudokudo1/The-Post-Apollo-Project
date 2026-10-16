@@ -9,7 +9,7 @@ import "SolarStormPolicy.js" as StormPolicy
 Scope {
     id: producer
     required property var spaceService
-    property var state: StormPolicy.initial()
+    property var kpState: StormPolicy.initial()
 
     function historyContains(id) {
         const rows = NotificationsService.notifications;
@@ -26,9 +26,9 @@ Scope {
             return;
         const observedMs = SolarReportPolicy.observationTimeMs(spaceService.kpTime);
         const now = Date.now();
-        const result = StormPolicy.transition(state, spaceService.kp,
+        const result = StormPolicy.transition(kpState, spaceService.kp,
                                               observedMs, now);
-        state = result.state;
+        kpState = result.state;
         if (result.emit === 0)
             return;
 

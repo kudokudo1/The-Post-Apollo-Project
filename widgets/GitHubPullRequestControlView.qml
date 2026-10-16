@@ -582,6 +582,10 @@ Rectangle {
                       + String(root.lifecycleService.operation || "").toUpperCase()
                       + " // " + String(root.lifecycleService.phase || "")
                       + " // AWAITING VERIFIED RESULT"
+                    : root.isMerged
+                    ? "PR MERGED // READ-ONLY LIFECYCLE // THIS PR CANNOT BE REOPENED"
+                    : root.isClosed
+                    ? "PR CLOSED // REOPEN TO REVIEW, UPDATE BRANCH OR MERGE // METADATA EDITS MAY STILL BE POSSIBLE"
                     : String(root.lifecycleService.status || "READY")
                   )
             accent:
@@ -638,6 +642,7 @@ Rectangle {
                         accent: Colors.cyan
                         enabledAction:
                             root.hasTarget
+                            && root.isOpen
                             && !root.lifecycleService.busy
                         onTriggered: {
                             root.clearArm();
@@ -672,6 +677,7 @@ Rectangle {
                         accent: Colors.orange
                         enabledAction:
                             root.hasTarget
+                            && root.isOpen
                             && !root.lifecycleService.busy
                         onTriggered: root.armOrRun(
                             "update-branch",
@@ -700,6 +706,7 @@ Rectangle {
                         accent: Colors.orange
                         enabledAction:
                             root.hasTarget
+                            && root.isOpen
                             && !root.lifecycleService.busy
                         onTriggered: root.armOrRun(
                             "update-rebase",
@@ -730,6 +737,7 @@ Rectangle {
                         accent: Colors.red
                         enabledAction:
                             root.hasTarget
+                            && (root.isOpen || root.isClosed)
                             && !root.lifecycleService.busy
                         onTriggered: {
                             if (String(root.pullRequestState || "").toUpperCase()
@@ -1063,7 +1071,8 @@ Rectangle {
                                 actionToken: "review-approve"
                                 label: "APPROVE"
                                 accent: Colors.green
-                                enabledAction: !root.lifecycleService.busy
+                                enabledAction:
+                                    root.isOpen && !root.lifecycleService.busy
                                 onTriggered: root.startLifecycleAction("review-approve", function() {
                             return root.lifecycleService.reviewPullRequest(
                                     root.repositorySlug,
@@ -1080,6 +1089,7 @@ Rectangle {
                                 label: "REVIEW COMMENT"
                                 accent: Colors.cyan
                                 enabledAction:
+                                    root.isOpen &&
                                     reviewInput.text.trim().length > 0
                                     && !root.lifecycleService.busy
                                 onTriggered: root.startLifecycleAction("review-comment", function() {
@@ -1098,6 +1108,7 @@ Rectangle {
                                 label: "REQUEST CHANGES"
                                 accent: Colors.orange
                                 enabledAction:
+                                    root.isOpen &&
                                     reviewInput.text.trim().length > 0
                                     && !root.lifecycleService.busy
                                 onTriggered: root.startLifecycleAction("review-changes", function() {
@@ -1161,6 +1172,8 @@ Rectangle {
                                 accent: Colors.red
                                 enabledAction:
                                     root.hasTarget
+                                    && root.isOpen
+                                    && !root.pullRequestDraft
                                     && /^[0-9a-fA-F]{40}$/.test(
                                         root.pullRequestHeadSha
                                        )

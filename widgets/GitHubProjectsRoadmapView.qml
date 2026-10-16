@@ -389,8 +389,22 @@ Item {
                                     height: parent.height
                                     spacing: 5
 
-                                    GitHubProjectsArchiveButton {
+                                    RoadAction {
                                         width: 40
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        label: "OPEN"
+                                        enabledAction:
+                                            !!root.projectService.itemUrl(
+                                                roadRow.modelData
+                                            )
+                                        onTriggered:
+                                            root.openProjectItem(
+                                                roadRow.modelData
+                                            )
+                                    }
+
+                                    GitHubProjectsArchiveButton {
+                                        width: 65
                                         anchors.verticalCenter: parent.verticalCenter
                                         armed: root.itemActionArmed("archive", roadRow.modelData)
                                         enabledAction:
@@ -528,8 +542,22 @@ Item {
                                     height: parent.height
                                     spacing: 4
 
-                                    GitHubProjectsArchiveButton {
+                                    RoadAction {
                                         width: 40
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        label: "OPEN"
+                                        enabledAction:
+                                            !!root.projectService.itemUrl(
+                                                unscheduledRow.modelData
+                                            )
+                                        onTriggered:
+                                            root.openProjectItem(
+                                                unscheduledRow.modelData
+                                            )
+                                    }
+
+                                    GitHubProjectsArchiveButton {
+                                        width: 76
                                         anchors.verticalCenter: parent.verticalCenter
                                         armed: root.itemActionArmed("archive", unscheduledRow.modelData)
                                         enabledAction:

@@ -677,14 +677,12 @@ Rectangle {
                             "update-branch",
                             function() {
                                 root.startLifecycleAction("update-branch", function() {
-                                    return root.startLifecycleAction("update-rebase", function() {
                                     return root.lifecycleService.updateBranch(
-                                    root.repositorySlug,
-                                    root.pullRequestNumber,
-                                    false,
-                                    true
-                                );
-                                });
+                                        root.repositorySlug,
+                                        root.pullRequestNumber,
+                                        false,
+                                        true
+                                    );
                                 });
                             }
                         )
@@ -706,12 +704,14 @@ Rectangle {
                         onTriggered: root.armOrRun(
                             "update-rebase",
                             function() {
-                                root.lifecycleService.updateBranch(
-                                    root.repositorySlug,
-                                    root.pullRequestNumber,
-                                    true,
-                                    true
-                                );
+                                root.startLifecycleAction("update-rebase", function() {
+                                    return root.lifecycleService.updateBranch(
+                                        root.repositorySlug,
+                                        root.pullRequestNumber,
+                                        true,
+                                        true
+                                    );
+                                });
                             }
                         )
                     }
@@ -804,17 +804,13 @@ Rectangle {
                         onTriggered: {
                             root.clearArm();
                             root.startLifecycleAction("title", function() {
-                                    return root.startLifecycleAction("base", function() {
-                                    return root.startLifecycleAction("body", function() {
                                     return root.lifecycleService.editPullRequest(
-                                root.repositorySlug,
-                                root.pullRequestNumber,
-                                titleInput.text.trim(),
-                                null,
-                                null
-                            );
-                                });
-                                });
+                                        root.repositorySlug,
+                                        root.pullRequestNumber,
+                                        titleInput.text.trim(),
+                                        null,
+                                        null
+                                    );
                                 });
                         }
                     }
@@ -845,13 +841,15 @@ Rectangle {
                             && !root.lifecycleService.busy
                         onTriggered: {
                             root.clearArm();
-                            root.lifecycleService.editPullRequest(
-                                root.repositorySlug,
-                                root.pullRequestNumber,
-                                null,
-                                null,
-                                baseInput.text.trim()
-                            );
+                            root.startLifecycleAction("base", function() {
+                                    return root.lifecycleService.editPullRequest(
+                                        root.repositorySlug,
+                                        root.pullRequestNumber,
+                                        null,
+                                        null,
+                                        baseInput.text.trim()
+                                    );
+                                });
                         }
                     }
                 }
@@ -879,13 +877,15 @@ Rectangle {
                             && !root.lifecycleService.busy
                         onTriggered: {
                             root.clearArm();
-                            root.lifecycleService.editPullRequest(
-                                root.repositorySlug,
-                                root.pullRequestNumber,
-                                null,
-                                bodyInput.text,
-                                null
-                            );
+                            root.startLifecycleAction("body", function() {
+                                    return root.lifecycleService.editPullRequest(
+                                        root.repositorySlug,
+                                        root.pullRequestNumber,
+                                        null,
+                                        bodyInput.text,
+                                        null
+                                    );
+                                });
                         }
                     }
                 }

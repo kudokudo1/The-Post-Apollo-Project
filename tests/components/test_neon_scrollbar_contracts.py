@@ -134,6 +134,8 @@ MIGRATED = {
         "handleOpacity: 0.92",
         "barGlowIdleOpacity: 0.28",
     ),
+    # Operator-approved 2026-10-16: previously display-only Pulls and
+    # Issues now need a distinguishable full rail with direct pointer control.
     "widgets/GitHubWorkItemsView.qml": (
         "NeonScrollBar {",
         "id: scrollTrack",
@@ -141,9 +143,13 @@ MIGRATED = {
         "railWidth: 4",
         "barHandleWidth: 4",
         "minimumHandleHeight: 18",
-        "railColor: Colors.dark",
-        "interactive: false",
+        "railColor: Colors.cyan",
+        "interactive: true",
+        "wheelEnabled: true",
+        "clickToJump: true",
     ),
+    # Only the Profile's Repository Catalog changes; other Profile rails
+    # and their existing inactive/hover behavior are not rewritten.
     "widgets/RepositoryProfileView.qml": (
         "NeonScrollBar {",
         "id: catalogScrollTrack",
@@ -151,9 +157,12 @@ MIGRATED = {
         "railWidth: 5",
         "barHandleWidth: 5",
         "minimumHandleHeight: 18",
-        "railBorderColor: Colors.dark",
+        "railColor: Colors.cyan",
+        "railBorderColor: Colors.blue",
         "handleOpacity: scrollable ? 0.82 : 0.30",
-        "interactive: false",
+        "interactive: true",
+        "wheelEnabled: true",
+        "clickToJump: true",
     ),
 }
 

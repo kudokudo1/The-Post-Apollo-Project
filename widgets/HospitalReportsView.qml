@@ -111,8 +111,13 @@ Item {
             })
             .slice()
             .sort(function(a, b) {
-                return String((b || {}).recordedAt || "")
-                    .localeCompare(String((a || {}).recordedAt || ""));
+                // PX SQLite timestamps use a space; local certification
+                // ISO timestamps use T. Normalize before comparing dates.
+                const newer = String((b || {}).recordedAt || "")
+                    .replace(" ", "T");
+                const older = String((a || {}).recordedAt || "")
+                    .replace(" ", "T");
+                return newer.localeCompare(older);
             });
     }
 

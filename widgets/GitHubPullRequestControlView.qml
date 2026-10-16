@@ -452,12 +452,17 @@ Rectangle {
             boundsBehavior: Flickable.StopAtBounds
             GohuText {
                 id: statusText
-                width: statusScroll.width
+                width: Math.max(0, statusScroll.width - (statusBox.detail ? 20 : 0))
                 text: statusBox.text
                 font.pixelSize: detail ? 10 : 9
                 color: statusBox.accent
                 wrapMode: Text.WrapAnywhere
             }
+        }
+        NeonScrollBar {
+            flickable: statusScroll
+            handleStyle: "star"
+            visible: statusBox.detail && scrollable
         }
     }
 

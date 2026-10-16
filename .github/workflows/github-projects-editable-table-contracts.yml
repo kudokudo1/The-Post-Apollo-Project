@@ -5,6 +5,7 @@ on:
     paths:
       - "services/github/GitHubProjectsService.qml"
       - "widgets/GitHubProjectsTableView.qml"
+      - "widgets/GitHubProjectsArchiveButton.qml"
       - "widgets/GitHubProjectsFieldEditor.qml"
       - "widgets/GitHubProjectsDateInput.qml"
       - "widgets/GitHubProjectsView.qml"
@@ -15,6 +16,7 @@ on:
     paths:
       - "services/github/GitHubProjectsService.qml"
       - "widgets/GitHubProjectsTableView.qml"
+      - "widgets/GitHubProjectsArchiveButton.qml"
       - "widgets/GitHubProjectsFieldEditor.qml"
       - "widgets/GitHubProjectsDateInput.qml"
       - "widgets/GitHubProjectsView.qml"

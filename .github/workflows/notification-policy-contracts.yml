@@ -37,3 +37,9 @@ jobs:
 
       - name: Validate daily Solar Report producer and NOAA snapshot policy
         run: python3 tests/notifications/test_solar_report_producer.py
+
+      - name: Validate daily Weather Report producer
+        run: python3 tests/notifications/test_weather_report_producer.py
+
+      - name: Validate expanded Weather and Solar report cards
+        run: python3 tests/notifications/test_rich_report_card_contracts.py

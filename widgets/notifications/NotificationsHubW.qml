@@ -106,6 +106,7 @@ PanelWindow {
 
     // Notification cards.
     property int cardHeight: 116
+    property int reportCardHeight: 352 // solar/weather records need readable multiline history
     property int cardSpacing: 2
     property int cardGlowGutter: 24
     property int cardContentMargin: 10
@@ -855,6 +856,80 @@ PanelWindow {
         filteredModelRefreshTimer.restart();
     }
 
+    // Report identity comes from the stored event, not an inferred message
+    // keyword. Existing solar records get the expanded layout after reload.
+    function reportKindFor(entry) {
+        const context = entry.context || {};
+        const eventType = String(context.eventType || "");
+        const sourceId = String(entry.sourceId || "").toLowerCase();
+        if (eventType === "solar-daily-report" && sourceId === "weather-space")
+            return "solar";
+        if (eventType === "weather-daily-report" && sourceId === "weather-brief")
+            return "weather";
+        return "";
+    }
+
+    function reportNumber(value, digits, suffix) {
+        if (value === null || value === undefined || value === "")
+            return "UNAVAILABLE";
+        const number = Number(value);
+        if (!isFinite(number))
+            return "UNAVAILABLE";
+        return number.toFixed(digits) + String(suffix || "");
+    }
+
+    function reportObserved(raw) {
+        const value = String(raw || "").trim();
+        if (!value)
+            return "TIME UNAVAILABLE";
+        return value.replace("T", " ").replace(/Z$/, " UTC").slice(0, 24);
+    }
+
+    function reportDetailsFor(entry, kind) {
+        const m = entry.metrics || {};
+        const ctx = entry.context || {};
+        if (kind === "solar") {
+            const stamps = ctx.observationTimesUtc || {};
+            return [
+                "GEOMAGNETIC // Kp " + root.reportNumber(m.kp, 1, "")
+                    + "  " + (Number(m.kp) >= 5 ? "STORM RANGE" : "OBSERVED"),
+                "SOLAR WIND // " + root.reportNumber(m.solarWindKmS, 0, " km/s"),
+                "MAGNETIC Bz // " + root.reportNumber(m.magneticBzNt, 1, " nT"),
+                "MAGNETIC Bt // " + root.reportNumber(m.magneticBtNt, 1, " nT"),
+                "RADIO FLUX F10.7 // " + root.reportNumber(m.solarFluxSfu, 0, " SFU"),
+                "",
+                "NOAA OBSERVATIONS // UTC",
+                "Kp // " + root.reportObserved(stamps.kp),
+                "WIND // " + root.reportObserved(stamps.solarWind),
+                "FIELD // " + root.reportObserved(stamps.magneticField),
+                "FLUX // " + root.reportObserved(stamps.solarFlux)
+            ].join("\n");
+        }
+        if (kind === "weather") {
+            const aqiAvailable = m.aqi !== null && m.aqi !== undefined
+                                 && isFinite(Number(m.aqi));
+            return [
+                "CONDITIONS // " + String(m.condition || "UNKNOWN").toUpperCase(),
+                "TEMPERATURE // " + root.reportNumber(m.temperatureF, 0, "°F"),
+                "FEELS LIKE // " + root.reportNumber(m.feelsLikeF, 0, "°F"),
+                "HUMIDITY // " + root.reportNumber(m.humidityPercent, 0, "%"),
+                "WIND // " + (String(m.windDirection || "").toUpperCase())
+                    + " " + root.reportNumber(m.windMph, 0, " mph"),
+                "",
+                "AIR QUALITY // " + (aqiAvailable
+                    ? root.reportNumber(m.aqi, 0, "") + "  " + String(m.aqiLabel || "")
+                    : "NOT AVAILABLE"),
+                "PM2.5 // " + root.reportNumber(m.pm25, 1, " µg/m³"),
+                "PM10 // " + root.reportNumber(m.pm10, 1, " µg/m³"),
+                "",
+                "WEATHER OBSERVED // " + root.reportObserved(ctx.observedAtUtc),
+                "DATA // WTTR.IN / OPEN-METEO",
+                "AQI // LAST AVAILABLE (SEPARATE)"
+            ].join("\n");
+        }
+        return "";
+    }
+
     function rebuildFilteredNotifications() {
         filteredNotifications.clear();
 
@@ -866,6 +941,7 @@ PanelWindow {
         for (let i = 0; i < NotificationsService.notifications.count; i++) {
             const entry = NotificationsService.notifications.get(i);
             const classification = root.classificationFor(entry.source, entry.sourceId, entry.category, entry.severity);
+            const reportKind = root.reportKindFor(entry);
             if (!root.notificationMatches(entry.source, entry.sourceId, entry.title, entry.message, entry.category, entry.severity, classification.group))
                 continue;
             rows.push({
@@ -880,7 +956,9 @@ PanelWindow {
                     "category": String(entry.category || "generic"),
                     "severity": String(entry.severity || "normal"),
                     "createdAt": Number(entry.createdAt || 0),
-                    "updatedAt": Number(entry.updatedAt || 0)
+                    "updatedAt": Number(entry.updatedAt || 0),
+                    "reportKind": reportKind,
+                    "reportDetails": root.reportDetailsFor(entry, reportKind)
                 }
             });
         }
@@ -2301,6 +2379,9 @@ PanelWindow {
                         required property string severity
                         required property double createdAt
                         required property double updatedAt
+                        required property string reportKind
+                        required property string reportDetails
+                        readonly property bool isReport: reportKind !== ""
 
                         readonly property string appKey: root.appKeyFor(notificationEntry.sourceId, notificationEntry.source)
 
@@ -2326,7 +2407,7 @@ PanelWindow {
 
                         width: historyList.width
                         height:
-                            root.cardHeight
+                            (notificationEntry.isReport ? root.reportCardHeight : root.cardHeight)
                             + (root.cardGlowVerticalGutter * 2)
                             + root.cardSpacing
 
@@ -2345,7 +2426,7 @@ PanelWindow {
                                 rightMargin: root.cardGlowGutter
                             }
 
-                            height: root.cardHeight
+                            height: notificationEntry.isReport ? root.reportCardHeight : root.cardHeight
 
                             fillColor: Colors.black
                             fillOpacity: root.cardFillOpacity
@@ -2378,6 +2459,7 @@ PanelWindow {
                                 anchors.fill: parent
 
                                 hoverEnabled: true
+                                enabled: !notificationEntry.isReport
 
                                 z: 0
 
@@ -2714,6 +2796,7 @@ PanelWindow {
                                 z: 1
 
                                 text: notificationEntry.message
+                                visible: !notificationEntry.isReport
 
                                 pixelSize: root.notificationMessageFontSize
 
@@ -2727,6 +2810,48 @@ PanelWindow {
                                 elideMode: Text.ElideRight
                             }
 
+
+                            // ===== MULTILINE REPORT DECK ===========
+                            // Compact app notifications stay 116px. Only
+                            // stored solar/weather briefs use this larger deck.
+                            Rectangle {
+                                id: reportDivider
+                                visible: notificationEntry.isReport
+                                anchors {
+                                    top: notificationTitle.bottom
+                                    left: parent.left
+                                    right: parent.right
+                                }
+                                anchors.topMargin: 7
+                                anchors.leftMargin: root.cardContentMargin + 8
+                                anchors.rightMargin: root.cardContentMargin + 8
+                                height: 1
+                                color: notificationEntry.notificationColor
+                                opacity: 0.48
+                            }
+
+                            GohuText {
+                                id: reportText
+                                visible: notificationEntry.isReport
+                                anchors {
+                                    top: reportDivider.bottom
+                                    bottom: parent.bottom
+                                    left: parent.left
+                                    right: parent.right
+                                }
+                                anchors.topMargin: 8
+                                anchors.bottomMargin: 12
+                                anchors.leftMargin: root.cardContentMargin + 8
+                                anchors.rightMargin: root.cardContentMargin + 8
+                                text: notificationEntry.reportDetails
+                                font.pixelSize: 11
+                                lineHeight: 1.25
+                                color: Colors.white
+                                wrapMode: Text.Wrap
+                                elide: Text.ElideNone
+                                verticalAlignment: Text.AlignTop
+                                z: 1
+                            }
                             // ===== BRING HERE / OPEN =============
                             //
                             // Card click:
@@ -2737,6 +2862,7 @@ PanelWindow {
 
                             MiniButton {
                                 id: bringHereButton
+                                visible: !notificationEntry.isReport
 
                                 anchors {
                                     bottom: parent.bottom

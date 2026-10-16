@@ -56,7 +56,7 @@ const ctx = {
     captureCurrentFloor(floor, probe){
         ctx.floors.push({floorId:floor.floorId,auditAvailable:true});
     },
-    finishRounds(){this.running=false;this.finished+=1;}
+    finishRounds(){ctx.running=false;ctx.finished+=1;}
 };
 vm.createContext(ctx);
 vm.runInContext(process.argv[1],ctx);

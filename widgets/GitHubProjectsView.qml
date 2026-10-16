@@ -871,8 +871,22 @@ Item {
                                                             elide: Text.ElideRight
                                                         }
 
-                                                        GitHubProjectsArchiveButton {
+                                                        ActionButton {
                                                             width: 42
+                                                            height: 20
+                                                            label: "OPEN"
+                                                            enabledAction:
+                                                                !!root.projectService.itemUrl(
+                                                                    itemCard.modelData
+                                                                )
+                                                            onTriggered:
+                                                                root.openProjectItem(
+                                                                    itemCard.modelData
+                                                                )
+                                                        }
+
+                                                        GitHubProjectsArchiveButton {
+                                                            width: 70
                                                             height: 20
                                                             armed: root.itemActionArmed("archive", itemCard.modelData)
                                                             enabledAction:

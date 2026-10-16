@@ -644,7 +644,9 @@ Item {
                                 x: parent.width - width
                                 y: 0
                                 height: parent.height
-                                z: 0
+                                // The catalog Flickable ends to the left of
+                                // this separate 16px-wide star-control lane.
+                                z: 2
 
                                 barAreaWidth: 5
                                 railWidth: 5
@@ -653,14 +655,16 @@ Item {
                                 scrollThreshold: 0
                                 autoHide: false
 
-                                railColor: Colors.black
-                                railOpacity: 1.0
-                                railRadius: 0
+                                // A visible cyan track contrasts with the
+                                // magenta star and black catalog background.
+                                railColor: Colors.cyan
+                                railOpacity: 0.84
+                                railRadius: 1
                                 railBorderWidth: 1
-                                railBorderColor: Colors.dark
+                                railBorderColor: Colors.blue
                                 railGlowEnabled: true
-                                railGlowOpacity: 0.16
-                                railGlowColor: Colors.dark
+                                railGlowOpacity: 0.28
+                                railGlowColor: Colors.cyan
 
                                 handleColor: Colors.magenta
                                 handleOpacity: scrollable ? 0.82 : 0.30
@@ -668,8 +672,11 @@ Item {
                                 handleBorderWidth: 0
                                 handleGlowEnabled: true
 
-                                interactive: false
-                                wheelEnabled: false
+                                // Enabled only while catalog content can
+                                // actually scroll; preserves empty-mode fade.
+                                interactive: true
+                                wheelEnabled: true
+                                clickToJump: true
                             }
                         }
                     }

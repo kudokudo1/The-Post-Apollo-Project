@@ -988,7 +988,9 @@ Item {
                 x: parent.width - width - 5
                 y: 5
                 height: Math.max(0, parent.height - 10)
-                z: 0
+                // Keep the complete rail above the clipped work-item list,
+                // inside the space already reserved for its 16px star track.
+                z: 2
 
                 barAreaWidth: 4
                 railWidth: 4
@@ -996,19 +998,27 @@ Item {
                 minimumHandleHeight: 18
                 scrollThreshold: 0
 
-                railColor: Colors.dark
-                railOpacity: 1.0
-                railRadius: 0
+                // The historical dark track was display-only and nearly
+                // invisible. Use the established cyan Git rail, distinct
+                // from the magenta position star, for real track targeting.
+                railColor: Colors.cyan
+                railOpacity: 0.84
+                railRadius: 1
                 railGlowEnabled: true
-                railGlowOpacity: 0.20
+                railGlowOpacity: 0.30
+                railGlowColor: Colors.cyan
 
                 handleColor: Colors.magenta
                 barHandleRadius: 0
                 handleBorderWidth: 0
                 handleGlowEnabled: true
 
-                interactive: false
-                wheelEnabled: false
+                // Mouse click moves to the clicked position; dragging the
+                // star moves through long Pull/Issue lists. No row hitboxes
+                // are covered because sourceList reserves this right lane.
+                interactive: true
+                wheelEnabled: true
+                clickToJump: true
 
                 visible: scrollable
             }

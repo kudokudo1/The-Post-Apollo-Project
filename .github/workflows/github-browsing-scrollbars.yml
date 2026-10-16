@@ -1,0 +1,27 @@
+name: GitHub browsing scrollbar interactions
+
+on:
+  pull_request:
+    paths:
+      - "widgets/GitHubWorkItemsView.qml"
+      - "widgets/RepositoryProfileView.qml"
+      - "tests/components/test_github_browsing_scrollbars.py"
+      - ".github/workflows/github-browsing-scrollbars.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "widgets/GitHubWorkItemsView.qml"
+      - "widgets/RepositoryProfileView.qml"
+      - "tests/components/test_github_browsing_scrollbars.py"
+      - ".github/workflows/github-browsing-scrollbars.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  browsing-scrollbar-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify real rail, click and drag enablement
+        run: python3 tests/components/test_github_browsing_scrollbars.py

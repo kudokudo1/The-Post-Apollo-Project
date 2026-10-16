@@ -1,0 +1,18 @@
+[Unit]
+Description=Post-Apollo Hi-Fi headless media controller
+Documentation=https://github.com/kudokudo1/The-Post-Apollo-Project/blob/main/scripts/media/HEADLESS-CONTROLLER.md
+
+[Service]
+Type=simple
+WorkingDirectory=%h/.config/quickshell
+ExecStart=/usr/bin/python3 %h/.config/quickshell/scripts/media/media_controller_server.py
+Environment=PYTHONUNBUFFERED=1
+RuntimeDirectory=post-apollo-media
+RuntimeDirectoryMode=0700
+UMask=0077
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

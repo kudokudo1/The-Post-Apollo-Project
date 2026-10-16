@@ -1,0 +1,32 @@
+name: Media Headless Controller Contracts
+
+on:
+  pull_request:
+    paths:
+      - "scripts/media/headless_mpd.py"
+      - "scripts/media/media_controller.py"
+      - "scripts/media/media_controller_server.py"
+      - "scripts/media/media_controller_cli.py"
+      - "tests/media/test_headless_controller.py"
+      - ".github/workflows/media-headless-controller.yml"
+  workflow_dispatch:
+
+jobs:
+  pure-controller-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python syntax and Unix-socket/source/backend contract tests
+        run: |
+          python3 -m py_compile \
+            scripts/media/headless_mpd.py \
+            scripts/media/media_controller.py \
+            scripts/media/media_controller_server.py \
+            scripts/media/media_controller_cli.py \
+            tests/media/test_headless_controller.py
+          python3 -m unittest discover \
+            -s tests/media -p 'test_headless_controller.py' -v

@@ -4,3 +4,4 @@ singleton NotificationsService 1.0 NotificationsService.qml
 singleton NotificationsConverter 1.0 NotificationsConverter.qml
 singleton NotificationsActionRouter 1.0 NotificationsActionRouter.qml
 WeatherAqiNotificationProducer 1.0 WeatherAqiNotificationProducer.qml
+SolarReportNotificationProducer 1.0 SolarReportNotificationProducer.qml

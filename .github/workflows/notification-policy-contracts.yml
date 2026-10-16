@@ -34,3 +34,6 @@ jobs:
 
       - name: Validate Weather Station AQI producer and transition policy
         run: python3 tests/notifications/test_weather_aqi_producer.py
+
+      - name: Validate daily Solar Report producer and NOAA snapshot policy
+        run: python3 tests/notifications/test_solar_report_producer.py

@@ -22,7 +22,7 @@ for needle in (
     assert needle in host, needle
 for needle in ("readonly property var catalogEvents:", "readonly property var combinedEvents:",
                'eventType: "ROOM REPORT // " + kind', "root.historyService.events",
-               "root.catalogService.reports", "NO CERTIFICATION EVENTS OR ROOM REPORTS"):
+               "root.catalogService.reports", "NO REPORTS MATCH THE SELECTED FILTER"):
     assert needle in view, needle
 assert 'NotificationsService.pushRich({' in host, "existing notifications must remain wired"
 

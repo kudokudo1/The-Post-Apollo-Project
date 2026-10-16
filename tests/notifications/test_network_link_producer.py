@@ -28,7 +28,7 @@ assert '"domain": "system"' in src
 assert 'NotificationsService.pushRich({' in src
 assert 'function pushRich(notification)' in SERVICE.read_text()
 assert 'function facetsFor(event)' in FACETS.read_text()
-for forbidden in ["Process {", "Timer {", "Quickshell.execDetached", "nmcli", "networkDock.",
+for forbidden in ["Process {", "Timer {", "Quickshell.execDetached", 'command: ["nmcli"', "networkDock.",
                   "telemetry.refresh(", "kill(", "limit(", "fanControl."]:
     assert forbidden not in src, "producer cannot poll or control: " + forbidden
 

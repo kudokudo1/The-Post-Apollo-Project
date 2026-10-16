@@ -22,18 +22,18 @@ Scope {
 
     function observe() {
         if (!NotificationsService.historyReady
-                || !spaceService || !spaceService.kpReady)
+                || !producer.spaceService || !producer.spaceService.kpReady)
             return;
-        const observedMs = SolarReportPolicy.observationTimeMs(spaceService.kpTime);
+        const observedMs = SolarReportPolicy.observationTimeMs(producer.spaceService.kpTime);
         const now = Date.now();
-        const result = StormPolicy.transition(kpState, spaceService.kp,
+        const result = StormPolicy.transition(producer.kpState, producer.spaceService.kp,
                                               observedMs, now);
-        kpState = result.state;
+        producer.kpState = result.state;
         if (result.emit === 0)
             return;
 
         const id = "apollo-noaa-kp-storm-" + observedMs;
-        if (historyContains(id))
+        if (producer.historyContains(id))
             return;
 
         const severe = result.emit >= 3;
@@ -48,13 +48,13 @@ Scope {
             "title": "SPACE WEATHER // " + band + " STORM "
                      + (result.kind === "escalated" ? "ESCALATED" : "OBSERVED"),
             "message": "NOAA SWPC observed planetary Kp "
-                     + Number(spaceService.kp).toFixed(1) + " (" + band
+                     + Number(producer.spaceService.kp).toFixed(1) + " (" + band
                      + ") at " + observedAt + ". "
                      + "This is an observed Kp threshold, not a forecast "
                      + "or an official NOAA warning. Review Weather Station SPACE.",
             "tags": ["weather", "space", "solar", "geomagnetic-storm"],
             "metrics": {
-                "kp": Number(spaceService.kp),
+                "kp": Number(producer.spaceService.kp),
                 "stormLevel": result.emit
             },
             "context": {

@@ -242,7 +242,6 @@ Rectangle {
         readonly property bool loading:
             actionToken.length > 0
             && root.activeLifecycleAction === actionToken
-            && root.lifecycleService.busy
 
         signal triggered()
 
@@ -363,9 +362,10 @@ Rectangle {
             clip: true
             font.family: "GohuFont 11 Nerd Font Mono"
             font.pixelSize: 9
-            color: Colors.white
+            color: Colors.magenta
             selectionColor: Colors.magenta
             selectedTextColor: Colors.black
+            cursorDelegate: Rectangle { width: 2; color: Colors.orange }
 
             Text {
                 anchors.verticalCenter: parent.verticalCenter
@@ -400,14 +400,15 @@ Rectangle {
 
             TextEdit {
                 id: editor
-                width: parent.width
+                width: Math.max(0, parent.width - 20)
                 wrapMode: TextEdit.Wrap
                 selectByMouse: true
                 font.family: "GohuFont 11 Nerd Font Mono"
                 font.pixelSize: 9
-                color: Colors.white
+                color: Colors.magenta
                 selectionColor: Colors.magenta
                 selectedTextColor: Colors.black
+                cursorDelegate: Rectangle { width: 2; color: Colors.orange }
 
                 Text {
                     visible: !editor.text && !editor.activeFocus
@@ -555,6 +556,7 @@ Rectangle {
         }
 
         StatusBox {
+            id: prActionStatus
             width: parent.width
             detail: !!root.lifecycleService.lastError
                     || root.lifecycleService.busy
@@ -595,7 +597,7 @@ Rectangle {
 
         Loader {
             width: parent.width
-            height: parent.height - 111
+            height: Math.max(0, parent.height - 52 - prActionStatus.height - 14)
             sourceComponent:
                 root.mode === "queue"
                 ? queuePane
@@ -629,6 +631,7 @@ Rectangle {
                     ActionButton {
                         width: 100
                         label:
+                            actionToken: "draft-toggle"
                             root.pullRequestDraft
                             ? "MARK READY"
                             : "MAKE DRAFT"
@@ -656,6 +659,7 @@ Rectangle {
                     ActionButton {
                         width: 110
                         label:
+                            actionToken: "update-branch"
                             root.armedAction === "update-branch"
                             ? "CONFIRM UPDATE"
                             : "UPDATE BRANCH"
@@ -681,6 +685,7 @@ Rectangle {
                     ActionButton {
                         width: 112
                         label:
+                            actionToken: "update-rebase"
                             root.armedAction === "update-rebase"
                             ? "CONFIRM REBASE"
                             : "UPDATE REBASE"
@@ -706,6 +711,7 @@ Rectangle {
                     ActionButton {
                         width: 100
                         label:
+                            actionToken: "close-reopen"
                             String(root.pullRequestState || "").toUpperCase()
                                 === "CLOSED"
                             ? "REOPEN"
@@ -776,6 +782,7 @@ Rectangle {
 
                     ActionButton {
                         width: 110
+                        actionToken: "title"
                         label: "SET TITLE"
                         accent: Colors.cyan
                         enabledAction:
@@ -811,6 +818,7 @@ Rectangle {
 
                     ActionButton {
                         width: 110
+                        actionToken: "base"
                         label: "SET BASE"
                         accent: Colors.cyan
                         enabledAction:
@@ -845,6 +853,7 @@ Rectangle {
                     ActionButton {
                         width: 110
                         anchors.verticalCenter: parent.verticalCenter
+                        actionToken: "body"
                         label: "SET BODY"
                         accent: Colors.cyan
                         enabledAction:
@@ -876,6 +885,7 @@ Rectangle {
 
                     ActionButton {
                         width: 88
+                        actionToken: "label-add"
                         label: "+ LABEL"
                         enabledAction:
                             metaInput.text.trim().length > 0
@@ -888,8 +898,18 @@ Rectangle {
                         )
                     }
 
+                }
+
+                // A single row of 552px fixed buttons made the entry unusable.
+                // Keep controls in two rows, with a usable full text field.
+                Row {
+                    width: parent.width
+                    height: 31
+                    spacing: 5
+
                     ActionButton {
                         width: 88
+                        actionToken: "label-remove"
                         label: "- LABEL"
                         accent: Colors.red
                         enabledAction:
@@ -905,6 +925,7 @@ Rectangle {
 
                     ActionButton {
                         width: 104
+                        actionToken: "assignee"
                         label: "+ ASSIGNEE"
                         enabledAction:
                             metaInput.text.trim().length > 0
@@ -919,6 +940,7 @@ Rectangle {
 
                     ActionButton {
                         width: 104
+                        actionToken: "reviewer"
                         label: "+ REVIEWER"
                         enabledAction:
                             metaInput.text.trim().length > 0
@@ -933,6 +955,7 @@ Rectangle {
 
                     ActionButton {
                         width: 92
+                        actionToken: "milestone"
                         label: "MILESTONE"
                         enabledAction:
                             metaInput.text.trim().length > 0
@@ -946,6 +969,7 @@ Rectangle {
 
                     ActionButton {
                         width: 76
+                        actionToken: "milestone-clear"
                         label: "CLEAR"
                         accent: Colors.red
                         enabledAction: !root.lifecycleService.busy
@@ -989,6 +1013,7 @@ Rectangle {
 
                             ActionButton {
                                 width: 94
+                                actionToken: "comment"
                                 label: "COMMENT"
                                 accent: Colors.cyan
                                 enabledAction:
@@ -1003,6 +1028,7 @@ Rectangle {
 
                             ActionButton {
                                 width: 94
+                                actionToken: "review-approve"
                                 label: "APPROVE"
                                 accent: Colors.green
                                 enabledAction: !root.lifecycleService.busy
@@ -1016,6 +1042,7 @@ Rectangle {
 
                             ActionButton {
                                 width: 106
+                                actionToken: "review-comment"
                                 label: "REVIEW COMMENT"
                                 accent: Colors.cyan
                                 enabledAction:
@@ -1031,6 +1058,7 @@ Rectangle {
 
                             ActionButton {
                                 width: 126
+                                actionToken: "review-changes"
                                 label: "REQUEST CHANGES"
                                 accent: Colors.orange
                                 enabledAction:
@@ -1079,6 +1107,7 @@ Rectangle {
 
                             delegate: ActionButton {
                                 required property string modelData
+                                actionToken: "merge-" + modelData
 
                                 width: 120
                                 anchors.verticalCenter: parent.verticalCenter

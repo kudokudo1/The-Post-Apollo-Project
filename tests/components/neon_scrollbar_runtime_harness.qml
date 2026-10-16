@@ -5,7 +5,7 @@ import "../../components" as Shared
 Window {
     id: root
     width: 370
-    height: 710
+    height: 910
     visible: true
     color: "#1B0623"
 
@@ -123,6 +123,57 @@ Window {
         }
     }
 
+    // Git Branch Map: the scrollbar's declarative parent is the inset
+    // wrapper, but its geometry owner is the outer bordered graph frame.
+    Rectangle {
+        id: graphFrame
+        objectName: "graphFrame"
+        x: 14; y: 671; width: 320; height: 190
+        color: "#16051F"
+
+        Item {
+            id: graphInset
+            objectName: "graphInset"
+            anchors.fill: parent
+            anchors.margins: 10
+
+            Item {
+                id: graphHeader
+                width: parent.width; height: 28
+            }
+            Flickable {
+                id: graphPane
+                objectName: "graphPane"
+                anchors {
+                    top: graphHeader.bottom
+                    topMargin: 4
+                    left: parent.left
+                    right: parent.right
+                    bottom: parent.bottom
+                }
+                contentWidth: width; contentHeight: 450
+                boundsBehavior: Flickable.StopAtBounds
+            }
+            Shared.NeonScrollBar {
+                id: graphRail
+                objectName: "graphRail"
+                flickable: graphPane
+                handleStyle: "star"
+                mountingParent: graphFrame
+                geometryHost: graphFrame
+            }
+        }
+    }
+
+    readonly property bool graphUsesOuterFrame: graphRail.geometryHost === graphFrame
+    // mapToItem() does not report geometry dependencies to QML's binding
+    // tracker; express the two possible declarative-parent offsets directly.
+    readonly property real graphRailFrameX: graphRail.x
+        + (graphRail.parent === graphInset ? graphInset.x : 0)
+    readonly property real graphRailFrameY: graphRail.y
+        + (graphRail.parent === graphInset ? graphInset.y : 0)
+    readonly property bool graphParentIsInset: graphRail.parent === graphInset
+    readonly property bool graphParentIsFrame: graphRail.parent === graphFrame
     readonly property bool mountedOnHost: positionerBar.parent === positionedHost
     readonly property bool columnKeptOneItem: positioner.children.length === 1
 

@@ -40,9 +40,14 @@ positioner = root.findChild(QObject, "positioner")
 section_bar = root.findChild(QObject, "sectionBar")
 section_pane = root.findChild(QObject, "sectionPane")
 section_host = root.findChild(QObject, "sectionHost")
+graph_rail = root.findChild(QObject, "graphRail")
+graph_pane = root.findChild(QObject, "graphPane")
+graph_frame = root.findChild(QObject, "graphFrame")
+graph_inset = root.findChild(QObject, "graphInset")
 if any(obj is None for obj in (bar, inner, outer, horizontal_bar, horizontal_pane,
                                positioner_bar, positioner_pane, positioned_host, positioner,
-                               section_bar, section_pane, section_host)):
+                               section_bar, section_pane, section_host,
+                               graph_rail, graph_pane, graph_frame, graph_inset)):
     raise AssertionError("QML harness did not expose the three target objects")
 
 def near(value, expected, label):
@@ -146,6 +151,23 @@ try:
     assert section_bar.setProperty("geometryMode", "box")
     app.processEvents()
     near(section_bar.property("y"), 35, "restored box alignment")
+
+    # Git Branch Map reproduces a 10px inset wrapper with an explicit outer
+    # frame geometryHost. The scrollbar fills the frame's side, not the inner
+    # viewport or inset wrapper, and stays inside its top/bottom borders.
+    assert root.property("graphParentIsFrame") is True, (
+        "Graph scrollbar must mount on the same outer frame it measures"
+    )
+    assert root.property("graphParentIsInset") is False
+    assert graph_rail.property("boxSideGeometry") is True
+    assert root.property("graphUsesOuterFrame") is True, "graph scrollbar must use outer frame"
+    near(graph_rail.property("width"), 16, "graph star rail width")
+    near(root.property("graphRailFrameX"), 320 - 16 - 4, "graph rail x in outer frame")
+    near(root.property("graphRailFrameY"), 2, "graph rail top in outer frame")
+    near(graph_rail.property("height"), 190 - 4, "graph full frame side track")
+    near(graph_pane.property("y"), 28 + 4, "graph content stays below header")
+    # Normal viewport compatibility is tested by section_bar above. This
+    # remounted graph-specific test guards only its intended box-side mode.
 
     # Preserve legacy per-layer inactive fading unless explicitly requested.
     assert bar.setProperty("autoHide", False)

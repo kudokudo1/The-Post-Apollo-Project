@@ -149,6 +149,7 @@ Item {
             spacing: 8
 
             Rectangle {
+                id: operationListFrame
                 width: Math.floor(parent.width * 0.46)
                 height: parent.height
                 color: Colors.dark
@@ -256,10 +257,11 @@ Item {
                     id: operationScrollTrack
                     flickable: operationList
                     handleStyle: "star"
-                    // Mount against the surrounding panel, *after* the card
-                    // viewport. This keeps the reserved lane actually usable.
-                    x: parent.width - width - 6
-                    y: operationList.y + effectiveTopInset
+                    // Follow the operation-list frame, not the inset card pane.
+                    // A stale y override used to push the full-height rail
+                    // past this frame's bottom edge.
+                    geometryHost: operationListFrame
+                    rightInset: 6
                     z: 2
                     visible: operationList.visible && scrollable
                 }

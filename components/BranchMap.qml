@@ -140,6 +140,9 @@ Rectangle {
 
             Row {
                 anchors.right: parent.right
+                // The full-height rail passes beside the header; keep
+                // the counts/labels out of its dedicated right-edge lane.
+                anchors.rightMargin: topologyScrollTrack.reservedExtent + 4
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 4
 
@@ -369,7 +372,11 @@ Rectangle {
                             id: metadataRow
 
                             x: topologyBody.laneAreaWidth
-                            width: parent.width - x - 6
+                            width: Math.max(
+                                0,
+                                parent.width - x - 6
+                                - topologyScrollTrack.reservedExtent
+                            )
                             height: parent.height
                             anchors.verticalCenter: parent.verticalCenter
                             spacing: 4
@@ -551,8 +558,14 @@ Rectangle {
     }
 
     NeonScrollBar {
+        id: topologyScrollTrack
         flickable: topologyFlick
         handleStyle: "star"
+        // Mount and measure against the *same* outer graph frame.
+        // Otherwise the 10px inset wrapper shifts the actual rail away
+        // from its box-side geometry (even when geometryHost is correct).
+        mountingParent: branchMap
+        geometryHost: branchMap
         visible: topologyFlick.visible && scrollable
     }
 }

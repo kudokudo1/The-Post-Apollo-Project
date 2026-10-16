@@ -561,8 +561,10 @@ Rectangle {
         id: topologyScrollTrack
         flickable: topologyFlick
         handleStyle: "star"
-        // The default parent is the inset content wrapper; the actual
-        // scroll-track box is the outer repository graph frame.
+        // Mount and measure against the *same* outer graph frame.
+        // Otherwise the 10px inset wrapper shifts the actual rail away
+        // from its box-side geometry (even when geometryHost is correct).
+        mountingParent: branchMap
         geometryHost: branchMap
         visible: topologyFlick.visible && scrollable
     }

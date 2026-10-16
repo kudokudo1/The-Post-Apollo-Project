@@ -159,6 +159,7 @@ Window {
                 objectName: "graphRail"
                 flickable: graphPane
                 handleStyle: "star"
+                mountingParent: graphFrame
                 geometryHost: graphFrame
             }
         }

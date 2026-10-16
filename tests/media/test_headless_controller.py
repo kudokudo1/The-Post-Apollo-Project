@@ -166,6 +166,20 @@ class HiFiControllerTests(unittest.TestCase):
         self.assertEqual(response["error"]["code"], "PLAYBACK_CHANGED_EXTERNALLY")
         self.assertFalse(any(c[0] == "pause" for c in self.mpd.calls))
 
+    def test_queue_remove_rejects_unowned_current_song(self):
+        self.mpd.queue_items = [{"id": "900", "uri": "music/two.ogg"}]
+        self.mpd.playing_id = "900"
+        self.mpd.status = "play"
+        response = self.c.request({"version": 1, "op": "queue_remove",
+                                   "args": {"queueId": "900"}})
+        self.assertFalse(response["ok"])
+        self.assertEqual(response["error"]["code"], "ACTIVE_TRACK")
+        self.assertFalse(any(c[0] == "deleteid" for c in self.mpd.calls))
+
+    def test_direct_dispatch_without_arguments(self):
+        self.assertEqual(self.c.dispatch("queue"), {"items": []})
+        self.assertEqual(self.c.dispatch("sources")["sources"][0]["id"], "local-mpd")
+
     def test_no_loaded_media_rejects_play(self):
         response = self.c.request({"version": 1, "op": "play"})
         self.assertEqual(response["error"]["code"], "NO_LOADED_MEDIA")

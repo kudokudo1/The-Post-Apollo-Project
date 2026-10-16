@@ -6,6 +6,7 @@ import qs.components as Components
 // Archive is separate from red Remove. Preserve two-step arming in caller.
 Item {
     id: root
+    height: 26 // Table default; Board (20) and Roadmap (24) override.
 
     property bool enabledAction: true
     property bool armed: false

@@ -39,7 +39,7 @@ class MediaController:
         try:
             self.intent_store.save(self.selection, self.loaded)
             self.persistence_error = None
-        except (OSError, ValueError, PermissionError):
+        except (OSError, ValueError, PermissionError, UnicodeError):
             # The MPD mutation may already have happened; never falsely report
             # playback failure just because a subsequent state save failed.
             self.persistence_error = "STATE_SAVE_FAILED"
@@ -47,7 +47,7 @@ class MediaController:
     def _restore_intent(self) -> None:
         try:
             saved = self.intent_store.load()
-        except (OSError, ValueError, PermissionError):
+        except (OSError, ValueError, PermissionError, UnicodeError):
             self.persistence_error = "STATE_LOAD_FAILED"
             return
         self.selection = saved.get("selection")

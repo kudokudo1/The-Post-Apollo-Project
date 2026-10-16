@@ -530,7 +530,7 @@ Scope {
                 'if [ -s "$rows_file" ]; then pulls="$(jq -s "." "$rows_file")"; fi',
                 'if [ -s "$states_file" ]; then repos="$(jq -s "." "$states_file")"; fi',
                 'jq -nc --arg viewerLogin "$viewer" --argjson pullRequests "$pulls" --argjson repositories "$repos" \'{viewerLogin:$viewerLogin,pullRequests:$pullRequests,repositories:$repositories}\''
-            ].join("\\n"),
+            ].join("\n"),
             "pa-github-attention",
             String(
                 Math.max(

@@ -22,7 +22,7 @@ assert 'telemetry: sharedSystemTelemetry' in shell
 assert 'CpuPlusThermalNotificationProducer 1.0 CpuPlusThermalNotificationProducer.qml' in QM.read_text()
 assert 'SystemTelemetry {' in shell
 assert 'id: sharedSystemTelemetry' in shell
-assert '"tempC"' in system and '\\"highC\\"' in system and '\\"critC\\"' in system
+assert '\\"tempC\\"' in system and '\\"highC\\"' in system and '\\"critC\\"' in system
 assert 'signal refreshed()' in system
 assert 'interval: 1900' in cpu
 assert 'cpuPlusWindow.menuOpen' in cpu

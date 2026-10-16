@@ -252,6 +252,11 @@ PanelWindow {
         spaceService: spaceService
     }
 
+    // Storm transitions from the SAME NOAA Kp observations, not new polling.
+    SolarStormNotificationProducer {
+        spaceService: spaceService
+    }
+
     // One session-wide hardware state. AppControl and CPU++ consume these
     // same instances instead of starting independent telemetry/control stacks.
     SystemTelemetry {

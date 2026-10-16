@@ -53,7 +53,7 @@ NeonScrollBar {
 
 **Content reservation stays with the host.** This change does not resize a Flickable, claim a new pointer hit area, or move the 10/16 px physical bar width. Host layouts must still reserve `reservedExtent` (plus chosen breathing room) next to their content. Custom rails, overlapping siblings, scrollable outer containers, and decorative extensions need live validation.
 
-For a pane whose scrollable viewport already accounts for endpoint clearance, configure **`viewportHasEndpointClearance: true`**. The scrollbar then does not insert duplicate insets, while preserving the **5px top/bottom defaults** (and horizontal **5px start/end defaults**) for panes without external endpoint clearance. Individual `topInset`, `bottomInset`, `leftInset`, and `rightEndInset` remain available for dedicated geometry.
+For a pane using **`geometryMode: "viewport"`** whose scrollable viewport already accounts for endpoint clearance, configure **`viewportHasEndpointClearance: true`**. The scrollbar then does not insert duplicate insets, while preserving the **5px top/bottom defaults** (and horizontal **5px start/end defaults**) for panes without external endpoint clearance. Individual `topInset`, `bottomInset`, `leftInset`, and `rightEndInset` remain available for dedicated geometry.
 
 ## Content clearance is a host layout responsibility
 

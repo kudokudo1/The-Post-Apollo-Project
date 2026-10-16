@@ -262,6 +262,11 @@ PanelWindow {
         }
     }
 
+    // Hardware-limit warnings reuse CPU++ / AppControl's existing samples.
+    CpuPlusThermalNotificationProducer {
+        telemetry: sharedSystemTelemetry
+    }
+
     FanControl {
         id: sharedFanControl
 

@@ -80,27 +80,72 @@ for needle in (
 ):
     assert needle in local, needle
 
-# Local CONTROL action identity must persist through hover/selection in the
-# foreground and all three independent glow planes. Selection fill/border
-# remain their own state semantics.
-for needle in (
-    "property color actionAccentColor: Colors.cyan",
-    ": blueAccent ? Colors.blue : actionAccentColor",
-    "idleForegroundColor: semanticAccent",
-    "hoverForegroundColor: semanticAccent",
-    "selectedForegroundColor: semanticAccent",
-    "keyboardSelectedForegroundColor: semanticAccent",
-    "idleBorderColor: semanticAccent",
-    "hoverBorderColor: semanticAccent",
-    "hoverFillColor: Colors.yellow",
-    "selectedFillColor: Colors.yellow",
-    "pressedForegroundColor: Colors.black",
+# Local CONTROL identities are *idle* colors only. Interaction follows the
+# shared ActionButton state precedence instead of freezing action colors across
+# hover/selection/press. Sampled text glow follows the visible foreground:
+# selected/keyboard-selected magenta characters require magenta text glow.
+assert "property color actionAccentColor: Colors.cyan" in pilot
+assert ": blueAccent ? Colors.blue : actionAccentColor" in pilot
+
+idle = {
+    "idleForegroundColor": "semanticAccent",
+    "idleBorderColor": "semanticAccent",
+    "idleContentGlowColor": "semanticAccent",
+    "idleSoftGlowColor": "semanticAccent",
+    "idleWideGlowColor": "semanticAccent",
+}
+for key, value in idle.items():
+    assert f"{key}: {value}" in pilot, f"{key} lost its idle identity"
+
+interaction = {
+    "hoverFillColor": "Colors.yellow",
+    "selectedFillColor": "Colors.yellow",
+    "keyboardSelectedFillColor": "Colors.yellow",
+    "pressedFillColor": "redAccent ? Colors.red : Colors.magenta",
+    "hoverForegroundColor": "Colors.orange",
+    "selectedForegroundColor": "Colors.magenta",
+    "keyboardSelectedForegroundColor": "Colors.magenta",
+    "pressedForegroundColor": "Colors.black",
+    "hoverBorderColor": "Colors.orange",
+    "selectedBorderColor": "Colors.magenta",
+    "keyboardSelectedBorderColor": "Colors.orange",
+    "hoverContentGlowColor": "Colors.orange",
+    "selectedContentGlowColor": "Colors.magenta",
+    "keyboardSelectedContentGlowColor": "Colors.magenta",
+    "pressedContentGlowColor": "Colors.magenta",
+    "hoverSoftGlowColor": "Colors.orange",
+    "selectedSoftGlowColor": "Colors.magenta",
+    "keyboardSelectedSoftGlowColor": "Colors.orange",
+    "pressedSoftGlowColor": "redAccent ? Colors.red : Colors.magenta",
+    "hoverWideGlowColor": "Colors.orange",
+    "selectedWideGlowColor": "Colors.magenta",
+    "keyboardSelectedWideGlowColor": "Colors.orange",
+    "pressedWideGlowColor": "redAccent ? Colors.red : Colors.magenta",
+}
+for key, value in interaction.items():
+    needle = f"{key}: {value}"
+    assert needle in pilot, f"Git action state must follow default: {needle}"
+
+for key in (
+    "hoverFillColor", "selectedFillColor", "hoverForegroundColor",
+    "selectedForegroundColor", "pressedForegroundColor", "hoverBorderColor",
+    "selectedBorderColor", "keyboardSelectedBorderColor",
 ):
-    assert needle in pilot, f"Git action color/fill contract: {needle}"
-for plane in ("ContentGlow", "SoftGlow", "WideGlow"):
-    for state in ("idle", "hover", "selected", "keyboardSelected", "pressed"):
-        needle = f"{state}{plane}Color: semanticAccent"
-        assert needle in pilot, f"Git action glow contract: {needle}"
+    assert interaction[key] in SHARED, (
+        f"Unexpected shared ActionButton state contract for {key}"
+    )
+
+# State precedence and external ownership stay in the shared component.
+for token in (
+    "readonly property color fillColor:",
+    "readonly property color foregroundColor:",
+    "readonly property color contentGlowColor:",
+    "pressed",
+    "keyboardSelected",
+    "selected",
+    "hovered",
+):
+    assert token in SHARED, f"Missing shared state machinery: {token}"
 
 # Each action owns its identity. The remote-only CLONE retains its existing
 # blue exception; the local PULL and even disabled PUSH use magenta.

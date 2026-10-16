@@ -155,16 +155,10 @@ try:
     # Git Branch Map reproduces a 10px inset wrapper with an explicit outer
     # frame geometryHost. The scrollbar fills the frame's side, not the inner
     # viewport or inset wrapper, and stays inside its top/bottom borders.
-    print("GRAPH FRAME DIAGNOSTIC:", {
-        "parentInset": root.property("graphParentIsInset"),
-        "parentFrame": root.property("graphParentIsFrame"),
-        "localX": graph_rail.property("x"),
-        "localY": graph_rail.property("y"),
-        "frameX": root.property("graphRailFrameX"),
-        "frameY": root.property("graphRailFrameY"),
-        "insetX": graph_inset.property("x"),
-        "insetY": graph_inset.property("y"),
-    }, flush=True)
+    assert root.property("graphParentIsFrame") is True, (
+        "Graph scrollbar must mount on the same outer frame it measures"
+    )
+    assert root.property("graphParentIsInset") is False
     assert graph_rail.property("boxSideGeometry") is True
     assert root.property("graphUsesOuterFrame") is True, "graph scrollbar must use outer frame"
     near(graph_rail.property("width"), 16, "graph star rail width")

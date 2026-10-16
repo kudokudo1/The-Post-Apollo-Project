@@ -83,7 +83,8 @@ assert re.search(
 ), "Hospital Rounds room cards overlap the scrollbar's reserved lane"
 assert re.search(
     r"NeonScrollBar\s*\{\s*id: roomBoardScrollbar\s+"
-    r"flickable: roomBoard\s+handleStyle: \"star\"",
+    r"flickable: roomBoard\s+handleStyle: \"star\"\s+" 
+    r"(?:\/\/[^\n]*\n\s*)?rightInset:\s*2",
     rounds,
 ), "Hospital Rounds must bind the reserved lane to its star scrollbar"
 

@@ -35,7 +35,7 @@ assert '"category": "internal"' in producer
 assert 'critical ? "critical" : "warning"' in producer
 assert '"eventType": "hardware-thermal-limit"' in producer
 assert '"sensorLabels": raised.map(' in producer
-assert '"sourceText === "cpu++"' in HUB.read_text()
+assert 'sourceText === "cpu++"' in HUB.read_text()
 assert 'function pushRich(notification)' in BASE.read_text()
 assert 'raised.sort(' in producer, "Coalesce multiple sensor events into a single batch"
 for forbidden in ["Process {", "Timer {", "telemetry.refresh(", "Quickshell.execDetached",

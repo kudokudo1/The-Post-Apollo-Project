@@ -37,8 +37,12 @@ positioner_bar = root.findChild(QObject, "positionerBar")
 positioner_pane = root.findChild(QObject, "positionerPane")
 positioned_host = root.findChild(QObject, "positionedHost")
 positioner = root.findChild(QObject, "positioner")
+section_bar = root.findChild(QObject, "sectionBar")
+section_pane = root.findChild(QObject, "sectionPane")
+section_host = root.findChild(QObject, "sectionHost")
 if any(obj is None for obj in (bar, inner, outer, horizontal_bar, horizontal_pane,
-                               positioner_bar, positioner_pane, positioned_host, positioner)):
+                               positioner_bar, positioner_pane, positioned_host, positioner,
+                               section_bar, section_pane, section_host)):
     raise AssertionError("QML harness did not expose the three target objects")
 
 def near(value, expected, label):
@@ -48,6 +52,10 @@ def near(value, expected, label):
 try:
     assert bar.property("nestedScrollMode") == "contain"
     assert bar.property("nestedPaneDetected") is True, "nested hierarchy was not detected"
+    assert bar.property("hostIsScrollingContent") is True
+    assert bar.property("boxSideGeometry") is False, (
+        "Do not stretch a nested list's rail over its parent Flickable content"
+    )
     assert bar.property("scrollChaining") is False
     assert bar.property("captureNestedPaneWheel") is True
     assert bar.property("horizontal") is False
@@ -114,11 +122,30 @@ try:
     # Verify a declaratively nested indicator actually escapes the Column.
     assert root.property("mountedOnHost") is True, "scrollbar was not reparented to the layout host"
     near(positioner_bar.property("width"), 16, "star overlay width")
-    near(positioner_bar.property("x"), 7 + 260 - 16 - 4, "mounted overlay x")
-    near(positioner_bar.property("y"), 11 + 5, "mounted overlay y")
+    assert positioner_bar.property("boxSideGeometry") is True
+    near(positioner_bar.property("x"), 320 - 16 - 4, "mounted box-edge x")
+    near(positioner_bar.property("y"), 2, "mounted box-edge y")
+    near(positioner_bar.property("height"), 78 - 4, "mounted box-edge height")
     assert root.property("columnKeptOneItem") is True, (
         "Scrollbar should not become an extra row in the Column"
     )
+
+    # Default box-side track follows its enclosing section, not the inset
+    # viewport. Direct header/footer siblings bound the actually usable side.
+    assert section_bar.property("boxSideGeometry") is True
+    near(section_bar.property("x"), 320 - 16 - 4, "section box-edge x")
+    near(section_bar.property("y"), 27 + 6 + 2, "section after-header y")
+    near(section_bar.property("height"), (151 - 2) - (33 + 2),
+         "section track extends to footer")
+    near(section_pane.property("y"), 46, "content pane stays put")
+    # Legacy viewport alignment remains explicit and fully reversible.
+    assert section_bar.setProperty("geometryMode", "viewport")
+    app.processEvents()
+    near(section_bar.property("y"), 46 + 5, "viewport override y")
+    near(section_bar.property("height"), 93 - 10, "viewport override height")
+    assert section_bar.setProperty("geometryMode", "box")
+    app.processEvents()
+    near(section_bar.property("y"), 35, "restored box alignment")
 
     # Preserve legacy per-layer inactive fading unless explicitly requested.
     assert bar.setProperty("autoHide", False)

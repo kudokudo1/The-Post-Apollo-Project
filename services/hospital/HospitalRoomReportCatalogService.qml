@@ -27,6 +27,8 @@ Scope {
 
         const script = [
             'set -uo pipefail',
+            'limit_rooms="$1"',
+            'limit_reports="$2"',
             'px="$HOME/.local/share/post-apollo-dev-runtime/bin/px"',
             '[ -x "$px" ] || px="$HOME/.local/bin/px"',
             'if [ ! -x "$px" ]; then echo "PX NOT INSTALLED" >&2; exit 20; fi',
@@ -46,7 +48,7 @@ Scope {
             '  if [ -z "$id" ]; then continue; fi',
             '  scanned=$((scanned + 1))',
             '  if ! "$px" hospital room-reports "$id" --limit "$limit_reports" --json > "$tmpdir/current.json" 2>"$tmpdir/error"; then failed=$((failed + 1)); continue; fi',
-            '  if ! jq -ce --arg roomId "$id" --arg team "$team" \'.[] | {id:(.id // ""),roomId:(.roomId // $roomId),team:$team,kind:(.kind // "DOCTOR_NOTE"),title:(.title // ""),body:((.body // "")[0:6000]),bodyTruncated:((.body // "" | length)>6000),repository:(.repository // ""),branch:(.branch // ""),headSha:(.headSha // ""),doctorId:(.doctorId // ""),createdAt:(.createdAt // "")}\' "$tmpdir/current.json" >> "$tmpdir/reports.ndjson"; then failed=$((failed + 1)); fi',
+            '  if ! jq -c --arg roomId "$id" --arg team "$team" \'.[] | {id:(.id // ""),roomId:(.roomId // $roomId),team:$team,kind:(.kind // "DOCTOR_NOTE"),title:(.title // ""),body:((.body // "")[0:6000]),bodyTruncated:((.body // "" | length)>6000),repository:(.repository // ""),branch:(.branch // ""),headSha:(.headSha // ""),doctorId:(.doctorId // ""),createdAt:(.createdAt // "")}\' "$tmpdir/current.json" >> "$tmpdir/reports.ndjson"; then failed=$((failed + 1)); fi',
             'done < <(jq -c ".[]" "$tmpdir/rooms.json")',
             'jq -sc --argjson total "$total" --argjson scanned "$scanned" --argjson failed "$failed" \'{totalRooms:$total,scannedRooms:$scanned,failedRooms:$failed,reports:(sort_by(.createdAt)|reverse|.[0:150])}\' "$tmpdir/reports.ndjson"'
         ].join("\n");

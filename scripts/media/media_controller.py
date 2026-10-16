@@ -103,6 +103,8 @@ class MediaController:
         }
 
     def dispatch(self, op: str, args: dict[str, Any] | None = None) -> dict[str, Any]:
+        if args is None:
+            args = {}
         if not isinstance(op, str) or not isinstance(args, dict):
             raise MediaBackendError("INVALID_REQUEST", "Expected operation and arguments object")
 
@@ -174,8 +176,10 @@ class MediaController:
             queue_id = args.get("queueId")
             if not isinstance(queue_id, str) or not queue_id.isdecimal():
                 raise MediaBackendError("INVALID_ARGUMENT", "Valid queueId string required")
-            if queue_id == self.owned_active_id:
-                raise MediaBackendError("ACTIVE_TRACK", "Stop before removing the playing track")
+            current = self.backends["mpd"].observe().get("current")
+            active_id = str(current["queueId"]) if current and current.get("queueId") else None
+            if queue_id == active_id:
+                raise MediaBackendError("ACTIVE_TRACK", "Cannot remove the current MPD track")
             self.backends["mpd"].remove(queue_id)
             if self.loaded and queue_id == self.loaded["queueId"]:
                 self.loaded = None

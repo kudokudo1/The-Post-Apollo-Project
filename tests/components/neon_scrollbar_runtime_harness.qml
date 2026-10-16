@@ -165,8 +165,12 @@ Window {
     }
 
     readonly property bool graphUsesOuterFrame: graphRail.geometryHost === graphFrame
-    readonly property real graphRailFrameX: graphRail.mapToItem(graphFrame, 0, 0).x
-    readonly property real graphRailFrameY: graphRail.mapToItem(graphFrame, 0, 0).y
+    // mapToItem() does not report geometry dependencies to QML's binding
+    // tracker; express the two possible declarative-parent offsets directly.
+    readonly property real graphRailFrameX: graphRail.x
+        + (graphRail.parent === graphInset ? graphInset.x : 0)
+    readonly property real graphRailFrameY: graphRail.y
+        + (graphRail.parent === graphInset ? graphInset.y : 0)
     readonly property bool graphParentIsInset: graphRail.parent === graphInset
     readonly property bool graphParentIsFrame: graphRail.parent === graphFrame
     readonly property bool mountedOnHost: positionerBar.parent === positionedHost

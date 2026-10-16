@@ -163,7 +163,7 @@ Item {
             idleForegroundColor: editCell.value ? Colors.white : Colors.magenta
             hoverForegroundColor: Colors.magenta
             idleBorderColor: editCell.accent
-            hoverBorderColor: Colors.orange
+            hoverBorderColor: editCell.accent
             accentColor: editCell.accent
             contentGlowEnabled: false
             softGlowEnabled: false
@@ -303,18 +303,21 @@ Item {
                             width: root.statusWidth
                             value: "STATUS"
                             header: true
+                            accent: Colors.yellow
                         }
 
                         Cell {
                             width: root.priorityWidth
                             value: "PRIORITY"
                             header: true
+                            accent: Colors.magenta
                         }
 
                         Cell {
                             width: root.iterationWidth
                             value: "ITERATION"
                             header: true
+                            accent: Colors.orange
                         }
 
                         Cell {
@@ -386,7 +389,7 @@ Item {
 
                             EditableCell {
                                 width: root.statusWidth
-                                accent: Colors.magenta
+                                accent: Colors.yellow
                                 value:
                                     root.projectService.itemStatus(
                                         tableRow.modelData
@@ -396,7 +399,7 @@ Item {
 
                             EditableCell {
                                 width: root.priorityWidth
-                                accent: Colors.orange
+                                accent: Colors.magenta
                                 value:
                                     root.projectService.itemPriority(
                                         tableRow.modelData
@@ -406,7 +409,7 @@ Item {
 
                             EditableCell {
                                 width: root.iterationWidth
-                                accent: Colors.magenta
+                                accent: Colors.orange
                                 value:
                                     root.projectService.itemIteration(
                                         tableRow.modelData
@@ -458,15 +461,9 @@ Item {
                                             )
                                     }
 
-                                    ItemAction {
+                                    GitHubProjectsArchiveButton {
                                         width: 76
-                                        label:
-                                            root.itemActionArmed(
-                                                "archive",
-                                                tableRow.modelData
-                                            )
-                                            ? "CONFIRM"
-                                            : "ARCHIVE"
+                                        armed: root.itemActionArmed("archive", tableRow.modelData)
                                         enabledAction:
                                             !root.projectService.busy
                                             && !!root.projectService.itemId(

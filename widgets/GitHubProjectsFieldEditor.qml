@@ -24,6 +24,11 @@ Item {
         fieldKind === "title" ? "DRAFT TITLE"
         : String(projectService.editableFieldName(fieldKind) || fieldKind).toUpperCase()
     readonly property var choices: projectService.editableChoices(fieldKind)
+    readonly property color optionAccent:
+        fieldKind === "status" ? Colors.yellow
+        : fieldKind === "priority" ? Colors.magenta
+        : fieldKind === "iteration" ? Colors.orange
+        : Colors.cyan
     readonly property bool knownField: fieldKind === "title" || !!projectService.editableField(fieldKind)
     readonly property bool canSetup:
         !knownField && ["status", "priority", "start", "target"].indexOf(fieldKind) >= 0
@@ -217,7 +222,9 @@ Item {
 
             Column {
                 id: choiceColumn
-                width: Math.max(0, choiceScroll.width - 20)
+                // Each option uses the entire popup width. Wheel/touch
+                // scrolling still works if the menu contains more choices.
+                width: choiceScroll.width
                 spacing: 4
 
                 Repeater {
@@ -228,9 +235,20 @@ Item {
                         height: 30
                         label: String(modelData.label || "")
                         labelPixelSize: 11
-                        accentColor: Colors.cyan
+                        accentColor: root.optionAccent
                         idleForegroundColor: Colors.magenta
-                        idleBorderColor: Colors.cyan
+                        hoverForegroundColor: Colors.magenta
+                        pressedForegroundColor: Colors.magenta
+                        selectedForegroundColor: Colors.magenta
+                        idleBorderColor: root.optionAccent
+                        hoverBorderColor: root.optionAccent
+                        pressedBorderColor: root.optionAccent
+                        selectedBorderColor: root.optionAccent
+                        selectedBorderWidth: 2
+                        idleFillColor: Colors.black
+                        hoverFillColor: Colors.black
+                        pressedFillColor: Colors.black
+                        selectedFillColor: Colors.black
                         selected: root.projectService.editableValue(
                             root.targetItem, root.fieldKind
                         ) === String(modelData.label || "")
@@ -240,13 +258,17 @@ Item {
                 }
             }
 
+            // Retain the scrollbar contract, but this compact choice menu
+            // intentionally has NO visible star, interactive rail or gutter.
+            // Flickable still receives normal wheel/trackpad/touch scrolling.
             NeonScrollBar {
                 flickable: choiceScroll
                 handleStyle: "star"
                 mountingParent: panel
-                x: choiceScroll.x + choiceScroll.width - width - rightInset
-                y: choiceScroll.y + effectiveTopInset
-                visible: choiceScroll.visible && scrollable
+                reserveSpace: false
+                visible: false
+                interactive: false
+                wheelEnabled: false
             }
         }
 

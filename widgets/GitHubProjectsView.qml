@@ -885,16 +885,10 @@ Item {
                                                                 )
                                                         }
 
-                                                        ActionButton {
+                                                        GitHubProjectsArchiveButton {
                                                             width: 70
                                                             height: 20
-                                                            label:
-                                                                root.itemActionArmed(
-                                                                    "archive",
-                                                                    itemCard.modelData
-                                                                )
-                                                                ? "CONFIRM"
-                                                                : "ARCHIVE"
+                                                            armed: root.itemActionArmed("archive", itemCard.modelData)
                                                             enabledAction:
                                                                 !root.projectService.busy
                                                                 && !!root.projectService.itemId(

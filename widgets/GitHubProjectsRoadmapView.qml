@@ -403,16 +403,11 @@ Item {
                                             )
                                     }
 
-                                    RoadAction {
+                                    GitHubProjectsArchiveButton {
                                         width: 65
+                                        height: 24
                                         anchors.verticalCenter: parent.verticalCenter
-                                        label:
-                                            root.itemActionArmed(
-                                                "archive",
-                                                roadRow.modelData
-                                            )
-                                            ? "CONFIRM"
-                                            : "ARCHIVE"
+                                        armed: root.itemActionArmed("archive", roadRow.modelData)
                                         enabledAction:
                                             !root.projectService.busy
                                             && !!root.projectService.itemId(
@@ -562,16 +557,11 @@ Item {
                                             )
                                     }
 
-                                    RoadAction {
+                                    GitHubProjectsArchiveButton {
                                         width: 76
+                                        height: 24
                                         anchors.verticalCenter: parent.verticalCenter
-                                        label:
-                                            root.itemActionArmed(
-                                                "archive",
-                                                unscheduledRow.modelData
-                                            )
-                                            ? "CONFIRM"
-                                            : "ARCHIVE"
+                                        armed: root.itemActionArmed("archive", unscheduledRow.modelData)
                                         enabledAction:
                                             !root.projectService.busy
                                             && !!root.projectService.itemId(

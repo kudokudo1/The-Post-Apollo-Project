@@ -50,6 +50,9 @@ jobs:
       - name: Validate CPU++ hardware thermal notifications
         run: python3 tests/notifications/test_cpu_plus_thermal_producer.py
 
+      - name: Validate CPU++ hwmon fan-health notifications
+        run: python3 tests/notifications/test_cpu_plus_fan_health_producer.py
+
       - name: Validate origin/domain/severity classification
         run: python3 tests/notifications/test_notification_facets.py
 

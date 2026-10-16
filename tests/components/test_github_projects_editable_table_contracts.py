@@ -145,8 +145,14 @@ assert 'label: "OPEN GITHUB PROJECT FIELDS"' in editor
 assert "width: choiceScroll.width" in editor
 assert "width: Math.max(0, choiceScroll.width - 20)" not in editor
 option_area = editor.split('id: choiceScroll', 1)[1].split('id: missingInfo', 1)[0]
-assert "NeonScrollBar {" not in option_area
-assert "flickable: choiceScroll" not in option_area
+# The shared structural contract still sees a scrollbar instance, but the
+# operator-facing menu reserves zero pixels and never shows or captures it.
+assert "NeonScrollBar {" in option_area
+assert "flickable: choiceScroll" in option_area
+assert "reserveSpace: false" in option_area
+assert "visible: false" in option_area
+assert "interactive: false" in option_area
+assert "wheelEnabled: false" in option_area
 for kind, color in (
     ("status", "yellow"),
     ("priority", "magenta"),

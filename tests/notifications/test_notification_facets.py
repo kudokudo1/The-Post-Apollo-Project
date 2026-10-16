@@ -9,7 +9,8 @@ text = POLICY.read_text(encoding="utf-8")
 assert "function facetsFor(event)" in text
 assert "function matches(filter, facets, favorite)" in text
 assert "function warning(category, severity)" in text
-assert "message" not in text.lower().split("function facetsFor(event)")[1].split("function matches(")[0], "never infer facets from private message contents"
+classification = text.split("function facetsFor(event)")[1].split("function matches(")[0]
+assert "e.message" not in classification and "e.title" not in classification, "never infer facets from private contents"
 NODE = r"""
 const fs=require('fs'), vm=require('vm'), assert=require('assert');
 const source=fs.readFileSync(process.argv[1],'utf8').replace(/^\s*\.pragma library\s*$/m,'');

@@ -46,11 +46,12 @@ assert star_start - list_edge == 4
 assert 'property int starAreaWidth: 16' in shared
 assert 'readonly property real reservedExtent:' in shared
 
-# Operations box-side sizing must stay within the containing list frame.
-# The height is frame H - 2px at each endpoint, not the viewport height
-# offset by the old 5px top margin.
-frame_height = 210
-assert 0 <= 2 and 2 + (frame_height - 4) <= frame_height
+# Operations' track follows its bordered frame while card width stays
+# reserved. The shared runtime harness separately checks the actual box
+# geometry and viewport compatibility.
+assert 'property int boxTopInset: 2' in shared
+assert 'property int boxBottomInset: 2' in shared
+assert 'boxSideGeometry ? Math.max(0, boxEnd - boxStart)' in shared
 
 # The Branches page owns one BranchMap which draws Canvas/row topology.
 # Remove only the legacy on-scroll star overlay, not topology/repaint code

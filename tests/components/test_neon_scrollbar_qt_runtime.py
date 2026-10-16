@@ -158,16 +158,17 @@ try:
     assert graph_rail.property("boxSideGeometry") is True
     assert root.property("graphUsesOuterFrame") is True, "graph scrollbar must use outer frame"
     near(graph_rail.property("width"), 16, "graph star rail width")
-    near(graph_rail.property("x"), 320 - 16 - 4 - 10, "graph frame-side x in inset coordinates")
-    near(graph_rail.property("y"), 2 - 10, "graph frame top in inset coordinates")
+    near(root.property("graphRailFrameX"), 320 - 16 - 4, "graph rail x in outer frame")
+    near(root.property("graphRailFrameY"), 2, "graph rail top in outer frame")
     near(graph_rail.property("height"), 190 - 4, "graph full frame side track")
     near(graph_pane.property("y"), 28 + 4, "graph content stays below header")
     assert graph_rail.setProperty("geometryMode", "viewport")
     app.processEvents()
-    near(graph_rail.property("y"), 28 + 4 + 5, "graph viewport-compatible top")
+    near(root.property("graphRailFrameY"), 10 + 28 + 4 + 5,
+         "graph viewport-compatible top in outer frame")
     assert graph_rail.setProperty("geometryMode", "box")
     app.processEvents()
-    near(graph_rail.property("y"), -8, "graph restored box-side top")
+    near(root.property("graphRailFrameY"), 2, "graph restored box-side top")
 
     # Preserve legacy per-layer inactive fading unless explicitly requested.
     assert bar.setProperty("autoHide", False)

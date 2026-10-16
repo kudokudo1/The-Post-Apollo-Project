@@ -52,7 +52,7 @@ with tempfile.TemporaryDirectory(prefix="hospital-reports-test-") as tmp:
     px.chmod(0o755)
     env = dict(os.environ, HOME=str(home))
     result = subprocess.run(
-        ["bash", "-c", cmd, "hospital-report-catalog", "10", "10"],
+        ["bash", "-lc", cmd, "hospital-report-catalog", "10", "10"],
         env=env, capture_output=True, text=True, timeout=30
     )
     assert result.returncode == 0, (result.stderr, result.stdout)

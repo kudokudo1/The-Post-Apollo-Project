@@ -272,6 +272,11 @@ PanelWindow {
         telemetry: sharedSystemTelemetry
     }
 
+    // Read-only fan tachometer alerts gated by reported hwmon minimums.
+    CpuPlusFanHealthNotificationProducer {
+        telemetry: sharedSystemTelemetry
+    }
+
     // Informational SYSTEM report from the same existing sample stream.
     CpuPlusSystemNotificationProducer {
         telemetry: sharedSystemTelemetry

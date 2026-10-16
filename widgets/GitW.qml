@@ -3257,13 +3257,13 @@ PanelWindow {
         pressedFillColor: redAccent ? Colors.red : Colors.magenta
 
         idleForegroundColor: semanticAccent
-        hoverForegroundColor: semanticAccent
-        selectedForegroundColor: semanticAccent
-        keyboardSelectedForegroundColor: semanticAccent
+        hoverForegroundColor: Colors.orange
+        selectedForegroundColor: Colors.magenta
+        keyboardSelectedForegroundColor: Colors.magenta
         pressedForegroundColor: Colors.black
 
         idleBorderColor: semanticAccent
-        hoverBorderColor: semanticAccent
+        hoverBorderColor: Colors.orange
         selectedBorderColor: Colors.magenta
         keyboardSelectedBorderColor: Colors.orange
         pressedBorderColor: redAccent ? Colors.red : Colors.magenta
@@ -3276,10 +3276,10 @@ PanelWindow {
         contentGlowSource: gitArtwork
         contentGlowEnabled: true
         idleContentGlowColor: semanticAccent
-        hoverContentGlowColor: semanticAccent
-        selectedContentGlowColor: semanticAccent
-        keyboardSelectedContentGlowColor: semanticAccent
-        pressedContentGlowColor: semanticAccent
+        hoverContentGlowColor: Colors.orange
+        selectedContentGlowColor: Colors.magenta
+        keyboardSelectedContentGlowColor: Colors.magenta
+        pressedContentGlowColor: Colors.magenta
         contentGlowIdleOpacity: 0.35
         contentGlowHoverOpacity: 0.75
         contentGlowSelectedOpacity: 0.75
@@ -3289,10 +3289,10 @@ PanelWindow {
         softGlowEnabled: true
         softGlowSpread: 3
         idleSoftGlowColor: semanticAccent
-        hoverSoftGlowColor: semanticAccent
-        selectedSoftGlowColor: semanticAccent
-        keyboardSelectedSoftGlowColor: semanticAccent
-        pressedSoftGlowColor: semanticAccent
+        hoverSoftGlowColor: Colors.orange
+        selectedSoftGlowColor: Colors.magenta
+        keyboardSelectedSoftGlowColor: Colors.orange
+        pressedSoftGlowColor: redAccent ? Colors.red : Colors.magenta
         softGlowIdleOpacity: 0.25
         softGlowHoverOpacity: 0.55
         softGlowSelectedOpacity: 0.55
@@ -3303,10 +3303,10 @@ PanelWindow {
         wideGlowEnabled: true
         wideGlowSpread: 10
         idleWideGlowColor: semanticAccent
-        hoverWideGlowColor: semanticAccent
-        selectedWideGlowColor: semanticAccent
-        keyboardSelectedWideGlowColor: semanticAccent
-        pressedWideGlowColor: semanticAccent
+        hoverWideGlowColor: Colors.orange
+        selectedWideGlowColor: Colors.magenta
+        keyboardSelectedWideGlowColor: Colors.orange
+        pressedWideGlowColor: redAccent ? Colors.red : Colors.magenta
         wideGlowIdleOpacity: 0.015
         wideGlowHoverOpacity: 0.075
         wideGlowSelectedOpacity: 0.075

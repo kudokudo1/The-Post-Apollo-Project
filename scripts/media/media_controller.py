@@ -10,6 +10,7 @@ from typing import Any
 from headless_mpd import LocalMpdSource, MediaBackendError, MpdBackend
 from youtube_catalog import YouTubeCatalogSource
 from media_intent_store import IntentStore
+from mpd_audio_probe import MpdAudioEvidenceProbe
 
 
 class MediaController:
@@ -22,6 +23,7 @@ class MediaController:
         local = LocalMpdSource(mpd)
         youtube = YouTubeCatalogSource()
         self.sources = {local.id: local, youtube.id: youtube}
+        self.audio_probe = MpdAudioEvidenceProbe(mpd)
         self.browse_context: dict[str, Any] | None = None
         self.selection: dict[str, Any] | None = None
         self.loaded: dict[str, Any] | None = None
@@ -177,6 +179,8 @@ class MediaController:
             return {"sources": [source.describe() for source in self.sources.values()]}
         if op == "snapshot":
             return self.snapshot()
+        if op == "audio_evidence":
+            return self.audio_probe.observe()
 
         if op == "search":
             source = self._source(args.get("source", "local-mpd"))

@@ -7,11 +7,13 @@ on:
       - "scripts/media/youtube_catalog.py"
       - "scripts/media/media_controller.py"
       - "scripts/media/media_intent_store.py"
+      - "scripts/media/mpd_audio_probe.py"
       - "scripts/media/media_controller_server.py"
       - "scripts/media/media_controller_cli.py"
       - "tests/media/test_headless_controller.py"
       - "tests/media/test_youtube_catalog.py"
       - "tests/media/test_media_intent_store.py"
+      - "tests/media/test_mpd_audio_probe.py"
       - ".github/workflows/media-headless-controller.yml"
   workflow_dispatch:
 
@@ -31,10 +33,12 @@ jobs:
             scripts/media/youtube_catalog.py \
             scripts/media/media_controller.py \
             scripts/media/media_intent_store.py \
+            scripts/media/mpd_audio_probe.py \
             scripts/media/media_controller_server.py \
             scripts/media/media_controller_cli.py \
             tests/media/test_headless_controller.py \
             tests/media/test_youtube_catalog.py \
-            tests/media/test_media_intent_store.py
+            tests/media/test_media_intent_store.py \
+            tests/media/test_mpd_audio_probe.py
           python3 -m unittest discover \
             -s tests/media -p 'test_*.py' -v

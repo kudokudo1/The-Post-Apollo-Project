@@ -5,6 +5,7 @@ on:
     paths:
       - "widgets/GitHubProjectsView.qml"
       - "widgets/GitHubProjectsTableView.qml"
+      - "widgets/GitHubProjectsArchiveButton.qml"
       - "widgets/GitHubProjectsRoadmapView.qml"
       - "tests/components/test_github_projects_visual_contracts.py"
       - ".github/workflows/github-projects-visual-contracts.yml"
@@ -13,6 +14,7 @@ on:
     paths:
       - "widgets/GitHubProjectsView.qml"
       - "widgets/GitHubProjectsTableView.qml"
+      - "widgets/GitHubProjectsArchiveButton.qml"
       - "widgets/GitHubProjectsRoadmapView.qml"
       - "tests/components/test_github_projects_visual_contracts.py"
       - ".github/workflows/github-projects-visual-contracts.yml"

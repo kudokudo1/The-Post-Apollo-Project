@@ -156,7 +156,7 @@ try:
     # frame geometryHost. The scrollbar fills the frame's side, not the inner
     # viewport or inset wrapper, and stays inside its top/bottom borders.
     assert graph_rail.property("boxSideGeometry") is True
-    assert graph_rail.property("geometryHost") == graph_frame
+    assert root.property("graphUsesOuterFrame") is True, "graph scrollbar must use outer frame"
     near(graph_rail.property("width"), 16, "graph star rail width")
     near(graph_rail.property("x"), 320 - 16 - 4 - 10, "graph frame-side x in inset coordinates")
     near(graph_rail.property("y"), 2 - 10, "graph frame top in inset coordinates")

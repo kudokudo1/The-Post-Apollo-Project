@@ -70,6 +70,33 @@ for needle, message in (
 
 assert "RectangularShadow {" not in POPUP
 
+# Popups take perimeter identity from the event's origin/domain, not
+# an exclusive filter or severity. The shared policy owns classification.
+for needle, message in (
+    ('import "../services/notifications/NotificationFacets.js" as NotificationFacets',
+     "popup imports the shared origin/domain policy"),
+    ("required property var context", "popup receives normalized event context"),
+    ("organizationFacets: NotificationFacets.facetsFor({",
+     "popup uses the independent notification facets"),
+    ('"context": notificationCard.context',
+     "popup preserves explicit Apollo origin and domain"),
+    ('organizationFacets.origin === "apollo" ? Colors.orange',
+     "Apollo source color stays orange"),
+    ('organizationFacets.domain === "social" ? Colors.omnitrix',
+     "external Social source color stays Omnitrix green"),
+    ('organizationFacets.domain === "system" ? Colors.white',
+     "external System source color stays white"),
+    (": Colors.cyan", "generic Apps remain cyan"),
+    ("borderColor: notificationCard.organizationColor",
+     "popup frame follows organization color"),
+    ("glowColor: notificationCard.organizationColor",
+     "popup glow follows the same organization color"),
+):
+    require(POPUP, needle, message)
+
+assert "borderColor: Colors.cyan\n\n                glowColor: Colors.cyan" not in POPUP
+
+
 # Receipt/update time uses existing persisted timestamps. In history, the
 # time must be directly to the right of the icon and above the source label.
 for needle, message in (

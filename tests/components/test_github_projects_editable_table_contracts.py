@@ -77,7 +77,7 @@ for needle in (
     "label: root.clearArmed ? \"CLEAR?\" : \"CLEAR\"",
     "destructive: true",
     "root.save(modelData.id, false)",
-    'root.save(valueEditor.text, false)',
+    'onAccepted: root.save(text, false)',
     "mountingParent: panel",
     'NO ITERATION IDS EXPOSED',
 ):

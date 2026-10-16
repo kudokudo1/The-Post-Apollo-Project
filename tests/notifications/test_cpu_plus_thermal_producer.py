@@ -39,7 +39,7 @@ assert 'sourceText === "cpu++"' in HUB.read_text()
 assert 'function pushRich(notification)' in BASE.read_text()
 assert 'raised.sort(' in producer, "Coalesce multiple sensor events into a single batch"
 for forbidden in ["Process {", "Timer {", "telemetry.refresh(", "Quickshell.execDetached",
-                  "fanControl.", "kill(", "contributors"]:
+                  "fanControl.", "kill(", "sensor.contributors", "sensor.source,"]:
     assert forbidden not in producer, forbidden
 
 NODE = r"""

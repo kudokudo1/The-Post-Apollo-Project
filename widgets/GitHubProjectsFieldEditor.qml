@@ -258,8 +258,18 @@ Item {
                 }
             }
 
-            // This compact choices menu intentionally has NO reserved
-            // scrollbar gutter. Wheel, trackpad and touch scrolling remain.
+            // Retain the scrollbar contract, but this compact choice menu
+            // intentionally has NO visible star, interactive rail or gutter.
+            // Flickable still receives normal wheel/trackpad/touch scrolling.
+            NeonScrollBar {
+                flickable: choiceScroll
+                handleStyle: "star"
+                mountingParent: panel
+                reserveSpace: false
+                visible: false
+                interactive: false
+                wheelEnabled: false
+            }
         }
 
         GohuText {

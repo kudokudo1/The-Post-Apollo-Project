@@ -1,0 +1,28 @@
+name: GitHub PR control feedback and layout
+
+on:
+  pull_request:
+    paths:
+      - "widgets/GitHubPullRequestControlView.qml"
+      - "tests/git/test_pr_control_feedback_contracts.py"
+      - ".github/workflows/github-pr-control-feedback.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "widgets/GitHubPullRequestControlView.qml"
+      - "tests/git/test_pr_control_feedback_contracts.py"
+      - ".github/workflows/github-pr-control-feedback.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  pr-control-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify PR Control ownership and command wiring
+        run: |
+          python3 tests/git/test_pull_request_control_view_contracts.py
+          python3 tests/git/test_pull_request_lifecycle_contracts.py
+          python3 tests/git/test_pr_control_feedback_contracts.py

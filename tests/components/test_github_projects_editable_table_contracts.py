@@ -12,6 +12,7 @@ service = (root / "services/github/GitHubProjectsService.qml").read_text()
 table = (root / "widgets/GitHubProjectsTableView.qml").read_text()
 editor = (root / "widgets/GitHubProjectsFieldEditor.qml").read_text()
 owner = (root / "widgets/GitHubProjectsView.qml").read_text()
+date_input = (root / "widgets/GitHubProjectsDateInput.qml").read_text()
 
 # Expose actual edit affordances for eligible project fields, not empty
 # decorative controls. Only draft titles may be changed inside the project.
@@ -86,5 +87,58 @@ for needle in (
 assert table.index("GitHubProjectsFieldEditor {") > table.index(
     "NeonScrollBar { flickable: tableScroll; handleStyle: \"star\""
 )
+
+# UI must show the pencil yellow independently of the value text.
+assert 'label: editCell.value || "—"' in table
+assert 'text: "✎"' in table
+assert 'color: Colors.yellow' in table
+
+# Popup belongs to the whole Projects shell, not the Table's short height.
+assert 'property Item editorHost: null' in table
+assert 'parent: root.editorHost ? root.editorHost : root' in table
+assert 'editorHost: root' in owner
+assert 'onVisibleChanged: { if (!visible) closeEditor(); }' in table
+assert 'height: Math.max(150, Math.min(root.isDate ? 225 : 228, root.height - 10))' in editor
+assert 'height: Math.max(25, panel.height - 101)' in editor
+
+# Status/Progress uses the project's actual three (or operator-customized)
+# single-select options. Never fake IDs just to show 3 buttons.
+assert 'root.projectService.editableChoices(fieldKind)' not in editor  # root binds through projectService
+assert 'projectService.editableChoices(fieldKind)' in editor
+assert 'root.save(modelData.id, false)' in editor
+assert '"Todo,In Progress,Done"' in service
+
+# The date picker owns THREE independently typed fields and step controls.
+for part in ('caption: "DAY"', 'caption: "MONTH"', 'caption: "YEAR"'):
+    assert part in date_input
+assert 'id: dayPart' in date_input
+assert 'id: monthPart' in date_input
+assert 'id: yearPart' in date_input
+assert 'validator: RegularExpressionValidator {' in date_input
+assert 'cursorDelegate: Rectangle {' in date_input
+assert 'color: Colors.orange' in date_input
+assert 'label: "↑"' in date_input
+assert 'label: "↓"' in date_input
+assert 'function isoValue()' in date_input
+assert 'year.padStart(4, "0") + "-"' in date_input
+assert 'month.padStart(2, "0") + "-"' in date_input
+assert 'day.padStart(2, "0")' in date_input
+assert 'onSubmitted: function(isoDate) { root.save(isoDate, false); }' in editor
+assert 'root.isDate ? dateInput.isoValue() : valueEditor.text' in editor
+
+# Missing fields require a second explicit click before any schema mutation,
+# and iteration is never synthesized from guessed IDs.
+assert 'property bool setupArmed: false' in editor
+assert 'if (root.setupArmed)' in editor
+assert 'root.projectService.setupMissingField(root.fieldKind)' in editor
+assert 'function setupMissingField(kind)' in service
+assert 'if (busy || !number || fields.length === 0' in service
+assert '|| editableField(kind)' in service
+assert 'exec gh project field-create "$1"' in service
+assert '"High,Medium,Low"' in service
+assert '"SINGLE_SELECT"' in service
+assert '"DATE"' in service
+assert 'FIELD SETUP UNAVAILABLE // CREATE ITERATIONS IN GITHUB' in service
+assert 'label: "OPEN GITHUB PROJECT FIELDS"' in editor
 
 print("PROJECTS EDITABLE TABLE // CONTRACT PASS")

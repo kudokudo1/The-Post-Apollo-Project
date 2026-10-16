@@ -58,8 +58,11 @@ def run_synthetic(payload, gh_code=0):
         shim = bindir / "gh"
         shim.write_text(
             "#!/bin/sh\n"
-            'cat "$PA_TEST_GRAPHQL_FIXTURE"\n'
-            'exit "$PA_TEST_GH_EXIT"\n',
+            'case "$*" in\n'
+            '  *graphql*) cat "$PA_TEST_GRAPHQL_FIXTURE"; exit "$PA_TEST_GH_EXIT";;\n'
+            '  *requested_reviewers*) printf "0\\n";;\n'
+            '  *) printf "[]\\n";;\n'
+            'esac\n',
             encoding="utf-8",
         )
         shim.chmod(0o755)
@@ -113,6 +116,23 @@ assert output[0]["checkState"] == "SUCCESS"
 assert len(output[0]["checkContexts"]) == 1
 assert output[0]["checkEvidenceLoaded"] is False
 assert output[0]["reviewRequestCount"] == 0
+
+# A sparse open PR must exercise the review/CI evidence fallback. The
+# fallback may be empty, but it must still produce the original PR record.
+fallback_row = dict(rows[0])
+fallback_row["state"] = "OPEN"
+fallback_row["reviewDecision"] = ""
+fallback_row["reviews"] = {"nodes": []}
+fallback_row["commits"] = {"nodes": [{"commit": {
+    "statusCheckRollup": {"state": "", "contexts": {"nodes": []}}
+}}]}
+fallback = run_synthetic(json.dumps([fallback_row]))
+assert fallback.returncode == 0, fallback.stderr
+fallback_rows = json.loads(fallback.stdout)
+assert len(fallback_rows) == 1 and fallback_rows[0]["number"] == 1
+assert fallback_rows[0]["checkEvidenceLoaded"] is True
+assert fallback_rows[0]["reviewEvidenceLoaded"] is True
+assert fallback_rows[0]["reviewRequestCount"] == 0
 
 empty = run_synthetic("[]")
 assert empty.returncode == 0 and json.loads(empty.stdout) == []

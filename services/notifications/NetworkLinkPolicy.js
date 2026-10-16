@@ -1,68 +1,71 @@
 .pragma library
 
-// Consume the Network dock's EXISTING "nmcli -t -f DEVICE,TYPE,STATE,CONNECTION
-// device" result. This observes local Wi-Fi/Ethernet link state, NOT reachability
-// of the internet. No extra polling, network requests, or execution.
+// Consume the Network dock's EXISTING nmcli DEVICE,TYPE,STATE,CONNECTION
+// output. Wi-Fi and Ethernet are separate local link observations: an active
+// Ethernet connection must NOT hide an actual Wi-Fi disconnection.
+// This policy does not test internet reachability or start extra processes.
 function parseDeviceStatus(raw) {
     if (typeof raw !== "string" || !raw.trim())
         return null;
 
+    const summary = {
+        wifi: { up: 0, down: 0, uncertain: 0 },
+        ethernet: { up: 0, down: 0, uncertain: 0 }
+    };
+    let seen = 0;
     const lines = raw.split(/\r?\n/);
-    let up = 0;
-    let down = 0;
-    let uncertain = 0;
-    let interfaces = 0;
-    for (let i = 0; i < lines.length; i++) {
+    for (let i = 0; i < lines.length; ++i) {
         const fields = lines[i].trim().split(":");
-        if (fields.length < 4)
+        if (fields.length < 3)
             continue;
         const type = String(fields[1] || "").trim().toLowerCase();
         if (type !== "wifi" && type !== "ethernet")
             continue;
+        seen += 1;
         const state = String(fields[2] || "").trim().toLowerCase();
-        interfaces += 1;
         if (state === "connected" || /^connected \([^)]+\)$/.test(state))
-            up += 1;
+            summary[type].up += 1;
         else if (state === "disconnected" || state === "unavailable")
-            down += 1;
+            summary[type].down += 1;
         else
-            uncertain += 1;
+            summary[type].uncertain += 1;
     }
-
-    // Failed/partial NMCLI output and machines without Wi-Fi/Ethernet devices
-    // cannot be interpreted as an outage.
-    if (!interfaces)
+    if (seen === 0)
         return null;
-    if (up > 0)
-        return { connected: true };
-    if (uncertain > 0 || down === 0)
-        return null; // "connecting", "unmanaged", unknown: no confirmed loss
-    return { connected: false };
+
+    function status(kind) {
+        const s = summary[kind];
+        if (s.up > 0)
+            return true;
+        if (s.uncertain === 0 && s.down > 0)
+            return false;
+        return null; // no device or connecting/unknown state
+    }
+    return { wifi: status("wifi"), ethernet: status("ethernet") };
+}
+
+function initialLink() {
+    return { stable: "", candidate: "", count: 0,
+             sinceMs: 0, lastSampleMs: 0 };
 }
 
 function initial() {
-    return {
-        stable: "",
-        candidate: "",
-        count: 0,
-        sinceMs: 0,
-        lastSampleMs: 0
-    };
+    return { wifi: initialLink(), ethernet: initialLink() };
 }
 
-// Three independent, consecutive observations spanning at least 2 seconds
-// establish either baseline or a real transition. No startup alerts.
-// Stale gaps clear candidates, not the previously confirmed link state.
-function transition(previous, observation, observedMs) {
-    const original = previous || initial();
+// Two observations spanning >= 1 second confirm a link transition; startup
+// establishes each link's baseline silently. Never announce an unobserved
+// device or a temporary "connecting" state as a disconnection.
+function advance(previous, connected, observedMs) {
+    const old = previous || initialLink();
     const state = {
-        stable: String(original.stable || ""),
-        candidate: String(original.candidate || ""),
-        count: Number(original.count || 0),
-        sinceMs: Number(original.sinceMs || 0),
-        lastSampleMs: Number(original.lastSampleMs || 0)
+        stable: String(old.stable || ""),
+        candidate: String(old.candidate || ""),
+        count: Number(old.count || 0),
+        sinceMs: Number(old.sinceMs || 0),
+        lastSampleMs: Number(old.lastSampleMs || 0)
     };
-    if (!observation || typeof observation.connected !== "boolean"
+    if (typeof connected !== "boolean"
             || typeof observedMs !== "number" || !isFinite(observedMs)
             || observedMs <= 0 || observedMs <= state.lastSampleMs)
         return { state: state, event: "" };
@@ -73,15 +76,13 @@ function transition(previous, observation, observedMs) {
         state.sinceMs = 0;
     }
     state.lastSampleMs = observedMs;
-
-    const seen = observation.connected ? "up" : "down";
+    const seen = connected ? "up" : "down";
     if (seen === state.stable) {
         state.candidate = "";
         state.count = 0;
         state.sinceMs = 0;
         return { state: state, event: "" };
     }
-
     if (state.candidate !== seen) {
         state.candidate = seen;
         state.count = 1;
@@ -89,17 +90,31 @@ function transition(previous, observation, observedMs) {
     } else {
         state.count += 1;
     }
-
-    if (state.count < 3 || observedMs - state.sinceMs < 2000)
+    if (state.count < 2 || observedMs - state.sinceMs < 1000)
         return { state: state, event: "" };
 
-    const previouslyStable = state.stable;
+    const before = state.stable;
     state.stable = seen;
     state.candidate = "";
     state.count = 0;
     state.sinceMs = 0;
-    // Establish initial baseline silently after startup, not an outage.
-    const event = previouslyStable === "" ? ""
-        : seen === "up" ? "restored" : "disconnected";
-    return { state: state, event: event };
+    return { state: state,
+             event: before === "" ? "" : seen === "up" ? "restored" : "disconnected" };
+}
+
+function transition(previous, observation, observedMs) {
+    const old = previous || initial();
+    const state = { wifi: old.wifi || initialLink(),
+                    ethernet: old.ethernet || initialLink() };
+    const events = [];
+    if (!observation)
+        return { state: state, events: events };
+
+    for (const kind of ["wifi", "ethernet"]) {
+        const result = advance(state[kind], observation[kind], observedMs);
+        state[kind] = result.state;
+        if (result.event)
+            events.push({ kind: kind, event: result.event });
+    }
+    return { state: state, events: events };
 }

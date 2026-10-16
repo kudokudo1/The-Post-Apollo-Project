@@ -55,3 +55,6 @@ jobs:
 
       - name: Validate Network link transition producer
         run: python3 tests/notifications/test_network_link_producer.py
+
+      - name: Validate CPU++ RAM and root storage pressure alerts
+        run: python3 tests/notifications/test_resource_pressure_producer.py

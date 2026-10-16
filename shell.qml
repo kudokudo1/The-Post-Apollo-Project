@@ -272,6 +272,11 @@ PanelWindow {
         telemetry: sharedSystemTelemetry
     }
 
+    // Sustained RAM/root-filesystem pressure from the SAME existing samples.
+    ResourcePressureNotificationProducer {
+        telemetry: sharedSystemTelemetry
+    }
+
     FanControl {
         id: sharedFanControl
 

@@ -443,7 +443,14 @@ Item {
 
                         Column {
                             id: roomColumn
-                            width: roomBoard.width
+                            // The star scrollbar overlays its Flickable; keep
+                            // the room cards outside its reserved lane.
+                            width: Math.max(
+                                0,
+                                roomBoard.width
+                                - roomBoardScrollbar.reservedExtent
+                                - 4
+                            )
                             spacing: 5
 
                             Repeater {
@@ -611,6 +618,7 @@ Item {
                         }
                     }
                     NeonScrollBar {
+                        id: roomBoardScrollbar
                         flickable: roomBoard
                         handleStyle: "star"
                         visible: roomBoard.visible && scrollable

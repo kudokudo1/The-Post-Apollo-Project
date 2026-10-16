@@ -35,7 +35,7 @@ PanelWindow {
     // Retain a stable source key so DND, snooze, and Favorites apply.
     function publishGitHubOutcome(repository, number, title, message, severity, eventType) {
         const repo = String(repository || "").trim();
-        if (!/^[^/\\s]+\\/[^/\\s]+$/.test(repo))
+        if (!/^[^/\s]+\/[^/\s]+$/.test(repo))
             return false;
 
         const parsedNumber = Number(number || 0);

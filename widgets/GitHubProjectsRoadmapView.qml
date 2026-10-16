@@ -405,6 +405,7 @@ Item {
 
                                     GitHubProjectsArchiveButton {
                                         width: 65
+                                        height: 24
                                         anchors.verticalCenter: parent.verticalCenter
                                         armed: root.itemActionArmed("archive", roadRow.modelData)
                                         enabledAction:
@@ -558,6 +559,7 @@ Item {
 
                                     GitHubProjectsArchiveButton {
                                         width: 76
+                                        height: 24
                                         anchors.verticalCenter: parent.verticalCenter
                                         armed: root.itemActionArmed("archive", unscheduledRow.modelData)
                                         enabledAction:

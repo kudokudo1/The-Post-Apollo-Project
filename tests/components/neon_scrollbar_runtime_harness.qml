@@ -164,6 +164,7 @@ Window {
         }
     }
 
+    readonly property bool graphUsesOuterFrame: graphRail.geometryHost === graphFrame
     readonly property bool mountedOnHost: positionerBar.parent === positionedHost
     readonly property bool columnKeptOneItem: positioner.children.length === 1
 

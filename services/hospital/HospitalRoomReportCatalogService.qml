@@ -9,6 +9,7 @@ Scope {
 
     property var reports: []
     property bool loading: false
+    property bool loaded: false
     property string lastError: ""
     property int totalRooms: 0
     property int scannedRooms: 0
@@ -23,6 +24,7 @@ Scope {
             return false;
 
         loading = true;
+        loaded = false;
         lastError = "";
 
         const script = [
@@ -75,6 +77,7 @@ Scope {
                     if (!Array.isArray(data.reports))
                         throw new Error("ROOM REPORT CATALOG EXPECTED ARRAY");
                     root.reports = data.reports;
+                    root.loaded = true;
                     root.totalRooms = Number(data.totalRooms || 0);
                     root.scannedRooms = Number(data.scannedRooms || 0);
                     root.failedRooms = Number(data.failedRooms || 0);

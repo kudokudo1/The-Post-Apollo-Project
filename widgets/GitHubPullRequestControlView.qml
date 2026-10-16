@@ -630,8 +630,8 @@ Rectangle {
 
                     ActionButton {
                         width: 100
+                        actionToken: "draft-toggle"
                         label:
-                            actionToken: "draft-toggle"
                             root.pullRequestDraft
                             ? "MARK READY"
                             : "MAKE DRAFT"
@@ -662,8 +662,8 @@ Rectangle {
 
                     ActionButton {
                         width: 110
+                        actionToken: "update-branch"
                         label:
-                            actionToken: "update-branch"
                             root.armedAction === "update-branch"
                             ? "CONFIRM UPDATE"
                             : "UPDATE BRANCH"
@@ -692,8 +692,8 @@ Rectangle {
 
                     ActionButton {
                         width: 112
+                        actionToken: "update-rebase"
                         label:
-                            actionToken: "update-rebase"
                             root.armedAction === "update-rebase"
                             ? "CONFIRM REBASE"
                             : "UPDATE REBASE"
@@ -718,8 +718,8 @@ Rectangle {
 
                     ActionButton {
                         width: 100
+                        actionToken: "close-reopen"
                         label:
-                            actionToken: "close-reopen"
                             String(root.pullRequestState || "").toUpperCase()
                                 === "CLOSED"
                             ? "REOPEN"

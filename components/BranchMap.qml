@@ -12,6 +12,9 @@ Rectangle {
     property int rowHeight: 24
     property int laneWidth: 22
     property int maxVisibleLanes: 7
+    // Operator-adjustable branch-map rail shift; affects the track and
+    // reserved label clearance together, never the shared scrollbar default.
+    property int scrollbarLeftShift: 20
 
     signal commitSelected(string sha)
 
@@ -144,6 +147,7 @@ Rectangle {
                 // The full-height rail passes beside the header; keep
                 // the counts/labels out of its dedicated right-edge lane.
                 anchors.rightMargin: topologyScrollTrack.reservedExtent + 4
+                    + branchMap.scrollbarLeftShift
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 4
 
@@ -377,6 +381,7 @@ Rectangle {
                                 0,
                                 parent.width - x - 6
                                 - topologyScrollTrack.reservedExtent
+                                - branchMap.scrollbarLeftShift
                             )
                             height: parent.height
                             anchors.verticalCenter: parent.verticalCenter
@@ -563,11 +568,12 @@ Rectangle {
         flickable: topologyFlick
         handleStyle: "star"
         // Keep the outer frame as the geometry owner, but place the rail
-        // in the original inset right-side lane. Start level with the
-        // COMMITS // REFS data row, not at the outer frame's top border.
+        // in the inset right-side lane, 20px farther left per the operator.
+        // Start level with the COMMITS // REFS data row, not the top border.
         mountingParent: branchMap
         geometryHost: branchMap
         rightInset: edgeInset + graphInset.anchors.margins
+            + branchMap.scrollbarLeftShift
         boxTopInset: graphInset.anchors.margins + header.height / 2
         visible: topologyFlick.visible && scrollable
     }

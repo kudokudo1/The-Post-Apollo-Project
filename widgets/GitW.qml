@@ -3189,6 +3189,8 @@ PanelWindow {
         property bool blueAccent: false
         property bool orangeAccent: false
         property bool redAccent: false
+        // The action's identity is independent from its selection/fill state.
+        property color actionAccentColor: Colors.cyan
 
         readonly property bool gitKeyboardSelector:
             root.gitKeyboardControl === gitAction
@@ -3199,7 +3201,7 @@ PanelWindow {
         readonly property color semanticAccent:
             redAccent ? Colors.red
             : orangeAccent ? Colors.orange
-            : blueAccent ? Colors.blue : Colors.cyan
+            : blueAccent ? Colors.blue : actionAccentColor
         readonly property real contentBudget: Math.max(0, width - 16)
         readonly property real iconBudget:
             (leftIcon.length > 0 ? iconPixelSize + 6 : 0)
@@ -3255,15 +3257,13 @@ PanelWindow {
         pressedFillColor: redAccent ? Colors.red : Colors.magenta
 
         idleForegroundColor: semanticAccent
-        hoverForegroundColor: semanticAccent === Colors.cyan
-            ? Colors.orange : semanticAccent
-        selectedForegroundColor: Colors.magenta
-        keyboardSelectedForegroundColor: Colors.magenta
+        hoverForegroundColor: semanticAccent
+        selectedForegroundColor: semanticAccent
+        keyboardSelectedForegroundColor: semanticAccent
         pressedForegroundColor: Colors.black
 
         idleBorderColor: semanticAccent
-        hoverBorderColor: semanticAccent === Colors.cyan
-            ? Colors.orange : semanticAccent
+        hoverBorderColor: semanticAccent
         selectedBorderColor: Colors.magenta
         keyboardSelectedBorderColor: Colors.orange
         pressedBorderColor: redAccent ? Colors.red : Colors.magenta
@@ -3277,8 +3277,8 @@ PanelWindow {
         contentGlowEnabled: true
         idleContentGlowColor: semanticAccent
         hoverContentGlowColor: semanticAccent
-        selectedContentGlowColor: Colors.orange
-        keyboardSelectedContentGlowColor: Colors.orange
+        selectedContentGlowColor: semanticAccent
+        keyboardSelectedContentGlowColor: semanticAccent
         pressedContentGlowColor: semanticAccent
         contentGlowIdleOpacity: 0.35
         contentGlowHoverOpacity: 0.75
@@ -3290,8 +3290,8 @@ PanelWindow {
         softGlowSpread: 3
         idleSoftGlowColor: semanticAccent
         hoverSoftGlowColor: semanticAccent
-        selectedSoftGlowColor: Colors.orange
-        keyboardSelectedSoftGlowColor: Colors.orange
+        selectedSoftGlowColor: semanticAccent
+        keyboardSelectedSoftGlowColor: semanticAccent
         pressedSoftGlowColor: semanticAccent
         softGlowIdleOpacity: 0.25
         softGlowHoverOpacity: 0.55
@@ -3304,8 +3304,8 @@ PanelWindow {
         wideGlowSpread: 10
         idleWideGlowColor: semanticAccent
         hoverWideGlowColor: semanticAccent
-        selectedWideGlowColor: Colors.orange
-        keyboardSelectedWideGlowColor: Colors.orange
+        selectedWideGlowColor: semanticAccent
+        keyboardSelectedWideGlowColor: semanticAccent
         pressedWideGlowColor: semanticAccent
         wideGlowIdleOpacity: 0.015
         wideGlowHoverOpacity: 0.075
@@ -5583,6 +5583,7 @@ PanelWindow {
                                     keyboardRow: 0
                                     leftIcon: "◂"
                                     iconPixelSize: 29
+                                    actionAccentColor: Colors.magenta
                                     blueAccent: !gitService.repoIsLocal
                                     enabledAction:
                                         !gitService.actionBusy
@@ -5670,7 +5671,7 @@ PanelWindow {
                                         ? "▸"
                                         : ""
                                     iconPixelSize: 29
-                                    blueAccent: !gitService.repoIsLocal
+                                    actionAccentColor: Colors.magenta
                                     enabledAction:
                                         gitService.repoIsLocal
                                         && !gitService.actionBusy
@@ -5703,6 +5704,7 @@ PanelWindow {
                                 width: 124
                                 height: 36
                                 label: "DIFF"
+                                actionAccentColor: Colors.blue
                                 keyboardRow: 1
                                 enabledAction: !gitService.actionBusy
                                 selectedAction: gitService.actionTitle === "DIFF"
@@ -5713,6 +5715,7 @@ PanelWindow {
                                 width: 124
                                 height: 36
                                 label: "LOG"
+                                actionAccentColor: Colors.green
                                 keyboardRow: 1
                                 enabledAction: !gitService.actionBusy
                                 selectedAction: gitService.actionTitle === "LOG"
@@ -5723,6 +5726,7 @@ PanelWindow {
                                 width: 124
                                 height: 36
                                 label: "LAZYGIT"
+                                actionAccentColor: Colors.yellow
                                 keyboardRow: 1
                                 enabledAction: true
                                 onTriggered: gitService.launchLazygit()

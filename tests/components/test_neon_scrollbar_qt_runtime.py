@@ -52,6 +52,10 @@ def near(value, expected, label):
 try:
     assert bar.property("nestedScrollMode") == "contain"
     assert bar.property("nestedPaneDetected") is True, "nested hierarchy was not detected"
+    assert bar.property("hostIsScrollingContent") is True
+    assert bar.property("boxSideGeometry") is False, (
+        "Do not stretch a nested list's rail over its parent Flickable content"
+    )
     assert bar.property("scrollChaining") is False
     assert bar.property("captureNestedPaneWheel") is True
     assert bar.property("horizontal") is False

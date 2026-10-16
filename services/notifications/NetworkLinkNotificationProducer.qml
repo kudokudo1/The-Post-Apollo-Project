@@ -3,8 +3,8 @@ import Quickshell
 import qs.services.notifications
 import "NetworkLinkPolicy.js" as NetworkLinkPolicy
 
-// Observes only the ALREADY RUNNING Network dock's nmcli device scan.
-// Does not initiate another command or network poll; no network control.
+// Receives ONLY the Network dock's existing nmcli device scan output.
+// Read-only and silent on startup; no new polling or connection commands.
 Scope {
     id: producer
     property var linkState: NetworkLinkPolicy.initial()
@@ -18,29 +18,33 @@ Scope {
         const outcome = NetworkLinkPolicy.transition(
             linkState, observation, observedAt);
         linkState = outcome.state;
-        if (outcome.event === "")
-            return;
 
-        const disconnected = outcome.event === "disconnected";
-        NotificationsService.pushRich({
-            "source": "NETWORK",
-            "sourceId": "apollo-network-link",
-            "category": "internal",
-            "severity": disconnected ? "warning" : "normal",
-            "title": disconnected ? "NETWORK // LINK DISCONNECTED"
-                                  : "NETWORK // LINK RESTORED",
-            "message": disconnected
-                ? "No Wi-Fi or Ethernet device currently reports a connected link."
-                : "A Wi-Fi or Ethernet device reports a connected link again.",
-            "tags": ["network", "system", "link-transition"],
-            "context": {
-                "eventType": disconnected ? "network-link-disconnected"
-                                          : "network-link-restored",
-                "origin": "apollo",
-                "domain": "system",
-                "observedAtUtc": new Date(observedAt).toISOString(),
-                "observation": "local link only; internet not verified"
-            }
-        });
+        for (const change of outcome.events) {
+            const disconnected = change.event === "disconnected";
+            const kindLabel = change.kind === "wifi" ? "WI-FI" : "ETHERNET";
+            NotificationsService.pushRich({
+                "source": "NETWORK",
+                "sourceId": "apollo-network-link",
+                "category": "internal",
+                "severity": disconnected ? "warning" : "normal",
+                "title": "NETWORK // " + kindLabel + " LINK "
+                         + (disconnected ? "DISCONNECTED" : "RESTORED"),
+                "message": disconnected
+                    ? kindLabel + " no longer reports a connected local link."
+                      + " Another network connection may still be available."
+                    : kindLabel + " reports a connected local link again."
+                      + " Internet access has not been verified.",
+                "tags": ["network", "system", "link-transition", change.kind],
+                "context": {
+                    "eventType": disconnected ? "network-link-disconnected"
+                                              : "network-link-restored",
+                    "origin": "apollo",
+                    "domain": "system",
+                    "linkType": change.kind,
+                    "observedAtUtc": new Date(observedAt).toISOString(),
+                    "observation": "local link only; internet not verified"
+                }
+            });
+        }
     }
 }

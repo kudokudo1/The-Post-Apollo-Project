@@ -448,28 +448,9 @@ Item {
                                     anchors.centerIn: parent
                                     spacing: 4
 
-                                    ItemAction {
+                                    GitHubProjectsArchiveButton {
                                         width: 40
-                                        label: "OPEN"
-                                        enabledAction:
-                                            !!root.projectService.itemUrl(
-                                                tableRow.modelData
-                                            )
-                                        onTriggered:
-                                            root.openProjectItem(
-                                                tableRow.modelData
-                                            )
-                                    }
-
-                                    ItemAction {
-                                        width: 76
-                                        label:
-                                            root.itemActionArmed(
-                                                "archive",
-                                                tableRow.modelData
-                                            )
-                                            ? "CONFIRM"
-                                            : "ARCHIVE"
+                                        armed: root.itemActionArmed("archive", tableRow.modelData)
                                         enabledAction:
                                             !root.projectService.busy
                                             && !!root.projectService.itemId(

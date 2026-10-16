@@ -54,7 +54,7 @@ const ctx = {
     Qt:{callLater(fn){queue.push(fn);}},
     rebuildMetrics(){},
     captureCurrentFloor(floor, probe){
-        this.floors.push({floorId:floor.floorId,auditAvailable:true});
+        ctx.floors.push({floorId:floor.floorId,auditAvailable:true});
     },
     finishRounds(){this.running=false;this.finished+=1;}
 };

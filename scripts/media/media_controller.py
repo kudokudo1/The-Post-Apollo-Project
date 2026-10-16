@@ -1,6 +1,6 @@
 """Universal Hi-Fi controller v0: separate browser, selection, load and session.
 
-No Qt, Quickshell, browser, network catalog or PulseAudio dependencies.
+No Qt, Quickshell or PulseAudio dependencies. Internet catalog is opt-in.
 Adapters are supplied at construction; the controller owns routing decisions.
 """
 from __future__ import annotations
@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 from headless_mpd import LocalMpdSource, MediaBackendError, MpdBackend
+from youtube_catalog import YouTubeCatalogSource
 
 
 class MediaController:
@@ -17,7 +18,8 @@ class MediaController:
         mpd = backend if backend is not None else MpdBackend()
         self.backends = {mpd.id: mpd}
         local = LocalMpdSource(mpd)
-        self.sources = {local.id: local}
+        youtube = YouTubeCatalogSource()
+        self.sources = {local.id: local, youtube.id: youtube}
         self.browse_context: dict[str, Any] | None = None
         self.selection: dict[str, Any] | None = None
         self.loaded: dict[str, Any] | None = None
@@ -28,7 +30,7 @@ class MediaController:
     def _advance(self) -> None:
         self.generation += 1
 
-    def _source(self, source_id: Any) -> LocalMpdSource:
+    def _source(self, source_id: Any) -> Any:
         if not isinstance(source_id, str) or source_id not in self.sources:
             raise MediaBackendError("UNKNOWN_SOURCE", "Source not registered")
         return self.sources[source_id]
@@ -119,11 +121,31 @@ class MediaController:
         if op == "search":
             source = self._source(args.get("source", "local-mpd"))
             query = args.get("query")
-            result = source.search(query)
+            cursor = args.get("cursor")
+            if source.id == "youtube":
+                result = source.search(query, cursor)
+            else:
+                if cursor is not None:
+                    raise MediaBackendError("PAGINATION_UNSUPPORTED",
+                                            "MPD library search is not paginated")
+                result = source.search(query)
             # A search updates browsing only. Selection/loaded/MPD stay untouched.
             self.browse_context = {"source": source.id, "query": query,
                                    "items": result["items"], "truncated": result["truncated"],
-                                   "totalObserved": result["totalObserved"]}
+                                   "totalObserved": result["totalObserved"],
+                                   "nextCursor": result.get("nextCursor")}
+            self._advance()
+            return {"browse": self.browse_context}
+
+        if op == "list":
+            source = self._source(args.get("source"))
+            if not hasattr(source, "list"):
+                raise MediaBackendError("UNSUPPORTED", "Source cannot list collections")
+            result = source.list(args.get("collection"), args.get("cursor"))
+            self.browse_context = {"source": source.id, "collection": args.get("collection"),
+                                   "items": result["items"], "truncated": result["truncated"],
+                                   "totalObserved": result["totalObserved"],
+                                   "nextCursor": result.get("nextCursor")}
             self._advance()
             return {"browse": self.browse_context}
 

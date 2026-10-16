@@ -27,8 +27,8 @@ def send(socket_path: Path, op: str, args: dict | None = None) -> dict:
     return result
 
 
-def ref(uri: str) -> dict:
-    return {"source": "local-mpd", "kind": "track", "id": uri}
+def ref(uri: str, source: str = "local-mpd") -> dict:
+    return {"source": source, "kind": "video" if source == "youtube" else "track", "id": uri}
 
 
 def main() -> int:
@@ -42,12 +42,19 @@ def main() -> int:
         subs.add_parser(name)
     search = subs.add_parser("search")
     search.add_argument("query")
+    search.add_argument("--source", choices=["local-mpd", "youtube"], default="local-mpd")
+    search.add_argument("--cursor", default=None, help="YouTube pagination token")
+    playlist = subs.add_parser("playlist")
+    playlist.add_argument("playlist_id", help="YouTube playlist ID")
+    playlist.add_argument("--cursor", default=None)
     for name in ("inspect", "select", "queue-add"):
         sub = subs.add_parser(name)
-        sub.add_argument("uri", help="Exact MPD library file ID returned by search")
+        sub.add_argument("uri", help="Exact source-qualified media ID returned by search")
+        sub.add_argument("--source", choices=["local-mpd", "youtube"], default="local-mpd")
     load = subs.add_parser("load")
     load.add_argument("--uri", default=None,
                       help="Specific MPD library file; default is selected track")
+    load.add_argument("--source", choices=["local-mpd", "youtube"], default="local-mpd")
     load.add_argument("--autoplay", action="store_true",
                       help="Explicitly start after loading (default is NO autoplay)")
     seek = subs.add_parser("seek")
@@ -59,13 +66,21 @@ def main() -> int:
     op = args.action.replace("-", "_")
     data: dict = {}
     if op == "search":
-        data = {"source": "local-mpd", "query": args.query}
+        data = {"source": args.source, "query": args.query}
+        if args.cursor is not None:
+            data["cursor"] = args.cursor
+    elif op == "playlist":
+        op = "list"
+        data = {"source": "youtube", "collection": {
+            "source": "youtube", "kind": "playlist", "id": args.playlist_id}}
+        if args.cursor is not None:
+            data["cursor"] = args.cursor
     elif op in ("inspect", "select", "queue_add"):
-        data = {"ref": ref(args.uri)}
+        data = {"ref": ref(args.uri, args.source)}
     elif op == "load":
         data = {"autoplay": args.autoplay}
         if args.uri is not None:
-            data["ref"] = ref(args.uri)
+            data["ref"] = ref(args.uri, args.source)
     elif op == "seek":
         op = "seek_relative"
         data = {"seconds": args.seconds}

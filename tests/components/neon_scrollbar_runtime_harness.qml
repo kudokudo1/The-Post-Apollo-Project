@@ -165,6 +165,10 @@ Window {
     }
 
     readonly property bool graphUsesOuterFrame: graphRail.geometryHost === graphFrame
+    readonly property real graphRailFrameX: graphRail.mapToItem(graphFrame, 0, 0).x
+    readonly property real graphRailFrameY: graphRail.mapToItem(graphFrame, 0, 0).y
+    readonly property bool graphParentIsInset: graphRail.parent === graphInset
+    readonly property bool graphParentIsFrame: graphRail.parent === graphFrame
     readonly property bool mountedOnHost: positionerBar.parent === positionedHost
     readonly property bool columnKeptOneItem: positioner.children.length === 1
 

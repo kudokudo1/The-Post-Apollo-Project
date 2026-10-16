@@ -6,6 +6,7 @@ import QtQuick.Layouts
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 import Quickshell.Networking
+import qs.services.notifications
 
 DockButton {
     id: networkDock
@@ -34,6 +35,11 @@ DockButton {
     wideGlowIdleOpacity: 0.07
     wideGlowHoverOpacity: 0.09
     wideGlowPressedOpacity: 0.12
+
+    // Only consumes existing nmcli device scan output; no additional polling.
+    NetworkLinkNotificationProducer {
+        id: networkLinkProducer
+    }
 
     RowLayout {
         id: root
@@ -146,6 +152,9 @@ DockButton {
 
             stdout: StdioCollector {
                 onStreamFinished: {
+                    // One shared observation for both Wi-Fi and Ethernet.
+                    // Unknown/partial results are ignored by the policy.
+                    networkLinkProducer.observeDeviceResult(text);
                     const lines = text.trim().split("\n");
 
                     const ethernetLine = lines.find(line => line.includes(":ethernet:"));

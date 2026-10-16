@@ -242,6 +242,11 @@ PanelWindow {
         id: spaceService
     }
 
+    // Daily observational brief from the same Space data as Weather Station.
+    SolarReportNotificationProducer {
+        spaceService: spaceService
+    }
+
     // One session-wide hardware state. AppControl and CPU++ consume these
     // same instances instead of starting independent telemetry/control stacks.
     SystemTelemetry {

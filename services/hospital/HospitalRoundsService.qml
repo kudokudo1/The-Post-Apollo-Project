@@ -24,29 +24,41 @@ Scope {
 
     property var scanQueue: []
     property int scanIndex: -1
-    property bool scanInFlight: false
-    property var currentFloor: ({})
+    property int completedFloors: 0
+    property var inFlightFloors: ({})
+    readonly property int scanTotal: scanQueue.length
+    readonly property int scanCompleted: completedFloors
 
     readonly property int floorCount: floors.length
     readonly property int roomCount: rooms.length
 
     signal refreshed()
 
-    HospitalAuditService {
-        id: auditProbe
-    }
+    // Three independent, bounded read-only PX audits. A slow Floor no
+    // longer prevents every other Floor from starting.
+    HospitalAuditService { id: auditProbeA }
+    HospitalAuditService { id: auditProbeB }
+    HospitalAuditService { id: auditProbeC }
 
     Connections {
-        target: auditProbe
-
+        target: auditProbeA
         function onRunningChanged() {
-            if (auditProbe.running || !roundsService.scanInFlight)
-                return;
-
-            // HospitalAuditService publishes its parsed snapshot immediately
-            // after dropping running=false. Defer one turn so available/rooms
-            // reflect the completed audit rather than the pre-parse state.
-            Qt.callLater(roundsService.finishCurrentFloor);
+            if (!auditProbeA.running)
+                Qt.callLater(function() { roundsService.finishSlot(0); });
+        }
+    }
+    Connections {
+        target: auditProbeB
+        function onRunningChanged() {
+            if (!auditProbeB.running)
+                Qt.callLater(function() { roundsService.finishSlot(1); });
+        }
+    }
+    Connections {
+        target: auditProbeC
+        function onRunningChanged() {
+            if (!auditProbeC.running)
+                Qt.callLater(function() { roundsService.finishSlot(2); });
         }
     }
 
@@ -163,6 +175,8 @@ Scope {
 
         scanQueue = queue;
         scanIndex = -1;
+        completedFloors = 0;
+        inFlightFloors = ({});
 
         if (scanQueue.length === 0) {
             lastError = "ROUNDS // NO FLOORS DISCOVERED";
@@ -174,53 +188,77 @@ Scope {
         return true;
     }
 
-    function scanNext() {
-        scanIndex += 1;
-
-        if (scanIndex >= scanQueue.length) {
-            finishRounds();
-            return;
-        }
-
-        const floor = scanQueue[scanIndex] || {};
-        currentFloor = floor;
-
-        if (!String(floor.repository || "")) {
-            const nextFloors = floors.slice();
-            nextFloors.push({
-                floorIndex: Number(floor.floorIndex || 0),
-                floorId: String(floor.floorId || ""),
-                floorLabel: String(floor.floorLabel || "REPOSITORY"),
-                origin: String(floor.origin || ""),
-                repository: "",
-                bedCount: Number(floor.bedCount || 0),
-                auditAvailable: false,
-                status: "LOCAL_ONLY",
-                roomCount: 0,
-                attentionCount: 0,
-                error: "NO GITHUB REMOTE"
-            });
-            floors = nextFloors;
-            Qt.callLater(scanNext);
-            return;
-        }
-
-        auditProbe.repository = String(floor.repository || "");
-        auditProbe.resetResult();
-
-        scanInFlight = true;
-        auditProbe.runAudit(true);
+    function auditors() {
+        return [auditProbeA, auditProbeB, auditProbeC];
     }
 
-    function finishCurrentFloor() {
-        if (!scanInFlight)
+    // Assign each queued Floor once. Slots run concurrently, but per-Floor
+    // results are processed independently; failures cannot hide successes.
+    function scanNext() {
+        if (!running)
             return;
 
-        scanInFlight = false;
+        const probes = auditors();
+        let active = Object.assign({}, inFlightFloors);
 
-        const floor = currentFloor || {};
+        for (let slot = 0; slot < probes.length; ++slot) {
+            if (active[String(slot)])
+                continue;
 
-        if (!auditProbe.available) {
+            while (scanIndex + 1 < scanQueue.length) {
+                scanIndex += 1;
+                const floor = scanQueue[scanIndex] || {};
+
+                if (!String(floor.repository || "")) {
+                    const localFloors = floors.slice();
+                    localFloors.push({
+                        floorIndex: Number(floor.floorIndex || 0),
+                        floorId: String(floor.floorId || ""),
+                        floorLabel: String(floor.floorLabel || "REPOSITORY"),
+                        origin: String(floor.origin || ""),
+                        repository: "",
+                        bedCount: Number(floor.bedCount || 0),
+                        auditAvailable: false,
+                        status: "LOCAL_ONLY",
+                        roomCount: 0,
+                        attentionCount: 0,
+                        error: "NO GITHUB REMOTE"
+                    });
+                    floors = localFloors;
+                    completedFloors += 1;
+                    continue;
+                }
+
+                active[String(slot)] = floor;
+                inFlightFloors = Object.assign({}, active);
+                const probe = probes[slot];
+                probe.repository = String(floor.repository || "");
+                probe.resetResult();
+                probe.runAudit(true);
+                break;
+            }
+        }
+
+        if (completedFloors >= scanQueue.length
+                && Object.keys(inFlightFloors).length === 0)
+            finishRounds();
+    }
+
+    function finishSlot(slot) {
+        const key = String(slot);
+        const floor = inFlightFloors[key];
+        if (!running || !floor)
+            return;
+
+        const probe = auditors()[slot];
+        if (probe.running)
+            return;
+
+        const active = Object.assign({}, inFlightFloors);
+        delete active[key];
+        inFlightFloors = active;
+
+        if (!probe.available) {
             const failedFloors = floors.slice();
             failedFloors.push({
                 floorIndex: Number(floor.floorIndex || 0),
@@ -233,21 +271,22 @@ Scope {
                 status: "AUDIT_ERROR",
                 roomCount: 0,
                 attentionCount: 0,
-                error: String(auditProbe.lastError || "AUDIT UNAVAILABLE")
+                error: String(probe.lastError || "AUDIT UNAVAILABLE")
             });
             floors = failedFloors;
-            Qt.callLater(scanNext);
-            return;
+        } else {
+            captureCurrentFloor(floor, probe);
         }
 
-        captureCurrentFloor(floor);
+        completedFloors += 1;
+        rebuildMetrics();
         Qt.callLater(scanNext);
     }
 
-    function captureCurrentFloor(floor) {
+    function captureCurrentFloor(floor, probe) {
         const source =
-            Array.isArray(auditProbe.rooms)
-            ? auditProbe.rooms
+            Array.isArray(probe.rooms)
+            ? probe.rooms
             : [];
 
         let floorAttention = 0;
@@ -290,19 +329,18 @@ Scope {
             repository: String(floor.repository || ""),
             bedCount: Number(floor.bedCount || 0),
             auditAvailable: true,
-            status: String(auditProbe.status || "UNKNOWN"),
-            defaultBranch: String(auditProbe.defaultBranch || ""),
+            status: String(probe.status || "UNKNOWN"),
+            defaultBranch: String(probe.defaultBranch || ""),
             roomCount: source.length,
             attentionCount: floorAttention,
-            workflowCount: Number(auditProbe.workflowCount || 0),
-            runCount: Number(auditProbe.runCount || 0),
+            workflowCount: Number(probe.workflowCount || 0),
+            runCount: Number(probe.runCount || 0),
             error: ""
         });
         floors = nextFloors;
     }
 
     function finishRounds() {
-        scanInFlight = false;
         running = false;
 
         const orderedRooms = rooms.slice().sort(function(a, b) {

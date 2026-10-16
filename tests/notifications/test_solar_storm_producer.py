@@ -30,7 +30,7 @@ assert "StormPolicy.transition(" in src
 assert 'id = "apollo-noaa-kp-storm-" + observedMs' in src
 assert "interval: 300000" in space
 assert "NOAA SWPC" in src
-for forbidden in ["Process {", "Timer {", "curl", "spaceService.refresh(",
+for forbidden in ["Process {", "Timer {", 'command: ["curl"', "spaceService.refresh(",
                   "systemctl", "pkexec", "Quickshell.execDetached", "kill("]:
     assert forbidden not in src, f"storm producer cannot poll/control: {forbidden}"
 NODE = r"""

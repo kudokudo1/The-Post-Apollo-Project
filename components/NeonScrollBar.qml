@@ -24,10 +24,15 @@ Item {
         geometryHost ? geometryHost : parent
     // Do not follow a parent Flickable's scrolling content or reinterpret
     // intentional protruding rails as ordinary box-edge tracks.
+    readonly property bool hostIsScrollingContent:
+        effectiveGeometryHost && effectiveGeometryHost.parent
+        && effectiveGeometryHost.parent.contentItem === effectiveGeometryHost
+        && effectiveGeometryHost.parent.flickableDirection !== undefined
     readonly property bool boxSideGeometry:
         geometryMode !== "viewport"
         && effectiveGeometryHost
-        && (geometryHost || effectiveGeometryHost.flickableDirection === undefined)
+        && (geometryHost || (!hostIsScrollingContent
+                             && effectiveGeometryHost.flickableDirection === undefined))
         && trackTopExtension <= 0
 
     // Find the usable side between real header/footer siblings of the pane.

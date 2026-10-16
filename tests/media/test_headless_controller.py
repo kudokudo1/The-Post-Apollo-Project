@@ -196,7 +196,7 @@ class HiFiControllerTests(unittest.TestCase):
         self.assertEqual(self.c.request({"version": 1, "op": "select",
                          "args": {"ref": ref("missing")}})["error"]["code"], "NOT_FOUND")
         self.assertEqual(self.c.request({"version": 1, "op": "select",
-                         "args": {"ref": {"source": "youtube", "kind": "track",
+                         "args": {"ref": {"source": "unknown-future-provider", "kind": "track",
                                            "id": "abc"}}})["error"]["code"], "UNKNOWN_SOURCE")
 
     def test_no_unverified_player_volume(self):

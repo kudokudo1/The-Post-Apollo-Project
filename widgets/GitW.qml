@@ -5,6 +5,7 @@ import qs.components
 import qs.components as SharedComponents
 import "../services/git"
 import "../services/github"
+import qs.services.notifications
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 
@@ -28,6 +29,113 @@ PanelWindow {
     property bool relationshipFocusModeActive: false
     property bool relationshipFocused: false
     property bool focusKeyTraceEnabled: false
+
+    // Notifications #2: GitHub is an event producer. It may report only
+    // completed operation signals, never inferred results from polling.
+    // Retain a stable source key so DND, snooze, and Favorites apply.
+    function publishGitHubOutcome(repository, number, title, message, severity, eventType) {
+        const repo = String(repository || "").trim();
+        if (!/^[^/\s]+\/[^/\s]+$/.test(repo))
+            return false;
+
+        const parsedNumber = Number(number || 0);
+        const prNumber = Number.isFinite(parsedNumber) && parsedNumber > 0
+            ? Math.floor(parsedNumber) : 0;
+        const target = prNumber > 0 ? " // #" + prNumber : "";
+
+        NotificationsService.pushRich({
+            "source": "GITHUB",
+            "sourceId": "github",
+            "category": "internal",
+            "severity": severity,
+            "title": title,
+            "message": message + " // " + repo + target,
+            "tags": ["github", "pull-request", eventType],
+            "context": {
+                "repository": repo,
+                "pullRequestNumber": prNumber,
+                "eventType": eventType
+            }
+        });
+        return true;
+    }
+
+    function reportPullRequestMutation(succeeded, verified, operation, evidence) {
+        const action = String(operation || "").trim().toLowerCase();
+        const isMerge = action.indexOf("merge-") === 0;
+        if (!isMerge && ["create", "close", "reopen"].indexOf(action) < 0)
+            return;
+
+        const result = evidence || {};
+        const pr = result.pullRequest || {};
+        const repository = String(
+            result.repository || githubPullRequestLifecycleService.pendingRepository || ""
+        ).trim();
+        const number = Number(
+            pr.number || githubPullRequestLifecycleService.pendingEvidenceTarget || 0
+        );
+        const state = String(pr.state || "").toUpperCase();
+        const expectedState = isMerge ? "MERGED" : action === "close" ? "CLOSED" : "OPEN";
+        const confirmed = succeeded && verified
+            && Number.isFinite(number) && number > 0
+            && state === expectedState
+            && String(pr.url || "").length > 0;
+        const display = isMerge ? "MERGE" : action.toUpperCase();
+
+        if (confirmed) {
+            const title = isMerge ? "PR MERGED"
+                : action === "create" ? "PR CREATED"
+                : action === "close" ? "PR CLOSED" : "PR REOPENED";
+            root.publishGitHubOutcome(
+                repository, number, title,
+                "GitHub confirmed the pull request state.",
+                "normal", "pr-" + action
+            );
+        } else {
+            // The process may have succeeded while verification failed.
+            // Do not call this a completed merge or include raw gh stderr.
+            root.publishGitHubOutcome(
+                repository, number,
+                succeeded ? "PR " + display + " UNVERIFIED" : "PR " + display + " FAILED",
+                succeeded
+                    ? "The command succeeded but the requested GitHub state was not verified. Inspect the PR."
+                    : "The operation did not complete. Inspect GitHub before retrying.",
+                "warning", "pr-" + action + "-attention"
+            );
+        }
+    }
+
+    function reportMergeQueueMutation(succeeded, verified, operation, evidence) {
+        const action = String(operation || "").trim().toLowerCase();
+        if (action !== "enqueue" && action !== "dequeue")
+            return;
+
+        const result = evidence || {};
+        const preview = githubMergeQueueLifecycleService.preview || {};
+        const repository = String(result.repository || preview.repository || "").trim();
+        const number = Number(result.pullRequestNumber || preview.number || 0);
+        const confirmed = succeeded && verified
+            && Number.isFinite(number) && number > 0
+            && Boolean(result.queued) === (action === "enqueue");
+
+        if (confirmed) {
+            root.publishGitHubOutcome(
+                repository, number,
+                action === "enqueue" ? "PR QUEUED" : "PR DEQUEUED",
+                "GitHub confirmed the merge-queue state.",
+                "normal", "queue-" + action
+            );
+        } else {
+            root.publishGitHubOutcome(
+                repository, number,
+                succeeded ? "MERGE QUEUE UNVERIFIED" : "MERGE QUEUE FAILED",
+                succeeded
+                    ? "The command succeeded but the queue state was not verified. Check GitHub."
+                    : "The queue operation did not complete. Check GitHub before retrying.",
+                "warning", "queue-" + action + "-attention"
+            );
+        }
+    }
 
     // Permanent-mapped overlay: initial owner claim may precede compositor
     // commitment of the changed keyboard input region. Notifications already
@@ -2529,6 +2637,25 @@ PanelWindow {
 
     GitHubMergeQueueLifecycleService {
         id: githubMergeQueueLifecycleService
+    }
+
+    // Actual PR/queue mutation completion, not polling or preview events.
+    Connections {
+        target: githubPullRequestLifecycleService
+        function onMutationFinished(mutationSucceeded, evidenceVerified, operation, evidence) {
+            root.reportPullRequestMutation(
+                mutationSucceeded, evidenceVerified, operation, evidence
+            );
+        }
+    }
+
+    Connections {
+        target: githubMergeQueueLifecycleService
+        function onMutationFinished(mutationSucceeded, evidenceVerified, operation, evidence) {
+            root.reportMergeQueueMutation(
+                mutationSucceeded, evidenceVerified, operation, evidence
+            );
+        }
     }
 
     GitHubPullRequestReviewThreadProvider {

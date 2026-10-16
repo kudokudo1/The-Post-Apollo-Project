@@ -80,7 +80,7 @@ while (ctx.running && count++<100){
 if(ctx.running || ctx.finished!==1 || ctx.completedFloors!==8 ||
    ctx.floors.length!==8 || maxConcurrent!==3)
     throw Error(JSON.stringify({running:ctx.running,done:ctx.completedFloors,
-        floors:ctx.floors,maximum:maxConcurrent,finish:ctx.finished}));
+        floors:ctx.floors,maximum:maxConcurrent,finish:ctx.finished,active:ctx.inFlightFloors,next:ctx.scanIndex,queued:queue.length,loops:count}));
 const seen=new Set(ctx.floors.map(f=>f.floorId));
 if(seen.size!==8) throw Error("duplicate Floor dispatch");
 if(!ctx.floors.some(f=>f.floorId==="2" && f.status==="AUDIT_ERROR"))

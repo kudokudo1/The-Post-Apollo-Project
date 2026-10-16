@@ -14,7 +14,7 @@ Rectangle {
     property int maxVisibleLanes: 7
     // Operator-adjustable branch-map rail shift; affects the track and
     // reserved label clearance together, never the shared scrollbar default.
-    property int scrollbarLeftShift: 20
+    property int scrollbarLeftShift: 28
 
     signal commitSelected(string sha)
 
@@ -568,7 +568,7 @@ Rectangle {
         flickable: topologyFlick
         handleStyle: "star"
         // Keep the outer frame as the geometry owner, but place the rail
-        // in the inset right-side lane, 20px farther left per the operator.
+        // in the inset right-side lane, 28px left of its baseline placement.
         // Start level with the COMMITS // REFS data row, not the top border.
         mountingParent: branchMap
         geometryHost: branchMap

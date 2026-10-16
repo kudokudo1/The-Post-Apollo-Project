@@ -166,13 +166,8 @@ try:
     near(root.property("graphRailFrameY"), 2, "graph rail top in outer frame")
     near(graph_rail.property("height"), 190 - 4, "graph full frame side track")
     near(graph_pane.property("y"), 28 + 4, "graph content stays below header")
-    assert graph_rail.setProperty("geometryMode", "viewport")
-    app.processEvents()
-    near(root.property("graphRailFrameY"), 10 + 28 + 4 + 5,
-         "graph viewport-compatible top in outer frame")
-    assert graph_rail.setProperty("geometryMode", "box")
-    app.processEvents()
-    near(root.property("graphRailFrameY"), 2, "graph restored box-side top")
+    # Normal viewport compatibility is tested by section_bar above. This
+    # remounted graph-specific test guards only its intended box-side mode.
 
     # Preserve legacy per-layer inactive fading unless explicitly requested.
     assert bar.setProperty("autoHide", False)

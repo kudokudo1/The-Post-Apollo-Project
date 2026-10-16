@@ -294,7 +294,9 @@ Rectangle {
         }
 
         height: 29
-        opacity: enabledAction ? 1.0 : 0.36
+        // Keep the active fill readable while the mutation temporarily
+        // disables another click on its originating button.
+        opacity: (enabledAction || loading || loadingComplete) ? 1.0 : 0.36
         color:
             selectedAction || mouse.containsMouse
             ? Colors.black
@@ -560,6 +562,7 @@ Rectangle {
             width: parent.width
             detail: !!root.lifecycleService.lastError
                     || root.lifecycleService.busy
+                    || root.isClosed || root.isMerged
             text:
                 root.armedAction
                 ? "ARMED // "
@@ -727,8 +730,9 @@ Rectangle {
                         width: 100
                         actionToken: "close-reopen"
                         label:
-                            String(root.pullRequestState || "").toUpperCase()
-                                === "CLOSED"
+                            root.isMerged
+                            ? "MERGED"
+                            : root.isClosed
                             ? "REOPEN"
                             : root.armedAction === "close"
                             ? "CONFIRM CLOSE"

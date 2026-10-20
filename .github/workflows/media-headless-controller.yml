@@ -5,6 +5,7 @@ on:
     paths:
       - "scripts/media/headless_mpd.py"
       - "scripts/media/youtube_catalog.py"
+      - "scripts/media/direct_stream_source.py"
       - "scripts/media/media_controller.py"
       - "scripts/media/media_intent_store.py"
       - "scripts/media/mpd_audio_probe.py"
@@ -12,6 +13,7 @@ on:
       - "scripts/media/media_controller_cli.py"
       - "tests/media/test_headless_controller.py"
       - "tests/media/test_youtube_catalog.py"
+      - "tests/media/test_direct_stream_source.py"
       - "tests/media/test_media_intent_store.py"
       - "tests/media/test_mpd_audio_probe.py"
       - ".github/workflows/media-headless-controller.yml"
@@ -31,6 +33,7 @@ jobs:
           python3 -m py_compile \
             scripts/media/headless_mpd.py \
             scripts/media/youtube_catalog.py \
+            scripts/media/direct_stream_source.py \
             scripts/media/media_controller.py \
             scripts/media/media_intent_store.py \
             scripts/media/mpd_audio_probe.py \
@@ -38,6 +41,7 @@ jobs:
             scripts/media/media_controller_cli.py \
             tests/media/test_headless_controller.py \
             tests/media/test_youtube_catalog.py \
+            tests/media/test_direct_stream_source.py \
             tests/media/test_media_intent_store.py \
             tests/media/test_mpd_audio_probe.py
           python3 -m unittest discover \

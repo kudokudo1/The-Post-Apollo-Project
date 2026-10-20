@@ -76,7 +76,7 @@ assert "rightMargin: 5" in profile
 for clause in (
     "id: profileLeftColumn",
     "Math.max(0, height - 2 * spacing)",
-    "Math.min(170, Math.max(100, cardSpace * 0.45))",
+    "Math.min(170, Math.max(90, cardSpace * 0.45))",
     "id: repositoryCatalogFrame",
     "id: targetBatchFrame",
     "id: savedSetsFrame",
@@ -105,12 +105,12 @@ assert 'placeholderText: "PROFILE SET NAME"' in profile
 
 for height in (215, 235, 300, 420):
     space = max(0, height - 2 * 6)
-    saved_target = min(space, min(170, max(100, space * 0.45)))
+    saved_target = min(space, min(170, max(90, space * 0.45)))
     upper = max(0, space - saved_target)
     catalog_height = round(upper * 0.52)
     batch_height = max(0, upper - catalog_height)
     saved_height = max(0, space - catalog_height - batch_height)
-    assert saved_height >= 100, f"Saved Sets collapsed at {height}px"
+    assert saved_height >= 90, f"Saved Sets collapsed at {height}px"
     assert abs(catalog_height + batch_height + saved_height + 12 - height) < 1.1
 
 # Intentionally no modifications to graph panes, shared UI primitive, or

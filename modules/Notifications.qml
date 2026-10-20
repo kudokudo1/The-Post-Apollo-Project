@@ -214,6 +214,7 @@ PanelWindow {
                         width: parent.width
 
                         text: notificationCard.sourceId !== "" ? notificationCard.source + "  [" + notificationCard.sourceId + "]" : notificationCard.source
+                        textFormat: Text.PlainText
 
                         color: Colors.cyan
 

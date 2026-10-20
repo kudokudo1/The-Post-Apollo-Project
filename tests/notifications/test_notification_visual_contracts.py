@@ -120,16 +120,17 @@ for needle, message in (
 ):
     require(POPUP, needle, message)
 
-# Eight compact filter controls follow the exact declared visual order;
+# Eight compact filter controls follow the exact declared visual order,
+# including FAVS immediately after COMBI for keyboard + pointer parity;
 # the underlying 'all' ID remains COMBI's broad filter semantics.
 filter_strip = HUB.split('id: filterStrip')[1].split('// New second header divider')[0]
 assert '(width - (spacing * 7)) / 8' in filter_strip, "eight filters must fit the existing strip"
 expected_filters = [
     ('all', 'COMBI', 'Colors.yellow'),
+    ('favorites', 'FAVS', 'Colors.magenta'),
     ('apps', 'APPS', 'Colors.cyan'),
     ('social', 'SOCIAL', 'root.omnitrixGreen'),
     ('apollo', 'APOLLO', 'Colors.orange'),
-    ('favorites', 'FAVS', 'Colors.magenta'),
     ('system', 'SYSTEM', 'Colors.white'),
     ('warning', 'WARNING', 'Colors.red'),
     ('manager', 'MANAGER', 'Colors.magenta'),
@@ -140,7 +141,7 @@ actual_filters = re.findall(
     filter_strip,
 )
 assert actual_filters == expected_filters, f"filter identities/order drifted: {actual_filters!r}"
-assert '"all", "apps", "social", "apollo", "favorites", "system", "warning", "manager"' in HUB, "keyboard tabs must match visual order"
+assert '"all", "favorites", "apps", "social", "apollo", "system", "warning", "manager"' in HUB, "keyboard tabs must match visual order"
 
 # Favorites Manager shares screen space but cannot eliminate the existing
 # DND list, destructive confirmation, history list or scrollbars.

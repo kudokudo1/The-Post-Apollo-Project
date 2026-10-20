@@ -5,6 +5,7 @@ import qs.components
 import "../services/git"
 import "../services/hospital"
 import qs.services.notifications
+import "../services/notifications/HospitalCertificationNotificationPolicy.js" as CertificationNotificationPolicy
 import "../services/github"
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
@@ -2564,6 +2565,23 @@ PanelWindow {
 
             root.remoteRefreshPending = false;
             githubService.refresh();
+        }
+    }
+
+    // Certification events are emitted after the Hospital records its
+    // transition. Do not interpret passive status updates as acceptance.
+    Connections {
+        target: certificationCoordinator
+
+        function onCertificationChanged(previousState, nextState, eventType) {
+            const outcome = CertificationNotificationPolicy.classify(
+                previousState, nextState, eventType);
+            if (!outcome)
+                return;
+            // Retain the existing Room/Patient gate and Hospital policy key.
+            // Never expose certificationBlocked(reason) raw diagnostics.
+            root.publishRoomOutcome(
+                outcome.title, outcome.message, outcome.severity, outcome.kind);
         }
     }
 

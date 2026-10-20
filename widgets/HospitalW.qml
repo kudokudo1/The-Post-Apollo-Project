@@ -2579,7 +2579,7 @@ PanelWindow {
             if (!outcome)
                 return;
             // Retain the existing Room/Patient gate and Hospital policy key.
-            // Never expose certificationBlocked(reason) raw diagnostics.
+            // Never publish raw certification failure diagnostics.
             root.publishRoomOutcome(
                 outcome.title, outcome.message, outcome.severity, outcome.kind);
         }

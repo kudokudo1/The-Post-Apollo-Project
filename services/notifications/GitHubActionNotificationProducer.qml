@@ -27,7 +27,7 @@ Scope {
                   + " operation. // " + item.repository + " #" + item.number
                 : "The " + item.action + " operation "
                   + (item.outcome === "UNVERIFIED"
-                     ? "reported process success without confirmed evidence."
+                     ? "reported process success, but the requested result was not independently confirmed."
                      : "failed to complete.")
                   + " Inspect GitHub before acting. // " + item.repository
                   + (item.number ? " #" + item.number : ""),

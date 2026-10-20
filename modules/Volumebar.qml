@@ -5,6 +5,7 @@ import QtQuick.Layouts
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 import Quickshell.Services.Pipewire
+import qs.services.notifications
 
 DockButton {
     id: volumebarDock
@@ -35,6 +36,12 @@ DockButton {
     wideGlowIdleOpacity: 0.07
     wideGlowHoverOpacity: 0.09
     wideGlowPressedOpacity: 0.12
+
+    // Observe the exact default-sink ready flag already used by this dock.
+    // This does not query, redirect or control the audio graph.
+    AudioOutputHealthNotificationProducer {
+        outputReady: root.ready
+    }
 
     RowLayout {
         id: root

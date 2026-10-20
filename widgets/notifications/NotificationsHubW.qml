@@ -145,7 +145,7 @@ PanelWindow {
 
     property int appNameFontSize: 14
     property int notificationTitleFontSize: 15
-    property int notificationMessageFontSize: 12
+    property int notificationMessageFontSize: 13
     property int notificationMetaFontSize: 10
 
     // App icon.
@@ -510,7 +510,6 @@ PanelWindow {
 
         property bool active: false
         property bool danger: false
-        property bool whiteLabel: false
 
         property color activeColor: Colors.orange
 
@@ -585,11 +584,6 @@ PanelWindow {
 
                 if (miniButton.danger && miniButton.hovered)
                     return Colors.red;
-
-                // ZZ has a white idle/selected identity, while preserving
-                // the ordinary orange hover and black press grammar.
-                if (miniButton.whiteLabel && !miniButton.hovered && !miniButton.pressed)
-                    return Colors.white;
 
                 if (miniButton.active)
                     return Colors.orange;
@@ -2722,11 +2716,10 @@ PanelWindow {
                                     height: 28
 
                                     label: "ZZ"
-                                    whiteLabel: true
 
                                     active: notificationEntry.snoozed
 
-                                    activeColor: Colors.white
+                                    activeColor: Colors.orange
 
                                     onTriggered: {
                                         if (notificationEntry.snoozed)

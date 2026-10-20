@@ -132,7 +132,7 @@ class DirectStreamTests(unittest.TestCase):
             "https://127.0.0.1/stream",
             "https://10.0.0.1/stream",
             "https://host.local/stream",
-            "https://127.0.0.1.nip.io/stream" if False else "https://device.internal/stream",
+            "https://device.internal/stream",
             "https://user:pass@radio.example.com/music",
             "https://radio.example.com:8080/stream",
             "https://radio.example.com/stream?token=secret",

@@ -125,6 +125,8 @@ class MediaController:
         backend = self._bound_backend()
         if self.owned_active_id is None:
             raise MediaBackendError("NO_OWNED_PLAYBACK", "Start playback through this controller first")
+        # A stale/replaced queue ID must never gain transport ownership.
+        self._verify_loaded_queue()
         current = backend.observe()["current"]
         current_id = str(current["queueId"]) if current and current.get("queueId") else None
         if current_id != self.owned_active_id:
@@ -189,6 +191,8 @@ class MediaController:
             source = self._source(args.get("source", "local-mpd"))
             query = args.get("query")
             cursor = args.get("cursor")
+            if not callable(getattr(source, "search", None)):
+                raise MediaBackendError("UNSUPPORTED", "Source does not support catalog search")
             if source.id == "youtube":
                 result = source.search(query, cursor)
             else:
@@ -241,6 +245,8 @@ class MediaController:
             self.loaded = {"ref": prepared["item"]["ref"], "item": prepared["item"],
                            "backend": backend.id, "queueId": queue_id}
             self.active_backend = backend.id
+            # Newly cued media isn't necessarily the session already playing.
+            self.owned_active_id = None
             self._advance()
             self._save_intent()
             if autoplay:

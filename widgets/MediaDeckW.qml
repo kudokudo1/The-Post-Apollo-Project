@@ -736,7 +736,8 @@ PanelWindow {
                 GohuText {
                     anchors.right: parent.right
                     anchors.top: parent.top
-                    text: deck.transportMode === "mpris" ? "MPRIS / EXTERNAL" : "LOCAL / MPD"
+                    text: deck.transportMode === "mpris"
+                          ? "MPRIS / EXTERNAL" : "HI-FI / CONTROLLER"
                     color: Colors.orange
                     font.pixelSize: 11
                 }
@@ -769,13 +770,25 @@ PanelWindow {
                             id: transportKey
 
                             required property var modelData
+                            readonly property bool localCanControl:
+                                !!headless.loaded && !headless.busy
+                                && (modelData.action === "play"
+                                    || (headless.ownsPlayback
+                                        && (modelData.action === "pause"
+                                            || modelData.action === "stop"
+                                            || (!headless.loaded.item.live
+                                                && ["previous", "next", "rewind5",
+                                                    "forward5"].indexOf(modelData.action) !== -1))))
+                            readonly property bool canControl:
+                                deck.transportMode === "mpris"
+                                ? mediaAdapter.supports(modelData.action)
+                                : localCanControl
 
                             width: (transportGrid.width
                                     - 3 * transportGrid.spacing) / 4
                             height: 50
                             radius: 3
-                            opacity: deck.transportMode !== "mpris"
-                                     || mediaAdapter.supports(modelData.action) ? 1.0 : 0.45
+                            opacity: transportKey.canControl ? 1.0 : 0.45
 
                             color: keyMouse.pressed
                                    ? "#16131B"
@@ -808,9 +821,10 @@ PanelWindow {
                             MouseArea {
                                 id: keyMouse
                                 anchors.fill: parent
+                                enabled: transportKey.canControl
                                 acceptedButtons: Qt.LeftButton
                                 hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
+                                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
 
                                 onClicked: deck.runTransport(
                                     transportKey.modelData.action
@@ -827,7 +841,9 @@ PanelWindow {
                     anchors.topMargin: 184
                     text: deck.transportMode === "mpris"
                           ? "STREAM TEST / MAY AFFECT OTHER BROWSER TABS"
-                          : "SWITCH TO MPRIS TO INSPECT BROWSER AUDIO"
+                          : (headless.loaded
+                             ? "CASSETTE LOADED / PRESS PLAY TO START"
+                             : "LOAD INTERNET RADIO IN CASSETTE BAY")
                     color: Colors.orange
                     font.pixelSize: 11
                     elide: Text.ElideRight
@@ -891,7 +907,9 @@ PanelWindow {
                     anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.topMargin: 259
-                    text: deck.audioSelectionLabel
+                    text: deck.transportMode === "mpd"
+                          ? ("PLAYBACK: " + headless.playbackState.toUpperCase())
+                          : deck.audioSelectionLabel
                     color: Colors.orange
                     font.pixelSize: 12
                     elide: Text.ElideRight
@@ -902,7 +920,8 @@ PanelWindow {
                     anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.topMargin: 281
-                    text: deck.audioTestStatus
+                    text: deck.transportMode === "mpd"
+                          ? headless.message : deck.audioTestStatus
                     color: Colors.cyan
                     font.pixelSize: 10
                     elide: Text.ElideRight
@@ -913,7 +932,7 @@ PanelWindow {
                     anchors.bottom: parent.bottom
                     text: deck.transportMode === "mpris"
                           ? "3S EXPERIMENT // AUTO-RESTORE REQUESTED"
-                          : "TRANSPORT // LOCAL MPD"
+                          : "TRANSPORT // HEADLESS MPD CONTROLLER"
                     color: Colors.cyan
                     opacity: 0.6
                     font.pixelSize: 10

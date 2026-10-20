@@ -214,6 +214,7 @@ PanelWindow {
                         width: parent.width
 
                         text: notificationCard.sourceId !== "" ? notificationCard.source + "  [" + notificationCard.sourceId + "]" : notificationCard.source
+                        textFormat: Text.PlainText
 
                         color: Colors.cyan
 
@@ -226,6 +227,7 @@ PanelWindow {
                         width: parent.width
 
                         text: notificationCard.title
+                        textFormat: Text.PlainText
 
                         color: Colors.orange
 
@@ -238,6 +240,7 @@ PanelWindow {
                         width: parent.width
 
                         text: notificationCard.message
+                        textFormat: Text.PlainText
 
                         color: Colors.white
 

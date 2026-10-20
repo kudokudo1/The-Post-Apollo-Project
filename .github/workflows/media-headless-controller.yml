@@ -3,6 +3,9 @@ name: Media Headless Controller Contracts
 on:
   pull_request:
     paths:
+      - "widgets/MediaDeckW.qml"
+      - "services/media/HeadlessMediaController.qml"
+      - "tests/media/test_headless_deck_bridge.cjs"
       - "scripts/media/headless_mpd.py"
       - "scripts/media/youtube_catalog.py"
       - "scripts/media/direct_stream_source.py"
@@ -50,3 +53,5 @@ jobs:
             tests/media/test_native_pipewire_evidence.py
           python3 -m unittest discover \
             -s tests/media -p 'test_*.py' -v
+      - name: Hi-Fi deck source and ownership safety contracts
+        run: node --test tests/media/test_headless_deck_bridge.cjs

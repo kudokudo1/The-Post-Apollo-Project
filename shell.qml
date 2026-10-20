@@ -290,6 +290,16 @@ PanelWindow {
         telemetry: sharedSystemTelemetry
     }
 
+    // Monitor health uses actual completed CPU++ observations, not optimistic
+    // errorText clearing at the start of a refresh.
+    CpuPlusTelemetryHealthNotificationProducer {
+        telemetry: sharedSystemTelemetry
+    }
+
+    // Notifications storage outcomes observe its existing FileView statuses;
+    // there is no second persistence backend.
+    NotificationsPersistenceHealthProducer {}
+
     FanControl {
         id: sharedFanControl
 

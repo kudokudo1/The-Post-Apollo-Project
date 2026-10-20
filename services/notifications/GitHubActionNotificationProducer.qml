@@ -50,7 +50,7 @@ Scope {
         producer.publish(ActionsPolicy.issue(
             succeeded, verified, operation, evidence,
             producer.issueLifecycle.pendingRepository,
-            producer.issueLifecycle.issueNumber));
+            producer.issueLifecycle.pendingEvidenceTarget));
     }
     function reviewFinished(succeeded, verified, operation, evidence) {
         producer.publish(ActionsPolicy.review(

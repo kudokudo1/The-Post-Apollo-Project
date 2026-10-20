@@ -62,6 +62,9 @@ jobs:
       - name: Validate CPU++ hwmon fan-health notifications
         run: python3 tests/notifications/test_cpu_plus_fan_health_producer.py
 
+      - name: Validate CPU++ telemetry and notification storage health
+        run: python3 tests/notifications/test_monitor_and_storage_health.py
+
       - name: Validate origin/domain/severity classification
         run: python3 tests/notifications/test_notification_facets.py
 

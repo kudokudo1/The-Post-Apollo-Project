@@ -227,6 +227,7 @@ PanelWindow {
                         width: parent.width
 
                         text: notificationCard.title
+                        textFormat: Text.PlainText
 
                         color: Colors.orange
 
@@ -239,6 +240,7 @@ PanelWindow {
                         width: parent.width
 
                         text: notificationCard.message
+                        textFormat: Text.PlainText
 
                         color: Colors.white
 

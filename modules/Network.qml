@@ -41,6 +41,12 @@ DockButton {
         id: networkLinkProducer
     }
 
+    // Separate slow Internet reachability checks from high-frequency link
+    // observations. Both see the same nmcli result; neither changes a link.
+    NetworkInternetHealthNotificationProducer {
+        id: networkInternetHealthProducer
+    }
+
     RowLayout {
         id: root
 

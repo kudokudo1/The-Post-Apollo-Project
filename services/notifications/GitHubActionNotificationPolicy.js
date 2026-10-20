@@ -13,8 +13,7 @@ function number(value) {
 }
 function issue(succeeded, verified, operation, evidence, fallbackRepo, fallbackNumber) {
     const action = String(operation || "").toLowerCase().trim();
-    if (["create", "edit", "comment", "close", "reopen", "assign", "unassign",
-         "label", "unlabel"].indexOf(action) < 0)
+    if (["create", "edit", "comment", "close", "reopen", "labels", "assignees"].indexOf(action) < 0)
         return null;
     const row = evidence || {};
     const issue = row.issue || {};

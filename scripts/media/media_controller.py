@@ -11,6 +11,7 @@ from headless_mpd import LocalMpdSource, MediaBackendError, MpdBackend
 from youtube_catalog import YouTubeCatalogSource
 from media_intent_store import IntentStore
 from mpd_audio_probe import MpdAudioEvidenceProbe
+from direct_stream_source import DirectHttpsStreamSource
 
 
 class MediaController:
@@ -22,7 +23,8 @@ class MediaController:
         self.backends = {mpd.id: mpd}
         local = LocalMpdSource(mpd)
         youtube = YouTubeCatalogSource()
-        self.sources = {local.id: local, youtube.id: youtube}
+        stream = DirectHttpsStreamSource(mpd)
+        self.sources = {local.id: local, youtube.id: youtube, stream.id: stream}
         self.audio_probe = MpdAudioEvidenceProbe(mpd)
         self.browse_context: dict[str, Any] | None = None
         self.selection: dict[str, Any] | None = None
@@ -104,7 +106,8 @@ class MediaController:
     def _backend_for(self, prepared: dict[str, Any]) -> MpdBackend:
         eligible = [
             backend for backend in self.backends.values()
-            if backend.required_kind == prepared.get("requiredKind")
+            if prepared.get("requiredKind", "") in getattr(
+                backend, "required_kinds", (backend.required_kind,))
             and backend.probe()["available"]
         ]
         if not eligible:
@@ -122,6 +125,8 @@ class MediaController:
         backend = self._bound_backend()
         if self.owned_active_id is None:
             raise MediaBackendError("NO_OWNED_PLAYBACK", "Start playback through this controller first")
+        # A stale/replaced queue ID must never gain transport ownership.
+        self._verify_loaded_queue()
         current = backend.observe()["current"]
         current_id = str(current["queueId"]) if current and current.get("queueId") else None
         if current_id != self.owned_active_id:
@@ -186,6 +191,8 @@ class MediaController:
             source = self._source(args.get("source", "local-mpd"))
             query = args.get("query")
             cursor = args.get("cursor")
+            if not callable(getattr(source, "search", None)):
+                raise MediaBackendError("UNSUPPORTED", "Source does not support catalog search")
             if source.id == "youtube":
                 result = source.search(query, cursor)
             else:
@@ -238,6 +245,8 @@ class MediaController:
             self.loaded = {"ref": prepared["item"]["ref"], "item": prepared["item"],
                            "backend": backend.id, "queueId": queue_id}
             self.active_backend = backend.id
+            # Newly cued media isn't necessarily the session already playing.
+            self.owned_active_id = None
             self._advance()
             self._save_intent()
             if autoplay:

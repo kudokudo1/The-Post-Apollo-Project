@@ -56,3 +56,11 @@ test("original browser audio experiment remains isolated to MPRIS", () => {
     assert.match(deck, /enabled:\s*deck\.transportMode\s*===\s*"mpris"/);
     assert.match(deck, /audioProbe\.refresh\(\)/);
 });
+
+test("background snapshot polling never flashes or disables radio cassette controls", () => {
+    assert.match(bridge, /readonly property bool busy:\s*commandProcess\.running\s*&&\s*pendingAction\s*!==\s*"snapshot"/);
+    assert.match(bridge, /onTriggered:\s*bridge\.refresh\(\)/);
+    assert.match(bridge, /issue\("snapshot",\s*\[\]\)/);
+    assert.match(deck, /opacity:\s*headless\.busy\s*\?\s*0\.5\s*:\s*1/);
+    assert.match(deck, /enabled:\s*!headless\.busy/);
+});

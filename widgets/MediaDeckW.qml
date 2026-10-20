@@ -325,7 +325,8 @@ PanelWindow {
                 GohuText {
                     anchors.left: parent.left
                     anchors.top: parent.top
-                    text: "DISPLAY / BROWSER"
+                    text: deck.transportMode === "mpd"
+                          ? "HI-FI / INDEPENDENT MUSIC" : "DISPLAY / BROWSER"
                     color: Colors.cyan
                     font.pixelSize: 16
                 }
@@ -335,7 +336,9 @@ PanelWindow {
                     anchors.topMargin: 35
                     anchors.left: parent.left
                     anchors.right: parent.right
-                    text: mediaAdapter.connected
+                    text: deck.transportMode === "mpd"
+                          ? "SOURCE: INTERNET RADIO / GROOVE SALAD"
+                          : mediaAdapter.connected
                           ? ("EXTERNAL: " + String(mediaAdapter.activePlayer.identity || "MPRIS"))
                           : "EXTERNAL: NO PLAYER SELECTED"
                     color: Colors.orange
@@ -348,9 +351,13 @@ PanelWindow {
                     anchors.topMargin: 61
                     anchors.left: parent.left
                     anchors.right: parent.right
-                    text: mediaAdapter.connected
+                    text: deck.transportMode === "mpd"
+                          ? (headless.loaded
+                             ? ("LOADED: " + String(headless.loaded.item.title || "RADIO"))
+                             : "NO CASSETTE LOADED / SELECT RADIO BELOW")
+                          : mediaAdapter.connected
                           ? String(mediaAdapter.activePlayer.trackTitle || "NO TRACK METADATA")
-                          : "Open a YouTube video in a browser first."
+                          : "NO EXTERNAL PLAYER SELECTED"
                     color: Colors.white
                     font.pixelSize: 14
                     elide: Text.ElideRight
@@ -361,7 +368,11 @@ PanelWindow {
                     anchors.topMargin: 90
                     anchors.left: parent.left
                     anchors.right: parent.right
-                    text: "AUDIO: "
+                    text: deck.transportMode === "mpd"
+                          ? ("STATE: " + headless.playbackState.toUpperCase()
+                             + (headless.ownsPlayback ? " / CONTROLLER OWNED"
+                                : " / NOT OWNED"))
+                          : "AUDIO: "
                           + (browserAudioEvidence
                              ? browserAudioEvidence.indexes.length + " APP STREAM(S)"
                              : "NO APP TARGET")
@@ -376,7 +387,11 @@ PanelWindow {
                     anchors.topMargin: 111
                     anchors.left: parent.left
                     anchors.right: parent.right
-                    text: audioProbe.errorText
+                    text: deck.transportMode === "mpd"
+                          ? (headless.errorText
+                             ? ("ERROR: " + headless.errorText)
+                             : "MUSIC SOURCE: MPD / HEADLESS CONTROLLER")
+                          : audioProbe.errorText
                           ? ("PROBE ERROR: " + audioProbe.errorText)
                           : "PIPEWIRE MATCH IS NOT PER-TAB PROOF"
                     color: Colors.orange
@@ -389,10 +404,14 @@ PanelWindow {
                     anchors.topMargin: 132
                     anchors.left: parent.left
                     anchors.right: parent.right
-                    text: "TARGET: " + (deck.autoFollowEnabled
+                    text: deck.transportMode === "mpd"
+                          ? headless.message
+                          : "TARGET: " + (deck.autoFollowEnabled
                            ? "AUTO FOLLOW / " : "MANUAL / ")
                            + deck.audioTargetResolution.status
-                    color: deck.selectedAudioCandidate ? Colors.cyan : Colors.orange
+                    color: deck.transportMode === "mpd"
+                           ? (headless.errorText ? Colors.orange : Colors.cyan)
+                           : (deck.selectedAudioCandidate ? Colors.cyan : Colors.orange)
                     font.pixelSize: 10
                     elide: Text.ElideRight
                 }
@@ -474,7 +493,7 @@ PanelWindow {
 
                         GohuText {
                             anchors.centerIn: parent
-                            text: "LOCAL / MPD"
+                            text: "HI-FI / MPD"
                             font.pixelSize: 12
                             color: Colors.white
                         }
@@ -535,7 +554,9 @@ PanelWindow {
                     anchors.left: parent.left
                     anchors.right: parent.right
                     anchors.bottom: parent.bottom
-                    text: "READ-ONLY AUDIO PROBE • NO VOLUME MUTATIONS"
+                    text: deck.transportMode === "mpd"
+                          ? "INDEPENDENT PLAYBACK • VOLUME / CAVA PENDING"
+                          : "READ-ONLY AUDIO PROBE • NO VOLUME MUTATIONS"
                     color: Colors.cyan
                     opacity: 0.65
                     font.pixelSize: 10

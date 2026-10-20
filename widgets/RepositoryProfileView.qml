@@ -512,7 +512,7 @@ Item {
                     Math.max(0, height - 2 * spacing)
                 readonly property real savedSetSpace:
                     Math.min(cardSpace,
-                             Math.min(170, Math.max(100, cardSpace * 0.45)))
+                             Math.min(170, Math.max(90, cardSpace * 0.45)))
                 readonly property real upperCardSpace:
                     Math.max(0, cardSpace - savedSetSpace)
 
@@ -941,6 +941,7 @@ Item {
                             text: "SAVED SETS // TARGETS + VISIBILITY + TOPICS + DESCRIPTION"
                             font.pixelSize: 7
                             color: Colors.cyan
+                            elide: Text.ElideRight
                         }
 
                         Flickable {

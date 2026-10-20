@@ -32,6 +32,9 @@ jobs:
       - name: Validate notification policy contracts
         run: python3 tests/notifications/test_notification_policy_contracts.py
 
+      - name: Validate native and browser notification intake contracts
+        run: python3 tests/notifications/test_external_native_intake.py
+
       - name: Validate recorded Hospital certification lifecycle notifications
         run: python3 tests/notifications/test_hospital_certification_notifications.py
 

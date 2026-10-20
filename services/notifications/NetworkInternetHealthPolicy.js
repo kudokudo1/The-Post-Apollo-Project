@@ -53,10 +53,17 @@ function transition(previous, observation, timeMs) {
         sinceMs: Number(old.sinceMs || 0),
         lastSampleMs: Number(old.lastSampleMs || 0)
     };
-    if (!observation || ["reachable", "dns-failed", "https-failed"]
-            .indexOf(observation.status) < 0
-            || typeof timeMs !== "number" || !isFinite(timeMs)
+    if (!observation || typeof timeMs !== "number" || !isFinite(timeMs)
             || timeMs <= 0 || timeMs <= state.lastSampleMs)
+        return { state: state, event: "" };
+
+    if (observation.status === "unknown") {
+        resetCandidate(state);
+        state.lastSampleMs = timeMs;
+        return { state: state, event: "" };
+    }
+    if (["reachable", "dns-failed", "https-failed"]
+            .indexOf(observation.status) < 0)
         return { state: state, event: "" };
 
     if (state.lastSampleMs && timeMs - state.lastSampleMs > 420000)

@@ -140,7 +140,9 @@ state=P.initial();
 assert.strictEqual(sample(result('https','https'),1000),'');
 assert.strictEqual(sample(result('unknown','https'),121000),'',
  'uncertain probe can never notify');
-assert.strictEqual(sample(result('https','https'),241000),'https-failed');
+assert.strictEqual(sample(result('https','https'),241000),'',
+ 'unknown interrupts a candidate streak');
+assert.strictEqual(sample(result('https','https'),361000),'https-failed');
 state=P.initial();
 assert.strictEqual(sample(result('dns','dns'),1000),'');
 assert.strictEqual(sample(result('dns','dns'),500000),'','stale observation invalidates pending');

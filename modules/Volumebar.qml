@@ -5,6 +5,7 @@ import QtQuick.Layouts
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 import Quickshell.Services.Pipewire
+import qs.services.notifications
 
 DockButton {
     id: volumebarDock

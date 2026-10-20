@@ -28,7 +28,10 @@ def send(socket_path: Path, op: str, args: dict | None = None) -> dict:
 
 
 def ref(uri: str, source: str = "local-mpd") -> dict:
-    return {"source": source, "kind": "video" if source == "youtube" else "track", "id": uri}
+    return {"source": source,
+            "kind": "video" if source == "youtube" else
+                    "stream" if source == "direct-stream" else "track",
+            "id": uri}
 
 
 def main() -> int:
@@ -50,11 +53,11 @@ def main() -> int:
     for name in ("inspect", "select", "queue-add"):
         sub = subs.add_parser(name)
         sub.add_argument("uri", help="Exact source-qualified media ID returned by search")
-        sub.add_argument("--source", choices=["local-mpd", "youtube"], default="local-mpd")
+        sub.add_argument("--source", choices=["local-mpd", "youtube", "direct-stream"], default="local-mpd")
     load = subs.add_parser("load")
     load.add_argument("--uri", default=None,
-                      help="Specific MPD library file; default is selected track")
-    load.add_argument("--source", choices=["local-mpd", "youtube"], default="local-mpd")
+                      help="Exact MPD library file or approved HTTPS stream URL; otherwise selected media")
+    load.add_argument("--source", choices=["local-mpd", "youtube", "direct-stream"], default="local-mpd")
     load.add_argument("--autoplay", action="store_true",
                       help="Explicitly start after loading (default is NO autoplay)")
     seek = subs.add_parser("seek")

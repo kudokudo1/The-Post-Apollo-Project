@@ -25,6 +25,14 @@ PanelWindow {
     // MPD remains the default. MPRIS is opt-in and targets one explicitly
     // selected external player; it is not a loaded YouTube playlist.
     property string transportMode: "mpd"
+    // Operator-selected initial radio station, not a searchable catalog.
+    readonly property string radioStreamUrl:
+        "https://ice5.somafm.com/groovesalad-128-mp3"
+
+    HeadlessMediaController {
+        id: headless
+        polling: deck.menuOpen && deck.transportMode === "mpd"
+    }
 
     MprisPlaybackAdapter {
         id: mediaAdapter
@@ -241,8 +249,10 @@ PanelWindow {
     }
 
     onMenuOpenChanged: {
-        if (menuOpen)
+        if (menuOpen && transportMode === "mpris")
             audioProbe.refresh();
+        if (menuOpen && transportMode === "mpd")
+            headless.refresh();
     }
 
     function runTransport(action) {
@@ -251,30 +261,12 @@ PanelWindow {
                 console.log("MediaDeck: MPRIS command unavailable", action);
             return;
         }
-        runLocalTransport(action);
+        if (!headless.transport(action))
+            console.log("MediaDeck: controller command unavailable", action);
     }
-    // The three functional zones are now stacked, with controls receiving
-    // the largest share. These proportions are still design parameters.
+
     property real displayHeightShare: 0.34
     property real cassetteHeightShare: 0.24
-
-    // Only the local MPD backend is connected in this prototype.
-    // A shared source-neutral transport service is a later milestone.
-    function runLocalTransport(action) {
-        const commands = {
-            previous: ["mpc", "prev"],
-            play: ["mpc", "play"],
-            pause: ["mpc", "pause", "1"],
-            next: ["mpc", "next"],
-            rewind5: ["mpc", "seek", "-5"],
-            forward5: ["mpc", "seek", "+5"],
-            stop: ["mpc", "stop"]
-        };
-
-        const command = commands[action];
-        if (command)
-            Quickshell.execDetached(command);
-    }
 
     screen: Quickshell.screens.find(s => s.name === "DP-5")
 

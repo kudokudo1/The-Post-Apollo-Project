@@ -2505,6 +2505,12 @@ PanelWindow {
             : gitService.cloneDestinationPath
     }
 
+    // Read-only notifications ONLY when the existing operation journal emits
+    // a confirmed completion/failure record. Never initiates a Git action.
+    LocalGitJournalNotificationProducer {
+        operationJournal: operationJournalService
+    }
+
     GitOperationRecoveryService {
         id: operationRecoveryService
         operationJournal: operationJournalService

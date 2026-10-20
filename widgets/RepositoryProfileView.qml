@@ -500,13 +500,26 @@ Item {
             spacing: 10
 
             Column {
+                id: profileLeftColumn
                 width: (parent.width - 10) * 0.43
                 height: parent.height
-                spacing: 8
+                spacing: 6
+
+                // Divide actual available height among the three panels.
+                // Fixed catalog/queue heights previously made Saved Sets
+                // negative in the compact GitHub camera.
+                readonly property real cardSpace:
+                    Math.max(0, height - 2 * spacing)
+                readonly property real savedSetSpace:
+                    Math.min(cardSpace,
+                             Math.min(170, Math.max(100, cardSpace * 0.45)))
+                readonly property real upperCardSpace:
+                    Math.max(0, cardSpace - savedSetSpace)
 
                 Rectangle {
+                    id: repositoryCatalogFrame
                     width: parent.width
-                    height: 205
+                    height: Math.round(profileLeftColumn.upperCardSpace * 0.52)
                     color: Colors.dark
                     border.width: 1
                     border.color: Colors.cyan
@@ -514,14 +527,14 @@ Item {
                     Column {
                         anchors {
                             fill: parent
-                            margins: 7
+                            margins: 4
                         }
 
-                        spacing: 5
+                        spacing: 3
 
                         Row {
                             width: parent.width
-                            height: 24
+                            height: 22
 
                             GohuText {
                                 width: parent.width - 84
@@ -532,7 +545,7 @@ Item {
 
                             ManagerButton {
                                 width: 84
-                                height: 24
+                                height: 22
                                 label: "REFRESH"
                                 enabledAction: !root.gitService.discoveringRepos
                                 onTriggered: root.gitService.discoverRepos()
@@ -543,7 +556,7 @@ Item {
                             id: catalogViewport
 
                             width: parent.width
-                            height: parent.height - 34
+                            height: Math.max(0, parent.height - 25)
 
                             Flickable {
                                 id: catalogScroll
@@ -683,8 +696,10 @@ Item {
                 }
 
                 Rectangle {
+                    id: targetBatchFrame
                     width: parent.width
-                    height: 145
+                    height: Math.max(0, profileLeftColumn.upperCardSpace
+                        - repositoryCatalogFrame.height)
                     color: Colors.dark
                     border.width: 1
                     border.color: Colors.orange
@@ -692,14 +707,14 @@ Item {
                     Column {
                         anchors {
                             fill: parent
-                            margins: 7
+                            margins: 4
                         }
 
-                        spacing: 5
+                        spacing: 3
 
                         Row {
                             width: parent.width
-                            height: 24
+                            height: 22
                             spacing: 4
 
                             GohuText {
@@ -711,7 +726,7 @@ Item {
 
                             ManagerButton {
                                 width: 94
-                                height: 24
+                                height: 22
                                 label:
                                     root.queueMissingCount() > 0
                                     ? "PRUNE "
@@ -730,7 +745,7 @@ Item {
 
                             ManagerButton {
                                 width: 66
-                                height: 24
+                                height: 22
                                 label: "CLEAR"
                                 enabledAction: root.profileStore.queueCount > 0
 
@@ -743,8 +758,9 @@ Item {
 
                         Flickable {
                             id: syntagmaPane1
-                            width: parent.width
-                            height: parent.height - 34
+                            width: Math.max(0, parent.width
+                                - queueScrollTrack.reservedExtent - 4)
+                            height: Math.max(0, parent.height - 25)
                             clip: true
                             contentWidth: width
                             contentHeight: queueColumn.height
@@ -813,17 +829,25 @@ Item {
                             }
                         }
                         NeonScrollBar {
+                            id: queueScrollTrack
                             flickable: syntagmaPane1
                             handleStyle: "star"
-                            mountingParent: syntagmaPane1.parent.parent
+                            mountingParent: targetBatchFrame
+                            geometryHost: targetBatchFrame
+                            rightInset: 4
+                            boxTopInset: 4 + syntagmaPane1.y
+                            boxBottomInset: 4
                             visible: syntagmaPane1.visible && scrollable
                         }
                     }
                 }
 
                 Rectangle {
+                    id: savedSetsFrame
                     width: parent.width
-                    height: parent.height - 366
+                    height: Math.max(0, profileLeftColumn.cardSpace
+                        - repositoryCatalogFrame.height
+                        - targetBatchFrame.height)
                     color: Colors.dark
                     border.width: 1
                     border.color: Colors.magenta
@@ -831,21 +855,23 @@ Item {
                     Column {
                         anchors {
                             fill: parent
-                            margins: 7
+                            margins: 6
                         }
 
-                        spacing: 5
+                        spacing: 4
 
                         Row {
+                            id: setNameRow
                             width: parent.width
-                            height: 28
+                            height: 32
                             spacing: 5
 
                             ManagerInput {
                                 id: setNameInput
 
                                 width: parent.width - 88
-                                height: 28
+                                height: 30
+                                anchors.verticalCenter: parent.verticalCenter
                                 placeholderText: "PROFILE SET NAME"
                                 text: root.setNameDraft
 
@@ -854,7 +880,8 @@ Item {
 
                             ManagerButton {
                                 width: 83
-                                height: 28
+                                height: 30
+                                anchors.verticalCenter: parent.verticalCenter
                                 label: {
                                     const name =
                                         setNameInput.text.trim();
@@ -909,6 +936,7 @@ Item {
                         }
 
                         GohuText {
+                            id: savedSetsCaption
                             width: parent.width
                             text: "SAVED SETS // TARGETS + VISIBILITY + TOPICS + DESCRIPTION"
                             font.pixelSize: 7
@@ -917,8 +945,10 @@ Item {
 
                         Flickable {
                             id: syntagmaPane2
-                            width: parent.width
-                            height: parent.height - 67
+                            width: Math.max(0, parent.width
+                                - savedSetsScrollTrack.reservedExtent - 4)
+                            height: Math.max(0, parent.height - setNameRow.height
+                                - savedSetsCaption.implicitHeight - 2 * parent.spacing)
                             clip: true
                             contentWidth: width
                             contentHeight: savedColumn.height
@@ -1061,9 +1091,14 @@ Item {
                             }
                         }
                         NeonScrollBar {
+                            id: savedSetsScrollTrack
                             flickable: syntagmaPane2
                             handleStyle: "star"
-                            mountingParent: syntagmaPane2.parent.parent
+                            mountingParent: savedSetsFrame
+                            geometryHost: savedSetsFrame
+                            rightInset: 6
+                            boxTopInset: 6 + syntagmaPane2.y
+                            boxBottomInset: 6
                             visible: syntagmaPane2.visible && scrollable
                         }
                     }

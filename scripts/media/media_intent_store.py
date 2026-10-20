@@ -22,11 +22,21 @@ def _valid_ref(value: Any) -> bool:
     if not isinstance(value, dict):
         return False
     source, kind, identifier = value.get("source"), value.get("kind"), value.get("id")
-    if (source, kind) not in (("local-mpd", "track"), ("youtube", "video")):
+    if (source, kind) not in (("local-mpd", "track"), ("youtube", "video"),
+                              ("direct-stream", "stream")):
         return False
-    return isinstance(identifier, str) and 0 < len(identifier) <= 4096 and not any(
+    if not isinstance(identifier, str) or not 0 < len(identifier) <= 4096 or any(
         ch in identifier for ch in "\x00\r\n"
-    )
+    ):
+        return False
+    if source == "direct-stream":
+        from direct_stream_source import validate_https_audio_url
+        from headless_mpd import MediaBackendError
+        try:
+            validate_https_audio_url(identifier)
+        except MediaBackendError:
+            return False
+    return True
 
 
 class IntentStore:
@@ -72,7 +82,7 @@ class IntentStore:
                 result["selection"] = selection
             if (isinstance(loaded, dict)
                 and _valid_ref(loaded.get("ref"))
-                and loaded["ref"]["source"] == "local-mpd"
+                and loaded["ref"]["source"] in ("local-mpd", "direct-stream")
                 and isinstance(loaded.get("queueId"), str)
                 and loaded["queueId"].isascii() and loaded["queueId"].isdecimal()):
                 result["loaded"] = {"ref": loaded["ref"], "queueId": loaded["queueId"]}
@@ -88,7 +98,7 @@ class IntentStore:
         if loaded is not None:
             ref = loaded.get("ref") if isinstance(loaded, dict) else None
             ident = loaded.get("queueId") if isinstance(loaded, dict) else None
-            if (not _valid_ref(ref) or ref["source"] != "local-mpd"
+            if (not _valid_ref(ref) or ref["source"] not in ("local-mpd", "direct-stream")
                 or not isinstance(ident, str) or not ident.isascii() or not ident.isdecimal()):
                 raise ValueError("Invalid loaded MPD intent")
             minimal = {"ref": ref, "queueId": ident}

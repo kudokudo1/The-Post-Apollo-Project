@@ -25,6 +25,14 @@ PanelWindow {
     // MPD remains the default. MPRIS is opt-in and targets one explicitly
     // selected external player; it is not a loaded YouTube playlist.
     property string transportMode: "mpd"
+    // Operator-selected initial radio station, not a searchable catalog.
+    readonly property string radioStreamUrl:
+        "https://ice5.somafm.com/groovesalad-128-mp3"
+
+    HeadlessMediaController {
+        id: headless
+        polling: deck.menuOpen && deck.transportMode === "mpd"
+    }
 
     MprisPlaybackAdapter {
         id: mediaAdapter
@@ -241,8 +249,10 @@ PanelWindow {
     }
 
     onMenuOpenChanged: {
-        if (menuOpen)
+        if (menuOpen && transportMode === "mpris")
             audioProbe.refresh();
+        if (menuOpen && transportMode === "mpd")
+            headless.refresh();
     }
 
     function runTransport(action) {
@@ -251,30 +261,12 @@ PanelWindow {
                 console.log("MediaDeck: MPRIS command unavailable", action);
             return;
         }
-        runLocalTransport(action);
+        if (!headless.transport(action))
+            console.log("MediaDeck: controller command unavailable", action);
     }
-    // The three functional zones are now stacked, with controls receiving
-    // the largest share. These proportions are still design parameters.
+
     property real displayHeightShare: 0.34
     property real cassetteHeightShare: 0.24
-
-    // Only the local MPD backend is connected in this prototype.
-    // A shared source-neutral transport service is a later milestone.
-    function runLocalTransport(action) {
-        const commands = {
-            previous: ["mpc", "prev"],
-            play: ["mpc", "play"],
-            pause: ["mpc", "pause", "1"],
-            next: ["mpc", "next"],
-            rewind5: ["mpc", "seek", "-5"],
-            forward5: ["mpc", "seek", "+5"],
-            stop: ["mpc", "stop"]
-        };
-
-        const command = commands[action];
-        if (command)
-            Quickshell.execDetached(command);
-    }
 
     screen: Quickshell.screens.find(s => s.name === "DP-5")
 
@@ -333,7 +325,8 @@ PanelWindow {
                 GohuText {
                     anchors.left: parent.left
                     anchors.top: parent.top
-                    text: "DISPLAY / BROWSER"
+                    text: deck.transportMode === "mpd"
+                          ? "HI-FI / INDEPENDENT MUSIC" : "DISPLAY / BROWSER"
                     color: Colors.cyan
                     font.pixelSize: 16
                 }
@@ -343,7 +336,9 @@ PanelWindow {
                     anchors.topMargin: 35
                     anchors.left: parent.left
                     anchors.right: parent.right
-                    text: mediaAdapter.connected
+                    text: deck.transportMode === "mpd"
+                          ? "SOURCE: INTERNET RADIO / GROOVE SALAD"
+                          : mediaAdapter.connected
                           ? ("EXTERNAL: " + String(mediaAdapter.activePlayer.identity || "MPRIS"))
                           : "EXTERNAL: NO PLAYER SELECTED"
                     color: Colors.orange
@@ -356,9 +351,13 @@ PanelWindow {
                     anchors.topMargin: 61
                     anchors.left: parent.left
                     anchors.right: parent.right
-                    text: mediaAdapter.connected
+                    text: deck.transportMode === "mpd"
+                          ? (headless.loaded
+                             ? ("LOADED: " + String(headless.loaded.item.title || "RADIO"))
+                             : "NO CASSETTE LOADED / SELECT RADIO BELOW")
+                          : mediaAdapter.connected
                           ? String(mediaAdapter.activePlayer.trackTitle || "NO TRACK METADATA")
-                          : "Open a YouTube video in a browser first."
+                          : "NO EXTERNAL PLAYER SELECTED"
                     color: Colors.white
                     font.pixelSize: 14
                     elide: Text.ElideRight
@@ -369,7 +368,11 @@ PanelWindow {
                     anchors.topMargin: 90
                     anchors.left: parent.left
                     anchors.right: parent.right
-                    text: "AUDIO: "
+                    text: deck.transportMode === "mpd"
+                          ? ("STATE: " + headless.playbackState.toUpperCase()
+                             + (headless.ownsPlayback ? " / CONTROLLER OWNED"
+                                : " / NOT OWNED"))
+                          : "AUDIO: "
                           + (browserAudioEvidence
                              ? browserAudioEvidence.indexes.length + " APP STREAM(S)"
                              : "NO APP TARGET")
@@ -384,7 +387,11 @@ PanelWindow {
                     anchors.topMargin: 111
                     anchors.left: parent.left
                     anchors.right: parent.right
-                    text: audioProbe.errorText
+                    text: deck.transportMode === "mpd"
+                          ? (headless.errorText
+                             ? ("ERROR: " + headless.errorText)
+                             : "MUSIC SOURCE: MPD / HEADLESS CONTROLLER")
+                          : audioProbe.errorText
                           ? ("PROBE ERROR: " + audioProbe.errorText)
                           : "PIPEWIRE MATCH IS NOT PER-TAB PROOF"
                     color: Colors.orange
@@ -397,10 +404,14 @@ PanelWindow {
                     anchors.topMargin: 132
                     anchors.left: parent.left
                     anchors.right: parent.right
-                    text: "TARGET: " + (deck.autoFollowEnabled
+                    text: deck.transportMode === "mpd"
+                          ? headless.message
+                          : "TARGET: " + (deck.autoFollowEnabled
                            ? "AUTO FOLLOW / " : "MANUAL / ")
                            + deck.audioTargetResolution.status
-                    color: deck.selectedAudioCandidate ? Colors.cyan : Colors.orange
+                    color: deck.transportMode === "mpd"
+                           ? (headless.errorText ? Colors.orange : Colors.cyan)
+                           : (deck.selectedAudioCandidate ? Colors.cyan : Colors.orange)
                     font.pixelSize: 10
                     elide: Text.ElideRight
                 }
@@ -482,7 +493,7 @@ PanelWindow {
 
                         GohuText {
                             anchors.centerIn: parent
-                            text: "LOCAL / MPD"
+                            text: "HI-FI / MPD"
                             font.pixelSize: 12
                             color: Colors.white
                         }
@@ -543,7 +554,9 @@ PanelWindow {
                     anchors.left: parent.left
                     anchors.right: parent.right
                     anchors.bottom: parent.bottom
-                    text: "READ-ONLY AUDIO PROBE • NO VOLUME MUTATIONS"
+                    text: deck.transportMode === "mpd"
+                          ? "INDEPENDENT PLAYBACK • VOLUME / CAVA PENDING"
+                          : "READ-ONLY AUDIO PROBE • NO VOLUME MUTATIONS"
                     color: Colors.cyan
                     opacity: 0.65
                     font.pixelSize: 10
@@ -570,6 +583,69 @@ PanelWindow {
                     text: "CASSETTE BAY"
                     color: Colors.cyan
                     font.pixelSize: 16
+                }
+
+                // Independent radio cassette. A station click queues the URL;
+                // it never autoplays, and PLAY is handled by the controller.
+                Column {
+                    id: radioCassette
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.topMargin: 35
+                    spacing: 9
+                    visible: deck.transportMode === "mpd"
+
+                    GohuText {
+                        text: "INTERNET RADIO / NO LOCAL LIBRARY REQUIRED"
+                        font.pixelSize: 11
+                        color: Colors.orange
+                    }
+
+                    Rectangle {
+                        id: grooveCassette
+                        width: radioCassette.width
+                        height: 43
+                        radius: 3
+                        opacity: headless.busy ? 0.5 : 1
+                        color: grooveMouse.pressed ? "#16131B"
+                               : grooveMouse.containsMouse ? "#39333E" : "#29252E"
+                        border.width: 1
+                        border.color: grooveMouse.containsMouse
+                                      ? Colors.orange : Colors.cyan
+
+                        GohuText {
+                            anchors.centerIn: parent
+                            text: "LOAD / GROOVE SALAD"
+                            color: Colors.white
+                            font.pixelSize: 13
+                        }
+
+                        MouseArea {
+                            id: grooveMouse
+                            anchors.fill: parent
+                            enabled: !headless.busy
+                            hoverEnabled: true
+                            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                            onClicked: headless.loadRadio(deck.radioStreamUrl)
+                        }
+                    }
+
+                    GohuText {
+                        width: parent.width
+                        text: headless.loaded && headless.loaded.ref.source === "direct-stream"
+                              ? "CASSETTE: HTTPS RADIO / QUEUED"
+                              : "CASSETTE: EMPTY / SELECT STATION"
+                        font.pixelSize: 11
+                        color: Colors.cyan
+                        elide: Text.ElideRight
+                    }
+
+                    GohuText {
+                        text: "LOAD DOES NOT AUTOPLAY / PRESS PLAY BELOW"
+                        font.pixelSize: 10
+                        color: Colors.white
+                    }
                 }
 
                 // Temporary read-only evidence bench. PipeWire media.name
@@ -660,7 +736,8 @@ PanelWindow {
                 GohuText {
                     anchors.right: parent.right
                     anchors.top: parent.top
-                    text: deck.transportMode === "mpris" ? "MPRIS / EXTERNAL" : "LOCAL / MPD"
+                    text: deck.transportMode === "mpris"
+                          ? "MPRIS / EXTERNAL" : "HI-FI / CONTROLLER"
                     color: Colors.orange
                     font.pixelSize: 11
                 }
@@ -693,13 +770,25 @@ PanelWindow {
                             id: transportKey
 
                             required property var modelData
+                            readonly property bool localCanControl:
+                                !!headless.loaded && !headless.busy
+                                && (modelData.action === "play"
+                                    || (headless.ownsPlayback
+                                        && (modelData.action === "pause"
+                                            || modelData.action === "stop"
+                                            || (!headless.loaded.item.live
+                                                && ["previous", "next", "rewind5",
+                                                    "forward5"].indexOf(modelData.action) !== -1))))
+                            readonly property bool canControl:
+                                deck.transportMode === "mpris"
+                                ? mediaAdapter.supports(modelData.action)
+                                : localCanControl
 
                             width: (transportGrid.width
                                     - 3 * transportGrid.spacing) / 4
                             height: 50
                             radius: 3
-                            opacity: deck.transportMode !== "mpris"
-                                     || mediaAdapter.supports(modelData.action) ? 1.0 : 0.45
+                            opacity: transportKey.canControl ? 1.0 : 0.45
 
                             color: keyMouse.pressed
                                    ? "#16131B"
@@ -732,9 +821,10 @@ PanelWindow {
                             MouseArea {
                                 id: keyMouse
                                 anchors.fill: parent
+                                enabled: transportKey.canControl
                                 acceptedButtons: Qt.LeftButton
                                 hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
+                                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
 
                                 onClicked: deck.runTransport(
                                     transportKey.modelData.action
@@ -751,7 +841,9 @@ PanelWindow {
                     anchors.topMargin: 184
                     text: deck.transportMode === "mpris"
                           ? "STREAM TEST / MAY AFFECT OTHER BROWSER TABS"
-                          : "SWITCH TO MPRIS TO INSPECT BROWSER AUDIO"
+                          : (headless.loaded
+                             ? "CASSETTE LOADED / PRESS PLAY TO START"
+                             : "LOAD INTERNET RADIO IN CASSETTE BAY")
                     color: Colors.orange
                     font.pixelSize: 11
                     elide: Text.ElideRight
@@ -815,7 +907,9 @@ PanelWindow {
                     anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.topMargin: 259
-                    text: deck.audioSelectionLabel
+                    text: deck.transportMode === "mpd"
+                          ? ("PLAYBACK: " + headless.playbackState.toUpperCase())
+                          : deck.audioSelectionLabel
                     color: Colors.orange
                     font.pixelSize: 12
                     elide: Text.ElideRight
@@ -826,7 +920,8 @@ PanelWindow {
                     anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.topMargin: 281
-                    text: deck.audioTestStatus
+                    text: deck.transportMode === "mpd"
+                          ? headless.message : deck.audioTestStatus
                     color: Colors.cyan
                     font.pixelSize: 10
                     elide: Text.ElideRight
@@ -837,7 +932,7 @@ PanelWindow {
                     anchors.bottom: parent.bottom
                     text: deck.transportMode === "mpris"
                           ? "3S EXPERIMENT // AUTO-RESTORE REQUESTED"
-                          : "TRANSPORT // LOCAL MPD"
+                          : "TRANSPORT // HEADLESS MPD CONTROLLER"
                     color: Colors.cyan
                     opacity: 0.6
                     font.pixelSize: 10

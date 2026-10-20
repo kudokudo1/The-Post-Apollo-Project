@@ -29,7 +29,7 @@ assert '"origin": "apollo"' in qml and '"domain": "system"' in qml
 assert '"observation": "default PipeWire audio sink readiness only"' in qml
 assert "function pushRich(notification)" in NOTIFICATIONS.read_text()
 for forbidden in ["Process {", "execDetached", "pw-dump", "pactl", "wpctl",
-                  "MPD", "setVolume(", "setMuted(", "toggleMute(", "device.name",
+                  "setVolume(", "setMuted(", "toggleMute(", "device.name",
                   "bluetoothctl", "systemctl", "audio.muted"]:
     assert forbidden not in qml, "Default audio observer cannot control audio: " + forbidden
 

@@ -233,6 +233,9 @@ PanelWindow {
         id: weatherService
     }
 
+    // Official NWS alerts only when an operator-pinned geographic point exists.
+    NwsOfficialAlertNotificationProducer {}
+
     // Observe existing AQI readings without touching Weather Station fetching.
     WeatherAqiNotificationProducer {
         weatherService: weatherService

@@ -10,6 +10,7 @@ import subprocess
 from typing import Any, Callable
 
 from headless_mpd import MediaBackendError
+from native_pipewire_evidence import pipewire_objects, native_output_nodes
 
 
 def parse_mpd_outputs(lines: list[str]) -> list[dict[str, Any]]:
@@ -87,9 +88,12 @@ def candidate_streams(rows: list[Any]) -> list[dict[str, Any]]:
 
 
 class MpdAudioEvidenceProbe:
-    def __init__(self, backend: Any, sink_provider: Callable[[], list] = pipewire_sink_inputs):
+    def __init__(self, backend: Any,
+                 sink_provider: Callable[[], list] = pipewire_sink_inputs,
+                 native_provider: Callable[[], list] = pipewire_objects):
         self.backend = backend
         self.sink_provider = sink_provider
+        self.native_provider = native_provider
 
     def observe(self) -> dict[str, Any]:
         try:
@@ -107,11 +111,18 @@ class MpdAudioEvidenceProbe:
             streams = []
             total = None
             audio_error = {"code": exc.code, "reason": exc.reason}
+        try:
+            native = native_output_nodes(self.native_provider())
+            native_error = None
+        except MediaBackendError as exc:
+            native = native_output_nodes([])
+            native_error = {"code": exc.code, "reason": exc.reason}
         return {
             "mpdOutputs": mpd_outputs, "mpdError": mpd_error,
+            **native, "pipewireNativeError": native_error,
             "observedSinkInputCount": total,
             "mpdCandidates": streams, "pipewireError": audio_error,
             "isolated": False, "playerVolumeAvailable": False,
             "playerCavaAvailable": False,
-            "reason": "Process/stream metadata cannot prove a dedicated MPD-only monitor or audio route",
+            "reason": "PulseAudio streams and native PipeWire nodes are observations; neither alone proves a dedicated MPD-only monitor or audio route",
         }

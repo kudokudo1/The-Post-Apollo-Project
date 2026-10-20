@@ -66,6 +66,8 @@ Scope {
 
                 systemTelemetry.loading = false;
                 systemTelemetry.refreshed();
+                systemTelemetry.monitorObservation(
+                    systemTelemetry.errorText === "");
             }
         }
 

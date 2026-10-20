@@ -41,6 +41,12 @@ DockButton {
         id: networkLinkProducer
     }
 
+    // Separate slow Internet reachability checks from high-frequency link
+    // observations. Both see the same nmcli result; neither changes a link.
+    NetworkInternetHealthNotificationProducer {
+        id: networkInternetHealthProducer
+    }
+
     RowLayout {
         id: root
 
@@ -155,6 +161,7 @@ DockButton {
                     // One shared observation for both Wi-Fi and Ethernet.
                     // Unknown/partial results are ignored by the policy.
                     networkLinkProducer.observeDeviceResult(text);
+                    networkInternetHealthProducer.observeDeviceResult(text);
                     const lines = text.trim().split("\n");
 
                     const ethernetLine = lines.find(line => line.includes(":ethernet:"));

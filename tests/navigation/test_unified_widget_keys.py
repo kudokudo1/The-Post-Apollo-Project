@@ -111,8 +111,8 @@ def test_weather_semantic_main_and_top_submode_and_arrow_preview():
 
 def test_notifications_tab_cycles_every_real_mode_in_visual_order():
     src = read("widgets/notifications/NotificationsHubW.qml")
-    expected = ["all", "apps", "social", "apollo",
-                "favorites", "system", "warning", "manager"]
+    expected = ["all", "favorites", "apps", "social",
+                "apollo", "system", "warning", "manager"]
 
     # Compare the Tab cycle against the actual left-to-right button row.
     order_match = re.search(

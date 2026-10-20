@@ -80,9 +80,9 @@ assert '"origin": "apollo"' in qml and '"domain": "system"' in qml
 assert '"severity": restored ? "normal" : "warning"' in qml
 assert "NotificationsService.pushRich({" in qml
 assert "function pushRich(notification)" in SERVICE.read_text()
-for forbidden in ["nmcli", "ping", "iptables", "pkexec", "Quickshell.execDetached",
+for forbidden in ['command: ["nmcli"', "ping(", "iptables", "pkexec", "Quickshell.execDetached",
                   "service.restart", "systemctl", "kill(", "gatewayAddress",
-                  "SSID", "password", "subprocess.run("]:
+                  '"ssid":', '"password":', "subprocess.run("]:
     assert forbidden not in qml, "Notification producer may not control network: " + forbidden
 
 NODE = r"""

@@ -24,9 +24,13 @@ function issue(succeeded, verified, operation, evidence, fallbackRepo, fallbackN
     const state = String(issue.state || "").toUpperCase();
     const expected = action === "close" ? "CLOSED"
                    : action === "create" || action === "reopen" ? "OPEN" : "";
+    // IssueService's generic evidence flag proves that the issue exists,
+    // not that an edit, comment, label or assignment was applied. Only
+    // actions with an independently checked target state may say VERIFIED.
     const confirmed = succeeded === true && verified === true
+        && ["create", "close", "reopen"].indexOf(action) >= 0
         && id > 0 && String(issue.url || "").length > 0
-        && (!expected || state === expected);
+        && state === expected;
     const result = succeeded === true
         ? confirmed ? "VERIFIED" : "UNVERIFIED"
         : "FAILED";

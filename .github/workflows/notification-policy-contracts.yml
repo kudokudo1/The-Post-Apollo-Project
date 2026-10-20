@@ -65,6 +65,9 @@ jobs:
       - name: Validate CPU++ telemetry and notification storage health
         run: python3 tests/notifications/test_monitor_and_storage_health.py
 
+      - name: Validate passive default audio-output health
+        run: python3 tests/notifications/test_audio_output_health.py
+
       - name: Validate origin/domain/severity classification
         run: python3 tests/notifications/test_notification_facets.py
 

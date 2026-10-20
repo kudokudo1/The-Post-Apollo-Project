@@ -71,6 +71,48 @@ assert "x: parent.width - width" in catalog_bar
 assert "right: catalogScrollTrack.left" in profile
 assert "rightMargin: 5" in profile
 
+# Compact Profile: catalog and queue no longer consume fixed 205+145 px.
+# The magenta Saved Sets panel keeps a real footer and scroll viewport.
+for clause in (
+    "id: profileLeftColumn",
+    "Math.max(0, height - 2 * spacing)",
+    "Math.min(170, Math.max(100, cardSpace * 0.45))",
+    "id: repositoryCatalogFrame",
+    "id: targetBatchFrame",
+    "id: savedSetsFrame",
+    "profileLeftColumn.upperCardSpace",
+    "profileLeftColumn.cardSpace",
+    "id: setNameRow",
+    "height: 32",
+    "height: 30\n                                anchors.verticalCenter: parent.verticalCenter",
+    "id: savedSetsCaption",
+    "id: queueScrollTrack",
+    "geometryHost: targetBatchFrame",
+    "boxTopInset: 4 + syntagmaPane1.y",
+    "id: savedSetsScrollTrack",
+    "geometryHost: savedSetsFrame",
+    "boxTopInset: 6 + syntagmaPane2.y",
+    "width: Math.max(0, parent.width\n                                - queueScrollTrack.reservedExtent - 4)",
+    "width: Math.max(0, parent.width\n                                - savedSetsScrollTrack.reservedExtent - 4)",
+    "setNameRow.height",
+    "savedSetsCaption.implicitHeight",
+):
+    assert clause in profile, f"Compact Profile missing: {clause}"
+
+assert "height: parent.height - 366" not in profile
+assert "height: parent.height - 67" not in profile
+assert 'placeholderText: "PROFILE SET NAME"' in profile
+
+for height in (215, 235, 300, 420):
+    space = max(0, height - 2 * 6)
+    saved_target = min(space, min(170, max(100, space * 0.45)))
+    upper = max(0, space - saved_target)
+    catalog_height = round(upper * 0.52)
+    batch_height = max(0, upper - catalog_height)
+    saved_height = max(0, space - catalog_height - batch_height)
+    assert saved_height >= 100, f"Saved Sets collapsed at {height}px"
+    assert abs(catalog_height + batch_height + saved_height + 12 - height) < 1.1
+
 # Intentionally no modifications to graph panes, shared UI primitive, or
 # unrelated Repository Profile subviews.
 print("GITHUB PULLS / ISSUES / CATALOG // INTERACTIVE RAIL CONTRACT PASS")

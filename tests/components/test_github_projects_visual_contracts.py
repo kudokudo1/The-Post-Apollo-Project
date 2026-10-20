@@ -75,6 +75,10 @@ for flickable in ("projectList", "mapScroll"):
     assert f"mountingParent: {flickable}.parent.parent" in rail
     assert f"x: {flickable}.parent.x + {flickable}.x" in rail
     if flickable == "mapScroll":
+        # A reparented board rail needs the viewport's *height*, not the
+        # entire Projects frame. Only its horizontal position is box-adjacent.
+        assert 'geometryMode: "viewport"' in rail
+        assert 'height:' not in rail
         # Actual visual gap = 20px viewport lane + 10px frame inset.
         # A 16px star therefore needs 7px from lane start, not 2px.
         assert "id: projectsFrame" in board

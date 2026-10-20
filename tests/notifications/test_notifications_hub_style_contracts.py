@@ -34,13 +34,14 @@ assert found == ["all", "favorites", "apps", "social",
                  "apollo", "system", "warning", "manager"], found
 assert '"all", "favorites", "apps", "social", "apollo", "system", "warning", "manager"' in hub
 
-# Only the ZZ's idle/active label is white. Existing hover/pressed
-# semantics and other MiniButtons retain their original colors.
+# Revert ZZ to the original cyan-idle / orange-active behavior,
+# keeping the shared MiniButton hover and pressed states untouched.
 control = hub.split('label: "ZZ"', 1)[1].split("onTriggered:", 1)[0]
-assert "whiteLabel: true" in control
-assert "activeColor: Colors.white" in control
-assert "if (miniButton.whiteLabel && !miniButton.hovered && !miniButton.pressed)" in hub
-assert "return Colors.white;" in hub
+assert "activeColor: Colors.orange" in control
+assert "whiteLabel" not in control
+assert "whiteLabel" not in hub
+assert "if (miniButton.active)" in hub
+assert "if (miniButton.pressed)" in hub
 
 # No manual expand click: text wraps and ListView delegate/card grows with
 # measured content. Preserve action buttons and glow gutters.
@@ -50,6 +51,8 @@ assert "wrapMode: glowText.wrapMode" in glow
 assert "verticalAlignment: glowText.wrapMode === Text.NoWrap" in glow
 message = hub.split("id: notificationMessage", 1)[1].split("MULTILINE REPORT DECK", 1)[0]
 assert "text: notificationEntry.message" in message
+assert "property int notificationMessageFontSize: 13" in hub
+assert "pixelSize: root.notificationMessageFontSize" in message
 assert "height: Math.max(19, Math.ceil(fullTextHeight))" in message
 assert "wrapMode: Text.Wrap" in message
 assert "elideMode: Text.ElideNone" in message
@@ -65,4 +68,4 @@ assert "height: root.cardHeight" not in hub, "card must not be fixed"
 # Styling only. Never use this feature to change the data policy.
 assert "function toggleFavorite" in service
 assert "function snoozeApp" in service
-print("Notifications Hub star/search/FAVS/ZZ/full-message contracts: PASS")
+print("Notifications Hub star/search/FAVS/original-ZZ/13px-message contracts: PASS")

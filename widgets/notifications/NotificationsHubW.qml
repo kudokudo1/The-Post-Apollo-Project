@@ -2178,6 +2178,15 @@ PanelWindow {
                             NeonScrollBar {
                                 flickable: dndManagerList
                                 handleStyle: "star"
+                                // The shared star's drop shadow must extend
+                                // beyond the 16px track, not be clipped to it.
+                                containGlow: false
+                                handleGlowEnabled: true
+                                handleGlowStyle: "drop"
+                                handleDropGlowRadius: 12
+                                handleDropGlowSamples: 17
+                                handleDropGlowIdleOpacity: 0.78
+                                handleDropGlowHoverOpacity: 0.95
                                 y: dndManagerList.y
                                 x: parent.width - width
                                 height: dndManagerList.height
@@ -2328,6 +2337,13 @@ PanelWindow {
                             NeonScrollBar {
                                 flickable: favoriteManagerList
                                 handleStyle: "star"
+                                containGlow: false
+                                handleGlowEnabled: true
+                                handleGlowStyle: "drop"
+                                handleDropGlowRadius: 12
+                                handleDropGlowSamples: 17
+                                handleDropGlowIdleOpacity: 0.78
+                                handleDropGlowHoverOpacity: 0.95
                                 y: favoriteManagerList.y
                                 x: parent.width - width
                                 height: favoriteManagerList.height
@@ -2931,6 +2947,9 @@ PanelWindow {
 
                     flickable: historyList
                     handleStyle: "star"
+                    // Reuse NeonScrollBar's star Canvas and SafeDropShadow;
+                    // allowing the halo outside its narrow track is essential.
+                    containGlow: false
                     starAreaWidth: root.scrollBarAreaWidth
                     starHandleSize: 14
 
@@ -2953,11 +2972,12 @@ PanelWindow {
                     handleColor: Colors.magenta
                     barHandleRadius: 0
                     handleBorderWidth: 0
+                    handleGlowEnabled: true
                     handleGlowStyle: "drop"
-                    handleDropGlowRadius: 10
-                    handleDropGlowSamples: 13
-                    handleDropGlowIdleOpacity: 0.60
-                    handleDropGlowHoverOpacity: 0.60
+                    handleDropGlowRadius: 12
+                    handleDropGlowSamples: 17
+                    handleDropGlowIdleOpacity: 0.78
+                    handleDropGlowHoverOpacity: 0.95
 
                     wheelEnabled: false
                     pointerCursorShape: Qt.ArrowCursor

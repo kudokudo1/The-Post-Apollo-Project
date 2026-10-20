@@ -55,8 +55,10 @@ def properties(lines: list[str]) -> dict[str, str]:
 
 def track_item(row: dict[str, str]) -> dict[str, Any]:
     uri = row.get("file", "")
+    is_stream = uri.startswith("https://")
     return {
-        "ref": {"source": "local-mpd", "kind": "track", "id": uri},
+        "ref": {"source": "direct-stream" if is_stream else "local-mpd",
+                "kind": "stream" if is_stream else "track", "id": uri},
         "title": row.get("Title") or uri.rsplit("/", 1)[-1],
         "artist": row.get("Artist", ""),
         "album": row.get("Album", ""),
@@ -69,6 +71,7 @@ def track_item(row: dict[str, str]) -> dict[str, Any]:
 class MpdBackend:
     id = "mpd"
     required_kind = "mpd-local-track"
+    required_kinds = ("mpd-local-track", "mpd-https-stream")
 
     def __init__(self, host: str = "127.0.0.1", port: int = 6600, timeout: float = 2.0):
         self.host = host
@@ -140,9 +143,13 @@ class MpdBackend:
                 if row.get("file")]
 
     def cue(self, request: dict[str, Any]) -> str:
-        if request.get("requiredKind") != self.required_kind:
+        kind = request.get("requiredKind")
+        if kind not in self.required_kinds:
             raise MediaBackendError("UNSUPPORTED", "MPD cannot cue this media kind")
         uri = request.get("uri", "")
+        if kind == "mpd-https-stream":
+            from direct_stream_source import validate_https_audio_url
+            uri = validate_https_audio_url(uri)
         if not isinstance(uri, str) or not uri:
             raise MediaBackendError("INVALID_REF", "No MPD library file supplied")
         response = properties(self.command("addid", uri))

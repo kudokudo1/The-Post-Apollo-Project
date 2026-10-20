@@ -85,7 +85,8 @@ assert.strictEqual(G.issue(true,true,'close',{repository:'a/b',issue:{number:2,u
 assert.strictEqual(G.issue(true,true,'close',{repository:'a/b',issue:{number:2,url:'u',state:'CLOSED'}}).outcome,'VERIFIED');
 assert.strictEqual(G.issue(false,false,'edit',{repository:'a/b'},'a/b',5).outcome,'FAILED');
 assert.strictEqual(G.issue(true,false,'labels',{repository:'a/b'},'a/b',5).outcome,'UNVERIFIED');
-assert.strictEqual(G.issue(true,true,'assignees',{repository:'a/b',issue:{number:3,url:'u'}}).outcome,'VERIFIED');
+assert.strictEqual(G.issue(true,true,'assignees',{repository:'a/b',issue:{number:3,url:'u'}}).outcome,'UNVERIFIED',
+ 'generic identity readback cannot verify assignment changes');
 assert.strictEqual(G.issue(true,true,'delete',{repository:'a/b',issue:{number:2,url:'u'}}),null);
 assert.strictEqual(G.issue(true,true,'edit',{repository:'bad name',issue:{number:2,url:'u'}}),null);
 assert.strictEqual(G.issue(true,true,'edit',{repository:'a/b',issue:{number:-3,url:'u'}}).outcome,'UNVERIFIED');

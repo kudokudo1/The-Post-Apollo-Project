@@ -585,6 +585,69 @@ PanelWindow {
                     font.pixelSize: 16
                 }
 
+                // Independent radio cassette. A station click queues the URL;
+                // it never autoplays, and PLAY is handled by the controller.
+                Column {
+                    id: radioCassette
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.topMargin: 35
+                    spacing: 9
+                    visible: deck.transportMode === "mpd"
+
+                    GohuText {
+                        text: "INTERNET RADIO / NO LOCAL LIBRARY REQUIRED"
+                        font.pixelSize: 11
+                        color: Colors.orange
+                    }
+
+                    Rectangle {
+                        id: grooveCassette
+                        width: radioCassette.width
+                        height: 43
+                        radius: 3
+                        opacity: headless.busy ? 0.5 : 1
+                        color: grooveMouse.pressed ? "#16131B"
+                               : grooveMouse.containsMouse ? "#39333E" : "#29252E"
+                        border.width: 1
+                        border.color: grooveMouse.containsMouse
+                                      ? Colors.orange : Colors.cyan
+
+                        GohuText {
+                            anchors.centerIn: parent
+                            text: "LOAD / GROOVE SALAD"
+                            color: Colors.white
+                            font.pixelSize: 13
+                        }
+
+                        MouseArea {
+                            id: grooveMouse
+                            anchors.fill: parent
+                            enabled: !headless.busy
+                            hoverEnabled: true
+                            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                            onClicked: headless.loadRadio(deck.radioStreamUrl)
+                        }
+                    }
+
+                    GohuText {
+                        width: parent.width
+                        text: headless.loaded && headless.loaded.ref.source === "direct-stream"
+                              ? "CASSETTE: HTTPS RADIO / QUEUED"
+                              : "CASSETTE: EMPTY / SELECT STATION"
+                        font.pixelSize: 11
+                        color: Colors.cyan
+                        elide: Text.ElideRight
+                    }
+
+                    GohuText {
+                        text: "LOAD DOES NOT AUTOPLAY / PRESS PLAY BELOW"
+                        font.pixelSize: 10
+                        color: Colors.white
+                    }
+                }
+
                 // Temporary read-only evidence bench. PipeWire media.name
                 // often differs from an MPRIS track title, which must be
                 // inspected before attempting any more automatic matching.

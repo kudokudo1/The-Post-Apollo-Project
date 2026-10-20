@@ -1051,6 +1051,10 @@ Item {
                     NeonScrollBar {
                         flickable: mapScroll
                         handleStyle: "star"
+                        // Keep the rail inside the actual board viewport. The
+                        // default box-side height would extend into controls
+                        // below this short board in the compact GitHub camera.
+                        geometryMode: "viewport"
                         // The board starts below the mode controls. Tracking
                         // its live Column y keeps the star rail beside the
                         // cards, not up among the project title/buttons.

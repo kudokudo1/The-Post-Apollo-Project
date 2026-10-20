@@ -2672,6 +2672,13 @@ PanelWindow {
         id: githubPullRequestReviewThreadLifecycleService
     }
 
+    // Only existing Issue/Review mutationFinished evidence. PR + merge
+    // queue outcomes keep their separate already-wired handlers above.
+    GitHubActionNotificationProducer {
+        issueLifecycle: githubIssueLifecycleService
+        reviewLifecycle: githubPullRequestReviewThreadLifecycleService
+    }
+
     Connections {
         target: githubWorkItemsService
 

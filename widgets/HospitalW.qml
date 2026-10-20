@@ -2154,6 +2154,14 @@ PanelWindow {
         roomId: root.selectedRoomTeam
     }
 
+    // Passive newly-listed reports; initial per-Room read is silent and
+    // never claims operator acceptance of any report's contents.
+    HospitalReportArrivalNotificationProducer {
+        reportService: roomReportService
+        roomId: root.selectedRoomTeam
+        repository: roomService.repository
+    }
+
     HospitalRoomReportCatalogService {
         id: roomReportCatalogService
     }

@@ -80,5 +80,8 @@ jobs:
       - name: Validate completed local Git journal notifications
         run: python3 tests/notifications/test_local_git_journal_producer.py
 
+      - name: Validate Hospital report arrival and GitHub issue/review outcomes
+        run: python3 tests/notifications/test_hospital_reports_and_github_actions.py
+
       - name: Validate CPU++ RAM and root storage pressure alerts
         run: python3 tests/notifications/test_resource_pressure_producer.py

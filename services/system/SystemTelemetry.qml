@@ -75,8 +75,10 @@ Scope {
             onStreamFinished: {
                 const message = String(text || "").trim();
 
-                if (message.length > 0)
+                if (message.length > 0) {
                     systemTelemetry.errorText = message;
+                    systemTelemetry.monitorObservation(false);
+                }
 
                 systemTelemetry.loading = false;
             }

@@ -170,7 +170,7 @@ PanelWindow {
     // Eight Main Mode buttons in filterStrip, in visual order.
     // They are Main Modes, not "History" plus six Sub Modes.
     readonly property var mainModeOrder: [
-        "all", "apps", "social", "apollo", "favorites", "system", "warning", "manager"
+        "all", "favorites", "apps", "social", "apollo", "system", "warning", "manager"
     ]
     property bool listKeyboardSelectionActive: false
     property string managerSelectionSection: "dnd"
@@ -459,7 +459,10 @@ PanelWindow {
         property int glowSamples: root.textGlowSamples
 
         property int elideMode: Text.ElideNone
+        property int wrapMode: Text.NoWrap
         property int horizontalAlignment: Text.AlignLeft
+        // Real wrapped Text height, independent of the old fixed card height.
+        readonly property real fullTextHeight: glowLabel.contentHeight
 
         GohuText {
             id: glowLabel
@@ -473,9 +476,11 @@ PanelWindow {
             color: glowText.textColor
 
             elide: glowText.elideMode
+            wrapMode: glowText.wrapMode
 
             horizontalAlignment: glowText.horizontalAlignment
-            verticalAlignment: Text.AlignVCenter
+            verticalAlignment: glowText.wrapMode === Text.NoWrap
+                               ? Text.AlignVCenter : Text.AlignTop
         }
 
         SafeDropShadow {
@@ -505,6 +510,7 @@ PanelWindow {
 
         property bool active: false
         property bool danger: false
+        property bool whiteLabel: false
 
         property color activeColor: Colors.orange
 
@@ -579,6 +585,11 @@ PanelWindow {
 
                 if (miniButton.danger && miniButton.hovered)
                     return Colors.red;
+
+                // ZZ has a white idle/selected identity, while preserving
+                // the ordinary orange hover and black press grammar.
+                if (miniButton.whiteLabel && !miniButton.hovered && !miniButton.pressed)
+                    return Colors.white;
 
                 if (miniButton.active)
                     return Colors.orange;
@@ -1402,7 +1413,13 @@ PanelWindow {
                         font.family: "GohuFont 11 Nerd Font Mono"
                         font.pixelSize: 12
 
-                        color: Colors.white
+                        color: Colors.magenta
+
+                        cursorDelegate: Rectangle {
+                            width: 2
+                            height: searchInput.cursorRectangle.height
+                            color: Colors.orange
+                        }
 
                         verticalAlignment: TextInput.AlignVCenter
 
@@ -1432,7 +1449,7 @@ PanelWindow {
                         radius: root.tightGlowRadius
                         samples: root.tightGlowSamples
 
-                        color: Colors.cyan
+                        color: Colors.magenta
 
                         opacity: 0.52
 
@@ -1501,6 +1518,14 @@ PanelWindow {
                     FilterButton {
                         width: filterStrip.buttonWidth
                         height: filterStrip.height
+                        filterId: "favorites"
+                        label: "FAVS"
+                        accentColor: Colors.magenta
+                    }
+
+                    FilterButton {
+                        width: filterStrip.buttonWidth
+                        height: filterStrip.height
                         filterId: "apps"
                         label: "APPS"
                         accentColor: Colors.cyan
@@ -1520,14 +1545,6 @@ PanelWindow {
                         filterId: "apollo"
                         label: "APOLLO"
                         accentColor: Colors.orange
-                    }
-
-                    FilterButton {
-                        width: filterStrip.buttonWidth
-                        height: filterStrip.height
-                        filterId: "favorites"
-                        label: "FAVS"
-                        accentColor: Colors.magenta
                     }
 
                     FilterButton {
@@ -2166,6 +2183,7 @@ PanelWindow {
                             }
                             NeonScrollBar {
                                 flickable: dndManagerList
+                                handleStyle: "star"
                                 y: dndManagerList.y
                                 x: parent.width - width
                                 height: dndManagerList.height
@@ -2315,6 +2333,7 @@ PanelWindow {
                             }
                             NeonScrollBar {
                                 flickable: favoriteManagerList
+                                handleStyle: "star"
                                 y: favoriteManagerList.y
                                 x: parent.width - width
                                 height: favoriteManagerList.height
@@ -2409,9 +2428,23 @@ PanelWindow {
 
                         readonly property url resolvedAppIcon: root.resolveAppIcon(notificationEntry.appIcon, notificationEntry.sourceId)
 
+                        // Only multiline ordinary notifications grow; the
+                        // 116px one-line cards and report deck retain baseline.
+                        readonly property real compactCardHeight: Math.max(
+                            root.cardHeight,
+                            notificationMessage.y + notificationMessage.height
+                            + root.cardContentMargin + 4
+                        )
+                        readonly property real extendedReportCardHeight: Math.max(
+                            root.reportCardHeight,
+                            reportText.y + reportText.contentHeight
+                            + root.cardContentMargin + 2
+                        )
+
                         width: historyList.width
                         height:
-                            (notificationEntry.isReport ? root.reportCardHeight : root.cardHeight)
+                            (notificationEntry.isReport ? notificationEntry.extendedReportCardHeight
+                                                        : notificationEntry.compactCardHeight)
                             + (root.cardGlowVerticalGutter * 2)
                             + root.cardSpacing
 
@@ -2430,7 +2463,8 @@ PanelWindow {
                                 rightMargin: root.cardGlowGutter
                             }
 
-                            height: notificationEntry.isReport ? root.reportCardHeight : root.cardHeight
+                            height: notificationEntry.isReport ? notificationEntry.extendedReportCardHeight
+                                                               : notificationEntry.compactCardHeight
 
                             fillColor: Colors.black
                             fillOpacity: root.cardFillOpacity
@@ -2688,10 +2722,11 @@ PanelWindow {
                                     height: 28
 
                                     label: "ZZ"
+                                    whiteLabel: true
 
                                     active: notificationEntry.snoozed
 
-                                    activeColor: Colors.orange
+                                    activeColor: Colors.white
 
                                     onTriggered: {
                                         if (notificationEntry.snoozed)
@@ -2795,7 +2830,7 @@ PanelWindow {
                                 anchors.leftMargin: root.cardContentMargin + 8
                                 anchors.rightMargin: 8
 
-                                height: 19
+                                height: Math.max(19, Math.ceil(fullTextHeight))
 
                                 z: 1
 
@@ -2811,13 +2846,14 @@ PanelWindow {
                                 glowRadius: root.tightGlowRadius
                                 glowSamples: root.tightGlowSamples
 
-                                elideMode: Text.ElideRight
+                                wrapMode: Text.Wrap
+                                elideMode: Text.ElideNone
                             }
 
 
                             // ===== MULTILINE REPORT DECK ===========
-                            // Compact app notifications stay 116px. Only
-                            // stored solar/weather briefs use this larger deck.
+                            // Short app messages stay compact; longer history
+                            // messages and report decks expand to fit their text.
                             Rectangle {
                                 id: reportDivider
                                 visible: notificationEntry.isReport
@@ -2901,6 +2937,9 @@ PanelWindow {
                     id: scrollBarArea
 
                     flickable: historyList
+                    handleStyle: "star"
+                    starAreaWidth: root.scrollBarAreaWidth
+                    starHandleSize: 14
 
                     x: parent.width - width
                     y: 0

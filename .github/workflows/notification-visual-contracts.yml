@@ -11,6 +11,7 @@ on:
       - "modules/Notifications.qml"
       - "widgets/notifications/NotificationsHubW.qml"
       - "tests/notifications/test_notification_visual_contracts.py"
+      - "tests/notifications/test_notifications_hub_style_contracts.py"
       - ".github/workflows/notification-visual-contracts.yml"
   pull_request:
     paths:
@@ -19,6 +20,7 @@ on:
       - "modules/Notifications.qml"
       - "widgets/notifications/NotificationsHubW.qml"
       - "tests/notifications/test_notification_visual_contracts.py"
+      - "tests/notifications/test_notifications_hub_style_contracts.py"
       - ".github/workflows/notification-visual-contracts.yml"
 
 permissions:
@@ -35,3 +37,6 @@ jobs:
 
       - name: Validate notification geometry and glow contracts
         run: python3 tests/notifications/test_notification_visual_contracts.py
+
+      - name: Validate Notifications Hub star, filter, search and multiline layout
+        run: python3 tests/notifications/test_notifications_hub_style_contracts.py

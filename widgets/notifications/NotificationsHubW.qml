@@ -2435,10 +2435,15 @@ PanelWindow {
                             notificationMessage.y + notificationMessage.height
                             + root.cardContentMargin + 4
                         )
+                        readonly property real extendedReportCardHeight: Math.max(
+                            root.reportCardHeight,
+                            reportText.y + reportText.contentHeight
+                            + root.cardContentMargin + 2
+                        )
 
                         width: historyList.width
                         height:
-                            (notificationEntry.isReport ? root.reportCardHeight
+                            (notificationEntry.isReport ? notificationEntry.extendedReportCardHeight
                                                         : notificationEntry.compactCardHeight)
                             + (root.cardGlowVerticalGutter * 2)
                             + root.cardSpacing
@@ -2458,7 +2463,7 @@ PanelWindow {
                                 rightMargin: root.cardGlowGutter
                             }
 
-                            height: notificationEntry.isReport ? root.reportCardHeight
+                            height: notificationEntry.isReport ? notificationEntry.extendedReportCardHeight
                                                                : notificationEntry.compactCardHeight
 
                             fillColor: Colors.black
@@ -2847,8 +2852,8 @@ PanelWindow {
 
 
                             // ===== MULTILINE REPORT DECK ===========
-                            // Compact app notifications stay 116px. Only
-                            // stored solar/weather briefs use this larger deck.
+                            // Short app messages stay compact; longer history
+                            // messages and report decks expand to fit their text.
                             Rectangle {
                                 id: reportDivider
                                 visible: notificationEntry.isReport

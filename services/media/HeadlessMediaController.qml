@@ -13,7 +13,9 @@ Scope {
     property string message: "SELECT A STATION TO LOAD"
     property string errorText: ""
     property string pendingAction: ""
-    readonly property bool busy: commandProcess.running
+    // Snapshot polling is read-only observation, not a user-initiated load.
+    // Never pulse/disable the cassette or transport keys every 2.4 seconds.
+    readonly property bool busy: commandProcess.running && pendingAction !== "snapshot"
     readonly property string playbackState:
         snapshot && snapshot.session ? String(snapshot.session.state || "unloaded") : "unknown"
     readonly property bool ownsPlayback:

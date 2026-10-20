@@ -307,6 +307,12 @@ Singleton {
         // select the desktop-native notifications backend.
         bodySupported: true
         actionsSupported: true
+        // Post-Apollo stores notification history even after popups expire,
+        // and its popup supports images supplied by native applications.
+        persistenceSupported: true
+        imageSupported: true
+        // We do NOT advertise markup support; client text must remain text.
+        bodyMarkupSupported: false
 
         onNotification: function (notification) {
             notification.tracked = true;

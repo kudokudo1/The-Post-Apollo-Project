@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::io::Write;
 use zellij_tile::prelude::*;
 
 #[derive(Default)]

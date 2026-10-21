@@ -44,6 +44,21 @@ for token in (
     "safeSource: modeButton.labelGlowSource",
 ):
     assert token in mode, f"Main Mode component missing: {token}"
+# Apollo Hub uses default ModeButton artwork. Keep glows in the independent
+# content plane (never inside the Grid, which would lay them out as cells),
+# but follow the live icon and caption positions reactively.
+HUB = (ROOT / "widgets/ApolloHubW.qml").read_text(encoding="utf-8")
+for needle in ("property bool trackDefaultGlowsLocally: false",
+               "id: defaultArtworkGrid",
+               "defaultArtworkGrid.x",
+               "defaultArtworkGrid.y",
+               "modeButton.textOnly ? defaultLabel.x : defaultIcon.x",
+               "defaultLabel.x",
+               "defaultLabel.y"):
+    assert needle in mode, f"Missing reactive default main-mode glow: {needle}"
+assert "trackDefaultGlowsLocally: true" in HUB
+assert HUB.count("trackDefaultGlowsLocally: true") == 1
+
 assert "implicitWidth:" not in mode and "implicitHeight:" not in mode
 assert "pressed ? pressedBorderColor" in mode
 assert "primaryHovered ? hoveredFillColor" in mode

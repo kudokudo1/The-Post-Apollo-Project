@@ -504,7 +504,7 @@ PanelWindow {
 
                 font.pixelSize: 20
 
-                color: Colors.cyan
+                color: Colors.magenta
             }
 
             Text {
@@ -633,7 +633,7 @@ PanelWindow {
 
                 height: 2
 
-                color: Colors.cyan
+                color: Colors.magenta
             }
         }
 

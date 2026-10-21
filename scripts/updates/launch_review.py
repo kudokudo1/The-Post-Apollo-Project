@@ -83,8 +83,8 @@ def kitty_argv(kind: str, token: str) -> tuple[list[str], bool]:
         # Separate session name: never attach to the user's ordinary Zellij
         # session or replay an old operation in a reused named session.
         session = "apollo-updates-" + kind + "-" + token[:8] + "-" + str(os.getpid())
-        return head + [zellij, "--session-name", session,
-                       "--layout-string", layout(kind, token, wasm)], True
+        return head + [zellij, "--layout-string", layout(kind, token, wasm),
+                       "attach", "--create", session], True
     # Non-destructive fallback. This still gets the Sway floating placement,
     # but does not pretend that a clickable Zellij X is available.
     return head[:-1] + ["--hold", "-e", "/usr/bin/python3", str(update_script()),
@@ -130,13 +130,20 @@ def place_with_sway(child_pid: int) -> bool:
     return False
 
 
+def review_environment() -> dict[str, str]:
+    """Prevent the dedicated Kitty process from inheriting a parent Zellij session."""
+    return {key: value for key, value in os.environ.items()
+            if key != "ZELLIJ" and not key.startswith("ZELLIJ_")}
+
+
 def main(args: list[str]) -> int:
     if len(args) != 2 or not valid_offer(args[0], args[1]):
         print("Usage: launch_review.py KIND TOKEN (known update only)", file=sys.stderr)
         return 2
     try:
         command, has_header = kitty_argv(args[0], args[1])
-        child = subprocess.Popen(command, close_fds=True, start_new_session=True)
+        child = subprocess.Popen(command, close_fds=True, start_new_session=True,
+                                 env=review_environment())
     except (OSError, RuntimeError, ValueError) as exc:
         print("UPDATE REVIEW // Could not launch Kitty: " + str(exc), file=sys.stderr)
         return 2

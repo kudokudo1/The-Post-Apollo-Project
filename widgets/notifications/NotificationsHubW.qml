@@ -11,6 +11,9 @@ PanelWindow {
     id: root
 
     property bool menuOpen: false
+    // Read-only update offers and explicit local reviewer. No update
+    // credentials, shell snippets, or arbitrary notification actions.
+    property var updatesController: null
     // Koinoikos / shared keyboard-owner compatibility. The menu remains
     // mapped while closed; neither visibility nor visual selection is focus.
     property bool keyboardActive: false
@@ -966,7 +969,11 @@ PanelWindow {
                     "createdAt": Number(entry.createdAt || 0),
                     "updatedAt": Number(entry.updatedAt || 0),
                     "reportKind": reportKind,
-                    "reportDetails": root.reportDetailsFor(entry, reportKind)
+                    "reportDetails": root.reportDetailsFor(entry, reportKind),
+                    "updateKind": entry.sourceId === "apollo-update-monitor"
+                                  ? String((entry.context || {}).updateKind || "") : "",
+                    "updateToken": entry.sourceId === "apollo-update-monitor"
+                                   ? String((entry.context || {}).updateToken || "") : ""
                 }
             });
         }
@@ -2414,7 +2421,12 @@ PanelWindow {
                         required property double updatedAt
                         required property string reportKind
                         required property string reportDetails
+                        required property string updateKind
+                        required property string updateToken
                         readonly property bool isReport: reportKind !== ""
+                        readonly property bool isUpdateOffer:
+                            root.updatesController !== null
+                            && root.updatesController.isCurrent(updateKind, updateToken)
 
                         readonly property string appKey: root.appKeyFor(notificationEntry.sourceId, notificationEntry.source)
 
@@ -2444,6 +2456,7 @@ PanelWindow {
                             root.cardHeight,
                             notificationMessage.y + notificationMessage.height
                             + root.cardContentMargin + 4
+                            + (notificationEntry.isUpdateOffer ? 32 : 0)
                         )
                         readonly property real extendedReportCardHeight: Math.max(
                             root.reportCardHeight,
@@ -2508,6 +2521,7 @@ PanelWindow {
 
                                 hoverEnabled: true
                                 enabled: !notificationEntry.isReport
+                                         && !notificationEntry.isUpdateOffer
 
                                 z: 0
 
@@ -2860,6 +2874,47 @@ PanelWindow {
                             }
 
 
+                            // ===== UPDATES // EXPLICIT DECISIONS ======
+                            // These actions are available only for a current
+                            // matching offer from the private update monitor;
+                            // persisted history and external notifications
+                            // cannot execute a stale update.
+                            Row {
+                                id: updateOfferActions
+                                visible: notificationEntry.isUpdateOffer
+                                anchors {
+                                    left: parent.left
+                                    bottom: parent.bottom
+                                }
+                                anchors.leftMargin: root.cardContentMargin + 8
+                                anchors.bottomMargin: 8
+                                spacing: 8
+                                z: 3
+
+                                MiniButton {
+                                    width: 86
+                                    height: 26
+                                    label: "REVIEW"
+                                    active: false
+                                    onTriggered: {
+                                        root.updatesController.review(
+                                            notificationEntry.updateKind,
+                                            notificationEntry.updateToken);
+                                    }
+                                }
+                                MiniButton {
+                                    width: 86
+                                    height: 26
+                                    label: "NOT NOW"
+                                    active: false
+                                    onTriggered: {
+                                        root.updatesController.defer(
+                                            notificationEntry.updateKind,
+                                            notificationEntry.updateToken);
+                                    }
+                                }
+                            }
+
                             // ===== MULTILINE REPORT DECK ===========
                             // Short app messages stay compact; longer history
                             // messages and report decks expand to fit their text.
@@ -2912,6 +2967,7 @@ PanelWindow {
                             MiniButton {
                                 id: bringHereButton
                                 visible: !notificationEntry.isReport
+                                         && !notificationEntry.isUpdateOffer
 
                                 anchors {
                                     bottom: parent.bottom

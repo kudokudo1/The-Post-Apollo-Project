@@ -35,6 +35,9 @@ jobs:
         run: |
           node --check scripts/finance/actual_readonly.mjs
           node --check scripts/finance/read_budget.mjs
+          node --check scripts/finance/source_config.mjs
+          node --check scripts/finance/check_server.mjs
+          node --check tests/finance/test_finance_source_config.mjs
           node --check tests/finance/test_actual_readonly.mjs
       - name: Read-only, fake-data snapshot tests
-        run: node --test tests/finance/test_actual_readonly.mjs
+        run: node --test tests/finance/test_actual_readonly.mjs tests/finance/test_finance_source_config.mjs

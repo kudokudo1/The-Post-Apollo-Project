@@ -438,6 +438,8 @@ PanelWindow {
                                             / Math.max(1, implicitWidth))
 
                             GohuText {
+                                // Keep small ornaments centered on the larger core glyph.
+                                anchors.verticalCenter: parent.verticalCenter
                                 text: modelData.prefix || ""
                                 font.pixelSize: 15
                                 color: mainModeButton.primaryColor
@@ -459,6 +461,8 @@ PanelWindow {
                                 color: mainModeButton.primaryColor
                             }
                             GohuText {
+                                // Keep small ornaments centered on the larger core glyph.
+                                anchors.verticalCenter: parent.verticalCenter
                                 text: modelData.suffix || ""
                                 font.pixelSize: 15
                                 color: mainModeButton.primaryColor
@@ -614,6 +618,8 @@ PanelWindow {
                                                 / Math.max(1, implicitWidth))
 
                                 GohuText {
+                                    // Keep small ornaments centered on the larger core glyph.
+                                    anchors.verticalCenter: parent.verticalCenter
                                     text: modelData.prefix || ""
                                     font.pixelSize: 12
                                     color: budgetSubButton.foregroundColor
@@ -632,6 +638,8 @@ PanelWindow {
                                     color: budgetSubButton.foregroundColor
                                 }
                                 GohuText {
+                                    // Keep small ornaments centered on the larger core glyph.
+                                    anchors.verticalCenter: parent.verticalCenter
                                     text: modelData.suffix || ""
                                     font.pixelSize: 12
                                     color: budgetSubButton.foregroundColor

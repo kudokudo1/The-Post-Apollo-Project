@@ -50,3 +50,19 @@ test("source checker is limited to local unauthenticated health probes", async (
     assert.ok(!script.includes(forbidden), forbidden);
   }
 });
+
+test("installer never copies budgets, migrates credentials, or changes source selection", async () => {
+  const {readFile} = await import("node:fs/promises");
+  const installer = await readFile(
+    new URL("../../scripts/finance/install_standalone_server.sh", import.meta.url),
+    "utf8");
+  assert.match(installer, /ACTUAL_HOSTNAME=127\.0\.0\.1/);
+  assert.match(installer, /ACTUAL_PORT=5006/);
+  assert.match(installer, /@actual-app\/sync-server@26\.10\.0/);
+  assert.match(installer, /systemctl --user enable --now/);
+  assert.match(installer, /if \[\[ "\$\{EUID\}" -eq 0 \]\]/);
+  for (const forbidden of ["rm -rf", "actual-password", "actual-sync-id",
+      "actual-server-url", "rsync", "cp -", "mv -"]) {
+    assert.ok(!installer.includes(forbidden), forbidden);
+  }
+});

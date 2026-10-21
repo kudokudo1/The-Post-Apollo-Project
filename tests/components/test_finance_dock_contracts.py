@@ -8,8 +8,8 @@ SHELL = (ROOT / "shell.qml").read_text(encoding="utf-8")
 FINANCE = (ROOT / "modules/Finance.qml").read_text(encoding="utf-8")
 MENU = (ROOT / "widgets/FinanceW.qml").read_text(encoding="utf-8")
 
-# A direct default DockButton between the media player and Hospital.
-assert SHELL.index("Mediaplayer {}") < SHELL.index("// Finance") < SHELL.index("FinanceW {") < SHELL.index("// Hospital")
+# Left-to-right top dock order: Media, Hospital, Finance, Git.
+assert SHELL.index("Mediaplayer {}") < SHELL.index("        // Hospital") < SHELL.index("HospitalW {") < SHELL.index("        // Finance") < SHELL.index("FinanceW {") < SHELL.index("        // Git", SHELL.index("        // Finance"))
 assert SHELL.count("            Finance {") == 1
 assert SHELL.count("            FinanceW {") == 1
 assert "menuOpen: financeWindow.menuOpen" in SHELL

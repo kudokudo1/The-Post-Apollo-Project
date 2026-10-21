@@ -72,6 +72,7 @@ impl ZellijPlugin for UpdateReviewHeader {
         };
         print!("\x1b[48;2;27;6;35m\x1b[38;2;199;78;199m{}{}{}\x1b[0m",
                prefix, x_color, close);
+        let _ = std::io::stdout().flush();
     }
 }
 

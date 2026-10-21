@@ -4,7 +4,8 @@ import Quickshell.Io
 import qs.services.notifications
 
 // A read-only, low-frequency update-offer observer. Only a *separate*
-// Kitty terminal with typed APPLY can run an updater. No QML code performs
+// Kitty terminal with typed DOWNLOAD or APPLY can run Flatpak updates.
+// Firmware review opens the native GNOME Software page. No QML code performs
 // OS/package mutations, handles passwords, or reboots.
 Scope {
     id: producer
@@ -19,7 +20,8 @@ Scope {
     readonly property string script: Quickshell.shellPath("scripts/updates/update_offers.py")
 
     function knownKind(kind) {
-        return ["silverblue", "oh-my-zsh", "powerlevel10k"].indexOf(kind) !== -1;
+        return ["silverblue", "oh-my-zsh", "powerlevel10k",
+                "flatpak-user", "flatpak-system", "firmware"].indexOf(kind) !== -1;
     }
 
     function isCurrent(kind, token) {
@@ -47,7 +49,7 @@ Scope {
         if (!parsed || parsed.schema !== 1 || !Array.isArray(parsed.offers))
             return;
         const current = {};
-        for (const row of parsed.offers.slice(0, 3)) {
+        for (const row of parsed.offers.slice(0, 6)) {
             const kind = String((row || {}).kind || "");
             const token = String((row || {}).token || "");
             if (!producer.knownKind(kind) || !/^[a-f0-9]{24}$/.test(token)
@@ -68,7 +70,11 @@ Scope {
                 "severity": "normal",
                 "title": String(row.title).slice(0, 110),
                 "message": String(row.message).slice(0, 360)
-                           + " Open Notifications Hub: REVIEW or NOT NOW.",
+                           + (kind.startsWith("flatpak-")
+                              ? " Open Notifications Hub: DOWNLOAD or NOT NOW."
+                              : kind === "firmware"
+                              ? " Open Notifications Hub: OPEN UPDATES or NOT NOW."
+                              : " Open Notifications Hub: REVIEW or NOT NOW."),
                 "tags": ["system", "updates", "operator-confirmation"],
                 "context": {
                     "origin": "apollo",
@@ -92,8 +98,14 @@ Scope {
         const next = Object.assign({}, producer.lastReviewAt);
         next[kind] = now;
         producer.lastReviewAt = next;
-        // The local Python entrypoint rechecks the exact immutable offer
-        // fingerprint, prints the command, and demands typed APPLY.
+        if (kind === "firmware") {
+            // GNOME Software owns fwupd's device warnings, authorization,
+            // installation and any reboot. Never run fwupdmgr update here.
+            Quickshell.execDetached(["gnome-software", "--mode=updates"]);
+            return true;
+        }
+        // The Python entrypoint rechecks the immutable offer fingerprint.
+        // Flatpaks ask for DOWNLOAD (cache only) or APPLY (deploy).
         Quickshell.execDetached([
             "kitty", "--hold", "-e", "/usr/bin/python3",
             producer.script, "review", String(kind), String(token)

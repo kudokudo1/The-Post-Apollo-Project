@@ -7,10 +7,12 @@ on:
     paths:
       - "scripts/updates/zellij/**"
       - ".github/workflows/update-review-header.yml"
+      - "tests/notifications/test_update_review_wasm.py"
   pull_request:
     paths:
       - "scripts/updates/zellij/**"
       - ".github/workflows/update-review-header.yml"
+      - "tests/notifications/test_update_review_wasm.py"
 
 permissions:
   contents: read
@@ -28,8 +30,8 @@ jobs:
         run: cargo test --manifest-path scripts/updates/zellij/update-review-header/Cargo.toml
       - name: Build WebAssembly plugin for Zellij 0.45
         run: cargo build --release --target wasm32-wasip1 --manifest-path scripts/updates/zellij/update-review-header/Cargo.toml
-      - name: Ensure plugin is WebAssembly
-        run: python3 -c "from pathlib import Path; p=Path('scripts/updates/zellij/update-review-header/target/wasm32-wasip1/release/post_apollo_update_header.wasm'); assert p.read_bytes()[:4] == bytes((0, 97, 115, 109))"
+      - name: Check compiled Zellij WASI command entry point
+        run: python3 tests/notifications/test_update_review_wasm.py
       - uses: actions/upload-artifact@v4
         with:
           name: post-apollo-update-header-wasm

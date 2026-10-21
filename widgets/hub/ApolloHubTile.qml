@@ -9,6 +9,7 @@ SectionFrame {
 
     property string moduleId: "time"
     property bool editing: false
+    property bool keyboardSelected: false
     property int tileIndex: 0
     property int tileCount: 0
     property date now: new Date()
@@ -16,10 +17,18 @@ SectionFrame {
     signal moveLeft(int index)
     signal moveRight(int index)
     signal changeModule(int index)
+    signal pointerEntered(int index)
+
+    HoverHandler {
+        onHoveredChanged: {
+            if (hovered)
+                tile.pointerEntered(tile.tileIndex);
+        }
+    }
 
     fillColor: Colors.black
     fillOpacity: 0.92
-    borderColor: Colors.cyan
+    borderColor: keyboardSelected ? Colors.orange : Colors.cyan
     borderOpacity: 0.7
     borderWidth: 1
     radius: 5

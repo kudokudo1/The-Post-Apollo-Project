@@ -17,7 +17,7 @@ PanelWindow {
     // Independent navigation state; no financial services are attached.
     readonly property var mainModes: [
         { id: "budget", name: "Budget", icon: "⋆$🗓₊˚" },
-        { id: "market", name: "Market", icon: "₊˚$🗠๋࣭⭑", prefix: "₊˚", core: "$🗠๋࣭", suffix: "⭑" },
+        { id: "market", name: "Market", icon: "₊˚$🗠๋࣭⭑", prefix: "₊˚", dollar: "$", core: "🗠๋࣭", suffix: "⭑" },
         { id: "radar", name: "Radar", icon: "࣪ ˖(˓🛰₊˚⊹", prefix: "࣪ ˖(˓", core: "🛰", suffix: "₊˚⊹", coreSize: 30 },
         { id: "research", name: "Research", icon: "⋆˚🗃₊" },
         { id: "strategies", name: "Strategies", icon: "˙°⚖︎๋࣭⭑", prefix: "˙°", core: "⚖︎๋࣭", suffix: "⭑", coreSize: 28 },
@@ -28,7 +28,7 @@ PanelWindow {
     ]
     readonly property var budgetSubModes: [
         { id: "budget", name: "Budget", icon: "˗ˋˏ˖⛁⛀๋࣭⭑ˎˊ˗", prefix: "˗ˋˏ˖", core: "⛁⛀๋࣭", suffix: "⭑ˎˊ˗" },
-        { id: "reports", name: "Reports", icon: "₊˚$🗠๋࣭⭑", prefix: "₊˚", core: "$🗠๋࣭", suffix: "⭑" },
+        { id: "reports", name: "Reports", icon: "₊˚$🗠๋࣭⭑", prefix: "₊˚", dollar: "$", core: "🗠๋࣭", suffix: "⭑" },
         { id: "schedules", name: "Schedules", icon: "⋆$🗓₊˚" }
     ]
     property string selectedMainMode: "budget"
@@ -442,6 +442,14 @@ PanelWindow {
                                 font.pixelSize: 15
                                 color: mainModeButton.primaryColor
                             }
+                            // Match the dollar in Main Budget instead of
+                            // enlarging it with the adjoining chart glyph.
+                            GohuText {
+                                visible: !!modelData.dollar
+                                text: modelData.dollar || ""
+                                font.pixelSize: 24
+                                color: mainModeButton.primaryColor
+                            }
                             GohuText {
                                 text: modelData.core || ""
                                 font.pixelSize: modelData.coreSize || 34
@@ -605,6 +613,13 @@ PanelWindow {
                                 GohuText {
                                     text: modelData.prefix || ""
                                     font.pixelSize: 12
+                                    color: budgetSubButton.foregroundColor
+                                }
+                                // Same Gohu dollar size used by Main Budget.
+                                GohuText {
+                                    visible: !!modelData.dollar
+                                    text: modelData.dollar || ""
+                                    font.pixelSize: 24
                                     color: budgetSubButton.foregroundColor
                                 }
                                 GohuText {

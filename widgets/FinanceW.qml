@@ -192,6 +192,7 @@ PanelWindow {
                 model: root.mainModes
 
                 ModeButton {
+                    id: mainModeButton
                     required property var modelData
                     width: mainModeRail.width
                     height: 60
@@ -215,7 +216,7 @@ PanelWindow {
                         textFormat: Text.PlainText
                         font.pixelSize: 17
                         elide: Text.ElideRight
-                        color: parent.primaryColor
+                        color: mainModeButton.primaryColor
                     }
 
                     GohuText {
@@ -227,7 +228,7 @@ PanelWindow {
                         text: modelData.future ? "LATER" : modelData.name.toUpperCase()
                         font.pixelSize: 10
                         elide: Text.ElideRight
-                        color: parent.selected ? Colors.magenta : Colors.white
+                        color: mainModeButton.selected ? Colors.magenta : Colors.white
                     }
 
                     onTriggered: root.selectMainMode(modelData.id)
@@ -282,6 +283,7 @@ PanelWindow {
                     model: root.budgetSubModes
 
                     ActionButton {
+                        id: budgetSubButton
                         required property var modelData
                         readonly property color identityColor:
                             root.budgetSubColor(modelData.id)
@@ -302,6 +304,10 @@ PanelWindow {
                         pressedContentGlowColor: identityGlow
                         selectedContentGlowColor: identityGlow
                         contentGlowSource: subIcon
+                        idleSoftGlowColor: identityGlow
+                        hoverSoftGlowColor: identityGlow
+                        pressedSoftGlowColor: identityGlow
+                        selectedSoftGlowColor: identityGlow
                         idleBorderColor: identityColor
                         hoverBorderColor: identityColor
                         selectedBorderColor: identityColor
@@ -317,7 +323,7 @@ PanelWindow {
                             textFormat: Text.PlainText
                             font.pixelSize: 15
                             elide: Text.ElideRight
-                            color: parent.foregroundColor
+                            color: budgetSubButton.foregroundColor
                         }
 
                         GohuText {

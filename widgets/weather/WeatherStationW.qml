@@ -100,6 +100,110 @@ PanelWindow {
         return activeDomainName + " // " + currentViewName;
     }
 
+    // Header source indicator. HOME currently reflects the actual weather
+    // transport; later MAP/NEWS/RADIO pages can replace this branch with
+    // their own provider state without changing the header geometry.
+    property int sourceStatusClock: 0
+
+    readonly property int weatherAgeMinutes: {
+        sourceStatusClock;
+
+        if (!weatherService || !weatherService.ready)
+            return -1;
+
+        const stamp = weatherService.lastUpdated;
+        if (!stamp || typeof stamp.getTime !== "function")
+            return -1;
+
+        const millis = stamp.getTime();
+        if (!isFinite(millis) || millis <= 0)
+            return -1;
+
+        return Math.max(
+            0,
+            Math.floor((Date.now() - millis) / 60000)
+        );
+    }
+
+    readonly property bool weatherStale:
+        weatherService
+        && weatherService.ready
+        && (
+            String(weatherService.errorText || "").length > 0
+            || weatherAgeMinutes >= 20
+        )
+
+    readonly property string sourceStatusText: {
+        if (currentView !== "home")
+            return "NO FEED";
+
+        if (!weatherService)
+            return "OFFLINE";
+
+        if (weatherService.loading)
+            return "READING";
+
+        if (!weatherService.ready)
+            return String(weatherService.errorText || "").length > 0
+                   ? "OFFLINE" : "CONNECTING";
+
+        if (weatherStale)
+            return "STALE";
+
+        return "WEATHER LIVE";
+    }
+
+    readonly property string sourceStatusDetail: {
+        if (currentView !== "home")
+            return "NOT WIRED";
+
+        if (!weatherService)
+            return "NO SERVICE";
+
+        if (weatherService.loading)
+            return "UPDATING";
+
+        if (!weatherService.ready)
+            return String(weatherService.errorText || "").length > 0
+                   ? "NO LINK" : "WAITING";
+
+        if (weatherAgeMinutes < 0)
+            return "UPDATED";
+
+        if (weatherAgeMinutes === 0)
+            return "UPDATED <1m";
+
+        return "UPDATED " + weatherAgeMinutes + "m";
+    }
+
+    readonly property color sourceStatusColor: {
+        if (currentView !== "home")
+            return Colors.orange;
+
+        if (!weatherService)
+            return Colors.red;
+
+        if (weatherService.loading)
+            return Colors.orange;
+
+        if (!weatherService.ready)
+            return String(weatherService.errorText || "").length > 0
+                   ? Colors.red : Colors.orange;
+
+        if (weatherStale)
+            return Colors.yellow;
+
+        // Healthy source relationship is magenta by operator decision.
+        return Colors.magenta;
+    }
+
+    Timer {
+        interval: 30000
+        repeat: true
+        running: weatherStation.menuOpen
+        onTriggered: weatherStation.sourceStatusClock++
+    }
+
     implicitWidth: menuOpen ? 1000 : 0
 
     implicitHeight: menuOpen ? 700 : 0
@@ -441,31 +545,47 @@ PanelWindow {
                     unavailableOpacity: 0.42
                 }
 
-                // Magenta is the established focus identity. Clicking this
-                // requests Weather keyboard ownership and returns Qt focus to
-                // the navigation anchor without forcing Exclusive layer focus.
-                ActionButton {
-                    id: focusButton
+                // Live source badge, matching the Git/Finance header grammar.
+                // It is an indicator, not an input control.
+                Rectangle {
+                    id: sourceStatusIndicator
 
-                    width: 74
-                    height: 32
+                    width: 104
+                    height: 34
+                    anchors.verticalCenter: parent.verticalCenter
 
-                    label: "FOCUS"
-                    labelPixelSize: 10
-                    contentPadding: 6
-                    trackLabelGlowLocally: true
+                    color: Colors.dark
+                    border.width: 1
+                    border.color: weatherStation.sourceStatusColor
 
-                    accentColor: Colors.magenta
-                    selected:
-                        weatherStation.relationshipFocusModeActive
-                        ? weatherStation.relationshipFocused
-                        : weatherKeyboardAnchor.activeFocus
+                    RectangularShadow {
+                        anchors.fill: parent
+                        z: -1
+                        spread: 4
+                        opacity: weatherStation.menuOpen ? 0.54 : 0
+                        color: weatherStation.sourceStatusColor
+                    }
 
-                    onLeftClicked: {
-                        weatherStation.keyboardOwnershipRequested();
-                        Qt.callLater(
-                            weatherStation.restoreWeatherKeyboardFocus
-                        );
+                    Column {
+                        anchors.centerIn: parent
+                        spacing: 0
+
+                        GohuText {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: weatherStation.sourceStatusText
+                            font.pixelSize: 8
+                            color: weatherStation.sourceStatusColor
+                            textFormat: Text.PlainText
+                        }
+
+                        GohuText {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: weatherStation.sourceStatusDetail
+                            font.pixelSize: 7
+                            color: weatherStation.sourceStatusColor
+                            opacity: 0.72
+                            textFormat: Text.PlainText
+                        }
                     }
                 }
 

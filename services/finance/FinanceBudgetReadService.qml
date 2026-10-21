@@ -157,9 +157,16 @@ Scope {
     Process {
         id: healthProbe
         onExited: function(exitCode, exitStatus) {
-            budgetBridge.healthStatus = budgetBridge.monitoring
+            const wasOffline = budgetBridge.healthStatus === "offline";
+            const nextHealth = budgetBridge.monitoring
                 ? (exitCode === 0 ? "online" : "offline")
                 : "unknown";
+            budgetBridge.healthStatus = nextHealth;
+            // HTTP returning after an outage is not authenticated evidence.
+            // Re-read Actual before the header is allowed back to LIVE.
+            if (wasOffline && nextHealth === "online"
+                    && !budgetBridge.loading)
+                budgetBridge.refresh();
         }
     }
 

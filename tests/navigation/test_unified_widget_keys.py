@@ -109,7 +109,7 @@ def test_weather_semantic_main_and_top_submode_and_arrow_preview():
     assert "context: Qt.WindowShortcut" in src
 
 
-def test_weather_focus_and_window_controls_follow_shared_contract():
+def test_weather_keyboard_live_indicator_and_close_follow_shared_contract():
     src = read("widgets/weather/WeatherStationW.qml")
 
     assert "property bool keyboardActive: true" in src
@@ -126,9 +126,16 @@ def test_weather_focus_and_window_controls_follow_shared_contract():
     assert "borderVisible: true" in src
     assert "borderColor: Colors.cyan" in src
 
-    assert "id: focusButton" in src
-    assert 'label: "FOCUS"' in src
-    assert "accentColor: Colors.magenta" in src
+    assert "id: sourceStatusIndicator" in src
+    assert 'return "WEATHER LIVE";' in src
+    assert 'return "READING";' in src
+    assert 'return "STALE";' in src
+    assert 'return "OFFLINE";' in src
+    assert "return Colors.magenta;" in src
+    assert "weatherAgeMinutes >= 20" in src
+    assert 'return "UPDATED " + weatherAgeMinutes + "m";' in src
+    assert "id: focusButton" not in src
+    assert 'label: "FOCUS"' not in src
 
     assert "id: closeButton" in src
     assert 'label: "×"' in src

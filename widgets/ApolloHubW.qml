@@ -330,6 +330,8 @@ PanelWindow {
                     text: "APOLLO // HUB"
                 }
                 ActionButton {
+                    // Keep text and its sampled glow aligned during layout/state changes.
+                    trackLabelGlowLocally: true
                     id: editButton
                     width: 85
                     height: 32
@@ -338,6 +340,8 @@ PanelWindow {
                     onLeftClicked: hub.editMode = !hub.editMode
                 }
                 ActionButton {
+                    // Keep text and its sampled glow aligned during layout/state changes.
+                    trackLabelGlowLocally: true
                     id: closeButton
                     width: 35
                     height: 32
@@ -383,6 +387,8 @@ PanelWindow {
                 Repeater {
                     model: hub.activeMode ? hub.activeMode.subModes.length : 0
                     ActionButton {
+                        // Keep text and its sampled glow aligned during layout/state changes.
+                        trackLabelGlowLocally: true
                         width: Math.min(160, Math.max(76, subStrip.width / Math.max(1, hub.activeMode.subModes.length) - 6))
                         height: subStrip.height
                         label: hub.activeMode.subModes[index].name
@@ -402,6 +408,8 @@ PanelWindow {
                 spacing: 6
 
                 ActionButton {
+                    // Keep text and its sampled glow aligned during layout/state changes.
+                    trackLabelGlowLocally: true
                     width: 88
                     height: 32
                     label: "+ MODE"
@@ -412,6 +420,8 @@ PanelWindow {
                     }
                 }
                 ActionButton {
+                    // Keep text and its sampled glow aligned during layout/state changes.
+                    trackLabelGlowLocally: true
                     width: 92
                     height: 32
                     label: "+ GROUP"
@@ -422,6 +432,8 @@ PanelWindow {
                     }
                 }
                 ActionButton {
+                    // Keep text and its sampled glow aligned during layout/state changes.
+                    trackLabelGlowLocally: true
                     width: 85
                     height: 32
                     label: "+ TILE"

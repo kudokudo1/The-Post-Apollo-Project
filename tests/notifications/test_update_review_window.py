@@ -33,7 +33,11 @@ assert "Mouse::LeftClick(line, column)" in src
 assert "self.detach_allowed && close_hit(" in src
 assert "detach();" in src
 assert not re.search(r"\b(?:quit_zellij|close_focused_tab|close_tab_with_id|close_terminal_pane|close_focus|run_command)\(", src)
-assert "fn x_only_in_right_edge_of_one_row_header()" in src
+assert "fn x_only_in_right_edge_of_title_row()" in src
+assert "fn cyan_divider_inset_from_both_edges()" in src
+assert "divider_line(columns)" in src
+assert "if rows >= 2" in src
+assert r"\x1b[38;2;85;207;202m" in src
 assert "wasm32-wasip1" in INSTALL.read_text()
 assert "post_apollo_update_header.wasm" in INSTALL.read_text()
 assert "test_update_review_window.py" in WORKFLOW.read_text()
@@ -86,7 +90,7 @@ with tempfile.TemporaryDirectory() as tmp:
         assert command[-1].startswith("apollo-updates-flatpak-system-")
         generated = command[command.index("--layout-string") + 1]
         assert 'plugin location="file:' in generated
-        assert "pane size=1 borderless=true" in generated
+        assert "pane size=2 borderless=true" in generated
         assert 'command="/usr/bin/python3"' in generated
         assert '"review" "flatpak-system" "' in generated
         assert "bash -c" not in generated

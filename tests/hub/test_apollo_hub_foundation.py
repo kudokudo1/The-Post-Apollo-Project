@@ -31,8 +31,11 @@ assert '>🗓</font> ⋆˙⟡' in dock
 assert "Colors.orange" in dock
 assert "color: Colors.white" in dock
 assert "contentGlowSource: hubMark" in dock
-for glow in ("normalDockGlowColor", "hoverDockGlowColor",
-             "pressedDockGlowColor", "openGlowColor",
+# Idle rear/wide chassis halo is orange; glyph sampling and active dock
+# states remain magenta without disturbing the reactive glow-tracking repair.
+assert "normalDockGlowColor: Colors.orange" in dock
+assert "trackArtworkGlowLocally: true" in dock
+for glow in ("hoverDockGlowColor", "pressedDockGlowColor", "openGlowColor",
              "normalContentGlowColor", "hoverContentGlowColor",
              "pressedContentGlowColor"):
     assert glow + ": Colors.magenta" in dock, glow

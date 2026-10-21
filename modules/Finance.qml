@@ -14,7 +14,7 @@ DockButton {
     normalForegroundColor: Colors.white
     hoverForegroundColor: Colors.white
     pressedForegroundColor: Colors.white
-    openForegroundColor: Colors.white
+    openForegroundColor: Colors.magenta
 
     normalContentGlowColor: Colors.omnitrix
     hoverContentGlowColor: Colors.omnitrix
@@ -28,10 +28,13 @@ DockButton {
 
     contentGlowSource: financeMark
 
+    // The decorated mark changes as one identity while the menu is open.
+    readonly property color coinColor: menuOpen ? Colors.magenta : Colors.green
+
     NotoText {
         id: financeMark
         anchors.centerIn: parent
-        text: "˗ˋˏ˖<font color='" + Colors.green + "'>⛁⛀</font>๋࣭⭑ˎˊ˗"
+        text: "˗ˋˏ˖<font color='" + financeDock.coinColor + "'>⛁⛀</font>๋࣭⭑ˎˊ˗"
         textFormat: Text.StyledText
         font.pixelSize: 21
         color: financeDock.foregroundColor

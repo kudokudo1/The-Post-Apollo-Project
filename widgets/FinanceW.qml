@@ -11,13 +11,12 @@ PanelWindow {
 
     // Display coordinates relative to DP-5, supplied by shell.qml.
     property real dockCenterX: 0
-    property real dockBottomY: 0
+    property real chassisTopY: 0
 
     // The visible chassis is exactly 9:16; gutter belongs to its glow.
     readonly property int frameWidth: 432
     readonly property int frameHeight: 768
     readonly property int glowGutter: 12
-    readonly property int buttonGap: 0 // Flush with the bottom of the Finance dock / invisible bar
 
     function toggle() {
         menuOpen = !menuOpen;
@@ -35,8 +34,8 @@ PanelWindow {
 
     // Clamp the panel to its screen if the dock layout becomes wider.
     margins {
-        top: Math.max(0, Math.round(root.dockBottomY + root.buttonGap
-                                    - root.glowGutter))
+        // Match Hospital/Git's visible frame top, not the Finance dock bottom.
+        top: Math.max(0, Math.round(root.chassisTopY - root.glowGutter))
         left: Math.max(0, Math.min(
             Math.max(0, root.screen ? root.screen.width - root.implicitWidth : 0),
             Math.round(root.dockCenterX - root.implicitWidth / 2)

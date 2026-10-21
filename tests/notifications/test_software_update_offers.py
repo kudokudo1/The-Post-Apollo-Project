@@ -14,6 +14,10 @@ import stat
 import tempfile
 from unittest.mock import patch
 
+# Keep updater-lock tests completely outside the operator's real state.
+TEST_STATE = tempfile.TemporaryDirectory(prefix="apollo-update-tests-")
+os.environ["XDG_STATE_HOME"] = TEST_STATE.name
+
 ROOT = Path(__file__).resolve().parents[2]
 BACKEND = ROOT / "scripts/updates/update_offers.py"
 PRODUCER = (ROOT / "services/notifications/SoftwareUpdateOfferNotificationProducer.qml").read_text()

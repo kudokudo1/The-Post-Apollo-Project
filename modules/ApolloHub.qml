@@ -31,6 +31,7 @@ DockButton {
     hoverContentGlowColor: Colors.magenta
     pressedContentGlowColor: Colors.magenta
     contentGlowSource: hubMark
+    trackArtworkGlowLocally: true
 
     // Keep the Unicode ornaments and emoji in ONE run to retain the original
     // Calendar text shaping and avoid doubled, separately sampled glow planes.

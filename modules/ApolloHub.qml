@@ -15,14 +15,14 @@ DockButton {
     radius: 7
     open: menuOpen
 
-    // Keep all three glyphs white/orange regardless of button state; preserve
-    // independent magenta neon for the dock chassis and entire artwork.
+    // Preserve white ornaments, orange Calendar glyph, and magenta artwork.
+    // Only the idle rear/wide dock halo is orange; active states remain magenta.
     normalForegroundColor: Colors.white
     hoverForegroundColor: Colors.white
     pressedForegroundColor: Colors.white
     openForegroundColor: Colors.white
 
-    normalDockGlowColor: Colors.magenta
+    normalDockGlowColor: Colors.orange
     hoverDockGlowColor: Colors.magenta
     pressedDockGlowColor: Colors.magenta
     openGlowColor: Colors.magenta

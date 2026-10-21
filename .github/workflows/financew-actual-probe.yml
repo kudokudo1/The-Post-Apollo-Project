@@ -39,5 +39,7 @@ jobs:
           node --check scripts/finance/check_server.mjs
           node --check tests/finance/test_finance_source_config.mjs
           node --check tests/finance/test_actual_readonly.mjs
+      - name: Validate standalone server installer Bash syntax
+        run: bash -n scripts/finance/install_standalone_server.sh
       - name: Read-only, fake-data snapshot tests
         run: node --test tests/finance/test_actual_readonly.mjs tests/finance/test_finance_source_config.mjs

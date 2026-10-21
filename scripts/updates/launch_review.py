@@ -54,6 +54,7 @@ def layout(kind: str, token: str, wasm: Path) -> str:
         }
     }
 }
+session_serialization false
 """ % (kdl_quote(plugin), kdl_quote(script),
        kdl_quote(kind), kdl_quote(token))
 

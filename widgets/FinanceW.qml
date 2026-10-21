@@ -17,7 +17,7 @@ PanelWindow {
     readonly property int frameWidth: 432
     readonly property int frameHeight: 768
     readonly property int glowGutter: 12
-    readonly property int buttonGap: 8
+    readonly property int buttonGap: 0 // Flush with the bottom of the Finance dock / invisible bar
 
     function toggle() {
         menuOpen = !menuOpen;
@@ -73,7 +73,7 @@ PanelWindow {
         fillOpacity: 0.95
         borderColor: Colors.omnitrix
         borderWidth: 1
-        radius: 4
+        radius: 0
 
         glowVisible: root.menuOpen
         glowColor: Colors.omnitrix

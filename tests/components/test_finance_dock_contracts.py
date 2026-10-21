@@ -15,12 +15,15 @@ assert SHELL.count("            FinanceW {") == 1
 assert "menuOpen: financeWindow.menuOpen" in SHELL
 assert "onToggleRequested: financeWindow.toggle()" in SHELL
 assert "dockCenterX: shellRoot.margins.left + leftModules.x" in SHELL
-assert "dockBottomY: shellRoot.margins.top + leftModules.y" in SHELL
+assert "chassisTopY: hospitalWindow.panelTopMargin" in SHELL
+assert "+ hospitalWindow.topGlowGutter" in SHELL
+assert "dockBottomY:" not in SHELL
 assert "DockButton {" in FINANCE
 assert 'import "../components"' in FINANCE
 
 # Do not normalize the operator's decorated identity or lose combining marks.
-assert 'text: "˗ˋˏ˖<font color=\'" + Colors.green + "\'>⛁⛀</font>๋࣭⭑ˎˊ˗"' in FINANCE
+assert 'text: "˗ˋˏ˖<font color=\'" + financeDock.coinColor + "\'>⛁⛀</font>๋࣭⭑ˎˊ˗"' in FINANCE
+assert "readonly property color coinColor: menuOpen ? Colors.magenta : Colors.green" in FINANCE
 assert "textFormat: Text.StyledText" in FINANCE
 assert "implicitWidth: Math.max(80, Math.ceil(financeMark.implicitWidth) + 24)" in FINANCE
 assert "contentGlowSource: financeMark" in FINANCE
@@ -29,9 +32,10 @@ assert "onLeftClicked: toggleRequested()" in FINANCE
 assert "color: financeDock.foregroundColor" in FINANCE
 assert "⛀⛁ ⛁⛀" not in FINANCE
 
-# Only the coins use sub-Omnitrix green; decorations remain white.
-for state in ("normal", "hover", "pressed", "open"):
+# Idle: green coins/white decoration; open: all magenta.
+for state in ("normal", "hover", "pressed"):
     assert f"{state}ForegroundColor: Colors.white" in FINANCE
+assert "openForegroundColor: Colors.magenta" in FINANCE
 for state in ("normal", "hover", "pressed"):
     assert f"{state}ContentGlowColor: Colors.omnitrix" in FINANCE
     assert f"{state}DockGlowColor: Colors.omnitrix" in FINANCE
@@ -52,10 +56,11 @@ assert "readonly property int frameHeight: 768" in MENU
 assert "implicitWidth: frameWidth + glowGutter * 2" in MENU
 assert "implicitHeight: frameHeight + glowGutter * 2" in MENU
 assert "property real dockCenterX: 0" in MENU
-assert "property real dockBottomY: 0" in MENU
+assert "property real chassisTopY: 0" in MENU
 assert "root.dockCenterX - root.implicitWidth / 2" in MENU
-assert "readonly property int buttonGap: 0" in MENU
-assert "root.dockBottomY + root.buttonGap" in MENU
+assert "root.chassisTopY - root.glowGutter" in MENU
+assert "dockBottomY" not in MENU
+assert "buttonGap" not in MENU
 assert "visible: true" in MENU  # do not remap layer-shell for toggles
 assert "visible: root.menuOpen" in MENU  # only the inner chassis hides
 assert "width: root.menuOpen ? root.frameWidth : 0" in MENU

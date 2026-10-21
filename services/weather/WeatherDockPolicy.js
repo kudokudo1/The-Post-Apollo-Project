@@ -9,6 +9,23 @@ function fresh(timestampMs, nowMs) {
            && now >= timestamp - 300000 && now - timestamp <= 3600000;
 }
 
+// The service reports Fahrenheit. Convert only for presentation, so the
+// alternate dock mode does not introduce another network fetch.
+function formatTemperature(fahrenheit, isFresh, useCelsius) {
+    const unit = useCelsius ? "°C" : "°F";
+    if (!isFresh || fahrenheit === null || fahrenheit === undefined
+            || String(fahrenheit).trim() === "")
+        return "--" + unit;
+
+    const value = Number(fahrenheit);
+    if (!isFinite(value) || value < -150 || value > 150)
+        return "--" + unit;
+
+    const displayed = useCelsius ? (value - 32) * 5 / 9 : value;
+    const rounded = Math.round(displayed);
+    return (rounded === 0 ? 0 : rounded) + unit;
+}
+
 function state(color, icon, label) {
     return { "color": color, "icon": icon, "label": label };
 }

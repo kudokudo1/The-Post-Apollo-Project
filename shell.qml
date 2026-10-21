@@ -300,6 +300,12 @@ PanelWindow {
     // there is no second persistence backend.
     NotificationsPersistenceHealthProducer {}
 
+    // Read-only Silverblue/Git update offers. Actions are gated by an
+    // explicit reviewer terminal; never authorize a background OS update.
+    SoftwareUpdateOfferNotificationProducer {
+        id: softwareUpdateOffers
+    }
+
     FanControl {
         id: sharedFanControl
 
@@ -711,6 +717,7 @@ PanelWindow {
 
             NotificationsHubW {
                 id: notificationsHubWindow
+                updatesController: softwareUpdateOffers
 
                 screen: Quickshell.screens.find(s => s.name === "DP-5")
                 keyboardActive: relationshipFocus.active

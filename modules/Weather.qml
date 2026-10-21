@@ -64,7 +64,7 @@ DockButton {
 
     implicitHeight: 50
     // Dynamic text must remain inside the dock footprint at every temperature.
-    implicitWidth: Math.max(90, Math.ceil(weatherText.implicitWidth) + 18)
+    implicitWidth: Math.max(90, Math.ceil(weatherContent.implicitWidth) + 18)
 
     open: menuOpen
     // An informational state has to stay legible when its color is yellow.
@@ -84,7 +84,7 @@ DockButton {
     hoverDockGlowColor: weatherColor
     pressedDockGlowColor: weatherColor
 
-    contentGlowSource: weatherText
+    contentGlowSource: weatherContent
     trackArtworkGlowLocally: true
 
     Timer {
@@ -95,13 +95,36 @@ DockButton {
         onTriggered: weatherDock.observationClockMs = Date.now()
     }
 
-    Text {
-        id: weatherText
+    // Preserve the original thermostat mark; keep condition and temperature
+    // as independent, vertically centered elements with their own sizes.
+    Row {
+        id: weatherContent
         anchors.centerIn: parent
-        text: weatherDock.weatherState.icon + " " + weatherDock.temperatureLabel
-        font.family: "GohuFont 11 Nerd Font Mono"
-        font.pixelSize: 20
-        color: weatherDock.foregroundColor
+        spacing: 6
+
+        Text {
+            id: weatherThermometer
+            anchors.verticalCenter: parent.verticalCenter
+            text: "🌡"
+            font.pixelSize: 24
+            color: Colors.orange
+        }
+
+        Text {
+            id: weatherCondition
+            anchors.verticalCenter: parent.verticalCenter
+            text: weatherDock.weatherState.icon
+            font.pixelSize: 32
+            color: weatherDock.foregroundColor
+        }
+
+        GohuText {
+            id: weatherTemperature
+            anchors.verticalCenter: parent.verticalCenter
+            text: weatherDock.temperatureLabel
+            font.pixelSize: 20
+            color: weatherDock.foregroundColor
+        }
     }
 
     onLeftClicked: {

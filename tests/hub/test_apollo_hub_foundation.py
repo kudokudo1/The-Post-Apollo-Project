@@ -19,7 +19,18 @@ assert "ApolloHubW {" not in shell
 
 # Use approved shared controls / frames rather than duplicating menus.
 assert "DockButton {" in dock
-assert 'text: "✦ APOLLO ✦"' in dock
+assert 'NotoText {' in dock
+assert 'textFormat: Text.StyledText' in dock
+assert '⌯⌲ <font color=' in dock
+assert '>🗓</font> ⋆˙⟡' in dock
+assert "Colors.orange" in dock
+assert "color: Colors.white" in dock
+assert "contentGlowSource: hubMark" in dock
+for glow in ("normalDockGlowColor", "hoverDockGlowColor",
+             "pressedDockGlowColor", "openGlowColor",
+             "normalContentGlowColor", "hoverContentGlowColor",
+             "pressedContentGlowColor"):
+    assert glow + ": Colors.magenta" in dock, glow
 assert "PanelWindow {" in window
 assert "WindowPanelFrame {" in window
 assert "ModeButton {" in window
@@ -40,6 +51,27 @@ assert "onMoveRight: hub.shiftTile(" in window
 assert "Layout.cycleTile(" in window
 assert "Qt.formatTime" in tile
 assert "Qt.formatDate" in tile
+
+# Standard window-local key grammar, without inventing a bottom rail.
+for key in ("Tab", "Shift+Tab", "Shift+Left", "Shift+Right",
+            "Left", "Right", "Up", "Down", "Enter", "Return", "Esc"):
+    assert 'sequence: "' + key + '"' in window, key
+assert 'sequence: "Ctrl+Left"' not in window
+assert 'sequence: "Ctrl+Right"' not in window
+assert "function cycleMainMode(direction)" in window
+assert "function cycleTopSubMode(direction)" in window
+assert "function moveNavigationCursor(delta)" in window
+assert "function activateNavigationCursor()" in window
+assert "Keys.onShortcutOverride" in window
+assert "Keys.onPressed" in window
+assert "modeNameInput.activeFocus" in window
+assert "context: Qt.WindowShortcut" in window
+assert "WlrKeyboardFocus.OnDemand" in window
+assert "WlrKeyboardFocus.Exclusive" not in window
+assert "property bool keyboardSelected" in tile
+assert "onPointerEntered: hub.selectedTileIndex = index" in window
+assert "if (!editMode || selectedTileIndex < 0" in window
+
 
 # Only save configuration, not user secrets or duplicated system services.
 assert '"/apollo-hub-layout.json"' in store

@@ -74,8 +74,8 @@ def kitty_argv(kind: str, token: str) -> tuple[list[str], bool]:
                        "--layout-string", layout(kind, token, wasm)], True
     # Non-destructive fallback. This still gets the Sway floating placement,
     # but does not pretend that a clickable Zellij X is available.
-    return head + ["/usr/bin/python3", str(update_script()),
-                   "review", kind, token], False
+    return head[:-1] + ["--hold", "-e", "/usr/bin/python3", str(update_script()),
+                        "review", kind, token], False
 
 
 def find_exact_kitty(tree: dict, child_pid: int) -> int | None:

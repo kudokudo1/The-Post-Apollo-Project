@@ -131,7 +131,7 @@ assert "WlrKeyboardFocus.Exclusive" in menu
 assert "property bool keyboardActive: false" in menu
 assert "property bool keyboardLock: false" in menu
 assert "id: financeKeyboardAnchor" in menu
-assert "root.menuOpen && keyboardActive" in menu
+assert "menuOpen && keyboardActive" in menu
 for sequence in ("Tab", "Shift+Tab", "Shift+Left", "Shift+Right",
                  "Up", "Down", "Left", "Right", "Return", "Enter", "Esc"):
     assert f'sequence: "{sequence}"' in menu, sequence

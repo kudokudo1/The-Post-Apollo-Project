@@ -2,38 +2,45 @@ import QtQuick
 import Quickshell
 import "../components"
 
-// New center-bar control, staged separately from shell.qml until the operator
-// has reviewed the first working Hub window.
+// ApolloHubW's center dock inherits Calendar's three-part ornament;
+// clicking it opens the Hub once the shell mounts the paired window.
 DockButton {
     id: dock
 
     property bool menuOpen: false
     signal toggleRequested()
 
-    implicitWidth: 120
+    implicitWidth: 113
     implicitHeight: 50
+    radius: 7
     open: menuOpen
 
+    // Keep all three glyphs white/orange regardless of button state; preserve
+    // independent magenta neon for the dock chassis and entire artwork.
     normalForegroundColor: Colors.white
     hoverForegroundColor: Colors.white
     pressedForegroundColor: Colors.white
+    openForegroundColor: Colors.white
 
-    normalDockGlowColor: Colors.cyan
-    hoverDockGlowColor: Colors.orange
+    normalDockGlowColor: Colors.magenta
+    hoverDockGlowColor: Colors.magenta
     pressedDockGlowColor: Colors.magenta
+    openGlowColor: Colors.magenta
 
-    normalContentGlowColor: Colors.cyan
-    hoverContentGlowColor: Colors.orange
+    normalContentGlowColor: Colors.magenta
+    hoverContentGlowColor: Colors.magenta
     pressedContentGlowColor: Colors.magenta
-    contentGlowSource: titleText
+    contentGlowSource: hubMark
 
-    GohuText {
-        id: titleText
+    // Keep the Unicode ornaments and emoji in ONE run to retain the original
+    // Calendar text shaping and avoid doubled, separately sampled glow planes.
+    NotoText {
+        id: hubMark
         anchors.centerIn: parent
-        text: "✦ APOLLO ✦"
-        font.pixelSize: 16
-        font.weight: 700
-        color: dock.foregroundColor
+        textFormat: Text.StyledText
+        text: " ⌯⌲ <font color='" + Colors.orange + "'>🗓</font> ⋆˙⟡ "
+        font.pixelSize: 20
+        color: Colors.white
     }
 
     onLeftClicked: toggleRequested()

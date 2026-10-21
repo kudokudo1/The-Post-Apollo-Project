@@ -33,6 +33,10 @@ assert 'id: healthProbe' in bridge
 assert '["/usr/bin/curl", "--silent", "--fail"' in bridge
 assert 'budgetBridge.monitoring' in bridge
 assert 'exitCode === 0 ? "online" : "offline"' in bridge
+assert 'const wasOffline = budgetBridge.healthStatus === "offline";' in bridge
+assert 'if (wasOffline && nextHealth === "online"' in bridge
+assert '&& !budgetBridge.loading)' in bridge
+assert 'budgetBridge.refresh();' in bridge[bridge.index('id: healthProbe'):bridge.index('Timer {')]
 assert 'lastReadAt = Qt.formatTime(new Date(), "hh:mm:ss");' in bridge
 assert 'onLeftClicked: financeBudget.refresh()' in ui
 assert 'available: !financeBudget.loading' in ui

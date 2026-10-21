@@ -21,6 +21,9 @@ mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
 
 assert 'zellij-tile = "=0.45.0"' in CARGO.read_text()
+assert '[[bin]]' in CARGO.read_text()
+assert 'name = "post_apollo_update_header"' in CARGO.read_text()
+assert 'crate-type = ["cdylib"]' not in CARGO.read_text()
 src = RUST.read_text()
 assert "register_plugin!(UpdateReviewHeader)" in src
 assert "EventType::Mouse" in src
@@ -77,12 +80,11 @@ with tempfile.TemporaryDirectory() as tmp:
             command, has_header = mod.kitty_argv("flatpak-system", "b"*24)
         assert has_header
         assert "/usr/bin/zellij" in command and "--layout-string" in command
-        assert "--session-name" in command
-        assert "--session" not in command, "must create, never attach to missing session"
-        assert command[command.index("--session-name") + 1].startswith(
-            "apollo-updates-flatpak-system-"
-        )
-        generated = command[-1]
+        assert "--session-name" not in command
+        assert "--session" not in command
+        assert command[-3:-1] == ["attach", "--create"]
+        assert command[-1].startswith("apollo-updates-flatpak-system-")
+        generated = command[command.index("--layout-string") + 1]
         assert 'plugin location="file:' in generated
         assert "pane size=1 borderless=true" in generated
         assert 'command="/usr/bin/python3"' in generated
@@ -113,8 +115,20 @@ with tempfile.TemporaryDirectory() as tmp:
             command, has_header = mod.kitty_argv("flatpak-system", "d"*24)
         assert has_header
         assert command[command.index("-e") + 1] == str(local_zellij)
-        assert "--session-name" in command
-        assert "--session" not in command
+        assert "--session-name" not in command
+        assert command[-3:-1] == ["attach", "--create"]
+
+# A launch from inside an ordinary Zellij pane must not hijack that session.
+with patch.dict(os.environ, {
+    "ZELLIJ": "0", "ZELLIJ_PANE_ID": "17",
+    "ZELLIJ_SESSION_NAME": "important-existing-session",
+    "WAYLAND_DISPLAY": "wayland-1",
+}):
+    child_env = mod.review_environment()
+    assert child_env["WAYLAND_DISPLAY"] == "wayland-1"
+    assert not any(key == "ZELLIJ" or key.startswith("ZELLIJ_")
+                   for key in child_env)
+    assert os.environ["ZELLIJ_SESSION_NAME"] == "important-existing-session"
 
 class Result:
     returncode = 0
@@ -145,5 +159,6 @@ with patch.object(mod.shutil, "which", side_effect=lambda name: "/usr/bin/"+name
     assert mod.main(["silverblue", "e"*24]) == 0
     assert popen.call_args.kwargs["start_new_session"] is True
     assert popen.call_args.kwargs["close_fds"] is True
+    assert popen.call_args.kwargs["env"] == mod.review_environment()
 
 print("Kitty/Sway/Zellij update window, X detach, safe fallback: PASS")

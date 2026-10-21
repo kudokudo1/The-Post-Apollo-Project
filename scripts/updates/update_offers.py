@@ -237,10 +237,22 @@ def review(kind: str, token: str) -> int:
         command = ["git", "-C", str(folder), "pull", "--ff-only"]
         print("Uses a fast-forward-only Git pull. Restart Zsh afterward.")
     print("Command:", " ".join(command))
-    answer = input("\nType APPLY to authorize, or anything else to cancel: ")
+    try:
+        answer = input("\nType APPLY to authorize, or anything else to cancel: ")
+    except (EOFError, KeyboardInterrupt):
+        print("\nCANCELLED // No update command executed.")
+        return 0
     if answer != "APPLY":
         print("CANCELLED // No update command executed.")
         return 0
+    # The exact fingerprint must still refer to the same offered version,
+    # including after the operator has spent time reading this terminal.
+    fresh = current_offer(kind)
+    if not fresh or fresh["token"] != token or fresh["phase"] != item["phase"]:
+        print("UPDATE REFUSED // Offer changed during confirmation.")
+        return 2
+    if kind in ("oh-my-zsh", "powerlevel10k") and not fresh_checkout_is_clean(kind):
+        return 2
     return subprocess.run(command, check=False).returncode
 
 

@@ -33,3 +33,5 @@ jobs:
         run: python3 tests/weather/test_shader_teardown_contracts.py
       - name: Validate live Weather dock state classification
         run: node tests/weather/test_weather_dock_policy.js
+      - name: Validate Weather Station domain palette and live meter contracts
+        run: node tests/weather/test_domain_palette_contracts.js

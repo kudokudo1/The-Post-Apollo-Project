@@ -18,6 +18,7 @@ on:
       - "widgets/FinanceW.qml"
       - "shell.qml"
       - "tests/components/test_finance_dock_contracts.py"
+      - "tests/components/test_finance_navigation_contracts.py"
       - ".github/workflows/financew-contracts.yml"
 
 permissions:

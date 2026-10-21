@@ -26,6 +26,10 @@ assert 'onStreamFinished: budgetBridge.acceptError(text)' in bridge
 assert 'snapshot = null;' in bridge
 assert 'Timer {' not in bridge
 assert 'running: true' not in bridge
+# QML's JS parser requires a catch binding; JS optional catch syntax
+# would otherwise prevent the entire Post-Apollo shell from starting.
+assert 'catch (error) {' in bridge
+assert 'catch {' not in bridge
 assert 'console.log' not in bridge
 for forbidden in ('runBankSync(', 'setBudgetAmount(', 'updateTransaction('):
     assert forbidden not in bridge

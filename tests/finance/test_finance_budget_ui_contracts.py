@@ -6,6 +6,33 @@ ui = (root / "widgets/FinanceW.qml").read_text()
 bridge = (root / "services/finance/FinanceBudgetReadService.qml").read_text()
 cli = (root / "scripts/finance/read_budget.mjs").read_text()
 assert 'FinanceServices.FinanceBudgetReadService {' in ui
+assert 'monitoring: root.menuOpen' in ui
+assert 'id: financeFeedIndicator' in ui
+assert 'anchors.right: closeButton.left' in ui
+assert 'anchors.right: financeFeedIndicator.left' in ui
+assert 'border.color: Colors.omnitrix' in ui
+assert 'text: root.feedStatus' in ui
+assert 'color: root.feedStatusColor' in ui
+assert 'feedStatus === "LIVE" ? Colors.omnitrix' in ui
+assert 'feedStatus === "OFFLINE" || feedStatus === "ERROR" ? Colors.red' in ui
+assert 'financeBudget.state === "ready"' in ui
+assert 'financeBudget.healthStatus === "online" ? "LIVE"' in ui
+assert '!hasBudgetFeed ? "NO FEED"' in ui
+assert 'text: "ACCOUNTS "' in ui
+assert 'root.accountTotalCents()' in ui
+assert 'Number.isSafeInteger(sum)' in ui
+assert 'ACTUAL // CACHED' in ui
+assert 'SOURCE OFFLINE // LAST READ' in ui
+assert 'property bool monitoring: false' in bridge
+assert 'property string healthStatus: "unknown"' in bridge
+assert 'onMonitoringChanged:' in bridge
+assert 'running: budgetBridge.monitoring' in bridge
+assert 'onTriggered: budgetBridge.checkReachability()' in bridge
+assert 'id: healthProbe' in bridge
+assert '["/usr/bin/curl", "--silent", "--fail"' in bridge
+assert 'budgetBridge.monitoring' in bridge
+assert 'exitCode === 0 ? "online" : "offline"' in bridge
+assert 'lastReadAt = Qt.formatTime(new Date(), "hh:mm:ss");' in bridge
 assert 'onLeftClicked: financeBudget.refresh()' in ui
 assert 'available: !financeBudget.loading' in ui
 assert 'onLeftClicked: financeBudget.shiftMonth(-1)' in ui
@@ -52,7 +79,10 @@ assert 'Number.isSafeInteger(payload.toBudgetCents)' in bridge
 assert 'onStreamFinished: budgetBridge.acceptOutput(text)' in bridge
 assert 'onStreamFinished: budgetBridge.acceptError(text)' in bridge
 assert 'snapshot = null;' in bridge
-assert 'Timer {' not in bridge
+assert bridge.count('Timer {') == 1
+assert 'interval: 15000' in bridge
+assert 'triggeredOnStart: true' in bridge
+assert bridge.count('Process {') == 2
 assert 'running: true' not in bridge
 # QML's JS parser requires a catch binding; JS optional catch syntax
 # would otherwise prevent the entire Post-Apollo shell from starting.

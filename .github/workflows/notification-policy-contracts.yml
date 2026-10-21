@@ -86,6 +86,9 @@ jobs:
       - name: Validate Flatpak downloads and firmware native review
         run: python3 tests/notifications/test_gnome_software_update_bridge.py
 
+      - name: Validate safe Sway Kitty Zellij review window
+        run: python3 tests/notifications/test_update_review_window.py
+
       - name: Validate completed local Git journal notifications
         run: python3 tests/notifications/test_local_git_journal_producer.py
 

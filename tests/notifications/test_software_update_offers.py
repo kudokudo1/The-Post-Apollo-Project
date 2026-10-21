@@ -14,6 +14,10 @@ import stat
 import tempfile
 from unittest.mock import patch
 
+# Keep updater-lock tests completely outside the operator's real state.
+TEST_STATE = tempfile.TemporaryDirectory(prefix="apollo-update-tests-")
+os.environ["XDG_STATE_HOME"] = TEST_STATE.name
+
 ROOT = Path(__file__).resolve().parents[2]
 BACKEND = ROOT / "scripts/updates/update_offers.py"
 PRODUCER = (ROOT / "services/notifications/SoftwareUpdateOfferNotificationProducer.qml").read_text()
@@ -28,6 +32,14 @@ spec.loader.exec_module(mod)
 assert mod.ALLOWED == {"silverblue", "oh-my-zsh", "powerlevel10k",
                        "flatpak-user", "flatpak-system", "firmware"}
 assert mod.DEFER_SECONDS == 24 * 60 * 60
+# Closing Kitty detaches the updater. A second review must not launch the
+# same maintenance operation while the first detached process is still busy.
+with mod.update_transaction_lock("flatpak-system") as primary:
+    assert primary
+    with mod.update_transaction_lock("flatpak-system") as duplicate:
+        assert duplicate is False
+with mod.update_transaction_lock("flatpak-system") as released:
+    assert released
 assert mod.fingerprint("silverblue", "old", "new") != mod.fingerprint("silverblue", "old", "newer")
 
 # No auto-accept or arbitrary remote-code execution in Quickshell.
@@ -39,8 +51,9 @@ assert "6 * 60 * 60 * 1000" in PRODUCER
 assert "NotificationsService.historyReady" in PRODUCER
 assert 'sourceId": "apollo-update-monitor"' in PRODUCER
 assert 'Quickshell.execDetached([' in PRODUCER
-assert '"kitty", "--hold", "-e", "/usr/bin/python3"' in PRODUCER
-assert "producer.script, \"review\"" in PRODUCER
+assert 'Quickshell.shellPath("scripts/updates/launch_review.py")' in PRODUCER
+assert '"kitty", "--hold", "-e"' not in PRODUCER
+assert "String(kind), String(token)" in PRODUCER
 assert 'producer.script, "defer"' in PRODUCER
 assert "producer.isCurrent(kind, token)" in PRODUCER
 assert "onExited: function(code, exitStatus)" in PRODUCER

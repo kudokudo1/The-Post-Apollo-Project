@@ -92,6 +92,56 @@ rpm-ostree status
 git -C ~/.oh-my-zsh status --short
 \`\`\`
 
+## Dedicated Sway + Kitty + Zellij reviewer
+
+Update REVIEW / DOWNLOAD now invokes `scripts/updates/launch_review.py` instead
+of opening an undifferentiated Kitty window. It gives Kitty a unique Wayland
+app-id `post-apollo-update-review`; a bounded Sway tree lookup matches that
+**specific Kitty PID**, floats it, gives it a 2px border, sizes it to 900x580,
+and centers it. No permanent Sway rule or global desktop reconfiguration is
+made, and a failed Sway placement does not block reviewing the update.
+
+When the dedicated, opt-in Zellij 0.45 header plugin is installed, Kitty runs
+an isolated **Zellij session with two panes**: a magenta one-line Post-Apollo
+header (including a top-right red **×**) and the existing Python update
+reviewer. This is not your main Kitty/Zellij session.
+
+**One-time setup after syncing this repository:**
+
+```bash
+cd ~/.config/quickshell
+bash scripts/updates/zellij/build_header.sh
+python3 tests/notifications/test_update_review_window.py
+```
+
+The build script requires existing `cargo` and `rustup` tools, installs
+the WASI target, compiles the pinned Zellij 0.45 plugin, and copies only the
+compiled `.wasm` to
+`~/.local/share/post-apollo/zellij/post_apollo_update_header.wasm`
+(or your `XDG_DATA_HOME`). It **never** runs automatically from a notification.
+If Zellij or the compiled header is unavailable, the old Kitty terminal
+remains accessible with `--hold`, still Sway-positioned, but without a
+fake/nonworking custom X.
+
+**Clicking × detaches the entire dedicated Zellij session.** The Kitty window
+disappears, but any in-progress download/install continues safely in the
+detached session. Zellij may ask once to grant this plugin only
+`ChangeApplicationState` permission; without it the X is grey/disabled.
+It has no permission to run shell commands or read pane contents.
+
+Recover detached sessions with `zellij list-sessions` and
+`zellij attach SESSION_NAME`. The update session names begin with
+`apollo-updates-`. To avoid accidentally launching two write operations,
+the update script also holds a per-source filesystem lock **only while an
+approved updater is actually running**. A second updater for that source
+refuses to start. Do not `zellij kill-sessions` during a live update.
+
+The one-row Zellij header is an actual WebAssembly plugin; it is not a
+faked terminal printout. The Sway window placement is a separate concern
+and is not controlled by the plugin. There is no automatic reboot or
+automatic update approval. Exited update-review sessions have session
+resurrection disabled, so stale updater commands are not re-created.
+
 ## Acceptance limits
 
 CI uses fabricated Silverblue status/available-update and Git remote responses.

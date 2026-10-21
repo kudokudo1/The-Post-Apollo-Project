@@ -1,0 +1,18 @@
+[package]
+name = "post-apollo-update-header"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+# This is a WebAssembly cdylib with a register_plugin! entrypoint.
+path = "src/main.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+zellij-tile = "=0.45.0"
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true

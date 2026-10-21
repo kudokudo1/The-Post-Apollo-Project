@@ -9,6 +9,7 @@ No sudo, reboot, shell interpolation, arbitrary paths or auto-updates.
 """
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import os
@@ -19,6 +20,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from contextlib import contextmanager
 
 ALLOWED = {"silverblue", "oh-my-zsh", "powerlevel10k",
            "flatpak-user", "flatpak-system", "firmware"}
@@ -295,6 +297,48 @@ def fresh_checkout_is_clean(kind: str) -> bool:
     return True
 
 
+@contextmanager
+def update_transaction_lock(kind: str):
+    """Serialize actual updater commands across detached/reopened reviewers.
+
+    The lock is scoped to the current user's XDG state tree; no lock is held
+    while the operator is reading the offer or considering consent.
+    """
+    if kind not in ALLOWED:
+        yield False
+        return
+    directory = state_file().parent / "locks"
+    directory.mkdir(parents=True, exist_ok=True)
+    lock_path = directory / (kind + ".lock")
+    fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+    acquired = False
+    try:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            acquired = True
+        except BlockingIOError:
+            pass
+        yield acquired
+    finally:
+        if acquired:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+
+
+def run_authorized_update(kind: str, commands: list[list[str]]) -> int:
+    with update_transaction_lock(kind) as acquired:
+        if not acquired:
+            print("UPDATE REFUSED // Another update for this source is running.")
+            print("Reattach its dedicated Zellij session instead of starting a second updater.")
+            return 2
+        for command in commands:
+            result = subprocess.run(command, check=False)
+            if result.returncode:
+                print("UPDATE INCOMPLETE // Stop at first failure.")
+                return result.returncode
+        return 0
+
+
 def review(kind: str, token: str) -> int:
     if kind not in ALLOWED or not re.fullmatch(r"[0-9a-f]{24}", token):
         print("UPDATE REFUSED // Unknown offer.")
@@ -339,20 +383,20 @@ def review(kind: str, token: str) -> int:
         if not fresh or fresh["token"] != token or flatpak_targets(kind) != rows:
             print("UPDATE REFUSED // Flatpak targets changed during review.")
             return 2
+        commands = []
         for ref, remote, commit in rows:
             argv = ["flatpak", "update", scope,
                     "--assumeyes", "--noninteractive"]
             if answer == "DOWNLOAD":
                 argv.append("--no-deploy")
             argv.extend(["--commit=" + commit, ref])
-            print("\nRUNNING //", " ".join(argv))
-            result = subprocess.run(argv, check=False)
-            if result.returncode != 0:
-                print("UPDATE INCOMPLETE // Stop at first failure.")
-                return result.returncode
-        print("\nCOMPLETE //", "Downloads cached." if answer == "DOWNLOAD"
-              else "Pinned Flatpak updates applied.")
-        return 0
+            print("\nQUEUED //", " ".join(argv))
+            commands.append(argv)
+        code = run_authorized_update(kind, commands)
+        if code == 0:
+            print("\nCOMPLETE //", "Downloads cached." if answer == "DOWNLOAD"
+                  else "Pinned Flatpak updates applied.")
+        return code
     if kind in ("oh-my-zsh", "powerlevel10k") and not fresh_checkout_is_clean(kind):
         return 2
     if kind == "silverblue":
@@ -389,7 +433,7 @@ def review(kind: str, token: str) -> int:
         return 2
     if kind in ("oh-my-zsh", "powerlevel10k") and not fresh_checkout_is_clean(kind):
         return 2
-    return subprocess.run(command, check=False).returncode
+    return run_authorized_update(kind, [command])
 
 
 def main() -> int:

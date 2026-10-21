@@ -551,8 +551,8 @@ PanelWindow {
                 Rectangle {
                     id: sourceStatusIndicator
 
-                    width: 164
-                    height: 34
+                    width: 150
+                    height: 32
                     anchors.verticalCenter: parent.verticalCenter
 
                     color: Colors.dark
@@ -570,7 +570,7 @@ PanelWindow {
                     GohuText {
                         anchors.centerIn: parent
                         text: weatherStation.sourceStatusDisplay
-                        font.pixelSize: 10
+                        font.pixelSize: 11
                         color: weatherStation.sourceStatusColor
                         textFormat: Text.PlainText
                     }

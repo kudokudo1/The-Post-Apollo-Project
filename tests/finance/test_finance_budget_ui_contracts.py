@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only FinanceW on-demand Budget UI contracts, no personal data."""
+"""Read-only FinanceW Budget UI and queued auto-refresh source contracts."""
 from pathlib import Path
 root = Path(__file__).resolve().parents[2]
 ui = (root / "widgets/FinanceW.qml").read_text()
@@ -21,7 +21,10 @@ assert 'FINANCEW_MONTH: selectedMonth' in bridge
 assert 'payload.month !== selectedMonth' in bridge
 assert 'if (direction !== 1 && direction !== -1)' in bridge
 assert 'refresh();' in bridge[bridge.index('function shiftMonth'):bridge.index('function fail')]
-assert 'if (probe.running)' in bridge
+assert 'if (requestActive || probe.running)' in bridge
+assert 'property bool requestActive: false' in bridge
+assert 'requestActive = true;' in bridge
+assert 'budgetBridge.requestActive = false;' in bridge
 assert 'pendingRefresh = selectedMonth !== inFlightMonth;' in bridge
 assert 'property bool pendingRefresh: false' in bridge
 assert 'inFlightMonth !== selectedMonth' in bridge
@@ -39,7 +42,7 @@ assert 'root.moneyText(modelData.availableCents)' in ui
 assert 'root.moneyText(modelData.budgetedCents)' in ui
 assert 'textFormat: Text.PlainText' in ui
 assert 'property string state: "idle"' in bridge
-assert 'if (loading || probe.running)' in bridge
+assert 'if (requestActive || probe.running)' in bridge
 assert 'Quickshell.shellPath("scripts/finance/read_budget.mjs")' in bridge
 assert 'ACTUAL_SYNC_ID: null' in bridge
 assert 'ACTUAL_SYNC_ID_FILE: null' in bridge
@@ -61,4 +64,4 @@ for forbidden in ('runBankSync(', 'setBudgetAmount(', 'updateTransaction('):
 for forbidden in ('password:', 'syncId:', 'ACTUAL_SYNC_ID='):
     assert forbidden not in ui
 assert 'ACTUAL_SYNC_ID_FILE' in cli
-print("FinanceW D3 manual read-only Budget UI contracts: PASS")
+print("FinanceW Budget read-only UI and queued refresh contracts: PASS")

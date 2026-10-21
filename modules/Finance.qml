@@ -2,7 +2,7 @@ import QtQuick
 import Quickshell
 import "../components"
 
-// FinanceW dock identity only. No menu or finance backend is attached yet.
+// FinanceW dock identity. The menu is a blank portrait chassis; no backend.
 // The shared DockButton owns pointer, hover, pressed, and glow behavior.
 DockButton {
     id: financeDock
@@ -35,5 +35,11 @@ DockButton {
         color: financeDock.foregroundColor
     }
 
-    // No onLeftClicked handler until FinanceW's menu is approved.
+    // The window owns its open state; DockButton supplies the default click
+    // and selected-state behavior without a second MouseArea.
+    property bool menuOpen: false
+    signal toggleRequested()
+    open: menuOpen
+
+    onLeftClicked: toggleRequested()
 }

@@ -412,7 +412,30 @@ PanelWindow {
 
         // Finance
 
-        Finance {}
+        Item {
+            id: financeHost
+            width: financeButton.implicitWidth
+            height: financeButton.implicitHeight
+
+            Finance {
+                id: financeButton
+                anchors.fill: parent
+                menuOpen: financeWindow.menuOpen
+                onToggleRequested: financeWindow.toggle()
+            }
+
+            FinanceW {
+                id: financeWindow
+                screen: shellRoot.screen
+
+                // Align the portrait panel's center beneath this dock item,
+                // including the bar's actual left margin and Row position.
+                dockCenterX: shellRoot.margins.left + leftModules.x
+                             + financeHost.x + financeButton.width / 2
+                dockBottomY: shellRoot.margins.top + leftModules.y
+                             + financeHost.y + financeButton.height
+            }
+        }
 
         // Hospital
 

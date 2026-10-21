@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
-"""FinanceW launcher-only source contract (no menu, provider, or local writes)."""
+"""FinanceW dock and blank 9:16 menu source contract (no provider or writes)."""
 
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SHELL = (ROOT / "shell.qml").read_text(encoding="utf-8")
 FINANCE = (ROOT / "modules/Finance.qml").read_text(encoding="utf-8")
+MENU = (ROOT / "widgets/FinanceW.qml").read_text(encoding="utf-8")
 
 # A direct default DockButton between the media player and Hospital.
-assert "Mediaplayer {}\n\n        // Finance\n\n        Finance {}\n\n        // Hospital" in SHELL
-assert SHELL.count("        Finance {}") == 1
+assert SHELL.index("Mediaplayer {}") < SHELL.index("// Finance") < SHELL.index("FinanceW {") < SHELL.index("// Hospital")
+assert SHELL.count("            Finance {") == 1
+assert SHELL.count("            FinanceW {") == 1
+assert "menuOpen: financeWindow.menuOpen" in SHELL
+assert "onToggleRequested: financeWindow.toggle()" in SHELL
+assert "dockCenterX: shellRoot.margins.left + leftModules.x" in SHELL
+assert "dockBottomY: shellRoot.margins.top + leftModules.y" in SHELL
 assert "DockButton {" in FINANCE
 assert 'import "../components"' in FINANCE
 
@@ -18,6 +24,8 @@ assert 'text: "˗ˋˏ˖<font color=\'" + Colors.green + "\'>⛁⛀</font>๋࣭�
 assert "textFormat: Text.StyledText" in FINANCE
 assert "implicitWidth: Math.max(80, Math.ceil(financeMark.implicitWidth) + 24)" in FINANCE
 assert "contentGlowSource: financeMark" in FINANCE
+assert "open: menuOpen" in FINANCE
+assert "onLeftClicked: toggleRequested()" in FINANCE
 assert "color: financeDock.foregroundColor" in FINANCE
 assert "⛀⛁ ⛁⛀" not in FINANCE
 
@@ -29,11 +37,35 @@ for state in ("normal", "hover", "pressed"):
     assert f"{state}DockGlowColor: Colors.omnitrix" in FINANCE
 assert "openGlowColor: Colors.omnitrix" in FINANCE
 
-# No backend, menu, custom click policy, or duplicate effect.
+# No backend, duplicate click area, or duplicated glow machinery.
 for forbidden in (
-    "FinanceW {", "Process {", "onLeftClicked:", "onRightClicked:",
+    "FinanceW {", "Process {", "onRightClicked:",
     "MouseArea {", "SafeDropShadow {", "RectangularShadow {",
 ):
     assert forbidden not in FINANCE, forbidden
 
-print("FinanceW launcher-only contract: PASS")
+# 9:16 portrait is a blank, independent window with a safe input mask.
+assert "PanelWindow {" in MENU
+assert "readonly property int frameWidth: 432" in MENU
+assert "readonly property int frameHeight: 768" in MENU
+assert "implicitWidth: frameWidth + glowGutter * 2" in MENU
+assert "implicitHeight: frameHeight + glowGutter * 2" in MENU
+assert "property real dockCenterX: 0" in MENU
+assert "property real dockBottomY: 0" in MENU
+assert "root.dockCenterX - root.implicitWidth / 2" in MENU
+assert "root.dockBottomY + root.buttonGap" in MENU
+assert "visible: true" in MENU  # do not remap layer-shell for toggles
+assert "visible: root.menuOpen" in MENU  # only the inner chassis hides
+assert "width: root.menuOpen ? root.frameWidth : 0" in MENU
+assert "height: root.menuOpen ? root.frameHeight : 0" in MENU
+assert "WlrLayershell.keyboardFocus: WlrKeyboardFocus.None" in MENU
+assert "focusable: false" in MENU
+assert "WindowPanelFrame {" in MENU
+assert "glowColor: Colors.omnitrix" in MENU
+assert "borderColor: Colors.omnitrix" in MENU
+assert "menuOpen = !menuOpen;" in MENU
+
+for forbidden in ("Process {", "Actual", "fetch(", "Qt.openUrlExternally"):
+    assert forbidden not in MENU, forbidden
+
+print("FinanceW dock and blank portrait menu contracts: PASS")

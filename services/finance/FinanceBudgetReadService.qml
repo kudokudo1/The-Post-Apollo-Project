@@ -69,7 +69,7 @@ Scope {
                         && Number.isSafeInteger(c.spentCents);
                 }))
                 throw new Error("Invalid snapshot");
-        } catch {
+        } catch (error) {
             fail("Budget data format was not recognized.");
             return;
         }

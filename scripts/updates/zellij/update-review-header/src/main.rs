@@ -10,10 +10,20 @@ struct UpdateReviewHeader {
 
 register_plugin!(UpdateReviewHeader);
 
-// Mouse coordinates belong to this dedicated ONE-ROW plugin pane.
-// Never detach for clicks in the main update transcript or any other pane.
+// Mouse coordinates belong to the dedicated header pane (title + divider).
+// Never detach for clicks in the divider or the update transcript.
 fn close_hit(line: isize, col: usize, columns: usize) -> bool {
     line == 0 && columns >= 18 && col >= columns.saturating_sub(5) && col < columns
+}
+
+// Terminal panes use character cells rather than pixel offsets. Two blank
+// columns at each edge keep the cyan rule away from the review window sides.
+fn divider_line(columns: usize) -> String {
+    if columns >= 5 {
+        format!("  {}  ", "─".repeat(columns - 4))
+    } else {
+        " ".repeat(columns)
+    }
 }
 
 impl ZellijPlugin for UpdateReviewHeader {
@@ -72,22 +82,45 @@ impl ZellijPlugin for UpdateReviewHeader {
         };
         print!("\x1b[48;2;27;6;35m\x1b[38;2;199;78;199m{}{}{}\x1b[0m",
                prefix, x_color, close);
+        if rows >= 2 {
+            // Absolute cursor placement avoids an accidental extra wrap after
+            // the full-width first row. This second row is never clickable.
+            print!("\x1b[2;1H\x1b[48;2;27;6;35m\x1b[38;2;85;207;202m{}\x1b[0m",
+                   divider_line(columns));
+        }
         let _ = std::io::stdout().flush();
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::close_hit;
+    use super::{close_hit, divider_line};
 
     #[test]
-    fn x_only_in_right_edge_of_one_row_header() {
+    fn x_only_in_right_edge_of_title_row() {
         assert!(close_hit(0, 76, 80));
         assert!(close_hit(0, 79, 80));
         assert!(!close_hit(0, 74, 80));
-        assert!(!close_hit(1, 79, 80));
+        assert!(!close_hit(1, 79, 80)); // Divider row cannot detach
         assert!(!close_hit(-1, 79, 80));
         assert!(!close_hit(0, 80, 80));
         assert!(!close_hit(0, 5, 10));
+    }
+
+    #[test]
+    fn cyan_divider_inset_from_both_edges() {
+        let row = divider_line(80);
+        assert_eq!(row.chars().count(), 80);
+        assert!(row.starts_with("  ─"));
+        assert!(row.ends_with("─  "));
+        assert_eq!(row.chars().filter(|&ch| ch == '─').count(), 76);
+
+        // Narrow panes produce only spaces, never overflow their width.
+        for columns in 0..5 {
+            let narrow = divider_line(columns);
+            assert_eq!(narrow.chars().count(), columns);
+            assert!(narrow.chars().all(|ch| ch == ' '));
+        }
+        assert_eq!(divider_line(5), "  ─  ");
     }
 }

@@ -15,7 +15,7 @@ DockButton {
     radius: 7
     open: menuOpen
 
-    // White ornaments at idle turn magenta when open; the Calendar stays orange.
+    // White ornaments and orange Calendar turn magenta together when open.
     // Keep the chassis and sampled artwork glow magenta in every state.
     normalForegroundColor: Colors.white
     hoverForegroundColor: Colors.white
@@ -39,7 +39,7 @@ DockButton {
         id: hubMark
         anchors.centerIn: parent
         textFormat: Text.StyledText
-        text: " ⌯⌲ <font color='" + Colors.orange + "'>🗓</font> ⋆˙⟡ "
+        text: " ⌯⌲ <font color='" + (dock.open ? Colors.magenta : Colors.orange) + "'>🗓</font> ⋆˙⟡ "
         font.pixelSize: 20
         color: dock.foregroundColor
     }

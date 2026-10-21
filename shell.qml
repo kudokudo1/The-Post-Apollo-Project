@@ -428,12 +428,12 @@ PanelWindow {
                 id: financeWindow
                 screen: shellRoot.screen
 
-                // Align the portrait panel's center beneath this dock item,
-                // including the bar's actual left margin and Row position.
+                // Center under Finance horizontally; align its top with
+                // Hospital/Git's top chassis line vertically.
                 dockCenterX: shellRoot.margins.left + leftModules.x
                              + financeHost.x + financeButton.width / 2
-                dockBottomY: shellRoot.margins.top + leftModules.y
-                             + financeHost.y + financeButton.height
+                chassisTopY: hospitalWindow.panelTopMargin
+                             + hospitalWindow.topGlowGutter
             }
         }
 

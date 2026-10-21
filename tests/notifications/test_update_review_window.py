@@ -106,7 +106,7 @@ with tempfile.TemporaryDirectory() as tmp:
         # mismatch for this launcher only, without changing global PATH.
         local_zellij = datadir / ".local/bin/zellij"
         local_zellij.parent.mkdir(parents=True)
-        local_zellij.write_text("#!/bin/sh\\nexit 0\\n")
+        local_zellij.touch()
         local_zellij.chmod(0o755)
         with patch.object(mod.shutil, "which", side_effect=missing_zellij), \
              patch.object(mod.Path, "home", return_value=datadir):

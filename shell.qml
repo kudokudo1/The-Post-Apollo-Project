@@ -582,15 +582,36 @@ PanelWindow {
 
     // ===== CENTER MODULE ========================================
 
-    Calendar {
-        id: calendarModule
+    // ApolloHubW replaces the passive Calendar dock, keeping the center
+    // anchor. The focus broker/coordinator are shared-owned seams; this
+    // bounded pilot uses window-local keys and OnDemand only.
+    Item {
+        id: apolloHubHost
+        width: apolloHubButton.implicitWidth
+        height: apolloHubButton.implicitHeight
 
         anchors {
             top: parent.top
             horizontalCenter: parent.horizontalCenter
         }
-
         anchors.topMargin: 8
+
+        ApolloHub {
+            id: apolloHubButton
+            anchors.fill: parent
+            menuOpen: apolloHubWindow.menuOpen
+            onToggleRequested: apolloHubWindow.toggle()
+        }
+
+        ApolloHubW {
+            id: apolloHubWindow
+            screen: shellRoot.screen
+            // The Hub is not yet enrolled in Koinoikos's cross-window
+            // registry; it cannot take keyboard input during that mode.
+            keyboardActive: !relationshipFocus.active
+            relationshipFocusModeActive: relationshipFocus.active
+            relationshipFocused: false
+        }
     }
 
     // ===== RIGHT MODULES ========================================

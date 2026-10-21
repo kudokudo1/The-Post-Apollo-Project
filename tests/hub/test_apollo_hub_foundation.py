@@ -12,10 +12,15 @@ layout = (ROOT / "services/hub/ApolloHubLayout.js").read_text(encoding="utf-8")
 store = (ROOT / "services/hub/ApolloHubStore.qml").read_text(encoding="utf-8")
 module = (ROOT / "services/hub/qmldir").read_text(encoding="utf-8")
 
-# Preserve the existing center dock until integration is approved/reconciled.
-assert "Calendar {" in shell
-assert "ApolloHub {" not in shell
-assert "ApolloHubW {" not in shell
+# Center dock integration is a separate shared-shell branch, allowing the
+# user to accept the root-safe click preview before live activation.
+assert "Calendar {" not in shell
+assert "ApolloHub {" in shell
+assert "ApolloHubW {" in shell
+assert "onToggleRequested: apolloHubWindow.toggle()" in shell
+assert "menuOpen: apolloHubWindow.menuOpen" in shell
+assert "keyboardActive: !relationshipFocus.active" in shell
+assert "WlrKeyboardFocus.Exclusive" not in window
 
 # Use approved shared controls / frames rather than duplicating menus.
 assert "DockButton {" in dock

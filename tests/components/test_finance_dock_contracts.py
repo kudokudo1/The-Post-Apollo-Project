@@ -14,14 +14,16 @@ assert "DockButton {" in FINANCE
 assert 'import "../components"' in FINANCE
 
 # Do not normalize the operator's decorated identity or lose combining marks.
-assert 'text: "˗ˋˏ˖⛀⛁ ⛁⛀๋࣭⭑ˎˊ˗"' in FINANCE
-assert "textFormat: Text.PlainText" in FINANCE
+assert 'text: "˗ˋˏ˖<font color=\'" + Colors.green + "\'>⛁⛀</font>๋࣭⭑ˎˊ˗"' in FINANCE
+assert "textFormat: Text.StyledText" in FINANCE
+assert "implicitWidth: Math.max(80, Math.ceil(financeMark.implicitWidth) + 24)" in FINANCE
 assert "contentGlowSource: financeMark" in FINANCE
 assert "color: financeDock.foregroundColor" in FINANCE
+assert "⛀⛁ ⛁⛀" not in FINANCE
 
-# Only the glyph itself uses sub-Omnitrix green.
+# Only the coins use sub-Omnitrix green; decorations remain white.
 for state in ("normal", "hover", "pressed", "open"):
-    assert f"{state}ForegroundColor: Colors.green" in FINANCE
+    assert f"{state}ForegroundColor: Colors.white" in FINANCE
 for state in ("normal", "hover", "pressed"):
     assert f"{state}ContentGlowColor: Colors.omnitrix" in FINANCE
     assert f"{state}DockGlowColor: Colors.omnitrix" in FINANCE

@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 """No real updates: GNOME Software / Flatpak / fwupd update bridge contracts."""
 from pathlib import Path
+import os
+import tempfile
 import importlib.util
 from unittest.mock import patch
 import json
 import subprocess
+
+# Keep updater-lock tests completely outside the operator's real state.
+TEST_STATE = tempfile.TemporaryDirectory(prefix="apollo-update-tests-")
+os.environ["XDG_STATE_HOME"] = TEST_STATE.name
 
 ROOT = Path(__file__).resolve().parents[2]
 backend = ROOT / "scripts/updates/update_offers.py"

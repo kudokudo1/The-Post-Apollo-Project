@@ -1,0 +1,32 @@
+name: Apollo Hub foundation contracts
+
+on:
+  pull_request:
+    paths:
+      - "widgets/ApolloHubW.qml"
+      - "widgets/hub/ApolloHubTile.qml"
+      - "modules/ApolloHub.qml"
+      - "components/ActionButton.qml"
+      - "tests/hub/test_apollo_hub_foundation.py"
+      - ".github/workflows/apollo-hub-foundation.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "widgets/ApolloHubW.qml"
+      - "widgets/hub/ApolloHubTile.qml"
+      - "modules/ApolloHub.qml"
+      - "components/ActionButton.qml"
+      - "tests/hub/test_apollo_hub_foundation.py"
+      - ".github/workflows/apollo-hub-foundation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Apollo Hub control and layout contracts
+        run: python3 tests/hub/test_apollo_hub_foundation.py

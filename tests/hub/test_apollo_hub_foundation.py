@@ -46,6 +46,39 @@ assert window.count("ActionButton {") >= 5
 assert "SectionFrame {" in tile
 assert "MouseArea {" not in window + tile + dock
 
+# Hub editor/selector buttons use ActionButton's existing reactive label
+# tracking (proven on Projects ARCHIVE). Keep the icon and caption alignment
+# independent from button backgrounds, halos and click actions.
+import re
+
+for path, source, count in (
+    ("widgets/ApolloHubW.qml", window, 6),
+    ("widgets/hub/ApolloHubTile.qml", tile, 3),
+):
+    actions = len(re.findall(r"\bActionButton\s*\{", source))
+    tracked = len(re.findall(
+        r"\bActionButton\s*\{\s*(?://[^\n]*\n\s*)?trackLabelGlowLocally:\s*true",
+        source,
+    ))
+    assert actions == count, f"{path}: action count changed ({actions})"
+    assert tracked == actions, f"{path}: {actions - tracked} untracked glow(s)"
+
+for action in (
+    'label: hub.editMode ? "VIEW" : "EDIT"',
+    'label: hub.activeMode.subModes[index].name',
+    'label: "+ MODE"',
+    'label: "+ GROUP"',
+    'label: "+ TILE"',
+):
+    assert action in window, f"Hub button behavior changed: {action}"
+for action in ('label: "←"', 'label: "→"', 'label: "SWAP"'):
+    assert action in tile, f"Hub edit-tile action changed: {action}"
+
+shared_action = (ROOT / "components/ActionButton.qml").read_text(encoding="utf-8")
+assert "property bool trackLabelGlowLocally: false" in shared_action
+assert "contentHost.x + labelText.x" in shared_action
+assert "contentHost.y + labelText.y" in shared_action
+
 # Configure modes/sub-modes and exchange module positions independently.
 for name in ("defaultLayout", "normalize", "parse", "swapTiles",
              "renameMode", "addMode", "addSubMode", "addTile", "cycleTile"):

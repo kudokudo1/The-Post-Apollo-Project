@@ -57,6 +57,7 @@ SectionFrame {
         visible: tile.editing
 
         ActionButton {
+            trackLabelGlowLocally: true
             width: 28
             height: 25
             label: "←"
@@ -64,6 +65,7 @@ SectionFrame {
             onLeftClicked: tile.moveLeft(tile.tileIndex)
         }
         ActionButton {
+            trackLabelGlowLocally: true
             width: 28
             height: 25
             label: "→"
@@ -71,6 +73,7 @@ SectionFrame {
             onLeftClicked: tile.moveRight(tile.tileIndex)
         }
         ActionButton {
+            trackLabelGlowLocally: true
             width: 57
             height: 25
             label: "SWAP"

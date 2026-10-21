@@ -1,6 +1,6 @@
 # FinanceW // Actual read-only connection pilot
 
-Stage D1: an isolated data probe, **not yet connected to FinanceW's UI**.
+Stage D3: an isolated probe with a **manual REFRESH** action in FinanceW's Budget UI.
 It does not have Actual mutation methods and does not modify a budget.
 It downloads an isolated disposable API copy, reads the requested month,
 and deletes its private working directory. No automatic polling or startup.
@@ -62,3 +62,25 @@ and deletes its private working directory. No automatic polling or startup.
   `better-sqlite3` dependency requires Node.js compatibility.
 - Nothing in FinanceW launches this script yet; UI integration awaits a
   successful local probe with fictional data.
+
+## Budget screen connection (D3)
+
+FinanceW now reads the local budget **only when REFRESH is pressed**.
+No polling, automatic account mutations, or tracked financial data.
+The user must first save their known Sync ID privately (zsh):
+
+```zsh
+mkdir -p -m 700 "$HOME/.config/financew"
+install -m 600 /dev/null "$HOME/.config/financew/actual-sync-id"
+read -rs "FINANCE_SYNC_ID?Paste Actual Sync ID: "
+printf '%s' "$FINANCE_SYNC_ID" > "$HOME/.config/financew/actual-sync-id"
+unset FINANCE_SYNC_ID
+printf '\nSync ID saved privately.\n'
+```
+
+The existing `actual-password` file remains in the same directory.
+Do not paste either value into a chat or repository. The server at
+127.0.0.1:5007 must be running to refresh. The snapshot is kept only in
+the Quickshell process memory, cleared on failed reads, and not written
+to disk by the UI. It shows the current month from Actual, not a sample
+or a guarantee of live continuous updates.

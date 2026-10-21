@@ -3,7 +3,7 @@ import Quickshell
 import Quickshell.Wayland
 import "../components"
 
-// Blank FinanceW chassis only. No services, money data, or input editors.
+// FinanceW navigation scaffold only. No services, money data, or input editors.
 PanelWindow {
     id: root
 

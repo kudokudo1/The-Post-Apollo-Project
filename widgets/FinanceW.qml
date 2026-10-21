@@ -131,13 +131,8 @@ PanelWindow {
             anchors.right: parent.right
             anchors.top: parent.top
             height: 56
-            color: Colors.dark
-
-            Rectangle {
-                anchors.fill: parent
-                color: Colors.magenta
-                opacity: 0.20
-            }
+            // Same actual surface as FinanceW, without an extra tint.
+            color: "transparent"
 
             GohuText {
                 anchors.left: parent.left
@@ -145,7 +140,7 @@ PanelWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 anchors.right: closeButton.left
                 anchors.rightMargin: 8
-                text: "FINANCEW // " + root.mainModeName().toUpperCase()
+                text: "FINANCE // " + root.mainModeName().toUpperCase()
                 font.pixelSize: 17
                 font.bold: true
                 color: Colors.magenta
@@ -172,7 +167,9 @@ PanelWindow {
             id: headerDivider
             anchors.top: financeHeader.bottom
             anchors.left: parent.left
+            anchors.leftMargin: 12
             anchors.right: parent.right
+            anchors.rightMargin: 12
             height: 2
             color: Colors.cyan
         }
@@ -205,7 +202,7 @@ PanelWindow {
                     primaryGlowEnabled: !modelData.future
                     bordered: true
 
-                    NotoText {
+                    GohuText {
                         id: mainIcon
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.top: parent.top
@@ -214,8 +211,10 @@ PanelWindow {
                         horizontalAlignment: Text.AlignHCenter
                         text: modelData.icon
                         textFormat: Text.PlainText
-                        font.pixelSize: 17
-                        elide: Text.ElideRight
+                        height: 31
+                        font.pixelSize: 24
+                        fontSizeMode: Text.Fit
+                        minimumPixelSize: 15
                         color: mainModeButton.primaryColor
                     }
 
@@ -229,6 +228,7 @@ PanelWindow {
                         font.pixelSize: 10
                         elide: Text.ElideRight
                         color: mainModeButton.selected ? Colors.magenta : Colors.white
+                        opacity: mainModeButton.selected ? 0.60 : 0.36
                     }
 
                     onTriggered: root.selectMainMode(modelData.id)
@@ -242,9 +242,24 @@ PanelWindow {
             anchors.leftMargin: 6
             anchors.top: headerDivider.bottom
             anchors.bottom: parent.bottom
-            width: 1
-            color: Colors.cyan
-            opacity: 0.55
+            width: 2
+            color: Colors.omnitrix
+            opacity: 1.0
+        }
+
+        // Separate sampled glow preserves the line's color and geometry.
+        SafeDropShadow {
+            id: mainRailDividerGlow
+            anchors.fill: mainRailDivider
+            safeSource: mainRailDivider
+            requestedVisible: root.menuOpen
+            horizontalOffset: 0
+            verticalOffset: 0
+            radius: 10
+            samples: 21
+            color: Colors.omnitrix
+            opacity: 0.70
+            transparentBorder: true
         }
 
         Item {
@@ -312,7 +327,7 @@ PanelWindow {
                         hoverBorderColor: identityColor
                         selectedBorderColor: identityColor
 
-                        NotoText {
+                        GohuText {
                             id: subIcon
                             anchors.top: parent.top
                             anchors.topMargin: 10
@@ -321,8 +336,10 @@ PanelWindow {
                             horizontalAlignment: Text.AlignHCenter
                             text: modelData.icon
                             textFormat: Text.PlainText
-                            font.pixelSize: 15
-                            elide: Text.ElideRight
+                            height: 35
+                            font.pixelSize: 22
+                            fontSizeMode: Text.Fit
+                            minimumPixelSize: 12
                             color: budgetSubButton.foregroundColor
                         }
 

@@ -49,6 +49,36 @@ assert "id: mainModeRail" in menu
 assert "id: budgetSubRail" in menu
 assert 'visible: root.selectedMainMode === "budget"' in menu
 
+# Match the chassis background; accent lives in the title, not a tinted header.
+assert 'text: "FINANCE // " + root.mainModeName().toUpperCase()' in menu
+header = menu[menu.index("id: financeHeader"):menu.index("id: headerDivider")]
+assert 'color: "transparent"' in header
+assert "opacity: 0.20" not in header
+header_divider = menu[menu.index("id: headerDivider"):menu.index("// MAIN MODE")]
+assert "anchors.leftMargin: 12" in header_divider
+assert "anchors.rightMargin: 12" in header_divider
+
+# Main and Budget sub-mode icon artwork uses Gohu, with fit to avoid
+# truncating decorated glyphs in the narrow 9:16 panel.
+assert "NotoText {" not in menu
+assert "GohuText {\n                        id: mainIcon" in menu
+assert "GohuText {\n                            id: subIcon" in menu
+assert "font.pixelSize: 24" in menu
+assert "font.pixelSize: 22" in menu
+assert menu.count("fontSizeMode: Text.Fit") == 2
+assert "minimumPixelSize: 15" in menu
+assert "minimumPixelSize: 12" in menu
+assert "opacity: mainModeButton.selected ? 0.60 : 0.36" in menu
+
+# Permanent Omnitrix vertical line with independent, source-safe glow.
+divider = menu[menu.index("id: mainRailDivider"):menu.index("id: workArea")]
+assert "width: 2" in divider
+assert "color: Colors.omnitrix" in divider
+assert "id: mainRailDividerGlow" in divider
+assert "safeSource: mainRailDivider" in divider
+assert "radius: 10" in divider
+assert "samples: 21" in divider
+
 # Specialized sub-mode foreground + independent glow.
 assert 'id === "budget" ? Colors.omnitrix' in menu
 assert 'id === "reports" ? Colors.white : Colors.green' in menu

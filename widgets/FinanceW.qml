@@ -159,8 +159,12 @@ PanelWindow {
     }
 
     onMenuOpenChanged: {
-        if (menuOpen && keyboardActive)
-            Qt.callLater(function() { financeKeyboardAnchor.forceActiveFocus(); });
+        if (menuOpen) {
+            // Refresh on each real closed → open transition, not shell boot.
+            financeBudget.refresh();
+            if (keyboardActive)
+                Qt.callLater(function() { financeKeyboardAnchor.forceActiveFocus(); });
+        }
     }
     onKeyboardActiveChanged: {
         if (menuOpen && keyboardActive)
@@ -695,7 +699,8 @@ PanelWindow {
                 border.color: Colors.cyan
                 opacity: 0.78
 
-                // Read only on explicit REFRESH. Snapshot never saved to disk.
+                // Read-only on open/month change or manual REFRESH.
+                // Snapshots stay in process memory, never tracked on disk.
                 Column {
                     id: actualBudgetPage
                     anchors.fill: parent
@@ -733,8 +738,8 @@ PanelWindow {
                         }
                     }
 
-                    // Selecting another month clears the previous month
-                    // so figures can never be displayed under a wrong date.
+                    // Month changes automatically queue a read; the previous
+                    // month is hidden immediately, even during slow downloads.
                     Row {
                         id: financeMonthRail
                         width: parent.width
@@ -747,7 +752,6 @@ PanelWindow {
                             label: "‹"
                             labelPixelSize: 16
                             accentColor: Colors.cyan
-                            available: !financeBudget.loading
                             onLeftClicked: financeBudget.shiftMonth(-1)
                         }
                         GohuText {
@@ -768,7 +772,6 @@ PanelWindow {
                             label: "›"
                             labelPixelSize: 16
                             accentColor: Colors.cyan
-                            available: !financeBudget.loading
                             onLeftClicked: financeBudget.shiftMonth(1)
                         }
                     }

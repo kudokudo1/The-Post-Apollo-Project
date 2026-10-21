@@ -30,7 +30,7 @@ for forbidden in ("TextHashGlow {", "MouseArea {", "ModeButtonCloseHalo {",
 assert mode.count("primaryGlowHost: modeIconSlot") == 1
 assert mode.count("labelGlowHost: modeCaptionSlot") == 1
 assert "primaryGlowHost: textModeIcon" not in mode
-assert "labelGlowHost: modeCaption" not in mode
+assert "labelGlowHost: modeCaption\n" not in mode
 hash_glow = (ROOT / "components/TextHashGlow.qml").read_text(encoding="utf-8")
 assert "sourceSharesGlowHost ? Qt.point(safeSource.x, safeSource.y)" in hash_glow
 assert "safeSource.parent === parent" in hash_glow

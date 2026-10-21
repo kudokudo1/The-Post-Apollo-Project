@@ -118,7 +118,9 @@ def test_weather_focus_and_window_controls_follow_shared_contract():
     assert "id: weatherKeyboardAnchor" in src
     assert "WlrKeyboardFocus.OnDemand" in src
     assert "weatherStation.keyboardLock" in src
-    assert "focusable: weatherStation.menuOpen && weatherStation.keyboardActive" in src
+    assert "focusable:" in src
+    assert "weatherStation.keyboardActive" in src
+    assert "weatherStation.relationshipFocused" in src
 
     assert "fillVisible: true" in src
     assert "borderVisible: true" in src

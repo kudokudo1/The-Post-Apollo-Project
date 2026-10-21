@@ -1,32 +1,37 @@
-# ApolloHubW // Foundation preview
+# ApolloHubW // Isolated preview and keyboard smoke test
 
-**Status:** first-stage GitHub-only development scaffold. This is not installed
-in the live Post-Apollo bar; `shell.qml` deliberately remains unchanged.
+**Status:** ApolloHubW and its Calendar-styled dock are on GitHub main, but
+`shell.qml` still mounts the original Calendar. Nothing activates the new
+center dock in the running taskbar without a separate shell integration.
 
-After a local sync is separately authorized and the operator has checked the
-working tree, a **separate Quickshell preview process** can be started with:
+The original `tests/hub/apollo_hub_preview.qml` is kept as source history but
+is **not** a valid top-level `-p` entry point: Quickshell roots the
+configuration at the chosen file's directory, making parent imports unresolved.
+
+To test the Hub *without touching your live Quickshell instance*, use the
+repo-root standalone click-and-keyboard harness:
 
 ```sh
-quickshell -p tests/hub/apollo_hub_preview.qml
+cd ~/.config/quickshell
+qs -p apollo_hub_click_preview.qml
 ```
 
-This proposed preview command has **not yet been runtime-verified** on the
-operator's Fedora/Quickshell installation. Do not restart or replace the live
-shell to test it.
+That starts a separate 113x50 dock and a Hub popup. Click the white-arrow /
+orange-calendar / white-stars button. The button glow should be magenta.
+In the Hub: Tab / Shift+Tab cycles main modes, Shift+Left/Right cycles an
+available top sub-mode, ordinary arrows select tiles (orange selection outline),
+and Escape closes the Hub. No bottom sub-mode is currently present, so no
+Ctrl+Left/Right shortcut is registered. Enter only cycles a selected module
+while in EDIT mode; preview cards do **not** activate real widget services.
 
-In the preview, try Dashboard/Console/Media, press EDIT, add a mode/group/tile,
-rename a mode, and use the left/right arrows to swap tile positions. Tile
-positions and menu choices are stored in Quickshell's data directory as
-`apollo-hub-layout.json` and should survive restarting the preview process.
-Only local time and date are live; all other cards intentionally say preview
-until Post-Apollo data-source adapters are connected.
+Click the MODE text field in EDIT mode and type using arrow keys, Tab and Enter
+normally. Closing the editor should restore the Hub's local navigation focus.
 
-The first pass supports two preset tile widths, a 6-mode / 6-group / 8-tile
-safety cap, and cycle-through tool selection. It does **not** support arbitrary
-drag/drop, resize handles, removal of modes/tiles, custom icon picking, mature
-cross-widget adapters, or in-Hub expanded views. Those remain future
-development work and require operator direction.
+Only time and date are live; Weather, CPU++, Media and other cards are
+placeholders. Layout/configuration persistence is implemented but restart
+round-trip and Sway keyboard acquisition must be accepted on-device.
 
-Verification boundaries: source assertions plus pure JS layout behavior can
-check configuration logic, but do not establish Quickshell loading, rendering,
-focus behavior, persistence across real restarts, or final operator acceptance.
+Safety: the preview is a separate process, not a new live-bar integration.
+Do not restart or replace the main Quickshell instance as part of this test.
+The shared shell and Koinoikos focus broker require separate integration
+verification; shortcuts are window-local until then.

@@ -39,8 +39,9 @@ assert "6 * 60 * 60 * 1000" in PRODUCER
 assert "NotificationsService.historyReady" in PRODUCER
 assert 'sourceId": "apollo-update-monitor"' in PRODUCER
 assert 'Quickshell.execDetached([' in PRODUCER
-assert '"kitty", "--hold", "-e", "/usr/bin/python3"' in PRODUCER
-assert "producer.script, \"review\"" in PRODUCER
+assert 'Quickshell.shellPath("scripts/updates/launch_review.py")' in PRODUCER
+assert '"kitty", "--hold", "-e"' not in PRODUCER
+assert "String(kind), String(token)" in PRODUCER
 assert 'producer.script, "defer"' in PRODUCER
 assert "producer.isCurrent(kind, token)" in PRODUCER
 assert "onExited: function(code, exitStatus)" in PRODUCER

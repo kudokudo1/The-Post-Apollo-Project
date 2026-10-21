@@ -410,6 +410,10 @@ PanelWindow {
 
         Mediaplayer {}
 
+        // Finance
+
+        Finance {}
+
         // Hospital
 
         Item {

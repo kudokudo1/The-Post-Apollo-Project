@@ -17,6 +17,26 @@ Scope {
     property bool pendingRefresh: false
     property bool requestActive: false
 
+    // LIVE requires both an authenticated snapshot and current loopback
+    // availability. HTTP alone cannot establish budget authorization.
+    property bool monitoring: false
+    property string healthStatus: "unknown"
+    property string lastReadAt: ""
+    onMonitoringChanged: {
+        if (!monitoring)
+            healthStatus = "unknown";
+    }
+
+    function checkReachability() {
+        if (!monitoring || healthProbe.running)
+            return false;
+        // No credentials or budget records travel through this check.
+        healthProbe.exec(["/usr/bin/curl", "--silent", "--fail",
+                          "--max-time", "3", "--output", "/dev/null",
+                          "http://127.0.0.1:5007/"]);
+        return true;
+    }
+
     function shiftMonth(direction) {
         if (direction !== 1 && direction !== -1)
             return false;
@@ -116,6 +136,7 @@ Scope {
         }
         snapshot = payload;
         state = "ready";
+        lastReadAt = Qt.formatTime(new Date(), "hh:mm:ss");
         message = "Budget read complete.";
     }
 
@@ -129,6 +150,25 @@ Scope {
             fail("Sync ID not configured. See FinanceW setup.");
         else
             fail("Local budget read failed. Check server and credentials.");
+    }
+
+    // Cheap local-server reachability observation. This is not an API
+    // authentication check; LIVE additionally requires a valid snapshot.
+    Process {
+        id: healthProbe
+        onExited: function(exitCode, exitStatus) {
+            budgetBridge.healthStatus = budgetBridge.monitoring
+                ? (exitCode === 0 ? "online" : "offline")
+                : "unknown";
+        }
+    }
+
+    Timer {
+        interval: 15000
+        repeat: true
+        running: budgetBridge.monitoring
+        triggeredOnStart: true
+        onTriggered: budgetBridge.checkReachability()
     }
 
     Process {

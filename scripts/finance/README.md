@@ -112,3 +112,24 @@ read once the current subprocess exits. Navigation stays responsive even
 when Actual is slow. No automatic polling occurs while the window stays
 open, and nothing reads at shell startup when FinanceW remains closed.
 Failed reads show an error and do not display old budget data.
+
+## FinanceW D6: source-aware header LIVE status + account summary
+
+In the Budget/Budget view, LIVE is shown only when the current month's
+authenticated read-only snapshot succeeded **and** the local Actual server
+responded to the latest loopback HTTP check. The source check uses a
+credential-free `curl --fail --max-time 3` every 15 seconds **only while
+FinanceW is open**. A failed read shows ERROR; a failed health check shows
+OFFLINE. READING appears while fetching; CHECK before verification. Reserved
+or unwired pages show NO FEED, not a fictional LIVE status.
+
+When the source drops after a successful read, the in-memory numbers remain
+visible but are clearly labeled CACHED, with the last successful read time.
+The indicator is sampled availability, not a continuous authenticated
+stream or proof of bank synchronization. Open/refresh/selected-month changes
+still authenticate through the actual-app API. Nothing runs while FinanceW
+remains closed and no budget records are written.
+
+The Budget page also totals all displayed active, on-budget account balances
+and shows their count. It intentionally excludes off-budget/closed accounts,
+so this is not a net-worth figure.

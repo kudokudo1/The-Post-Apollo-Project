@@ -109,6 +109,31 @@ def test_weather_semantic_main_and_top_submode_and_arrow_preview():
     assert "context: Qt.WindowShortcut" in src
 
 
+def test_weather_focus_and_window_controls_follow_shared_contract():
+    src = read("widgets/weather/WeatherStationW.qml")
+
+    assert "property bool keyboardActive: true" in src
+    assert "property bool keyboardLock: false" in src
+    assert "signal keyboardOwnershipRequested()" in src
+    assert "id: weatherKeyboardAnchor" in src
+    assert "WlrKeyboardFocus.OnDemand" in src
+    assert "weatherStation.keyboardLock" in src
+    assert "focusable: weatherStation.menuOpen && weatherStation.keyboardActive" in src
+
+    assert "fillVisible: true" in src
+    assert "borderVisible: true" in src
+    assert "borderColor: Colors.cyan" in src
+
+    assert "id: focusButton" in src
+    assert 'label: "FOCUS"' in src
+    assert "accentColor: Colors.magenta" in src
+
+    assert "id: closeButton" in src
+    assert 'label: "×"' in src
+    assert "accentColor: Colors.red" in src
+    assert "destructive: true" in src
+
+
 def test_notifications_tab_cycles_every_real_mode_in_visual_order():
     src = read("widgets/notifications/NotificationsHubW.qml")
     expected = ["all", "favorites", "apps", "social",

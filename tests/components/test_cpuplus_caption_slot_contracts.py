@@ -11,6 +11,7 @@ for token in (
     'sampledPrimaryActive && modelData.kind !== "thermal"',
     "id: modeIconSlot", "id: modeCaptionSlot",
     "id: textModeIcon", "id: modeCaption", "QuietText {",
+    "primaryGlowHost: modeIconSlot", "labelGlowHost: modeCaptionSlot",
     "width: modeCaption.implicitWidth",
     "height: modeCaption.implicitHeight",
     "anchors.horizontalCenter: parent.horizontalCenter",
@@ -22,6 +23,19 @@ for token in (
 for forbidden in ("TextHashGlow {", "MouseArea {", "ModeButtonCloseHalo {",
                   "ModeButtonWideHalo {", "RectangularShadow {"):
     assert forbidden not in mode, forbidden
+# Neither sampler may be parented to the sampled text (feedback loop),
+# and the two independent effects stay inside their own icon/caption slots.
+# Unlike a cross-parent mapToItem binding, these local-host siblings use
+# reactive text x/y from the shared TextHashGlow fix.
+assert mode.count("primaryGlowHost: modeIconSlot") == 1
+assert mode.count("labelGlowHost: modeCaptionSlot") == 1
+assert "primaryGlowHost: textModeIcon" not in mode
+assert "labelGlowHost: modeCaption" not in mode
+hash_glow = (ROOT / "components/TextHashGlow.qml").read_text(encoding="utf-8")
+assert "sourceSharesGlowHost ? Qt.point(safeSource.x, safeSource.y)" in hash_glow
+assert "safeSource.parent === parent" in hash_glow
+assert "safeSource.mapToItem(parent, 0, 0)" in hash_glow
+
 assert 'import "thermal"' in qml
 assert qml.count("id: thermalIconComponent") == 1
 component = qml[qml.index("id: thermalIconComponent"):qml.index("// WINDOW", qml.index("id: thermalIconComponent"))]

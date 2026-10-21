@@ -134,8 +134,8 @@ def test_weather_keyboard_live_indicator_and_close_follow_shared_contract():
     assert "return Colors.magenta;" in src
     assert "weatherAgeMinutes >= 20" in src
     assert 'return sourceStatusText + " // " + ageText;' in src
-    assert 'width: 164' in src
-    assert 'font.pixelSize: 10' in src
+    assert 'width: 150' in src
+    assert 'font.pixelSize: 11' in src
     assert "id: focusButton" not in src
     assert 'label: "FOCUS"' not in src
 

@@ -91,6 +91,7 @@ assert.match(dock, /id:\s*weatherContent[\s\S]*?spacing:\s*6/);
 assert.match(dock, /id:\s*weatherReadout[\s\S]*?spacing:\s*0/);
 assert.match(dock, /id:\s*weatherTemperature[\s\S]*?spacing:\s*0/);
 assert.match(dock, /contentGlowSource:\s*weatherContent/);
+assert.match(dock, /opacity:\s*weatherDock\.contentGlowOpacity/);
 // Idle uses observed weather colors; interaction takes the standard orange -> magenta path.
 for (const [property, color] of [
     ["normalForegroundColor", "weatherColor"],
@@ -108,8 +109,8 @@ for (const [property, color] of [
 ]) {
     assert.ok(dock.includes(property + ": " + color), property + " should use " + color);
 }
-assert.match(dock, /id:\\s*weatherThermometer[\\s\\S]*?color:\\s*weatherDock\\.open\\s*\\|\\|\\s*weatherDock\\.pressed[\\s\\S]*?Colors\\.magenta\\s*:\\s*Colors\\.orange/);
-assert.match(dock, /id:\\s*weatherContent[\\s\\S]*?spacing:\\s*6/);
+assert.match(dock, /id:\s*weatherThermometer[\s\S]*?color:\s*weatherDock\.open\s*\|\|\s*weatherDock\.pressed[\s\S]*?Colors\.magenta\s*:\s*Colors\.orange/);
+assert.match(dock, /id:\s*weatherContent[\s\S]*?spacing:\s*6/);
 assert.ok(dock.indexOf("id: weatherCondition") < dock.indexOf("id: weatherTemperature"));
 assert.ok(dock.indexOf("id: weatherTemperature") < dock.indexOf("id: weatherThermometer"));
 assert.ok(dock.indexOf("id: weatherTemperatureUnit") < dock.indexOf("id: weatherThermometer"));

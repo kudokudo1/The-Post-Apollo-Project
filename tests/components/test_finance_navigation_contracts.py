@@ -79,21 +79,34 @@ assert "opacity: mainModeButton.selected ? 0.60 : 0.36" in menu
 # No increase in ornament size: the two core glyphs are larger, the
 # decorations remain smaller and Unicode combining marks stay on the core.
 segmented = {
-    '"market"': ("₊˚", "$🗠๋࣭", "⭑", "₊˚$🗠๋࣭⭑"),
-    '"radar"': ("࣪ ˖(˓", "🛰", "₊˚⊹", "࣪ ˖(˓🛰₊˚⊹"),
-    '"strategies"': ("˙°", "⚖︎๋࣭", "⭑", "˙°⚖︎๋࣭⭑"),
-    '"safety"': ("", "🛡๋࣭", "⭑", "🛡๋࣭⭑"),
-    '"agentic"': ("⋆˚", "⚡︎๋࣭", "⭑", "⋆˚⚡︎๋࣭⭑"),
+    '"market"': ("₊˚", "$", "🗠๋࣭", "⭑", "₊˚$🗠๋࣭⭑"),
+    '"radar"': ("࣪ ˖(˓", "", "🛰", "₊˚⊹", "࣪ ˖(˓🛰₊˚⊹"),
+    '"strategies"': ("˙°", "", "⚖︎๋࣭", "⭑", "˙°⚖︎๋࣭⭑"),
+    '"safety"': ("", "", "🛡๋࣭", "⭑", "🛡๋࣭⭑"),
+    '"agentic"': ("⋆˚", "", "⚡︎๋࣭", "⭑", "⋆˚⚡︎๋࣭⭑"),
 }
-for key, (pre, core, post, full) in segmented.items():
-    assert pre + core + post == full
-    assert f'prefix: "{pre}", core: "{core}", suffix: "{post}"' in menu, key
-for pre, core, post, full in (
-    ("˗ˋˏ˖", "⛁⛀๋࣭", "⭑ˎˊ˗", "˗ˋˏ˖⛁⛀๋࣭⭑ˎˊ˗"),
-    ("₊˚", "$🗠๋࣭", "⭑", "₊˚$🗠๋࣭⭑"),
+for key, (pre, dollar, core, post, full) in segmented.items():
+    assert pre + dollar + core + post == full
+    dollar_field = f'dollar: "{dollar}", ' if dollar else ""
+    assert (f'prefix: "{pre}", ' + dollar_field
+            + f'core: "{core}", suffix: "{post}"') in menu, key
+for pre, dollar, core, post, full in (
+    ("˗ˋˏ˖", "", "⛁⛀๋࣭", "⭑ˎˊ˗", "˗ˋˏ˖⛁⛀๋࣭⭑ˎˊ˗"),
+    ("₊˚", "$", "🗠๋࣭", "⭑", "₊˚$🗠๋࣭⭑"),
 ):
-    assert pre + core + post == full
-    assert f'prefix: "{pre}", core: "{core}", suffix: "{post}"' in menu
+    assert pre + dollar + core + post == full
+    dollar_field = f'dollar: "{dollar}", ' if dollar else ""
+    assert (f'prefix: "{pre}", ' + dollar_field
+            + f'core: "{core}", suffix: "{post}"') in menu
+
+# Market and Reports dollars now have the same Gohu font setting as
+# Main Budget's $; chart symbols retain 34px and 31px sizes.
+assert menu.count('dollar: "$"') == 2
+assert menu.count('text: modelData.dollar || ""') == 2
+assert menu.count("visible: !!modelData.dollar") == 2
+assert menu.count("font.pixelSize: 24") == 3  # main Budget + two dollar glyphs
+assert 'font.pixelSize: modelData.coreSize || 34' in menu
+assert 'font.pixelSize: 31' in menu
 for size in (31, 15, 12):
     assert f"font.pixelSize: {size}" in menu
 assert "font.pixelSize: modelData.coreSize || 34" in menu

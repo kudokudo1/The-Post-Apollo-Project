@@ -20,7 +20,11 @@ import sys
 import tempfile
 import time
 
-ALLOWED = {"silverblue", "oh-my-zsh", "powerlevel10k"}
+ALLOWED = {"silverblue", "oh-my-zsh", "powerlevel10k",
+           "flatpak-user", "flatpak-system", "firmware"}
+FLATPAK_REF = re.compile(r"(?:app|runtime)/[A-Za-z0-9_.-]+/[A-Za-z0-9_]+/[A-Za-z0-9_.-]+")
+FLATPAK_REMOTE = re.compile(r"[A-Za-z0-9_.-]{1,100}")
+REVISION = re.compile(r"[a-f0-9]{40,64}")
 DEFER_SECONDS = 24 * 60 * 60
 
 
@@ -137,10 +141,99 @@ def managed_checkout(kind: str) -> dict[str, str] | None:
                  "Review the changes and local Git state before updating.", "review")
 
 
+def flatpak_targets(kind: str) -> list[tuple[str, str, str]] | None:
+    """Refs, remotes and pinned upstream commits, or None on unreliable evidence."""
+    if kind not in ("flatpak-user", "flatpak-system") or not shutil.which("flatpak"):
+        return None
+    scope = "--user" if kind == "flatpak-user" else "--system"
+    rc, raw = run(["flatpak", "remote-ls", scope, "--updates",
+                   "--columns=ref,origin"], timeout=45)
+    if rc:
+        return None
+    lines = [line.strip() for line in raw.splitlines() if line.strip()]
+    # A bounded complete result prevents partial notices or mass operations.
+    if len(lines) > 30:
+        return None
+    found = []
+    for line in lines:
+        if line.lower().replace(" ", "") == "reforigin":
+            continue
+        fields = line.split()
+        if len(fields) != 2 or not FLATPAK_REF.fullmatch(fields[0]) or not FLATPAK_REMOTE.fullmatch(fields[1]):
+            return None
+        ref, remote = fields
+        rc, text = run(["flatpak", "remote-info", scope, "--show-commit",
+                        remote, ref], timeout=20)
+        commit = text.strip().lower()
+        if rc or not REVISION.fullmatch(commit):
+            return None
+        found.append((ref, remote, commit))
+    return sorted(set(found))
+
+
+def flatpak_offer(kind: str) -> dict[str, str] | None:
+    rows = flatpak_targets(kind)
+    if not rows:
+        return None
+    # This token is derived from the exact refs, remotes and upstream commits,
+    # NOT solely from app names or last-known installed versions.
+    target = "\n".join("\t".join(row) for row in rows)
+    label = "USER" if kind == "flatpak-user" else "SYSTEM"
+    return offer(kind, label, target,
+                 "FLATPAK // " + label + " UPDATES AVAILABLE",
+                 str(len(rows)) + " Flatpak ref(s) have upstream changes. "
+                 "DOWNLOAD caches pinned versions without deployment; APPLY installs. "
+                 "Review the exact refs and confirm separately in Kitty.",
+                 "available")
+
+
+def firmware() -> dict[str, str] | None:
+    """Observe fwupd JSON, but never install/flash firmware from this program."""
+    if not shutil.which("fwupdmgr"):
+        return None
+    rc, raw = run(["fwupdmgr", "get-updates", "--json"], timeout=45)
+    if rc != 0:
+        return None
+    try:
+        data = json.loads(raw)
+        devices = data.get("Devices", [])
+        if not isinstance(devices, list):
+            return None
+        found = []
+        for device in devices[:40]:
+            if not isinstance(device, dict):
+                continue
+            device_id = str(device.get("DeviceId", ""))
+            releases = device.get("Releases", [])
+            if not isinstance(releases, list) or not releases:
+                continue
+            for release in releases[:2]:
+                if not isinstance(release, dict):
+                    continue
+                version = str(release.get("Version", "")).strip()
+                if device_id and version and len(device_id) < 256 and len(version) < 120:
+                    found.append((device_id, version))
+        if not found:
+            return None
+        found.sort()
+        return offer("firmware", "fwupd", repr(found),
+                     "FIRMWARE // UPDATE NEEDS REVIEW",
+                     str(len(found)) + " firmware release(s) reported by fwupd. "
+                     "Review the devices, warnings and restart requirements in "
+                     "GNOME Software before making any firmware changes.",
+                     "review")
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
 def current_offer(kind: str) -> dict[str, str] | None:
     if kind == "silverblue":
         return silverblue()
-    if kind in ALLOWED:
+    if kind.startswith("flatpak-"):
+        return flatpak_offer(kind)
+    if kind == "firmware":
+        return firmware()
+    if kind in ("oh-my-zsh", "powerlevel10k"):
         return managed_checkout(kind)
     return None
 
@@ -179,7 +272,8 @@ def scan() -> None:
     until = saved_deferrals()
     now = time.time()
     rows = []
-    for kind in ("silverblue", "oh-my-zsh", "powerlevel10k"):
+    for kind in ("silverblue", "flatpak-user", "flatpak-system",
+                 "firmware", "oh-my-zsh", "powerlevel10k"):
         item = current_offer(kind)
         if item and until.get(kind + ":" + item["token"], 0) <= now:
             rows.append(item)
@@ -217,6 +311,48 @@ def review(kind: str, token: str) -> int:
         print("Review with: rpm-ostree status")
         print("Reboot separately when ready. This tool will never reboot.")
         return 0
+    if kind == "firmware":
+        print("Firmware installation is managed only through GNOME Software/fwupd.")
+        print("No firmware updater command is available through this script.")
+        return 0
+    if kind.startswith("flatpak-"):
+        rows = flatpak_targets(kind)
+        if not rows:
+            print("UPDATE REFUSED // Flatpak target list changed.")
+            return 2
+        scope = "--user" if kind == "flatpak-user" else "--system"
+        print("\nFlatpak scope: " + scope)
+        for ref, remote, commit in rows:
+            print(" ", ref, "//", remote, "//", commit[:12])
+        print("\nDOWNLOAD caches pinned versions without installing.")
+        print("APPLY downloads and deploys each pinned version.")
+        print("Existing GNOME Software auto-update preferences are unchanged.")
+        try:
+            answer = input("\nType DOWNLOAD, APPLY, or anything else to cancel: ")
+        except (EOFError, KeyboardInterrupt):
+            print("\nCANCELLED // No Flatpak command executed.")
+            return 0
+        if answer not in ("DOWNLOAD", "APPLY"):
+            print("CANCELLED // No Flatpak command executed.")
+            return 0
+        fresh = current_offer(kind)
+        if not fresh or fresh["token"] != token or flatpak_targets(kind) != rows:
+            print("UPDATE REFUSED // Flatpak targets changed during review.")
+            return 2
+        for ref, remote, commit in rows:
+            argv = ["flatpak", "update", scope,
+                    "--assumeyes", "--noninteractive"]
+            if answer == "DOWNLOAD":
+                argv.append("--no-deploy")
+            argv.extend(["--commit=" + commit, ref])
+            print("\nRUNNING //", " ".join(argv))
+            result = subprocess.run(argv, check=False)
+            if result.returncode != 0:
+                print("UPDATE INCOMPLETE // Stop at first failure.")
+                return result.returncode
+        print("\nCOMPLETE //", "Downloads cached." if answer == "DOWNLOAD"
+              else "Pinned Flatpak updates applied.")
+        return 0
     if kind in ("oh-my-zsh", "powerlevel10k") and not fresh_checkout_is_clean(kind):
         return 2
     if kind == "silverblue":
@@ -229,7 +365,7 @@ def review(kind: str, token: str) -> int:
             return 2
         command = ["zsh", str(updater)]
         print("Runs the official Oh My Zsh update script.")
-    else:
+    elif kind == "powerlevel10k":
         folder = next((p for p in [home() / ".oh-my-zsh/custom/themes/powerlevel10k",
                                   home() / "powerlevel10k"] if (p / ".git").exists()), None)
         if not folder:

@@ -44,6 +44,35 @@ for glow in ("hoverDockGlowColor", "pressedDockGlowColor", "openGlowColor",
 assert "PanelWindow {" in window
 assert "WindowPanelFrame {" in window
 assert "ModeButton {" in window
+
+# ApolloHub chassis: 1000x700 visible body flush with top of screen,
+# centered horizontally, square frame, magenta title and cyan inner outline.
+assert "readonly property int frameWidth: 1000" in window
+assert "readonly property int frameHeight: 700" in window
+assert "readonly property int frameInset: 8" in window
+assert "implicitHeight: frameHeight + glowGutter" in window
+assert "        top: 0" in window
+assert "anchors.topMargin: 0" in window
+assert "((hub.screen ? hub.screen.width : 2560) - hub.implicitWidth) / 2" in window
+assert "id: hubInnerFrame" in window
+assert "anchors.margins: hub.frameInset" in window
+assert "border.color: Colors.cyan" in window
+assert "glowColor: Colors.magenta" in window
+assert "borderColor: Colors.magenta" in window
+assert "radius: 0" in window
+assert 'color: Colors.magenta\n                    text: "APOLLO // HUB"' in window
+assert "id: headerDivider" in window
+assert "height: 2\n                color: Colors.cyan" in window
+
+# Scroll content subtracts both header divider and fixed footer, including
+# view/edit visibility-dependent Column spacings; the footer cannot be pushed
+# below the bottom border by a full-height Flickable.
+assert "id: statusFooter" in window
+assert "- statusFooter.height" in window
+assert "- headerDivider.height" in window
+assert "(hub.editMode ? 6 : 5) * hubColumn.spacing" in window
+assert "verticalAlignment: Text.AlignVCenter" in window
+assert "    radius: 0\n    inset: 10" in tile
 assert window.count("ActionButton {") >= 5
 assert "SectionFrame {" in tile
 assert "MouseArea {" not in window + tile + dock

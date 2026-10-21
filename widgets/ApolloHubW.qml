@@ -14,6 +14,18 @@ PanelWindow {
 
     property bool menuOpen: false
     property bool editMode: false
+    // Only the currently keyboard-owned window may consume navigation keys.
+    // The standalone preview uses keyboardActive=true; the main bar supplies
+    // relationship-focus guards when it mounts this window.
+    property bool keyboardActive: true
+    property bool relationshipFocusModeActive: false
+    property bool relationshipFocused: false
+    signal keyboardOwnershipRequested()
+    property int selectedTileIndex: 0
+    readonly property bool standardKeysAvailable:
+        menuOpen && keyboardActive
+        && (!relationshipFocusModeActive || relationshipFocused)
+        && !modeNameInput.activeFocus
     property bool writingLayout: false
     property var layout: Layout.defaultLayout()
     property int selectedModeIndex: 0
@@ -40,6 +52,7 @@ PanelWindow {
         layout = Layout.parse(ApolloHubStore.layoutJson);
         selectedModeIndex = Math.min(selectedModeIndex, layout.modes.length - 1);
         selectedSubModeIndex = 0;
+        selectedTileIndex = 0;
     }
 
     function save(next) {
@@ -50,8 +63,53 @@ PanelWindow {
     }
 
     function chooseMode(index) {
+        if (index < 0 || index >= layout.modes.length)
+            return;
         selectedModeIndex = index;
         selectedSubModeIndex = 0;
+        selectedTileIndex = 0;
+    }
+
+    function cycleMainMode(direction) {
+        const count = layout.modes.length;
+        if (count < 2)
+            return;
+        const step = Number(direction) < 0 ? -1 : 1;
+        chooseMode((selectedModeIndex + step + count) % count);
+    }
+
+    function selectSubMode(index) {
+        if (!activeMode || index < 0 || index >= activeMode.subModes.length)
+            return;
+        selectedSubModeIndex = index;
+        selectedTileIndex = 0;
+    }
+
+    function cycleTopSubMode(direction) {
+        if (!activeMode || activeMode.subModes.length < 2)
+            return;
+        const count = activeMode.subModes.length;
+        const step = Number(direction) < 0 ? -1 : 1;
+        selectSubMode((selectedSubModeIndex + step + count) % count);
+    }
+
+    // The initial tile grid is two columns wide. Keep navigation bounded;
+    // selection previews a card, it does not activate its action.
+    function moveNavigationCursor(delta) {
+        if (activeTiles.length < 1)
+            return;
+        selectedTileIndex = Math.max(0, Math.min(
+            activeTiles.length - 1, selectedTileIndex + delta));
+    }
+
+    function activateNavigationCursor() {
+        // View-mode modules without real action adapters are deliberately inert.
+        // EDIT + Enter performs only the same safe module-cycle as SWAP.
+        if (!editMode || selectedTileIndex < 0
+                || selectedTileIndex >= activeTiles.length)
+            return;
+        save(Layout.cycleTile(layout, selectedModeIndex,
+                              selectedSubModeIndex, selectedTileIndex));
     }
 
     function shiftTile(fromIndex, toIndex) {
@@ -60,6 +118,20 @@ PanelWindow {
     }
 
     Component.onCompleted: restore()
+    onMenuOpenChanged: {
+        if (menuOpen && keyboardActive)
+            Qt.callLater(function() {
+                if (hub.standardKeysAvailable)
+                    hubKeyboardAnchor.forceActiveFocus();
+            });
+    }
+    onKeyboardActiveChanged: {
+        if (menuOpen && keyboardActive)
+            Qt.callLater(function() {
+                if (hub.standardKeysAvailable)
+                    hubKeyboardAnchor.forceActiveFocus();
+            });
+    }
 
     Connections {
         target: ApolloHubStore
@@ -85,8 +157,9 @@ PanelWindow {
     exclusiveZone: 0
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus:
-        hub.menuOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
-    focusable: hub.menuOpen
+        hub.menuOpen && hub.keyboardActive
+        ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    focusable: hub.menuOpen && hub.keyboardActive
     color: "transparent"
     surfaceFormat.opaque: false
 
@@ -100,10 +173,118 @@ PanelWindow {
         height: hub.menuOpen ? hub.frameHeight : 0
     }
 
+    // Qt may consume Tab before a WindowShortcut; intercept locally when
+    // the navigation anchor owns Qt focus, and keep matching guarded shortcuts
+    // for all the other keyboard focus paths. Never intercept text editing.
+    Item {
+        id: hubKeyboardAnchor
+        anchors.fill: parent
+        z: -1000
+        focus: hub.standardKeysAvailable
+        enabled: hub.standardKeysAvailable
+
+        Keys.priority: Keys.BeforeItem
+        Keys.onShortcutOverride: function(event) {
+            if (!hub.standardKeysAvailable)
+                return;
+            if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab
+                    || event.key === Qt.Key_Escape) {
+                event.accepted = true;
+            }
+        }
+        Keys.onPressed: function(event) {
+            if (!hub.standardKeysAvailable)
+                return;
+            if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
+                const reverse = event.key === Qt.Key_Backtab
+                                || (event.modifiers & Qt.ShiftModifier) !== 0;
+                hub.cycleMainMode(reverse ? -1 : 1);
+            } else if ((event.modifiers & Qt.ShiftModifier) !== 0
+                       && (event.key === Qt.Key_Left || event.key === Qt.Key_Right)) {
+                hub.cycleTopSubMode(event.key === Qt.Key_Left ? -1 : 1);
+            } else if (event.key === Qt.Key_Left) {
+                hub.moveNavigationCursor(-1);
+            } else if (event.key === Qt.Key_Right) {
+                hub.moveNavigationCursor(1);
+            } else if (event.key === Qt.Key_Up) {
+                hub.moveNavigationCursor(-2);
+            } else if (event.key === Qt.Key_Down) {
+                hub.moveNavigationCursor(2);
+            } else if (event.key === Qt.Key_Enter || event.key === Qt.Key_Return) {
+                hub.activateNavigationCursor();
+            } else if (event.key === Qt.Key_Escape) {
+                hub.menuOpen = false;
+            } else {
+                return;
+            }
+            event.accepted = true;
+        }
+    }
+
+    Shortcut {
+        sequence: "Tab"
+        context: Qt.WindowShortcut
+        enabled: hub.standardKeysAvailable
+        onActivated: hub.cycleMainMode(1)
+    }
+    Shortcut {
+        sequence: "Shift+Tab"
+        context: Qt.WindowShortcut
+        enabled: hub.standardKeysAvailable
+        onActivated: hub.cycleMainMode(-1)
+    }
+    Shortcut {
+        sequence: "Shift+Left"
+        context: Qt.WindowShortcut
+        enabled: hub.standardKeysAvailable
+        onActivated: hub.cycleTopSubMode(-1)
+    }
+    Shortcut {
+        sequence: "Shift+Right"
+        context: Qt.WindowShortcut
+        enabled: hub.standardKeysAvailable
+        onActivated: hub.cycleTopSubMode(1)
+    }
+    Shortcut {
+        sequence: "Left"
+        context: Qt.WindowShortcut
+        enabled: hub.standardKeysAvailable
+        onActivated: hub.moveNavigationCursor(-1)
+    }
+    Shortcut {
+        sequence: "Right"
+        context: Qt.WindowShortcut
+        enabled: hub.standardKeysAvailable
+        onActivated: hub.moveNavigationCursor(1)
+    }
+    Shortcut {
+        sequence: "Up"
+        context: Qt.WindowShortcut
+        enabled: hub.standardKeysAvailable
+        onActivated: hub.moveNavigationCursor(-2)
+    }
+    Shortcut {
+        sequence: "Down"
+        context: Qt.WindowShortcut
+        enabled: hub.standardKeysAvailable
+        onActivated: hub.moveNavigationCursor(2)
+    }
+    Shortcut {
+        sequence: "Enter"
+        context: Qt.WindowShortcut
+        enabled: hub.standardKeysAvailable
+        onActivated: hub.activateNavigationCursor()
+    }
+    Shortcut {
+        sequence: "Return"
+        context: Qt.WindowShortcut
+        enabled: hub.standardKeysAvailable
+        onActivated: hub.activateNavigationCursor()
+    }
     Shortcut {
         sequence: "Esc"
         context: Qt.WindowShortcut
-        enabled: hub.menuOpen
+        enabled: hub.standardKeysAvailable
         onActivated: hub.menuOpen = false
     }
 
@@ -118,6 +299,14 @@ PanelWindow {
         borderColor: Colors.cyan
         borderWidth: 1
         radius: 5
+
+        HoverHandler {
+            enabled: hub.menuOpen
+            onHoveredChanged: {
+                if (hovered)
+                    hub.keyboardOwnershipRequested();
+            }
+        }
 
         Column {
             id: hubColumn
@@ -171,6 +360,9 @@ PanelWindow {
                                / hub.layout.modes.length
                         height: modeStrip.height
                         selected: hub.selectedModeIndex === index
+                        keyboardActive: hub.standardKeysAvailable
+                        keyboardSelected: hub.selectedModeIndex === index
+                        onPointerMoved: hub.chooseMode(index)
                         iconText: hub.layout.modes[index].icon
                         labelText: hub.layout.modes[index].name
                         iconFontSize: 18
@@ -193,7 +385,10 @@ PanelWindow {
                         height: subStrip.height
                         label: hub.activeMode.subModes[index].name
                         selected: hub.selectedSubModeIndex === index
-                        onLeftClicked: hub.selectedSubModeIndex = index
+                        keyboardSelected: hub.standardKeysAvailable
+                                          && hub.selectedSubModeIndex === index
+                        onPointerMoved: hub.selectSubMode(index)
+                        onLeftClicked: hub.selectSubMode(index)
                     }
                 }
             }
@@ -248,13 +443,20 @@ PanelWindow {
                     inset: 5
 
                     TextInput {
+                        id: modeNameInput
                         anchors.fill: parent
                         color: Colors.white
                         font.pixelSize: 14
                         selectByMouse: true
                         text: hub.activeMode ? hub.activeMode.name : ""
-                        onEditingFinished: hub.save(
-                            Layout.renameMode(hub.layout, hub.selectedModeIndex, text))
+                        onEditingFinished: {
+                            hub.save(Layout.renameMode(
+                                hub.layout, hub.selectedModeIndex, text));
+                            if (hub.menuOpen && hub.keyboardActive)
+                                Qt.callLater(function() {
+                                    hubKeyboardAnchor.forceActiveFocus();
+                                });
+                        }
                     }
                 }
             }
@@ -284,6 +486,9 @@ PanelWindow {
                             tileIndex: index
                             tileCount: hub.activeTiles.length
                             editing: hub.editMode
+                            keyboardSelected: hub.standardKeysAvailable
+                                              && hub.selectedTileIndex === index
+                            onPointerEntered: hub.selectedTileIndex = index
                             width: tileConfig.size === "wide"
                                    ? tileFlow.width
                                    : (tileFlow.width - tileFlow.spacing) / 2

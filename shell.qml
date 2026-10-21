@@ -156,6 +156,7 @@ PanelWindow {
         appControl: appControlWindow
         hospital: hospitalWindow
         git: gitWindow
+        finance: financeWindow
         cpu: cpuPlusWindow
         weather: weatherStationWindow
         notifications: notificationsHubWindow
@@ -177,6 +178,8 @@ PanelWindow {
                 shellRoot.controlKeyboardOwner = "hospital";
             else if (previous === "git" && gitWindow.menuOpen)
                 shellRoot.controlKeyboardOwner = "git";
+            else if (previous === "finance" && financeWindow.menuOpen)
+                shellRoot.controlKeyboardOwner = "finance";
             else if (previous === "notifications" && notificationsHubWindow.menuOpen)
                 shellRoot.controlKeyboardOwner = "notifications";
         }
@@ -433,6 +436,22 @@ PanelWindow {
             FinanceW {
                 id: financeWindow
                 screen: shellRoot.screen
+                keyboardActive: relationshipFocus.active
+                                ? relationshipFocus.owner === "finance"
+                                : shellRoot.controlKeyboardOwner === "finance"
+                keyboardLock: keyboardOwnership.boostOwner === "finance"
+                relationshipFocusModeActive: relationshipFocus.active
+                relationshipFocused: relationshipFocus.owner === "finance"
+
+                onKeyboardOwnershipRequested:
+                    shellRoot.requestControlKeyboard("finance", "pointer")
+
+                onMenuOpenChanged: {
+                    if (menuOpen)
+                        shellRoot.requestControlKeyboard("finance", "open");
+                    else
+                        keyboardOwnership.release("finance");
+                }
 
                 // Center under Finance horizontally; align its top with
                 // Hospital/Git's top chassis line vertically.

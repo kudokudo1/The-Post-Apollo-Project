@@ -94,8 +94,18 @@ for pre, core, post, full in (
 ):
     assert pre + core + post == full
     assert f'prefix: "{pre}", core: "{core}", suffix: "{post}"' in menu
-for size in (34, 31, 15, 12):
+for size in (31, 15, 12):
     assert f"font.pixelSize: {size}" in menu
+assert "font.pixelSize: modelData.coreSize || 34" in menu
+for ident, size in (("radar", 30), ("strategies", 28), ("safety", 28)):
+    row = next(line for line in menu.splitlines()
+               if f'id: "{ident}", name:' in line)
+    assert f'coreSize: {size}' in row, (ident, row)
+for ident in ("market", "agentic"):
+    row = next(line for line in menu.splitlines()
+               if f'id: "{ident}", name:' in line)
+    assert "coreSize:" not in row, (ident, row)
+assert menu.count("coreSize:") == 3
 assert "scale: Math.min(1, mainIcon.width" in menu
 assert "scale: Math.min(1, subIcon.width" in menu
 

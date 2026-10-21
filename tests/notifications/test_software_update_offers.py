@@ -32,6 +32,14 @@ spec.loader.exec_module(mod)
 assert mod.ALLOWED == {"silverblue", "oh-my-zsh", "powerlevel10k",
                        "flatpak-user", "flatpak-system", "firmware"}
 assert mod.DEFER_SECONDS == 24 * 60 * 60
+# Closing Kitty detaches the updater. A second review must not launch the
+# same maintenance operation while the first detached process is still busy.
+with mod.update_transaction_lock("flatpak-system") as primary:
+    assert primary
+    with mod.update_transaction_lock("flatpak-system") as duplicate:
+        assert duplicate is False
+with mod.update_transaction_lock("flatpak-system") as released:
+    assert released
 assert mod.fingerprint("silverblue", "old", "new") != mod.fingerprint("silverblue", "old", "newer")
 
 # No auto-accept or arbitrary remote-code execution in Quickshell.

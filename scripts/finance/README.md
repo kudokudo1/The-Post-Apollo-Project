@@ -84,3 +84,16 @@ Do not paste either value into a chat or repository. The server at
 the Quickshell process memory, cleared on failed reads, and not written
 to disk by the UI. It shows the current month from Actual, not a sample
 or a guarantee of live continuous updates.
+
+## FinanceW D4: month navigation and category spending
+
+Budget → Budget now has previous/next month controls. Selecting a month
+invalidates the previous in-memory snapshot; use **REFRESH** to read that
+specific month from Actual. No automatic background refresh or mutation
+occurs, and a missing or failed response never shows the last month's
+numbers as the selected month's numbers.
+
+Category rows show assigned, net spent (the signed value returned by Actual),
+available, an overspent label when the available balance is negative, and a
+bounded spending progress indicator for categories with positive assignments.
+The bar is only a visual indicator, not a spending-limit enforcement rule.

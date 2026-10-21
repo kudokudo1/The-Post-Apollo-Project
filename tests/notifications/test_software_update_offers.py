@@ -25,7 +25,8 @@ WORKFLOW = (ROOT / ".github/workflows/notification-policy-contracts.yml").read_t
 spec = importlib.util.spec_from_file_location("post_apollo_update_offers", BACKEND)
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
-assert mod.ALLOWED == {"silverblue", "oh-my-zsh", "powerlevel10k"}
+assert mod.ALLOWED == {"silverblue", "oh-my-zsh", "powerlevel10k",
+                       "flatpak-user", "flatpak-system", "firmware"}
 assert mod.DEFER_SECONDS == 24 * 60 * 60
 assert mod.fingerprint("silverblue", "old", "new") != mod.fingerprint("silverblue", "old", "newer")
 
@@ -52,7 +53,9 @@ assert 'updateKind": entry.sourceId === "apollo-update-monitor"' in HUB
 assert 'updateToken": entry.sourceId === "apollo-update-monitor"' in HUB
 assert "root.updatesController.isCurrent(updateKind, updateToken)" in HUB
 assert '(notificationEntry.isUpdateOffer ? 32 : 0)' in HUB
-assert 'label: "REVIEW"' in HUB
+assert 'label: notificationEntry.updateKind === "firmware"' in HUB
+assert '? "OPEN UPDATES"' in HUB
+assert '? "DOWNLOAD" : "REVIEW"' in HUB
 assert 'label: "NOT NOW"' in HUB
 assert "root.updatesController.review(" in HUB
 assert "root.updatesController.defer(" in HUB

@@ -35,7 +35,8 @@ for state in ("normal", "hover", "pressed", "open"):
 for state in ("normal", "hover", "pressed"):
     assert f"{state}ContentGlowColor: Colors.omnitrix" in FINANCE
     assert f"{state}DockGlowColor: Colors.omnitrix" in FINANCE
-assert "openGlowColor: Colors.omnitrix" in FINANCE
+assert "openFillColor: Colors.yellow" in FINANCE
+assert "openGlowColor: Colors.magenta" in FINANCE
 
 # No backend, duplicate click area, or duplicated glow machinery.
 for forbidden in (
@@ -53,6 +54,7 @@ assert "implicitHeight: frameHeight + glowGutter * 2" in MENU
 assert "property real dockCenterX: 0" in MENU
 assert "property real dockBottomY: 0" in MENU
 assert "root.dockCenterX - root.implicitWidth / 2" in MENU
+assert "readonly property int buttonGap: 0" in MENU
 assert "root.dockBottomY + root.buttonGap" in MENU
 assert "visible: true" in MENU  # do not remap layer-shell for toggles
 assert "visible: root.menuOpen" in MENU  # only the inner chassis hides
@@ -62,6 +64,7 @@ assert "WlrLayershell.keyboardFocus: WlrKeyboardFocus.None" in MENU
 assert "focusable: false" in MENU
 assert "WindowPanelFrame {" in MENU
 assert "glowColor: Colors.omnitrix" in MENU
+assert "radius: 0" in MENU
 assert "borderColor: Colors.omnitrix" in MENU
 assert "menuOpen = !menuOpen;" in MENU
 

@@ -27,10 +27,15 @@ SafeDropShadow {
     property bool modeSelected: false
     property bool modeHovered: false
 
+    // mapToItem() alone does not track changes to an anchored source's x/y.
+    // For source/effect siblings use reactive local coordinates instead.
+    // Keep the original cross-parent mapping for existing consumers.
+    readonly property bool sourceSharesGlowHost:
+        sourceAttached && parent !== null && safeSource.parent === parent
     readonly property point sourceOrigin:
-        sourceAttached && parent !== null
-        ? safeSource.mapToItem(parent, 0, 0)
-        : Qt.point(0, 0)
+        !sourceAttached || parent === null ? Qt.point(0, 0)
+        : sourceSharesGlowHost ? Qt.point(safeSource.x, safeSource.y)
+        : safeSource.mapToItem(parent, 0, 0)
 
     x: sourceOrigin.x
     y: sourceOrigin.y

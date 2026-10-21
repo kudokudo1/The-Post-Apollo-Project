@@ -141,6 +141,14 @@ with tempfile.TemporaryDirectory() as td:
         assert mod.review("silverblue", offered["token"]) == 0
         fake_update.assert_not_called()
 
+    # A changed offer while the user reads the terminal must not be applied.
+    changed = dict(offered, token="f"*24)
+    with patch.object(mod, "current_offer", side_effect=[offered, changed]), \
+         patch("builtins.input", return_value="APPLY"), \
+         patch.object(mod.subprocess, "run") as fake_update:
+        assert mod.review("silverblue", offered["token"]) == 2
+        fake_update.assert_not_called()
+
     # Only a separate terminal, exact fingerprint and typed APPLY can stage.
     with patch.object(mod, "current_offer", return_value=offered), \
          patch("builtins.input", return_value="APPLY"), \

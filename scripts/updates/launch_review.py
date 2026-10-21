@@ -57,7 +57,7 @@ def layout(kind: str, token: str, wasm: Path) -> str:
     plugin = "file:" + str(wasm.resolve())
     return """layout {
     pane split_direction="horizontal" {
-        pane size=1 borderless=true {
+        pane size=2 borderless=true {
             plugin location=%s
         }
         pane focus=true borderless=true command="/usr/bin/python3" {

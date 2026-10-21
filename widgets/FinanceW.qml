@@ -27,8 +27,8 @@ PanelWindow {
     readonly property string feedStatus:
         !hasBudgetFeed ? "NO FEED"
         : !menuOpen ? "IDLE"
-        : financeBudget.state === "failed" ? "ERROR"
         : financeBudget.healthStatus === "offline" ? "OFFLINE"
+        : financeBudget.state === "failed" ? "ERROR"
         : financeBudget.loading ? "READING"
         : financeBudget.state === "ready"
           && financeBudget.snapshot

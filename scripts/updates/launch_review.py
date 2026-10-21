@@ -27,6 +27,17 @@ def plugin_file() -> Path:
     return base / "post-apollo/zellij/post_apollo_update_header.wasm"
 
 
+def zellij_executable() -> str | None:
+    """Find Zellij without altering Quickshell's PATH or global shell settings."""
+    executable = shutil.which("zellij")
+    if executable:
+        return executable
+    local = Path.home() / ".local/bin/zellij"
+    if local.is_file() and os.access(local, os.X_OK):
+        return str(local)
+    return None
+
+
 def update_script() -> Path:
     return Path(__file__).resolve().parent / "update_offers.py"
 
@@ -67,11 +78,12 @@ def kitty_argv(kind: str, token: str) -> tuple[list[str], bool]:
     head = ["kitty", "--class", WINDOW_APP_ID,
             "--title", "POST-APOLLO // UPDATE REVIEW", "-e"]
     wasm = plugin_file()
-    if shutil.which("zellij") and wasm.is_file() and wasm.stat().st_size > 0:
+    zellij = zellij_executable()
+    if zellij and wasm.is_file() and wasm.stat().st_size > 0:
         # Separate session name: never attach to the user's ordinary Zellij
         # session or replay an old operation in a reused named session.
         session = "apollo-updates-" + kind + "-" + token[:8] + "-" + str(os.getpid())
-        return head + ["zellij", "--session", session,
+        return head + [zellij, "--session-name", session,
                        "--layout-string", layout(kind, token, wasm)], True
     # Non-destructive fallback. This still gets the Sway floating placement,
     # but does not pretend that a clickable Zellij X is available.

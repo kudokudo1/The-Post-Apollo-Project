@@ -28,7 +28,7 @@ assert 'NotoText {' in dock
 assert 'textFormat: Text.StyledText' in dock
 assert '⌯⌲ <font color=' in dock
 assert '>🗓</font> ⋆˙⟡' in dock
-assert "Colors.orange" in dock
+assert """text: " ⌯⌲ <font color='" + Colors.magenta + "'>🗓</font> ⋆˙⟡ " """ .strip() in dock
 assert "color: Colors.white" in dock
 assert "contentGlowSource: hubMark" in dock
 # Idle rear/wide chassis halo is orange; glyph sampling and active dock

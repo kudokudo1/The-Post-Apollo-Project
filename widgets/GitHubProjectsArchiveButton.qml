@@ -17,6 +17,9 @@ Item {
         available: root.enabledAction
         selected: root.armed
         label: root.armed ? "CONFIRM" : "ARCHIVE"
+        // Retain orange/white archive identity while the changing text
+        // and its sampled glow stay in the same local coordinate space.
+        trackLabelGlowLocally: true
         labelPixelSize: 10
         labelMinimumPixelSize: 8
         contentPadding: 2

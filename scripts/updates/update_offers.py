@@ -156,9 +156,9 @@ def flatpak_targets(kind: str) -> list[tuple[str, str, str]] | None:
         return None
     found = []
     for line in lines:
-        if line.lower().replace(" ", "") == "reforigin":
-            continue
         fields = line.split()
+        if [part.lower() for part in fields] == ["ref", "origin"]:
+            continue
         if len(fields) != 2 or not FLATPAK_REF.fullmatch(fields[0]) or not FLATPAK_REMOTE.fullmatch(fields[1]):
             return None
         ref, remote = fields

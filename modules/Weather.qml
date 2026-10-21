@@ -8,6 +8,8 @@ DockButton {
 
     property var weatherStationWindow: null
     property var weatherService: null
+    // Right-click toggles the displayed unit while this Quickshell session runs.
+    property bool useCelsius: false
     property real observationClockMs: Date.now()
 
     readonly property bool menuOpen:
@@ -53,14 +55,12 @@ DockButton {
         }
     }
 
-    readonly property string temperatureLabel: {
-        if (!weatherFresh)
-            return "--°";
-        const value = Number(weatherService.tempF);
-        if (!isFinite(value) || value < -150 || value > 150)
-            return "--°";
-        return Math.round(value) + "°";
-    }
+    readonly property string temperatureLabel:
+        WeatherDockPolicy.formatTemperature(
+            weatherService ? weatherService.tempF : "",
+            weatherFresh,
+            useCelsius
+        )
 
     implicitHeight: 50
     // Dynamic text must remain inside the dock footprint at every temperature.
@@ -95,20 +95,12 @@ DockButton {
         onTriggered: weatherDock.observationClockMs = Date.now()
     }
 
-    // Preserve the original thermostat mark; keep condition and temperature
-    // as independent, vertically centered elements with their own sizes.
+    // Condition -> measured temperature + units -> original thermometer.
+    // Keep all three glyphs independently sized within the 50px dock.
     Row {
         id: weatherContent
         anchors.centerIn: parent
         spacing: 6
-
-        Text {
-            id: weatherThermometer
-            anchors.verticalCenter: parent.verticalCenter
-            text: "🌡"
-            font.pixelSize: 24
-            color: Colors.orange
-        }
 
         Text {
             id: weatherCondition
@@ -125,6 +117,18 @@ DockButton {
             font.pixelSize: 20
             color: weatherDock.foregroundColor
         }
+
+        Text {
+            id: weatherThermometer
+            anchors.verticalCenter: parent.verticalCenter
+            text: "🌡"
+            font.pixelSize: 24
+            color: Colors.orange
+        }
+    }
+
+    onRightClicked: {
+        useCelsius = !useCelsius;
     }
 
     onLeftClicked: {

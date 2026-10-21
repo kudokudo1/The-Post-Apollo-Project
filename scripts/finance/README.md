@@ -97,3 +97,17 @@ Category rows show assigned, net spent (the signed value returned by Actual),
 available, an overspent label when the available balance is negative, and a
 bounded spending progress indicator for categories with positive assignments.
 The bar is only a visual indicator, not a spending-limit enforcement rule.
+
+## FinanceW D5: automatic read on opening and changing months
+
+Opening FinanceW now triggers a read-only refresh of the selected
+month without requiring REFRESH. Clicking either month arrow updates the
+month label, hides stale figures, and starts a refresh automatically.
+REFRESH remains available for retrying or checking recent changes.
+
+If an Actual read is already active, additional month selections do not
+launch concurrent API downloads: the latest selected month is queued and
+read once the current subprocess exits. Navigation stays responsive even
+when Actual is slow. No automatic polling occurs while the window stays
+open, and nothing reads at shell startup when FinanceW remains closed.
+Failed reads show an error and do not display old budget data.

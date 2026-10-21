@@ -25,7 +25,8 @@ function cents(value, label) {
   return value;
 }
 
-export function normalizeSnapshot({month, budget, accounts, balances}) {
+export function normalizeSnapshot({month, budget, accounts, balances,
+                                   transactionSets = new Map(), payees = []}) {
   if (!validMonth(month)) throw new Error("invalid-month");
   if (!budget || !Array.isArray(budget.categoryGroups)
       || !Array.isArray(accounts) || !(balances instanceof Map)) {
@@ -63,6 +64,43 @@ export function normalizeSnapshot({month, budget, accounts, balances}) {
         balanceCents: cents(balances.get(account.id), "account-balance")
       };
     });
+  if (!(transactionSets instanceof Map) || !Array.isArray(payees))
+    throw new Error("unexpected-transactions-shape");
+  const activeAccounts = accounts.filter(account => !account.offbudget && !account.closed);
+  const payeeNames = new Map();
+  for (const payee of payees) {
+    if (!payee || typeof payee.id !== "string"
+               || typeof payee.name !== "string")
+      throw new Error("unexpected-payee");
+    payeeNames.set(payee.id, payee.name);
+  }
+  const transactionRows = [];
+  for (const account of activeAccounts) {
+    const items = transactionSets.get(account.id) || [];
+    if (!Array.isArray(items))
+      throw new Error("unexpected-transactions");
+    for (const item of items) {
+      if (!item || typeof item.date !== "string"
+                || !/^\d{4}-\d{2}-\d{2}$/.test(item.date)
+                || !item.date.startsWith(month + "-")
+                || (item.account !== undefined && item.account !== account.id))
+        throw new Error("unexpected-transaction");
+      const payeeKey = item.payee_id || item.payee || "";
+      const payeeName = payeeNames.get(payeeKey)
+            || (typeof item.imported_payee === "string" ? item.imported_payee : "")
+            || (item.transfer_id ? "TRANSFER" : "TRANSACTION");
+      transactionRows.push({
+        date: item.date,
+        account: account.name,
+        description: payeeName,
+        amountCents: cents(item.amount, "transaction-amount"),
+        cleared: item.cleared === true
+      });
+    }
+  }
+  // The page previews at most 24 latest entries. Do not sum split entries:
+  // API returns parent transaction amounts and nested split details.
+  transactionRows.sort((a, b) => b.date.localeCompare(a.date));
   return {
     schemaVersion: 1,
     source: "actual-budget",
@@ -70,7 +108,9 @@ export function normalizeSnapshot({month, budget, accounts, balances}) {
     month,
     toBudgetCents: cents(budget.toBudget, "toBudget"),
     accounts: accountRows,
-    categories: categoryRows
+    categories: categoryRows,
+    transactionsCount: transactionRows.length,
+    transactions: transactionRows.slice(0, 24)
   };
 }
 
@@ -83,10 +123,15 @@ export async function takeReadOnlySnapshot(api, month) {
   ]);
   if (!Array.isArray(accounts)) throw new Error("unexpected-accounts");
   const balances = new Map();
+  const transactionSets = new Map();
+  const from = month + "-01";
+  const until = month + "-31"; // Inclusive end, per Actual API documentation.
+  const payees = await api.getPayees();
   for (const account of accounts) {
     if (!account.offbudget && !account.closed) {
       balances.set(account.id, await api.getAccountBalance(account.id));
+      transactionSets.set(account.id, await api.getTransactions(account.id, from, until));
     }
   }
-  return normalizeSnapshot({month, budget, accounts, balances});
+  return normalizeSnapshot({month, budget, accounts, balances, transactionSets, payees});
 }

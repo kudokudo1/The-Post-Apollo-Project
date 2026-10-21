@@ -119,6 +119,18 @@ Scope {
                 || !Number.isSafeInteger(payload.toBudgetCents)
                 || !Array.isArray(payload.accounts)
                 || !Array.isArray(payload.categories)
+                || !Number.isSafeInteger(payload.transactionsCount)
+                || payload.transactionsCount < 0
+                || !Array.isArray(payload.transactions)
+                || payload.transactions.length > 24
+                || payload.transactions.length > payload.transactionsCount
+                || !payload.transactions.every(function(t) {
+                    return t && typeof t.date === "string"
+                        && t.date.startsWith(payload.month + "-")
+                        && typeof t.description === "string"
+                        && typeof t.account === "string"
+                        && Number.isSafeInteger(t.amountCents);
+                })
                 || !payload.accounts.every(function(a) {
                     return a && typeof a.name === "string"
                         && Number.isSafeInteger(a.balanceCents);

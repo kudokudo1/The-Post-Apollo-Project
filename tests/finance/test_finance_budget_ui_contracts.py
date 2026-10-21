@@ -8,12 +8,30 @@ cli = (root / "scripts/finance/read_budget.mjs").read_text()
 assert 'FinanceServices.FinanceBudgetReadService {' in ui
 assert 'monitoring: root.menuOpen' in ui
 assert 'id: financeFeedIndicator' in ui
+assert 'import QtQuick.Effects' in ui
+assert 'id: financeFeedText' in ui
+assert 'color: root.feedBorderColor' in ui
+assert 'color: root.feedStatusColor' in ui
+assert 'feedStatus === "LIVE" ? Colors.green' in ui
+assert 'feedStatus === "OFFLINE" || feedStatus === "ERROR"' in ui
+assert '|| feedStatus === "NO FEED" ? feedStatusColor : Colors.omnitrix' in ui
+assert 'id: closeButton' in ui
+assert 'softGlowIdleOpacity: 0.48' in ui
+assert 'wideGlowEnabled: true' in ui
+assert 'idleWideGlowColor: Colors.red' in ui
+assert 'root.moneyText(modelData.amountCents)' in ui
+assert 'modelData.date + "  " + modelData.description' in ui
+assert 'modelData.account' in ui
+assert 'LATEST 24 SHOWN // READ ONLY' in ui
+assert 'financeBudget.snapshot.transactionsCount' in ui
+assert 'Number.isSafeInteger(payload.transactionsCount)' in bridge
+assert 'payload.transactions.length > 24' in bridge
 assert 'anchors.right: closeButton.left' in ui
 assert 'anchors.right: financeFeedIndicator.left' in ui
-assert 'border.color: Colors.omnitrix' in ui
+assert 'border.color: root.feedBorderColor' in ui
 assert 'text: root.feedStatus' in ui
 assert 'color: root.feedStatusColor' in ui
-assert 'feedStatus === "LIVE" ? Colors.omnitrix' in ui
+assert 'feedStatus === "LIVE" ? Colors.green' in ui
 assert 'feedStatus === "OFFLINE" || feedStatus === "ERROR" ? Colors.red' in ui
 assert 'financeBudget.state === "ready"' in ui
 assert 'financeBudget.healthStatus === "online" ? "LIVE"' in ui

@@ -133,3 +133,19 @@ remains closed and no budget records are written.
 The Budget page also totals all displayed active, on-budget account balances
 and shows their count. It intentionally excludes off-budget/closed accounts,
 so this is not a net-worth figure.
+
+## FinanceW D7: transaction preview + header glow
+
+The same isolated read-only Actual snapshot now queries `getPayees()`
+and `getTransactions(accountId, start, end)` for the selected month
+across all open, on-budget accounts. The Budget scroll area shows the
+latest 24 transactions, their date, available payee label or fallback,
+account, and signed amount. It also shows the monthly count. There is no
+financial mutation, transaction-import operation, or local file persistence.
+
+The upper-right state indicator now uses green LIVE lettering and a
+matching text glow. Border and border glow remain Omnitrix green for
+normal states (including LIVE, CHECK, READING), switching to the actual
+text state color for OFFLINE, ERROR, or NO FEED. The close × uses the
+shared ActionButton's own stronger red glow. No independent glyph
+shadow sources are added to the close button.

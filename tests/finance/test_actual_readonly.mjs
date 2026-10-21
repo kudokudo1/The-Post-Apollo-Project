@@ -24,7 +24,13 @@ const sample = {
     {id:"closed", name:"Old account", closed:true},
     {id:"other", name:"Off-budget", offbudget:true}
   ],
-  balances: new Map([["checking",25000]])
+  balances: new Map([["checking",25000]]),
+  payees: [{id:"shop",name:"Corner Market"}],
+  transactionSets: new Map([["checking",[
+    {date:"2026-10-18", account:"checking", amount:-1200, payee_id:"shop", cleared:true},
+    {date:"2026-10-19", account:"checking", amount:25000, imported_payee:"Payroll"},
+    {date:"2026-10-17", account:"checking", amount:-220, payee_id:"missing"}
+  ]]])
 };
 
 test("snapshot contains the original fictional $250 / $50 / $200 values", () => {
@@ -39,19 +45,33 @@ test("snapshot contains the original fictional $250 / $50 / $200 values", () => 
     budgetedCents:5000,spentCents:0,availableCents:5000
   }]);
   assert.equal(result.schemaVersion, 1);
+  assert.equal(result.transactionsCount, 3);
+  assert.deepEqual(result.transactions.map(x=>x.date),
+    ["2026-10-19","2026-10-18","2026-10-17"]);
+  assert.equal(result.transactions[1].description, "Corner Market");
+  assert.equal(result.transactions[1].amountCents, -1200);
+  assert.equal(result.transactions[2].description, "TRANSACTION");
 });
 
-test("only three Actual getters called, no financial mutations", async () => {
+test("only read-only Actual getters called, no financial mutations", async () => {
   const methods=[];
   const api = {
     getBudgetMonth: async month => {methods.push(["getBudgetMonth",month]);return sample.budget;},
     getAccounts: async () => {methods.push(["getAccounts"]);return sample.accounts;},
-    getAccountBalance: async id => {methods.push(["getAccountBalance",id]);return 25000;}
+    getAccountBalance: async id => {methods.push(["getAccountBalance",id]);return 25000;},
+    getPayees: async () => {methods.push(["getPayees"]);return sample.payees;},
+    getTransactions: async (id, start, end) => {
+      methods.push(["getTransactions",id,start,end]);
+      return sample.transactionSets.get(id);
+    }
   };
   const r=await takeReadOnlySnapshot(api, "2026-10");
   assert.equal(r.accounts[0].balanceCents,25000);
+  assert.equal(r.transactionsCount, 3);
+  assert.deepEqual(methods.find(x=>x[0]==="getTransactions").slice(1),
+    ["checking", "2026-10-01", "2026-10-31"]);
   assert.deepEqual(methods.map(x=>x[0]).sort(),
-    ["getAccounts","getAccountBalance","getBudgetMonth"].sort());
+    ["getAccounts","getAccountBalance","getBudgetMonth","getPayees","getTransactions"].sort());
 });
 
 test("fail closed rather than inventing a missing balance", () => {
@@ -66,6 +86,32 @@ test("fail closed rather than inventing a missing balance", () => {
       name:"Usual Expenses",categories:[{id:"x",name:"Test",budgeted:500,
         spent:0,balance:5.3}]
     }]}}), /invalid-financial-field/);
+});
+
+test("transaction input validation refuses bad dates, amounts, and accounts", () => {
+  const bad = badRow => ({...sample, transactionSets: new Map([
+    ["checking", [badRow]]
+  ])});
+  const row = sample.transactionSets.get("checking")[0];
+  assert.throws(()=>normalizeSnapshot(bad({...row,amount:1.5})),
+    /invalid-financial-field/);
+  assert.throws(()=>normalizeSnapshot(bad({...row,date:"2026-09-30"})),
+    /unexpected-transaction/);
+  assert.throws(()=>normalizeSnapshot(bad({...row,account:"other"})),
+    /unexpected-transaction/);
+  assert.throws(()=>normalizeSnapshot({...sample,
+    transactionSets:new Map([["checking", "nope"]])}), /unexpected-transactions/);
+});
+
+test("latest transaction preview is bounded to 24 items, never totals splits", () => {
+  const entries = Array.from({length: 40}, (_, index) => ({
+    date: "2026-10-18", account: "checking", amount: -100 - index
+  }));
+  const snapshot = normalizeSnapshot({...sample,
+    transactionSets: new Map([["checking",entries]])});
+  assert.equal(snapshot.transactionsCount, 40);
+  assert.equal(snapshot.transactions.length, 24);
+  assert.ok(snapshot.transactions.every(x => !("subtransactions" in x)));
 });
 
 test("local URLs and months only", () => {

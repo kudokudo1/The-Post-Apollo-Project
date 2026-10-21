@@ -15,7 +15,7 @@ DockButton {
     radius: 7
     open: menuOpen
 
-    // Preserve white ornaments, orange Calendar glyph, and magenta artwork.
+    // Preserve white ornaments, magenta Calendar glyph, and magenta artwork.
     // Only the idle rear/wide dock halo is orange; active states remain magenta.
     normalForegroundColor: Colors.white
     hoverForegroundColor: Colors.white
@@ -39,7 +39,7 @@ DockButton {
         id: hubMark
         anchors.centerIn: parent
         textFormat: Text.StyledText
-        text: " ⌯⌲ <font color='" + Colors.orange + "'>🗓</font> ⋆˙⟡ "
+        text: " ⌯⌲ <font color='" + Colors.magenta + "'>🗓</font> ⋆˙⟡ "
         font.pixelSize: 20
         color: Colors.white
     }

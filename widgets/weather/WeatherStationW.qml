@@ -22,7 +22,6 @@ PanelWindow {
     property bool relationshipFocusModeActive: false
     property bool relationshipFocused: false
 
-    property string activeDomain: "sky"
     property string currentView: "home"
     // A keyboard cursor previews rail controls; Enter activates it.
     property int navigationIndex: 0
@@ -31,79 +30,42 @@ PanelWindow {
         && keyboardActive
         && (!relationshipFocusModeActive || relationshipFocused)
 
-    readonly property var domains: [
-        {
-            "id": "ground",
-            "name": "GROUND",
-            "symbol": "⌁"
-        },
-        {
-            "id": "sky",
-            "name": "SKY",
-            "symbol": "☁"
-        },
-        {
-            "id": "space",
-            "name": "SPACE",
-            "symbol": "✦"
-        }
+    // HOME, GROUND, SKY and SPACE are peers now. MAP/NEWS/RADIO/TERMINAL
+    // remain peers in the same Main Mode family; page-local Sub Modes can be
+    // added later without pretending a domain is a filter under HOME.
+    readonly property var mainModes: [
+        { "id": "home", "name": "HOME", "symbol": "⌂" },
+        { "id": "ground", "name": "GROUND", "symbol": "⌁" },
+        { "id": "sky", "name": "SKY", "symbol": "☁" },
+        { "id": "space", "name": "SPACE", "symbol": "✦" },
+        { "id": "map", "name": "MAP", "symbol": "⌖" },
+        { "id": "news", "name": "NEWS", "symbol": "▤" },
+        { "id": "radio", "name": "RADIO", "symbol": "◉" },
+        { "id": "terminal", "name": "TERMINAL", "symbol": ">_" }
     ]
-
-    readonly property var views: [
-        {
-            "id": "map",
-            "name": "MAP",
-            "symbol": "⌖"
-        },
-        {
-            "id": "news",
-            "name": "NEWS",
-            "symbol": "▤"
-        },
-        {
-            "id": "radio",
-            "name": "RADIO",
-            "symbol": "◉"
-        },
-        {
-            "id": "terminal",
-            "name": "TERMINAL",
-            "symbol": ">_"
-        }
-    ]
-
-    readonly property string activeDomainName: {
-        for (let i = 0; i < domains.length; i++) {
-            if (domains[i].id === activeDomain)
-                return domains[i].name;
-        }
-
-        return "UNKNOWN";
-    }
 
     readonly property string currentViewName: {
-        if (currentView === "home")
-            return "HOME";
-
-        for (let i = 0; i < views.length; i++) {
-            if (views[i].id === currentView)
-                return views[i].name;
+        for (let i = 0; i < mainModes.length; i++) {
+            if (mainModes[i].id === currentView)
+                return mainModes[i].name;
         }
-
         return "UNKNOWN";
     }
 
-    readonly property string currentContext: {
-        if (currentView === "home")
-            return "HOME";
+    readonly property string currentContext: currentViewName
 
-        return activeDomainName + " // " + currentViewName;
-    }
-
-    // Header source indicator. HOME currently reflects the actual weather
-    // transport; later MAP/NEWS/RADIO pages can replace this branch with
-    // their own provider state without changing the header geometry.
+    // Header source indicator follows the selected Main Mode's provider.
+    // HOME temporarily reports the weather transport until its aggregate
+    // favorites/relevance model is built.
     property int sourceStatusClock: 0
+
+    readonly property bool usesWeatherSource:
+        currentView === "home"
+        || currentView === "ground"
+        || currentView === "sky"
+
+    readonly property bool usesSpaceSource:
+        currentView === "space"
 
     readonly property int weatherAgeMinutes: {
         sourceStatusClock;
@@ -134,68 +96,86 @@ PanelWindow {
         )
 
     readonly property string sourceStatusText: {
-        if (currentView !== "home")
-            return "NO FEED";
+        if (usesWeatherSource) {
+            if (!weatherService)
+                return "OFFLINE";
+            if (weatherService.loading)
+                return "READING";
+            if (!weatherService.ready)
+                return String(weatherService.errorText || "").length > 0
+                       ? "OFFLINE" : "CONNECTING";
+            if (weatherStale)
+                return "STALE";
+            return "WEATHER LIVE";
+        }
 
-        if (!weatherService)
-            return "OFFLINE";
+        if (usesSpaceSource) {
+            if (!spaceService)
+                return "OFFLINE";
+            if (spaceService.loading)
+                return "READING";
+            if (spaceService.ready)
+                return "SPACE LIVE";
+            if (String(spaceService.errorText || "").length > 0)
+                return "OFFLINE";
+            return "PARTIAL";
+        }
 
-        if (weatherService.loading)
-            return "READING";
-
-        if (!weatherService.ready)
-            return String(weatherService.errorText || "").length > 0
-                   ? "OFFLINE" : "CONNECTING";
-
-        if (weatherStale)
-            return "STALE";
-
-        return "WEATHER LIVE";
+        return "NO FEED";
     }
 
     readonly property string sourceStatusDisplay: {
-        if (currentView !== "home")
-            return "NO FEED // NOT WIRED";
+        if (usesWeatherSource) {
+            if (!weatherService)
+                return "OFFLINE // NO SERVICE";
+            if (weatherService.loading)
+                return "READING // UPDATING";
+            if (!weatherService.ready)
+                return String(weatherService.errorText || "").length > 0
+                       ? "OFFLINE // NO LINK" : "CONNECTING // WAITING";
 
-        if (!weatherService)
-            return "OFFLINE // NO SERVICE";
+            if (weatherAgeMinutes < 0)
+                return sourceStatusText;
 
-        if (weatherService.loading)
-            return "READING // UPDATING";
+            const ageText = weatherAgeMinutes === 0
+                            ? "<1m"
+                            : weatherAgeMinutes + "m";
+            return sourceStatusText + " // " + ageText;
+        }
 
-        if (!weatherService.ready)
-            return String(weatherService.errorText || "").length > 0
-                   ? "OFFLINE // NO LINK" : "CONNECTING // WAITING";
-
-        if (weatherAgeMinutes < 0)
+        if (usesSpaceSource)
             return sourceStatusText;
 
-        const ageText = weatherAgeMinutes === 0
-                        ? "<1m"
-                        : weatherAgeMinutes + "m";
-
-        return sourceStatusText + " // " + ageText;
+        return "NO FEED // NOT WIRED";
     }
 
     readonly property color sourceStatusColor: {
-        if (currentView !== "home")
-            return Colors.orange;
+        if (usesWeatherSource) {
+            if (!weatherService)
+                return Colors.red;
+            if (weatherService.loading)
+                return Colors.orange;
+            if (!weatherService.ready)
+                return String(weatherService.errorText || "").length > 0
+                       ? Colors.red : Colors.orange;
+            if (weatherStale)
+                return Colors.yellow;
+            return Colors.magenta;
+        }
 
-        if (!weatherService)
-            return Colors.red;
-
-        if (weatherService.loading)
-            return Colors.orange;
-
-        if (!weatherService.ready)
-            return String(weatherService.errorText || "").length > 0
-                   ? Colors.red : Colors.orange;
-
-        if (weatherStale)
+        if (usesSpaceSource) {
+            if (!spaceService)
+                return Colors.red;
+            if (spaceService.loading)
+                return Colors.orange;
+            if (spaceService.ready)
+                return Colors.magenta;
+            if (String(spaceService.errorText || "").length > 0)
+                return Colors.red;
             return Colors.yellow;
+        }
 
-        // Healthy source relationship is magenta by operator decision.
-        return Colors.magenta;
+        return Colors.orange;
     }
 
     Timer {
@@ -305,12 +285,6 @@ PanelWindow {
                     event.key === Qt.Key_Backtab
                     || (event.modifiers & Qt.ShiftModifier) !== 0;
                 weatherStation.cycleMainMode(reverse ? -1 : 1);
-            } else if ((event.modifiers & Qt.ShiftModifier) !== 0
-                       && (event.key === Qt.Key_Left
-                           || event.key === Qt.Key_Right)) {
-                weatherStation.cycleTopSubMode(
-                    event.key === Qt.Key_Left ? -1 : 1
-                );
             } else if (event.key === Qt.Key_Up) {
                 weatherStation.moveNavigationCursor(-1);
             } else if (event.key === Qt.Key_Down) {
@@ -345,41 +319,28 @@ PanelWindow {
     }
 
 
-    // The Home + VIEW pages are the Main Mode family. DOMAIN is a top
-    // Sub Mode family; arrow/Enter navigation follows the actual vertical rail.
+    // Every visible rail page is a Main Mode. Tab/Shift+Tab cycles them
+    // in rail order; Up/Down previews the same list and Enter activates it.
     function cycleMainMode(direction) {
-        const pages = ["home"].concat(views.map(function(v) { return v.id; }));
-        const current = Math.max(0, pages.indexOf(currentView));
-        const step = Number(direction) < 0 ? -1 : 1;
-        const next = (current + step + pages.length) % pages.length;
-        currentView = pages[next];
-        navigationIndex = next === 0 ? 0 : domains.length + next;
-    }
-
-    function cycleTopSubMode(direction) {
-        const current = Math.max(0, domains.findIndex(function(d) {
-            return d.id === activeDomain;
+        const current = Math.max(0, mainModes.findIndex(function(mode) {
+            return mode.id === currentView;
         }));
         const step = Number(direction) < 0 ? -1 : 1;
-        const index = (current + step + domains.length) % domains.length;
-        activeDomain = domains[index].id;
-        navigationIndex = 1 + index;
+        const next = (current + step + mainModes.length) % mainModes.length;
+        currentView = mainModes[next].id;
+        navigationIndex = next;
     }
 
     function moveNavigationCursor(direction) {
-        const count = 1 + domains.length + views.length;
         const step = Number(direction) < 0 ? -1 : 1;
-        navigationIndex = (navigationIndex + step + count) % count;
+        navigationIndex =
+            (navigationIndex + step + mainModes.length) % mainModes.length;
     }
 
     function activateNavigationCursor() {
-        if (navigationIndex === 0) {
-            currentView = "home";
-        } else if (navigationIndex <= domains.length) {
-            activeDomain = domains[navigationIndex - 1].id;
-        } else {
-            currentView = views[navigationIndex - domains.length - 1].id;
-        }
+        if (navigationIndex < 0 || navigationIndex >= mainModes.length)
+            return;
+        currentView = mainModes[navigationIndex].id;
     }
 
     Shortcut {
@@ -393,18 +354,6 @@ PanelWindow {
         context: Qt.WindowShortcut
         enabled: weatherStation.standardKeysAvailable
         onActivated: weatherStation.cycleMainMode(-1)
-    }
-    Shortcut {
-        sequence: "Shift+Left"
-        context: Qt.WindowShortcut
-        enabled: weatherStation.standardKeysAvailable
-        onActivated: weatherStation.cycleTopSubMode(-1)
-    }
-    Shortcut {
-        sequence: "Shift+Right"
-        context: Qt.WindowShortcut
-        enabled: weatherStation.standardKeysAvailable
-        onActivated: weatherStation.cycleTopSubMode(1)
     }
     Shortcut {
         sequence: "Up"
@@ -668,64 +617,30 @@ PanelWindow {
                 anchors.top: parent.top
                 anchors.left: parent.left
                 anchors.right: parent.right
-
                 anchors.topMargin: 14
 
                 spacing: 6
 
-                ModeButton {
-                    id: homeButton
-                    keyboardActive: weatherStation.standardKeysAvailable
-                    keyboardSelected: weatherStation.navigationIndex === 0
-                    onPointerMoved: weatherStation.navigationIndex = 0
-
-                    width: railColumn.width
-                    height: 48
-                    selected: weatherStation.currentView === "home"
-                    bordered: false
-                    horizontalContent: true
-                    contentSpacing: 10
-                    iconFontSize: 18
-                    labelFontSize: 18
-                    iconText: "⌂"
-                    labelText: "HOME"
-                    onTriggered: {
-                        weatherStation.navigationIndex = 0;
-                        weatherStation.currentView = "home";
-                    }
-                }
-
-                Item {
-                    width: 1
-                    height: 7
-                }
-
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-
-                    text: "DOMAIN"
-
-                    font.family: "GohuFont 11 Nerd Font Mono"
-
-                    font.pixelSize: 12
-
-                    color: Colors.white
-                }
-
                 Repeater {
-                    model: weatherStation.domains
+                    model: weatherStation.mainModes
 
                     delegate: ModeButton {
-                        id: domainButton
-                        keyboardActive: weatherStation.standardKeysAvailable
-                        keyboardSelected: weatherStation.navigationIndex === 1 + index
-                        onPointerMoved: weatherStation.navigationIndex = 1 + index
+                        id: mainModeButton
+
                         required property int index
-                                                required property var modelData
+                        required property var modelData
 
                         width: railColumn.width
                         height: 48
-                        selected: weatherStation.activeDomain === modelData.id
+
+                        keyboardActive: weatherStation.standardKeysAvailable
+                        keyboardSelected:
+                            weatherStation.navigationIndex === index
+                        onPointerMoved:
+                            weatherStation.navigationIndex = index
+
+                        selected:
+                            weatherStation.currentView === modelData.id
                         bordered: false
                         horizontalContent: true
                         contentSpacing: 10
@@ -733,65 +648,9 @@ PanelWindow {
                         labelFontSize: 18
                         iconText: modelData.symbol
                         labelText: modelData.name
+
                         onTriggered: {
-                            weatherStation.navigationIndex = 1 + index;
-                            weatherStation.activeDomain = modelData.id;
-                        }
-                    }
-                }
-
-                Item {
-                    width: railColumn.width
-                    height: 17
-
-                    Rectangle {
-                        anchors.centerIn: parent
-
-                        width: parent.width - 28
-                        height: 2
-
-                        color: Colors.cyan
-                    }
-                }
-
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-
-                    text: "VIEW"
-
-                    font.family: "GohuFont 11 Nerd Font Mono"
-
-                    font.pixelSize: 12
-
-                    color: Colors.white
-                }
-
-                Repeater {
-                    model: weatherStation.views
-
-                    delegate: ModeButton {
-                        id: viewButton
-                        keyboardActive: weatherStation.standardKeysAvailable
-                        keyboardSelected: weatherStation.navigationIndex
-                                          === 1 + weatherStation.domains.length + index
-                        onPointerMoved: weatherStation.navigationIndex =
-                            1 + weatherStation.domains.length + index
-                        required property int index
-                                                required property var modelData
-
-                        width: railColumn.width
-                        height: 48
-                        selected: weatherStation.currentView === modelData.id
-                        bordered: false
-                        horizontalContent: true
-                        contentSpacing: 10
-                        iconFontSize: 18
-                        labelFontSize: 18
-                        iconText: modelData.symbol
-                        labelText: modelData.name
-                        onTriggered: {
-                            weatherStation.navigationIndex =
-                                1 + weatherStation.domains.length + index;
+                            weatherStation.navigationIndex = index;
                             weatherStation.currentView = modelData.id;
                         }
                     }
@@ -817,32 +676,32 @@ PanelWindow {
 
             Loader {
                 anchors.fill: parent
-
                 visible: weatherStation.currentView !== "terminal"
 
-                sourceComponent: weatherStation.currentView === "home" ? homeViewComponent : placeholderViewComponent
+                sourceComponent:
+                    weatherStation.currentView === "home"
+                    ? homeViewComponent
+                    : weatherStation.currentView === "ground"
+                    ? groundViewComponent
+                    : weatherStation.currentView === "sky"
+                    ? skyViewComponent
+                    : weatherStation.currentView === "space"
+                    ? spaceViewComponent
+                    : placeholderViewComponent
             }
 
             StationTerminal {
                 id: terminalView
 
                 anchors.fill: parent
-
                 visible: weatherStation.currentView === "terminal"
-
                 stationOpen: weatherStation.menuOpen
-
                 targetScreen: weatherStation.screen
-
                 stationWidth: stationBackground.width
-
                 stationHeight: stationBackground.height
-
                 stationRightMargin: 20
                 stationBottomMargin: 90
-
                 stationHeaderHeight: header.height
-
                 stationRailWidth: modeRail.width
             }
         }
@@ -851,15 +710,32 @@ PanelWindow {
             id: homeViewComponent
 
             StationHome {
-                activeDomain: weatherStation.activeDomain
-
                 weatherService: weatherStation.weatherService
-
                 spaceService: weatherStation.spaceService
+            }
+        }
 
-                onDomainRequested: function (domain) {
-                    weatherStation.activeDomain = domain;
-                }
+        Component {
+            id: groundViewComponent
+
+            StationGround {
+                weatherService: weatherStation.weatherService
+            }
+        }
+
+        Component {
+            id: skyViewComponent
+
+            StationSky {
+                weatherService: weatherStation.weatherService
+            }
+        }
+
+        Component {
+            id: spaceViewComponent
+
+            StationSpace {
+                spaceService: weatherStation.spaceService
             }
         }
 
@@ -871,54 +747,27 @@ PanelWindow {
 
                 Column {
                     anchors.centerIn: parent
-
                     spacing: 12
 
-                    Text {
+                    GohuText {
                         anchors.horizontalCenter: parent.horizontalCenter
-
-                        text: weatherStation.activeDomainName
-
-                        font.family: "GohuFont 11 Nerd Font Mono"
-
-                        font.pixelSize: 20
-
-                        color: Colors.cyan
-                    }
-
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-
                         text: weatherStation.currentViewName
-
-                        font.family: "GohuFont 11 Nerd Font Mono"
-
                         font.pixelSize: 28
-
                         color: Colors.orange
                     }
 
-                    Text {
+                    SecondaryText {
                         anchors.horizontalCenter: parent.horizontalCenter
-
                         text: {
                             if (weatherStation.currentView === "map")
                                 return "map display offline...";
-
                             if (weatherStation.currentView === "news")
                                 return "news receiver offline...";
-
                             if (weatherStation.currentView === "radio")
                                 return "radio receiver offline...";
-
                             return "";
                         }
-
-                        font.family: "GohuFont 11 Nerd Font Mono"
-
                         font.pixelSize: 16
-
-                        color: Colors.white
                     }
                 }
             }
@@ -985,7 +834,7 @@ PanelWindow {
 
                 anchors.rightMargin: 20
 
-                text: weatherStation.activeDomainName
+                text: weatherStation.currentViewName
 
                 font.family: "GohuFont 11 Nerd Font Mono"
 

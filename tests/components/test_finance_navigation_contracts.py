@@ -104,6 +104,15 @@ for pre, dollar, core, post, full in (
 assert menu.count('dollar: "$"') == 2
 assert menu.count('text: modelData.dollar || ""') == 2
 assert menu.count("visible: !!modelData.dollar") == 2
+# The 24px dollar must be vertically centered alongside each larger chart.
+# Do not recenter the small stars or resize any glyphs in this follow-up.
+for row_id, end_id in (("mainGlyphParts", "mainModeButton"),
+                       ("subGlyphParts", "budgetSubButton")):
+    start = menu.index("id: " + row_id)
+    after = menu.index('visible: !!modelData.dollar', start)
+    dollar_block = menu[after:menu.index("}", after)]
+    assert "anchors.verticalCenter: parent.verticalCenter" in dollar_block, row_id
+assert menu.count("anchors.verticalCenter: parent.verticalCenter") >= 2
 assert menu.count("font.pixelSize: 24") == 3  # main Budget + two dollar glyphs
 assert 'font.pixelSize: modelData.coreSize || 34' in menu
 assert 'font.pixelSize: 31' in menu

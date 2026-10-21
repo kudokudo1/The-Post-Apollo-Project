@@ -340,13 +340,41 @@ PanelWindow {
                     onLeftClicked: hub.editMode = !hub.editMode
                 }
                 ActionButton {
-                    // Keep text and its sampled glow aligned during layout/state changes.
+                    // Standard Close × (U+00D7), not the letter X.
+                    // Red is the permanent close identity; the shared
+                    // destructive pressed state remains black-on-red.
                     trackLabelGlowLocally: true
                     id: closeButton
                     width: 35
                     height: 32
                     label: "×"
+                    labelPixelSize: 22
+                    contentPadding: 4
+                    accentColor: Colors.red
                     destructive: true
+                    idleForegroundColor: Colors.red
+                    hoverForegroundColor: Colors.red
+                    selectedForegroundColor: Colors.red
+                    keyboardSelectedForegroundColor: Colors.red
+                    hoverBorderColor: Colors.red
+                    selectedBorderColor: Colors.red
+                    keyboardSelectedBorderColor: Colors.red
+                    idleContentGlowColor: Colors.red
+                    hoverContentGlowColor: Colors.red
+                    selectedContentGlowColor: Colors.red
+                    keyboardSelectedContentGlowColor: Colors.red
+                    softGlowEnabled: true
+                    idleSoftGlowColor: Colors.red
+                    hoverSoftGlowColor: Colors.red
+                    pressedSoftGlowColor: Colors.red
+                    softGlowIdleOpacity: 0.48
+                    softGlowHoverOpacity: 0.70
+                    wideGlowEnabled: true
+                    idleWideGlowColor: Colors.red
+                    hoverWideGlowColor: Colors.red
+                    pressedWideGlowColor: Colors.red
+                    wideGlowIdleOpacity: 0.22
+                    wideGlowHoverOpacity: 0.32
                     onLeftClicked: hub.menuOpen = false
                 }
             }

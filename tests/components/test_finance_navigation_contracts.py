@@ -30,8 +30,11 @@ assert 'primaryGlowEnabled: !modelData.future' in menu
 assert 'if (mainModes[i].id === id && !mainModes[i].future)' in menu
 assert 'property string selectedMainMode: "budget"' in menu
 assert 'property string selectedBudgetSubMode: "budget"' in menu
-assert 'onTriggered: root.selectMainMode(modelData.id)' in menu
-assert 'onLeftClicked: root.selectedBudgetSubMode = modelData.id' in menu
+assert "onTriggered: {" in menu
+assert "root.selectMainMode(modelData.id);" in menu
+assert "onLeftClicked: {" in menu
+assert "root.selectedBudgetSubMode = modelData.id;" in menu
+assert "root.keyboardOwnershipRequested();" in menu
 
 # Reuse the standard controls instead of introducing custom MouseAreas.
 assert menu.count("ModeButton {") == 1
@@ -61,14 +64,40 @@ assert "anchors.rightMargin: 12" in header_divider
 # Main and Budget sub-mode icon artwork uses Gohu, with fit to avoid
 # truncating decorated glyphs in the narrow 9:16 panel.
 assert "NotoText {" not in menu
-assert "GohuText {\n                        id: mainIcon" in menu
-assert "GohuText {\n                            id: subIcon" in menu
+assert "Item {\n                        id: mainIcon" in menu
+assert "Item {\n                            id: subIcon" in menu
+assert "id: mainGlyphParts" in menu
+assert "id: subGlyphParts" in menu
+assert "GohuText {" in menu
 assert "font.pixelSize: 24" in menu
 assert "font.pixelSize: 22" in menu
 assert menu.count("fontSizeMode: Text.Fit") == 2
 assert "minimumPixelSize: 15" in menu
 assert "minimumPixelSize: 12" in menu
 assert "opacity: mainModeButton.selected ? 0.60 : 0.36" in menu
+
+# No increase in ornament size: the two core glyphs are larger, the
+# decorations remain smaller and Unicode combining marks stay on the core.
+segmented = {
+    '"market"': ("₊˚", "$🗠๋࣭", "⭑", "₊˚$🗠๋࣭⭑"),
+    '"radar"': ("࣪ ˖(˓", "🛰", "₊˚⊹", "࣪ ˖(˓🛰₊˚⊹"),
+    '"strategies"': ("˙°", "⚖︎๋࣭", "⭑", "˙°⚖︎๋࣭⭑"),
+    '"safety"': ("", "🛡๋࣭", "⭑", "🛡๋࣭⭑"),
+    '"agentic"': ("⋆˚", "⚡︎๋࣭", "⭑", "⋆˚⚡︎๋࣭⭑"),
+}
+for key, (pre, core, post, full) in segmented.items():
+    assert pre + core + post == full
+    assert f'prefix: "{pre}", core: "{core}", suffix: "{post}"' in menu, key
+for pre, core, post, full in (
+    ("˗ˋˏ˖", "⛁⛀๋࣭", "⭑ˎˊ˗", "˗ˋˏ˖⛁⛀๋࣭⭑ˎˊ˗"),
+    ("₊˚", "$🗠๋࣭", "⭑", "₊˚$🗠๋࣭⭑"),
+):
+    assert pre + core + post == full
+    assert f'prefix: "{pre}", core: "{core}", suffix: "{post}"' in menu
+for size in (34, 31, 15, 12):
+    assert f"font.pixelSize: {size}" in menu
+assert "scale: Math.min(1, mainIcon.width" in menu
+assert "scale: Math.min(1, subIcon.width" in menu
 
 # Permanent Omnitrix vertical line with independent, source-safe glow.
 divider = menu[menu.index("id: mainRailDivider"):menu.index("id: workArea")]
@@ -96,7 +125,23 @@ assert "readonly property int frameWidth: 432" in menu
 assert "readonly property int frameHeight: 768" in menu
 assert "visible: true" in menu
 assert "width: root.menuOpen ? root.frameWidth : 0" in menu
-assert "WlrLayershell.keyboardFocus: WlrKeyboardFocus.None" in menu
+assert "WlrKeyboardFocus.None" in menu
+assert "WlrKeyboardFocus.OnDemand" in menu
+assert "WlrKeyboardFocus.Exclusive" in menu
+assert "property bool keyboardActive: false" in menu
+assert "property bool keyboardLock: false" in menu
+assert "id: financeKeyboardAnchor" in menu
+assert "menuOpen && keyboardActive" in menu
+for sequence in ("Tab", "Shift+Tab", "Shift+Left", "Shift+Right",
+                 "Up", "Down", "Left", "Right", "Return", "Enter", "Esc"):
+    assert f'sequence: "{sequence}"' in menu, sequence
+assert "context: Qt.WindowShortcut" in menu
+assert "enabled: root.standardKeysAvailable" in menu
+assert "root.menuOpen = false" in menu
+assert "activeMainModes().length" in menu
+assert "return mainModes.filter(function(mode) { return !mode.future; });" in menu
+assert "root.moveNavigationZone(-1)" in menu
+assert "root.activateNavigationCursor()" in menu
 for forbidden in ("Process {", "Actual", "fetch(", "Qt.openUrlExternally", "Sqlite"):
     assert forbidden not in menu, forbidden
 

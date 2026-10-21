@@ -8,26 +8,104 @@ PanelWindow {
     id: root
 
     property bool menuOpen: false
+    property bool keyboardActive: false
+    property bool keyboardLock: false
+    property bool relationshipFocusModeActive: false
+    property bool relationshipFocused: false
+    signal keyboardOwnershipRequested()
 
     // Independent navigation state; no financial services are attached.
     readonly property var mainModes: [
         { id: "budget", name: "Budget", icon: "⋆$🗓₊˚" },
-        { id: "market", name: "Market", icon: "₊˚$🗠๋࣭⭑" },
-        { id: "radar", name: "Radar", icon: "࣪ ˖(˓🛰₊˚⊹" },
+        { id: "market", name: "Market", icon: "₊˚$🗠๋࣭⭑", prefix: "₊˚", core: "$🗠๋࣭", suffix: "⭑" },
+        { id: "radar", name: "Radar", icon: "࣪ ˖(˓🛰₊˚⊹", prefix: "࣪ ˖(˓", core: "🛰", suffix: "₊˚⊹" },
         { id: "research", name: "Research", icon: "⋆˚🗃₊" },
-        { id: "strategies", name: "Strategies", icon: "˙°⚖︎๋࣭⭑" },
-        { id: "safety", name: "Safety", icon: "🛡๋࣭⭑" },
-        { id: "agentic", name: "Agentic", icon: "⋆˚⚡︎๋࣭⭑" },
+        { id: "strategies", name: "Strategies", icon: "˙°⚖︎๋࣭⭑", prefix: "˙°", core: "⚖︎๋࣭", suffix: "⭑" },
+        { id: "safety", name: "Safety", icon: "🛡๋࣭⭑", prefix: "", core: "🛡๋࣭", suffix: "⭑" },
+        { id: "agentic", name: "Agentic", icon: "⋆˚⚡︎๋࣭⭑", prefix: "⋆˚", core: "⚡︎๋࣭", suffix: "⭑" },
         { id: "later-shop", name: "Later", icon: "🛍", future: true },
         { id: "later-print", name: "Later", icon: "🖨", future: true }
     ]
     readonly property var budgetSubModes: [
-        { id: "budget", name: "Budget", icon: "˗ˋˏ˖⛁⛀๋࣭⭑ˎˊ˗" },
-        { id: "reports", name: "Reports", icon: "₊˚$🗠๋࣭⭑" },
+        { id: "budget", name: "Budget", icon: "˗ˋˏ˖⛁⛀๋࣭⭑ˎˊ˗", prefix: "˗ˋˏ˖", core: "⛁⛀๋࣭", suffix: "⭑ˎˊ˗" },
+        { id: "reports", name: "Reports", icon: "₊˚$🗠๋࣭⭑", prefix: "₊˚", core: "$🗠๋࣭", suffix: "⭑" },
         { id: "schedules", name: "Schedules", icon: "⋆$🗓₊˚" }
     ]
     property string selectedMainMode: "budget"
     property string selectedBudgetSubMode: "budget"
+
+
+    // Keyboard follows the shared Post-Apollo control grammar. The two
+    // future slots never enter the keyboard selection cycle.
+    property string navigationZone: "main"
+    property int navigationIndex: 0
+    readonly property bool standardKeysAvailable:
+        menuOpen && keyboardActive
+
+    function activeMainModes() {
+        return mainModes.filter(function(mode) { return !mode.future; });
+    }
+
+    function cycleMainMode(direction) {
+        const modes = activeMainModes();
+        const at = Math.max(0, modes.findIndex(function(mode) {
+            return mode.id === selectedMainMode;
+        }));
+        const step = Number(direction) < 0 ? -1 : 1;
+        const next = (at + step + modes.length) % modes.length;
+        selectMainMode(modes[next].id);
+        navigationZone = "main";
+        navigationIndex = next;
+    }
+
+    function cycleBudgetSubMode(direction) {
+        if (selectedMainMode !== "budget")
+            return;
+        const at = Math.max(0, budgetSubModes.findIndex(function(mode) {
+            return mode.id === selectedBudgetSubMode;
+        }));
+        const step = Number(direction) < 0 ? -1 : 1;
+        navigationIndex = (at + step + budgetSubModes.length)
+                          % budgetSubModes.length;
+        navigationZone = "sub";
+        selectedBudgetSubMode = budgetSubModes[navigationIndex].id;
+    }
+
+    function moveNavigationCursor(direction) {
+        const count = navigationZone === "sub" && selectedMainMode === "budget"
+                      ? budgetSubModes.length : activeMainModes().length;
+        const step = Number(direction) < 0 ? -1 : 1;
+        navigationIndex = (navigationIndex + step + count) % count;
+    }
+
+    function moveNavigationZone(direction) {
+        if (selectedMainMode !== "budget")
+            return;
+        if (Number(direction) > 0) {
+            if (navigationZone === "sub")
+                return;
+            navigationZone = "sub";
+            navigationIndex = Math.max(0, budgetSubModes.findIndex(
+                function(mode) { return mode.id === selectedBudgetSubMode; }
+            ));
+        } else {
+            if (navigationZone === "main")
+                return;
+            navigationZone = "main";
+            navigationIndex = Math.max(0, activeMainModes().findIndex(
+                function(mode) { return mode.id === selectedMainMode; }
+            ));
+        }
+    }
+
+    function activateNavigationCursor() {
+        if (navigationZone === "sub" && selectedMainMode === "budget")
+            selectedBudgetSubMode = budgetSubModes[navigationIndex].id;
+        else {
+            const modes = activeMainModes();
+            selectMainMode(modes[navigationIndex].id);
+        }
+    }
 
     function mainModeName() {
         for (let i = 0; i < mainModes.length; ++i) {
@@ -68,6 +146,15 @@ PanelWindow {
         menuOpen = !menuOpen;
     }
 
+    onMenuOpenChanged: {
+        if (menuOpen && keyboardActive)
+            Qt.callLater(function() { financeKeyboardAnchor.forceActiveFocus(); });
+    }
+    onKeyboardActiveChanged: {
+        if (menuOpen && keyboardActive)
+            Qt.callLater(function() { financeKeyboardAnchor.forceActiveFocus(); });
+    }
+
     implicitWidth: frameWidth + glowGutter * 2
     implicitHeight: frameHeight + glowGutter * 2
 
@@ -91,10 +178,15 @@ PanelWindow {
     exclusiveZone: 0
     WlrLayershell.layer: WlrLayer.Overlay
 
-    // Blank chassis has no text editor or keyboard shortcuts. Never steal
-    // focus from Hospital, Git, or the terminal just to display it.
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-    focusable: false
+    // Only the current shared owner can receive keys. A bounded acquisition
+    // pulse is used at open/pointer entry; never hold Exclusive indefinitely.
+    WlrLayershell.keyboardFocus:
+        !root.menuOpen || !root.keyboardActive
+        ? WlrKeyboardFocus.None
+        : root.keyboardLock
+        ? WlrKeyboardFocus.Exclusive
+        : WlrKeyboardFocus.OnDemand
+    focusable: root.menuOpen && root.keyboardActive
 
     color: "transparent"
     surfaceFormat.opaque: false
@@ -107,6 +199,106 @@ PanelWindow {
         y: root.glowGutter
         width: root.menuOpen ? root.frameWidth : 0
         height: root.menuOpen ? root.frameHeight : 0
+    }
+
+
+    Item {
+        id: financeKeyboardAnchor
+        anchors.fill: parent
+        enabled: root.standardKeysAvailable
+        focus: root.standardKeysAvailable
+        z: -1000
+
+        // Qt can consume Tab as focus-chain navigation before Shortcut.
+        Keys.priority: Keys.BeforeItem
+        Keys.onShortcutOverride: function(event) {
+            if (!root.standardKeysAvailable)
+                return;
+            if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab
+                    || event.key === Qt.Key_Escape)
+                event.accepted = true;
+        }
+        Keys.onPressed: function(event) {
+            if (!root.standardKeysAvailable)
+                return;
+            if (event.key === Qt.Key_Escape) {
+                root.menuOpen = false;
+                event.accepted = true;
+            } else if (event.key === Qt.Key_Tab
+                       || event.key === Qt.Key_Backtab) {
+                const reverse = event.key === Qt.Key_Backtab
+                    || (event.modifiers & Qt.ShiftModifier) !== 0;
+                root.cycleMainMode(reverse ? -1 : 1);
+                event.accepted = true;
+            }
+        }
+    }
+
+    Shortcut {
+        sequence: "Tab"
+        context: Qt.WindowShortcut
+        enabled: root.standardKeysAvailable
+        onActivated: root.cycleMainMode(1)
+    }
+    Shortcut {
+        sequence: "Shift+Tab"
+        context: Qt.WindowShortcut
+        enabled: root.standardKeysAvailable
+        onActivated: root.cycleMainMode(-1)
+    }
+    Shortcut {
+        sequence: "Shift+Left"
+        context: Qt.WindowShortcut
+        enabled: root.standardKeysAvailable
+        onActivated: root.cycleBudgetSubMode(-1)
+    }
+    Shortcut {
+        sequence: "Shift+Right"
+        context: Qt.WindowShortcut
+        enabled: root.standardKeysAvailable
+        onActivated: root.cycleBudgetSubMode(1)
+    }
+    Shortcut {
+        sequence: "Up"
+        context: Qt.WindowShortcut
+        enabled: root.standardKeysAvailable
+        onActivated: root.moveNavigationCursor(-1)
+    }
+    Shortcut {
+        sequence: "Down"
+        context: Qt.WindowShortcut
+        enabled: root.standardKeysAvailable
+        onActivated: root.moveNavigationCursor(1)
+    }
+    Shortcut {
+        sequence: "Left"
+        context: Qt.WindowShortcut
+        enabled: root.standardKeysAvailable
+        onActivated: root.moveNavigationZone(-1)
+    }
+    Shortcut {
+        sequence: "Right"
+        context: Qt.WindowShortcut
+        enabled: root.standardKeysAvailable
+        onActivated: root.moveNavigationZone(1)
+    }
+    Shortcut {
+        sequence: "Return"
+        context: Qt.WindowShortcut
+        enabled: root.standardKeysAvailable
+        onActivated: root.activateNavigationCursor()
+    }
+    Shortcut {
+        sequence: "Enter"
+        context: Qt.WindowShortcut
+        enabled: root.standardKeysAvailable
+        onActivated: root.activateNavigationCursor()
+    }
+    Shortcut {
+        sequence: "Esc"
+        context: Qt.WindowShortcut
+        enabled: root.standardKeysAvailable
+        onActivated: root.menuOpen = false
     }
 
     WindowPanelFrame {
@@ -123,6 +315,14 @@ PanelWindow {
 
         glowVisible: root.menuOpen
         glowColor: Colors.omnitrix
+
+        HoverHandler {
+            enabled: root.menuOpen
+            onHoveredChanged: {
+                if (hovered)
+                    root.keyboardOwnershipRequested();
+            }
+        }
 
         // Header stays independent from the main and budget-mode rails.
         Rectangle {
@@ -191,10 +391,14 @@ PanelWindow {
                 ModeButton {
                     id: mainModeButton
                     required property var modelData
+                    required property int index
                     width: mainModeRail.width
                     height: 60
                     interactive: !modelData.future
                     selected: root.selectedMainMode === modelData.id
+                    keyboardActive: root.standardKeysAvailable
+                    keyboardSelected: root.navigationZone === "main"
+                                      && root.navigationIndex === index
                     opacity: modelData.future ? 0.42 : 1.0
                     customArtwork: true
                     customPrimaryGlowSource: mainIcon
@@ -202,20 +406,53 @@ PanelWindow {
                     primaryGlowEnabled: !modelData.future
                     bordered: true
 
-                    GohuText {
+                    Item {
                         id: mainIcon
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.top: parent.top
                         anchors.topMargin: 5
                         width: parent.width - 6
-                        horizontalAlignment: Text.AlignHCenter
-                        text: modelData.icon
-                        textFormat: Text.PlainText
                         height: 31
-                        font.pixelSize: 24
-                        fontSizeMode: Text.Fit
-                        minimumPixelSize: 15
-                        color: mainModeButton.primaryColor
+
+                        GohuText {
+                            anchors.centerIn: parent
+                            visible: !modelData.core
+                            width: parent.width
+                            horizontalAlignment: Text.AlignHCenter
+                            text: modelData.icon
+                            textFormat: Text.PlainText
+                            font.pixelSize: 24
+                            fontSizeMode: Text.Fit
+                            minimumPixelSize: 15
+                            color: mainModeButton.primaryColor
+                        }
+
+                        // The ornaments stay small while the meaningful
+                        // central glyph grows; marks stay attached to core.
+                        Row {
+                            id: mainGlyphParts
+                            anchors.centerIn: parent
+                            visible: !!modelData.core
+                            spacing: 0
+                            scale: Math.min(1, mainIcon.width
+                                            / Math.max(1, implicitWidth))
+
+                            GohuText {
+                                text: modelData.prefix || ""
+                                font.pixelSize: 15
+                                color: mainModeButton.primaryColor
+                            }
+                            GohuText {
+                                text: modelData.core || ""
+                                font.pixelSize: 34
+                                color: mainModeButton.primaryColor
+                            }
+                            GohuText {
+                                text: modelData.suffix || ""
+                                font.pixelSize: 15
+                                color: mainModeButton.primaryColor
+                            }
+                        }
                     }
 
                     GohuText {
@@ -231,7 +468,12 @@ PanelWindow {
                         opacity: mainModeButton.selected ? 0.60 : 0.36
                     }
 
-                    onTriggered: root.selectMainMode(modelData.id)
+                    onTriggered: {
+                        root.selectMainMode(modelData.id);
+                        root.navigationZone = "main";
+                        root.navigationIndex = index;
+                        root.keyboardOwnershipRequested();
+                    }
                 }
             }
         }
@@ -300,6 +542,7 @@ PanelWindow {
                     ActionButton {
                         id: budgetSubButton
                         required property var modelData
+                        required property int index
                         readonly property color identityColor:
                             root.budgetSubColor(modelData.id)
                         readonly property color identityGlow:
@@ -309,6 +552,9 @@ PanelWindow {
                         height: 72
                         showLabel: false
                         selected: root.selectedBudgetSubMode === modelData.id
+                        keyboardSelected: root.standardKeysAvailable
+                                          && root.navigationZone === "sub"
+                                          && root.navigationIndex === index
                         accentColor: identityColor
                         idleForegroundColor: identityColor
                         hoverForegroundColor: identityColor
@@ -327,20 +573,51 @@ PanelWindow {
                         hoverBorderColor: identityColor
                         selectedBorderColor: identityColor
 
-                        GohuText {
+                        Item {
                             id: subIcon
                             anchors.top: parent.top
                             anchors.topMargin: 10
                             anchors.horizontalCenter: parent.horizontalCenter
                             width: parent.width - 8
-                            horizontalAlignment: Text.AlignHCenter
-                            text: modelData.icon
-                            textFormat: Text.PlainText
                             height: 35
-                            font.pixelSize: 22
-                            fontSizeMode: Text.Fit
-                            minimumPixelSize: 12
-                            color: budgetSubButton.foregroundColor
+
+                            GohuText {
+                                anchors.centerIn: parent
+                                visible: !modelData.core
+                                width: parent.width
+                                horizontalAlignment: Text.AlignHCenter
+                                text: modelData.icon
+                                textFormat: Text.PlainText
+                                font.pixelSize: 22
+                                fontSizeMode: Text.Fit
+                                minimumPixelSize: 12
+                                color: budgetSubButton.foregroundColor
+                            }
+
+                            Row {
+                                id: subGlyphParts
+                                anchors.centerIn: parent
+                                visible: !!modelData.core
+                                spacing: 0
+                                scale: Math.min(1, subIcon.width
+                                                / Math.max(1, implicitWidth))
+
+                                GohuText {
+                                    text: modelData.prefix || ""
+                                    font.pixelSize: 12
+                                    color: budgetSubButton.foregroundColor
+                                }
+                                GohuText {
+                                    text: modelData.core || ""
+                                    font.pixelSize: 31
+                                    color: budgetSubButton.foregroundColor
+                                }
+                                GohuText {
+                                    text: modelData.suffix || ""
+                                    font.pixelSize: 12
+                                    color: budgetSubButton.foregroundColor
+                                }
+                            }
                         }
 
                         GohuText {
@@ -355,7 +632,12 @@ PanelWindow {
                             elide: Text.ElideRight
                         }
 
-                        onLeftClicked: root.selectedBudgetSubMode = modelData.id
+                        onLeftClicked: {
+                            root.selectedBudgetSubMode = modelData.id;
+                            root.navigationZone = "sub";
+                            root.navigationIndex = index;
+                            root.keyboardOwnershipRequested();
+                        }
                     }
                 }
             }

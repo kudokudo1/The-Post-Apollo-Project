@@ -174,7 +174,7 @@ assert "function advanceWidget()" not in broker
 assert "function beginAndAdvance(): bool" not in broker
 assert "function advance(): bool" not in broker
 assert 'id: relationshipFocus' in shell
-for label in ("appcontrol", "hospital", "git", "cpu", "weather", "notifications"):
+for label in ("appcontrol", "hospital", "git", "finance", "cpu", "weather", "notifications"):
     assert label in broker, label
     assert 'relationshipFocus.owner === "' + label + '"' in shell
 
@@ -214,8 +214,8 @@ for required in (
     assert required in ownership, required
 assert 'interval: 120' in ownership
 # All Koinoikos candidates must be known to the same logical coordinator.
-# Only the three prior Wlr layer-shell consumers may receive the bounded
-# Exclusive pulse; stage 1 must not force it onto Weather, CPU or AppControl.
+# FinanceW now opts into the same bounded focus pulse. Weather, CPU and
+# AppControl remain outside the Exclusive pulse path.
 import re
 
 registered = set(re.findall(r'\{ id: "([^"]+)", item: broker\.', broker))
@@ -224,7 +224,7 @@ supported = set(re.findall(r'"([^"]+)"', owner_list))
 assert registered == supported, (registered, supported)
 pulse_list = ownership.split('readonly property var pulseIds: [', 1)[1].split(']', 1)[0]
 pulsed = set(re.findall(r'"([^"]+)"', pulse_list))
-assert pulsed == {"git", "hospital", "notifications"}, pulsed
+assert pulsed == {"git", "hospital", "finance", "notifications"}, pulsed
 assert 'if (widgetIds.indexOf(id) < 0)' in ownership
 assert 'if (pulseIds.indexOf(id) >= 0)' in ownership
 assert 'releaseBoost.stop();' in ownership
@@ -244,6 +244,11 @@ assert 'keyboardOwnership.release("notifications")' in shell
 assert 'keyboardLock: keyboardOwnership.boostOwner === "git"' in shell
 assert 'keyboardLock: keyboardOwnership.boostOwner === "hospital"' in shell
 assert 'keyboardLock: keyboardOwnership.boostOwner === "notifications"' in shell
+assert 'keyboardLock: keyboardOwnership.boostOwner === "finance"' in shell
+assert 'shellRoot.requestControlKeyboard("finance", "open")' in shell
+assert 'shellRoot.requestControlKeyboard("finance", "pointer")' in shell
+assert 'keyboardOwnership.release("finance")' in shell
+assert 'finance: financeWindow' in shell
 assert '|| (hospitalWindow.menuOpen && gitWindow.menuOpen)' not in shell
 assert 'keyboardOwnership.claim(owner, "koinoikos")' in shell
 assert 'if (active && owner !== "")' in shell
@@ -292,8 +297,8 @@ assert "boostOwner: keyboardOwnership.boostOwner" in shell
 # layer-shell surface actually receives Tab.
 import re
 candidates = set(re.findall(r'\{ id: "([^"]+)", item: broker\.', broker))
-assert candidates == {"appcontrol", "hospital", "git", "cpu",
-                      "weather", "notifications"}
+assert candidates == {"appcontrol", "hospital", "git", "finance",
+                      "cpu", "weather", "notifications"}
 assert "brave" not in candidates
 
 diag_path = ROOT / "scripts/focus_diagnostics.py"

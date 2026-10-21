@@ -10,6 +10,7 @@ QtObject {
     property var appControl: null
     property var hospital: null
     property var git: null
+    property var finance: null
     property var cpu: null
     property var weather: null
     property var notifications: null
@@ -81,6 +82,7 @@ QtObject {
             { id: "appcontrol", item: broker.appControl },
             { id: "hospital", item: broker.hospital },
             { id: "git", item: broker.git },
+            { id: "finance", item: broker.finance },
             { id: "cpu", item: broker.cpu },
             { id: "weather", item: broker.weather },
             { id: "notifications", item: broker.notifications }
@@ -181,6 +183,7 @@ QtObject {
                 inspectWindow("appcontrol", appControl),
                 inspectWindow("hospital", hospital),
                 inspectWindow("git", git),
+                inspectWindow("finance", finance),
                 inspectWindow("cpu", cpu),
                 inspectWindow("weather", weather),
                 inspectWindow("notifications", notifications)

@@ -95,8 +95,8 @@ DockButton {
         onTriggered: weatherDock.observationClockMs = Date.now()
     }
 
-    // Condition -> measured temperature + units -> original thermometer.
-    // Keep all three glyphs independently sized within the 50px dock.
+    // Condition -> measured temperature with isolated degree glow -> thermometer.
+    // Preserve the original overall module glow and 50px dock height.
     Row {
         id: weatherContent
         anchors.centerIn: parent
@@ -110,20 +110,70 @@ DockButton {
             color: weatherDock.foregroundColor
         }
 
-        GohuText {
-            id: weatherTemperature
+        // Keep the weather icon at its existing 6px distance while moving
+        // only the temperature group closer to the thermometer.
+        Row {
+            id: weatherReadout
             anchors.verticalCenter: parent.verticalCenter
-            text: weatherDock.temperatureLabel
-            font.pixelSize: 20
-            color: weatherDock.foregroundColor
-        }
+            spacing: 2
 
-        Text {
-            id: weatherThermometer
-            anchors.verticalCenter: parent.verticalCenter
-            text: "🌡"
-            font.pixelSize: 24
-            color: Colors.orange
+            Row {
+                id: weatherTemperature
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 0
+
+                GohuText {
+                    id: weatherTemperatureValue
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: weatherDock.temperatureLabel.slice(0, -2)
+                    font.pixelSize: 20
+                    color: weatherDock.foregroundColor
+                }
+
+                Item {
+                    id: degreeSlot
+                    anchors.verticalCenter: parent.verticalCenter
+                    implicitWidth: weatherDegree.implicitWidth
+                    implicitHeight: weatherDegree.implicitHeight
+
+                    SafeDropShadow {
+                        anchors.fill: weatherDegree
+                        safeSource: weatherDegree
+                        requestedVisible: true
+                        z: -1
+                        radius: 8
+                        samples: 15
+                        horizontalOffset: 0
+                        verticalOffset: 0
+                        transparentBorder: true
+                        opacity: 0.8
+                        color: Colors.orange
+                    }
+
+                    GohuText {
+                        id: weatherDegree
+                        text: "°"
+                        font.pixelSize: 20
+                        color: Colors.white
+                    }
+                }
+
+                GohuText {
+                    id: weatherTemperatureUnit
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: weatherDock.temperatureLabel.slice(-1)
+                    font.pixelSize: 20
+                    color: weatherDock.foregroundColor
+                }
+            }
+
+            Text {
+                id: weatherThermometer
+                anchors.verticalCenter: parent.verticalCenter
+                text: "🌡"
+                font.pixelSize: 24
+                color: Colors.orange
+            }
         }
     }
 

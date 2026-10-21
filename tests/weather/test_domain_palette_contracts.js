@@ -59,9 +59,12 @@ for (let i = 0; i < specs.length; i++) {
         const start = section.indexOf(location);
         assert.ok(start >= 0 && section.indexOf(location, start + 1) === -1,
                   name + "/" + meter + " unique meter");
-        const fill = section.slice(start, start + 160);
-        assert.ok(fill.includes("color: " + id + ".accentColor"),
-                  name + "/" + meter + " fill");
+        // Read the first color property after the meter-width expression,
+        // independent of nesting/indentation in the Wind layout.
+        const firstColor = section.slice(start).match(/\bcolor:\s*([A-Za-z0-9.]+)/);
+        assert.ok(firstColor, name + "/" + meter + " has a fill");
+        assert.equal(firstColor[1], id + ".accentColor",
+                     name + "/" + meter + " fill");
     }
     assert.ok(section.includes("safeSource: " + id));
     assert.ok(section.includes("color: " + id + ".accentColor"),

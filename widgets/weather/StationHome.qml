@@ -318,6 +318,8 @@ Rectangle {
             color: Colors.black
 
             readonly property bool selected: home.activeDomain === "space"
+            // One consistent domain color for section heading, track and live fill.
+            readonly property color accentColor: Colors.magenta
 
             Rectangle {
                 anchors.left: parent.left
@@ -326,7 +328,7 @@ Rectangle {
 
                 width: 3
 
-                color: spaceBand.selected ? Colors.orange : spaceMouse.containsMouse ? Colors.orange : Colors.cyan
+                color: spaceBand.accentColor
             }
 
             Text {
@@ -344,7 +346,7 @@ Rectangle {
 
                 font.pixelSize: 20
 
-                color: spaceBand.selected ? Colors.orange : spaceMouse.containsMouse ? Colors.orange : Colors.cyan
+                color: spaceBand.accentColor
             }
 
             Text {
@@ -428,7 +430,7 @@ Rectangle {
                         color: Colors.black
 
                         border.width: 1
-                        border.color: Colors.cyan
+                        border.color: spaceBand.accentColor
 
                         Rectangle {
                             x: 2
@@ -439,7 +441,7 @@ Rectangle {
 
                             height: parent.height - 4
 
-                            color: home.kpColor
+                            color: spaceBand.accentColor
                         }
                     }
                 }
@@ -480,7 +482,7 @@ Rectangle {
                         color: Colors.black
 
                         border.width: 1
-                        border.color: Colors.cyan
+                        border.color: spaceBand.accentColor
 
                         Rectangle {
                             x: 2
@@ -491,7 +493,7 @@ Rectangle {
 
                             height: parent.height - 4
 
-                            color: home.solarWindColor
+                            color: spaceBand.accentColor
                         }
                     }
                 }
@@ -542,7 +544,7 @@ Rectangle {
                         color: Colors.black
 
                         border.width: 1
-                        border.color: Colors.cyan
+                        border.color: spaceBand.accentColor
 
                         Rectangle {
                             x: 2
@@ -553,7 +555,7 @@ Rectangle {
 
                             height: parent.height - 4
 
-                            color: home.bzColor
+                            color: spaceBand.accentColor
                         }
                     }
                 }
@@ -594,7 +596,7 @@ Rectangle {
                         color: Colors.black
 
                         border.width: 1
-                        border.color: Colors.cyan
+                        border.color: spaceBand.accentColor
 
                         Rectangle {
                             x: 2
@@ -605,7 +607,7 @@ Rectangle {
 
                             height: parent.height - 4
 
-                            color: Colors.cyan
+                            color: spaceBand.accentColor
                         }
                     }
                 }
@@ -645,7 +647,7 @@ Rectangle {
 
                 z: -1
 
-                color: Colors.orange
+                color: spaceBand.accentColor
 
                 opacity: spaceBand.selected ? 0.28 : spaceMouse.containsMouse ? 0.18 : 0
 
@@ -673,6 +675,8 @@ Rectangle {
             color: Colors.black
 
             readonly property bool selected: home.activeDomain === "sky"
+            // One consistent domain color for section heading, track and live fill.
+            readonly property color accentColor: Colors.cyan
 
             Rectangle {
                 anchors.left: parent.left
@@ -681,7 +685,7 @@ Rectangle {
 
                 width: 3
 
-                color: skyBand.selected ? Colors.orange : skyMouse.containsMouse ? Colors.orange : Colors.cyan
+                color: skyBand.accentColor
             }
 
             Text {
@@ -699,7 +703,7 @@ Rectangle {
 
                 font.pixelSize: 20
 
-                color: skyBand.selected ? Colors.orange : skyMouse.containsMouse ? Colors.orange : Colors.cyan
+                color: skyBand.accentColor
             }
 
             Text {
@@ -767,7 +771,7 @@ Rectangle {
                         color: Colors.black
 
                         border.width: 1
-                        border.color: Colors.cyan
+                        border.color: skyBand.accentColor
 
                         Rectangle {
                             x: 2
@@ -778,7 +782,7 @@ Rectangle {
 
                             height: parent.height - 4
 
-                            color: Colors.orange
+                            color: skyBand.accentColor
                         }
                     }
                 }
@@ -881,7 +885,7 @@ Rectangle {
                         color: Colors.black
 
                         border.width: 1
-                        border.color: Colors.cyan
+                        border.color: skyBand.accentColor
 
                         Rectangle {
                             x: 2
@@ -892,7 +896,7 @@ Rectangle {
 
                             height: parent.height - 4
 
-                            color: home.aqiColor
+                            color: skyBand.accentColor
                         }
                     }
                 }
@@ -933,7 +937,7 @@ Rectangle {
                         color: Colors.black
 
                         border.width: 1
-                        border.color: Colors.cyan
+                        border.color: skyBand.accentColor
 
                         Rectangle {
                             x: 2
@@ -944,7 +948,7 @@ Rectangle {
 
                             height: parent.height - 4
 
-                            color: Colors.cyan
+                            color: skyBand.accentColor
                         }
                     }
                 }
@@ -1009,7 +1013,7 @@ Rectangle {
                             color: Colors.black
 
                             border.width: 1
-                            border.color: Colors.cyan
+                            border.color: skyBand.accentColor
 
                             Rectangle {
                                 x: 2
@@ -1020,7 +1024,7 @@ Rectangle {
 
                                 height: parent.height - 4
 
-                                color: Colors.cyan
+                                color: skyBand.accentColor
                             }
                         }
                     }
@@ -1061,7 +1065,7 @@ Rectangle {
 
                 z: -1
 
-                color: Colors.orange
+                color: skyBand.accentColor
 
                 opacity: skyBand.selected ? 0.28 : skyMouse.containsMouse ? 0.18 : 0
 
@@ -1089,6 +1093,8 @@ Rectangle {
             color: Colors.black
 
             readonly property bool selected: home.activeDomain === "ground"
+            // One consistent domain color for section heading, track and live fill.
+            readonly property color accentColor: Colors.green
 
             Rectangle {
                 anchors.left: parent.left
@@ -1097,7 +1103,7 @@ Rectangle {
 
                 width: 3
 
-                color: groundBand.selected ? Colors.orange : groundMouse.containsMouse ? Colors.orange : Colors.cyan
+                color: groundBand.accentColor
             }
 
             Text {
@@ -1115,7 +1121,7 @@ Rectangle {
 
                 font.pixelSize: 20
 
-                color: groundBand.selected ? Colors.orange : groundMouse.containsMouse ? Colors.orange : Colors.cyan
+                color: groundBand.accentColor
             }
 
             Text {
@@ -1199,7 +1205,7 @@ Rectangle {
                         color: Colors.black
 
                         border.width: 1
-                        border.color: Colors.cyan
+                        border.color: groundBand.accentColor
 
                         Rectangle {
                             x: 2
@@ -1210,7 +1216,7 @@ Rectangle {
 
                             height: parent.height - 4
 
-                            color: home.aqiColor
+                            color: groundBand.accentColor
                         }
                     }
                 }
@@ -1251,7 +1257,7 @@ Rectangle {
                         color: Colors.black
 
                         border.width: 1
-                        border.color: Colors.cyan
+                        border.color: groundBand.accentColor
 
                         Rectangle {
                             x: 2
@@ -1262,7 +1268,7 @@ Rectangle {
 
                             height: parent.height - 4
 
-                            color: Colors.cyan
+                            color: groundBand.accentColor
                         }
                     }
                 }
@@ -1303,7 +1309,7 @@ Rectangle {
                         color: Colors.black
 
                         border.width: 1
-                        border.color: Colors.cyan
+                        border.color: groundBand.accentColor
 
                         Rectangle {
                             x: 2
@@ -1314,7 +1320,7 @@ Rectangle {
 
                             height: parent.height - 4
 
-                            color: Colors.cyan
+                            color: groundBand.accentColor
                         }
                     }
                 }
@@ -1394,7 +1400,7 @@ Rectangle {
 
                 z: -1
 
-                color: Colors.orange
+                color: groundBand.accentColor
 
                 opacity: groundBand.selected ? 0.28 : groundMouse.containsMouse ? 0.18 : 0
 

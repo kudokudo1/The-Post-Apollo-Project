@@ -41,6 +41,7 @@ PanelWindow {
     readonly property int frameWidth: 1000
     readonly property int frameHeight: 700
     readonly property int glowGutter: 12
+    readonly property int frameInset: 8
 
     function toggle() {
         menuOpen = !menuOpen;
@@ -140,7 +141,9 @@ PanelWindow {
 
     screen: Quickshell.screens.find(s => s.name === "DP-5")
     implicitWidth: frameWidth + glowGutter * 2
-    implicitHeight: frameHeight + glowGutter * 2
+    // Leave glow room on the sides and bottom, but let the visible chassis
+    // touch the top edge of the display without an empty strip.
+    implicitHeight: frameHeight + glowGutter
 
     anchors {
         top: true
@@ -149,7 +152,7 @@ PanelWindow {
         right: false
     }
     margins {
-        top: 70
+        top: 0
         left: Math.max(0, Math.round(
             ((hub.screen ? hub.screen.width : 2560) - hub.implicitWidth) / 2))
     }
@@ -168,7 +171,7 @@ PanelWindow {
     visible: true
     mask: Region {
         x: hub.glowGutter
-        y: hub.glowGutter
+        y: 0
         width: hub.menuOpen ? hub.frameWidth : 0
         height: hub.menuOpen ? hub.frameHeight : 0
     }
@@ -291,14 +294,15 @@ PanelWindow {
     WindowPanelFrame {
         anchors.fill: parent
         anchors.margins: hub.glowGutter
+        anchors.topMargin: 0
         visible: hub.menuOpen
         glowVisible: hub.menuOpen
-        glowColor: Colors.cyan
+        glowColor: Colors.magenta
         fillColor: Colors.black
         fillOpacity: 0.96
-        borderColor: Colors.cyan
+        borderColor: Colors.magenta
         borderWidth: 1
-        radius: 5
+        radius: 0
 
         HoverHandler {
             enabled: hub.menuOpen
@@ -306,6 +310,18 @@ PanelWindow {
                 if (hovered)
                     hub.keyboardOwnershipRequested();
             }
+        }
+
+        // Hospital/Git chassis variant: square, cyan inner outline separated
+        // from the magenta outer frame by an eight-pixel inset.
+        Rectangle {
+            id: hubInnerFrame
+            anchors.fill: parent
+            anchors.margins: hub.frameInset
+            color: "transparent"
+            border.width: 1
+            border.color: Colors.cyan
+            opacity: 0.70
         }
 
         Column {
@@ -326,7 +342,7 @@ PanelWindow {
                     verticalAlignment: Text.AlignVCenter
                     font.pixelSize: 18
                     font.weight: 700
-                    color: Colors.cyan
+                    color: Colors.magenta
                     text: "APOLLO // HUB"
                 }
                 ActionButton {
@@ -377,6 +393,13 @@ PanelWindow {
                     wideGlowHoverOpacity: 0.32
                     onLeftClicked: hub.menuOpen = false
                 }
+            }
+
+            Rectangle {
+                id: headerDivider
+                width: parent.width
+                height: 2
+                color: Colors.cyan
             }
 
             Row {
@@ -505,8 +528,13 @@ PanelWindow {
             Flickable {
                 id: tileScroll
                 width: parent.width
-                height: Math.max(100, hubColumn.height - header.height - modeStrip.height
-                                 - subStrip.height - editRow.height - 5 * hubColumn.spacing)
+                // Reserve the footer and divider *inside* the fixed panel.
+                // Edit mode has seven visible Column children; view has six.
+                height: Math.max(100, hubColumn.height - header.height
+                                 - headerDivider.height - modeStrip.height
+                                 - subStrip.height - editRow.height
+                                 - statusFooter.height
+                                 - (hub.editMode ? 6 : 5) * hubColumn.spacing)
                 contentWidth: width
                 contentHeight: tileFlow.height
                 clip: true
@@ -545,8 +573,10 @@ PanelWindow {
             }
 
             GohuText {
+                id: statusFooter
                 width: parent.width
-                height: 22
+                height: 26
+                verticalAlignment: Text.AlignVCenter
                 color: Colors.cyan
                 opacity: 0.8
                 font.pixelSize: 11

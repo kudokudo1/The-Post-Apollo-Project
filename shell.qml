@@ -677,6 +677,7 @@ PanelWindow {
                 anchors.fill: parent
 
                 weatherStationWindow: weatherStationWindow
+                weatherService: weatherService
             }
 
             WeatherStationW {

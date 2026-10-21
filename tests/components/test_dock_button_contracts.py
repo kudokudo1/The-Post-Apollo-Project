@@ -157,11 +157,11 @@ DOCK_MODULES = {
     ),
     "modules/Weather.qml": (
         "DockButton {",
-        "implicitWidth: 90",
+        "Math.max(90, Math.ceil(weatherText.implicitWidth) + 18)",
         "implicitHeight: 50",
         "open: menuOpen",
-        "normalForegroundColor: Colors.orange",
-        "normalDockGlowColor: Colors.orange",
+        "normalForegroundColor: weatherColor",
+        "normalDockGlowColor: weatherColor",
     ),
 }
 

@@ -59,9 +59,18 @@ impl ZellijPlugin for UpdateReviewHeader {
         } else {
             " ".repeat(columns)
         };
-        // ANSI true color belongs only to Zellij plugin pane rendering.
-        // No terminal control codes are passed to any updater.
-        print!("\x1b[48;2;27;6;35m\x1b[38;2;199;78;199m{}\x1b[0m", printable);
+        // The header is magenta; the interactive X is red only after the
+        // operator granted the minimal ChangeApplicationState permission.
+        // This plugin never reads update contents or invokes the updater.
+        let prefix_len = printable.len().saturating_sub(x.len());
+        let (prefix, close) = printable.split_at(prefix_len);
+        let x_color = if self.detach_allowed {
+            "\x1b[38;2;209;96;65m"
+        } else {
+            "\x1b[38;2;110;110;110m"
+        };
+        print!("\x1b[48;2;27;6;35m\x1b[38;2;199;78;199m{}{}{}\x1b[0m",
+               prefix, x_color, close);
     }
 }
 

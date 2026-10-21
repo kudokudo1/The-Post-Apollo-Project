@@ -130,6 +130,22 @@ for ident in ("market", "agentic"):
 assert menu.count("coreSize:") == 3
 assert "scale: Math.min(1, mainIcon.width" in menu
 assert "scale: Math.min(1, subIcon.width" in menu
+# Ornaments are vertically centered relative to the larger core glyph
+# while retaining the 15/12 px small decorations and original source strings.
+for row_id, ornament_px, expected_color in (
+    ("mainGlyphParts", 15, "mainModeButton.primaryColor"),
+    ("subGlyphParts", 12, "budgetSubButton.foregroundColor"),
+):
+    row = menu[menu.index("id: " + row_id):]
+    for ornament in ("prefix", "suffix"):
+        marker = 'text: modelData.' + ornament + ' || ""'
+        pos = row.index(marker)
+        block = row[row.rfind("GohuText {", 0, pos):row.index("}", pos)]
+        assert "anchors.verticalCenter: parent.verticalCenter" in block, (row_id, ornament)
+        assert f"font.pixelSize: {ornament_px}" in block, (row_id, ornament)
+        assert f"color: {expected_color}" in block, (row_id, ornament)
+assert menu.count('anchors.verticalCenter: parent.verticalCenter') >= 6
+
 
 # Permanent Omnitrix vertical line with independent, source-safe glow.
 divider = menu[menu.index("id: mainRailDivider"):menu.index("id: workArea")]

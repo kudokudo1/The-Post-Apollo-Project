@@ -84,6 +84,9 @@ test("CLI has no budget mutator or auto-start feature", async () => {
   const cli = await readFile(new URL("../../scripts/finance/read_budget.mjs",
     import.meta.url),"utf8");
   assert.ok(cli.includes('ACTUAL_PASSWORD_FILE'));
+  assert.ok(cli.includes('ACTUAL_SYNC_ID_FILE'));
+  assert.ok(cli.includes('".config", "financew", "actual-sync-id"'));
+  assert.ok(cli.includes('".config", "financew", "actual-password"'));
   assert.ok(cli.includes('await rm(directory, {recursive: true, force: true})'));
   for(const forbidden of ["setBudgetAmount(","createAccount(","runBankSync(",
     "updateTransaction(","execSync(","setInterval("]) {

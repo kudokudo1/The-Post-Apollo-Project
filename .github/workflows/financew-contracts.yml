@@ -8,6 +8,8 @@ on:
     paths:
       - "modules/Finance.qml"
       - "widgets/FinanceW.qml"
+      - "services/finance/**"
+      - "tests/finance/test_finance_budget_ui_contracts.py"
       - "shell.qml"
       - "tests/components/test_finance_dock_contracts.py"
       - "tests/components/test_finance_navigation_contracts.py"
@@ -16,6 +18,8 @@ on:
     paths:
       - "modules/Finance.qml"
       - "widgets/FinanceW.qml"
+      - "services/finance/**"
+      - "tests/finance/test_finance_budget_ui_contracts.py"
       - "shell.qml"
       - "tests/components/test_finance_dock_contracts.py"
       - "tests/components/test_finance_navigation_contracts.py"
@@ -33,3 +37,5 @@ jobs:
         run: python3 tests/components/test_finance_dock_contracts.py
       - name: Validate FinanceW navigation and reserved slots
         run: python3 tests/components/test_finance_navigation_contracts.py
+      - name: Verify local read-only FinanceW Budget UI
+        run: python3 tests/finance/test_finance_budget_ui_contracts.py

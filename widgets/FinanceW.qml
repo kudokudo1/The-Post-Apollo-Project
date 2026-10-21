@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import "../components"
+import "../services/finance" as FinanceServices
 
 // FinanceW navigation scaffold only. No services, money data, or input editors.
 PanelWindow {
@@ -13,6 +14,17 @@ PanelWindow {
     property bool relationshipFocusModeActive: false
     property bool relationshipFocused: false
     signal keyboardOwnershipRequested()
+
+    FinanceServices.FinanceBudgetReadService {
+        id: financeBudget
+    }
+
+    function moneyText(cents) {
+        if (!Number.isSafeInteger(cents))
+            return "—";
+        return (cents < 0 ? "-$" : "$")
+            + (Math.abs(cents) / 100).toFixed(2);
+    }
 
     // Independent navigation state; no financial services are attached.
     readonly property var mainModes: [
@@ -683,7 +695,159 @@ PanelWindow {
                 border.color: Colors.cyan
                 opacity: 0.78
 
+                // Read only on explicit REFRESH. Snapshot never saved to disk.
+                Column {
+                    id: actualBudgetPage
+                    anchors.fill: parent
+                    anchors.margins: 9
+                    spacing: 9
+                    visible: root.selectedMainMode === "budget"
+                             && root.selectedBudgetSubMode === "budget"
+
+                    Row {
+                        width: parent.width
+                        spacing: 7
+
+                        GohuText {
+                            width: parent.width - refreshBudget.width - 7
+                            height: 30
+                            verticalAlignment: Text.AlignVCenter
+                            text: financeBudget.state === "ready"
+                                  ? "ACTUAL // READ ONLY"
+                                  : financeBudget.state === "loading"
+                                  ? "ACTUAL // READING"
+                                  : "ACTUAL // NOT LOADED"
+                            font.pixelSize: 10
+                            color: Colors.cyan
+                            elide: Text.ElideRight
+                        }
+                        ActionButton {
+                            id: refreshBudget
+                            width: 78
+                            height: 30
+                            label: financeBudget.loading ? "LOADING" : "REFRESH"
+                            labelPixelSize: 10
+                            accentColor: Colors.omnitrix
+                            available: !financeBudget.loading
+                            onLeftClicked: financeBudget.refresh()
+                        }
+                    }
+
+                    GohuText {
+                        visible: financeBudget.state === "ready"
+                        text: "MONTH " + (financeBudget.snapshot
+                                          ? financeBudget.snapshot.month : "")
+                              + "   |   TO BUDGET "
+                              + root.moneyText(financeBudget.snapshot
+                                  ? financeBudget.snapshot.toBudgetCents : null)
+                        font.pixelSize: 11
+                        color: Colors.white
+                        width: parent.width
+                        elide: Text.ElideRight
+                    }
+
+                    GohuText {
+                        visible: financeBudget.state !== "ready"
+                        text: financeBudget.message
+                        textFormat: Text.PlainText
+                        font.pixelSize: 11
+                        color: Colors.white
+                        width: parent.width
+                        wrapMode: Text.WordWrap
+                    }
+
+                    Flickable {
+                        id: budgetScroll
+                        width: parent.width
+                        height: Math.max(0, actualBudgetPage.height - y - 4)
+                        visible: financeBudget.state === "ready"
+                        clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+                        contentHeight: budgetList.implicitHeight
+
+                        Column {
+                            id: budgetList
+                            width: budgetScroll.width
+                            spacing: 7
+
+                            GohuText {
+                                text: "ACCOUNTS"
+                                font.pixelSize: 12
+                                color: Colors.omnitrix
+                            }
+                            Repeater {
+                                model: financeBudget.snapshot
+                                       ? financeBudget.snapshot.accounts : []
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    width: budgetList.width
+                                    height: 42
+                                    color: Colors.black
+                                    border.color: Colors.omnitrix
+                                    GohuText {
+                                        anchors.left: parent.left
+                                        anchors.top: parent.top
+                                        anchors.right: parent.right
+                                        anchors.margins: 5
+                                        text: modelData.name
+                                        textFormat: Text.PlainText
+                                        font.pixelSize: 10
+                                        color: Colors.white
+                                        elide: Text.ElideRight
+                                    }
+                                    GohuText {
+                                        anchors.left: parent.left
+                                        anchors.bottom: parent.bottom
+                                        anchors.margins: 5
+                                        text: root.moneyText(modelData.balanceCents)
+                                        font.pixelSize: 11
+                                        color: Colors.omnitrix
+                                    }
+                                }
+                            }
+
+                            GohuText {
+                                text: "CATEGORIES"
+                                font.pixelSize: 12
+                                color: Colors.cyan
+                            }
+                            Repeater {
+                                model: financeBudget.snapshot
+                                       ? financeBudget.snapshot.categories : []
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    width: budgetList.width
+                                    height: 45
+                                    color: Colors.black
+                                    border.color: Colors.cyan
+                                    GohuText {
+                                        anchors.top: parent.top
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.margins: 5
+                                        text: modelData.name
+                                        textFormat: Text.PlainText
+                                        font.pixelSize: 10
+                                        color: Colors.white
+                                        elide: Text.ElideRight
+                                    }
+                                    GohuText {
+                                        anchors.left: parent.left
+                                        anchors.bottom: parent.bottom
+                                        anchors.margins: 5
+                                        text: "SET " + root.moneyText(modelData.budgetedCents)
+                                              + "   LEFT " + root.moneyText(modelData.availableCents)
+                                        font.pixelSize: 9
+                                        color: Colors.omnitrix
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 GohuText {
+                    visible: !actualBudgetPage.visible
                     anchors.top: parent.top
                     anchors.topMargin: 16
                     anchors.horizontalCenter: parent.horizontalCenter

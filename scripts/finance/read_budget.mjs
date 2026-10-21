@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // FinanceW read-only Actual probe. Run manually; no startup hooks or writers.
 import {readFile, stat, mkdtemp, rm, chmod} from "node:fs/promises";
-import {tmpdir} from "node:os";
+import {tmpdir, homedir} from "node:os";
 import {join} from "node:path";
 import {validMonth, localServerUrl, takeReadOnlySnapshot} from "./actual_readonly.mjs";
 
@@ -10,8 +10,8 @@ function monthNow() {
   return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0");
 }
 
-async function protectedSecret(envName) {
-  const filename = process.env[envName];
+async function protectedSecret(envName, fallback) {
+  const filename = process.env[envName] || fallback;
   if (!filename) throw new Error("missing-" + envName.toLowerCase());
   const info = await stat(filename);
   if (!info.isFile() || (info.mode & 0o077) !== 0) {
@@ -25,14 +25,24 @@ async function protectedSecret(envName) {
 async function run() {
   // Refuse to connect to a non-local URL or emit a partial snapshot.
   const serverURL = localServerUrl(process.env.ACTUAL_SERVER_URL);
-  const syncId = process.env.ACTUAL_SYNC_ID;
+  // UI reads the ID from a private local file; legacy manual env probes work.
+  let syncId = process.env.ACTUAL_SYNC_ID;
+  if (!syncId) {
+    try {
+      syncId = await protectedSecret("ACTUAL_SYNC_ID_FILE",
+        join(homedir(), ".config", "financew", "actual-sync-id"));
+    } catch {
+      throw new Error("missing-or-invalid-sync-id");
+    }
+  }
   if (!syncId || !/^[a-zA-Z0-9-]{8,80}$/.test(syncId)) {
     throw new Error("missing-or-invalid-sync-id");
   }
   const month = process.env.FINANCEW_MONTH || monthNow();
   if (!validMonth(month)) throw new Error("invalid-month");
 
-  const password = await protectedSecret("ACTUAL_PASSWORD_FILE");
+  const password = await protectedSecret("ACTUAL_PASSWORD_FILE",
+    join(homedir(), ".config", "financew", "actual-password"));
   const encryptionPassword = process.env.ACTUAL_ENCRYPTION_PASSWORD_FILE
     ? await protectedSecret("ACTUAL_ENCRYPTION_PASSWORD_FILE") : null;
 

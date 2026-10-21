@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Source contracts for the FinanceW UI-only navigation scaffold."""
+"""Source contracts for FinanceW navigation and icon controls."""
 
 from pathlib import Path
 
@@ -38,7 +38,8 @@ assert "root.keyboardOwnershipRequested();" in menu
 
 # Reuse the standard controls instead of introducing custom MouseAreas.
 assert menu.count("ModeButton {") == 1
-assert menu.count("ActionButton {") == 2
+# Close button, three delegated Budget sub-mode buttons, and new manual REFRESH.
+assert menu.count("ActionButton {") == 3
 assert "MouseArea {" not in menu
 
 # Distinct header, divider, and canonical U+00D7 close control.

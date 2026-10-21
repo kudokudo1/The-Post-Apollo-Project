@@ -85,13 +85,19 @@ assert.match(dock, /WeatherDockPolicy\.formatTemperature\([\s\S]*?weatherFresh,[
 assert.match(dock, /id:\s*weatherCondition[\s\S]*?text:\s*weatherDock\.weatherState\.icon[\s\S]*?font\.pixelSize:\s*32/);
 assert.match(dock, /id:\s*weatherTemperatureValue[\s\S]*?text:\s*weatherDock\.temperatureLabel\.slice\(0, -2\)[\s\S]*?font\.pixelSize:\s*20/);
 assert.match(dock, /id:\s*weatherTemperatureUnit[\s\S]*?text:\s*weatherDock\.temperatureLabel\.slice\(-1\)[\s\S]*?font\.pixelSize:\s*20/);
-assert.match(dock, /id:\s*weatherDegree[\s\S]*?text:\s*"°"[\s\S]*?font\.pixelSize:\s*20[\s\S]*?color:\s*weatherDock\.open\s*\|\|\s*weatherDock\.pressed[\s\S]*?Colors\.magenta[\s\S]*?weatherDock\.hovered\s*\?\s*Colors\.orange\s*:\s*Colors\.white/);
+assert.match(dock, /id:\s*weatherDegree[\s\S]*?text:\s*"°"[\s\S]*?font\.pixelSize:\s*20[\s\S]*?color:\s*weatherDock\.open\s*\?\s*Colors\.magenta[\s\S]*?weatherDock\.pressed\s*\?\s*Colors\.white[\s\S]*?weatherDock\.hovered\s*\?\s*Colors\.orange\s*:\s*Colors\.white/);
 assert.match(dock, /SafeDropShadow\s*\{[^}]*safeSource:\s*weatherDegree[^}]*color:\s*weatherDock\.open\s*\|\|\s*weatherDock\.pressed\s*\?\s*Colors\.magenta\s*:\s*Colors\.orange/s);
-assert.match(dock, /id:\s*weatherContent[\s\S]*?spacing:\s*6/);
+assert.match(dock, /id:\s*weatherContent[\s\S]*?anchors\.horizontalCenterOffset:\s*2[\s\S]*?spacing:\s*6/);
 assert.match(dock, /id:\s*weatherReadout[\s\S]*?spacing:\s*0/);
 assert.match(dock, /id:\s*weatherTemperature[\s\S]*?spacing:\s*0/);
 assert.match(dock, /contentGlowSource:\s*weatherContent/);
 assert.match(dock, /opacity:\s*weatherDock\.contentGlowOpacity/);
+assert.match(dock, /pressedContentGlowColor:\s*Colors\.magenta/);
+assert.match(dock, /pressedDockGlowColor:\s*Colors\.magenta/);
+assert.match(dock, /openForegroundColor:\s*Colors\.magenta/);
+assert.match(dock, /openGlowColor:\s*Colors\.magenta/);
+assert.match(dock, /pressedForegroundColor:\s*weatherColor/);
+assert.match(dock, /implicitWidth:\s*Math\.ceil\(weatherContent\.implicitWidth\)\s*\+\s*6/);
 // Idle uses observed weather colors; interaction takes the standard orange -> magenta path.
 for (const [property, color] of [
     ["normalForegroundColor", "weatherColor"],
@@ -100,7 +106,7 @@ for (const [property, color] of [
     ["hoverForegroundColor", "Colors.orange"],
     ["hoverContentGlowColor", "Colors.orange"],
     ["hoverDockGlowColor", "Colors.orange"],
-    ["pressedForegroundColor", "Colors.magenta"],
+    ["pressedForegroundColor", "weatherColor"],
     ["pressedContentGlowColor", "Colors.magenta"],
     ["pressedDockGlowColor", "Colors.magenta"],
     ["openForegroundColor", "Colors.magenta"],
@@ -109,7 +115,7 @@ for (const [property, color] of [
 ]) {
     assert.ok(dock.includes(property + ": " + color), property + " should use " + color);
 }
-assert.match(dock, /id:\s*weatherThermometer[\s\S]*?color:\s*weatherDock\.open\s*\|\|\s*weatherDock\.pressed[\s\S]*?Colors\.magenta\s*:\s*Colors\.orange/);
+assert.match(dock, /id:\s*weatherThermometer[\s\S]*?color:\s*weatherDock\.open\s*\?\s*Colors\.magenta\s*:\s*Colors\.orange/);
 assert.match(dock, /id:\s*weatherContent[\s\S]*?spacing:\s*6/);
 assert.ok(dock.indexOf("id: weatherCondition") < dock.indexOf("id: weatherTemperature"));
 assert.ok(dock.indexOf("id: weatherTemperature") < dock.indexOf("id: weatherThermometer"));

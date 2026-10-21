@@ -28,12 +28,14 @@ assert 'NotoText {' in dock
 assert 'textFormat: Text.StyledText' in dock
 assert '⌯⌲ <font color=' in dock
 assert '>🗓</font> ⋆˙⟡' in dock
-assert """text: " ⌯⌲ <font color='" + Colors.magenta + "'>🗓</font> ⋆˙⟡ " """ .strip() in dock
-assert "color: Colors.white" in dock
+assert """text: " ⌯⌲ <font color='" + Colors.orange + "'>🗓</font> ⋆˙⟡ " """ .strip() in dock
+assert "color: dock.foregroundColor" in dock
+assert "normalForegroundColor: Colors.white" in dock
+assert "openForegroundColor: Colors.magenta" in dock
 assert "contentGlowSource: hubMark" in dock
-# Idle rear/wide chassis halo is orange; glyph sampling and active dock
-# states remain magenta without disturbing the reactive glow-tracking repair.
-assert "normalDockGlowColor: Colors.orange" in dock
+# Keep every chassis/artwork halo magenta, with reactive glow tracking.
+# Only the ornaments switch white -> magenta on open; Calendar stays orange.
+assert "normalDockGlowColor: Colors.magenta" in dock
 assert "trackArtworkGlowLocally: true" in dock
 for glow in ("hoverDockGlowColor", "pressedDockGlowColor", "openGlowColor",
              "normalContentGlowColor", "hoverContentGlowColor",

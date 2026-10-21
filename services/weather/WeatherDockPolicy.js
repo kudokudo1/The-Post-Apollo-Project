@@ -52,11 +52,11 @@ function classify(reading) {
                             305, 308, 311, 314, 353, 356, 359]) ||
         /rain|drizzle|shower/.test(desc))
         return state("blue", "☂︎", "RAIN");
+    if (code === 116 || /partly sunny|partly cloudy/.test(desc))
+        return state("orange", "🌤︎", "PARTLY SUNNY");
     if (includesCode(code, [119, 122, 143, 248, 260]) ||
         /cloud|overcast|fog|mist|haze/.test(desc))
         return state("yellow", "☁︎", "CLOUDS / FOG");
-    if (code === 116 || /partly sunny|partly cloudy/.test(desc))
-        return state("orange", "🌤︎", "PARTLY SUNNY");
     if (code === 113 || /sunny|clear/.test(desc))
         return state("orange", "☀︎", "SUNNY / CLEAR");
 

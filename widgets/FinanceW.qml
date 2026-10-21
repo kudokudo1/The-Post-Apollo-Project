@@ -18,10 +18,10 @@ PanelWindow {
     readonly property var mainModes: [
         { id: "budget", name: "Budget", icon: "⋆$🗓₊˚" },
         { id: "market", name: "Market", icon: "₊˚$🗠๋࣭⭑", prefix: "₊˚", core: "$🗠๋࣭", suffix: "⭑" },
-        { id: "radar", name: "Radar", icon: "࣪ ˖(˓🛰₊˚⊹", prefix: "࣪ ˖(˓", core: "🛰", suffix: "₊˚⊹" },
+        { id: "radar", name: "Radar", icon: "࣪ ˖(˓🛰₊˚⊹", prefix: "࣪ ˖(˓", core: "🛰", suffix: "₊˚⊹", coreSize: 30 },
         { id: "research", name: "Research", icon: "⋆˚🗃₊" },
-        { id: "strategies", name: "Strategies", icon: "˙°⚖︎๋࣭⭑", prefix: "˙°", core: "⚖︎๋࣭", suffix: "⭑" },
-        { id: "safety", name: "Safety", icon: "🛡๋࣭⭑", prefix: "", core: "🛡๋࣭", suffix: "⭑" },
+        { id: "strategies", name: "Strategies", icon: "˙°⚖︎๋࣭⭑", prefix: "˙°", core: "⚖︎๋࣭", suffix: "⭑", coreSize: 28 },
+        { id: "safety", name: "Safety", icon: "🛡๋࣭⭑", prefix: "", core: "🛡๋࣭", suffix: "⭑", coreSize: 28 },
         { id: "agentic", name: "Agentic", icon: "⋆˚⚡︎๋࣭⭑", prefix: "⋆˚", core: "⚡︎๋࣭", suffix: "⭑" },
         { id: "later-shop", name: "Later", icon: "🛍", future: true },
         { id: "later-print", name: "Later", icon: "🖨", future: true }
@@ -444,7 +444,7 @@ PanelWindow {
                             }
                             GohuText {
                                 text: modelData.core || ""
-                                font.pixelSize: 34
+                                font.pixelSize: modelData.coreSize || 34
                                 color: mainModeButton.primaryColor
                             }
                             GohuText {

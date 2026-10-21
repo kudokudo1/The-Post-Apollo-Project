@@ -733,14 +733,52 @@ PanelWindow {
                         }
                     }
 
+                    // Selecting another month clears the previous month
+                    // so figures can never be displayed under a wrong date.
+                    Row {
+                        id: financeMonthRail
+                        width: parent.width
+                        spacing: 7
+
+                        ActionButton {
+                            id: previousBudgetMonth
+                            width: 40
+                            height: 28
+                            label: "‹"
+                            labelPixelSize: 16
+                            accentColor: Colors.cyan
+                            available: !financeBudget.loading
+                            onLeftClicked: financeBudget.shiftMonth(-1)
+                        }
+                        GohuText {
+                            width: parent.width - previousBudgetMonth.width
+                                   - nextBudgetMonth.width - financeMonthRail.spacing * 2
+                            height: 28
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                            text: financeBudget.selectedMonth
+                            textFormat: Text.PlainText
+                            font.pixelSize: 13
+                            color: Colors.white
+                        }
+                        ActionButton {
+                            id: nextBudgetMonth
+                            width: 40
+                            height: 28
+                            label: "›"
+                            labelPixelSize: 16
+                            accentColor: Colors.cyan
+                            available: !financeBudget.loading
+                            onLeftClicked: financeBudget.shiftMonth(1)
+                        }
+                    }
+
                     GohuText {
                         visible: financeBudget.state === "ready"
-                        text: "MONTH " + (financeBudget.snapshot
-                                          ? financeBudget.snapshot.month : "")
-                              + "   |   TO BUDGET "
+                        text: "TO BUDGET "
                               + root.moneyText(financeBudget.snapshot
                                   ? financeBudget.snapshot.toBudgetCents : null)
-                        font.pixelSize: 11
+                        font.pixelSize: 13
                         color: Colors.white
                         width: parent.width
                         elide: Text.ElideRight
@@ -817,9 +855,17 @@ PanelWindow {
                                 delegate: Rectangle {
                                     required property var modelData
                                     width: budgetList.width
-                                    height: 45
+                                    height: 76
                                     color: Colors.black
-                                    border.color: Colors.cyan
+                                    border.color: modelData.availableCents < 0
+                                                  ? Colors.magenta : Colors.cyan
+                                    readonly property real usageRatio:
+                                        modelData.budgetedCents > 0
+                                        ? Math.max(0, Math.min(1,
+                                            Math.max(0, -modelData.spentCents)
+                                            / modelData.budgetedCents))
+                                        : 0
+
                                     GohuText {
                                         anchors.top: parent.top
                                         anchors.left: parent.left
@@ -833,12 +879,41 @@ PanelWindow {
                                     }
                                     GohuText {
                                         anchors.left: parent.left
+                                        anchors.top: parent.top
+                                        anchors.topMargin: 24
+                                        anchors.leftMargin: 5
+                                        text: "SET " + root.moneyText(modelData.budgetedCents)
+                                              + "  NET SPENT " + root.moneyText(modelData.spentCents)
+                                        textFormat: Text.PlainText
+                                        font.pixelSize: 9
+                                        color: Colors.cyan
+                                    }
+                                    GohuText {
+                                        anchors.left: parent.left
+                                        anchors.top: parent.top
+                                        anchors.topMargin: 42
+                                        anchors.leftMargin: 5
+                                        text: "LEFT " + root.moneyText(modelData.availableCents)
+                                              + (modelData.availableCents < 0
+                                                 ? "  // OVERSPENT" : "")
+                                        textFormat: Text.PlainText
+                                        font.pixelSize: 9
+                                        color: modelData.availableCents < 0
+                                               ? Colors.magenta : Colors.omnitrix
+                                    }
+                                    Rectangle {
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
                                         anchors.bottom: parent.bottom
                                         anchors.margins: 5
-                                        text: "SET " + root.moneyText(modelData.budgetedCents)
-                                              + "   LEFT " + root.moneyText(modelData.availableCents)
-                                        font.pixelSize: 9
-                                        color: Colors.omnitrix
+                                        height: 3
+                                        color: Colors.dark
+                                        Rectangle {
+                                            width: parent.width * usageRatio
+                                            height: parent.height
+                                            color: modelData.availableCents < 0
+                                                   ? Colors.magenta : Colors.cyan
+                                        }
                                     }
                                 }
                             }

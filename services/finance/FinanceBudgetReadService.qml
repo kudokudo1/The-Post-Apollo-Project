@@ -10,6 +10,30 @@ Scope {
     property string state: "idle"
     property string message: "Press REFRESH to read your local budget."
     readonly property bool loading: state === "loading"
+    // The selected month changes only on explicit previous/next navigation.
+    // Each new month invalidates the old snapshot until REFRESH is pressed.
+    property string selectedMonth: Qt.formatDate(new Date(), "yyyy-MM")
+
+    function shiftMonth(direction) {
+        if (loading || probe.running || (direction !== 1 && direction !== -1))
+            return false;
+        const parts = selectedMonth.split("-");
+        if (parts.length !== 2)
+            return false;
+        const monthIndex = Number(parts[0]) * 12 + Number(parts[1]) - 1
+                           + direction;
+        const nextYear = Math.floor(monthIndex / 12);
+        const nextMonth = monthIndex - nextYear * 12 + 1;
+        if (nextYear < 1900 || nextYear > 2099
+                || nextMonth < 1 || nextMonth > 12)
+            return false;
+        selectedMonth = String(nextYear) + "-"
+                        + String(nextMonth).padStart(2, "0");
+        snapshot = null;
+        state = "idle";
+        message = "Press REFRESH to read the selected month.";
+        return true;
+    }
 
     function fail(reason) {
         snapshot = null;
@@ -31,7 +55,7 @@ Scope {
                 ACTUAL_SYNC_ID_FILE: null,
                 ACTUAL_PASSWORD_FILE: null,
                 ACTUAL_SERVER_URL: "http://127.0.0.1:5007",
-                FINANCEW_MONTH: null
+                FINANCEW_MONTH: selectedMonth
             })
         });
         return true;
@@ -55,6 +79,7 @@ Scope {
                 || payload.source !== "actual-budget"
                 || payload.readOnly !== true
                 || !/^\d{4}-\d{2}$/.test(String(payload.month || ""))
+                || payload.month !== selectedMonth
                 || !Number.isSafeInteger(payload.toBudgetCents)
                 || !Array.isArray(payload.accounts)
                 || !Array.isArray(payload.categories)

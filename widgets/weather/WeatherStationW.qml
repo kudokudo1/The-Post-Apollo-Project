@@ -11,6 +11,13 @@ PanelWindow {
     property var weatherService: null
     property var spaceService: null
 
+    // Shared keyboard-ownership contract. Weather stays usable with the
+    // existing shell even before shell-level ownership wiring lands because
+    // keyboardActive defaults true and OnDemand never traps desktop typing.
+    property bool keyboardActive: true
+    property bool keyboardLock: false
+    signal keyboardOwnershipRequested()
+
     property bool menuOpen: false
     property bool relationshipFocusModeActive: false
     property bool relationshipFocused: false
@@ -20,7 +27,9 @@ PanelWindow {
     // A keyboard cursor previews rail controls; Enter activates it.
     property int navigationIndex: 0
     readonly property bool standardKeysAvailable:
-        menuOpen && (!relationshipFocusModeActive || relationshipFocused)
+        menuOpen
+        && keyboardActive
+        && (!relationshipFocusModeActive || relationshipFocused)
 
     readonly property var domains: [
         {
@@ -98,16 +107,28 @@ PanelWindow {
     visible: true
     color: "transparent"
 
+    exclusiveZone: 0
     WlrLayershell.layer: WlrLayer.Overlay
 
-    // Outside Relationship Focus Mode preserve Weather's original policy.
-    // During it only the selected menu can hold exclusive layer input.
+    // Ordinary Weather use is OnDemand so an open widget never monopolizes
+    // keyboard input from normal apps. Preserve Weather's existing Koinoikos
+    // selected-menu behavior until the concurrent shell ownership seam is
+    // available for the same bounded keyboard-lock wiring as Git/Finance.
     WlrLayershell.keyboardFocus:
-        !weatherStation.menuOpen ? WlrKeyboardFocus.None
+        !weatherStation.menuOpen || !weatherStation.keyboardActive
+        ? WlrKeyboardFocus.None
         : weatherStation.relationshipFocusModeActive
         ? (weatherStation.relationshipFocused
            ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None)
-        : WlrKeyboardFocus.Exclusive
+        : weatherStation.keyboardLock
+        ? WlrKeyboardFocus.Exclusive
+        : WlrKeyboardFocus.OnDemand
+    focusable:
+        weatherStation.menuOpen
+        && weatherStation.keyboardActive
+        && (!weatherStation.relationshipFocusModeActive
+            || weatherStation.relationshipFocused)
+    surfaceFormat.opaque: false
 
     anchors {
         top: true
@@ -140,6 +161,81 @@ PanelWindow {
             height: weatherStation.menuOpen && weatherStation.currentView === "terminal" && terminalView.terminalState === "VISIBLE" ? terminalView.bayHeight : 0
 
             intersection: Intersection.Subtract
+        }
+    }
+
+    // Stable keyboard home. Qt can consume Tab as focus-chain navigation
+    // before a WindowShortcut, so the anchor handles the shared navigation
+    // keys locally while the guarded Shortcut entries remain as fallback.
+    Item {
+        id: weatherKeyboardAnchor
+
+        anchors.fill: parent
+        enabled: weatherStation.standardKeysAvailable
+        focus: weatherStation.standardKeysAvailable
+        z: -1000
+
+        Keys.priority: Keys.BeforeItem
+
+        Keys.onShortcutOverride: function(event) {
+            if (!weatherStation.standardKeysAvailable)
+                return;
+
+            if (event.key === Qt.Key_Tab
+                    || event.key === Qt.Key_Backtab
+                    || event.key === Qt.Key_Escape) {
+                event.accepted = true;
+            }
+        }
+
+        Keys.onPressed: function(event) {
+            if (!weatherStation.standardKeysAvailable)
+                return;
+
+            if (event.key === Qt.Key_Escape) {
+                weatherStation.close();
+            } else if (event.key === Qt.Key_Tab
+                       || event.key === Qt.Key_Backtab) {
+                const reverse =
+                    event.key === Qt.Key_Backtab
+                    || (event.modifiers & Qt.ShiftModifier) !== 0;
+                weatherStation.cycleMainMode(reverse ? -1 : 1);
+            } else if ((event.modifiers & Qt.ShiftModifier) !== 0
+                       && (event.key === Qt.Key_Left
+                           || event.key === Qt.Key_Right)) {
+                weatherStation.cycleTopSubMode(
+                    event.key === Qt.Key_Left ? -1 : 1
+                );
+            } else if (event.key === Qt.Key_Up) {
+                weatherStation.moveNavigationCursor(-1);
+            } else if (event.key === Qt.Key_Down) {
+                weatherStation.moveNavigationCursor(1);
+            } else if (event.key === Qt.Key_Return
+                       || event.key === Qt.Key_Enter) {
+                weatherStation.activateNavigationCursor();
+            } else {
+                return;
+            }
+
+            event.accepted = true;
+        }
+    }
+
+    function restoreWeatherKeyboardFocus() {
+        if (weatherStation.standardKeysAvailable)
+            weatherKeyboardAnchor.forceActiveFocus();
+    }
+
+    onKeyboardActiveChanged: {
+        if (weatherStation.menuOpen && weatherStation.keyboardActive)
+            Qt.callLater(weatherStation.restoreWeatherKeyboardFocus);
+    }
+
+    onRelationshipFocusedChanged: {
+        if (weatherStation.menuOpen
+                && (!weatherStation.relationshipFocusModeActive
+                    || weatherStation.relationshipFocused)) {
+            Qt.callLater(weatherStation.restoreWeatherKeyboardFocus);
         }
     }
 
@@ -231,7 +327,9 @@ PanelWindow {
     }
 
     function open() {
+        weatherStation.keyboardOwnershipRequested();
         menuOpen = true;
+        Qt.callLater(weatherStation.restoreWeatherKeyboardFocus);
     }
 
     function close() {
@@ -257,9 +355,15 @@ PanelWindow {
 
         visible: weatherStation.menuOpen
 
-        fillVisible: false
-        borderVisible: false
+        fillVisible: true
+        fillColor: Colors.black
+        fillOpacity: 0.96
+        borderVisible: true
+        borderColor: Colors.cyan
+        borderWidth: 1
+        radius: 0
 
+        glowVisible: weatherStation.menuOpen
         glowColor: Colors.cyan
         closeGlowSpread: 4
         closeGlowOpacity: relationshipFocusModeActive
@@ -310,27 +414,105 @@ PanelWindow {
                 color: Colors.orange
             }
 
-            Text {
-                id: observatoryButton
+            Row {
+                id: headerActions
 
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
+                anchors.rightMargin: 14
 
-                anchors.rightMargin: 22
+                spacing: 8
 
-                text: "[ □ ]"
+                // Observatory expansion is not wired yet. Present it as an
+                // unavailable shared action instead of a fake clickable glyph.
+                ActionButton {
+                    id: observatoryButton
 
-                font.family: "GohuFont 11 Nerd Font Mono"
+                    width: 34
+                    height: 32
 
-                font.pixelSize: 20
+                    label: "□"
+                    labelPixelSize: 18
+                    contentPadding: 4
 
-                color: observatoryMouse.pressed ? Colors.magenta : observatoryMouse.containsMouse ? Colors.orange : Colors.cyan
+                    available: false
+                    interactive: false
+                    accentColor: Colors.cyan
+                    unavailableOpacity: 0.42
+                }
 
-                MouseArea {
-                    id: observatoryMouse
+                // Magenta is the established focus identity. Clicking this
+                // requests Weather keyboard ownership and returns Qt focus to
+                // the navigation anchor without forcing Exclusive layer focus.
+                ActionButton {
+                    id: focusButton
 
-                    anchors.fill: parent
-                    hoverEnabled: true
+                    width: 74
+                    height: 32
+
+                    label: "FOCUS"
+                    labelPixelSize: 10
+                    contentPadding: 6
+                    trackLabelGlowLocally: true
+
+                    accentColor: Colors.magenta
+                    selected:
+                        weatherStation.relationshipFocusModeActive
+                        ? weatherStation.relationshipFocused
+                        : weatherKeyboardAnchor.activeFocus
+
+                    onLeftClicked: {
+                        weatherStation.keyboardOwnershipRequested();
+                        Qt.callLater(
+                            weatherStation.restoreWeatherKeyboardFocus
+                        );
+                    }
+                }
+
+                // Standard Post-Apollo Close / Dismiss glyph: × (U+00D7).
+                ActionButton {
+                    id: closeButton
+
+                    width: 34
+                    height: 32
+
+                    label: "×"
+                    labelPixelSize: 22
+                    contentPadding: 4
+                    trackLabelGlowLocally: true
+
+                    accentColor: Colors.red
+                    destructive: true
+
+                    idleForegroundColor: Colors.red
+                    hoverForegroundColor: Colors.red
+                    selectedForegroundColor: Colors.red
+                    keyboardSelectedForegroundColor: Colors.red
+
+                    hoverBorderColor: Colors.red
+                    selectedBorderColor: Colors.red
+                    keyboardSelectedBorderColor: Colors.red
+
+                    idleContentGlowColor: Colors.red
+                    hoverContentGlowColor: Colors.red
+                    selectedContentGlowColor: Colors.red
+                    keyboardSelectedContentGlowColor: Colors.red
+
+                    softGlowEnabled: true
+                    idleSoftGlowColor: Colors.red
+                    hoverSoftGlowColor: Colors.red
+                    pressedSoftGlowColor: Colors.red
+                    softGlowIdleOpacity: 0.48
+                    softGlowHoverOpacity: 0.70
+
+                    wideGlowEnabled: true
+                    idleWideGlowColor: Colors.red
+                    hoverWideGlowColor: Colors.red
+                    pressedWideGlowColor: Colors.red
+                    wideGlowIdleOpacity: 0.22
+                    wideGlowHoverOpacity: 0.32
+
+                    onLeftClicked: weatherStation.close()
                 }
             }
 

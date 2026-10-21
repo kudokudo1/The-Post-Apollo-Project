@@ -1,0 +1,36 @@
+name: FinanceW Actual read-only probe contracts
+
+on:
+  pull_request:
+    paths:
+      - "scripts/finance/**"
+      - "tests/finance/**"
+      - ".gitignore"
+      - ".github/workflows/financew-actual-probe.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/finance/**"
+      - "tests/finance/**"
+      - ".gitignore"
+      - ".github/workflows/financew-actual-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Syntax check
+        run: |
+          node --check scripts/finance/actual_readonly.mjs
+          node --check scripts/finance/read_budget.mjs
+          node --check tests/finance/test_actual_readonly.mjs
+      - name: Read-only, fake-data snapshot tests
+        run: node --test tests/finance/test_actual_readonly.mjs

@@ -5,6 +5,8 @@ on:
     paths:
       - "scripts/finance/**"
       - "tests/finance/**"
+      - "services/finance/**"
+      - "widgets/FinanceW.qml"
       - ".gitignore"
       - ".github/workflows/financew-actual-probe.yml"
   push:
@@ -12,6 +14,8 @@ on:
     paths:
       - "scripts/finance/**"
       - "tests/finance/**"
+      - "services/finance/**"
+      - "widgets/FinanceW.qml"
       - ".gitignore"
       - ".github/workflows/financew-actual-probe.yml"
   workflow_dispatch:

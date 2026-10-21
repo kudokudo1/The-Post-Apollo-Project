@@ -8,6 +8,18 @@ cli = (root / "scripts/finance/read_budget.mjs").read_text()
 assert 'FinanceServices.FinanceBudgetReadService {' in ui
 assert 'onLeftClicked: financeBudget.refresh()' in ui
 assert 'available: !financeBudget.loading' in ui
+assert 'onLeftClicked: financeBudget.shiftMonth(-1)' in ui
+assert 'onLeftClicked: financeBudget.shiftMonth(1)' in ui
+assert 'text: financeBudget.selectedMonth' in ui
+assert 'root.moneyText(modelData.spentCents)' in ui
+assert 'NET SPENT ' in ui
+assert 'OVERSPENT' in ui
+assert 'Math.max(0, Math.min(1,' in ui
+assert 'function shiftMonth(direction)' in bridge
+assert 'selectedMonth = String(nextYear)' in bridge
+assert 'FINANCEW_MONTH: selectedMonth' in bridge
+assert 'payload.month !== selectedMonth' in bridge
+assert 'if (loading || probe.running || (direction !== 1 && direction !== -1))' in bridge
 assert 'visible: !actualBudgetPage.visible' in ui
 assert 'root.moneyText(modelData.balanceCents)' in ui
 assert 'root.moneyText(modelData.availableCents)' in ui

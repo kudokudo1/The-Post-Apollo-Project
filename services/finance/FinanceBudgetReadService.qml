@@ -15,6 +15,7 @@ Scope {
     property string selectedMonth: Qt.formatDate(new Date(), "yyyy-MM")
     property string inFlightMonth: ""
     property bool pendingRefresh: false
+    property bool requestActive: false
 
     function shiftMonth(direction) {
         if (direction !== 1 && direction !== -1)
@@ -48,7 +49,7 @@ Scope {
     function refresh() {
         // During a slow download, keep the latest selection and fetch it
         // once the current read exits. Repeated opens don't spawn duplicates.
-        if (probe.running) {
+        if (requestActive || probe.running) {
             pendingRefresh = selectedMonth !== inFlightMonth;
             snapshot = null;
             state = "loading";
@@ -58,6 +59,7 @@ Scope {
         }
         pendingRefresh = false;
         inFlightMonth = selectedMonth;
+        requestActive = true;
         snapshot = null;
         state = "loading";
         message = "Reading the local budget.";
@@ -140,6 +142,7 @@ Scope {
         onExited: function(exitCode, exitStatus) {
             // Defer until the process/collectors finish delivering output.
             Qt.callLater(function() {
+                budgetBridge.requestActive = false;
                 if (budgetBridge.pendingRefresh) {
                     budgetBridge.pendingRefresh = false;
                     budgetBridge.state = "idle";

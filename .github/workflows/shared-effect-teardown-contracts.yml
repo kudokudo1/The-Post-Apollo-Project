@@ -11,7 +11,10 @@ on:
       - "widgets/GitW.qml"
       - "components/qmldir"
       - "widgets/notifications/NotificationsHubW.qml"
-      - "widgets/weather/StationHome.qml"\n      - "widgets/weather/StationGround.qml"\n      - "widgets/weather/StationSky.qml"\n      - "widgets/weather/StationSpace.qml"
+      - "widgets/weather/StationHome.qml"
+      - "widgets/weather/StationGround.qml"
+      - "widgets/weather/StationSky.qml"
+      - "widgets/weather/StationSpace.qml"
       - "tests/components/test_safe_shadow_teardown_contracts.py"
       - ".github/workflows/shared-effect-teardown-contracts.yml"
   push:
@@ -26,7 +29,10 @@ on:
       - "widgets/GitW.qml"
       - "components/qmldir"
       - "widgets/notifications/NotificationsHubW.qml"
-      - "widgets/weather/StationHome.qml"\n      - "widgets/weather/StationGround.qml"\n      - "widgets/weather/StationSky.qml"\n      - "widgets/weather/StationSpace.qml"
+      - "widgets/weather/StationHome.qml"
+      - "widgets/weather/StationGround.qml"
+      - "widgets/weather/StationSky.qml"
+      - "widgets/weather/StationSpace.qml"
       - "tests/components/test_safe_shadow_teardown_contracts.py"
       - ".github/workflows/shared-effect-teardown-contracts.yml"
 

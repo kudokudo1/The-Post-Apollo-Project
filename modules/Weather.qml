@@ -146,7 +146,7 @@ DockButton {
                         horizontalOffset: 0
                         verticalOffset: 0
                         transparentBorder: true
-                        opacity: 0.8
+                        opacity: weatherDock.contentGlowOpacity
                         color: weatherDock.open || weatherDock.pressed
                                ? Colors.magenta : Colors.orange
                     }

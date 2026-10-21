@@ -63,26 +63,27 @@ DockButton {
         )
 
     implicitHeight: 50
-    // Dynamic text must remain inside the dock footprint at every temperature.
-    implicitWidth: Math.max(90, Math.ceil(weatherContent.implicitWidth) + 18)
+    // Precisely fit the visible content with 3px left and right padding.
+    // This width follows temperature digits, units, and condition glyph changes.
+    implicitWidth: Math.ceil(weatherContent.implicitWidth) + 6
 
     open: menuOpen
-    // An informational state has to stay legible when its color is yellow.
-    openFillColor: Colors.black
+    // Follow the shared dock recipe: yellow open fill, magenta opened mark/glow.
+    openFillColor: Colors.yellow
 
     normalForegroundColor: weatherColor
-    hoverForegroundColor: weatherColor
-    pressedForegroundColor: weatherColor
-    openForegroundColor: weatherColor
+    hoverForegroundColor: Colors.orange
+    pressedForegroundColor: Colors.magenta
+    openForegroundColor: Colors.magenta
 
     normalContentGlowColor: weatherColor
-    hoverContentGlowColor: weatherColor
-    pressedContentGlowColor: weatherColor
-    openGlowColor: weatherColor
+    hoverContentGlowColor: Colors.orange
+    pressedContentGlowColor: Colors.magenta
+    openGlowColor: Colors.magenta
 
     normalDockGlowColor: weatherColor
-    hoverDockGlowColor: weatherColor
-    pressedDockGlowColor: weatherColor
+    hoverDockGlowColor: Colors.orange
+    pressedDockGlowColor: Colors.magenta
 
     contentGlowSource: weatherContent
     trackArtworkGlowLocally: true
@@ -110,12 +111,11 @@ DockButton {
             color: weatherDock.foregroundColor
         }
 
-        // Keep the weather icon at its existing 6px distance while moving
-        // only the temperature group closer to the thermometer.
+        // Keep the icon-to-data gap at 6px; close only the readout-to-🌡 gap.
         Row {
             id: weatherReadout
             anchors.verticalCenter: parent.verticalCenter
-            spacing: 2
+            spacing: 0
 
             Row {
                 id: weatherTemperature
@@ -146,15 +146,18 @@ DockButton {
                         horizontalOffset: 0
                         verticalOffset: 0
                         transparentBorder: true
-                        opacity: 0.8
-                        color: Colors.orange
+                        opacity: weatherDock.contentGlowOpacity
+                        color: weatherDock.open || weatherDock.pressed
+                               ? Colors.magenta : Colors.orange
                     }
 
                     GohuText {
                         id: weatherDegree
                         text: "°"
                         font.pixelSize: 20
-                        color: Colors.white
+                        color: weatherDock.open || weatherDock.pressed
+                               ? Colors.magenta
+                               : weatherDock.hovered ? Colors.orange : Colors.white
                     }
                 }
 
@@ -172,7 +175,8 @@ DockButton {
                 anchors.verticalCenter: parent.verticalCenter
                 text: "🌡"
                 font.pixelSize: 24
-                color: Colors.orange
+                color: weatherDock.open || weatherDock.pressed
+                       ? Colors.magenta : Colors.orange
             }
         }
     }

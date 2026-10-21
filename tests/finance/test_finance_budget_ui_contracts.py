@@ -17,6 +17,7 @@ assert 'feedStatus === "LIVE" ? Colors.omnitrix' in ui
 assert 'feedStatus === "OFFLINE" || feedStatus === "ERROR" ? Colors.red' in ui
 assert 'financeBudget.state === "ready"' in ui
 assert 'financeBudget.healthStatus === "online" ? "LIVE"' in ui
+assert ui.index('financeBudget.healthStatus === "offline" ? "OFFLINE"') < ui.index('financeBudget.state === "failed" ? "ERROR"')
 assert '!hasBudgetFeed ? "NO FEED"' in ui
 assert 'text: "ACCOUNTS "' in ui
 assert 'root.accountTotalCents()' in ui

@@ -1,0 +1,31 @@
+name: FinanceW dock and portrait menu contracts
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "modules/Finance.qml"
+      - "widgets/FinanceW.qml"
+      - "shell.qml"
+      - "tests/components/test_finance_dock_contracts.py"
+      - ".github/workflows/financew-contracts.yml"
+  pull_request:
+    paths:
+      - "modules/Finance.qml"
+      - "widgets/FinanceW.qml"
+      - "shell.qml"
+      - "tests/components/test_finance_dock_contracts.py"
+      - ".github/workflows/financew-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate FinanceW dock and blank portrait menu source
+        run: python3 tests/components/test_finance_dock_contracts.py

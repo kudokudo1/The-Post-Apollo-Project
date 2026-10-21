@@ -65,8 +65,12 @@ assert "visible: true" in MENU  # do not remap layer-shell for toggles
 assert "visible: root.menuOpen" in MENU  # only the inner chassis hides
 assert "width: root.menuOpen ? root.frameWidth : 0" in MENU
 assert "height: root.menuOpen ? root.frameHeight : 0" in MENU
-assert "WlrLayershell.keyboardFocus: WlrKeyboardFocus.None" in MENU
-assert "focusable: false" in MENU
+assert "WlrKeyboardFocus.None" in MENU
+assert "WlrKeyboardFocus.OnDemand" in MENU
+assert "WlrKeyboardFocus.Exclusive" in MENU
+assert "focusable: root.menuOpen && root.keyboardActive" in MENU
+assert "keyboardLock" in MENU
+assert "id: financeKeyboardAnchor" in MENU
 assert "WindowPanelFrame {" in MENU
 assert "glowColor: Colors.omnitrix" in MENU
 assert "radius: 0" in MENU

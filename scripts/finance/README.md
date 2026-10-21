@@ -1,0 +1,64 @@
+# FinanceW // Actual read-only connection pilot
+
+Stage D1: an isolated data probe, **not yet connected to FinanceW's UI**.
+It does not have Actual mutation methods and does not modify a budget.
+It downloads an isolated disposable API copy, reads the requested month,
+and deletes its private working directory. No automatic polling or startup.
+
+## Local preflight
+
+1. Keep the Actual desktop app's local sync server running (the setup
+   shown in the operator screenshot used `localhost:5007`).
+2. Get the **Sync ID** from Actual: budget Settings → Advanced → Sync ID.
+   Never copy this ID into tracked Git files.
+3. Create a local private password file. Do not paste passwords into chat,
+   Git, commands with echoed arguments, or shell history:
+
+   ```bash
+   mkdir -p -m 700 ~/.config/financew
+   install -m 600 /dev/null ~/.config/financew/actual-password
+   read -rs "FINANCE_SECRET?Actual server password: "
+   printf '%s' "$FINANCE_SECRET" > ~/.config/financew/actual-password
+   unset FINANCE_SECRET
+   ```
+
+   The `read` command above uses **zsh** (the user's shell).
+   On bash use `read -rsp "Actual server password: " FINANCE_SECRET`.
+
+4. On the host with Node.js 22+ installed, install the package into
+   this isolated script directory. `node_modules` is ignored by Git.
+
+   ```bash
+   npm install --prefix ~/.config/quickshell/scripts/finance --no-save --package-lock=false
+   ```
+
+5. Run manually, using your own Sync ID (no need to share it here):
+
+   ```bash
+   export ACTUAL_PASSWORD_FILE="$HOME/.config/financew/actual-password"
+   export ACTUAL_SERVER_URL="http://127.0.0.1:5007"
+   export ACTUAL_SYNC_ID="REPLACE_WITH_SYNC_ID_FROM_ACTUAL"
+   FINANCEW_MONTH=2026-10 node ~/.config/quickshell/scripts/finance/read_budget.mjs
+   unset ACTUAL_SYNC_ID ACTUAL_PASSWORD_FILE ACTUAL_SERVER_URL
+   ```
+
+   Output is **private financial data**. Do not paste raw JSON into chat
+   or save it in this repository. For the fictional test data, verify
+   `toBudgetCents: 20000`, checking `balanceCents: 25000`, and
+   Spotify `availableCents: 5000`.
+
+## Security and limitations
+
+- Read-only API getters for Budget Month and account balances; no writes,
+  sync upload call, bank sync, schedules, or actual account credentials.
+- The Actual API still downloads the budget into a temporary local working
+  copy as part of its normal operation. That directory is mode 0700 and
+  removed on exit; avoid running a real-data budget until local testing passes.
+- The connection is loopback HTTP only, not exposed to your network.
+- The credential file must be a regular file with mode 0600/0400.
+- If data shape differs from the current Actual API, the probe fails
+  instead of inventing balances; report the error code, not the raw JSON.
+- The package is pinned to `@actual-app/api@26.10.0`. A native
+  `better-sqlite3` dependency requires Node.js compatibility.
+- Nothing in FinanceW launches this script yet; UI integration awaits a
+  successful local probe with fictional data.

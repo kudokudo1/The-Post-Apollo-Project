@@ -1,0 +1,12 @@
+{
+  "name": "financew-actual-readonly-probe",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test ../../tests/finance/test_actual_readonly.mjs",
+    "snapshot": "node read_budget.mjs"
+  },
+  "dependencies": {
+    "@actual-app/api": "26.10.0"
+  }
+}

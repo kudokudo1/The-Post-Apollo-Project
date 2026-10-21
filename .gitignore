@@ -37,3 +37,7 @@ git-operation-journal.json
 
 # Local persistent interactive-rebase session state
 git-rebase-sessions.json
+
+# FinanceW local Node adapter dependencies and probe artifacts
+scripts/finance/node_modules/
+scripts/finance/package-lock.json

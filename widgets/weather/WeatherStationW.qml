@@ -153,27 +153,28 @@ PanelWindow {
         return "WEATHER LIVE";
     }
 
-    readonly property string sourceStatusDetail: {
+    readonly property string sourceStatusDisplay: {
         if (currentView !== "home")
-            return "NOT WIRED";
+            return "NO FEED // NOT WIRED";
 
         if (!weatherService)
-            return "NO SERVICE";
+            return "OFFLINE // NO SERVICE";
 
         if (weatherService.loading)
-            return "UPDATING";
+            return "READING // UPDATING";
 
         if (!weatherService.ready)
             return String(weatherService.errorText || "").length > 0
-                   ? "NO LINK" : "WAITING";
+                   ? "OFFLINE // NO LINK" : "CONNECTING // WAITING";
 
         if (weatherAgeMinutes < 0)
-            return "UPDATED";
+            return sourceStatusText;
 
-        if (weatherAgeMinutes === 0)
-            return "UPDATED <1m";
+        const ageText = weatherAgeMinutes === 0
+                        ? "<1m"
+                        : weatherAgeMinutes + "m";
 
-        return "UPDATED " + weatherAgeMinutes + "m";
+        return sourceStatusText + " // " + ageText;
     }
 
     readonly property color sourceStatusColor: {
@@ -550,7 +551,7 @@ PanelWindow {
                 Rectangle {
                     id: sourceStatusIndicator
 
-                    width: 104
+                    width: 164
                     height: 34
                     anchors.verticalCenter: parent.verticalCenter
 
@@ -566,26 +567,12 @@ PanelWindow {
                         color: weatherStation.sourceStatusColor
                     }
 
-                    Column {
+                    GohuText {
                         anchors.centerIn: parent
-                        spacing: 0
-
-                        GohuText {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            text: weatherStation.sourceStatusText
-                            font.pixelSize: 8
-                            color: weatherStation.sourceStatusColor
-                            textFormat: Text.PlainText
-                        }
-
-                        GohuText {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            text: weatherStation.sourceStatusDetail
-                            font.pixelSize: 7
-                            color: weatherStation.sourceStatusColor
-                            opacity: 0.72
-                            textFormat: Text.PlainText
-                        }
+                        text: weatherStation.sourceStatusDisplay
+                        font.pixelSize: 10
+                        color: weatherStation.sourceStatusColor
+                        textFormat: Text.PlainText
                     }
                 }
 

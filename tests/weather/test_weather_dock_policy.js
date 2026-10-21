@@ -59,7 +59,14 @@ const dock = fs.readFileSync(path.join(root, "modules/Weather.qml"), "utf8");
 const shell = fs.readFileSync(path.join(root, "shell.qml"), "utf8");
 assert.match(dock, /weatherStationWindow\.toggle\(\)/);
 assert.match(dock, /implicitHeight:\s*50/);
-assert.match(dock, /Math\.max\(90, Math\.ceil\(weatherText\.implicitWidth\)/);
+assert.match(dock, /Math\.max\(90, Math\.ceil\(weatherContent\.implicitWidth\)/);
+// Keep the original identity glyph while rendering condition and temperature separately.
+assert.match(dock, /id:\s*weatherThermometer[\s\S]*?text:\s*"🌡"[\s\S]*?font\.pixelSize:\s*24/);
+assert.match(dock, /id:\s*weatherCondition[\s\S]*?text:\s*weatherDock\.weatherState\.icon[\s\S]*?font\.pixelSize:\s*32/);
+assert.match(dock, /id:\s*weatherTemperature[\s\S]*?text:\s*weatherDock\.temperatureLabel[\s\S]*?font\.pixelSize:\s*20/);
+assert.match(dock, /contentGlowSource:\s*weatherContent/);
+assert.ok(dock.indexOf("id: weatherThermometer") < dock.indexOf("id: weatherCondition"));
+assert.ok(dock.indexOf("id: weatherCondition") < dock.indexOf("id: weatherTemperature"));
 assert.match(dock, /WeatherDockPolicy\.classify/);
 assert.doesNotMatch(dock, /\bProcess\s*\{/);
 assert.match(shell, /Weather\s*\{[^}]*weatherService:\s*weatherService/s);

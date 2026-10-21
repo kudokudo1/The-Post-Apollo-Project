@@ -60,13 +60,14 @@ and deletes its private working directory. No automatic polling or startup.
   instead of inventing balances; report the error code, not the raw JSON.
 - The package is pinned to `@actual-app/api@26.10.0`. A native
   `better-sqlite3` dependency requires Node.js compatibility.
-- Nothing in FinanceW launches this script yet; UI integration awaits a
-  successful local probe with fictional data.
+- FinanceW invokes the script on menu open, month change, or manual REFRESH.
+  No startup-time shell read and no persistent network polling.
 
 ## Budget screen connection (D3)
 
-FinanceW now reads the local budget **only when REFRESH is pressed**.
-No polling, automatic account mutations, or tracked financial data.
+FinanceW reads the local budget on menu opening, changing months, or
+pressing REFRESH. No persistent polling, automatic account mutations,
+or tracked financial data.
 The user must first save their known Sync ID privately (zsh):
 
 ```zsh
@@ -88,10 +89,10 @@ or a guarantee of live continuous updates.
 ## FinanceW D4: month navigation and category spending
 
 Budget → Budget now has previous/next month controls. Selecting a month
-invalidates the previous in-memory snapshot; use **REFRESH** to read that
-specific month from Actual. No automatic background refresh or mutation
-occurs, and a missing or failed response never shows the last month's
-numbers as the selected month's numbers.
+invalidates the previous in-memory snapshot and automatically starts or
+queues a read for that month. There is no continuous background polling or
+financial mutation, and a missing or failed response never shows the last
+month's numbers as the selected month's numbers.
 
 Category rows show assigned, net spent (the signed value returned by Actual),
 available, an overspent label when the available balance is negative, and a

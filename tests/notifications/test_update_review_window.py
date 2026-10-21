@@ -68,7 +68,7 @@ with tempfile.TemporaryDirectory() as tmp:
         assert not has_header
         assert command[:5] == ["kitty", "--class", mod.WINDOW_APP_ID,
                                "--title", "POST-APOLLO // UPDATE REVIEW"]
-        assert command[-4:] == ["review", "flatpak-system", "a"*24][-4:] if False else command[-3:] == ["review", "flatpak-system", "a"*24]
+        assert command[-3:] == ["review", "flatpak-system", "a"*24]
         # After a separately authorized build/install, Zellij runs an
         # isolated plugin + review command layout with no shell interpolation.
         wasm.parent.mkdir(parents=True)

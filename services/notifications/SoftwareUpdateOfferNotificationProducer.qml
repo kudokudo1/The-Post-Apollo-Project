@@ -104,11 +104,13 @@ Scope {
             Quickshell.execDetached(["gnome-software", "--mode=updates"]);
             return true;
         }
-        // The Python entrypoint rechecks the immutable offer fingerprint.
-        // Flatpaks ask for DOWNLOAD (cache only) or APPLY (deploy).
+        // A dedicated wrapper asks Sway to float/center this Kitty window
+        // and uses the Zellij X header when the plugin is installed.
+        // The review script retains its independent typed authorization.
         Quickshell.execDetached([
-            "kitty", "--hold", "-e", "/usr/bin/python3",
-            producer.script, "review", String(kind), String(token)
+            "/usr/bin/python3",
+            Quickshell.shellPath("scripts/updates/launch_review.py"),
+            String(kind), String(token)
         ]);
         return true;
     }

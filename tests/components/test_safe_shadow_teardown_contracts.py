@@ -45,8 +45,12 @@ for relative, minimum_safe_count in SURFACES.items():
 
 dock = (ROOT / "components" / "DockButton.qml").read_text(encoding="utf-8")
 assert "safeSource: dockButton.contentGlowSource" in dock
-assert "readonly property point sourceOrigin: sourceAttached" in dock
-assert "? dockButton.contentGlowSource.mapToItem(contentLayer, 0, 0)" in dock
+# DockButton now keeps an opt-in reactive local artwork path while the
+# original cross-parent mapping stays the safe default for other docks.
+assert "readonly property bool artworkIsLocalSource:" in dock
+assert "readonly property point sourceOrigin:" in dock
+assert "!sourceAttached ? Qt.point(0, 0)" in dock
+assert "contentGlowSource.mapToItem(contentLayer, 0, 0)" in dock
 assert "requestedVisible: dockButton.contentGlowEnabled" in dock
 
 LAYER_SURFACES = (

@@ -2,20 +2,23 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Manual, memory-only read-only connection. No financial writes and no
-// credential values passed into the Qt UI or process arguments.
+// Read-only Actual connection: refresh on FinanceW open or month change.
+// One probe runs at a time, with latest-month-wins queued refreshes.
+// Nothing starts at shell boot; credentials never enter the Qt UI or argv.
 Scope {
     id: budgetBridge
     property var snapshot: null
     property string state: "idle"
     property string message: "Press REFRESH to read your local budget."
     readonly property bool loading: state === "loading"
-    // The selected month changes only on explicit previous/next navigation.
-    // Each new month invalidates the old snapshot until REFRESH is pressed.
+    // Only Process may read the local budget; refreshes are serialized.
     property string selectedMonth: Qt.formatDate(new Date(), "yyyy-MM")
+    property string inFlightMonth: ""
+    property bool pendingRefresh: false
+    property bool requestActive: false
 
     function shiftMonth(direction) {
-        if (loading || probe.running || (direction !== 1 && direction !== -1))
+        if (direction !== 1 && direction !== -1)
             return false;
         const parts = selectedMonth.split("-");
         if (parts.length !== 2)
@@ -29,9 +32,11 @@ Scope {
             return false;
         selectedMonth = String(nextYear) + "-"
                         + String(nextMonth).padStart(2, "0");
+        // Never show another month's values while navigating.
         snapshot = null;
         state = "idle";
-        message = "Press REFRESH to read the selected month.";
+        message = "Reading selected month.";
+        refresh();
         return true;
     }
 
@@ -42,8 +47,19 @@ Scope {
     }
 
     function refresh() {
-        if (loading || probe.running)
+        // During a slow download, keep the latest selection and fetch it
+        // once the current read exits. Repeated opens don't spawn duplicates.
+        if (requestActive || probe.running) {
+            pendingRefresh = selectedMonth !== inFlightMonth;
+            snapshot = null;
+            state = "loading";
+            message = pendingRefresh ? "Waiting to read selected month."
+                                     : "Reading the local budget.";
             return false;
+        }
+        pendingRefresh = false;
+        inFlightMonth = selectedMonth;
+        requestActive = true;
         snapshot = null;
         state = "loading";
         message = "Reading the local budget.";
@@ -70,8 +86,8 @@ Scope {
                 break;
             }
         }
-        if (!json)
-            return;
+        if (!json || inFlightMonth !== selectedMonth)
+            return; // A superseded month may never overwrite the selected one.
         let payload;
         try {
             payload = JSON.parse(json);
@@ -100,10 +116,12 @@ Scope {
         }
         snapshot = payload;
         state = "ready";
-        message = "Manual read complete.";
+        message = "Budget read complete.";
     }
 
     function acceptError(raw) {
+        if (inFlightMonth !== selectedMonth)
+            return; // Suppress errors from superseded month reads.
         const detail = String(raw || "");
         if (detail.indexOf("FINANCEW_READ_ONLY_ERROR") < 0)
             return;
@@ -122,9 +140,16 @@ Scope {
             onStreamFinished: budgetBridge.acceptError(text)
         }
         onExited: function(exitCode, exitStatus) {
+            // Defer until the process/collectors finish delivering output.
             Qt.callLater(function() {
-                if (budgetBridge.state === "loading")
+                budgetBridge.requestActive = false;
+                if (budgetBridge.pendingRefresh) {
+                    budgetBridge.pendingRefresh = false;
+                    budgetBridge.state = "idle";
+                    budgetBridge.refresh();
+                } else if (budgetBridge.state === "loading") {
                     budgetBridge.fail("Local budget read failed.");
+                }
             });
         }
     }

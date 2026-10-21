@@ -55,7 +55,7 @@ Rectangle {
         }
 
         Row {
-            spacing: 54
+            spacing: 35
 
             Column {
                 width: 145

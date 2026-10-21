@@ -340,10 +340,10 @@ PanelWindow {
                     onLeftClicked: hub.editMode = !hub.editMode
                 }
                 ActionButton {
+                    trackLabelGlowLocally: true
                     // Standard Close × (U+00D7), not the letter X.
                     // Red is the permanent close identity; the shared
                     // destructive pressed state remains black-on-red.
-                    trackLabelGlowLocally: true
                     id: closeButton
                     width: 35
                     height: 32

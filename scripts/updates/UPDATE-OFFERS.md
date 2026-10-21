@@ -20,6 +20,18 @@ approximately every six hours, starting after Notifications history is ready.
   and manual checkout paths when they are Git checkouts with tracking
   branches. Other plugin managers need their own integration.
 
+* **Flatpak user/system:** separately checks installed Flatpak updates in the
+  user and system installations. Each offer uses the exact refs, remotes and
+  upstream commits. **DOWNLOAD** opens Kitty and requires a typed DOWNLOAD
+  to cache pinned commits (Flatpak no-deploy), or APPLY to download and
+  deploy those commits. GNOME Software may already be downloading updates.
+* **Firmware / Secure Boot:** reads fwupdmgr's JSON update list when
+  available. **OPEN UPDATES** opens the native GNOME Software Updates page.
+  Post-Apollo never flashes firmware or alters the Secure Boot database.
+
+GNOME Software's **System Updates** plus Files, Firefox, codecs and other
+entries under **Requires Restart** can be individual changes within one
+Silverblue rpm-ostree deployment. These do not get duplicate RPM alerts.
 **Kitty installation provenance matters:** Kitty can be part of the Silverblue
 deployment, layered, installed by its own binary installer, or installed in a
 container. This pass deliberately does not run Kitty's standalone installer
@@ -59,6 +71,8 @@ snooze changes.
 | Silverblue, already staged | Read-only review; **no reboot and no extra update**. |
 | Oh My Zsh | Runs the installed official \`tools/upgrade.sh\`, only if checkout has no local changes. |
 | Powerlevel10k | \`git pull --ff-only\` on recognized checkout, only if local working tree is clean. Restart Zsh afterward. |
+| Flatpak (user/system) | Review terminal requires typed DOWNLOAD for download-only or typed APPLY to deploy pinned commits. |
+| Firmware | OPEN UPDATES opens GNOME Software/fwupd; Post-Apollo does not install firmware. |
 
 No arbitrary command from a notification, auto-reboot, forced Git update,
 automatic configuration change, or background elevation exists here.

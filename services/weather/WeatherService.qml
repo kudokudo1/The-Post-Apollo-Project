@@ -15,6 +15,7 @@ Scope {
     property string feelsLikeF: "--"
     property string condition: "UNKNOWN"
     property string weatherCode: ""
+    property real uvIndex: -1
 
     property string humidity: "--"
 
@@ -43,6 +44,7 @@ Scope {
     property real pm10: -1
 
     property string aqiErrorText: ""
+    property date aqiLastUpdated
 
     readonly property bool aqiLoading: airQualityFetch.running
 
@@ -173,6 +175,14 @@ Scope {
 
             weatherCode = current.weatherCode || "";
 
+            // wttr.in j1 supplies UV alongside the current condition.
+            // A missing/invalid value must never look like a safe UV reading.
+            const reportedUv = Number(current.uvIndex);
+            uvIndex = current.uvIndex !== undefined && current.uvIndex !== null
+                      && String(current.uvIndex).trim() !== ""
+                      && isFinite(reportedUv) && reportedUv >= 0
+                      ? reportedUv : -1;
+
             if (current.weatherDesc && current.weatherDesc.length > 0 && current.weatherDesc[0].value) {
                 condition = current.weatherDesc[0].value;
             } else {
@@ -251,6 +261,7 @@ Scope {
             aqiLabel = describeAqi(aqi);
 
             aqiErrorText = "";
+            aqiLastUpdated = new Date();
             aqiReady = true;
         } catch (error) {
             console.log("WeatherService AQI parse error:", error);

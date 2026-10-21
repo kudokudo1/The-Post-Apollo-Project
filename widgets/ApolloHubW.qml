@@ -362,7 +362,6 @@ PanelWindow {
                         selected: hub.selectedModeIndex === index
                         keyboardActive: hub.standardKeysAvailable
                         keyboardSelected: hub.selectedModeIndex === index
-                        onPointerMoved: hub.chooseMode(index)
                         iconText: hub.layout.modes[index].icon
                         labelText: hub.layout.modes[index].name
                         iconFontSize: 18
@@ -387,7 +386,6 @@ PanelWindow {
                         selected: hub.selectedSubModeIndex === index
                         keyboardSelected: hub.standardKeysAvailable
                                           && hub.selectedSubModeIndex === index
-                        onPointerMoved: hub.selectSubMode(index)
                         onLeftClicked: hub.selectSubMode(index)
                     }
                 }

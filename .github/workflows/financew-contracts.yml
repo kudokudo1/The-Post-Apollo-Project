@@ -10,6 +10,7 @@ on:
       - "widgets/FinanceW.qml"
       - "shell.qml"
       - "tests/components/test_finance_dock_contracts.py"
+      - "tests/components/test_finance_navigation_contracts.py"
       - ".github/workflows/financew-contracts.yml"
   pull_request:
     paths:
@@ -17,6 +18,7 @@ on:
       - "widgets/FinanceW.qml"
       - "shell.qml"
       - "tests/components/test_finance_dock_contracts.py"
+      - "tests/components/test_finance_navigation_contracts.py"
       - ".github/workflows/financew-contracts.yml"
 
 permissions:
@@ -29,3 +31,5 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate FinanceW dock and blank portrait menu source
         run: python3 tests/components/test_finance_dock_contracts.py
+      - name: Validate FinanceW navigation and reserved slots
+        run: python3 tests/components/test_finance_navigation_contracts.py

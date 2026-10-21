@@ -76,7 +76,7 @@ const dock = fs.readFileSync(path.join(root, "modules/Weather.qml"), "utf8");
 const shell = fs.readFileSync(path.join(root, "shell.qml"), "utf8");
 assert.match(dock, /weatherStationWindow\.toggle\(\)/);
 assert.match(dock, /implicitHeight:\s*50/);
-assert.match(dock, /Math\.max\(90, Math\.ceil\(weatherContent\.implicitWidth\)/);
+assert.match(dock, /implicitWidth:\s*Math\.ceil\(weatherContent\.implicitWidth\)\s*\+\s*6/);
 // Keep the original identity glyph while rendering condition and temperature separately.
 assert.match(dock, /id:\s*weatherThermometer[\s\S]*?text:\s*"🌡"[\s\S]*?font\.pixelSize:\s*24/);
 assert.match(dock, /property bool useCelsius:\s*false/);
@@ -85,12 +85,31 @@ assert.match(dock, /WeatherDockPolicy\.formatTemperature\([\s\S]*?weatherFresh,[
 assert.match(dock, /id:\s*weatherCondition[\s\S]*?text:\s*weatherDock\.weatherState\.icon[\s\S]*?font\.pixelSize:\s*32/);
 assert.match(dock, /id:\s*weatherTemperatureValue[\s\S]*?text:\s*weatherDock\.temperatureLabel\.slice\(0, -2\)[\s\S]*?font\.pixelSize:\s*20/);
 assert.match(dock, /id:\s*weatherTemperatureUnit[\s\S]*?text:\s*weatherDock\.temperatureLabel\.slice\(-1\)[\s\S]*?font\.pixelSize:\s*20/);
-assert.match(dock, /id:\s*weatherDegree[\s\S]*?text:\s*"°"[\s\S]*?font\.pixelSize:\s*20[\s\S]*?color:\s*Colors\.white/);
-assert.match(dock, /SafeDropShadow\s*\{[^}]*safeSource:\s*weatherDegree[^}]*color:\s*Colors\.orange/s);
+assert.match(dock, /id:\s*weatherDegree[\s\S]*?text:\s*"°"[\s\S]*?font\.pixelSize:\s*20[\s\S]*?color:\s*weatherDock\.open\s*\|\|\s*weatherDock\.pressed[\s\S]*?Colors\.magenta[\s\S]*?weatherDock\.hovered\s*\?\s*Colors\.orange\s*:\s*Colors\.white/);
+assert.match(dock, /SafeDropShadow\s*\{[^}]*safeSource:\s*weatherDegree[^}]*color:\s*weatherDock\.open\s*\|\|\s*weatherDock\.pressed\s*\?\s*Colors\.magenta\s*:\s*Colors\.orange/s);
 assert.match(dock, /id:\s*weatherContent[\s\S]*?spacing:\s*6/);
-assert.match(dock, /id:\s*weatherReadout[\s\S]*?spacing:\s*2/);
+assert.match(dock, /id:\s*weatherReadout[\s\S]*?spacing:\s*0/);
 assert.match(dock, /id:\s*weatherTemperature[\s\S]*?spacing:\s*0/);
 assert.match(dock, /contentGlowSource:\s*weatherContent/);
+// Idle uses observed weather colors; interaction takes the standard orange -> magenta path.
+for (const [property, color] of [
+    ["normalForegroundColor", "weatherColor"],
+    ["normalContentGlowColor", "weatherColor"],
+    ["normalDockGlowColor", "weatherColor"],
+    ["hoverForegroundColor", "Colors.orange"],
+    ["hoverContentGlowColor", "Colors.orange"],
+    ["hoverDockGlowColor", "Colors.orange"],
+    ["pressedForegroundColor", "Colors.magenta"],
+    ["pressedContentGlowColor", "Colors.magenta"],
+    ["pressedDockGlowColor", "Colors.magenta"],
+    ["openForegroundColor", "Colors.magenta"],
+    ["openGlowColor", "Colors.magenta"],
+    ["openFillColor", "Colors.yellow"]
+]) {
+    assert.ok(dock.includes(property + ": " + color), property + " should use " + color);
+}
+assert.match(dock, /id:\\s*weatherThermometer[\\s\\S]*?color:\\s*weatherDock\\.open\\s*\\|\\|\\s*weatherDock\\.pressed[\\s\\S]*?Colors\\.magenta\\s*:\\s*Colors\\.orange/);
+assert.match(dock, /id:\\s*weatherContent[\\s\\S]*?spacing:\\s*6/);
 assert.ok(dock.indexOf("id: weatherCondition") < dock.indexOf("id: weatherTemperature"));
 assert.ok(dock.indexOf("id: weatherTemperature") < dock.indexOf("id: weatherThermometer"));
 assert.ok(dock.indexOf("id: weatherTemperatureUnit") < dock.indexOf("id: weatherThermometer"));

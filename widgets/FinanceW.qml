@@ -17,6 +17,42 @@ PanelWindow {
 
     FinanceServices.FinanceBudgetReadService {
         id: financeBudget
+        monitoring: root.menuOpen
+    }
+
+    readonly property bool hasBudgetFeed:
+        selectedMainMode === "budget" && selectedBudgetSubMode === "budget"
+    // NO FEED for reserved/unimplemented pages. LIVE means an authenticated
+    // read succeeded AND the local source remains reachable.
+    readonly property string feedStatus:
+        !hasBudgetFeed ? "NO FEED"
+        : !menuOpen ? "IDLE"
+        : financeBudget.state === "failed" ? "ERROR"
+        : financeBudget.healthStatus === "offline" ? "OFFLINE"
+        : financeBudget.loading ? "READING"
+        : financeBudget.state === "ready"
+          && financeBudget.snapshot
+          && financeBudget.healthStatus === "online" ? "LIVE"
+        : "CHECK"
+    readonly property color feedStatusColor:
+        feedStatus === "LIVE" ? Colors.omnitrix
+        : feedStatus === "OFFLINE" || feedStatus === "ERROR" ? Colors.red
+        : feedStatus === "NO FEED" ? Colors.orange
+        : Colors.cyan
+
+    function accountTotalCents() {
+        const data = financeBudget.snapshot;
+        if (!data || !Array.isArray(data.accounts))
+            return null;
+        let sum = 0;
+        for (let i = 0; i < data.accounts.length; ++i) {
+            if (!Number.isSafeInteger(data.accounts[i].balanceCents))
+                return null;
+            sum += data.accounts[i].balanceCents;
+            if (!Number.isSafeInteger(sum))
+                return null;
+        }
+        return sum;
     }
 
     function moneyText(cents) {
@@ -354,13 +390,48 @@ PanelWindow {
                 anchors.left: parent.left
                 anchors.leftMargin: 14
                 anchors.verticalCenter: parent.verticalCenter
-                anchors.right: closeButton.left
+                anchors.right: financeFeedIndicator.left
                 anchors.rightMargin: 8
                 text: "FINANCE // " + root.mainModeName().toUpperCase()
                 font.pixelSize: 17
                 font.bold: true
                 color: Colors.magenta
                 elide: Text.ElideRight
+            }
+
+            // Git/Hospital-style source badge, constrained to the header.
+            // Always tells the truth for the currently selected view.
+            Rectangle {
+                id: financeFeedIndicator
+                width: 68
+                height: 26
+                anchors.right: closeButton.left
+                anchors.rightMargin: 7
+                anchors.verticalCenter: parent.verticalCenter
+                color: Colors.dark
+                border.width: 1
+                border.color: Colors.omnitrix
+
+                GohuText {
+                    id: financeFeedText
+                    anchors.centerIn: parent
+                    text: root.feedStatus
+                    font.pixelSize: 9
+                    color: root.feedStatusColor
+                    textFormat: Text.PlainText
+                }
+                SafeDropShadow {
+                    anchors.fill: financeFeedText
+                    safeSource: financeFeedText
+                    requestedVisible: root.menuOpen
+                    horizontalOffset: 0
+                    verticalOffset: 0
+                    radius: 6
+                    samples: 9
+                    opacity: 0.48
+                    color: root.feedStatusColor
+                    transparentBorder: true
+                }
             }
 
             ActionButton {
@@ -718,7 +789,8 @@ PanelWindow {
                             height: 30
                             verticalAlignment: Text.AlignVCenter
                             text: financeBudget.state === "ready"
-                                  ? "ACTUAL // READ ONLY"
+                                  ? (financeBudget.healthStatus === "offline"
+                                     ? "ACTUAL // CACHED" : "ACTUAL // READ ONLY")
                                   : financeBudget.state === "loading"
                                   ? "ACTUAL // READING"
                                   : "ACTUAL // NOT LOADED"
@@ -784,6 +856,30 @@ PanelWindow {
                         font.pixelSize: 13
                         color: Colors.white
                         width: parent.width
+                        elide: Text.ElideRight
+                    }
+
+                    // Account summary comes from the same verified read-only
+                    // response as the list, never an independent bank guess.
+                    GohuText {
+                        visible: financeBudget.state === "ready"
+                        text: "ACCOUNTS "
+                              + (financeBudget.snapshot
+                                 ? financeBudget.snapshot.accounts.length : 0)
+                              + "  /  TOTAL " + root.moneyText(root.accountTotalCents())
+                        width: parent.width
+                        font.pixelSize: 11
+                        color: Colors.omnitrix
+                        elide: Text.ElideRight
+                    }
+
+                    GohuText {
+                        visible: financeBudget.state === "ready"
+                                 && financeBudget.healthStatus === "offline"
+                        text: "SOURCE OFFLINE // LAST READ " + financeBudget.lastReadAt
+                        width: parent.width
+                        font.pixelSize: 9
+                        color: Colors.red
                         elide: Text.ElideRight
                     }
 

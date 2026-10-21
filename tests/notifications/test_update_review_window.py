@@ -76,8 +76,12 @@ with tempfile.TemporaryDirectory() as tmp:
         with patch.object(mod.shutil, "which", side_effect=lambda name: "/usr/bin/"+name):
             command, has_header = mod.kitty_argv("flatpak-system", "b"*24)
         assert has_header
-        assert "zellij" in command and "--layout-string" in command
-        assert "--session" in command
+        assert "/usr/bin/zellij" in command and "--layout-string" in command
+        assert "--session-name" in command
+        assert "--session" not in command, "must create, never attach to missing session"
+        assert command[command.index("--session-name") + 1].startswith(
+            "apollo-updates-flatpak-system-"
+        )
         generated = command[-1]
         assert 'plugin location="file:' in generated
         assert "pane size=1 borderless=true" in generated
@@ -87,6 +91,30 @@ with tempfile.TemporaryDirectory() as tmp:
         assert "session_serialization false" in generated
         assert "--hold" not in command
         assert "; reboot" not in generated
+
+        # Quickshell's PATH can omit ~/.local/bin even when Zellij is installed.
+        # With no Zellij anywhere, ordinary Kitty remains a safe fallback.
+        missing_zellij = lambda name: "/usr/bin/kitty" if name == "kitty" else None
+        with patch.object(mod.shutil, "which", side_effect=missing_zellij), \
+             patch.object(mod.Path, "home", return_value=datadir):
+            command, has_header = mod.kitty_argv("flatpak-system", "c"*24)
+        assert not has_header
+        assert "--hold" in command
+        assert "zellij" not in command
+
+        # A verified executable at ~/.local/bin/zellij fixes that environment
+        # mismatch for this launcher only, without changing global PATH.
+        local_zellij = datadir / ".local/bin/zellij"
+        local_zellij.parent.mkdir(parents=True)
+        local_zellij.write_text("#!/bin/sh\\nexit 0\\n")
+        local_zellij.chmod(0o755)
+        with patch.object(mod.shutil, "which", side_effect=missing_zellij), \
+             patch.object(mod.Path, "home", return_value=datadir):
+            command, has_header = mod.kitty_argv("flatpak-system", "d"*24)
+        assert has_header
+        assert command[command.index("-e") + 1] == str(local_zellij)
+        assert "--session-name" in command
+        assert "--session" not in command
 
 class Result:
     returncode = 0

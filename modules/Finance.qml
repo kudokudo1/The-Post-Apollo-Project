@@ -22,7 +22,9 @@ DockButton {
     normalDockGlowColor: Colors.omnitrix
     hoverDockGlowColor: Colors.omnitrix
     pressedDockGlowColor: Colors.omnitrix
-    openGlowColor: Colors.omnitrix
+    // Open button: canonical yellow surface with a magenta halo.
+    openFillColor: Colors.yellow
+    openGlowColor: Colors.magenta
 
     contentGlowSource: financeMark
 

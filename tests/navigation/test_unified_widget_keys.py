@@ -91,20 +91,37 @@ def test_cpu_mode_and_monitor_keys_are_window_local():
     assert 'sequence: "Ctrl+Right"' not in src
 
 
-def test_weather_semantic_main_and_top_submode_and_arrow_preview():
+def test_weather_domains_are_first_class_main_modes():
     src = read("widgets/weather/WeatherStationW.qml")
-    for key in ("Tab", "Shift+Tab", "Shift+Left", "Shift+Right",
-                "Up", "Down", "Enter", "Return"):
+
+    for key in ("Tab", "Shift+Tab", "Up", "Down", "Enter", "Return"):
         assert 'sequence: "' + key + '"' in src
+
+    # Domain pages are no longer a HOME-owned top Sub Mode family.
+    assert 'sequence: "Shift+Left"' not in src
+    assert 'sequence: "Shift+Right"' not in src
+    assert "function cycleTopSubMode(direction)" not in src
+    assert "property string activeDomain" not in src
+
+    order_match = re.search(
+        r"readonly property var mainModes:\s*\[([^\]]+)\]", src
+    )
+    assert order_match
+    order = re.findall(r'"id":\s*"([^"]+)"', order_match.group(1))
+    assert order == [
+        "home", "ground", "sky", "space",
+        "map", "news", "radio", "terminal",
+    ]
+
     assert "function cycleMainMode(direction)" in src
-    assert "function cycleTopSubMode(direction)" in src
-    assert 'const pages = ["home"].concat(views.map' in src
     assert "function moveNavigationCursor(direction)" in src
     assert "function activateNavigationCursor()" in src
-    for qml in ("id: homeButton", "id: domainButton", "id: viewButton"):
-        assert qml in src
-    assert src.count("keyboardSelected: weatherStation.navigationIndex") == 3
-    assert src.count("onPointerMoved: weatherStation.navigationIndex") == 3
+    assert "id: mainModeButton" in src
+    assert "keyboardSelected:" in src
+    assert "onPointerMoved:" in src
+    assert "StationGround {" in src
+    assert "StationSky {" in src
+    assert "StationSpace {" in src
     assert "(!relationshipFocusModeActive || relationshipFocused)" in src
     assert "context: Qt.WindowShortcut" in src
 

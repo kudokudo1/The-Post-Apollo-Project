@@ -12844,6 +12844,13 @@ PanelWindow {
                     keyboardSelected: isRailCursor
                     customPrimaryGlowSource: modeSymbol
                     customLabelGlowSource: modeLabel
+                    // KILL swaps between differently sized Unicode faces.
+                    // Keep its sampled glow in the same moving local wrapper
+                    // as the face so both recenter together (not a stale
+                    // cross-parent mapToItem projection).
+                    primaryGlowHost:
+                        index === appControlWindow.killModeIndex
+                        ? modeSymbol.parent : null
                     primaryGlowEnabled: index !== appControlWindow.thermalModeIndex
                     bordered: false
                     readonly property bool isSelected: selected

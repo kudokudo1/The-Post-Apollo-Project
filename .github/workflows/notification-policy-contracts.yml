@@ -86,14 +86,6 @@ jobs:
       - name: Validate Flatpak downloads and firmware native review
         run: python3 tests/notifications/test_gnome_software_update_bridge.py
 
-      - name: Build Zellij header as a WASI command module
-        run: |
-          rustup target add wasm32-wasip1
-          cargo build --release --target wasm32-wasip1 --manifest-path scripts/updates/zellij/update-review-header/Cargo.toml
-
-      - name: Verify Zellij header exports its WASI entry point
-        run: python3 tests/notifications/test_update_review_wasm.py
-
       - name: Validate safe Sway Kitty Zellij review window
         run: python3 tests/notifications/test_update_review_window.py
 

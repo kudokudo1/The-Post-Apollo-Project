@@ -38,8 +38,8 @@ PanelWindow {
         ? activeMode.subModes[selectedSubModeIndex] : null
     readonly property var activeTiles: activeSubMode ? activeSubMode.tiles : []
 
-    readonly property int frameWidth: 700
-    readonly property int frameHeight: 670
+    readonly property int frameWidth: 1000
+    readonly property int frameHeight: 700
     readonly property int glowGutter: 12
 
     function toggle() {

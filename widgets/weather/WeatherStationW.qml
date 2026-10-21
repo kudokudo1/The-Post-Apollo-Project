@@ -110,19 +110,24 @@ PanelWindow {
     exclusiveZone: 0
     WlrLayershell.layer: WlrLayer.Overlay
 
-    // Modern shared ownership policy: ordinary Weather use is OnDemand so
-    // an open widget never monopolizes keyboard input from normal apps.
-    // Exclusive is reserved for the coordinator's bounded acquisition pulse.
+    // Ordinary Weather use is OnDemand so an open widget never monopolizes
+    // keyboard input from normal apps. Preserve Weather's existing Koinoikos
+    // selected-menu behavior until the concurrent shell ownership seam is
+    // available for the same bounded keyboard-lock wiring as Git/Finance.
     WlrLayershell.keyboardFocus:
         !weatherStation.menuOpen || !weatherStation.keyboardActive
         ? WlrKeyboardFocus.None
         : weatherStation.relationshipFocusModeActive
-          && !weatherStation.relationshipFocused
-        ? WlrKeyboardFocus.None
+        ? (weatherStation.relationshipFocused
+           ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None)
         : weatherStation.keyboardLock
         ? WlrKeyboardFocus.Exclusive
         : WlrKeyboardFocus.OnDemand
-    focusable: weatherStation.menuOpen && weatherStation.keyboardActive
+    focusable:
+        weatherStation.menuOpen
+        && weatherStation.keyboardActive
+        && (!weatherStation.relationshipFocusModeActive
+            || weatherStation.relationshipFocused)
     surfaceFormat.opaque: false
 
     anchors {

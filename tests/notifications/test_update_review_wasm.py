@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[2]
 WASM = (ROOT / "scripts/updates/zellij/update-review-header/target"
         / "wasm32-wasip1/release/post_apollo_update_header.wasm")
 data = WASM.read_bytes()
-assert data[:8] == b"\\0asm\\x01\\0\\0\\0", "Not a WebAssembly v1 binary"
+assert data[:8] == b"\0asm\x01\0\0\0", "Not a WebAssembly v1 binary"
 
 
 def uleb(offset: int) -> tuple[int, int]:

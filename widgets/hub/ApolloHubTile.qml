@@ -31,7 +31,7 @@ SectionFrame {
     borderColor: keyboardSelected ? Colors.orange : Colors.cyan
     borderOpacity: 0.7
     borderWidth: 1
-    radius: 5
+    radius: 0
     inset: 10
 
     Timer {

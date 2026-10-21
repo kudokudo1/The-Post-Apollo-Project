@@ -48,6 +48,38 @@ assert window.count("ActionButton {") >= 5
 assert "SectionFrame {" in tile
 assert "MouseArea {" not in window + tile + dock
 
+# The header Close action uses the canonical U+00D7 multiplication sign.
+# Red stays its identity for normal/hover/keyboard states, without changing
+# ActionButton's destructive black-on-red pressed state. Size follows the
+# accepted FinanceW Close precedent, not a generic 10px label.
+close_start = window.index("id: closeButton")
+close_end = window.index("onLeftClicked: hub.menuOpen = false", close_start)
+close_button = window[close_start:close_end]
+for needle in (
+    'label: "×"',
+    "labelPixelSize: 22",
+    "contentPadding: 4",
+    "accentColor: Colors.red",
+    "destructive: true",
+    "trackLabelGlowLocally: true",
+    "hoverForegroundColor: Colors.red",
+    "hoverBorderColor: Colors.red",
+    "hoverContentGlowColor: Colors.red",
+    "softGlowEnabled: true",
+    "wideGlowEnabled: true",
+    "softGlowIdleOpacity: 0.48",
+    "wideGlowIdleOpacity: 0.22",
+):
+    # trackLabelGlowLocally appears before the id, unlike state/size options.
+    if needle == "trackLabelGlowLocally: true":
+        assert needle in window[window.rindex("ActionButton {", 0, close_start):close_start]
+    else:
+        assert needle in close_button, f"Hub Close missing {needle}"
+assert 'label: "X"' not in close_button
+assert 'label: "✕"' not in close_button
+assert 'label: "✖"' not in close_button
+assert "onLeftClicked: hub.menuOpen = false" in window[close_start:close_end + 42]
+
 # Hub editor/selector buttons use ActionButton's existing reactive label
 # tracking (proven on Projects ARCHIVE). Keep the icon and caption alignment
 # independent from button backgrounds, halos and click actions.

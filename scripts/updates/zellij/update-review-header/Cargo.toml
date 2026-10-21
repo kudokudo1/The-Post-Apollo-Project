@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 
-[lib]
-# This is a WebAssembly cdylib with a register_plugin! entrypoint.
+[[bin]]
+# Zellij invokes the WASI _start export from a command binary, not a cdylib.
+name = "post_apollo_update_header"
 path = "src/main.rs"
-crate-type = ["cdylib"]
 
 [dependencies]
 zellij-tile = "=0.45.0"

@@ -162,10 +162,11 @@ with tempfile.TemporaryDirectory() as td:
 
     # No action at all from absent/stale tokens or declined terminal consent.
     with patch.object(mod, "current_offer", return_value=offered), \
-         patch("builtins.input", return_value="NO"), \
+         patch("builtins.input", return_value="NO") as confirmation, \
          patch.object(mod.subprocess, "run") as fake_update:
         assert mod.review("silverblue", "0"*24) == 2
         assert mod.review("silverblue", offered["token"]) == 0
+        confirmation.assert_called_once_with("\n  Type APPLY to authorize, or anything else to cancel: ")
         fake_update.assert_not_called()
 
     # A changed offer while the user reads the terminal must not be applied.

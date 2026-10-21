@@ -80,6 +80,9 @@ jobs:
       - name: Validate bounded Internet reachability notifications
         run: python3 tests/notifications/test_network_internet_health_producer.py
 
+      - name: Validate update-offer detection and explicit user authorization
+        run: python3 tests/notifications/test_software_update_offers.py
+
       - name: Validate completed local Git journal notifications
         run: python3 tests/notifications/test_local_git_journal_producer.py
 

@@ -446,6 +446,9 @@ PanelWindow {
                             // enlarging it with the adjoining chart glyph.
                             GohuText {
                                 visible: !!modelData.dollar
+                                // Row aligns children at the top by default;
+                                // center $ vertically against the taller chart.
+                                anchors.verticalCenter: parent.verticalCenter
                                 text: modelData.dollar || ""
                                 font.pixelSize: 24
                                 color: mainModeButton.primaryColor
@@ -618,6 +621,7 @@ PanelWindow {
                                 // Same Gohu dollar size used by Main Budget.
                                 GohuText {
                                     visible: !!modelData.dollar
+                                    anchors.verticalCenter: parent.verticalCenter
                                     text: modelData.dollar || ""
                                     font.pixelSize: 24
                                     color: budgetSubButton.foregroundColor

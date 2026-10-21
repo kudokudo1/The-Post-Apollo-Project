@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import Quickshell
 import Quickshell.Wayland
 import "../components"
@@ -35,10 +36,15 @@ PanelWindow {
           && financeBudget.healthStatus === "online" ? "LIVE"
         : "CHECK"
     readonly property color feedStatusColor:
-        feedStatus === "LIVE" ? Colors.omnitrix
+        feedStatus === "LIVE" ? Colors.green
         : feedStatus === "OFFLINE" || feedStatus === "ERROR" ? Colors.red
         : feedStatus === "NO FEED" ? Colors.orange
         : Colors.cyan
+    // Border normally stays Omnitrix. Only genuinely unavailable source/
+    // unimplemented page states inherit the interior text state.
+    readonly property color feedBorderColor:
+        feedStatus === "OFFLINE" || feedStatus === "ERROR"
+        || feedStatus === "NO FEED" ? feedStatusColor : Colors.omnitrix
 
     function accountTotalCents() {
         const data = financeBudget.snapshot;
@@ -410,7 +416,15 @@ PanelWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 color: Colors.dark
                 border.width: 1
-                border.color: Colors.omnitrix
+                border.color: root.feedBorderColor
+
+                RectangularShadow {
+                    anchors.fill: parent
+                    z: -1
+                    spread: 4
+                    opacity: root.menuOpen ? 0.54 : 0
+                    color: root.feedBorderColor
+                }
 
                 GohuText {
                     id: financeFeedText
@@ -428,7 +442,7 @@ PanelWindow {
                     verticalOffset: 0
                     radius: 6
                     samples: 9
-                    opacity: 0.48
+                    opacity: 0.82
                     color: root.feedStatusColor
                     transparentBorder: true
                 }
@@ -446,6 +460,20 @@ PanelWindow {
                 contentPadding: 4
                 accentColor: Colors.red
                 destructive: true
+                // The shared ActionButton provides a glow without cloning
+                // the × glyph through an extra DropShadow source.
+                softGlowEnabled: true
+                idleSoftGlowColor: Colors.red
+                hoverSoftGlowColor: Colors.red
+                pressedSoftGlowColor: Colors.red
+                softGlowIdleOpacity: 0.48
+                softGlowHoverOpacity: 0.70
+                wideGlowEnabled: true
+                idleWideGlowColor: Colors.red
+                hoverWideGlowColor: Colors.red
+                pressedWideGlowColor: Colors.red
+                wideGlowIdleOpacity: 0.22
+                wideGlowHoverOpacity: 0.32
                 onLeftClicked: root.menuOpen = false
             }
         }
@@ -1015,6 +1043,81 @@ PanelWindow {
                                         }
                                     }
                                 }
+                            }
+
+                            GohuText {
+                                width: parent.width
+                                text: "TRANSACTIONS // "
+                                      + (financeBudget.snapshot
+                                         ? financeBudget.snapshot.transactionsCount : 0)
+                                      + " THIS MONTH"
+                                textFormat: Text.PlainText
+                                font.pixelSize: 12
+                                color: Colors.cyan
+                            }
+
+                            GohuText {
+                                width: parent.width
+                                visible: financeBudget.snapshot
+                                         && financeBudget.snapshot.transactionsCount === 0
+                                text: "NO TRANSACTIONS IN SELECTED MONTH"
+                                textFormat: Text.PlainText
+                                font.pixelSize: 9
+                                color: Colors.white
+                            }
+
+                            Repeater {
+                                model: financeBudget.snapshot
+                                       ? financeBudget.snapshot.transactions : []
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    width: budgetList.width
+                                    height: 54
+                                    color: Colors.black
+                                    border.width: 1
+                                    border.color: Colors.cyan
+                                    GohuText {
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.top: parent.top
+                                        anchors.margins: 5
+                                        text: modelData.date + "  " + modelData.description
+                                        textFormat: Text.PlainText
+                                        color: Colors.white
+                                        font.pixelSize: 10
+                                        elide: Text.ElideRight
+                                    }
+                                    GohuText {
+                                        anchors.left: parent.left
+                                        anchors.bottom: parent.bottom
+                                        anchors.margins: 5
+                                        text: modelData.account
+                                        textFormat: Text.PlainText
+                                        color: Colors.cyan
+                                        font.pixelSize: 9
+                                        elide: Text.ElideRight
+                                    }
+                                    GohuText {
+                                        anchors.right: parent.right
+                                        anchors.bottom: parent.bottom
+                                        anchors.margins: 5
+                                        text: root.moneyText(modelData.amountCents)
+                                        textFormat: Text.PlainText
+                                        color: modelData.amountCents < 0
+                                               ? Colors.orange : Colors.omnitrix
+                                        font.pixelSize: 11
+                                    }
+                                }
+                            }
+
+                            GohuText {
+                                width: parent.width
+                                visible: financeBudget.snapshot
+                                         && financeBudget.snapshot.transactionsCount > 24
+                                text: "LATEST 24 SHOWN // READ ONLY"
+                                textFormat: Text.PlainText
+                                font.pixelSize: 9
+                                color: Colors.orange
                             }
                         }
                     }

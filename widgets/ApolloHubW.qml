@@ -359,6 +359,9 @@ PanelWindow {
                         width: (modeStrip.width - (hub.layout.modes.length - 1) * modeStrip.spacing)
                                / hub.layout.modes.length
                         height: modeStrip.height
+                        // Default Grid glyphs and sampled glows track the same
+                        // reactive coordinates without becoming Grid children.
+                        trackDefaultGlowsLocally: true
                         selected: hub.selectedModeIndex === index
                         keyboardActive: hub.standardKeysAvailable
                         keyboardSelected: hub.selectedModeIndex === index

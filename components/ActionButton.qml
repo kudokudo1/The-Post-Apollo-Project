@@ -100,6 +100,9 @@ Rectangle {
     property bool contentGlowEnabled: true
     property Item contentGlowSource:
         showLabel ? labelText : contentHost
+    // Opt-in for centered labels whose glyph width/text changes. Track
+    // actual local geometry instead of relying on a one-off mapToItem().
+    property bool trackLabelGlowLocally: false
 
     property color idleContentGlowColor: accentColor
     property color hoverContentGlowColor: Colors.orange
@@ -373,14 +376,18 @@ Rectangle {
         SafeDropShadow {
             id: contentGlow
 
+            readonly property bool labelIsLocalSource:
+                sourceAttached && actionButton.trackLabelGlowLocally
+                && actionButton.contentGlowSource === labelText
+                && labelText.parent === contentHost
             readonly property point sourceOrigin:
-                sourceAttached
-                ? actionButton.contentGlowSource.mapToItem(
-                      contentLayer,
-                      0,
-                      0
-                  )
-                : Qt.point(0, 0)
+                !sourceAttached ? Qt.point(0, 0)
+                : labelIsLocalSource
+                  ? Qt.point(contentHost.x + labelText.x,
+                             contentHost.y + labelText.y)
+                  : actionButton.contentGlowSource.mapToItem(
+                        contentLayer, 0, 0
+                    )
 
             x: sourceOrigin.x
             y: sourceOrigin.y

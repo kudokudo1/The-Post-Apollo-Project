@@ -32,6 +32,9 @@ Rectangle {
 
     // Menu chooses arrangement, sizing and custom glyph composition.
     property bool customArtwork: false
+    // The Hub opts into reactive positioning for the built-in Grid artwork.
+    // Effects stay OUTSIDE the Grid so they cannot become layout cells.
+    property bool trackDefaultGlowsLocally: false
     property Item customPrimaryGlowSource: null
     property Item customLabelGlowSource: null
     property bool primaryGlowEnabled: true
@@ -168,6 +171,7 @@ Rectangle {
             visible: !modeButton.customArtwork
     
             Grid {
+                id: defaultArtworkGrid
                 anchors.centerIn: parent
                 columns: modeButton.horizontalContent ? 2 : 1
                 rows: modeButton.horizontalContent ? 1 : 2
@@ -202,6 +206,18 @@ Rectangle {
         TextHashGlow {
             parent: modeButton.effectivePrimaryGlowHost
             safeSource: modeButton.primaryGlowSource
+            // Keep default artwork effects on the independent content plane,
+            // but bind to each glyph's actual Grid coordinates.
+            x: modeButton.trackDefaultGlowsLocally
+               && !modeButton.customArtwork && sourceAttached
+               ? defaultContentHost.x + defaultArtworkGrid.x
+                 + (modeButton.textOnly ? defaultLabel.x : defaultIcon.x)
+               : sourceOrigin.x
+            y: modeButton.trackDefaultGlowsLocally
+               && !modeButton.customArtwork && sourceAttached
+               ? defaultContentHost.y + defaultArtworkGrid.y
+                 + (modeButton.textOnly ? defaultLabel.y : defaultIcon.y)
+               : sourceOrigin.y
             requestedVisible: modeButton.primaryGlowEnabled
                               && modeButton.primaryGlowSource !== null
                               && modeButton.primaryGlowSource.visible
@@ -215,6 +231,14 @@ Rectangle {
         TextHashGlow {
             parent: modeButton.effectiveLabelGlowHost
             safeSource: modeButton.labelGlowSource
+            x: modeButton.trackDefaultGlowsLocally
+               && !modeButton.customArtwork && sourceAttached
+               ? defaultContentHost.x + defaultArtworkGrid.x + defaultLabel.x
+               : sourceOrigin.x
+            y: modeButton.trackDefaultGlowsLocally
+               && !modeButton.customArtwork && sourceAttached
+               ? defaultContentHost.y + defaultArtworkGrid.y + defaultLabel.y
+               : sourceOrigin.y
             requestedVisible: modeButton.labelGlowEnabled
                               && !modeButton.pressed
                               && modeButton.labelGlowSource !== null

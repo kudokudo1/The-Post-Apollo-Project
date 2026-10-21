@@ -122,6 +122,25 @@ for needle, message in (
 ):
     require(COMPONENT, needle, message)
 
+# Projects ARCHIVE changes to CONFIRM while retaining its custom white/orange
+# state identity. Opt it into reactive label-to-glow positioning only.
+ARCHIVE = (ROOT / "widgets/GitHubProjectsArchiveButton.qml").read_text(encoding="utf-8")
+for needle in (
+    "property bool trackLabelGlowLocally: false",
+    "readonly property bool labelIsLocalSource:",
+    "contentHost.x + labelText.x",
+    "contentHost.y + labelText.y",
+    "contentGlowSource.mapToItem(",
+):
+    require(COMPONENT, needle, "reactive ActionButton label geometry")
+for needle in (
+    'label: root.armed ? "CONFIRM" : "ARCHIVE"',
+    "trackLabelGlowLocally: true",
+    "idleForegroundColor: Colors.white",
+    "idleContentGlowColor: Colors.orange",
+):
+    require(ARCHIVE, needle, "ARCHIVE markup and glow identity")
+
 require(QMLDIR, "ActionButton 1.0 ActionButton.qml", "component registration")
 require(TEMPLATE, "ActionButton {", "template must compose the real component")
 require(TEMPLATE, "available: true", "template must teach semantic availability")

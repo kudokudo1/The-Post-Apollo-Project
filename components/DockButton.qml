@@ -73,6 +73,9 @@ Rectangle {
     // Attach to one meaningful cluster, not an indiscriminate module-wide wash.
     // Distinct semantic clusters may own separate SafeDropShadows.
     property Item contentGlowSource: contentHost
+    // Opt-in: when the dock mark is a direct child of the content host,
+    // resolve its position from reactive local x/y (preserve fallback).
+    property bool trackArtworkGlowLocally: false
 
     readonly property bool hovered: interactive && mouse.containsMouse
     readonly property bool pressed: interactive && mouse.pressed
@@ -176,9 +179,15 @@ Rectangle {
         SafeDropShadow {
             id: contentGlow
 
-            readonly property point sourceOrigin: sourceAttached
-                                                  ? dockButton.contentGlowSource.mapToItem(contentLayer, 0, 0)
-                                                  : Qt.point(0, 0)
+            readonly property bool artworkIsLocalSource:
+                sourceAttached && dockButton.trackArtworkGlowLocally
+                && dockButton.contentGlowSource.parent === contentHost
+            readonly property point sourceOrigin:
+                !sourceAttached ? Qt.point(0, 0)
+                : artworkIsLocalSource
+                  ? Qt.point(contentHost.x + dockButton.contentGlowSource.x,
+                             contentHost.y + dockButton.contentGlowSource.y)
+                  : dockButton.contentGlowSource.mapToItem(contentLayer, 0, 0)
 
             x: sourceOrigin.x
             y: sourceOrigin.y

@@ -38,6 +38,21 @@ for needle, message in (
 ):
     require(COMPONENT, needle, message)
 
+# Apollo Hub's centered, styled-calendar cluster is sampled once as a
+# direct child. Its moving x/y must keep the glow in the same position.
+HUB_DOCK = (ROOT / "modules/ApolloHub.qml").read_text(encoding="utf-8")
+for needle in ("property bool trackArtworkGlowLocally: false",
+               "readonly property bool artworkIsLocalSource:",
+               "contentHost.x + dockButton.contentGlowSource.x",
+               "contentHost.y + dockButton.contentGlowSource.y",
+               "contentGlowSource.mapToItem(contentLayer, 0, 0)"):
+    require(COMPONENT, needle, "optional local dock artwork tracking")
+for needle in ("contentGlowSource: hubMark",
+               "trackArtworkGlowLocally: true",
+               'textFormat: Text.StyledText',
+               "normalContentGlowColor: Colors.magenta"):
+    require(HUB_DOCK, needle, "Apollo Hub single-cluster glow")
+
 require(QMLDIR, "DockButton 1.0 DockButton.qml", "component registration")
 require(GIT, "DockButton {", "Git must prove the reusable component")
 require(GIT, "open: menuOpen", "Git open state must drive the component")

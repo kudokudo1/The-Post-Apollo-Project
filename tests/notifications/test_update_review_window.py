@@ -84,6 +84,7 @@ with tempfile.TemporaryDirectory() as tmp:
         assert 'command="/usr/bin/python3"' in generated
         assert '"review" "flatpak-system" "' in generated
         assert "bash -c" not in generated
+        assert "session_serialization false" in generated
         assert "--hold" not in command
         assert "; reboot" not in generated
 

@@ -2894,7 +2894,10 @@ PanelWindow {
                                 MiniButton {
                                     width: 86
                                     height: 26
-                                    label: "REVIEW"
+                                    label: notificationEntry.updateKind === "firmware"
+                                           ? "OPEN UPDATES"
+                                           : notificationEntry.updateKind.indexOf("flatpak-") === 0
+                                           ? "DOWNLOAD" : "REVIEW"
                                     active: false
                                     onTriggered: {
                                         root.updatesController.review(

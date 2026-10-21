@@ -3,7 +3,8 @@
 import {readFile, stat, mkdtemp, rm, chmod} from "node:fs/promises";
 import {tmpdir, homedir} from "node:os";
 import {join} from "node:path";
-import {validMonth, localServerUrl, takeReadOnlySnapshot} from "./actual_readonly.mjs";
+import {validMonth, takeReadOnlySnapshot} from "./actual_readonly.mjs";
+import {readActualServerURL} from "./source_config.mjs";
 
 function monthNow() {
   const date = new Date();
@@ -24,7 +25,7 @@ async function protectedSecret(envName, fallback) {
 
 async function run() {
   // Refuse to connect to a non-local URL or emit a partial snapshot.
-  const serverURL = localServerUrl(process.env.ACTUAL_SERVER_URL);
+  const serverURL = await readActualServerURL();
   // UI reads the ID from a private local file; legacy manual env probes work.
   let syncId = process.env.ACTUAL_SYNC_ID;
   if (!syncId) {

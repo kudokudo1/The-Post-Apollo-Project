@@ -31,9 +31,8 @@ Scope {
         if (!monitoring || healthProbe.running)
             return false;
         // No credentials or budget records travel through this check.
-        healthProbe.exec(["/usr/bin/curl", "--silent", "--fail",
-                          "--max-time", "3", "--output", "/dev/null",
-                          "http://127.0.0.1:5007/"]);
+        healthProbe.exec(["/usr/bin/env", "node",
+                          Quickshell.shellPath("scripts/finance/check_server.mjs")]);
         return true;
     }
 
@@ -90,7 +89,7 @@ Scope {
                 ACTUAL_SYNC_ID: null,
                 ACTUAL_SYNC_ID_FILE: null,
                 ACTUAL_PASSWORD_FILE: null,
-                ACTUAL_SERVER_URL: "http://127.0.0.1:5007",
+                ACTUAL_SERVER_URL: null,
                 FINANCEW_MONTH: selectedMonth
             })
         });
@@ -164,8 +163,9 @@ Scope {
             fail("Local budget read failed. Check server and credentials.");
     }
 
-    // Cheap local-server reachability observation. This is not an API
-    // authentication check; LIVE additionally requires a valid snapshot.
+    // Cheap local-server reachability observation. Uses the same selected
+    // loopback URL as the Actual probe, without checking credentials.
+    // LIVE additionally requires a valid authenticated snapshot.
     Process {
         id: healthProbe
         onExited: function(exitCode, exitStatus) {

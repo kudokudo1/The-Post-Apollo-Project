@@ -48,7 +48,8 @@ assert 'onMonitoringChanged:' in bridge
 assert 'running: budgetBridge.monitoring' in bridge
 assert 'onTriggered: budgetBridge.checkReachability()' in bridge
 assert 'id: healthProbe' in bridge
-assert '["/usr/bin/curl", "--silent", "--fail"' in bridge
+assert 'Quickshell.shellPath("scripts/finance/check_server.mjs")' in bridge
+assert 'ACTUAL_SERVER_URL: null' in bridge
 assert 'budgetBridge.monitoring' in bridge
 assert 'exitCode === 0 ? "online" : "offline"' in bridge
 assert 'const wasOffline = budgetBridge.healthStatus === "offline";' in bridge
@@ -97,7 +98,7 @@ assert 'Quickshell.shellPath("scripts/finance/read_budget.mjs")' in bridge
 assert 'ACTUAL_SYNC_ID: null' in bridge
 assert 'ACTUAL_SYNC_ID_FILE: null' in bridge
 assert 'ACTUAL_PASSWORD_FILE: null' in bridge
-assert 'ACTUAL_SERVER_URL: "http://127.0.0.1:5007"' in bridge
+assert 'ACTUAL_SERVER_URL: null' in bridge
 assert 'Number.isSafeInteger(payload.toBudgetCents)' in bridge
 assert 'onStreamFinished: budgetBridge.acceptOutput(text)' in bridge
 assert 'onStreamFinished: budgetBridge.acceptError(text)' in bridge

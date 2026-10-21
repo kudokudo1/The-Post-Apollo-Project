@@ -149,3 +149,55 @@ normal states (including LIVE, CHECK, READING), switching to the actual
 text state color for OFFLINE, ERROR, or NO FEED. The close × uses the
 shared ActionButton's own stronger red glow. No independent glyph
 shadow sources are added to the close button.
+
+## Standalone local server (not tied to the desktop window)
+
+Actual's desktop app can run its own embedded server on 5007. Closing the
+desktop window stops that embedded server, so the FinanceW client loses its
+source. A separate, user-managed Actual sync server is required for a
+persistent budget source. We stage it on **127.0.0.1:5006** and run it
+through a user systemd service. It starts with your login, not the
+FinanceW menu and not the desktop Actual app. Server version is pinned to
+`@actual-app/sync-server@26.10.0`, matching the FinanceW API family.
+
+**Never substitute an empty new server for the existing budget.** The new
+server has its own data directory and password and initially contains no
+budget. Do not point FinanceW at it until you export and restore the actual
+budget and verify your account and category balances. The installer never
+copies, moves, deletes, or migrates desktop app financial records.
+
+1. In your **existing desktop Actual Budget**, choose Settings → Data →
+   **Export data** and save the downloaded budget ZIP. Keep it as a backup.
+2. With the current budget safely exported, run
+   `bash ~/.config/quickshell/scripts/finance/install_standalone_server.sh`
+   on the Silverblue HOST, not in a toolbox. It installs under
+   `~/.local/share/financew/`, writes a user systemd unit and enables it.
+3. Open `http://127.0.0.1:5006` in your browser; set a NEW server password
+   if prompted and import the ZIP using the Actual **Import file** workflow.
+   Verify the budget's accounts, categories and balances. Ensure the
+   imported budget has a Sync ID in Settings → Advanced. Don't reset sync
+   on the original desktop installation.
+4. Back up the old local FinanceW files `actual-password` and
+   `actual-sync-id` to a private directory first. Then update those two
+   **private (0600)** files to the NEW server's password and imported
+   budget's Sync ID. The old 5007 credentials do not automatically apply
+   to 5006.
+5. Only after verification, switch the connection using
+   `printf 'http://127.0.0.1:5006\\n' > ~/.config/financew/actual-server-url`
+   and `chmod 600 ~/.config/financew/actual-server-url`.
+   Restart or reopen FinanceW, then verify an authenticated read and a
+   LIVE status **with the desktop app closed**.
+6. For the rollback, restore the original password and Sync ID private
+   files, remove `~/.config/financew/actual-server-url` to fall back to
+   5007, and launch your original desktop Actual app. To stop the new
+   service: `systemctl --user disable --now financew-actual-server.service`.
+   Never delete either server's data just to fix a connection failure.
+
+FinanceW reads `~/.config/financew/actual-server-url` on every read
+and health check. **When it is absent**, the existing `127.0.0.1:5007`
+behavior stays unchanged. Only valid loopback HTTP URLs are accepted,
+and no URL or credential file is committed to Git.
+
+Useful diagnostics: `systemctl --user status financew-actual-server.service`
+and `curl -I http://127.0.0.1:5006`. The status alone is not sufficient
+to claim authenticated LIVE; the actual budget must be downloaded.

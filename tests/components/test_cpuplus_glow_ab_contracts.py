@@ -39,6 +39,8 @@ for token in (
     "cpuPlusWindow.modeGlowExperiment !== 4",
     "sampledPrimaryActive ? textModeIcon : null",
     "sampledCaptionActive ? modeCaption : null",
+    "primaryGlowHost: modeIconSlot",
+    "labelGlowHost: modeCaptionSlot",
     'sampledPrimaryActive && modelData.kind !== "thermal"',
     "labelGlowEnabled: sampledCaptionActive",
     "cpuPlusWindow.modeGlowExperiment === 5",

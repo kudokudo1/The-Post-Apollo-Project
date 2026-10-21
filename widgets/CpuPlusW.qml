@@ -755,6 +755,12 @@ PanelWindow {
                         sampledPrimaryActive ? textModeIcon : null
                     customLabelGlowSource:
                         sampledCaptionActive ? modeCaption : null
+                    // Keep each sampled shadow in its own source's local
+                    // coordinate space. The shared TextHashGlow now follows
+                    // direct sibling x/y reactively, like AppControl KILL.
+                    // These are the slot wrappers, never the source itself.
+                    primaryGlowHost: modeIconSlot
+                    labelGlowHost: modeCaptionSlot
                     primaryGlowEnabled:
                         sampledPrimaryActive && modelData.kind !== "thermal"
                     labelGlowEnabled: sampledCaptionActive

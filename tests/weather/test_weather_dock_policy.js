@@ -12,6 +12,23 @@ const src = fs.readFileSync(path.join(root, "services/weather/WeatherDockPolicy.
 const context = {};
 vm.runInNewContext(src, context);
 assert.equal(typeof context.classify, "function");
+assert.equal(typeof context.formatTemperature, "function");
+
+// The exact same observed Fahrenheit reading supports both presentation units.
+assert.equal(context.formatTemperature("72", true, false), "72°F");
+assert.equal(context.formatTemperature("72", true, true), "22°C");
+assert.equal(context.formatTemperature("32", true, true), "0°C");
+assert.equal(context.formatTemperature("-40", true, false), "-40°F");
+assert.equal(context.formatTemperature("-40", true, true), "-40°C");
+assert.equal(context.formatTemperature("98.6", true, false), "99°F");
+assert.equal(context.formatTemperature("98.6", true, true), "37°C");
+assert.equal(context.formatTemperature("-0.1", true, false), "0°F");
+assert.equal(context.formatTemperature("--", true, false), "--°F");
+assert.equal(context.formatTemperature("", true, true), "--°C");
+assert.equal(context.formatTemperature("75", false, false), "--°F");
+assert.equal(context.formatTemperature("75", false, true), "--°C");
+assert.equal(context.formatTemperature(null, true, true), "--°C");
+assert.equal(context.formatTemperature("Infinity", true, false), "--°F");
 
 const nowMs = 1780000000000;
 function reading(patch = {}) {
@@ -62,11 +79,14 @@ assert.match(dock, /implicitHeight:\s*50/);
 assert.match(dock, /Math\.max\(90, Math\.ceil\(weatherContent\.implicitWidth\)/);
 // Keep the original identity glyph while rendering condition and temperature separately.
 assert.match(dock, /id:\s*weatherThermometer[\s\S]*?text:\s*"🌡"[\s\S]*?font\.pixelSize:\s*24/);
+assert.match(dock, /property bool useCelsius:\s*false/);
+assert.match(dock, /onRightClicked:\s*\{\s*useCelsius\s*=\s*!useCelsius;/);
+assert.match(dock, /WeatherDockPolicy\.formatTemperature\([\s\S]*?weatherFresh,[\s\S]*?useCelsius/);
 assert.match(dock, /id:\s*weatherCondition[\s\S]*?text:\s*weatherDock\.weatherState\.icon[\s\S]*?font\.pixelSize:\s*32/);
 assert.match(dock, /id:\s*weatherTemperature[\s\S]*?text:\s*weatherDock\.temperatureLabel[\s\S]*?font\.pixelSize:\s*20/);
 assert.match(dock, /contentGlowSource:\s*weatherContent/);
-assert.ok(dock.indexOf("id: weatherThermometer") < dock.indexOf("id: weatherCondition"));
 assert.ok(dock.indexOf("id: weatherCondition") < dock.indexOf("id: weatherTemperature"));
+assert.ok(dock.indexOf("id: weatherTemperature") < dock.indexOf("id: weatherThermometer"));
 assert.match(dock, /WeatherDockPolicy\.classify/);
 assert.doesNotMatch(dock, /\bProcess\s*\{/);
 assert.match(shell, /Weather\s*\{[^}]*weatherService:\s*weatherService/s);

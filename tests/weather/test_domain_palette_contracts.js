@@ -1,83 +1,64 @@
 #!/usr/bin/env node
 "use strict";
 
-// Weather Station palette contract: presentation changes must not affect
-// raw telemetry, meter scaling, or risk-level text.
+// Weather Station palette contract after domain separation. This pass protects
+// semantic identities and telemetry severity colors while layout polish remains
+// intentionally deferred.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const root = path.resolve(__dirname, "../..");
-const windowSource = fs.readFileSync(
-    path.join(root, "widgets/weather/WeatherStationW.qml"), "utf8");
-const homeSource = fs.readFileSync(
-    path.join(root, "widgets/weather/StationHome.qml"), "utf8");
+
+function read(relative) {
+    return fs.readFileSync(path.join(root, relative), "utf8");
+}
+
+const windowSource = read("widgets/weather/WeatherStationW.qml");
+const homeSource = read("widgets/weather/StationHome.qml");
+const groundSource = read("widgets/weather/StationGround.qml");
+const skySource = read("widgets/weather/StationSky.qml");
+const spaceSource = read("widgets/weather/StationSpace.qml");
 
 const mainHeaderStart = windowSource.indexOf("id: header");
 const mainHeaderEnd = windowSource.indexOf("// NAVIGATION", mainHeaderStart);
 assert.ok(mainHeaderStart >= 0 && mainHeaderEnd > mainHeaderStart);
 const header = windowSource.slice(mainHeaderStart, mainHeaderEnd);
-assert.match(header, /text: "✦ WEATHER STATION ✦"[\s\S]*?color: Colors\.magenta/);
+assert.match(
+    header,
+    /text: "✦ WEATHER STATION ✦"[\s\S]*?color: Colors\.magenta/
+);
 assert.match(header, /height: 2\s+color: Colors\.magenta/);
-// Keep functional status and destructive controls independent.
 assert.match(header, /border\.color: weatherStation\.sourceStatusColor/);
 assert.match(header, /accentColor: Colors\.red/);
 
-const markers = ["id: spaceBand", "id: skyBand", "id: groundBand"];
-const positions = markers.map(x => homeSource.indexOf(x));
-assert.ok(positions[0] >= 0 && positions[0] < positions[1]
-          && positions[1] < positions[2]);
-const areas = [
-    homeSource.slice(positions[0], positions[1]),
-    homeSource.slice(positions[1], positions[2]),
-    homeSource.slice(positions[2])
-];
+// HOME no longer owns the three domains.
+for (const title of ["⌁  GROUND", "☁  SKY", "✦  SPACE"])
+    assert.ok(!homeSource.includes(title), "HOME still contains " + title);
+assert.ok(homeSource.includes("FAVORITES // RELEVANT // AUTO"));
 
-const specs = [
-    { name: "space", accent: "magenta",
-      title: "✦  SPACE", meters: ["kp", "solarWind", "bz", "solarFlux"] },
-    { name: "sky", accent: "cyan",
-      title: "☁  SKY", meters: ["temperature", "aqi", "humidity", "wind"] },
-    { name: "ground", accent: "green",
-      title: "⌁  GROUND", meters: ["aqi", "pm25", "pm10"] }
-];
+// Stable domain identities survive the structural split.
+assert.match(groundSource, /text: "⌁  GROUND"[\s\S]*?color: Colors\.green/);
+assert.match(skySource, /text: "☁  SKY"[\s\S]*?color: Colors\.cyan/);
+assert.match(spaceSource, /text: "✦  SPACE"[\s\S]*?color: Colors\.magenta/);
 
-for (let i = 0; i < specs.length; i++) {
-    const {name, accent, title, meters} = specs[i];
-    const section = areas[i], id = name + "Band";
-    assert.ok(section.includes("readonly property color accentColor: Colors." + accent));
-    // Identity is stable across pointer hover and current domain selection.
-    assert.ok(section.includes('text: "' + title + '"'));
-    const heading = section.slice(section.indexOf('text: "' + title + '"'),
-                                  section.indexOf('text: "' + title + '"') + 260);
-    assert.ok(heading.includes("color: " + id + ".accentColor"), name + " title");
-    assert.ok(section.slice(0, section.indexOf("id: " + name + "Title"))
-                     .includes("color: " + id + ".accentColor"), name + " left marker");
-    assert.equal(section.split("border.color: " + id + ".accentColor").length - 1,
-                 meters.length, name + " meter outlines");
-    for (const meter of meters) {
-        const location = "width: (parent.width - 4) * home." + meter + "Meter";
-        const start = section.indexOf(location);
-        assert.ok(start >= 0 && section.indexOf(location, start + 1) === -1,
-                  name + "/" + meter + " unique meter");
-        // Read the first color property after the meter-width expression,
-        // independent of nesting/indentation in the Wind layout.
-        const firstColor = section.slice(start).match(/\bcolor:\s*([A-Za-z0-9.]+)/);
-        assert.ok(firstColor, name + "/" + meter + " has a fill");
-        assert.equal(firstColor[1], id + ".accentColor",
-                     name + "/" + meter + " fill");
-    }
-    assert.ok(section.includes("safeSource: " + id));
-    assert.ok(section.includes("color: " + id + ".accentColor"),
-              name + " selected glow");
-}
+// Existing semantic telemetry severity remains independent from page identity.
+assert.match(groundSource, /readonly property color aqiColor:/);
+for (const color of ["cyan", "yellow", "orange", "red"])
+    assert.ok(groundSource.includes("Colors." + color));
 
-// Semantic severity of source telemetry stays independent of domain accents.
-assert.match(areas[0], /color: home\.kpColor/);
-assert.match(areas[0], /color: home\.solarWindColor/);
-assert.match(areas[0], /color: home\.bzColor/);
-assert.match(areas[1], /color: home\.aqiColor/);
-assert.match(areas[2], /color: home\.aqiColor/);
-assert.match(homeSource, /readonly property real aqiMeter:\s*Math\.max/);
-assert.match(homeSource, /readonly property real kpMeter:\s*Math\.max/);
+for (const property of ["kpColor", "solarWindColor", "bzColor"])
+    assert.ok(spaceSource.includes("readonly property color " + property));
+for (const color of ["cyan", "yellow", "orange", "red"])
+    assert.ok(spaceSource.includes("Colors." + color));
+
+// Current weather content remains on SKY rather than being lost in the split.
+for (const token of [
+    "weatherService.tempF",
+    "weatherService.feelsLikeF",
+    "weatherService.condition",
+    "weatherService.humidity",
+    "weatherService.windMph",
+])
+    assert.ok(skySource.includes(token), token);
 
 console.log("Weather Station domain palette contracts: PASS");

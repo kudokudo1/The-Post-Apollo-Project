@@ -73,7 +73,8 @@ DockButton {
 
     normalForegroundColor: weatherColor
     hoverForegroundColor: Colors.orange
-    pressedForegroundColor: Colors.magenta
+    // Pressing keeps each icon's semantic foreground; only the glow pulses magenta.
+    pressedForegroundColor: weatherColor
     openForegroundColor: Colors.magenta
 
     normalContentGlowColor: weatherColor
@@ -101,6 +102,9 @@ DockButton {
     Row {
         id: weatherContent
         anchors.centerIn: parent
+        // Font bearings put the visible 🌡 slightly farther from the right
+        // edge. Compensate optically while keeping measured width + 6px.
+        anchors.horizontalCenterOffset: 2
         spacing: 6
 
         Text {
@@ -155,8 +159,8 @@ DockButton {
                         id: weatherDegree
                         text: "°"
                         font.pixelSize: 20
-                        color: weatherDock.open || weatherDock.pressed
-                               ? Colors.magenta
+                        color: weatherDock.open ? Colors.magenta
+                               : weatherDock.pressed ? Colors.white
                                : weatherDock.hovered ? Colors.orange : Colors.white
                     }
                 }
@@ -175,8 +179,7 @@ DockButton {
                 anchors.verticalCenter: parent.verticalCenter
                 text: "🌡"
                 font.pixelSize: 24
-                color: weatherDock.open || weatherDock.pressed
-                       ? Colors.magenta : Colors.orange
+                color: weatherDock.open ? Colors.magenta : Colors.orange
             }
         }
     }

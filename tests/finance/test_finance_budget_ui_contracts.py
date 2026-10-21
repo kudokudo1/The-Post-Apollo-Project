@@ -19,7 +19,20 @@ assert 'function shiftMonth(direction)' in bridge
 assert 'selectedMonth = String(nextYear)' in bridge
 assert 'FINANCEW_MONTH: selectedMonth' in bridge
 assert 'payload.month !== selectedMonth' in bridge
-assert 'if (loading || probe.running || (direction !== 1 && direction !== -1))' in bridge
+assert 'if (direction !== 1 && direction !== -1)' in bridge
+assert 'refresh();' in bridge[bridge.index('function shiftMonth'):bridge.index('function fail')]
+assert 'if (probe.running)' in bridge
+assert 'pendingRefresh = selectedMonth !== inFlightMonth;' in bridge
+assert 'property bool pendingRefresh: false' in bridge
+assert 'inFlightMonth !== selectedMonth' in bridge
+assert 'if (budgetBridge.pendingRefresh)' in bridge
+assert 'budgetBridge.refresh();' in bridge
+assert 'if (menuOpen) {' in ui[ui.index('onMenuOpenChanged:'):ui.index('onKeyboardActiveChanged:')]
+assert 'financeBudget.refresh();' in ui[ui.index('onMenuOpenChanged:'):ui.index('onKeyboardActiveChanged:')]
+assert 'available: !financeBudget.loading' in ui[ui.index('id: refreshBudget'):ui.index('id: financeMonthRail')]
+for arrow in ('previousBudgetMonth', 'nextBudgetMonth'):
+    portion = ui[ui.index('id: ' + arrow):ui.index('onLeftClicked: financeBudget.shiftMonth', ui.index('id: ' + arrow))]
+    assert 'available: !financeBudget.loading' not in portion
 assert 'visible: !actualBudgetPage.visible' in ui
 assert 'root.moneyText(modelData.balanceCents)' in ui
 assert 'root.moneyText(modelData.availableCents)' in ui

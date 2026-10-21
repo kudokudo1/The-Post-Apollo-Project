@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - "widgets/weather/**"
+      - "modules/Weather.qml"
+      - "services/weather/**"
+      - "shell.qml"
       - "tests/weather/**"
       - ".github/workflows/weather-teardown-contracts.yml"
   push:
@@ -11,6 +14,9 @@ on:
       - main
     paths:
       - "widgets/weather/**"
+      - "modules/Weather.qml"
+      - "services/weather/**"
+      - "shell.qml"
       - "tests/weather/**"
       - ".github/workflows/weather-teardown-contracts.yml"
 
@@ -25,3 +31,5 @@ jobs:
         uses: actions/checkout@v4
       - name: Validate Weather Station effect teardown contracts
         run: python3 tests/weather/test_shader_teardown_contracts.py
+      - name: Validate live Weather dock state classification
+        run: node tests/weather/test_weather_dock_policy.js

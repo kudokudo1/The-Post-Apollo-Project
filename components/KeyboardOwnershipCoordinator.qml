@@ -11,9 +11,9 @@ QtObject {
     // other widgets retain their existing compositor focus policies until
     // separately audited and verified on SwayFX.
     readonly property var widgetIds: [
-        "appcontrol", "hospital", "git", "cpu", "weather", "notifications"
+        "appcontrol", "hospital", "git", "finance", "cpu", "weather", "notifications"
     ]
-    readonly property var pulseIds: ["hospital", "git", "notifications"]
+    readonly property var pulseIds: ["hospital", "git", "finance", "notifications"]
 
     // The currently selected Quickshell menu, not a native Sway window.
     property string owner: ""

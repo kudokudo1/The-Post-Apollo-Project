@@ -28,13 +28,16 @@ PanelWindow {
     property string catalogSource: "local-mpd"
     property int browseIndex: 0
     property int navigationZone: 1 // SOURCE / RESULTS / NOW
-    property string browserStatus: "SEARCH LIBRARY OR YOUTUBE"
+    property string browserStatus: "SEARCH LIBRARY, RADIO OR YOUTUBE"
     readonly property var browseItems:
         catalogSource === "direct-stream"
         ? [{ref: {source: "direct-stream", kind: "stream", id: radioStreamUrl},
             title: "Groove Salad", artist: "SomaFM"}]
         : headless.browse && headless.browse.source === catalogSource
           && Array.isArray(headless.browse.items) ? headless.browse.items : []
+    readonly property string nextBrowseCursor:
+        headless.browse && headless.browse.source === catalogSource
+        ? String(headless.browse.nextCursor || "") : ""
     readonly property var highlightedItem:
         browseIndex >= 0 && browseIndex < browseItems.length
         ? browseItems[browseIndex] : null
@@ -64,15 +67,18 @@ PanelWindow {
     }
 
     function toggleCatalogSource() {
-        catalogSource = catalogSource === "local-mpd" ? "youtube"
+        catalogSource = catalogSource === "local-mpd" ? "radio-browser"
+            : catalogSource === "radio-browser" ? "youtube"
             : catalogSource === "youtube" ? "direct-stream" : "local-mpd";
         navigationZone = 0;
         browseIndex = 0;
         browserStatus = catalogSource === "youtube"
             ? "YOUTUBE CATALOG / REQUIRES API KEY / NO PLAYBACK"
-            : catalogSource === "direct-stream"
-              ? "RADIO / SELECT THEN LOAD / NO AUTOPLAY"
-              : "LOCAL MPD LIBRARY";
+            : catalogSource === "radio-browser"
+              ? "RADIO DIRECTORY / BROWSE ONLY / PLAYBACK NEEDS APPROVAL"
+              : catalogSource === "direct-stream"
+                ? "RADIO PRESET / SELECT THEN LOAD / NO AUTOPLAY"
+                : "LOCAL MPD LIBRARY";
     }
 
     function searchLibrary() {
@@ -81,16 +87,31 @@ PanelWindow {
             return;
         }
         const query = browserControls.queryText;
-        if (!query.trim()) {
+        if (!query.trim() && catalogSource !== "radio-browser") {
             browserStatus = "ENTER A SEARCH QUERY";
             return;
         }
         if (headless.searchMedia(catalogSource, query)) {
             browseIndex = 0;
             navigationZone = 1;
-            browserStatus = "SEARCH REQUESTED / " + catalogSource.toUpperCase();
+            browserStatus = catalogSource === "radio-browser"
+                ? "RADIO DIRECTORY / BROWSE ONLY / LOAD NOT AVAILABLE"
+                : "SEARCH REQUESTED / " + catalogSource.toUpperCase();
         } else {
             browserStatus = "SEARCH UNAVAILABLE / CONTROLLER BUSY";
+        }
+    }
+
+    function nextRadioPage() {
+        if (catalogSource !== "radio-browser" || !nextBrowseCursor) {
+            browserStatus = "NO NEXT RADIO PAGE";
+            return;
+        }
+        if (headless.searchMedia("radio-browser", browserControls.queryText, nextBrowseCursor)) {
+            browseIndex = 0;
+            browserStatus = "RADIO / NEXT PAGE REQUESTED";
+        } else {
+            browserStatus = "RADIO / NEXT PAGE UNAVAILABLE";
         }
     }
 
@@ -101,7 +122,9 @@ PanelWindow {
             return;
         }
         if (headless.selectMedia(item.ref))
-            browserStatus = "SELECT REQUESTED / NOT LOADED";
+            browserStatus = item.ref.source === "radio-browser"
+                ? "STATION SELECTED / CATALOG ONLY / NO LOAD"
+                : "SELECT REQUESTED / NOT LOADED";
         else
             browserStatus = "SELECT UNAVAILABLE";
     }
@@ -137,8 +160,13 @@ PanelWindow {
             browserStatus = "YOUTUBE IS CATALOG-ONLY / NO PLAYBACK";
             return;
         }
+        if (item.ref.source === "radio-browser") {
+            // Directory URLs are untrusted, not direct-stream refs.
+            browserStatus = "RADIO DIRECTORY / PLAYBACK REQUIRES APPROVAL";
+            return;
+        }
         const requested = item.ref.source === "direct-stream"
-            ? headless.loadRadio(radioStreamUrl) : headless.loadMedia(item.ref);
+            ? headless.loadRadio(item.ref.id) : headless.loadMedia(item.ref);
         if (requested)
             browserStatus = "ENTER / LOAD REQUESTED / PRESS PLAY";
         else

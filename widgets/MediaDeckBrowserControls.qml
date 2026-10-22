@@ -21,7 +21,8 @@ Item {
             width: 84
             height: parent.height
             label: bay.deckHost.catalogSource === "youtube" ? "YOUTUBE"
-                : bay.deckHost.catalogSource === "direct-stream" ? "RADIO" : "LIBRARY"
+                : bay.deckHost.catalogSource === "radio-browser" ? "RADIO"
+                : bay.deckHost.catalogSource === "direct-stream" ? "PRESET" : "LIBRARY"
             labelPixelSize: 10
             // Ordinary ActionButton: no specialized/latched selection face.
             onClicked: bay.deckHost.toggleCatalogSource()
@@ -60,7 +61,10 @@ Item {
                 anchors { left: parent.left; leftMargin: 7; verticalCenter: parent.verticalCenter }
                 visible: !searchInput.text.length && !searchInput.activeFocus
                 text: bay.deckHost.catalogSource === "direct-stream"
-                    ? "GROOVE SALAD / RADIO" : "ARTIST / SONG / ALBUM"
+                    ? "GROOVE SALAD / PRESET"
+                    : bay.deckHost.catalogSource === "radio-browser"
+                      ? "NAME / TAG:JAZZ / COUNTRY:US"
+                      : "ARTIST / SONG / ALBUM"
                 font.pixelSize: 10
                 opacity: 0.55
                 color: Colors.magenta
@@ -160,8 +164,18 @@ Item {
                            && bay.deckHost.transportMode === "mpd"
                 onClicked: bay.deckHost.loadStaged()
             }
+            ActionButton {
+                width: parent.width
+                height: 16
+                visible: bay.deckHost.catalogSource === "radio-browser"
+                label: "NEXT 50"
+                labelPixelSize: 9
+                available: !!bay.deckHost.nextBrowseCursor && !bay.controller.busy
+                onClicked: bay.deckHost.nextRadioPage()
+            }
             GohuText {
                 width: parent.width
+                visible: bay.deckHost.catalogSource !== "radio-browser"
                 horizontalAlignment: Text.AlignHCenter
                 text: "SHIFT / SELECT"
                 color: Colors.orange

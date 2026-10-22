@@ -130,7 +130,7 @@ class ControllerCatalogTests(unittest.TestCase):
 
     def test_source_availability_independent_of_local(self):
         info = self.controller.dispatch("sources")
-        self.assertEqual({i["id"] for i in info["sources"]}, {"youtube", "local-mpd", "direct-stream"})
+        self.assertEqual({i["id"] for i in info["sources"]}, {"youtube", "local-mpd", "direct-stream", "radio-browser"})
         self.assertEqual(self.controller.dispatch("health")["backend"]["id"], "mpd")
 
     def test_local_search_cursor_denied(self):

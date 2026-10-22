@@ -23,7 +23,8 @@ test("MPRIS transport is kept explicitly separate", () => {
 });
 
 test("radio station load is explicit and does not autoplay", () => {
-    assert.match(deck, /headless\.loadRadio\(radioStreamUrl\)/);
+    assert.match(deck, /headless\.loadRadio\(item\.ref\.id\)/);
+    assert.match(deck, /if \(item\.ref\.source === "radio-browser"\)/);
     assert.match(deck, /catalogSource === "direct-stream"/);
     assert.doesNotMatch(deck, /onClicked:\s*headless\.loadRadio/);
     assert.match(bridge, /issue\("load",\s*\["--source",\s*"direct-stream",\s*"--uri",\s*url\]\)/);
@@ -134,7 +135,8 @@ test("Shift selection remains fail-closed; bare grave is reserved", () => {
 test("radio cassette is display-only; its SELECT and LOAD are on the bay", () => {
     const ui = fs.readFileSync(path.join(base, "widgets/MediaDeckBrowserControls.qml"), "utf8");
     assert.match(deck, /catalogSource === "direct-stream"/);
-    assert.match(deck, /headless\.loadRadio\(radioStreamUrl\)/);
+    assert.match(deck, /headless\.loadRadio\(item\.ref\.id\)/);
+    assert.match(deck, /if \(item\.ref\.source === "radio-browser"\)/);
     assert.match(deck, /function selectHighlighted\(\)/);
     assert.match(bridge, /ref\.source !== "direct-stream"/);
     assert.match(ui, /label: bay\.deckHost\.catalogSource === "youtube"/);
@@ -165,14 +167,28 @@ test("SEARCH and source button positions are swapped, input uses magenta and ora
     assert.match(ui, /id:\s*queryBezel[\s\S]*?border\.color:\s*Colors\.magenta/);
     assert.match(ui, /id:\s*searchInput[\s\S]*?color:\s*Colors\.magenta/);
     assert.match(ui, /cursorDelegate:\s*Rectangle\s*\{[\s\S]*?color:\s*Colors\.orange/);
-    assert.match(ui, /GohuText\s*\{[\s\S]*?GROOVE SALAD \/ RADIO[\s\S]*?color:\s*Colors\.magenta/);
+    assert.match(ui, /GohuText\s*\{[\s\S]*?GROOVE SALAD \/ PRESET[\s\S]*?color:\s*Colors\.magenta/);
 });
 
 test("browser action controls retain ordinary ActionButton variants", () => {
     const ui = fs.readFileSync(path.join(base, "widgets/MediaDeckBrowserControls.qml"), "utf8");
-    assert.equal((ui.match(/ActionButton\s*\{/g) || []).length, 5);
+    assert.equal((ui.match(/ActionButton\s*\{/g) || []).length, 6);
     assert.doesNotMatch(ui, /selected:\s*bay\.deckHost\.navigationZone/);
     assert.doesNotMatch(ui, /destructive:\s*true|variant:\s*"special"/);
     assert.match(ui, /id:\s*sourceKey[\s\S]*?onClicked:\s*bay\.deckHost\.toggleCatalogSource/);
     assert.match(ui, /id:\s*searchKey[\s\S]*?onClicked:\s*bay\.deckHost\.searchLibrary/);
+});
+
+test("radio directory supports browsing but blocks untrusted station playback", () => {
+    const ui = fs.readFileSync(path.join(base, "widgets/MediaDeckBrowserControls.qml"), "utf8");
+    assert.match(deck, /catalogSource === "radio-browser"/);
+    assert.match(deck, /function nextRadioPage\(\)/);
+    assert.match(deck, /headless\.searchMedia\("radio-browser", browserControls\.queryText, nextBrowseCursor\)/);
+    assert.match(deck, /headless\.loadRadio\(item\.ref\.id\)/);
+    assert.match(deck, /if \(item\.ref\.source === "radio-browser"\)/);
+    assert.match(deck, /headless\.browse\.nextCursor/);
+    assert.match(ui, /label: "NEXT 50"/);
+    assert.match(ui, /onClicked: bay\.deckHost\.nextRadioPage\(\)/);
+    assert.match(ui, /label: bay\.deckHost\.catalogSource === "youtube"/);
+    assert.match(bridge, /source !== "radio-browser"/);
 });

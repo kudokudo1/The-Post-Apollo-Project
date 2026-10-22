@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import stat
 import tempfile
+import uuid
 from typing import Any
 
 
@@ -23,12 +24,19 @@ def _valid_ref(value: Any) -> bool:
         return False
     source, kind, identifier = value.get("source"), value.get("kind"), value.get("id")
     if (source, kind) not in (("local-mpd", "track"), ("youtube", "video"),
-                              ("direct-stream", "stream")):
+                              ("direct-stream", "stream"),
+                              ("radio-browser", "station")):
         return False
     if not isinstance(identifier, str) or not 0 < len(identifier) <= 4096 or any(
         ch in identifier for ch in "\x00\r\n"
     ):
         return False
+    if source == "radio-browser":
+        try:
+            if str(uuid.UUID(identifier)) != identifier:
+                return False
+        except (ValueError, AttributeError):
+            return False
     if source == "direct-stream":
         from direct_stream_source import validate_https_audio_url
         from headless_mpd import MediaBackendError

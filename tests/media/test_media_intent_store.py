@@ -115,6 +115,22 @@ class IntentTests(unittest.TestCase):
                                       "args": {"query": "first"}})
         self.assertTrue(response["ok"])
 
+    def test_radio_directory_uuid_selection_survives_restart_without_loading(self):
+        import uuid
+        ref = {"source": "radio-browser", "kind": "station",
+               "id": str(uuid.uuid5(uuid.NAMESPACE_URL, "https://example.com/station"))}
+        self.store.save(ref, None)
+        self.assertEqual(self.store.load().get("selection"), ref)
+        self.assertIsNone(self.store.load().get("loaded"))
+        restarted = MediaController(self.mpd, intent_store=self.store)
+        self.assertEqual(restarted.selection, ref)
+        self.assertIsNone(restarted.loaded)
+        self.assertIsNone(restarted.owned_active_id)
+        self.assertFalse(any(call[0] in ("addid", "playid") for call in self.mpd.calls))
+        for bad in ("not-a-uuid", "ABCDEF", ref["id"].upper()):
+            with self.assertRaises(ValueError):
+                self.store.save({**ref, "id": bad}, None)
+
     def test_no_credentials_or_browse_query_written(self):
         self.c.dispatch("search", {"source": "local-mpd", "query": "private-query"})
         self.c.dispatch("select", {"ref": ref()})

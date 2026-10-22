@@ -53,13 +53,16 @@ Scope {
     // All browsing/selection requests use the same versioned CLI and private socket.
     // None of these methods starts playback or mutates another player's audio.
     function searchMedia(source, query, cursor) {
-        if ((source !== "local-mpd" && source !== "youtube")
-                || typeof query !== "string" || query.trim().length === 0
+        if ((source !== "local-mpd" && source !== "youtube"
+                && source !== "radio-browser")
+                || typeof query !== "string"
+                || (query.trim().length === 0 && source !== "radio-browser")
                 || query.length > 256)
             return false;
         const args = [query, "--source", source];
         if (cursor !== undefined && cursor !== null && cursor !== "") {
-            if (source !== "youtube" || typeof cursor !== "string"
+            if ((source !== "youtube" && source !== "radio-browser")
+                    || typeof cursor !== "string"
                     || cursor.length > 256)
                 return false;
             args.push("--cursor", cursor);
@@ -71,7 +74,8 @@ Scope {
         if (!ref || typeof ref.id !== "string" || !ref.id.length
                 || ref.id.length > 4096
                 || (ref.source !== "local-mpd" && ref.source !== "youtube"
-                    && ref.source !== "direct-stream"))
+                    && ref.source !== "direct-stream"
+                    && ref.source !== "radio-browser"))
             return null;
         return [ref.id, "--source", ref.source];
     }

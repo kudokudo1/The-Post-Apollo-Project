@@ -63,10 +63,16 @@ async function main() {
     working = await mkdtemp(join(tmpdir(),"financew-write-"));
     await chmod(working,0o700);
     const serverURL = await readActualServerURL();
+    if (serverURL !== "http://127.0.0.1:5006")
+      throw new TransactionRefusal("unsupported-write-server");
     const password = await privateFile(join(config,"actual-password"));
     const syncId = await privateFile(join(config,"actual-sync-id"));
     if (!/^[a-zA-Z0-9-]{8,80}$/.test(syncId))
       throw new TransactionRefusal("invalid-sync-id");
+    const expectedKey = createHash("sha256")
+      .update(serverURL + "\0" + syncId).digest("hex");
+    if (cmd.sourceKey !== expectedKey)
+      throw new TransactionRefusal("budget-source-changed");
     // Any unresolved earlier attempt blocks ALL later saves until manual
     // inspection. Neither reboot nor creating a new request ID bypasses it.
     for (const name of await readdir(ledgerDir)) {

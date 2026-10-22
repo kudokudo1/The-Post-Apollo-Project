@@ -7,12 +7,14 @@ on:
       - main
     paths:
       - "services/notifications/**"
+      - "integrations/proton/**"
       - "widgets/notifications/**"
       - "tests/notifications/**"
       - ".github/workflows/notification-policy-contracts.yml"
   pull_request:
     paths:
       - "services/notifications/**"
+      - "integrations/proton/**"
       - "widgets/notifications/**"
       - "tests/notifications/**"
       - ".github/workflows/notification-policy-contracts.yml"
@@ -34,6 +36,12 @@ jobs:
 
       - name: Validate exact website DND/ZZ scope and legacy inheritance
         run: python3 tests/notifications/test_notification_website_scope.py
+
+      - name: Validate dual Proton Browser + Bridge action policy
+        run: python3 tests/notifications/test_proton_dual_adapter_policy.py
+
+      - name: Validate read-only Proton browser native handshake
+        run: python3 tests/notifications/test_proton_browser_handshake.py
 
       - name: Validate email action deck live sender capabilities
         run: python3 tests/notifications/test_notification_email_actions.py

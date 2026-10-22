@@ -66,6 +66,11 @@ test("fictional create commits once, writes a private receipt, and rejects repea
     assert.match(duplicate.stdout,/blocked:possible-duplicate/);
     assert.equal(data(f).transactions.length,1);
     assert.deepEqual(data(f).events,["add","sync"]);
+    const second=run(f,command({requestId:"e".repeat(32),date:"2026-10-24",amountCents:-200}));
+    assert.equal(second.status,0,second.stderr+second.stdout);
+    assert.match(second.stdout,/FINANCEW_TRANSACTION_RESULT committed/);
+    assert.equal(data(f).transactions.length,2);
+    assert.deepEqual(data(f).events,["add","sync","add","sync"]);
   } finally {cleanup(f);}
 });
 

@@ -343,7 +343,11 @@ DockButton {
                     weatherDock.thermometerState.valid
                     ? weatherDock.thermometerState.level : 0
 
-                readonly property color glassColor: Colors.white
+                // Glass and its graduated ticks share one state color.
+                // Only OPEN turns structural glass magenta; idle, hover,
+                // and pressed retain the normal off-white glass.
+                readonly property color glassColor:
+                    weatherDock.open ? Colors.magenta : Colors.white
                 readonly property real glassOpacity: 1.0
                 readonly property real fillStart:
                     Math.max(0, Math.min(1, 1 - animatedLevel))
@@ -536,7 +540,7 @@ DockButton {
                     }
                 }
 
-                // The white glass stays on top of liquid and its halo.
+                // The glass follows open mode and stays over the liquid halo.
                 Shape {
                     anchors.fill: parent
                     z: 3
@@ -602,8 +606,8 @@ DockButton {
                     }
                 }
 
-                // Major/minor scale marks: both use the EXACT white and
-                // opacity of the glass. Snap their edges to whole pixels so
+                // Major/minor scale marks use the SAME color and opacity
+                // as the glass, including the magenta-open state. Snap their edges to whole pixels so
                 // 4-sample antialiasing does not fade the tiny strokes.
                 // The long marks intentionally cross the right edge of the
                 // narrow liquid column, like a graduated thermometer scale.

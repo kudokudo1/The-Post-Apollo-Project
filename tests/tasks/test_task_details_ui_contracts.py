@@ -22,6 +22,8 @@ assert "todoSnapshot: ApolloHubTodoStore.snapshot" in HUB
 assert "signal taskSelected(string taskId)" in MINI
 assert "TapHandler {" in MINI
 assert "todoMini.taskSelected(String(todoEntry.modelData.id))" in MINI
+assert 'import "../../services/hub/ApolloHubTodoPolicy.js" as TodoPolicy' in DETAILS
+assert "TodoPolicy.validDueDate(" in DETAILS
 assert "onVisibleChanged:" in DETAILS
 assert "dueDateInput.focus = false;" in DETAILS
 assert "descriptionInput.focus = false;" in DETAILS

@@ -208,10 +208,30 @@ Rectangle {
                     color: Colors.orange
                 }
 
-                Text {
-                    text: sky.conditionState.icon
-                    font.pixelSize: 44
-                    color: sky.iconColor(sky.conditionState.color)
+                Item {
+                    width: 76
+                    height: 66
+
+                    SafeDropShadow {
+                        anchors.fill: conditionIconGlyph
+                        safeSource: conditionIconGlyph
+                        requestedVisible: true
+                        radius: 10
+                        samples: 19
+                        horizontalOffset: 0
+                        verticalOffset: 0
+                        transparentBorder: true
+                        opacity: 0.95
+                        color: sky.iconColor(sky.conditionState.color)
+                    }
+
+                    Text {
+                        id: conditionIconGlyph
+                        anchors.centerIn: parent
+                        text: sky.conditionState.icon
+                        font.pixelSize: 56
+                        color: sky.iconColor(sky.conditionState.color)
+                    }
                 }
             }
 
@@ -505,12 +525,33 @@ Rectangle {
                             color: Colors.orange
                         }
 
-                        Text {
+                        Item {
+                            width: parent.width
+                            height: 52
+
                             readonly property var forecastState:
                                 sky.iconState(modelData.condition, modelData.weatherCode, false)
-                            text: forecastState.icon
-                            font.pixelSize: 32
-                            color: sky.iconColor(forecastState.color)
+
+                            SafeDropShadow {
+                                anchors.fill: hourlyIconGlyph
+                                safeSource: hourlyIconGlyph
+                                requestedVisible: true
+                                radius: 9
+                                samples: 17
+                                horizontalOffset: 0
+                                verticalOffset: 0
+                                transparentBorder: true
+                                opacity: 0.95
+                                color: sky.iconColor(parent.forecastState.color)
+                            }
+
+                            Text {
+                                id: hourlyIconGlyph
+                                anchors.centerIn: parent
+                                text: parent.forecastState.icon
+                                font.pixelSize: 40
+                                color: sky.iconColor(parent.forecastState.color)
+                            }
                         }
 
                         QuietText {
@@ -572,6 +613,8 @@ Rectangle {
                         }
 
                         GohuText {
+                            width: parent.width
+                            horizontalAlignment: Text.AlignHCenter
                             text: (
                                 modelData.maxTempF > -900
                                 ? Math.round(modelData.maxTempF) : "--"
@@ -583,12 +626,33 @@ Rectangle {
                             color: Colors.white
                         }
 
-                        Text {
+                        Item {
+                            width: parent.width
+                            height: 60
+
                             readonly property var forecastState:
                                 sky.iconState(modelData.condition, modelData.weatherCode, false)
-                            text: forecastState.icon
-                            font.pixelSize: 32
-                            color: sky.iconColor(forecastState.color)
+
+                            SafeDropShadow {
+                                anchors.fill: dailyIconGlyph
+                                safeSource: dailyIconGlyph
+                                requestedVisible: true
+                                radius: 9
+                                samples: 17
+                                horizontalOffset: 0
+                                verticalOffset: 0
+                                transparentBorder: true
+                                opacity: 0.95
+                                color: sky.iconColor(parent.forecastState.color)
+                            }
+
+                            Text {
+                                id: dailyIconGlyph
+                                anchors.centerIn: parent
+                                text: parent.forecastState.icon
+                                font.pixelSize: 48
+                                color: sky.iconColor(parent.forecastState.color)
+                            }
                         }
 
                         QuietText {

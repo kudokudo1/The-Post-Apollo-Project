@@ -11,6 +11,7 @@ tile = (ROOT / "widgets/hub/ApolloHubTile.qml").read_text(encoding="utf-8")
 media_mini = (ROOT / "widgets/hub/ApolloHubMediaMini.qml").read_text(encoding="utf-8")
 system_mini = (ROOT / "widgets/hub/ApolloHubSystemMini.qml").read_text(encoding="utf-8")
 uptime_mini = (ROOT / "widgets/hub/ApolloHubUptimeMini.qml").read_text(encoding="utf-8")
+apps_mini = (ROOT / "widgets/hub/ApolloHubAppsMini.qml").read_text(encoding="utf-8")
 layout = (ROOT / "services/hub/ApolloHubLayout.js").read_text(encoding="utf-8")
 store = (ROOT / "services/hub/ApolloHubStore.qml").read_text(encoding="utf-8")
 module = (ROOT / "services/hub/qmldir").read_text(encoding="utf-8")
@@ -401,6 +402,49 @@ for forbidden in (
 for forbidden in ("FileView {", "Process {", "/proc/uptime"):
     assert forbidden not in window + tile, (
         f"Uptime Hub UI must not add a procfs reader: {forbidden}")
+
+# B6 Apps UI: existing native index only. Opening/scrolling/selecting
+# the Hub never starts an application, changes launcher ownership, or begins
+# an independent desktop-file scan.
+assert "appsSnapshot: hub.liveBridge" in window
+assert "hub.liveBridge.appsSnapshot : null" in window
+assert "property var appsSnapshot: null" in tile
+assert "ApolloHubAppsMini {" in tile
+assert 'visible: tile.moduleId === "apps"' in tile
+assert "appsSnapshot: tile.appsSnapshot" in tile
+assert 'tile.moduleId !== "apps"' in tile
+assert "appsMini.statusLine" in tile
+for phrase in (
+    "property var appsSnapshot: null",
+    'catalogState === "ready"',
+    'catalogState === "empty"',
+    'catalogState === "unavailable"',
+    "appsSnapshot.installedCount",
+    "appsSnapshot.matchCount",
+    "appsSnapshot.truncated",
+    "appsSnapshot.items",
+    "entries.length",
+    "GridView {",
+    "model: appsMini.entries",
+    "appEntry.modelData.name",
+    "appEntry.modelData.icon",
+    "Quickshell.iconPath(",
+    "GridView.FlowLeftToRight",
+    'boundsBehavior: Flickable.StopAtBounds',
+    'text: appsMini.catalogReady ? "NO MATCHES"',
+    '"NO APPLICATIONS"',
+    '"CATALOG UNAVAILABLE"',
+    "READ ONLY",
+):
+    assert phrase in apps_mini, f"B6 app mini missing {phrase}"
+for forbidden in (
+    "DesktopEntries {", "DesktopEntries.byId(", "DesktopEntries.applications",
+    ".execute(", "execute(", "execDetached(", "Process {", "Timer {",
+    "FileView {", "scanDesktopFiles(", "app.launch(", "onClicked:",
+    "onDoubleClicked:", "onTapped:", "MouseArea {", "TapHandler {",
+):
+    assert forbidden not in apps_mini + tile + window, (
+        f"UI cannot collect apps or trigger launch: {forbidden}")
 
 # Launchers and widget backends are unchanged in this first stage.
 print("ApolloHubW foundation source contracts passed")

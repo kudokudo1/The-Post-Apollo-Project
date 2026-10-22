@@ -32,9 +32,11 @@ Rectangle {
 
     // Menu chooses arrangement, sizing and custom glyph composition.
     property bool customArtwork: false
-    // The Hub opts into reactive positioning for the built-in Grid artwork.
-    // Effects stay OUTSIDE the Grid so they cannot become layout cells.
-    property bool trackDefaultGlowsLocally: false
+    // Built-in Grid icon/caption sampling tracks its own coordinates by
+    // default, not a potentially stale mapToItem() projection. Effects stay
+    // OUTSIDE the Grid so they never become layout cells. Custom artwork and
+    // explicitly hosted effects retain their independent placement.
+    property bool trackDefaultGlowsLocally: true
     property Item customPrimaryGlowSource: null
     property Item customLabelGlowSource: null
     property bool primaryGlowEnabled: true
@@ -210,11 +212,13 @@ Rectangle {
             // but bind to each glyph's actual Grid coordinates.
             x: modeButton.trackDefaultGlowsLocally
                && !modeButton.customArtwork && sourceAttached
+               && modeButton.effectivePrimaryGlowHost === contentLayer
                ? defaultContentHost.x + defaultArtworkGrid.x
                  + (modeButton.textOnly ? defaultLabel.x : defaultIcon.x)
                : sourceOrigin.x
             y: modeButton.trackDefaultGlowsLocally
                && !modeButton.customArtwork && sourceAttached
+               && modeButton.effectivePrimaryGlowHost === contentLayer
                ? defaultContentHost.y + defaultArtworkGrid.y
                  + (modeButton.textOnly ? defaultLabel.y : defaultIcon.y)
                : sourceOrigin.y
@@ -233,10 +237,12 @@ Rectangle {
             safeSource: modeButton.labelGlowSource
             x: modeButton.trackDefaultGlowsLocally
                && !modeButton.customArtwork && sourceAttached
+               && modeButton.effectiveLabelGlowHost === contentLayer
                ? defaultContentHost.x + defaultArtworkGrid.x + defaultLabel.x
                : sourceOrigin.x
             y: modeButton.trackDefaultGlowsLocally
                && !modeButton.customArtwork && sourceAttached
+               && modeButton.effectiveLabelGlowHost === contentLayer
                ? defaultContentHost.y + defaultArtworkGrid.y + defaultLabel.y
                : sourceOrigin.y
             requestedVisible: modeButton.labelGlowEnabled

@@ -1,0 +1,34 @@
+name: Apollo Hub B9 local Calendar contracts
+
+on:
+  pull_request:
+    paths:
+      - "services/hub/ApolloHubCalendarPolicy.js"
+      - "services/hub/ApolloHubLiveBridge.qml"
+      - "tests/hub/test_apollo_hub_calendar_policy.cjs"
+      - "tests/hub/test_apollo_hub_calendar_bridge.py"
+      - ".github/workflows/apollo-hub-calendar.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "services/hub/ApolloHubCalendarPolicy.js"
+      - "services/hub/ApolloHubLiveBridge.qml"
+      - "tests/hub/test_apollo_hub_calendar_policy.cjs"
+      - "tests/hub/test_apollo_hub_calendar_bridge.py"
+      - ".github/workflows/apollo-hub-calendar.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise civil months leap years and DST dates
+        run: node tests/hub/test_apollo_hub_calendar_policy.cjs
+      - name: Guard B9 shared clock and event-source boundary
+        run: python3 tests/hub/test_apollo_hub_calendar_bridge.py

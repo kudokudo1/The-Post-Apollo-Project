@@ -108,8 +108,9 @@ assert.strictEqual(youtube.website,'YouTube');
 assert.strictEqual(youtube.websiteHost,'www.youtube.com');
 assert.strictEqual(youtube.websiteIcon,'file:///tmp/native-site-logo.png');
 const maliciousRemote=mock('Brave','brave-browser',null,1);
-maliciousRemote.body='youtube.com\\n\\nNew video';
+maliciousRemote.body='youtube.com\n\nNew video';
 maliciousRemote.image='https://tracker.example/favicon.png';
+assert.strictEqual(C.convert(maliciousRemote).website,'YouTube');
 assert.strictEqual(C.convert(maliciousRemote).websiteIcon,'',
  'do not turn a native notice into a remote favicon request');
 assert.strictEqual(youtube.message,'www.youtube.com\n\nNew channel video');

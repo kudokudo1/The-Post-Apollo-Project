@@ -5,6 +5,7 @@ on:
     paths:
       - "widgets/ApolloHubW.qml"
       - "widgets/hub/ApolloHubTile.qml"
+      - "widgets/hub/ApolloHubMediaMini.qml"
       - "modules/ApolloHub.qml"
       - "components/ActionButton.qml"
       - "tests/hub/test_apollo_hub_foundation.py"
@@ -15,6 +16,7 @@ on:
     paths:
       - "widgets/ApolloHubW.qml"
       - "widgets/hub/ApolloHubTile.qml"
+      - "widgets/hub/ApolloHubMediaMini.qml"
       - "modules/ApolloHub.qml"
       - "components/ActionButton.qml"
       - "tests/hub/test_apollo_hub_foundation.py"

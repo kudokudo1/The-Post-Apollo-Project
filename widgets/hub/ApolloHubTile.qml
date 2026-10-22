@@ -2,8 +2,8 @@ import QtQuick
 import "../../components"
 import "../../services/hub/ApolloHubLayout.js" as Layout
 
-// Presentation only: Weather, Network, Media, CPU++, Uptime, and Apps
-// consume read-only snapshots. This tile creates no providers or pollers.
+// Hub mini presentations consume shared snapshots. The B7 To-do UI uses
+// the single user-private store only for intentional task actions.
 SectionFrame {
     id: tile
 
@@ -14,6 +14,9 @@ SectionFrame {
     property var systemSnapshot: null
     property var uptimeSnapshot: null
     property var appsSnapshot: null
+    property var todoStore: null
+    property var todoSnapshot: null
+    signal todoTextFocusChanged(bool focused)
     // B3 deliberately distinguishes local link status from verified internet.
     // Connected Wi-Fi/Ethernet is NOT proof that the internet is reachable.
     readonly property string networkState:
@@ -370,6 +373,25 @@ SectionFrame {
         }
     }
 
+    // B7 personal checklist, independent from Hospital and Hub layout data.
+    ApolloHubTodoMini {
+        id: todoMini
+        visible: tile.moduleId === "todo"
+        todoStore: tile.todoStore
+        todoSnapshot: tile.todoSnapshot
+        onTextFocusChanged: function(focused) {
+            tile.todoTextFocusChanged(focused);
+        }
+        anchors {
+            left: parent.left
+            right: parent.right
+            top: parent.top
+            bottom: parent.bottom
+            topMargin: tile.editing ? 32 : 22
+            bottomMargin: 23
+        }
+    }
+
     // MPD and MPRIS remain separate; neither gets selected automatically.
     ApolloHubMediaMini {
         visible: tile.moduleId === "media"
@@ -390,6 +412,7 @@ SectionFrame {
                  && tile.moduleId !== "cpu"
                  && tile.moduleId !== "uptime"
                  && tile.moduleId !== "apps"
+                 && tile.moduleId !== "todo"
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
@@ -432,6 +455,8 @@ SectionFrame {
               ? uptimeMini.statusLine
               : tile.moduleId === "apps"
               ? appsMini.statusLine
+              : tile.moduleId === "todo"
+              ? todoMini.statusLine
               : "DATA ADAPTER NOT CONNECTED"
     }
 }

@@ -32,6 +32,17 @@ spec.loader.exec_module(mod)
 assert mod.ALLOWED == {"silverblue", "oh-my-zsh", "powerlevel10k",
                        "flatpak-user", "flatpak-system", "firmware"}
 assert mod.DEFER_SECONDS == 24 * 60 * 60
+# Review-only text formatting: two cells inside the cyan edge rule.
+# This is presentation-only and does not change typed consent/commands.
+view = StringIO()
+with patch.object(mod.shutil, "get_terminal_size",
+                  return_value=os.terminal_size((40, 24))), redirect_stdout(view):
+    mod.review_print("The tracked remote revision differs from the local checkout.")
+wrapped = view.getvalue().splitlines()
+assert len(wrapped) >= 2
+assert all(line.startswith("  ") and len(line) <= 39 for line in wrapped)
+assert "  " == mod.REVIEW_TEXT_INSET
+
 # Closing Kitty detaches the updater. A second review must not launch the
 # same maintenance operation while the first detached process is still busy.
 with mod.update_transaction_lock("flatpak-system") as primary:
@@ -151,10 +162,11 @@ with tempfile.TemporaryDirectory() as td:
 
     # No action at all from absent/stale tokens or declined terminal consent.
     with patch.object(mod, "current_offer", return_value=offered), \
-         patch("builtins.input", return_value="NO"), \
+         patch("builtins.input", return_value="NO") as confirmation, \
          patch.object(mod.subprocess, "run") as fake_update:
         assert mod.review("silverblue", "0"*24) == 2
         assert mod.review("silverblue", offered["token"]) == 0
+        confirmation.assert_called_once_with("\n  Type APPLY to authorize, or anything else to cancel: ")
         fake_update.assert_not_called()
 
     # A changed offer while the user reads the terminal must not be applied.

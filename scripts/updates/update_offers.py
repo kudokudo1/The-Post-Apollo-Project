@@ -20,6 +20,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import textwrap
 from contextlib import contextmanager
 
 ALLOWED = {"silverblue", "oh-my-zsh", "powerlevel10k",
@@ -339,49 +340,69 @@ def run_authorized_update(kind: str, commands: list[list[str]]) -> int:
         return 0
 
 
+# Only the human-readable review transcript gets a left inset.
+# Scans, typed authorization checks, and updater command arguments stay intact.
+REVIEW_TEXT_INSET = "  "
+
+
+def review_print(*values: object) -> None:
+    text = " ".join(str(value) for value in values)
+    width = max(20, shutil.get_terminal_size(fallback=(80, 24)).columns - 1)
+    for paragraph in text.split("\n"):
+        if not paragraph:
+            print()
+            continue
+        print(textwrap.fill(
+            paragraph, width=width,
+            initial_indent=REVIEW_TEXT_INSET,
+            subsequent_indent=REVIEW_TEXT_INSET,
+            replace_whitespace=False, drop_whitespace=False,
+            break_long_words=True, break_on_hyphens=False))
+
+
 def review(kind: str, token: str) -> int:
     if kind not in ALLOWED or not re.fullmatch(r"[0-9a-f]{24}", token):
-        print("UPDATE REFUSED // Unknown offer.")
+        review_print("UPDATE REFUSED // Unknown offer.")
         return 2
     item = current_offer(kind)
     if not item or item["token"] != token:
-        print("UPDATE REFUSED // Offer changed or no longer available. Scan again.")
+        review_print("UPDATE REFUSED // Offer changed or no longer available. Scan again.")
         return 2
-    print(item["title"])
-    print(item["message"])
-    print("\nThis is a separate terminal authorization, NOT automatic installation.")
+    review_print(item["title"])
+    review_print(item["message"])
+    review_print("\nThis is a separate terminal authorization, NOT automatic installation.")
     if item["phase"] == "staged":
-        print("The Silverblue deployment is already staged. No update is needed.")
-        print("Review with: rpm-ostree status")
-        print("Reboot separately when ready. This tool will never reboot.")
+        review_print("The Silverblue deployment is already staged. No update is needed.")
+        review_print("Review with: rpm-ostree status")
+        review_print("Reboot separately when ready. This tool will never reboot.")
         return 0
     if kind == "firmware":
-        print("Firmware installation is managed only through GNOME Software/fwupd.")
-        print("No firmware updater command is available through this script.")
+        review_print("Firmware installation is managed only through GNOME Software/fwupd.")
+        review_print("No firmware updater command is available through this script.")
         return 0
     if kind.startswith("flatpak-"):
         rows = flatpak_targets(kind)
         if not rows:
-            print("UPDATE REFUSED // Flatpak target list changed.")
+            review_print("UPDATE REFUSED // Flatpak target list changed.")
             return 2
         scope = "--user" if kind == "flatpak-user" else "--system"
-        print("\nFlatpak scope: " + scope)
+        review_print("\nFlatpak scope: " + scope)
         for ref, remote, commit in rows:
-            print(" ", ref, "//", remote, "//", commit[:12])
-        print("\nDOWNLOAD caches pinned versions without installing.")
-        print("APPLY downloads and deploys each pinned version.")
-        print("Existing GNOME Software auto-update preferences are unchanged.")
+            review_print(" ", ref, "//", remote, "//", commit[:12])
+        review_print("\nDOWNLOAD caches pinned versions without installing.")
+        review_print("APPLY downloads and deploys each pinned version.")
+        review_print("Existing GNOME Software auto-update preferences are unchanged.")
         try:
-            answer = input("\nType DOWNLOAD, APPLY, or anything else to cancel: ")
+            answer = input("\n  Type DOWNLOAD, APPLY, or anything else to cancel: ")
         except (EOFError, KeyboardInterrupt):
-            print("\nCANCELLED // No Flatpak command executed.")
+            review_print("\nCANCELLED // No Flatpak command executed.")
             return 0
         if answer not in ("DOWNLOAD", "APPLY"):
-            print("CANCELLED // No Flatpak command executed.")
+            review_print("CANCELLED // No Flatpak command executed.")
             return 0
         fresh = current_offer(kind)
         if not fresh or fresh["token"] != token or flatpak_targets(kind) != rows:
-            print("UPDATE REFUSED // Flatpak targets changed during review.")
+            review_print("UPDATE REFUSED // Flatpak targets changed during review.")
             return 2
         commands = []
         for ref, remote, commit in rows:
@@ -390,46 +411,46 @@ def review(kind: str, token: str) -> int:
             if answer == "DOWNLOAD":
                 argv.append("--no-deploy")
             argv.extend(["--commit=" + commit, ref])
-            print("\nQUEUED //", " ".join(argv))
+            review_print("\nQUEUED //", " ".join(argv))
             commands.append(argv)
         code = run_authorized_update(kind, commands)
         if code == 0:
-            print("\nCOMPLETE //", "Downloads cached." if answer == "DOWNLOAD"
+            review_print("\nCOMPLETE //", "Downloads cached." if answer == "DOWNLOAD"
                   else "Pinned Flatpak updates applied.")
         return code
     if kind in ("oh-my-zsh", "powerlevel10k") and not fresh_checkout_is_clean(kind):
         return 2
     if kind == "silverblue":
         command = ["rpm-ostree", "upgrade"]
-        print("This stages a deployment, not a live OS replacement.")
+        review_print("This stages a deployment, not a live OS replacement.")
     elif kind == "oh-my-zsh":
         updater = home() / ".oh-my-zsh/tools/upgrade.sh"
         if not updater.is_file() or not shutil.which("zsh"):
-            print("UPDATE REFUSED // Official Oh My Zsh updater unavailable.")
+            review_print("UPDATE REFUSED // Official Oh My Zsh updater unavailable.")
             return 2
         command = ["zsh", str(updater)]
-        print("Runs the official Oh My Zsh update script.")
+        review_print("Runs the official Oh My Zsh update script.")
     elif kind == "powerlevel10k":
         folder = next((p for p in [home() / ".oh-my-zsh/custom/themes/powerlevel10k",
                                   home() / "powerlevel10k"] if (p / ".git").exists()), None)
         if not folder:
             return 2
         command = ["git", "-C", str(folder), "pull", "--ff-only"]
-        print("Uses a fast-forward-only Git pull. Restart Zsh afterward.")
-    print("Command:", " ".join(command))
+        review_print("Uses a fast-forward-only Git pull. Restart Zsh afterward.")
+    review_print("Command:", " ".join(command))
     try:
-        answer = input("\nType APPLY to authorize, or anything else to cancel: ")
+        answer = input("\n  Type APPLY to authorize, or anything else to cancel: ")
     except (EOFError, KeyboardInterrupt):
-        print("\nCANCELLED // No update command executed.")
+        review_print("\nCANCELLED // No update command executed.")
         return 0
     if answer != "APPLY":
-        print("CANCELLED // No update command executed.")
+        review_print("CANCELLED // No update command executed.")
         return 0
     # The exact fingerprint must still refer to the same offered version,
     # including after the operator has spent time reading this terminal.
     fresh = current_offer(kind)
     if not fresh or fresh["token"] != token or fresh["phase"] != item["phase"]:
-        print("UPDATE REFUSED // Offer changed during confirmation.")
+        review_print("UPDATE REFUSED // Offer changed during confirmation.")
         return 2
     if kind in ("oh-my-zsh", "powerlevel10k") and not fresh_checkout_is_clean(kind):
         return 2

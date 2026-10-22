@@ -16,13 +16,13 @@ fn close_hit(line: isize, col: usize, columns: usize) -> bool {
     line == 0 && columns >= 18 && col >= columns.saturating_sub(5) && col < columns
 }
 
-// Terminal panes use character cells rather than pixel offsets. Two blank
-// columns at each edge keep the cyan rule away from the review window sides.
+// Terminal panes use cells, not pixel units. Half-cell box-drawing caps
+// bring the cyan rule closer to the window sides without touching either wall.
 fn divider_line(columns: usize) -> String {
-    if columns >= 5 {
-        format!("  {}  ", "─".repeat(columns - 4))
-    } else {
-        " ".repeat(columns)
+    match columns {
+        0 => String::new(),
+        1 => "╶".to_string(),
+        _ => format!("╶{}╴", "─".repeat(columns - 2)),
     }
 }
 
@@ -111,16 +111,13 @@ mod tests {
     fn cyan_divider_inset_from_both_edges() {
         let row = divider_line(80);
         assert_eq!(row.chars().count(), 80);
-        assert!(row.starts_with("  ─"));
-        assert!(row.ends_with("─  "));
-        assert_eq!(row.chars().filter(|&ch| ch == '─').count(), 76);
-
-        // Narrow panes produce only spaces, never overflow their width.
-        for columns in 0..5 {
-            let narrow = divider_line(columns);
-            assert_eq!(narrow.chars().count(), columns);
-            assert!(narrow.chars().all(|ch| ch == ' '));
-        }
-        assert_eq!(divider_line(5), "  ─  ");
+        // Half-cell caps leave air on both sides, unlike full-width lines.
+        assert!(row.starts_with("╶─"));
+        assert!(row.ends_with("─╴"));
+        assert_eq!(row.chars().filter(|&ch| ch == '─').count(), 78);
+        assert_eq!(divider_line(0), "");
+        assert_eq!(divider_line(1), "╶");
+        assert_eq!(divider_line(2), "╶╴");
+        assert_eq!(divider_line(3), "╶─╴");
     }
 }

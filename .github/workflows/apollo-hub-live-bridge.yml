@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - "services/hub/ApolloHubLiveBridge.qml"
+      - "services/hub/ApolloHubUptimeSource.qml"
+      - "services/hub/ApolloHubUptimePolicy.js"
+      - "tests/hub/test_apollo_hub_uptime_bridge.py"
+      - "tests/hub/test_apollo_hub_uptime_policy.cjs"
       - "services/hub/ApolloHubMediaPolicy.js"
       - "services/media/HeadlessMediaController.qml"
       - "services/media/MprisPlaybackAdapter.qml"
@@ -31,6 +35,10 @@ on:
       - main
     paths:
       - "services/hub/ApolloHubLiveBridge.qml"
+      - "services/hub/ApolloHubUptimeSource.qml"
+      - "services/hub/ApolloHubUptimePolicy.js"
+      - "tests/hub/test_apollo_hub_uptime_bridge.py"
+      - "tests/hub/test_apollo_hub_uptime_policy.cjs"
       - "services/hub/ApolloHubMediaPolicy.js"
       - "services/media/HeadlessMediaController.qml"
       - "services/media/MprisPlaybackAdapter.qml"
@@ -78,3 +86,7 @@ jobs:
         run: python3 tests/hub/test_apollo_hub_media_bridge.py
       - name: Exercise B4 MPD/MPRIS snapshot semantics
         run: node tests/hub/test_apollo_hub_media_policy.cjs
+      - name: Guard B5 uptime source isolation and read-only access
+        run: python3 tests/hub/test_apollo_hub_uptime_bridge.py
+      - name: Exercise B5 uptime parser and aging states
+        run: node tests/hub/test_apollo_hub_uptime_policy.cjs

@@ -570,6 +570,10 @@ PanelWindow {
                             // A reactive QML binding, not a second collector.
                             systemSnapshot: hub.liveBridge
                                             ? hub.liveBridge.systemSnapshot : null
+                            // B5 OS uptime is already read by the shared
+                            // bridge. This binding adds no timer or procfs IO.
+                            uptimeSnapshot: hub.liveBridge
+                                            ? hub.liveBridge.uptimeSnapshot : null
                             tileIndex: index
                             tileCount: hub.activeTiles.length
                             editing: hub.editMode

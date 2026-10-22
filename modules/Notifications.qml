@@ -123,6 +123,8 @@ PanelWindow {
                 required property string message
                 required property string appIcon
                 required property string image
+                required property string website
+                required property string websiteIcon
                 required property string category
                 required property string severity
                 required property double createdAt
@@ -179,7 +181,15 @@ PanelWindow {
                     anchors.leftMargin: 15
                     anchors.topMargin: 15
 
-                    source: notificationCard.image !== "" ? notificationCard.image : notificationCard.appIcon !== "" ? Quickshell.iconPath(notificationCard.appIcon, true) : ""
+                    // Website mark overrides the browser logo only when
+                    // origin metadata identifies the website. Other native
+                    // notifications retain their existing image preference.
+                    source: notificationCard.website === "YouTube"
+                        ? Qt.resolvedUrl("../assets/notifications/youtube.svg")
+                        : notificationCard.website !== "" && notificationCard.websiteIcon !== ""
+                        ? notificationCard.websiteIcon
+                        : notificationCard.image !== "" ? notificationCard.image
+                        : notificationCard.appIcon !== "" ? Quickshell.iconPath(notificationCard.appIcon, true) : ""
 
                     fillMode: Image.PreserveAspectFit
                 }
@@ -213,7 +223,11 @@ PanelWindow {
                     Text {
                         width: parent.width
 
-                        text: notificationCard.sourceId !== "" ? notificationCard.source + "  [" + notificationCard.sourceId + "]" : notificationCard.source
+                        text: notificationCard.website !== ""
+                            ? notificationCard.source + " // " + notificationCard.website
+                            : notificationCard.sourceId !== ""
+                            ? notificationCard.source + "  [" + notificationCard.sourceId + "]"
+                            : notificationCard.source
                         textFormat: Text.PlainText
 
                         color: Colors.cyan

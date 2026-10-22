@@ -34,6 +34,19 @@ for running in ("wifiEnabledProcess", "wifiSignalProcess",
 assert "networkLinkProducer.observeDeviceResult(text);" in network
 assert "networkInternetHealthProducer.observeDeviceResult(text);" in network
 assert "network poll-gap=" in network
+
+# Isolation switch defaults off and suppresses BOTH Network dock timer work
+# and its startup commands. It never requests link/radio/route changes.
+assert 'Quickshell.env("POST_APOLLO_NETWORK_POLL_PAUSED")' in network
+assert 'trim() === "1"' in network
+assert "readonly property bool networkPollPaused:" in network
+assert "running: !networkDock.networkPollPaused" in network
+assert "if (networkDock.networkPollPaused) {" in network
+assert "network widget polling PAUSED" in network
+assert network.count("Process {") == 5  # Existing command clients, no new ones.
+for forbidden in ("nmcli radio wifi off", "nmcli networking off",
+                  "nmcli dev disconnect", "systemctl stop NetworkManager"):
+    assert forbidden not in network
 assert 'reportBgCallback("poll-dispatch"' in network
 for stage in ("wifi-radio", "wifi-signal", "wifi-link",
               "device-and-notification-producers", "ethernet-speed"):

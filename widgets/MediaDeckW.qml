@@ -30,8 +30,11 @@ PanelWindow {
     property int navigationZone: 1 // SOURCE / RESULTS / NOW
     property string browserStatus: "SEARCH LIBRARY OR YOUTUBE"
     readonly property var browseItems:
-        headless.browse && headless.browse.source === catalogSource
-        && Array.isArray(headless.browse.items) ? headless.browse.items : []
+        catalogSource === "direct-stream"
+        ? [{ref: {source: "direct-stream", kind: "stream", id: radioStreamUrl},
+            title: "Groove Salad", artist: "SomaFM"}]
+        : headless.browse && headless.browse.source === catalogSource
+          && Array.isArray(headless.browse.items) ? headless.browse.items : []
     readonly property var highlightedItem:
         browseIndex >= 0 && browseIndex < browseItems.length
         ? browseItems[browseIndex] : null
@@ -61,15 +64,22 @@ PanelWindow {
     }
 
     function toggleCatalogSource() {
-        catalogSource = catalogSource === "local-mpd" ? "youtube" : "local-mpd";
+        catalogSource = catalogSource === "local-mpd" ? "youtube"
+            : catalogSource === "youtube" ? "direct-stream" : "local-mpd";
         navigationZone = 0;
         browseIndex = 0;
         browserStatus = catalogSource === "youtube"
             ? "YOUTUBE CATALOG / REQUIRES API KEY / NO PLAYBACK"
-            : "LOCAL MPD LIBRARY";
+            : catalogSource === "direct-stream"
+              ? "RADIO / SELECT THEN LOAD / NO AUTOPLAY"
+              : "LOCAL MPD LIBRARY";
     }
 
     function searchLibrary() {
+        if (catalogSource === "direct-stream") {
+            browserStatus = "RADIO / USE SELECT THEN LOAD";
+            return;
+        }
         const query = browserControls.queryText;
         if (!query.trim()) {
             browserStatus = "ENTER A SEARCH QUERY";
@@ -97,7 +107,9 @@ PanelWindow {
     }
 
     function loadStaged() {
-        if (!headless.selection || headless.selection.source !== "local-mpd") {
+        if (!headless.selection
+                || (headless.selection.source !== "local-mpd"
+                    && headless.selection.source !== "direct-stream")) {
             browserStatus = "STAGED SOURCE CANNOT LOAD INTO MPD";
             return;
         }
@@ -121,11 +133,13 @@ PanelWindow {
             browserStatus = "NO RESULT TO OPEN";
             return;
         }
-        if (item.ref.source !== "local-mpd" || item.ref.kind !== "track") {
-            browserStatus = "SOURCE CAN BROWSE / PLAYBACK NOT AVAILABLE";
+        if (item.ref.source === "youtube") {
+            browserStatus = "YOUTUBE IS CATALOG-ONLY / NO PLAYBACK";
             return;
         }
-        if (headless.loadMedia(item.ref))
+        const requested = item.ref.source === "direct-stream"
+            ? headless.loadRadio(radioStreamUrl) : headless.loadMedia(item.ref);
+        if (requested)
             browserStatus = "ENTER / LOAD REQUESTED / PRESS PLAY";
         else
             browserStatus = "ENTER / LOAD UNAVAILABLE";
@@ -583,27 +597,15 @@ PanelWindow {
                         width: radioCassette.width
                         height: 38
                         radius: 3
-                        opacity: headless.busy ? 0.5 : 1
-                        color: grooveMouse.pressed ? "#16131B"
-                               : grooveMouse.containsMouse ? "#39333E" : "#29252E"
+                        color: "#29252E"
                         border.width: 1
-                        border.color: grooveMouse.containsMouse
-                                      ? Colors.orange : Colors.cyan
-
+                        border.color: Colors.cyan
                         GohuText {
                             anchors.centerIn: parent
-                            text: "LOAD / GROOVE SALAD"
+                            text: headless.loaded && headless.loaded.ref.source === "direct-stream"
+                                ? "GROOVE SALAD / INSERTED" : "CASSETTE BAY / NOT INSERTED"
                             color: Colors.white
-                            font.pixelSize: 13
-                        }
-
-                        MouseArea {
-                            id: grooveMouse
-                            anchors.fill: parent
-                            enabled: !headless.busy
-                            hoverEnabled: true
-                            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                            onClicked: headless.loadRadio(deck.radioStreamUrl)
+                            font.pixelSize: 12
                         }
                     }
 

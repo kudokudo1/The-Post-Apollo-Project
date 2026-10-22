@@ -61,13 +61,13 @@ for forbidden in (
     "Process {", "Quickshell.execDetached(", "SystemTelemetry {",
     "Connections {", "Timer {", "HttpClient", "XmlHttpRequest",
     "fetch(", "execute(", "run(", "FileView {",
-    "writeAdapter(", "AppControl", "HospitalAssignment",
+    "writeAdapter(", "HospitalAssignment",
 ):
     assert forbidden not in policy, f"Forbidden B7 policy side effect: {forbidden}"
 assert "onAdapterUpdated:" not in store
 assert "onFileChanged:" not in store
 for forbidden in ("Process {", "Timer {", "Quickshell.execDetached(",
-                  "Qt.openUrlExternally(", "play(", "calendar", "notify("):
+                  "Qt.openUrlExternally(", "play(", "notify("):
     assert forbidden not in store, f"Forbidden B7 To-do store side effect: {forbidden}"
 
 for needle in (

@@ -9,6 +9,7 @@ on:
       - "scripts/finance/disposable_actual_roundtrip.mjs"
       - "scripts/finance/disposable_allocation_roundtrip.mjs"
       - "scripts/finance/allocation_guard.mjs"
+      - "scripts/finance/write_allocation.mjs"
       - ".github/workflows/financew-disposable-actual.yml"
   push:
     branches: [main]
@@ -19,6 +20,7 @@ on:
       - "scripts/finance/disposable_actual_roundtrip.mjs"
       - "scripts/finance/disposable_allocation_roundtrip.mjs"
       - "scripts/finance/allocation_guard.mjs"
+      - "scripts/finance/write_allocation.mjs"
       - ".github/workflows/financew-disposable-actual.yml"
   workflow_dispatch:
 

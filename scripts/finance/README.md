@@ -386,3 +386,43 @@ establish production write safety or an operator-authorized live writer.
 No category allocation APPLY button, local write authorization, persistent
 journal integration, or real-budget mutations are introduced in D12b.
 Those remain D12c/D12d and separately authorized stages.
+
+
+## FinanceW D12c // Separate guarded category-allocation writer
+
+The Node writer at `scripts/finance/write_allocation.mjs` is committed
+as a **disconnected backend**. No Quickshell caller or APPLY button was
+added. It is not an extension of the D9 transaction permission: it checks
+for a *different* private mode-0600 operator authorization file named
+`~/.config/financew/allocation-writes-enabled` with the exact intended
+marker `FINANCEW_ALLOCATION_WRITES_APPROVED`. This file is **not**
+provisioned by installation, Git pulls or FinanceW.
+
+The writer takes a single framed JSON command from **stdin**, never argv,
+and requires a matching source fingerprint, an exact month/category ID,
+original budget figures, and a new 32-character hexadecimal request ID.
+It rereads Actual's current month before considering a mutation.
+
+Before any call to Actual's `setBudgetAmount`, the writer:
+1. Acquires the **same** exclusive `~/.local/state/financew/operations/.write-lock`
+   used by D9. This prevents concurrent transaction and allocation writes.
+2. Refuses if any previous finance operation journal is unfinished, corrupt
+   or unsafe. It never automatically reconciles or retries it.
+3. Writes, flushes, and syncs a private
+   `allocation-<requestId>.json` attempt journal. The receipt stores
+   an operation hash and state, never a category name or money amount.
+4. Calls the guarded policy once, Actual sync once, and verifies fresh
+   readback before committing the receipt. After attempt recording, any
+   failure is **UNCERTAIN**, leaving an attempted receipt behind and
+   blocking both allocation and transaction writers until manual review.
+
+This is **not live activation**. The D12c GitHub tests inject only
+fictional Actual APIs in isolated temporary HOME directories, including
+mutations that fail after being applied. Test coverage verifies the
+independent permission gate, stale source refusal, shared lock, journal
+privacy, stale preflight, sync uncertainty, and mutual recovery barriers.
+Never create the authorization file merely to test the interface.
+
+The next step is to validate the complete guarded writer against a
+disposable **real** Actual server, including controlled failure recovery,
+before adding any D12d UI controls or considering a real-budget activation.

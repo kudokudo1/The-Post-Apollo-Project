@@ -1,3 +1,4 @@
 module qs.services.hub
 
 singleton ApolloHubStore 1.0 ApolloHubStore.qml
+ApolloHubLiveBridge 1.0 ApolloHubLiveBridge.qml

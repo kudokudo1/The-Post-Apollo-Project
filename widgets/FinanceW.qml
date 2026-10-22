@@ -845,6 +845,7 @@ PanelWindow {
                             labelPixelSize: 10
                             accentColor: Colors.omnitrix
                             available: !financeBudget.loading
+                            interactive: available && financeWrite.state !== "pending"
                             onLeftClicked: financeBudget.refresh()
                         }
                     }
@@ -863,6 +864,7 @@ PanelWindow {
                             label: "‹"
                             labelPixelSize: 16
                             accentColor: Colors.cyan
+                            interactive: financeWrite.state !== "pending"
                             onLeftClicked: financeBudget.shiftMonth(-1)
                         }
                         GohuText {
@@ -883,6 +885,7 @@ PanelWindow {
                             label: "›"
                             labelPixelSize: 16
                             accentColor: Colors.cyan
+                            interactive: financeWrite.state !== "pending"
                             onLeftClicked: financeBudget.shiftMonth(1)
                         }
                     }
@@ -1084,6 +1087,8 @@ PanelWindow {
                                     available: financeBudget.state === "ready"
                                                && financeBudget.snapshot
                                                && financeBudget.snapshot.accounts.length > 0
+                                               && financeWrite.state !== "pending"
+                                               && financeWrite.state !== "uncertain"
                                     onLeftClicked: transactionDraftPane.begin()
                                 }
                             }

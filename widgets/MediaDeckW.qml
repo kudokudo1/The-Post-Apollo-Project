@@ -905,6 +905,7 @@ PanelWindow {
                                 label: modelData.label
                                 labelPixelSize: 10
                                 available: deck.transportMode === "mpris"
+                                enabled: deck.transportMode === "mpris"
                                 onClicked: deck.handleAudioExperiment(modelData.action)
                             }
                         }

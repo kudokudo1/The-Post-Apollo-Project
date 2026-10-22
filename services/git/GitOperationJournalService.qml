@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "GitJournalSerialization.js" as JournalCodec
+import "GitJournalDelta.js" as DeltaCodec
 
 // Durable Git operation journal foundation.
 //
@@ -20,6 +21,16 @@ Scope {
     property int serial: 0
     property var entries: []
     property var encodedEntries: []
+    // Delta writes are initially opt-in; a nonempty existing sidecar always
+    // forces replay to prevent silent loss when the option is switched off.
+    readonly property bool deltaRequested:
+        String(Quickshell.env("POST_APOLLO_GIT_JOURNAL_DELTA") || "").trim() === "1"
+    property bool deltaActive: false
+    property bool storageReady: false
+    property string storageError: ""
+    property int checkpointGeneration: 0
+    property var deltaRecords: []
+    property int maxDeltaRecords: 48
     property int lastPersistSerializationMs: 0
     property int lastPersistWriteMs: 0
     property int lastPersistReusedCount: 0
@@ -70,7 +81,7 @@ Scope {
         const repo = String(repositoryPath || "").trim();
         const operationKind = String(kind || "").trim();
 
-        if (!repo || !operationKind)
+        if (!repo || !operationKind || !storageReady)
             return "";
 
         const operationId = nextOperationId();
@@ -97,7 +108,7 @@ Scope {
             next.length = maxEntries;
 
         entries = next;
-        persist();
+        persist(record);
         operationStarted(operationId, cloneValue(record));
         return operationId;
     }
@@ -153,7 +164,7 @@ Scope {
 
         next[index] = record;
         entries = next;
-        persist();
+        persist(record);
         operationFinished(operationId, true, cloneValue(record));
         return true;
     }
@@ -184,34 +195,48 @@ Scope {
 
         next[index] = record;
         entries = next;
-        persist();
+        persist(record);
         operationFinished(operationId, false, cloneValue(record));
         return true;
     }
 
     function load() {
-        // Do not reuse cached records when the file is reloaded.
+        // The two FileViews use blocking initial loads. Never interpret a
+        // malformed sidecar as an empty record set and start new mutations.
+        storageReady = false;
+        storageError = "";
         encodedEntries = [];
         const raw = String(journalFile.text() || "").trim();
-
-        if (!raw) {
-            entries = [];
-            return;
-        }
-
-        let parsed = null;
+        const overlayRaw = String(deltaFile.text() || "").trim();
+        let source = [];
 
         try {
-            parsed = JSON.parse(raw);
+            const base = raw ? JSON.parse(raw) : {
+                schemaVersion: schemaVersion,
+                entries: []
+            };
+            if (!base || !Array.isArray(base.entries))
+                throw new Error("INVALID LEGACY JOURNAL CHECKPOINT");
+            checkpointGeneration = DeltaCodec.checkGeneration(
+                typeof base.checkpointGeneration === "undefined"
+                ? 0
+                : base.checkpointGeneration
+            );
+            const overlay = DeltaCodec.readSidecar(
+                overlayRaw, checkpointGeneration
+            );
+            deltaRecords = overlay.rows;
+            deltaActive = deltaRequested || overlay.rows.length > 0;
+            source = DeltaCodec.overlay(
+                base.entries, overlay.rows, maxEntries
+            );
         } catch (error) {
-            entries = [];
+            storageError = "JOURNAL STORAGE BLOCKED // "
+                + String(error);
+            console.warn(storageError);
             return;
         }
 
-        const source =
-            parsed && Array.isArray(parsed.entries)
-            ? parsed.entries
-            : [];
         const next = [];
         let repairedInterrupted = false;
 
@@ -263,7 +288,10 @@ Scope {
         }
 
         entries = next;
+        storageReady = true;
 
+        // Interruption repairs checkpoint both partitions before another
+        // operation can be accepted.
         if (repairedInterrupted)
             persist();
     }
@@ -292,30 +320,92 @@ Scope {
         return true;
     }
 
-    function persist() {
-        // Serialize only new/replaced records, but write the entire valid
-        // schema atomically and synchronously before execution continues.
+    function persist(record) {
+        if (!storageReady)
+            return false;
+
+        const deltaEligible = record
+            && (record.kind === "CONTROL/FETCH"
+                || record.kind === "CONTROL/PULL");
+        if (deltaActive && deltaEligible) {
+            const start = Date.now();
+            const revised = DeltaCodec.upsert(deltaRecords, record);
+            if (revised.length < maxDeltaRecords) {
+                const serialized = DeltaCodec.encodeSidecar(
+                    checkpointGeneration, revised
+                );
+                const writeStarted = Date.now();
+                deltaFile.setText(serialized);
+                const written = Date.now();
+                deltaRecords = revised;
+                lastPersistSerializationMs = writeStarted - start;
+                lastPersistWriteMs = written - writeStarted;
+                lastPersistReusedCount = 0;
+                return true;
+            }
+        }
+
+        // Existing behavior remains the default. A delta-active checkpoint
+        // writes the full base FIRST and clears the sidecar SECOND. If the
+        // app crashes between writes, generation rules ignore the stale
+        // overlay because all of its rows are already in the new base.
         const start = Date.now();
         const encoded = JournalCodec.serializeJournal(
             schemaVersion, entries, encodedEntries
         );
+        const nextGeneration = deltaActive
+            ? checkpointGeneration + 1
+            : checkpointGeneration;
+        const data = deltaActive
+            ? JSON.stringify({
+                schemaVersion: schemaVersion,
+                checkpointGeneration: nextGeneration,
+                entries: entries
+            })
+            : encoded.text;
         const writeStarted = Date.now();
-        journalFile.setText(encoded.text);
+        journalFile.setText(data);
+        if (deltaActive) {
+            deltaFile.setText(
+                DeltaCodec.encodeSidecar(nextGeneration, [])
+            );
+            checkpointGeneration = nextGeneration;
+            deltaRecords = [];
+        }
         const written = Date.now();
         encodedEntries = encoded.cache;
         lastPersistSerializationMs = writeStarted - start;
         lastPersistWriteMs = written - writeStarted;
         lastPersistReusedCount = encoded.reusedCount;
+        return true;
     }
 
     FileView {
         id: journalFile
 
         path: Qt.resolvedUrl("../../git-operation-journal.json")
+        blockLoading: true
         blockWrites: true
         atomicWrites: true
         printErrors: false
 
-        onLoaded: root.load()
+        onLoaded: {
+            if (!root.storageReady)
+                root.load();
+        }
+    }
+
+    FileView {
+        id: deltaFile
+        path: Qt.resolvedUrl("../../git-operation-journal-delta.json")
+        blockLoading: true
+        blockWrites: true
+        atomicWrites: true
+        printErrors: false
+    }
+
+    Component.onCompleted: {
+        if (!storageReady)
+            load();
     }
 }

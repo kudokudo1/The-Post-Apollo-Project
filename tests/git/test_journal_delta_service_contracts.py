@@ -17,6 +17,8 @@ assert 'if (!repo || !operationKind || !storageReady)' in journal
 assert 'deltaActive = deltaRequested || overlay.present;' in journal
 assert 'storageReady = false;' in journal and 'storageReady = true;' in journal
 assert 'JOURNAL STORAGE BLOCKED' in journal
+assert 'const record = Object.assign({}, row, {' in journal
+assert 'undoState: String(row.undoState || "NOT_IMPLEMENTED")' in journal
 
 assert 'path: Qt.resolvedUrl("../../git-operation-journal.json")' in journal
 assert 'path: Qt.resolvedUrl("../../git-operation-journal-delta.json")' in journal

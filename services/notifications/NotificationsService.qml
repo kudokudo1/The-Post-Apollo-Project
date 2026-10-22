@@ -71,7 +71,10 @@ Singleton {
         const host = BrowserSiteIdentity.hostnameFor(websiteHost);
         if (host === "")
             return "";
-        return "website:" + encodeURIComponent(sourceKey(sourceId, source)) + "::" + host;
+        const site = host === "youtu.be" || host === "youtube.com"
+            || host.endsWith(".youtube.com") ? "youtube.com"
+            : host.startsWith("www.") ? host.substring(4) : host;
+        return "website:" + encodeURIComponent(sourceKey(sourceId, source)) + "::" + site;
     }
 
     // Favorites are source-wide, just like the card star, but are persisted

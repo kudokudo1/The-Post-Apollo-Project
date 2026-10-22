@@ -67,7 +67,7 @@ r=inspect("https://mail.proton.me",[readButton("Mark as read",""),readButton("Ma
 assert.strictEqual(r.markReadCandidates,2);
 r=inspect("https://mail.proton.me",Array.from({length:600},()=>readButton("Archive","")));
 assert.strictEqual(r.markReadCandidates,0);
-async function background(family,goodTab=true) {
+async function background(family,goodTab=true,nativeError=false) {
  const calls={native:0,scripting:0}, logs=[];
  const response={protocol:1,kind:"PONG",origin:"https://mail.proton.me",
    mailboxAccess:false,messageIdentityVerified:false,capabilities:[]};
@@ -77,7 +77,11 @@ async function background(family,goodTab=true) {
     calls.native++;
     assert.strictEqual(name,"org.postapollo.proton_mail");
     assert.deepStrictEqual(JSON.parse(JSON.stringify(request)),{protocol:1,kind:"PING"});
-    if(family==="chromium")callback(response);else return Promise.resolve(response);
+    if(family==="chromium") {
+      if(nativeError) api.runtime.lastError={message:"offline"};
+      callback(nativeError?undefined:response);
+      api.runtime.lastError=null;
+    } else return nativeError?Promise.reject(new Error("offline")):Promise.resolve(response);
   }},
   scripting:{executeScript(options,callback){
     calls.scripting++;
@@ -101,6 +105,7 @@ async function background(family,goodTab=true) {
 (async()=>{
  for(const family of ["chromium","firefox"]){
    await background(family,true);
+   await background(family,true,true);
    await background(family,false);
  }
  console.log("Proton page readiness simulated browser checks: PASS");

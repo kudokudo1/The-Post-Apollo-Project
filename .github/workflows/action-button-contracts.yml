@@ -22,6 +22,8 @@ on:
       - "widgets/GitInteractiveRebaseView.qml"
       - "widgets/GitChangeTransferView.qml"
       - "tests/components/test_action_button_contracts.py"
+      - "tests/components/test_action_button_glow_qt_runtime.py"
+      - "tests/components/action_button_glow_runtime_harness.qml"
       - ".github/workflows/action-button-contracts.yml"
   pull_request:
     paths:
@@ -41,6 +43,8 @@ on:
       - "widgets/GitInteractiveRebaseView.qml"
       - "widgets/GitChangeTransferView.qml"
       - "tests/components/test_action_button_contracts.py"
+      - "tests/components/test_action_button_glow_qt_runtime.py"
+      - "tests/components/action_button_glow_runtime_harness.qml"
       - ".github/workflows/action-button-contracts.yml"
 
 permissions:
@@ -59,3 +63,25 @@ jobs:
         run: |
           python3 tests/components/test_action_button_contracts.py
           python3 tests/git/test_primary_action_button_contracts.py
+
+  runtime-smoke:
+    name: Offscreen Qt ActionButton glow geometry
+    runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+      QT_QUICK_BACKEND: software
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install headless Qt runtime libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libegl1 libopengl0 libgl1 libxkbcommon0
+      - name: Install Qt runtime bindings
+        run: python -m pip install "PySide6>=6.10,<6.12"
+      - name: Exercise source-aligned ActionButton geometry
+        run: python tests/components/test_action_button_glow_qt_runtime.py

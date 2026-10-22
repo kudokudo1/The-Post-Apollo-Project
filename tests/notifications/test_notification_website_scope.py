@@ -49,6 +49,7 @@ const S = {
   sourcePolicies: new Model(),
   activeNotifications: new Model(),
   defaultSnoozeDurationMs: 86400000,
+  policyVersion: 1,
   policyRevision: 0,
   schedulePolicySave() {}
 };

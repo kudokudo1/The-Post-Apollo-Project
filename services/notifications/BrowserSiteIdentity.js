@@ -66,6 +66,18 @@ function labelFor(host) {
     return host.startsWith("www.") ? host.substring(4) : host;
 }
 
+function localSiteIcon(value) {
+    const image = token(value);
+    // Never turn a website notification into an unsolicited HTTP fetch.
+    // Chromium's native image paths are local files/image providers.
+    if (image.length > 4096)
+        return "";
+    if (image.startsWith("/") || image.startsWith("file:")
+            || image.startsWith("image:"))
+        return image;
+    return "";
+}
+
 function fromNotification(notification) {
     const blank = { host: "", label: "", icon: "" };
     if (!notification || !chromiumFamily(notification.appName, notification.desktopEntry))
@@ -82,6 +94,6 @@ function fromNotification(notification) {
     return {
         host: host,
         label: labelFor(host),
-        icon: token(notification.image)
+        icon: localSiteIcon(notification.image)
     };
 }

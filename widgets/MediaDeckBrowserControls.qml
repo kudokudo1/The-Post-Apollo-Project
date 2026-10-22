@@ -8,6 +8,7 @@ Item {
     required property var deckHost
     required property var controller
     property alias queryText: searchInput.text
+    readonly property bool searchEditing: searchInput.activeFocus
 
     Item {
         id: searchRow

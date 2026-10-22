@@ -197,6 +197,8 @@ Item {
         }
 
         ActionButton {
+            // Keep its label and sampled shadow aligned when content/state changes.
+            trackLabelGlowLocally: true
             width: parent.width
             height: 28
             accentColor: Colors.omnitrix
@@ -210,6 +212,8 @@ Item {
         }
 
         ActionButton {
+            // Keep its label and sampled shadow aligned when content/state changes.
+            trackLabelGlowLocally: true
             width: parent.width
             height: 28
             accentColor: Colors.cyan
@@ -249,6 +253,8 @@ Item {
             width: parent.width
             spacing: 7
             ActionButton {
+                // Keep its label and sampled shadow aligned when content/state changes.
+                trackLabelGlowLocally: true
                 width: (parent.width - 7) / 2
                 height: 30
                 accentColor: Colors.omnitrix
@@ -257,6 +263,8 @@ Item {
                 onLeftClicked: draft.reviewed = true
             }
             ActionButton {
+                // Keep its label and sampled shadow aligned when content/state changes.
+                trackLabelGlowLocally: true
                 width: (parent.width - 7) / 2
                 height: 30
                 accentColor: Colors.orange

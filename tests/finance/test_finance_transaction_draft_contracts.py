@@ -6,6 +6,35 @@ menu = (root / "widgets/FinanceW.qml").read_text()
 pane = (root / "widgets/FinanceTransactionDraftPane.qml").read_text()
 read_service = (root / "services/finance/FinanceBudgetReadService.qml").read_text()
 
+# Prevent double/ghosted glow on NEW DRAFT and the four staged action
+# labels. These use ActionButton's existing opt-in local source tracking.
+# Preserve the existing non-mutating draft and account-cycle behavior.
+import re
+action_blocks = re.findall(
+    r"\bActionButton\s*\{\s*(?:\/\/[^\n]*\n\s*)?"
+    r"trackLabelGlowLocally:\s*true",
+    pane,
+)
+assert pane.count("ActionButton {") == 4
+assert len(action_blocks) == 4, (
+    "All four staged draft controls need reactive label/glow alignment"
+)
+new_button = menu[menu.index("id: newTransactionDraft"):
+                  menu.index("onLeftClicked: transactionDraftPane.begin()")]
+assert "trackLabelGlowLocally: true" in new_button
+for label in (
+    'label: "ACCOUNT // " + draft.accountName',
+    'label: draft.direction === "expense" ? "EXPENSE" : "INCOME"',
+    'label: "PREVIEW"',
+    'label: "CANCEL"',
+):
+    assert label in pane, f"Draft button changed: {label}"
+assert 'label: "NEW DRAFT"' in new_button
+action_shared = (root / "components/ActionButton.qml").read_text()
+assert "property bool trackLabelGlowLocally: false" in action_shared
+assert "contentHost.x + labelText.x" in action_shared
+assert "contentHost.y + labelText.y" in action_shared
+
 # UI is genuinely connected to the existing authenticated read-only snapshot.
 assert 'FinanceTransactionDraftPane {' in menu
 assert 'id: transactionDraftPane' in menu

@@ -94,7 +94,9 @@ PanelWindow {
         if (headless.searchMedia(catalogSource, query)) {
             browseIndex = 0;
             navigationZone = 1;
-            browserStatus = "SEARCH REQUESTED / " + catalogSource.toUpperCase();
+            browserStatus = catalogSource === "radio-browser"
+                ? "RADIO DIRECTORY / BROWSE ONLY / LOAD NOT AVAILABLE"
+                : "SEARCH REQUESTED / " + catalogSource.toUpperCase();
         } else {
             browserStatus = "SEARCH UNAVAILABLE / CONTROLLER BUSY";
         }
@@ -120,7 +122,9 @@ PanelWindow {
             return;
         }
         if (headless.selectMedia(item.ref))
-            browserStatus = "SELECT REQUESTED / NOT LOADED";
+            browserStatus = item.ref.source === "radio-browser"
+                ? "STATION SELECTED / CATALOG ONLY / NO LOAD"
+                : "SELECT REQUESTED / NOT LOADED";
         else
             browserStatus = "SELECT UNAVAILABLE";
     }

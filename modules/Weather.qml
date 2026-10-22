@@ -62,6 +62,30 @@ DockButton {
             useCelsius
         )
 
+    // Temperature-state colors are distinct from weather-condition colors.
+    // Use the shared Fahrenheit reading regardless of the unit shown on screen.
+    readonly property var thermometerState: WeatherDockPolicy.temperatureState(
+        weatherService ? weatherService.tempF : "",
+        weatherFresh
+    )
+
+    readonly property color thermometerLiquidColor: {
+        if (!thermometerState.valid)
+            return "transparent";
+        if (weatherDock.open)
+            return Colors.magenta;
+        switch (thermometerState.color) {
+        case "white": return Colors.white;
+        case "cyan": return Colors.cyan;
+        case "blue": return Colors.blue;
+        case "magenta": return Colors.magenta;
+        case "yellow": return Colors.yellow;
+        case "orange": return Colors.orange;
+        case "red": return Colors.red;
+        default: return Colors.white;
+        }
+    }
+
     implicitHeight: 50
     // Precisely fit the visible content with 3px left and right padding.
     // This width follows temperature digits, units, and condition glyph changes.
@@ -97,22 +121,27 @@ DockButton {
         onTriggered: weatherDock.observationClockMs = Date.now()
     }
 
-    // Condition -> measured temperature with isolated degree glow -> thermometer.
-    // Preserve the original overall module glow and 50px dock height.
+    // Condition -> measured temperature -> active thermometer.
+    // The former +2px correction compensated for an emoji's font bearings.
+    // The drawn gauge has explicit geometry; center the whole group evenly.
     Row {
         id: weatherContent
         anchors.centerIn: parent
-        // Font bearings put the visible 🌡 slightly farther from the right
-        // edge. Compensate optically while keeping measured width + 6px.
-        anchors.horizontalCenterOffset: 2
         spacing: 6
 
-        Text {
-            id: weatherCondition
+        Item {
+            id: weatherConditionSlot
             anchors.verticalCenter: parent.verticalCenter
-            text: weatherDock.weatherState.icon
-            font.pixelSize: 32
-            color: weatherDock.foregroundColor
+            implicitWidth: Math.ceil(weatherCondition.implicitWidth)
+            implicitHeight: 46
+
+            Text {
+                id: weatherCondition
+                anchors.centerIn: parent
+                text: weatherDock.weatherState.icon
+                font.pixelSize: 42
+                color: weatherDock.foregroundColor
+            }
         }
 
         // Keep the icon-to-data gap at 6px; close only the readout-to-🌡 gap.
@@ -174,12 +203,81 @@ DockButton {
                 }
             }
 
-            Text {
+            // QML instrument instead of a monolithic font glyph. The
+            // white glass/ticks never imply that the fluid is a safe color.
+            Item {
                 id: weatherThermometer
                 anchors.verticalCenter: parent.verticalCenter
-                text: "🌡"
-                font.pixelSize: 24
-                color: weatherDock.open ? Colors.magenta : Colors.orange
+                implicitWidth: 23
+                implicitHeight: 46
+
+                readonly property color liquidColor: weatherDock.thermometerLiquidColor
+
+                Rectangle {
+                    id: glassTube
+                    x: 4
+                    y: 1
+                    width: 12
+                    height: 32
+                    radius: 6
+                    color: Colors.black
+                    border.width: 2
+                    border.color: Colors.white
+                    clip: true
+
+                    Rectangle {
+                        id: liquidColumn
+                        x: 4
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: 3
+                        width: 4
+                        height: weatherDock.thermometerState.level * 26
+                        radius: 2
+                        color: weatherThermometer.liquidColor
+                        Behavior on height {
+                            NumberAnimation { duration: 300; easing.type: Easing.InOutQuad }
+                        }
+                        Behavior on color {
+                            ColorAnimation { duration: 300 }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    id: glassBulb
+                    x: 1
+                    y: 27
+                    width: 18
+                    height: 18
+                    radius: 9
+                    color: Colors.black
+                    border.width: 2
+                    border.color: Colors.white
+
+                    Rectangle {
+                        id: liquidBulb
+                        anchors.centerIn: parent
+                        width: 12
+                        height: 12
+                        radius: 6
+                        visible: weatherDock.thermometerState.valid
+                        color: weatherThermometer.liquidColor
+                        Behavior on color {
+                            ColorAnimation { duration: 300 }
+                        }
+                    }
+                }
+
+                Repeater {
+                    model: 4
+                    delegate: Rectangle {
+                        x: 17
+                        y: 6 + index * 7
+                        width: index % 2 === 0 ? 5 : 3
+                        height: 1
+                        color: Colors.white
+                    }
+                }
             }
         }
     }

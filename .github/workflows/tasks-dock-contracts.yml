@@ -10,8 +10,11 @@ on:
       - "tests/components/test_tasks_menu_contracts.py"
       - "tests/components/test_tasks_m3_shared_editor_contracts.py"
       - "widgets/tasks/TaskDetailsPane.qml"
+      - "widgets/tasks/TaskDateSegment.qml"
+      - "widgets/tasks/TaskDateSegments.js"
       - "widgets/hub/ApolloHubTodoMini.qml"
       - "tests/tasks/test_task_details_ui_contracts.py"
+      - "tests/tasks/test_task_date_segments.cjs"
       - ".github/workflows/tasks-dock-contracts.yml"
   push:
     branches:
@@ -24,8 +27,11 @@ on:
       - "tests/components/test_tasks_menu_contracts.py"
       - "tests/components/test_tasks_m3_shared_editor_contracts.py"
       - "widgets/tasks/TaskDetailsPane.qml"
+      - "widgets/tasks/TaskDateSegment.qml"
+      - "widgets/tasks/TaskDateSegments.js"
       - "widgets/hub/ApolloHubTodoMini.qml"
       - "tests/tasks/test_task_details_ui_contracts.py"
+      - "tests/tasks/test_task_date_segments.cjs"
       - ".github/workflows/tasks-dock-contracts.yml"
 
 permissions:
@@ -44,3 +50,5 @@ jobs:
         run: python3 tests/components/test_tasks_m3_shared_editor_contracts.py
       - name: Validate TASKS v2 details UI and single-writer contracts
         run: python3 tests/tasks/test_task_details_ui_contracts.py
+      - name: Validate three-part Gregorian due date steppers
+        run: node tests/tasks/test_task_date_segments.cjs

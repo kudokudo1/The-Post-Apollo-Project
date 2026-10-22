@@ -40,6 +40,14 @@ assert any(
     for part in command
 )
 
+# Flatpak apps must not receive a profile path outside their sandbox.
+with patch.object(browser, "browser_prefix", return_value=["flatpak", "run", "com.brave.Browser"]):
+    flatpak_command = browser.browser_command()
+assert any(
+    ".var/app/com.brave.Browser/data/post-apollo/x-browser" in part
+    for part in flatpak_command
+)
+
 # The launcher never opens a new process if the X application already exists.
 commands = []
 with patch.object(browser, "x_exists", return_value=True):

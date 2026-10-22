@@ -107,6 +107,16 @@ function receiptStatus(plan, requestId, receipt) {
             || receipt.operation !== plan.operation
             || receipt.eventId !== plan.eventId)
         return "not-confirmed";
+    // A provider response for a different message cannot authorize this
+    // action even if its request ID/account/action happen to match.
+    if (plan.adapter === "browser"
+            && receipt.messageKey !== plan.reference.messageKey)
+        return "not-confirmed";
+    if (plan.adapter === "bridge"
+            && (receipt.mailboxKey !== plan.reference.mailboxKey
+                || receipt.uidValidity !== plan.reference.uidValidity
+                || receipt.uid !== plan.reference.uid))
+        return "not-confirmed";
     if (receipt.status === "applied" && receipt.verified === true)
         return "confirmed";
     if (receipt.status === "accepted")

@@ -184,6 +184,31 @@ assert "onAdapterUpdated: writeAdapter()" in store
 assert "singleton ApolloHubStore" in module
 assert "ApolloHubStore.layoutJson = JSON.stringify(layout);" in window
 assert "DATA ADAPTER NOT CONNECTED" in tile
+
+# W1 UI: consume the shared shell's existing bridge through reactive QML
+# bindings, never a copied snapshot or another WeatherService. Independent
+# weather/AQI states must be visible even without a shell attachment.
+assert "property var liveBridge: null" in window
+assert "weatherSnapshot: hub.liveBridge" in window
+assert "hub.liveBridge.weatherSnapshot : null" in window
+assert "property var weatherSnapshot: null" in tile
+assert 'weatherState === "ready"' in tile
+assert "weatherSnapshot.fresh === true" in tile
+assert 'weatherState === "ready" && !weatherReady' in tile
+assert "tile.weatherStatus" in tile
+assert 'tile.moduleId === "weather"' in tile
+assert "tile.weatherSnapshot.temperatureF" in tile
+assert "tile.weatherSnapshot.condition" in tile
+assert "tile.weatherSnapshot.humidity" in tile
+assert "tile.weatherSnapshot.windMph" in tile
+assert "tile.airQualityText" in tile
+assert "airQuality.fresh === true" in tile
+assert "airQuality.index" in tile
+assert 'return "DISCONNECTED";' in tile
+assert 'String(airQuality.state || "unavailable").toUpperCase()' in tile
+assert 'tile.weatherSnapshot.ageMinutes' in tile
+for forbidden in ("WeatherService {", "ApolloHubLiveBridge {", "SystemTelemetry {"):
+    assert forbidden not in window + tile, forbidden
 assert "SystemTelemetry {" not in window
 assert "HeadlessMediaController {" not in window
 

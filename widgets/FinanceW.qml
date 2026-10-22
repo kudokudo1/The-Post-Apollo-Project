@@ -1064,6 +1064,9 @@ PanelWindow {
                                 }
                                 ActionButton {
                                     id: newTransactionDraft
+                                    // Same reactive label/glow tracking as the
+                                    // four actions within the staged draft.
+                                    trackLabelGlowLocally: true
                                     width: 84
                                     height: 30
                                     label: "NEW DRAFT"

@@ -141,3 +141,38 @@ test("radio cassette is display-only; its SELECT and LOAD are on the bay", () =>
     assert.match(ui, /bay\.controller\.selection\.source === "direct-stream"/);
     assert.doesNotMatch(deck, /id:\s*grooveMouse/);
 });
+
+test("analog controls follow slider, horizontal dial, actions, tune dial order", () => {
+    const ui = fs.readFileSync(path.join(base, "widgets/MediaDeckBrowserControls.qml"), "utf8");
+    const parts = [
+        "id: resultSlider", "id: navigationDial",
+        "id: mediaActionColumn", "id: tuningDial"
+    ];
+    const offsets = parts.map(id => ui.indexOf(id));
+    assert.ok(offsets.every(offset => offset !== -1));
+    assert.ok(offsets.every((offset, i) => i === 0 || offset > offsets[i - 1]));
+    assert.match(ui, /id:\s*resultSlider[\s\S]*?width:\s*40/);
+    assert.match(ui, /id:\s*navigationDial[\s\S]*?scale:\s*0\.77/);
+    assert.match(ui, /id:\s*tuningDial[\s\S]*?scale:\s*1\.0/);
+    assert.match(ui, /navigationRig\.width - 40 - 110 - 150/);
+});
+
+test("SEARCH and source button positions are swapped, input uses magenta and orange caret", () => {
+    const ui = fs.readFileSync(path.join(base, "widgets/MediaDeckBrowserControls.qml"), "utf8");
+    assert.match(ui, /id:\s*searchKey[\s\S]*?anchors \{ left: parent\.left/);
+    assert.match(ui, /id:\s*sourceKey[\s\S]*?anchors \{ right: parent\.right/);
+    assert.match(ui, /left: searchKey\.right; right: sourceKey\.left/);
+    assert.match(ui, /id:\s*queryBezel[\s\S]*?border\.color:\s*Colors\.magenta/);
+    assert.match(ui, /id:\s*searchInput[\s\S]*?color:\s*Colors\.magenta/);
+    assert.match(ui, /cursorDelegate:\s*Rectangle\s*\{[\s\S]*?color:\s*Colors\.orange/);
+    assert.match(ui, /GohuText\s*\{[\s\S]*?GROOVE SALAD \/ RADIO[\s\S]*?color:\s*Colors\.magenta/);
+});
+
+test("browser action controls retain ordinary ActionButton variants", () => {
+    const ui = fs.readFileSync(path.join(base, "widgets/MediaDeckBrowserControls.qml"), "utf8");
+    assert.equal((ui.match(/ActionButton\s*\{/g) || []).length, 5);
+    assert.doesNotMatch(ui, /selected:\s*bay\.deckHost\.navigationZone/);
+    assert.doesNotMatch(ui, /destructive:\s*true|variant:\s*"special"/);
+    assert.match(ui, /id:\s*sourceKey[\s\S]*?onClicked:\s*bay\.deckHost\.toggleCatalogSource/);
+    assert.match(ui, /id:\s*searchKey[\s\S]*?onClicked:\s*bay\.deckHost\.searchLibrary/);
+});

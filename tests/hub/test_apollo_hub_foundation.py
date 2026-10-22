@@ -128,7 +128,7 @@ import re
 
 for path, source, count in (
     ("widgets/ApolloHubW.qml", window, 7),
-    ("widgets/hub/ApolloHubTile.qml", tile, 4),
+    ("widgets/hub/ApolloHubTile.qml", tile, 6),
 ):
     actions = len(re.findall(r"\bActionButton\s*\{", source))
     tracked = len(re.findall(
@@ -176,6 +176,36 @@ assert 'label: "×"' in tile
 assert 'accentColor: Colors.red' in tile
 assert 'onLeftClicked: tile.removeTile(tile.tileIndex)' in tile
 assert 'onRemoveTile: hub.removeEditedTile(index)' in window
+# P1 stage 2: no new service or layout schema; in-place edit-only resize
+# controls preserve the normal tile size and share the Undo path.
+for token in (
+    'property int tileColumnSpan: 1',
+    'property int tileRowSpan: 1',
+    'label: "W:" + tile.tileColumnSpan',
+    'label: "H:" + tile.tileRowSpan',
+    'signal toggleTileWidth(int index)',
+    'signal cycleTileHeight(int index)',
+    'onLeftClicked: tile.toggleTileWidth(tile.tileIndex)',
+    'onLeftClicked: tile.cycleTileHeight(tile.tileIndex)',
+):
+    assert token in tile, f"Tile resizing seam missing: {token}"
+assert tile.index('label: "SWAP"') < tile.index('label: "W:"') \
+       < tile.index('label: "H:"') < tile.index('label: "×"')
+for token in (
+    'function toggleEditedTileWidth(index)',
+    'function cycleEditedTileHeight(index)',
+    'nextSize = tile.size === "wide" ? "half" : "wide"',
+    'tile.rowSpan >= Layout.MAX_ROW_SPAN',
+    'Layout.resizeTile(layout, selectedModeIndex,',
+    'tileColumnSpan: tileConfig.size === "wide" ? 2 : 1',
+    'tileRowSpan: tileConfig.rowSpan || 1',
+    'onToggleTileWidth: hub.toggleEditedTileWidth(index)',
+    'onCycleTileHeight: hub.cycleEditedTileHeight(index)',
+    'if (!editMode || layoutStorageIssue.length > 0',
+):
+    assert token in window, f"Hub resize wiring missing: {token}"
+assert 'property var layoutUndoStack: []' in window
+assert 'height: 140 * (tileConfig.rowSpan || 1)' in window
 assert 'Layout.removeTile(layout, selectedModeIndex,' in window
 assert 'function undoLastLayoutEdit()' in window
 assert 'onLeftClicked: hub.undoLastLayoutEdit()' in window

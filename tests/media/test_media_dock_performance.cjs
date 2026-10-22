@@ -138,7 +138,7 @@ test("open state magenta-energizes every Media icon and CAVA visual without affe
     assert.equal((source.match(/color:\s*mediaDock\.artworkAccentColor/g) || []).length, 9);
     assert.doesNotMatch(source, /^\s*color:\s*mediaDock\.accentColor\s*$/m);
     assert.equal((source.match(/SafeDropShadow \{/g) || []).length, 3);
-    assert.equal((source.match(/RectangularShadow \{/g) || []).length, 4);
+    assert.equal((source.match(/RectangularShadow \{/g) || []).length, 5);
     assert.doesNotMatch(source, /contentGlowSource:\s*(?:spectrum|cavaBar|mediaArtwork)/);
     assert.match(source, /id:\s*cavaAmbientWash[\s\S]*?height:\s*mediaDock\.cavaAmbientTargetHeight/);
     assert.match(source, /if \(changed\)\s*levels = newLevels;/);
@@ -251,11 +251,12 @@ test("Media's rear halo follows CAVA while DockButton's front wash stays magenta
     assert.match(dockButtonSource, /property color openGlowColor:\s*Colors\.magenta/);
 });
 
-test("small stars get their own soft CAVA-accent auras behind the white glyphs", () => {
-    // Small white ornament pixels form weaker sampled shadows than the
-    // larger clef image. Add one local underlight per star group only.
+test("stars and treble clef each have a matching local accent aura", () => {
+    // The three static glyph groups each need local, equal-strength underlight
+    // in addition to their independent source-attached shadows.
     for (const [auraId, glyphId] of [
         ["leadingStarsAura", "leadingStars"],
+        ["trebleClefAura", "trebleClef"],
         ["trailingStarAura", "trailingStar"]
     ]) {
         const match = source.match(new RegExp(
@@ -284,11 +285,17 @@ test("small stars get their own soft CAVA-accent auras behind the white glyphs",
         assert.doesNotMatch(body, /safeSource|cavaBar|levels|frame|Repeater|ShaderEffect|Behavior on/,
             "star underlights must not sample or follow CAVA bar frames");
     }
-    assert.equal((source.match(/RectangularShadow \{/g) || []).length, 4);
+    assert.equal((source.match(/RectangularShadow \{/g) || []).length, 5);
     assert.equal((source.match(/SafeDropShadow \{/g) || []).length, 3);
     assert.match(source, /Row \{\s*id:\s*mediaArtwork\s*anchors\.centerIn:\s*parent\s*spacing:\s*9\s*z:\s*1/);
     assert.match(source, /id:\s*leadingStars[\s\S]*?text:\s*"‧₊˚ "[\s\S]*?color:\s*mediaDock\.foregroundColor/);
     assert.match(source, /id:\s*trailingStar[\s\S]*?text:\s*"˖"[\s\S]*?color:\s*mediaDock\.foregroundColor/);
+    // The clef preserves its font-independent PNG and has one sampled
+    // shadow plus one underlight, just like each ornament group.
+    assert.match(source, /id:\s*trebleClef\s*width:\s*15\s*height:\s*34/);
+    assert.match(source, /source:\s*mediaDock\.open\s*\?\s*Qt\.resolvedUrl\("\.\.\/assets\/media\/treble-clef\.png"\)/);
+    assert.equal((source.match(/id:\s*trebleClefAura\b/g) || []).length, 1);
+    assert.equal((source.match(/id:\s*trebleClefGlow\b/g) || []).length, 1);
     assert.doesNotMatch(source, /id:\s*(?:musicMarkUnderlay|mediaArtworkUnderlay)/);
 });
 
@@ -339,8 +346,8 @@ test("magenta front wash, three independent static art glows, per-bar CAVA halos
     // geometry-only per-bar halos, never a combined drop-shadow texture.
     assert.match(source, /Row \{\s*id:\s*mediaArtwork\s*anchors\.centerIn:\s*parent\s*spacing:\s*9\s*z:\s*1/);
     assert.doesNotMatch(source, /id:\s*(?:musicMarkUnderlay|mediaArtworkUnderlay)/);
-    assert.equal((source.match(/RectangularShadow \{/g) || []).length, 4,
-        "rear and CAVA washes plus two individually bounded star auras");
+    assert.equal((source.match(/RectangularShadow \{/g) || []).length, 5,
+        "rear and CAVA washes plus three independently bounded glyph auras");
     assert.match(source, /contentGlowEnabled:\s*false/);
     assert.match(source, /contentGlowSource:\s*null/);
     assert.doesNotMatch(source, /contentGlowSource:\s*(?:musicMark|mediaArtwork|spectrum|cavaBar)/);
@@ -387,7 +394,7 @@ test("large faded CAVA-only ambient wash follows a padded spectrum envelope", ()
 
     // The soft CAVA ambient wash must remain separate from the rear accent
     // halo and the intentionally magenta front wash.
-    assert.equal((source.match(/RectangularShadow \{/g) || []).length, 4);
+    assert.equal((source.match(/RectangularShadow \{/g) || []).length, 5);
     assert.doesNotMatch(source, /id:\s*(?:musicMarkUnderlay|mediaArtworkUnderlay)/);
     for (const mode of ["normal", "hover", "pressed"]) {
         assert.match(source, new RegExp(mode + "DockGlowColor:\\s*Colors\\.magenta"));

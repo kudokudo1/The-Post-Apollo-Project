@@ -31,6 +31,8 @@ Rectangle {
         Math.max(0, Math.min(1, solarWindValue / 1000))
     readonly property real bzMeter:
         Math.max(0, Math.min(1, Math.abs(bzValue) / 20))
+    readonly property real btMeter:
+        Math.max(0, Math.min(1, btValue / 20))
     readonly property real solarFluxMeter:
         Math.max(0, Math.min(1, solarFluxValue / 300))
 
@@ -274,6 +276,22 @@ Rectangle {
                           : "-- nT"
                     font.pixelSize: 18
                     color: Colors.white
+                }
+
+                Rectangle {
+                    width: 125
+                    height: 8
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.magenta
+
+                    Rectangle {
+                        x: 2
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: (parent.width - 4) * space.btMeter
+                        height: parent.height - 4
+                        color: Colors.magenta
+                    }
                 }
 
                 QuietText {

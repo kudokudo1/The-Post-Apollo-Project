@@ -14,6 +14,7 @@ import stat
 import sys
 
 from media_controller import MediaController
+from radio_stream_relay import RadioStreamRelay
 from media_intent_store import IntentStore
 
 
@@ -91,24 +92,31 @@ def run(path: Path) -> None:
                 path.unlink()  # Stale private socket, while holding our server lock.
             else:
                 raise RuntimeError("Controller socket already has a live server")
-        with HiFiServer(str(path), MediaController(intent_store=IntentStore())) as server:
-            os.chmod(path, 0o600)
-            bound_inode = path.stat().st_ino
-            def stop(_signal, _frame):
-                raise KeyboardInterrupt()
-            signal.signal(signal.SIGTERM, stop)
-            signal.signal(signal.SIGINT, stop)
-            print("HI-FI CONTROLLER // READY // " + str(path), flush=True)
-            try:
-                server.serve_forever(poll_interval=0.2)
-            except KeyboardInterrupt:
-                pass
-            finally:
+        # The loopback relay is lazy. It starts only when the user explicitly
+        # LOADs a directory station, not at application startup or on SEARCH.
+        relay = RadioStreamRelay()
+        try:
+            controller = MediaController(intent_store=IntentStore(), radio_relay=relay)
+            with HiFiServer(str(path), controller) as server:
+                os.chmod(path, 0o600)
+                bound_inode = path.stat().st_ino
+                def stop(_signal, _frame):
+                    raise KeyboardInterrupt()
+                signal.signal(signal.SIGTERM, stop)
+                signal.signal(signal.SIGINT, stop)
+                print("HI-FI CONTROLLER // READY // " + str(path), flush=True)
                 try:
-                    if path.stat().st_ino == bound_inode:
-                        path.unlink()
-                except FileNotFoundError:
+                    server.serve_forever(poll_interval=0.2)
+                except KeyboardInterrupt:
                     pass
+                finally:
+                    try:
+                        if path.stat().st_ino == bound_inode:
+                            path.unlink()
+                    except FileNotFoundError:
+                        pass
+        finally:
+            relay.close()
     finally:
         os.close(fd)
 

@@ -66,7 +66,8 @@ assert 'Date.UTC(parts[0], parts[1] - 1, parts[2])' in pane
 assert 'input.slice(0, 7) !== selectedMonth' in pane
 assert 'String(payeeText).trim().length > 120' in pane
 assert 'available: !draft.validationError' in pane
-assert 'onLeftClicked: draft.reviewed = true' in pane
+assert 'draft.reviewed = true;' in pane
+assert 'draft.requestCommit();' in pane
 assert 'onLeftClicked: draft.clear()' in pane
 assert 'PREVIEW ONLY // NO CHANGES YET' in pane
 assert 'signal saveRequested(var payload)' in pane

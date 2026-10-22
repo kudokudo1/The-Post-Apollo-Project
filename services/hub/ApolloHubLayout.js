@@ -4,9 +4,34 @@
 // own widget tree when a user rearranges a tile.
 var MODULE_IDS = ["time", "calendar", "todo", "notes", "weather", "uptime",
                   "media", "apps", "cpu", "network"];
+var LAYOUT_VERSION = 2;
+var MAX_MODES = 6;
+var MAX_SUBMODES = 6;
+var MAX_TILES = 8;
+var MAX_ROW_SPAN = 3;
+var MAX_TILE_ID = 1000000000;
+
+function validIndex(value, limit) {
+    return typeof value === "number" && isFinite(value)
+           && Math.floor(value) === value && value >= 0 && value < limit;
+}
+
+function tileNumber(value) {
+    if (typeof value !== "string" || !/^tile-[1-9][0-9]*$/.test(value))
+        return -1;
+    var number = Number(value.slice(5));
+    return isFinite(number) && Math.floor(number) === number
+           && number >= 1 && number < MAX_TILE_ID ? number : -1;
+}
+
+function validRowSpan(value) {
+    return typeof value === "number" && isFinite(value)
+           && Math.floor(value) === value && value >= 1
+           && value <= MAX_ROW_SPAN;
+}
 
 function defaultLayout() {
-    return {
+    return normalizeCore({
         version: 1,
         modes: [
             { id: "dashboard", name: "Dashboard", icon: "✦", subModes: [
@@ -33,7 +58,7 @@ function defaultLayout() {
                 ]}
             ]}
         ]
-    };
+    });
 }
 
 function validModule(id) {
@@ -54,11 +79,46 @@ function clone(value) {
     return JSON.parse(JSON.stringify(value));
 }
 
-function normalize(data) {
-    if (!data || typeof data !== "object" || !Array.isArray(data.modes))
-        return defaultLayout();
-    var result = { version: 1, modes: [] };
-    for (var i = 0; i < Math.min(6, data.modes.length); ++i) {
+// Core normalization migrates v1's {module,size} tiles into stable v2
+// identities + row spans. It NEVER mutates the caller's saved object.
+function normalizeCore(data) {
+    var highest = 0;
+    if (data.version === LAYOUT_VERSION) {
+        for (var m = 0; m < data.modes.length; m++) {
+            var groups = data.modes[m] && data.modes[m].subModes;
+            if (!Array.isArray(groups))
+                continue;
+            for (var g = 0; g < groups.length; g++) {
+                var tiles = groups[g] && groups[g].tiles;
+                if (!Array.isArray(tiles))
+                    continue;
+                for (var t = 0; t < tiles.length; t++)
+                    highest = Math.max(highest, tileNumber(tiles[t] && tiles[t].id));
+            }
+        }
+    }
+    var nextId = highest + 1;
+    if (data.version === LAYOUT_VERSION
+            && validIndex(data.nextTileId, MAX_TILE_ID)
+            && data.nextTileId > nextId)
+        nextId = data.nextTileId;
+    var used = {};
+    function assignId(input) {
+        var number = data.version === LAYOUT_VERSION
+                     ? tileNumber(input && input.id) : -1;
+        var preserved = number > 0 ? "tile-" + number : "";
+        if (preserved && !Object.prototype.hasOwnProperty.call(used,preserved)) {
+            used[preserved] = true;
+            return preserved;
+        }
+        if (nextId >= MAX_TILE_ID)
+            return null;
+        var generated = "tile-" + nextId++;
+        used[generated] = true;
+        return generated;
+    }
+    var result = { version: LAYOUT_VERSION, nextTileId: 1, modes: [] };
+    for (var i = 0; i < Math.min(MAX_MODES, data.modes.length); ++i) {
         var inputMode = data.modes[i];
         if (!inputMode || !Array.isArray(inputMode.subModes))
             continue;
@@ -68,7 +128,7 @@ function normalize(data) {
             icon: String(inputMode.icon || "✦").slice(0, 4),
             subModes: []
         };
-        for (var j = 0; j < Math.min(6, inputMode.subModes.length); ++j) {
+        for (var j = 0; j < Math.min(MAX_SUBMODES, inputMode.subModes.length); ++j) {
             var inputSub = inputMode.subModes[j];
             if (!inputSub || !Array.isArray(inputSub.tiles))
                 continue;
@@ -77,13 +137,19 @@ function normalize(data) {
                 name: String(inputSub.name || ("Group " + (j + 1))).slice(0, 20),
                 tiles: []
             };
-            for (var k = 0; k < Math.min(8, inputSub.tiles.length); ++k) {
+            for (var k = 0; k < Math.min(MAX_TILES, inputSub.tiles.length); ++k) {
                 var t = inputSub.tiles[k];
                 if (!t || !validModule(t.module))
                     continue;
+                var id = assignId(t);
+                if (!id)
+                    continue;
                 sub.tiles.push({
+                    id: id,
                     module: String(t.module),
-                    size: t.size === "wide" ? "wide" : "half"
+                    size: t.size === "wide" ? "wide" : "half",
+                    rowSpan: data.version === LAYOUT_VERSION && validRowSpan(t.rowSpan)
+                             ? t.rowSpan : 1
                 });
             }
             mode.subModes.push(sub);
@@ -91,7 +157,17 @@ function normalize(data) {
         if (mode.subModes.length > 0)
             result.modes.push(mode);
     }
-    return result.modes.length > 0 ? result : defaultLayout();
+    result.nextTileId = nextId;
+    return result;
+}
+
+function normalize(data) {
+    if (!data || typeof data !== "object" || Array.isArray(data)
+            || !Array.isArray(data.modes)
+            || (data.version !== 1 && data.version !== LAYOUT_VERSION))
+        return defaultLayout();
+    var next = normalizeCore(data);
+    return next.modes.length > 0 ? next : defaultLayout();
 }
 
 function parse(text) {
@@ -133,7 +209,7 @@ function renameMode(layout, index, name) {
 
 function addMode(layout) {
     var next = normalize(clone(layout));
-    if (next.modes.length >= 6)
+    if (next.modes.length >= MAX_MODES)
         return next;
     var stamp = Date.now();
     next.modes.push({
@@ -150,7 +226,7 @@ function addSubMode(layout, modeIndex) {
     if (modeIndex < 0 || modeIndex >= next.modes.length)
         return next;
     var groups = next.modes[modeIndex].subModes;
-    if (groups.length < 6)
+    if (groups.length < MAX_SUBMODES)
         groups.push({ id: "group-" + Date.now(), name: "Group " + (groups.length + 1), tiles: [] });
     return next;
 }
@@ -163,12 +239,15 @@ function addTile(layout, modeIndex, subIndex) {
     if (subIndex < 0 || subIndex >= groups.length)
         return next;
     var tiles = groups[subIndex].tiles;
-    if (tiles.length >= 8)
+    if (tiles.length >= MAX_TILES)
         return next;
     var candidate = MODULE_IDS.find(function(id) {
         return !tiles.some(function(t) { return t.module === id; });
     }) || MODULE_IDS[0];
-    tiles.push({ module: candidate, size: "half" });
+    if (next.nextTileId >= MAX_TILE_ID)
+        return next;
+    tiles.push({ id: "tile-" + next.nextTileId++,
+                 module: candidate, size: "half", rowSpan: 1 });
     return next;
 }
 
@@ -190,5 +269,40 @@ function cycleTile(layout, modeIndex, subIndex, tileIndex) {
             break;
         }
     }
+    return next;
+}
+
+// Remove only the requested TILE PLACEMENT, never the module's own data.
+// Explicit UI activation owns removal and records an undo snapshot.
+function removeTile(layout, modeIndex, subIndex, tileIndex) {
+    var next = normalize(clone(layout));
+    if (!validIndex(modeIndex, next.modes.length))
+        return next;
+    var groups = next.modes[modeIndex].subModes;
+    if (!validIndex(subIndex, groups.length))
+        return next;
+    var tiles = groups[subIndex].tiles;
+    if (!validIndex(tileIndex, tiles.length))
+        return next;
+    tiles.splice(tileIndex, 1);
+    return next;
+}
+
+// Backing shape for future sizing controls. The live UI currently renders
+// 2 columns; rowSpan: 1 retains the original 140px card height.
+function resizeTile(layout, modeIndex, subIndex, tileIndex, size, rowSpan) {
+    var next = normalize(clone(layout));
+    if (!validIndex(modeIndex, next.modes.length))
+        return next;
+    var groups = next.modes[modeIndex].subModes;
+    if (!validIndex(subIndex, groups.length))
+        return next;
+    var tiles = groups[subIndex].tiles;
+    if (!validIndex(tileIndex, tiles.length)
+            || (size !== "half" && size !== "wide")
+            || !validRowSpan(rowSpan))
+        return next;
+    tiles[tileIndex].size = size;
+    tiles[tileIndex].rowSpan = rowSpan;
     return next;
 }

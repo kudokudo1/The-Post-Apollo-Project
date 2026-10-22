@@ -125,7 +125,7 @@ assert "WorldClockPolicy.snapshot(localClock.date.getTime()," in window
 assert 'command: ["date", "+%z"]' in window
 assert 'environment: { TZ: worldLookupZone, LC_ALL: "C" }' in window
 assert "Process {" in window
-assert window.count("Process {") == 2
+assert window.count("Process {") == 4
 assert "worldLookup.running" in window
 assert 'onLeftClicked:' in window
 assert 'timew.chooseWorldZone(modelData.id)' in window
@@ -142,7 +142,30 @@ assert 'import QtQuick.Controls' in window
 assert 'import "../services/time/WorldZoneSearch.js" as WorldZoneSearch' in window
 assert 'zoneCatalogLookup.exec(["timedatectl", "list-timezones", "--no-pager"])' in window
 assert 'WorldZoneSearch.parseCatalog(this.text)' in window
-assert 'WorldZoneSearch.search(worldZoneCatalog, worldSearchQuery, 6)' in window
+assert 'WorldZoneSearch.search(worldZoneCatalog, worldSearchQuery,' in window
+assert '120, worldCountryIndex)' in window
+assert 'WorldZoneSearch.parseCountryZones(worldCountryZoneTable, worldCountryNames)' in window
+assert 'WorldZoneSearch.parseCountryNames(this.text)' in window
+assert 'isoCountryLookup.exec(["cat", "/usr/share/zoneinfo/iso3166.tab"])' in window
+assert 'zoneCountryLookup.exec(["cat", "/usr/share/zoneinfo/zone.tab"])' in window
+assert 'property bool worldCountryLookupStarted: false' in window
+assert 'function loadWorldCountryMetadata()' in window
+assert 'loadWorldCountryMetadata();' in window
+assert 'worldCountryLookupStarted = true;' in window
+# ListView virtualizes many search hits while the host NeonScrollBar
+# represents overflow rather than stretching TimeW past its frame.
+assert 'id: worldSearchResults' in window
+assert 'ListView {' in window
+assert 'NeonScrollBar {' in window
+assert 'flickable: worldSearchResults' in window
+assert 'handleStyle: "star"' in window
+assert 'handleColor: Colors.white' in window
+assert 'geometryMode: "viewport"' in window
+assert 'Math.min(188, 8' in window
+assert 'interactive: contentHeight > height' in window
+assert 'model: timew.worldSearchMatches' in window
+assert 'modelData.country' in window
+assert 'TYPE CITY OR COUNTRY' in window
 assert 'WorldZoneSearch.contains(worldZoneCatalog, zoneId)' in window
 assert 'function toggleWorldMode()' in window
 assert 'function selectWorldSearchResult(zoneId)' in window

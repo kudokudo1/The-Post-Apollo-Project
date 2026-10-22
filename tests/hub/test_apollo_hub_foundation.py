@@ -18,6 +18,8 @@ notes_mini = (ROOT / "widgets/hub/ApolloHubNotesMini.qml").read_text(encoding="u
 notes_store = (ROOT / "services/hub/ApolloHubNotesStore.qml").read_text(encoding="utf-8")
 calendar_mini = (ROOT / "widgets/hub/ApolloHubCalendarMini.qml").read_text(encoding="utf-8")
 calendar_policy = (ROOT / "services/hub/ApolloHubCalendarPolicy.js").read_text(encoding="utf-8")
+time_mini = (ROOT / "widgets/hub/ApolloHubTimeMini.qml").read_text(encoding="utf-8")
+time_policy = (ROOT / "services/hub/ApolloHubTimePolicy.js").read_text(encoding="utf-8")
 layout = (ROOT / "services/hub/ApolloHubLayout.js").read_text(encoding="utf-8")
 store = (ROOT / "services/hub/ApolloHubStore.qml").read_text(encoding="utf-8")
 module = (ROOT / "services/hub/qmldir").read_text(encoding="utf-8")
@@ -163,7 +165,7 @@ assert 'Math.min(8, inputSub.tiles.length)' in layout
 assert "onMoveLeft: hub.shiftTile(" in window
 assert "onMoveRight: hub.shiftTile(" in window
 assert "Layout.cycleTile(" in window
-assert "Qt.formatTime" in tile
+assert 'TimePolicy.snapshot(tile.now.getTime(), tile.use24Hour)' in tile
 assert "Qt.formatDate(tile.now" not in tile
 
 # Standard window-local key grammar, without inventing a bottom rail.
@@ -674,6 +676,52 @@ for forbidden in (
 assert "function snapshot(" in calendar_policy
 assert 'eventsState:"not-connected"' in calendar_policy
 assert "eventCount:-1" in calendar_policy
+
+# B10 Time UI uses the original, single 1000ms tile.now timer.
+# Formatting is pure; 12/24 changes are presentation-only and in-memory.
+assert 'import "../../services/hub/ApolloHubTimePolicy.js" as TimePolicy' in tile
+assert "property date now: new Date()" in tile
+assert tile.count("Timer {") == 1
+assert 'interval: 1000' in tile
+assert 'onTriggered: tile.now = new Date()' in tile
+assert 'running: tile.visible && (tile.moduleId === "time" || tile.moduleId === "calendar")' in tile
+assert 'property bool use24Hour: true' in tile
+assert 'TimePolicy.snapshot(tile.now.getTime(), tile.use24Hour)' in tile
+assert "ApolloHubTimeMini {" in tile
+assert 'visible: tile.moduleId === "time"' in tile
+assert "timeSnapshot: tile.timeSnapshot" in tile
+assert "use24Hour: tile.use24Hour" in tile
+assert "onToggleHourFormat: tile.use24Hour = !tile.use24Hour" in tile
+assert 'tile.moduleId !== "time"' in tile
+assert "timeMini.statusLine" in tile
+assert "Qt.formatTime(" not in tile
+
+for needle in (
+    "property var timeSnapshot: null",
+    "property bool use24Hour: true",
+    "signal toggleHourFormat()",
+    'timeSnapshot.state === "ready"',
+    "timeSnapshot.displayTime",
+    "timeSnapshot.dateLabel",
+    "timeSnapshot.utcOffsetLabel",
+    'label: timeMini.use24Hour ? "24H" : "12H"',
+    "onLeftClicked: timeMini.toggleHourFormat()",
+    '"--:--:--"', '"LOCAL DATE UNAVAILABLE"',
+    '"UTC OFFSET UNKNOWN"', '"TIME // UNAVAILABLE"',
+    '"TIME // LOCAL CLOCK // "',
+):
+    assert needle in time_mini, f"B10 Time mini missing {needle}"
+
+for forbidden in (
+    "Timer {", "SystemClock {", "Process {", "FileView {",
+    "Date.now(", "new Date(", "setTime(", "Qt.formatTime(",
+    "ApolloHubStore", "TimeW", "Qt.openUrlExternally(",
+):
+    assert forbidden not in time_mini, (
+        f"B10 mini must not create clock, mutate time, or persist preferences: {forbidden}")
+assert "function snapshot(epochMs, use24Hour)" in time_policy
+assert 'utcOffsetLabel: offsetLabel' in time_policy
+assert 'displayTime: use24Hour ? time24 : time12' in time_policy
 
 # Launchers and widget backends are unchanged in this first stage.
 print("ApolloHubW foundation source contracts passed")

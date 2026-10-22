@@ -2659,10 +2659,11 @@ PanelWindow {
 
                                 z: 1
 
-                                color: Colors.dark
+                                color: notificationEntry.website !== "" ? Colors.black : Colors.dark
 
                                 border.width: 1
-                                border.color: notificationEntry.sourceColor
+                                border.color: notificationEntry.website !== ""
+                                    ? Colors.magenta : notificationEntry.sourceColor
 
                                 Image {
                                     id: appIconImage
@@ -2675,6 +2676,23 @@ PanelWindow {
                                     fillMode: Image.PreserveAspectFit
 
                                     asynchronous: true
+                                    // Preserve luminance and transparent shapes
+                                    // while giving arbitrary native site favicons
+                                    // the same magenta/black treatment.
+                                    visible: notificationEntry.website === ""
+                                        || notificationEntry.website === "YouTube"
+                                }
+
+                                Colorize {
+                                    anchors.fill: appIconImage
+                                    source: appIconImage
+                                    visible: notificationEntry.website !== ""
+                                        && notificationEntry.website !== "YouTube"
+                                        && appIconImage.status === Image.Ready
+                                    hue: 0.8333
+                                    saturation: 0.65
+                                    lightness: -0.12
+                                    cached: true
                                 }
 
                                 // ONE icon only:
@@ -2689,7 +2707,8 @@ PanelWindow {
 
                                     font.pixelSize: 9
 
-                                    color: notificationEntry.sourceColor
+                                    color: notificationEntry.website !== ""
+                                        ? Colors.magenta : notificationEntry.sourceColor
                                 }
                             }
 
@@ -2767,8 +2786,9 @@ PanelWindow {
 
                             // ===== SOURCE-SCOPED / CARD CONTROLS =====
                             //
-                            // SITE/APP selects the DND/ZZ target for browser
-                            // notifications. FAVS and CLEAR ALL remain app-wide;
+                            // SITE/APP selects the DND/ZZ target from the
+                            // bottom row beside the Bring Here arrow.
+                            // FAVS and CLEAR ALL remain app-wide;
                             // X dismisses only this notification.
 
                             Row {
@@ -2785,18 +2805,6 @@ PanelWindow {
                                 spacing: 5
 
                                 z: 3
-
-                                MiniButton {
-                                    width: 44
-                                    height: 28
-                                    visible: notificationEntry.websiteKey !== ""
-                                    label: notificationEntry.targetWholeApp ? "APP"
-                                        : notificationEntry.inheritedRule ? "SITE*" : "SITE"
-                                    labelPixelSize: 9
-                                    active: !notificationEntry.targetWholeApp
-                                    activeColor: Colors.magenta
-                                    onTriggered: notificationEntry.targetWholeApp = !notificationEntry.targetWholeApp
-                                }
 
                                 MiniButton {
                                     width: 32
@@ -2907,7 +2915,7 @@ PanelWindow {
                                 anchors {
                                     top: notificationTitle.bottom
                                     left: parent.left
-                                    right: bringHereButton.left
+                                    right: cardFooterActions.left
                                 }
 
                                 anchors.topMargin: 2
@@ -3028,32 +3036,41 @@ PanelWindow {
                             // This button:
                             //     BRING APP HERE / OPEN HERE
 
-                            MiniButton {
-                                id: bringHereButton
+                            Row {
+                                id: cardFooterActions
                                 visible: !notificationEntry.isReport
                                          && !notificationEntry.isUpdateOffer
-
                                 anchors {
                                     bottom: parent.bottom
                                     right: parent.right
                                 }
-
                                 anchors.bottomMargin: 8
                                 anchors.rightMargin: root.cardContentMargin
-
-                                width: 30
-                                height: 24
-
+                                spacing: 5
                                 z: 3
 
-                                label: "⇲"
+                                MiniButton {
+                                    width: 44
+                                    height: 24
+                                    visible: notificationEntry.websiteKey !== ""
+                                    label: notificationEntry.targetWholeApp ? "APP"
+                                        : notificationEntry.inheritedRule ? "SITE*" : "SITE"
+                                    labelPixelSize: 9
+                                    active: !notificationEntry.targetWholeApp
+                                    activeColor: Colors.magenta
+                                    onTriggered: notificationEntry.targetWholeApp = !notificationEntry.targetWholeApp
+                                }
 
-                                labelPixelSize: 15
-
-                                active: false
-
-                                onTriggered: {
-                                    root.bringAppHere(notificationEntry.sourceId, notificationEntry.source);
+                                MiniButton {
+                                    id: bringHereButton
+                                    width: 30
+                                    height: 24
+                                    label: "⇲"
+                                    labelPixelSize: 15
+                                    active: false
+                                    onTriggered: {
+                                        root.bringAppHere(notificationEntry.sourceId, notificationEntry.source);
+                                    }
                                 }
                             }
                         }

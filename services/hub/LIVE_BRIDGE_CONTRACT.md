@@ -151,7 +151,7 @@ A browser appearing in the MPRIS list is **not** permission to take it over. Eve
 
 ### Owner-mediated integration (proposed in draft PR; runtime unverified)
 
-The Media Deck currently creates **one** `HeadlessMediaController { id: headless }` and **one** `MprisPlaybackAdapter { id: mediaAdapter }` inside `widgets/MediaDeckW.qml`. They are not exposed to `shell.qml` or the Hub, so **do not construct another instance just to fill the Hub tile**.
+The Media Deck creates **one** `HeadlessMediaController { id: headless }` and **one** `MprisPlaybackAdapter { id: mediaAdapter }` inside `widgets/MediaDeckW.qml`. On the B4 integration branch, these existing instances are exposed through read-only Media Deck/Dock properties and passed to the Hub bridge by the existing shell. **Never construct another instance to fill the Hub tile.**
 
 The Media/UI owner should expose read-only references (or snapshots) via `MediaDeckW` → `Mediaplayer.qml` to the shared shell, without changing playback controls. Then the shell owner can add to the **already existing** `ApolloHubLiveBridge`:
 

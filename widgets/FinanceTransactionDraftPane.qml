@@ -6,6 +6,10 @@ import "../components"
 Item {
     id: draft
     signal saveRequested(var payload)
+    signal draftSaveRequested(var payload)
+    property string localDraftId: ""
+    property string draftStoreState: "idle"
+    property string draftStoreMessage: ""
     property bool editing: false
     property string editingId: ""
     property string requestId: ""
@@ -13,6 +17,7 @@ Item {
     property string saveState: "idle"
     property string saveMessage: ""
     readonly property bool savePending: saveState === "pending"
+    readonly property bool localPending: draftStoreState === "pending"
     property string selectedMonth: ""
     property var accounts: []
     property string sourceKey: ""
@@ -113,6 +118,38 @@ Item {
         return true;
     }
 
+    function requestDraftSave() {
+        // Incomplete dates, descriptions, and amounts are allowed for drafts.
+        // This never goes through the Actual transaction writer.
+        if (editing || localPending || savePending || !accountId
+                || !/^[a-f0-9]{64}$/.test(sourceKey))
+            return false;
+        draftSaveRequested({id:localDraftId || null, sourceKey:sourceKey,
+            month:selectedMonth,accountId:accountId,dateText:dateText,
+            payeeText:payeeText,amountText:amountText,direction:direction});
+        return true;
+    }
+
+    function beginStored(record) {
+        if (!record || record.sourceKey !== sourceKey
+                || record.month !== selectedMonth || !record.id)
+            return false;
+        const position = Array.isArray(accounts)
+            ? accounts.findIndex(function(a) {return a.id === record.accountId;}) : -1;
+        if (position < 0)
+            return false;
+        clear();
+        localDraftId = record.id;
+        accountIndex = position;
+        dateText = record.dateText;
+        payeeText = record.payeeText;
+        amountText = record.amountText;
+        direction = record.direction;
+        requestId = newRequestId();
+        open = true;
+        return true;
+    }
+
     function requestCommit() {
         if (!reviewed || validationError !== "" || !requestId
                 || savePending || saveState === "uncertain")
@@ -154,6 +191,7 @@ Item {
         open = false;
         reviewed = false;
         editing = false;
+        localDraftId = "";
         editingId = "";
         requestId = "";
         original = null;
@@ -187,7 +225,9 @@ Item {
 
         GohuText {
             width: parent.width
-            text: draft.editing ? "EDIT TRANSACTION // REVIEW" : "NEW TRANSACTION // REVIEW"
+            text: draft.editing ? "EDIT TRANSACTION // REVIEW"
+                  : draft.localDraftId ? "SAVED LOCAL DRAFT // REVIEW"
+                  : "NEW TRANSACTION // REVIEW"
             font.pixelSize: 11
             color: Colors.omnitrix
             textFormat: Text.PlainText
@@ -358,6 +398,30 @@ Item {
                 available: !draft.savePending
                 onLeftClicked: draft.clear()
             }
+        }
+
+        ActionButton {
+            trackLabelGlowLocally: true
+            width: parent.width
+            height: 28
+            accentColor: Colors.cyan
+            label: draft.localDraftId ? "UPDATE DRAFT" : "SAVE DRAFT"
+            labelPixelSize: 10
+            available: !draft.editing && !draft.localPending && !draft.savePending
+                       && draft.accounts && draft.accounts.length > 0
+            onLeftClicked: draft.requestDraftSave()
+        }
+
+        GohuText {
+            width: parent.width
+            visible: draft.draftStoreState === "failed"
+                     || draft.localPending
+            text: draft.localPending ? "LOCAL DRAFT // STORING"
+                  : draft.draftStoreMessage
+            font.pixelSize: 9
+            color: Colors.orange
+            textFormat: Text.PlainText
+            elide: Text.ElideRight
         }
 
         GohuText {

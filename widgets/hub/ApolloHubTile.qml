@@ -2,14 +2,15 @@ import QtQuick
 import "../../components"
 import "../../services/hub/ApolloHubLayout.js" as Layout
 
-// Presentation only: live Weather and Network snapshots arrive from
-// ApolloHubW. This tile never creates services or polls/controls the network.
+// Presentation only: Weather, Network, and Media arrive as read-only
+// snapshots. This tile creates no provider, controller, poller, or player.
 SectionFrame {
     id: tile
 
     property string moduleId: "time"
     property var weatherSnapshot: null
     property var networkSnapshot: null
+    property var mediaSnapshot: null
     // B3 deliberately distinguishes local link status from verified internet.
     // Connected Wi-Fi/Ethernet is NOT proof that the internet is reachable.
     readonly property string networkState:
@@ -319,8 +320,23 @@ SectionFrame {
         }
     }
 
+    // MPD and MPRIS remain separate; neither gets selected automatically.
+    ApolloHubMediaMini {
+        visible: tile.moduleId === "media"
+        mediaSnapshot: tile.mediaSnapshot
+        anchors {
+            left: parent.left
+            right: parent.right
+            top: parent.top
+            bottom: parent.bottom
+            topMargin: tile.editing ? 32 : 22
+            bottomMargin: 23
+        }
+    }
+
     GohuText {
         visible: tile.moduleId !== "weather" && tile.moduleId !== "network"
+                 && tile.moduleId !== "media"
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
@@ -355,6 +371,8 @@ SectionFrame {
               ? ("NETWORK // " + (tile.networkConnected
                                   ? "LOCAL LINK CONNECTED" : tile.networkState.toUpperCase())
                  + " // INTERNET UNVERIFIED")
+              : tile.moduleId === "media"
+              ? "MEDIA // READ ONLY // AUDIO OUTPUT NOT VERIFIED"
               : "DATA ADAPTER NOT CONNECTED"
     }
 }

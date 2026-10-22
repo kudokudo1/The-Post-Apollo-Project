@@ -41,6 +41,22 @@ assert.equal(snap(true, false, "", rows, now + 1000).state, "stale");
 assert.equal(snap(true, false, "", [], now).state, "unavailable");
 assert.equal(snap(true, false, "", [rows[0]], now).state, "unavailable");
 
+// Required rows must have valid percentages, not merely matching IDs.
+// The first B2 independent review exposed the false-ready edge case.
+for (const invalid of [null, undefined, "", -1, 101, "NaN", Infinity]) {
+    const badCpu = [row("system:cpu", invalid, "bogus"), ...rows.slice(1)];
+    const badMem = [rows[0], row("system:memory", invalid, "bogus"), ...rows.slice(2)];
+    for (const candidate of [badCpu, badMem]) {
+        const result = snap(true, false, "", candidate, now - 1000);
+        assert.equal(result.state, "unavailable");
+        assert.equal(result.fresh, false);
+        assert.equal(result.cpuPercent, -1);
+        assert.equal(result.memoryPercent, -1);
+    }
+}
+assert.equal(snap(true, false, "", [row("system:cpu", 0),
+                                   row("system:memory", 0)]).state, "ready");
+
 const good = snap();
 assert.equal(good.state, "ready");
 assert.equal(good.fresh, true);

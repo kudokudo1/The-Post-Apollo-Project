@@ -41,7 +41,7 @@ for needle, message in (
 # Apollo Hub's centered, styled-calendar cluster is sampled once as a
 # direct child. Its moving x/y must keep the glow in the same position.
 HUB_DOCK = (ROOT / "modules/ApolloHub.qml").read_text(encoding="utf-8")
-for needle in ("property bool trackArtworkGlowLocally: false",
+for needle in ("property bool trackArtworkGlowLocally: true",
                "readonly property bool artworkIsLocalSource:",
                "contentHost.x + dockButton.contentGlowSource.x",
                "contentHost.y + dockButton.contentGlowSource.y",
@@ -53,6 +53,14 @@ for needle in ("contentGlowSource: hubMark",
                "normalContentGlowColor: Colors.magenta"):
     require(HUB_DOCK, needle, "Apollo Hub single-cluster glow")
 
+# Automatic direct-child placement must preserve the original fallback for
+# whole-content, deeply nested, or reviewed special art. Do not make the
+# effect sample its own host or drop source teardown protection.
+assert "sourceAttached && dockButton.trackArtworkGlowLocally" in COMPONENT
+assert "dockButton.contentGlowSource.parent === contentHost" in COMPONENT
+assert "contentGlowSource.mapToItem(contentLayer, 0, 0)" in COMPONENT
+assert "safeSource: dockButton.contentGlowSource" in COMPONENT
+assert "requestedVisible: dockButton.contentGlowEnabled" in COMPONENT
 require(QMLDIR, "DockButton 1.0 DockButton.qml", "component registration")
 require(GIT, "DockButton {", "Git must prove the reusable component")
 require(GIT, "open: menuOpen", "Git open state must drive the component")

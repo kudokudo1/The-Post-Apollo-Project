@@ -367,22 +367,22 @@ test("large faded CAVA-only ambient wash follows a padded spectrum envelope", ()
     assert.match(wash, /anchors\.horizontalCenter:\s*parent\.horizontalCenter/);
     assert.match(wash, /anchors\.bottom:\s*parent\.bottom/);
     assert.match(wash, /anchors\.bottomMargin:\s*-2/);
-    assert.match(wash, /width:\s*Math\.max\(0,\s*spectrum\.width\s*\+\s*8\s*\*\s*mediaDock\.softGlowSpread\)/);
+    assert.match(wash, /width:\s*Math\.max\(0,\s*spectrum\.width\s*\+\s*2\s*\*\s*\(mediaDock\.contentGlowRadius\s*\+\s*4\s*\+\s*mediaDock\.softGlowSpread\)\)/);
     assert.match(source,
         /id:\s*spectrum\s*width:\s*mediaDock\.barCount\s*\*\s*5\s*\+\s*\(mediaDock\.barCount\s*-\s*1\)\s*\*\s*2/);
-    const washWidthExpression = wash.match(/width:\s*(Math\.max\(0,\s*spectrum\.width\s*\+\s*8\s*\*\s*mediaDock\.softGlowSpread\))/);
+    const washWidthExpression = wash.match(/width:\s*(Math\.max\(0,\s*spectrum\.width\s*\+\s*2\s*\*\s*\(mediaDock\.contentGlowRadius\s*\+\s*4\s*\+\s*mediaDock\.softGlowSpread\)\))/);
     assert.ok(washWidthExpression, "ambient wash should react to the spectrum width");
     const widthForBarCount = count => vm.runInNewContext(washWidthExpression[1], {
         Math,
         spectrum: {width: count * 5 + (count - 1) * 2},
-        mediaDock: {softGlowSpread: 3}
+        mediaDock: {softGlowSpread: 3, contentGlowRadius: 14}
     });
-    assert.equal(widthForBarCount(16), 134, "the wash must spread left and right of both end bars");
-    assert.equal(widthForBarCount(24), 190, "adding eight bars must extend the side glow automatically");
+    assert.equal(widthForBarCount(16), 152, "the wash places both blur edges beyond the end bars");
+    assert.equal(widthForBarCount(24), 208, "adding eight bars must extend the side glow automatically");
     assert.equal(widthForBarCount(24) - widthForBarCount(16), 8 * (5 + 2),
         "wash growth must match the spectrum growth without fixed pixel widths");
-    assert.equal((widthForBarCount(16) - (16 * 5 + 15 * 2)) / 2, 12,
-        "ambient wash extends 12px past each outer bar with default spread");
+    assert.equal((widthForBarCount(16) - (16 * 5 + 15 * 2)) / 2, 14 + 4 + 3,
+        "each blur shoulder extends equally past its nearest edge bar");
     assert.match(wash, /height:\s*mediaDock\.cavaAmbientTargetHeight/);
     assert.match(wash, /radius:\s*height\s*\/\s*2/);
     assert.match(wash, /blur:\s*mediaDock\.contentGlowRadius\s*\+\s*4/);

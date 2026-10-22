@@ -75,7 +75,7 @@ PanelWindow {
         browserStatus = catalogSource === "youtube"
             ? "YOUTUBE CATALOG / REQUIRES API KEY / NO PLAYBACK"
             : catalogSource === "radio-browser"
-              ? "RADIO DIRECTORY / SEARCH OR PRESS SEARCH FOR POPULAR"
+              ? "RADIO DIRECTORY / BROWSE ONLY / PLAYBACK NEEDS APPROVAL"
               : catalogSource === "direct-stream"
                 ? "RADIO PRESET / SELECT THEN LOAD / NO AUTOPLAY"
                 : "LOCAL MPD LIBRARY";
@@ -154,6 +154,11 @@ PanelWindow {
         }
         if (item.ref.source === "youtube") {
             browserStatus = "YOUTUBE IS CATALOG-ONLY / NO PLAYBACK";
+            return;
+        }
+        if (item.ref.source === "radio-browser") {
+            // Directory URLs are untrusted, not direct-stream refs.
+            browserStatus = "RADIO DIRECTORY / PLAYBACK REQUIRES APPROVAL";
             return;
         }
         const requested = item.ref.source === "direct-stream"

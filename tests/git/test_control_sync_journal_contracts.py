@@ -202,4 +202,30 @@ for marker in (
 ):
     require(SERVICE, marker, "preparation latency stage accounting")
 
+# Durable full journal writes remain mandatory. Only the serialization of
+# unchanged historical entries is cached.
+JOURNAL_CODEC = "services/git/GitJournalSerialization.js"
+for marker in (
+    'import "GitJournalSerialization.js" as JournalCodec',
+    'encodedEntries = []',
+    'JournalCodec.serializeJournal(',
+    'journalFile.setText(encoded.text)',
+    'encodedEntries = encoded.cache',
+    'lastPersistWriteMs = written - writeStarted',
+):
+    require(JOURNAL, marker, "journal encoding cache and durability")
+for marker in (
+    'function serializeJournal(schemaVersion, entries, previous)',
+    'cache.record === record',
+    'JSON.stringify(record)',
+    'JSON.stringify(schemaVersion)',
+):
+    require(JOURNAL_CODEC, marker, "lossless serializer contract")
+for marker in (
+    '"FINISHED // journal "',
+    '" ms (encode "',
+    '" ms / disk "',
+):
+    require(SERVICE, marker, "after-completion stage timing")
+
 print("Git CONTROL sync journal contracts: PASS")

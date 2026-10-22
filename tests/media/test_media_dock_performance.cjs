@@ -161,6 +161,18 @@ test("requested music icon retains the exact ornament codepoints and PNG treble 
     assert.doesNotMatch(markBody, /text:\s*" ׅ˖ㅤ"/);
     assert.doesNotMatch(markBody, /text:\s*"[^"]*ㅤ"/);
 
+    // Keep both right ornament marks in the SAME Text object (so the Hebrew
+    // combining accent is shaped with the outer star), but reduce the internal
+    // glyph advance. The start of trailingStar remains anchored next to clef.
+    const trailing = markBody.match(/GohuText \{\s*id:\s*trailingStar([\s\S]*?)\n\s*\}/)?.[1];
+    assert.ok(trailing, "right ornament must remain one text/glow source");
+    assert.match(trailing, /text:\s*"ׅ˖"/);
+    assert.match(trailing, /font\.letterSpacing:\s*-6/);
+    assert.match(trailing, /color:\s*mediaDock\.foregroundColor/);
+    assert.equal((markBody.match(/GohuText \{/g) || []).length, 2,
+        "no split mark that could break font shaping or duplicate glows");
+
+
     assert.match(source, /id:\s*trebleClef\s*width:\s*15\s*height:\s*34/);
     assert.match(source, /source:\s*mediaDock\.open\s*\?\s*Qt\.resolvedUrl/);
     assert.match(source, /id:\s*trebleClefGlow\s*safeSource:\s*trebleClef/);

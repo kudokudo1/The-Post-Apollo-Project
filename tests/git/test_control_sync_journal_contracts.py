@@ -222,9 +222,13 @@ for marker in (
 ):
     require(JOURNAL_CODEC, marker, "lossless serializer contract")
 for marker in (
-    '"FINISHED // journal "',
+    '"FINISHED // after snapshot "',
+    '" ms // journal "',
     '" ms (encode "',
     '" ms / disk "',
+    '"REFRESHED // repository view "',
+    'syncAfterSnapshotStartedMs = Date.now()',
+    'syncAfterRefreshStartedMs = Date.now()',
 ):
     require(SERVICE, marker, "after-completion stage timing")
 

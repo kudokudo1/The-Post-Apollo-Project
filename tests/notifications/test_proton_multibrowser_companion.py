@@ -26,7 +26,7 @@ assert "allowed_origins" not in FIREFOX_HOST
 assert CHROMIUM_HOST["allowed_origins"] == ["chrome-extension://REPLACE_WITH_ACTUAL_EXTENSION_ID/"]
 assert "allowed_extensions" not in CHROMIUM_HOST
 for manifest in (CHROMIUM, FIREFOX):
-    assert sorted(manifest["permissions"]) == ["activeTab", "nativeMessaging"]
+    assert sorted(manifest["permissions"]) == ["activeTab", "nativeMessaging", "scripting"]
     assert "content_scripts" not in manifest
     assert "host_permissions" not in manifest
     assert "webRequest" not in manifest["permissions"]

@@ -107,8 +107,13 @@ DockButton {
     pressedContentGlowColor: Colors.magenta
     openGlowColor: Colors.magenta
 
-    normalDockGlowColor: weatherColor
-    hoverDockGlowColor: Colors.orange
+    // Dock floor/perimeter follows the thermometer's actual temperature,
+    // not the condition icon. Keep condition/text hover artwork orange.
+    // A missing reading falls back to the prior weather-state glow.
+    normalDockGlowColor: thermometerState.valid
+                         ? thermometerLiquidColor : weatherColor
+    hoverDockGlowColor: thermometerState.valid
+                        ? thermometerLiquidColor : Colors.orange
     pressedDockGlowColor: Colors.magenta
 
     contentGlowSource: weatherContent
@@ -123,11 +128,12 @@ DockButton {
     }
 
     // Condition -> measured temperature -> active thermometer.
-    // The former +2px correction compensated for an emoji's font bearings.
-    // The drawn gauge has explicit geometry; center the whole group evenly.
+    // Native glyph bearings leave the visible group a little left-heavy.
+    // Preserve responsive content width and shift the artwork 2px right.
     Row {
         id: weatherContent
         anchors.centerIn: parent
+        anchors.horizontalCenterOffset: 2
         spacing: 6
 
         Item {

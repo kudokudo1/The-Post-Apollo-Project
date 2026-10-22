@@ -100,9 +100,11 @@ Rectangle {
     property bool contentGlowEnabled: true
     property Item contentGlowSource:
         showLabel ? labelText : contentHost
-    // Opt-in for centered labels whose glyph width/text changes. Track
-    // actual local geometry instead of relying on a one-off mapToItem().
-    property bool trackLabelGlowLocally: false
+    // Normal labels track their source geometry by default, so changing
+    // text, layout, or label width cannot leave the sampled glow behind.
+    // Custom effect sources retain their existing cross-parent fallback.
+    // Legacy consumers may explicitly set false for a reviewed exception.
+    property bool trackLabelGlowLocally: true
 
     property color idleContentGlowColor: accentColor
     property color hoverContentGlowColor: Colors.orange

@@ -143,8 +143,12 @@ Scope {
         }
         function onRefreshed() {
             if (bridge.systemSource && !bridge.systemSource.loading
-                    && !bridge.systemSource.errorText)
-                bridge.systemObservedAtMs = Date.now();
+                    && !bridge.systemSource.errorText) {
+                // The sample may complete between minute-clock ticks.
+                // Advance both timestamps together to avoid false staleness.
+                bridge.observationNowMs = Date.now();
+                bridge.systemObservedAtMs = bridge.observationNowMs;
+            }
         }
     }
 

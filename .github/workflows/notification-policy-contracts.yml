@@ -46,6 +46,9 @@ jobs:
       - name: Validate Chromium and Firefox shared Proton companion
         run: python3 tests/notifications/test_proton_multibrowser_companion.py
 
+      - name: Validate Proton Mark Read page readiness (read-only)
+        run: python3 tests/notifications/test_proton_readiness_probe.py
+
       - name: Validate email action deck live sender capabilities
         run: python3 tests/notifications/test_notification_email_actions.py
 

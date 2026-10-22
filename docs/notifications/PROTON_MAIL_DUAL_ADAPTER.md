@@ -83,6 +83,51 @@ Native host references:
 - Opera native messaging: https://help.opera.com/en/extensions/message-passing/
 - Mullvad extension/fingerprinting advisory: https://mullvad.net/en/help/faq
 
+## Mark Read UI readiness inspection (read-only pilot, 2026-10-22)
+
+To begin the operator's first real-action goal without guessing message IDs, the
+Chromium + Firefox companion now has a **click-initiated, `activeTab`-scoped**
+page readiness probe, using the browser `scripting` permission:
+
+1. On the user's explicit extension-button click in an exact Proton-origin tab,
+   the companion runs `readiness_probe.js` in that specific tab. This
+   read-only probe requires no native host installation and remains available
+   even if the host is disconnected.
+2. Independently, the extension tries the native read-only `PING/PONG`
+   handshake; its success does NOT turn page observations into message IDs.
+   The probe inspects only button ARIA labels / `title` attributes for the
+   exact English `Mark as read` label. It returns only a capped count of
+   0, 1 or 2 candidates plus `messageIdentityVerified:false` and
+   `canMutate:false`. The background script checks the returned schema.
+3. The readiness result is reported only to the extension's developer console; it is
+   never sent to the native host or Notifications history. No message subjects,
+   text, addresses, page URLs, tokens, session storage, mail IDs or DOM are
+   exported. The probe never clicks a page control.
+
+A single matched control **does not** prove the user is on a one-message view,
+that the message belongs to a particular notification, or that the control
+will mark that exact email. Non-English sites, inaccessible labels, invisible
+elements, 0 or multiple matches can all fail closed or be ambiguous. No
+control is considered actionable on the basis of this probe alone.
+
+**Do not enable MAIL buttons on this evidence.** Further separately approved
+live validation must establish a provider-authenticated account, immutable
+message identity, event-to-message correlation, and an operation receipt.
+Do not infer identity from a label, subject, hostname or internal URL.
+The eventual first supported action will be Mark Read; no mailbox mutation
+is part of this slice.
+
+**Permissions delta:** the extension manifests now request `scripting`
+in addition to `activeTab` and `nativeMessaging`. That is a capability
+expansion and must be independently reviewed before user-approved installation.
+No always-on content scripts, broad host permissions, cookie access or
+unprompted page inspection are added. Browser-family variations and Mullvad
+privacy opt-in rules remain in force.
+
+**Developer checks:** `python3 tests/notifications/test_proton_readiness_probe.py`
+plus the existing multi-browser and Proton policy tests. These are simulated
+DOM/browser tests only, not live Proton certification.
+
 ## Authoritative external references
 
 - Proton Bridge Linux paid requirement: https://proton.me/support/bridge-for-linux

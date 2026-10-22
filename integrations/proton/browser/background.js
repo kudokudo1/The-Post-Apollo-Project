@@ -17,7 +17,51 @@ function isProtonTab(tab) {
   }
 }
 
-function inspectHandshake(response) {
+function reportReadiness(results) {
+  const state = Array.isArray(results) && results.length === 1
+    ? results[0].result : null;
+  if (!state || state.kind !== "PROTON_READINESS_V1"
+      || state.originOk !== true
+      || state.messageIdentityVerified !== false
+      || state.canMutate !== false
+      || !Number.isInteger(state.markReadCandidates)
+      || state.markReadCandidates < 0 || state.markReadCandidates > 2) {
+    console.warn("Post-Apollo Proton: readiness probe unavailable");
+    return;
+  }
+  // We cannot derive an authenticated email identity from a button's label.
+  // Zero/two candidates mean unrecognised or ambiguous UI; one is just a hint.
+  console.info(state.markReadCandidates === 1
+    ? "Post-Apollo Proton: one read-control candidate; identity NOT verified"
+    : "Post-Apollo Proton: no unambiguous read-control candidate");
+}
+
+function inspectReadiness(tab) {
+  if (!tab || !Number.isSafeInteger(tab.id) || tab.id < 0)
+    return;
+  const api = firefoxApi || chromiumApi;
+  if (!api || !api.scripting || typeof api.scripting.executeScript !== "function")
+    return;
+  const details = {
+    target: {tabId: tab.id},
+    files: ["readiness_probe.js"]
+  };
+  if (firefoxApi) {
+    browser.scripting.executeScript(details)
+      .then(reportReadiness, () => console.warn(
+        "Post-Apollo Proton: readiness probe unavailable"));
+  } else {
+    chrome.scripting.executeScript(details, (results) => {
+      if (chrome.runtime.lastError) {
+        console.warn("Post-Apollo Proton: readiness probe unavailable");
+        return;
+      }
+      reportReadiness(results);
+    });
+  }
+}
+
+function inspectHandshake(response, tab) {
   // The read-only host MUST never claim it can identify or mutate mail.
   if (!response || response.protocol !== 1
       || response.kind !== "PONG"
@@ -40,11 +84,14 @@ function reportUnavailable() {
 function onCompanionClicked(tab) {
   if (!isProtonTab(tab))
     return;
+  // This observation is read-only and does not need native-host privileges.
+  // It can be manually inspected before a host is installed/authorized.
+  inspectReadiness(tab);
   const request = { protocol: 1, kind: "PING" };
   if (firefoxApi) {
     // Firefox WebExtensions return a Promise from sendNativeMessage.
     browser.runtime.sendNativeMessage(NATIVE_HOST, request)
-      .then(inspectHandshake, reportUnavailable);
+      .then((response) => inspectHandshake(response, tab), reportUnavailable);
   } else if (chromiumApi) {
     // Chrome/Brave/Edge/Opera callback-style native messaging.
     chrome.runtime.sendNativeMessage(NATIVE_HOST, request, (response) => {
@@ -52,7 +99,7 @@ function onCompanionClicked(tab) {
         reportUnavailable();
         return;
       }
-      inspectHandshake(response);
+      inspectHandshake(response, tab);
     });
   }
 }

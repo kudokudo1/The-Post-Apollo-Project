@@ -7,6 +7,7 @@ import Quickshell.Services.Notifications
 import "." as NotificationsBackend
 import "BrowserSiteIdentity.js" as BrowserSiteIdentity
 import "ApolloNotificationRoute.js" as ApolloNotificationRoute
+import "EmailNotificationActions.js" as EmailNotificationActions
 
 Singleton {
     id: root
@@ -435,6 +436,42 @@ Singleton {
                 // Quickshell closes nonresident native notifications itself.
                 return true;
             }
+        }
+        return false;
+    }
+
+    // Sender-advertised EMAIL actions only. The desktop notification does not
+    // carry an authenticated mailbox message ID, so a saved notification or
+    // an expired native callback MUST NOT mutate mail. A successful return
+    // means only "dispatched to the original sender", not mailbox confirmed.
+    function emailActionsFor(eventId) {
+        const id = String(eventId || "");
+        const index = indexOfNotification(notifications, id);
+        if (index < 0)
+            return [];
+        const live = liveExternalNotifications[id];
+        if (!live || Number(live.expiresAt || 0) <= Date.now())
+            return [];
+        return EmailNotificationActions.availableActions(
+            notifications.get(index), live.notification.actions || []);
+    }
+
+    function hasEmailAction(eventId, operation) {
+        const requested = String(operation || "");
+        const actions = emailActionsFor(eventId);
+        for (let i = 0; i < actions.length; i++) {
+            if (actions[i].kind === requested)
+                return true;
+        }
+        return false;
+    }
+
+    function dispatchEmailAction(eventId, operation) {
+        const requested = String(operation || "");
+        const actions = emailActionsFor(eventId);
+        for (let i = 0; i < actions.length; i++) {
+            if (actions[i].kind === requested)
+                return invokeExternalAction(eventId, actions[i].identifier);
         }
         return false;
     }

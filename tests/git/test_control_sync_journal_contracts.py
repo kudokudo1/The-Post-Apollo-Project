@@ -112,13 +112,14 @@ require(
 require_regex(
     SERVICE,
     r'if \(raw === "__PA_DONE__"\) \{\s*'
+    r'actionProcessDoneSeen = true;\s*'
     r'finishActionProcess\(\);',
     "process completion marker must enter the journal-aware completion seam",
 )
 require(
     SERVICE,
-    "CONTROL ACTION TIMEOUT // STATE UNCERTAIN",
-    "CONTROL timeout must be journaled as uncertain state",
+    "STILL RUNNING // Git exceeded 15 seconds",
+    "CONTROL watchdog must warn without releasing subprocess protection",
 )
 require_regex(
     "widgets/GitW.qml",

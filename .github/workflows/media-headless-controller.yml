@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - "widgets/MediaDeckW.qml"
+      - "modules/Mediaplayer.qml"
+      - "services/media/MediaDockMpdStatus.js"
+      - "tests/media/test_media_dock_mpd_status.cjs"
       - "widgets/MediaDeckBrowserControls.qml"
       - "services/media/HeadlessMediaController.qml"
       - "tests/media/test_headless_deck_bridge.cjs"
@@ -56,3 +59,5 @@ jobs:
             -s tests/media -p 'test_*.py' -v
       - name: Hi-Fi deck source and ownership safety contracts
         run: node --test tests/media/test_headless_deck_bridge.cjs
+      - name: Validate existing MPD dock status parser
+        run: node --test tests/media/test_media_dock_mpd_status.cjs

@@ -7,6 +7,7 @@ import "../components"
 import "../services/hub/ApolloHubTimePolicy.js" as LocalTimePolicy
 import "../services/time/WorldClockPolicy.js" as WorldClockPolicy
 import "../services/time/WorldZoneSearch.js" as WorldZoneSearch
+import "../services/time/TimeConverterFormat.js" as ConverterFormat
 
 // TimeW M1: standalone temporal window foundation.
 // No timers, activity recording, screenshots or restoration are active here.
@@ -53,6 +54,36 @@ PanelWindow {
     // new background clock. UTC initial values avoid ambiguous local defaults.
     property string converterDate: new Date().toISOString().slice(0, 10)
     property string converterTime: new Date().toISOString().slice(11, 16)
+    // Independent format preferences: input controls how a civil time is
+    // entered; output only changes presentation of a completed conversion.
+    property bool converterInput24Hour: true
+    property bool converterOutput24Hour: true
+    readonly property color converterInputFormatColor:
+        converterInput24Hour ? Colors.orange : Colors.cyan
+    readonly property color converterOutputFormatColor:
+        converterOutput24Hour ? Colors.orange : Colors.cyan
+    readonly property var converterParsedTime:
+        ConverterFormat.parseInput(converterTime, converterInput24Hour)
+
+    function toggleConverterInputFormat() {
+        const target24 = !converterInput24Hour;
+        const converted = ConverterFormat.convertInput(
+                              converterTime, converterInput24Hour, target24);
+        if (!converted.valid) {
+            // Avoid rewriting an invalid, partially typed value, or silently
+            // assuming PM for an ambiguous 12H entry.
+            converterResult = {status: converted.error, options: []};
+            return;
+        }
+        converterInput24Hour = target24;
+        converterTime = converted.text;
+        // Same canonical civil instant: retain an existing result.
+    }
+
+    function toggleConverterOutputFormat() {
+        converterOutput24Hour = !converterOutput24Hour;
+        // Repaint existing results; neither input nor backend is touched.
+    }
     property string converterSourceZone: "UTC"
     property string converterTargetZone: "America/New_York"
     property bool converterBusy: false
@@ -99,8 +130,9 @@ PanelWindow {
     }
     property string converterSubmittedKey: ""
     readonly property string converterInputsKey:
-        [converterDate, converterTime, converterSourceZone,
-         converterTargetZone].join("|")
+        [converterDate, converterParsedTime.valid
+                        ? converterParsedTime.canonical : "INVALID:" + converterTime,
+         converterSourceZone, converterTargetZone].join("|")
     // Keep the four clock shortcuts; add a selected WORLD result, if one exists.
     readonly property var converterZones: worldZones.concat(
         selectedSearchedZone !== ""
@@ -137,6 +169,10 @@ PanelWindow {
             converterResult = { status: "ZONE_UNAVAILABLE", options: [] };
             return;
         }
+        if (!converterParsedTime.valid) {
+            converterResult = {status: converterParsedTime.error, options: []};
+            return;
+        }
         converterResult = null;
         converterSubmittedKey = converterInputsKey;
         converterBusy = true;
@@ -145,7 +181,7 @@ PanelWindow {
         converterProcess.exec([
             "python3", "-B", "-I",
             Quickshell.shellPath("services/time/TimeZoneConverter.py"),
-            src, dst, converterDate, converterTime
+            src, dst, converterDate, converterParsedTime.canonical
         ]);
     }
 

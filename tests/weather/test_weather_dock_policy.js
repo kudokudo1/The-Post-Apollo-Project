@@ -13,6 +13,7 @@ const context = {};
 vm.runInNewContext(src, context);
 assert.equal(typeof context.classify, "function");
 assert.equal(typeof context.formatTemperature, "function");
+assert.equal(typeof context.temperatureState, "function");
 
 // The exact same observed Fahrenheit reading supports both presentation units.
 assert.equal(context.formatTemperature("72", true, false), "72°F");
@@ -29,6 +30,34 @@ assert.equal(context.formatTemperature("75", false, false), "--°F");
 assert.equal(context.formatTemperature("75", false, true), "--°C");
 assert.equal(context.formatTemperature(null, true, true), "--°C");
 assert.equal(context.formatTemperature("Infinity", true, false), "--°F");
+
+// Fixed comfort baseline A, with lower/upper boundary checks for each band.
+for (const [temp, color] of [
+    [-40, "white"], [15, "white"], [16, "cyan"], [32, "cyan"],
+    [33, "blue"], [49, "blue"], [50, "magenta"], [59, "magenta"],
+    [60, "yellow"], [75, "yellow"], [76, "orange"], [89, "orange"],
+    [90, "red"], [113, "red"]
+]) {
+    const state = context.temperatureState(String(temp), true);
+    assert.equal(state.valid, true, "valid " + temp);
+    assert.equal(state.color, color, "color at " + temp);
+    assert.ok(state.level >= 0 && state.level <= 1, "clamped at " + temp);
+}
+assert.equal(context.temperatureState("32", true).level,
+             (32 + 20) / 130);
+assert.equal(context.temperatureState("0", true).level,
+             20 / 130);
+assert.equal(context.temperatureState("-25", true).level, 0);
+assert.equal(context.temperatureState("115", true).level, 1);
+for (const [temp, ready] of [["--", true], ["", true],
+                            [null, true], ["75", false], ["NaN", true]]) {
+    const state = context.temperatureState(temp, ready);
+    assert.equal(state.valid, false);
+    assert.equal(state.level, 0);
+}
+// Changing Fahrenheit/Celsius display cannot alter the physical gauge.
+assert.equal(context.formatTemperature("72", true, true), "22°C");
+assert.equal(context.temperatureState("72", true).color, "yellow");
 
 const nowMs = 1780000000000;
 function reading(patch = {}) {
@@ -77,17 +106,30 @@ const shell = fs.readFileSync(path.join(root, "shell.qml"), "utf8");
 assert.match(dock, /weatherStationWindow\.toggle\(\)/);
 assert.match(dock, /implicitHeight:\s*50/);
 assert.match(dock, /implicitWidth:\s*Math\.ceil\(weatherContent\.implicitWidth\)\s*\+\s*6/);
-// Keep the original identity glyph while rendering condition and temperature separately.
-assert.match(dock, /id:\s*weatherThermometer[\s\S]*?text:\s*"🌡"[\s\S]*?font\.pixelSize:\s*24/);
+// Preserve an identifiable weather condition, live numeric readout, and a drawn thermometer.
+assert.match(dock, /id:\s*weatherThermometer[\s\S]*?implicitWidth:\s*23[\s\S]*?implicitHeight:\s*46/);
+assert.doesNotMatch(dock, /text:\s*"🌡"/);
+assert.match(dock, /id:\s*glassTube[\s\S]*?border\.color:\s*Colors\.white[\s\S]*?clip:\s*true/);
+assert.match(dock, /id:\s*glassBulb[\s\S]*?border\.color:\s*Colors\.white/);
+assert.match(dock, /id:\s*liquidColumn[\s\S]*?height:\s*weatherDock\.thermometerState\.level\s*\*\s*26/);
+assert.match(dock, /id:\s*liquidBulb[\s\S]*?visible:\s*weatherDock\.thermometerState\.valid/);
+assert.match(dock, /Behavior on height[\s\S]*?NumberAnimation\s*\{\s*duration:\s*300/);
+assert.match(dock, /Behavior on color[\s\S]*?ColorAnimation\s*\{\s*duration:\s*300/);
+assert.match(dock, /Repeater\s*\{\s*model:\s*4[\s\S]*?color:\s*Colors\.white/);
+assert.match(dock, /WeatherDockPolicy\.temperatureState\(/);
+assert.match(dock, /if \(!thermometerState\.valid\)[\s\S]*?return "transparent"/);
+assert.match(dock, /if \(weatherDock\.open\)[\s\S]*?return Colors\.magenta/);
 assert.match(dock, /property bool useCelsius:\s*false/);
 assert.match(dock, /onRightClicked:\s*\{\s*useCelsius\s*=\s*!useCelsius;/);
 assert.match(dock, /WeatherDockPolicy\.formatTemperature\([\s\S]*?weatherFresh,[\s\S]*?useCelsius/);
-assert.match(dock, /id:\s*weatherCondition[\s\S]*?text:\s*weatherDock\.weatherState\.icon[\s\S]*?font\.pixelSize:\s*32/);
+assert.match(dock, /id:\s*weatherConditionSlot[\s\S]*?implicitHeight:\s*46/);
+assert.match(dock, /id:\s*weatherCondition[\s\S]*?text:\s*weatherDock\.weatherState\.icon[\s\S]*?font\.pixelSize:\s*42/);
 assert.match(dock, /id:\s*weatherTemperatureValue[\s\S]*?text:\s*weatherDock\.temperatureLabel\.slice\(0, -2\)[\s\S]*?font\.pixelSize:\s*20/);
 assert.match(dock, /id:\s*weatherTemperatureUnit[\s\S]*?text:\s*weatherDock\.temperatureLabel\.slice\(-1\)[\s\S]*?font\.pixelSize:\s*20/);
 assert.match(dock, /id:\s*weatherDegree[\s\S]*?text:\s*"°"[\s\S]*?font\.pixelSize:\s*20[\s\S]*?color:\s*weatherDock\.open\s*\?\s*Colors\.magenta[\s\S]*?weatherDock\.pressed\s*\?\s*Colors\.white[\s\S]*?weatherDock\.hovered\s*\?\s*Colors\.orange\s*:\s*Colors\.white/);
 assert.match(dock, /SafeDropShadow\s*\{[^}]*safeSource:\s*weatherDegree[^}]*color:\s*weatherDock\.open\s*\|\|\s*weatherDock\.pressed\s*\?\s*Colors\.magenta\s*:\s*Colors\.orange/s);
-assert.match(dock, /id:\s*weatherContent[\s\S]*?anchors\.horizontalCenterOffset:\s*2[\s\S]*?spacing:\s*6/);
+assert.match(dock, /id:\s*weatherContent[\s\S]*?anchors\.centerIn:\s*parent[\s\S]*?spacing:\s*6/);
+assert.doesNotMatch(dock, /anchors\.horizontalCenterOffset:\s*2/);
 assert.match(dock, /id:\s*weatherReadout[\s\S]*?spacing:\s*0/);
 assert.match(dock, /id:\s*weatherTemperature[\s\S]*?spacing:\s*0/);
 assert.match(dock, /contentGlowSource:\s*weatherContent/);
@@ -115,7 +157,7 @@ for (const [property, color] of [
 ]) {
     assert.ok(dock.includes(property + ": " + color), property + " should use " + color);
 }
-assert.match(dock, /id:\s*weatherThermometer[\s\S]*?color:\s*weatherDock\.open\s*\?\s*Colors\.magenta\s*:\s*Colors\.orange/);
+assert.match(dock, /readonly property color liquidColor:\s*weatherDock\.thermometerLiquidColor/);
 assert.match(dock, /id:\s*weatherContent[\s\S]*?spacing:\s*6/);
 assert.ok(dock.indexOf("id: weatherCondition") < dock.indexOf("id: weatherTemperature"));
 assert.ok(dock.indexOf("id: weatherTemperature") < dock.indexOf("id: weatherThermometer"));

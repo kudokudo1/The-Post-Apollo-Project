@@ -965,6 +965,7 @@ PanelWindow {
                     "message": String(entry.message || ""),
                     "appIcon": String(entry.appIcon || ""),
                     "website": String(entry.website || ""),
+                    "websiteHost": String(entry.websiteHost || ""),
                     "websiteIcon": String(entry.websiteIcon || ""),
                     "category": String(entry.category || "generic"),
                     "severity": String(entry.severity || "normal"),
@@ -2431,6 +2432,7 @@ PanelWindow {
                         required property string message
                         required property string appIcon
                         required property string website
+                        required property string websiteHost
                         required property string websiteIcon
                         required property string category
                         required property string severity
@@ -2449,8 +2451,29 @@ PanelWindow {
 
                         readonly property bool favorite: NotificationsService.favoritesRevision >= 0 && NotificationsService.isFavorite(notificationEntry.appKey)
 
-                        readonly property bool snoozed: NotificationsService.policyRevision >= 0 && NotificationsService.isSnoozed(notificationEntry.appKey)
-                        readonly property bool dnd: NotificationsService.policyRevision >= 0 && NotificationsService.isDnd(notificationEntry.appKey)
+                        // Website-capable cards default to the specific site.
+                        // The SITE/APP selector leaves legacy app-wide controls
+                        // available without changing CLEAR ALL or Favorites.
+                        property bool targetWholeApp: false
+                        // Delegates are recycled: scope must never leak from
+                        // one history record into a different notification.
+                        onNotificationIdChanged: targetWholeApp = false
+                        readonly property string websiteKey: NotificationsService.websiteKey(
+                            notificationEntry.sourceId, notificationEntry.source, notificationEntry.websiteHost)
+                        readonly property bool targetingWebsite: websiteKey !== "" && !targetWholeApp
+                        readonly property string targetKey: targetingWebsite ? websiteKey : appKey
+                        readonly property string targetLabel: targetingWebsite
+                            ? source + " // " + website : source
+                        readonly property bool inheritedRule: targetingWebsite
+                            && NotificationsService.policyRevision >= 0
+                            && (NotificationsService.isDnd(appKey)
+                                || NotificationsService.isSnoozed(appKey))
+                        readonly property bool snoozed: NotificationsService.policyRevision >= 0
+                            && (NotificationsService.isSnoozed(targetKey)
+                                || (targetingWebsite && NotificationsService.isSnoozed(appKey)))
+                        readonly property bool dnd: NotificationsService.policyRevision >= 0
+                            && (NotificationsService.isDnd(targetKey)
+                                || (targetingWebsite && NotificationsService.isDnd(appKey)))
 
                         readonly property var classification: root.classificationFor(notificationEntry.source, notificationEntry.sourceId, notificationEntry.category, notificationEntry.severity)
 
@@ -2742,9 +2765,10 @@ PanelWindow {
                                 elideMode: Text.ElideRight
                             }
 
-                            // ===== APP-WIDE / CARD CONTROLS ======
+                            // ===== SOURCE-SCOPED / CARD CONTROLS =====
                             //
-                            // ZZ + DND are app-wide.
+                            // SITE/APP selects the DND/ZZ target for browser
+                            // notifications. FAVS and CLEAR ALL remain app-wide;
                             // X dismisses only this notification.
 
                             Row {
@@ -2763,20 +2787,34 @@ PanelWindow {
                                 z: 3
 
                                 MiniButton {
+                                    width: 44
+                                    height: 28
+                                    visible: notificationEntry.websiteKey !== ""
+                                    label: notificationEntry.targetWholeApp ? "APP"
+                                        : notificationEntry.inheritedRule ? "SITE*" : "SITE"
+                                    labelPixelSize: 9
+                                    active: !notificationEntry.targetWholeApp
+                                    activeColor: Colors.magenta
+                                    onTriggered: notificationEntry.targetWholeApp = !notificationEntry.targetWholeApp
+                                }
+
+                                MiniButton {
                                     width: 32
                                     height: 28
 
                                     label: "ZZ"
 
                                     active: notificationEntry.snoozed
+                                    enabled: !notificationEntry.inheritedRule
 
                                     activeColor: Colors.orange
 
                                     onTriggered: {
-                                        if (notificationEntry.snoozed)
-                                            NotificationsService.clearSnooze(notificationEntry.appKey);
+                                        if (NotificationsService.isSnoozed(notificationEntry.targetKey))
+                                            NotificationsService.clearSnooze(notificationEntry.targetKey);
                                         else
-                                            NotificationsService.snoozeApp(notificationEntry.appKey, notificationEntry.sourceId, notificationEntry.source);
+                                            NotificationsService.snoozeApp(notificationEntry.targetKey,
+                                                notificationEntry.sourceId, notificationEntry.targetLabel);
                                     }
                                 }
 
@@ -2789,11 +2827,13 @@ PanelWindow {
                                     labelPixelSize: 9
 
                                     active: notificationEntry.dnd
+                                    enabled: !notificationEntry.inheritedRule
 
                                     activeColor: Colors.orange
 
                                     onTriggered: {
-                                        NotificationsService.toggleDnd(notificationEntry.appKey, notificationEntry.sourceId, notificationEntry.source);
+                                        NotificationsService.toggleDnd(notificationEntry.targetKey,
+                                            notificationEntry.sourceId, notificationEntry.targetLabel);
                                     }
                                 }
 

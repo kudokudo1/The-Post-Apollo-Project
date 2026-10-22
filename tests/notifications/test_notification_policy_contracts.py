@@ -27,7 +27,7 @@ HUB = "widgets/notifications/NotificationsHubW.qml"
 require(SERVICE, "property ListModel sourcePolicies: ListModel {}", "policy model must be persistent service state")
 require(SERVICE, "property int defaultSnoozeDurationMs: 24 * 60 * 60 * 1000", "default snooze must be one day")
 require(SERVICE, 'path: Quickshell.dataPath("notification-policies.json")', "notification policies must persist across reloads")
-require(SERVICE, "function shouldSuppress(sourceId, source)", "service must gate popup delivery")
+require(SERVICE, "function shouldSuppress(sourceId, source, websiteHost)", "service must gate popup delivery")
 require(SERVICE, "function snoozeApp(appKey, sourceId, source)", "service must implement timed snooze")
 require(SERVICE, "function setDnd(appKey, sourceId, source, enabled)", "service must implement DND")
 require_regex(
@@ -42,7 +42,7 @@ require_regex(
 )
 require_regex(
     SERVICE,
-    r"const suppressed = shouldSuppress\(entry\.sourceId, entry\.source\).*?if \(suppressed\).*?activeNotifications\.remove",
+    r"const suppressed = shouldSuppress\(entry\.sourceId, entry\.source, entry\.websiteHost\).*?if \(suppressed\).*?activeNotifications\.remove",
     "suppressed notifications must stay out of the popup model",
 )
 
@@ -54,6 +54,20 @@ for preset in ("1H", "6H", "12H", "1D", "3D", "7D"):
     require(HUB, f'label: "{preset}"', f"manager must expose {preset} snooze preset")
 require(HUB, "NotificationsService.snoozeApp(", "ZZ button must call backend snooze policy")
 require(HUB, "NotificationsService.toggleDnd(", "DND button must call backend DND policy")
+# A website gets a child DND/ZZ policy without changing the existing app key.
+require(SERVICE, "function websiteKey(sourceId, source, websiteHost)", "child website policy keys")
+require(SERVICE, 'return "website:" + encodeURIComponent(sourceKey(sourceId, source))', "child keys must nest beneath a stable parent")
+require(SERVICE, 'const parent = policyFor(sourceKey(sourceId, source));', "parent policy inheritance")
+require(SERVICE, 'const child = policyFor(childKey);', "exact website policy")
+require(SERVICE, 'websiteKey(entry.sourceId, entry.source, entry.websiteHost) === key', "website DND must immediately suppress only matching active site popups")
+require(HUB, '"websiteHost": String(entry.websiteHost || "")', "website hostname reaches card controls")
+require(HUB, 'onNotificationIdChanged: targetWholeApp = false', "recycled card must reset SITE/APP scope")
+require(HUB, 'notificationEntry.targetWholeApp ? "APP"', "visible SITE/APP selector")
+require(HUB, 'NotificationsService.toggleDnd(notificationEntry.targetKey,', "DND must follow selected scope")
+require(HUB, 'NotificationsService.snoozeApp(notificationEntry.targetKey,', "ZZ must follow selected scope")
+require(HUB, 'enabled: !notificationEntry.inheritedRule', "do not falsely allow disabling inherited app policy through site button")
+require(HUB, 'root.requestClearAllForApp(notificationEntry.appKey, notificationEntry.source)', "CLEAR ALL must preserve legacy whole-app scope")
+
 require(SERVICE, "function clearNotificationsForSource(appKey)", "service must support source-wide history clearing")
 require_regex(
     SERVICE,

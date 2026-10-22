@@ -32,6 +32,9 @@ jobs:
       - name: Validate notification policy contracts
         run: python3 tests/notifications/test_notification_policy_contracts.py
 
+      - name: Validate exact website DND/ZZ scope and legacy inheritance
+        run: python3 tests/notifications/test_notification_website_scope.py
+
       - name: Validate native and browser notification intake contracts
         run: python3 tests/notifications/test_external_native_intake.py
 

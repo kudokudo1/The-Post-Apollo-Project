@@ -25,7 +25,15 @@ assert "todoMini.taskSelected(String(todoEntry.modelData.id))" in MINI
 assert 'import "../../services/hub/ApolloHubTodoPolicy.js" as TodoPolicy' in DETAILS
 assert "TodoPolicy.validDueDate(" in DETAILS
 assert "onVisibleChanged:" in DETAILS
-assert "dueDateInput.focus = false;" in DETAILS
+assert "monthDateInput.releaseFocus();" in DETAILS
+assert "dayDateInput.releaseFocus();" in DETAILS
+assert "yearDateInput.releaseFocus();" in DETAILS
+assert DETAILS.count("TaskDateSegment {") == 3
+assert "DateSegments.step(dueDateDraft, kind, direction)" in DETAILS
+assert "DateSegments.setPart(dueDateDraft, kind, typedValue)" in DETAILS
+assert "details.clearDueDate()" in DETAILS
+assert 'id: mainModeVerticalDivider' in TASKS
+assert 'anchors.horizontalCenter: mainModeRailGlow.horizontalCenter' in TASKS
 assert "descriptionInput.focus = false;" in DETAILS
 
 # Never drop unsaved detail drafts on switching tasks, and never claim a
@@ -40,7 +48,8 @@ for required in (
     "todoStore.updateTaskDetails(selectedTaskId, pendingPriority,",
     "readonly property bool fieldsValid:", "readonly property bool dirty:",
     'readonly property var priorities: ["none", "low", "medium", "high", "urgent"]',
-    'text: "DESCRIPTION // PLAIN TEXT"', 'text: "YYYY-MM-DD"',
+    'text: "DESCRIPTION // PLAIN TEXT"', 'placeholder: "YYYY"',
+    'placeholder: "MM"', 'placeholder: "DD"',
 ):
     assert required in DETAILS, required
 

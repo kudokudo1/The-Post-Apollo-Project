@@ -601,6 +601,12 @@ PanelWindow {
                             onNotesTextFocusChanged: function(focused) {
                                 hub.notesInputFocused = focused;
                             }
+                            // B9 reuses the shared bridge's local civil
+                            // calendar. Only explicit view button clicks
+                            // update month offset or week-start preference.
+                            calendarSnapshot: hub.liveBridge
+                                              ? hub.liveBridge.calendarSnapshot : null
+                            calendarBridge: hub.liveBridge
                             tileIndex: index
                             tileCount: hub.activeTiles.length
                             editing: hub.editMode

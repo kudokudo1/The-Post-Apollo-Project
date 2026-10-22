@@ -55,7 +55,10 @@ function snapshot(connected, loading, errorText, rows, observedAtMs, nowMs) {
             state = "unobserved";
         else if (!freshTime)
             state = "stale";
-        else if (!cpu || !memory)
+        else if (!cpu || !memory
+                || usagePercent(cpu) < 0 || usagePercent(memory) < 0)
+            // Both rows and valid percentages are required for ready.
+            // Missing/invalid readings must not look like healthy data.
             state = "unavailable";
         else
             state = "ready";

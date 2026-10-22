@@ -201,3 +201,19 @@ and no URL or credential file is committed to Git.
 Useful diagnostics: `systemctl --user status financew-actual-server.service`
 and `curl -I http://127.0.0.1:5006`. The status alone is not sufficient
 to claim authenticated LIVE; the actual budget must be downloaded.
+
+## FinanceW D8 // draft-only transaction staging
+
+Budget → Budget → Transactions now contains a NEW DRAFT action.
+It opens an isolated in-memory editor (date, description, positive USD
+amount, selected displayed account, expense/income) with fail-closed
+date/amount validation and a PREVIEW button. CANCEL, source refresh,
+month changes and menu close discard the draft.
+
+The preview is **not a save**. No Actual API mutation methods, financial
+writes, file persistence or banking permissions are connected to this
+screen. Existing transaction history remains read-only. Before enabling
+actual writes we must include stable transaction IDs and account IDs,
+explicit mutation authority, review confirmation, durable failure/retry
+boundaries, and a tested rollback path. A displayed account name alone
+must never be used as a write target.

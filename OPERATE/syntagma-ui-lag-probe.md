@@ -166,3 +166,51 @@ Do not optimize, disable features, or declare a cause from one log.
 **Rollback:** relaunch without `POST_APOLLO_UI_LAG_PROBE=1` using the
 existing restart procedure above. Reverting the diagnostic PR also
 removes the source instrumentation without data migrations.
+
+## October 22 controlled isolation // Network dock subprocess polling
+
+**State: diagnostic experiment only; live operator trial not yet verified.**
+
+Use `POST_APOLLO_NETWORK_POLL_PAUSED=1` in the **Quickshell launch
+environment** to skip both the Network dock's initial subprocess probes
+and its existing 500 ms polling timer. It is disabled by default. This is
+not a network-disconnect or performance fix.
+
+- Suppressed by this flag: only `modules/Network.qml`'s recurring/startup
+  `nmcli`, `iw`, and `ethtool` subprocess probes, including its device
+  result-triggered link/Internet notification producer updates.
+- Preserved: NetworkManager and actual Wi-Fi/Ethernet connections; the
+  passive `Quickshell.Networking` device observer; other widgets, services,
+  visual effects, and normal lag diagnostics.
+- Tradeoff: the dock's polled signal, bitrate, and Ethernet readings can
+  be absent or stale; Network-owned notifications may not be generated
+  while testing. The flag does not isolate other independent network clients.
+- One startup confirmation warning begins
+  `SYNTAGMA_BG_PROBE // network widget polling PAUSED`.
+  No repeated network poll-gap warnings should occur with polling disabled.
+  Persistent event-loop gaps indicate this specific polling path is
+  **not necessary** for a freeze, not that networking or rendering is innocent.
+
+Use the existing safe restart script only after verifying the changed
+Network source is in the **local** checkout and saving temporary UI state:
+
+```bash
+qsdir="$(readlink -f ~/.config/quickshell)"
+POST_APOLLO_UI_LAG_PROBE=1 POST_APOLLO_NETWORK_POLL_PAUSED=1 \
+  bash "$qsdir/scripts/restart_quickshell_safe.sh" "$qsdir"
+```
+
+Verify both variables in the running Quickshell process and capture a
+comparable Radio-stopped/CAVA-resumed interval. To restore the baseline
+polling behavior while **keeping the lag recorder enabled**, deliberately
+relaunch without the Network pause flag:
+
+```bash
+POST_APOLLO_UI_LAG_PROBE=1 \
+  bash "$qsdir/scripts/restart_quickshell_safe.sh" "$qsdir"
+```
+
+Avoid changing the MPD, CAVA, and Network conditions together: use
+comparable windows before and after, and distinguish a genuinely quiet
+interval from evidence that the issue was fixed. Neither mode changes the
+operator's network configuration.

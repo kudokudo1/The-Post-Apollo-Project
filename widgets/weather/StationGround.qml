@@ -23,6 +23,13 @@ Rectangle {
     readonly property real dustValue:
         weatherService ? Number(weatherService.dust) : -1
 
+    readonly property real ozoneAqiValue:
+        weatherService ? Number(weatherService.ozoneAqi) : -1
+    readonly property real nitrogenDioxideAqiValue:
+        weatherService ? Number(weatherService.nitrogenDioxideAqi) : -1
+    readonly property real carbonMonoxideAqiValue:
+        weatherService ? Number(weatherService.carbonMonoxideAqi) : -1
+
     readonly property var pollenPeak: {
         if (!weatherService || !weatherService.pollenAvailable)
             return { "name": "UNAVAILABLE", "value": -1 };
@@ -60,6 +67,15 @@ Rectangle {
         Math.max(0, Math.min(1, pm25Value / 100))
     readonly property real pm10Meter:
         Math.max(0, Math.min(1, pm10Value / 150))
+
+    // Gas bars use Open-Meteo's provider-computed U.S. AQI component
+    // indices rather than inventing arbitrary concentration ceilings.
+    readonly property real ozoneMeter:
+        Math.max(0, Math.min(1, ozoneAqiValue / 500))
+    readonly property real nitrogenDioxideMeter:
+        Math.max(0, Math.min(1, nitrogenDioxideAqiValue / 500))
+    readonly property real carbonMonoxideMeter:
+        Math.max(0, Math.min(1, carbonMonoxideAqiValue / 500))
 
     readonly property color aqiColor: {
         if (!aqiReady)
@@ -262,6 +278,22 @@ Rectangle {
                     font.pixelSize: 16
                     color: Colors.white
                 }
+
+                Rectangle {
+                    width: 115
+                    height: 8
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.green
+
+                    Rectangle {
+                        x: 2
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: (parent.width - 4) * ground.ozoneMeter
+                        height: parent.height - 4
+                        color: Colors.green
+                    }
+                }
             }
 
             Column {
@@ -280,6 +312,22 @@ Rectangle {
                     font.pixelSize: 16
                     color: Colors.white
                 }
+
+                Rectangle {
+                    width: 115
+                    height: 8
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.green
+
+                    Rectangle {
+                        x: 2
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: (parent.width - 4) * ground.nitrogenDioxideMeter
+                        height: parent.height - 4
+                        color: Colors.green
+                    }
+                }
             }
 
             Column {
@@ -297,6 +345,22 @@ Rectangle {
                     )
                     font.pixelSize: 16
                     color: Colors.white
+                }
+
+                Rectangle {
+                    width: 125
+                    height: 8
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.green
+
+                    Rectangle {
+                        x: 2
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: (parent.width - 4) * ground.carbonMonoxideMeter
+                        height: parent.height - 4
+                        color: Colors.green
+                    }
                 }
             }
 

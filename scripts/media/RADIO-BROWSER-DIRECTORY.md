@@ -40,9 +40,10 @@ loopback or otherwise non-global IP, and connects to a pinned numeric public
 IP. TLS SNI and certificate verification use the original hostname, preventing
 the usual DNS-validation/re-resolution race. HTTP redirects are refused,
 response must be HTTP 200 with MP3 Content-Type, and tokens expire after
-12 hours. At most two concurrent audio streams and 32 outstanding tokens
-are supported. No playlist fetch, subprocess player, Quickshell audio worker,
-or disk cache is introduced.
+12 hours. At most two concurrent audio streams and 256 outstanding tokens
+are supported. A failed MPD queue insertion releases its unneeded token.
+No playlist fetch, subprocess player, Quickshell audio worker, or disk cache
+is introduced.
 
 The controller preserves source-qualified station identity, MPD queue ID and
 the relay URI for queue ownership verification. Only selection survives the

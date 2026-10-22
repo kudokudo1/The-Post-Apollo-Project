@@ -566,6 +566,10 @@ PanelWindow {
                             // MPD and explicitly selected MPRIS snapshots.
                             mediaSnapshot: hub.liveBridge
                                            ? hub.liveBridge.mediaSnapshot : null
+                            // B2 CPU++ reuses the shared telemetry snapshot.
+                            // A reactive QML binding, not a second collector.
+                            systemSnapshot: hub.liveBridge
+                                            ? hub.liveBridge.systemSnapshot : null
                             tileIndex: index
                             tileCount: hub.activeTiles.length
                             editing: hub.editMode

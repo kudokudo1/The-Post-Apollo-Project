@@ -115,6 +115,18 @@ assert.doesNotMatch(dock, /text:\s*"🌡"/);
 assert.doesNotMatch(dock, /\bCanvas\s*\{/);
 assert.match(dock, /\bShape\s*\{/);
 assert.match(dock, /\bShapePath\s*\{/);
+// The vessel's center is clear, not a black face laid over the dock.
+// The glass outline and animated colored fluid keep their own layers.
+const vesselStart = dock.indexOf("// The vessel is transparent:");
+const fluidGlowStart = dock.indexOf("// A small LOCAL liquid-only halo", vesselStart);
+assert.ok(vesselStart > 0 && fluidGlowStart > vesselStart, "transparent vessel bounds");
+const vessel = dock.slice(vesselStart, fluidGlowStart);
+assert.match(vessel, /ShapePath\s*\{\s*strokeWidth:\s*0\s+strokeColor:\s*"transparent"\s+fillColor:\s*"transparent"/);
+const gaugeBody = dock.slice(dock.indexOf("id: weatherThermometer"), dock.indexOf("onRightClicked:"));
+assert.doesNotMatch(gaugeBody, /fillColor:\s*Colors\.black/);
+assert.match(gaugeBody, /fillGradient:\s*LinearGradient/);
+assert.match(gaugeBody, /strokeColor:\s*weatherThermometer\.glassColor/);
+
 assert.match(dock, /\bPathQuad\s*\{/);
 assert.match(dock, /\bPathCubic\s*\{/);
 // At tiny dock sizes, mathematically circular curves can still rasterize

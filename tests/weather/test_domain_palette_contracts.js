@@ -60,13 +60,35 @@ for (const cardTitle of [
 ])
     assert.ok(homeSource.includes('title: "' + cardTitle + '"'), cardTitle);
 
-assert.ok(homeSource.includes("StationHomePolicy.chooseRelevant"));
-assert.ok(homeSource.includes("AUTO PROMOTED // "));
+assert.ok(homeSource.includes("StationHomePolicy.rankRelevant"));
+assert.ok(homeSource.includes("activeWatchIds"));
+assert.ok(homeSource.includes("temperatureDelta"));
+assert.ok(homeSource.includes("pressureDelta"));
+assert.ok(homeSource.includes("rainChanceDelta"));
+assert.ok(homeSource.includes("aqiDelta"));
+assert.ok(homeSource.includes("kpDelta"));
+assert.ok(homeSource.includes("solarWindDelta"));
+assert.ok(homeSource.includes("bzDelta"));
+assert.ok(homeSource.includes("Repeater {"));
+assert.ok(homeSource.includes("kpStaleAfterMinutes: 360"));
+assert.ok(homeSource.includes("solarWindStaleAfterMinutes: 45"));
+assert.ok(homeSource.includes("magneticFieldStaleAfterMinutes: 45"));
+assert.ok(homeSource.includes("solarFluxStaleAfterMinutes: 2160"));
+assert.ok(homeSource.includes('"spaceStale": spaceStale'));
 assert.ok(!homeSource.includes("FAVORITES // RELEVANT // AUTO"));
 
 assert.match(homeCardSource, /border\.color:\s*Colors\.cyan/);
 assert.match(homeCardSource, /border\.color:\s*Colors\.cyan[\s\S]*?meterFillColor/);
 assert.match(homePolicySource, /function chooseRelevant\(input\)/);
+assert.match(homePolicySource, /function rankRelevant\(input, previousIds, limit\)/);
+assert.match(homePolicySource, /function activeAbove\(/);
+assert.match(homePolicySource, /function activeBelow\(/);
+assert.match(homePolicySource, /SPACE WEATHER STACK/);
+assert.match(homePolicySource, /HOT \/\/ HUMID/);
+assert.match(homePolicySource, /WIND \+ RAIN/);
+assert.match(homePolicySource, /PRESSURE TREND/);
+assert.match(homePolicySource, /SUNRISE/);
+assert.match(homePolicySource, /SUNSET/);
 
 // HOME consumes both source families, so the header badge must describe the
 // aggregate rather than pretending HOME is Weather-only.

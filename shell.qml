@@ -687,7 +687,27 @@ PanelWindow {
 
         // Tasks
 
-        Tasks {}
+        Item {
+            id: tasksHost
+            width: tasksButton.implicitWidth
+            height: tasksButton.implicitHeight
+
+            Tasks {
+                id: tasksButton
+                anchors.fill: parent
+                menuOpen: tasksWindow.menuOpen
+                onToggleRequested: tasksWindow.toggle()
+            }
+
+            TasksW {
+                id: tasksWindow
+                screen: shellRoot.screen
+                dockCenterX: shellRoot.margins.left + leftModules.x
+                             + tasksHost.x + tasksButton.width / 2
+                chassisTopY: hospitalWindow.panelTopMargin
+                             + hospitalWindow.topGlowGutter
+            }
+        }
     }
 
     // ===== CENTER MODULE ========================================

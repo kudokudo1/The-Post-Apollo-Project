@@ -2,14 +2,15 @@ import QtQuick
 import Quickshell
 import "../components"
 
-// TASKS dock artwork pilot. The task window does not exist yet.
-// Keep this visual launcher non-interactive until it has a real target.
+// TASKS dock launcher. Task storage and sync remain future work.
 DockButton {
     id: tasksDock
 
     implicitHeight: 50
     implicitWidth: Math.max(72, Math.ceil(tasksMark.implicitWidth) + 20)
-    interactive: false
+    property bool menuOpen: false
+    signal toggleRequested()
+    open: menuOpen
 
     // White monochrome task identity with independent cyan artwork glow
     // and dock halo. Keep the glyph color separate from glow color.
@@ -31,4 +32,6 @@ DockButton {
         color: Colors.white
         text: "݁˖✎๋࣭🗒︎๋࣭⊹"
     }
+
+    onLeftClicked: toggleRequested()
 }

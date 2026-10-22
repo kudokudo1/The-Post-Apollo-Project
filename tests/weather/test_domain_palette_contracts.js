@@ -148,11 +148,21 @@ for (const title of [
 ])
     assert.ok(spaceSource.includes('title: "' + title + '"'), title);
 
-// Ground/Space get more breathing room than their former 20 px stack spacing;
-// Sky increases from 18 px while retaining enough room for both forecasts.
+// Ground/Space retain their stationary geometry. SKY scrolls its measured
+// expanded forecast so daily weather, rain and sunrise/sunset stay reachable.
 assert.match(groundSource, /anchors\.margins:\s*24[\s\S]*?spacing:\s*26/);
-assert.match(skySource, /anchors\.margins:\s*24[\s\S]*?spacing:\s*20/);
+assert.match(skySource, /Flickable\s*\{\s*id:\s*skyScroll/);
+assert.match(skySource, /clip:\s*true[\s\S]*?contentHeight:\s*Math\.max\(height, skyContent\.y \+ skyContent\.implicitHeight \+ 24\)/);
+assert.match(skySource, /id:\s*skyContent[\s\S]*?x:\s*24[\s\S]*?y:\s*24[\s\S]*?spacing:\s*20/);
+assert.match(skySource, /NeonScrollBar\s*\{[\s\S]*?flickable:\s*skyScroll[\s\S]*?handleStyle:\s*"star"/);
 assert.match(spaceSource, /anchors\.margins:\s*24[\s\S]*?spacing:\s*26/);
+
+for (const [id, size] of [["conditionIconGlyph", 80], ["hourlyIconGlyph", 80], ["dailyIconGlyph", 100]]) {
+    assert.match(skySource, new RegExp("id: " + id + "[\\s\\S]*?font\\.pixelSize: " + size));
+}
+for (const id of ["conditionIconGlyph", "hourlyIconGlyph", "dailyIconGlyph"])
+    assert.match(skySource, new RegExp("safeSource: " + id));
+assert.match(skySource, /width: parent\.width\s+horizontalAlignment: Text\.AlignHCenter\s+text: modelData\.date/);
 
 // Existing semantic telemetry severity remains independent from page identity.
 assert.match(groundSource, /readonly property color aqiColor:/);

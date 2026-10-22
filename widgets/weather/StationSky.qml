@@ -114,12 +114,24 @@ Rectangle {
 
     color: Colors.black
 
-    Column {
+    // SKY extends beyond the fixed-height station when forecast artwork is
+    // enlarged. Measure its real content and scroll rather than clipping rows.
+    Flickable {
+        id: skyScroll
         anchors.fill: parent
-        anchors.margins: 24
-        spacing: 20
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        contentWidth: width
+        contentHeight: Math.max(height, skyContent.y + skyContent.implicitHeight + 24)
 
-        Row {
+        Column {
+            id: skyContent
+            x: 24
+            y: 24
+            width: Math.max(0, skyScroll.width - 48)
+            spacing: 20
+
+            Row {
             width: parent.width
 
             GohuText {
@@ -209,15 +221,15 @@ Rectangle {
                 }
 
                 Item {
-                    width: 76
-                    height: 66
+                    width: 110
+                    height: 110
 
                     SafeDropShadow {
                         anchors.fill: conditionIconGlyph
                         safeSource: conditionIconGlyph
                         requestedVisible: true
-                        radius: 10
-                        samples: 19
+                        radius: 12
+                        samples: 25
                         horizontalOffset: 0
                         verticalOffset: 0
                         transparentBorder: true
@@ -229,7 +241,7 @@ Rectangle {
                         id: conditionIconGlyph
                         anchors.centerIn: parent
                         text: sky.conditionState.icon
-                        font.pixelSize: 56
+                        font.pixelSize: 80
                         color: sky.iconColor(sky.conditionState.color)
                     }
                 }
@@ -527,7 +539,7 @@ Rectangle {
 
                         Item {
                             width: parent.width
-                            height: 52
+                            height: 112
 
                             readonly property var forecastState:
                                 sky.iconState(modelData.condition, modelData.weatherCode, false)
@@ -536,8 +548,8 @@ Rectangle {
                                 anchors.fill: hourlyIconGlyph
                                 safeSource: hourlyIconGlyph
                                 requestedVisible: true
-                                radius: 9
-                                samples: 17
+                                radius: 12
+                                samples: 25
                                 horizontalOffset: 0
                                 verticalOffset: 0
                                 transparentBorder: true
@@ -549,7 +561,7 @@ Rectangle {
                                 id: hourlyIconGlyph
                                 anchors.centerIn: parent
                                 text: parent.forecastState.icon
-                                font.pixelSize: 40
+                                font.pixelSize: 80
                                 color: sky.iconColor(parent.forecastState.color)
                             }
                         }
@@ -607,6 +619,8 @@ Rectangle {
                         spacing: 3
 
                         GohuText {
+                            width: parent.width
+                            horizontalAlignment: Text.AlignHCenter
                             text: modelData.date
                             font.pixelSize: 12
                             color: Colors.cyan
@@ -628,7 +642,7 @@ Rectangle {
 
                         Item {
                             width: parent.width
-                            height: 60
+                            height: 132
 
                             readonly property var forecastState:
                                 sky.iconState(modelData.condition, modelData.weatherCode, false)
@@ -637,8 +651,8 @@ Rectangle {
                                 anchors.fill: dailyIconGlyph
                                 safeSource: dailyIconGlyph
                                 requestedVisible: true
-                                radius: 9
-                                samples: 17
+                                radius: 12
+                                samples: 25
                                 horizontalOffset: 0
                                 verticalOffset: 0
                                 transparentBorder: true
@@ -650,12 +664,14 @@ Rectangle {
                                 id: dailyIconGlyph
                                 anchors.centerIn: parent
                                 text: parent.forecastState.icon
-                                font.pixelSize: 48
+                                font.pixelSize: 100
                                 color: sky.iconColor(parent.forecastState.color)
                             }
                         }
 
                         QuietText {
+                            width: parent.width
+                            horizontalAlignment: Text.AlignHCenter
                             text: modelData.chanceRain >= 0
                                   ? "RAIN "
                                     + Math.round(modelData.chanceRain)
@@ -666,6 +682,7 @@ Rectangle {
 
                         Rectangle {
                             width: 180
+                            anchors.horizontalCenter: parent.horizontalCenter
                             height: 6
                             color: Colors.black
                             border.width: 1
@@ -684,6 +701,8 @@ Rectangle {
                         }
 
                         QuietText {
+                            width: parent.width
+                            horizontalAlignment: Text.AlignHCenter
                             text: "SUN "
                                   + modelData.sunrise
                                   + " → "
@@ -699,5 +718,14 @@ Rectangle {
             text: "weather / atmosphere / radar / aviation"
             font.pixelSize: 13
         }
+        }
+    }
+
+    // Use the established scroll control; the rail remains outside content.
+    NeonScrollBar {
+        flickable: skyScroll
+        handleStyle: "star"
+        geometryHost: sky
+        visible: scrollable
     }
 }

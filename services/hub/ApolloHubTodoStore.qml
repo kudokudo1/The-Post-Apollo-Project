@@ -77,6 +77,12 @@ Scope {
                                       title, Date.now(), false));
     }
 
+    // One atomic edit of all optional details, using the existing writer.
+    function updateTaskDetails(id, priority, description, dueDate) {
+        return stage(TodoPolicy.updateDetails(document, id, priority,
+                                              description, dueDate, Date.now()));
+    }
+
     function removeTask(id, confirmed) {
         return stage(TodoPolicy.update(document, id, "delete",
                                       null, Date.now(), confirmed));

@@ -50,6 +50,12 @@ Item {
     anchors.fill: parent
     open: mediaRoot.deckOpen
 
+    // Keep the media dock's dark stage while the Hi-Fi deck is open.
+    // Shared DockButton normally fills open buttons yellow; that solid fill
+    // obscures our cyan/orange ornament + CAVA glow and magenta front wash.
+    // Override only this module's fill, not its open-magenta glow priority.
+    openFillColor: Colors.black
+
     readonly property int barCount: 16
     property var levels: Array(barCount).fill(0)
 

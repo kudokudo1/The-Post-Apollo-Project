@@ -28,6 +28,15 @@ PanelWindow {
         onDraftSaved: transactionDraftPane.clear()
     }
 
+    FinanceServices.FinanceAllocationWriteService {
+        id: financeAllocationWrite
+        onSaved: {
+            allocationPreviewPane.clear();
+            if (root.menuOpen)
+                financeBudget.refresh();
+        }
+    }
+
     FinanceServices.FinanceTransactionWriteService {
         id: financeWrite
         onSaved: {
@@ -1001,6 +1010,20 @@ PanelWindow {
                                 id: allocationPreviewPane
                                 width: parent.width
                                 snapshot: financeBudget.snapshot
+                                writeState: financeAllocationWrite.state
+                                writeMessage: financeAllocationWrite.message
+                                onSaveRequested: function(payload) {
+                                    financeAllocationWrite.submit(payload);
+                                }
+                            }
+                            GohuText {
+                                width: parent.width
+                                text: financeAllocationWrite.message
+                                textFormat: Text.PlainText
+                                font.pixelSize: 9
+                                color: financeAllocationWrite.state === "committed"
+                                       ? Colors.omnitrix : Colors.orange
+                                wrapMode: Text.WordWrap
                             }
                             Repeater {
                                 model: financeBudget.snapshot
@@ -1033,6 +1056,8 @@ PanelWindow {
                                         accentColor: Colors.cyan
                                         available: financeBudget.state === "ready"
                                                    && !!financeBudget.snapshot
+                                                   && financeAllocationWrite.state !== "pending"
+                                                   && financeAllocationWrite.state !== "uncertain"
                                         onLeftClicked: allocationPreviewPane.begin(modelData)
                                     }
                                     GohuText {

@@ -57,6 +57,46 @@ PanelWindow {
     property string converterTargetZone: "America/New_York"
     property bool converterBusy: false
     property var converterResult: null
+    // Only one of the independent FROM/TO selector popups may be open.
+    property string activeConverterDropdown: ""
+
+    function closeConverterDropdowns() {
+        activeConverterDropdown = "";
+        converterSourcePicker.dropFocus();
+        converterTargetPicker.dropFocus();
+        Qt.callLater(restoreKeyboardFocus);
+    }
+
+    function openConverterDropdown(which) {
+        if (!menuOpen || selectedMode !== "calc")
+            return;
+        if (which !== "source" && which !== "target")
+            return;
+        activeConverterDropdown = which;
+        loadWorldZoneCatalog();
+    }
+
+    function toggleConverterDropdown(which) {
+        if (activeConverterDropdown === which)
+            closeConverterDropdowns();
+        else
+            openConverterDropdown(which);
+    }
+
+    function chooseConverterSearchZone(which, zoneId) {
+        // Search text is never passed to subprocesses. Selected IDs must
+        // belong to the trusted catalog from timedatectl.
+        if (!WorldZoneSearch.contains(worldZoneCatalog, zoneId))
+            return;
+        if (which === "source")
+            converterSourceZone = zoneId;
+        else if (which === "target")
+            converterTargetZone = zoneId;
+        else
+            return;
+        converterResult = null;
+        closeConverterDropdowns();
+    }
     property string converterSubmittedKey: ""
     readonly property string converterInputsKey:
         [converterDate, converterTime, converterSourceZone,
@@ -80,6 +120,12 @@ PanelWindow {
         else
             converterTargetZone = choices[idx].id;
         converterResult = null;
+        closeConverterDropdowns();
+    }
+
+    function converterZoneAllowed(zoneId) {
+        return converterZones.some(function(z) { return z.id === zoneId; })
+               || WorldZoneSearch.contains(worldZoneCatalog, zoneId);
     }
 
     function runTimeConverter() {
@@ -87,8 +133,7 @@ PanelWindow {
             return;
         const src = converterSourceZone;
         const dst = converterTargetZone;
-        if (!converterZones.some(function(z) { return z.id === src; })
-                || !converterZones.some(function(z) { return z.id === dst; })) {
+        if (!converterZoneAllowed(src) || !converterZoneAllowed(dst)) {
             converterResult = { status: "ZONE_UNAVAILABLE", options: [] };
             return;
         }
@@ -137,6 +182,8 @@ PanelWindow {
                                WorldZoneSearch.MAX_ZONES, worldCountryIndex)
     readonly property bool navigationKeysAvailable:
         standardKeysAvailable && !worldSearchInput.activeFocus
+        && !converterSourcePicker.searchFocused
+        && !converterTargetPicker.searchFocused
         && !converterDateInput.activeFocus && !converterTimeInput.activeFocus
     property string worldLookupZone: ""
     property string worldValidZone: ""
@@ -169,7 +216,7 @@ PanelWindow {
     }
 
     function loadWorldZoneCatalog() {
-        if (!menuOpen || selectedMode !== "clock"
+        if (!menuOpen || (selectedMode !== "clock" && selectedMode !== "calc")
                 || worldCatalogLoaded || worldCatalogLoading)
             return;
         worldCatalogLoading = true;
@@ -179,7 +226,8 @@ PanelWindow {
     }
 
     function loadWorldCountryMetadata() {
-        if (worldCountryLookupStarted || !menuOpen || selectedMode !== "clock")
+        if (worldCountryLookupStarted || !menuOpen
+                || (selectedMode !== "clock" && selectedMode !== "calc"))
             return;
         worldCountryLookupStarted = true;
         // Fixed, read-only system files; neither command takes user input.
@@ -286,23 +334,27 @@ PanelWindow {
     }
 
     onMenuOpenChanged: {
-        if (!menuOpen)
+        if (!menuOpen) {
             dismissWorldSearchPopup();
+            closeConverterDropdowns();
+        }
         if (menuOpen) {
             Qt.callLater(restoreKeyboardFocus);
-            if (selectedMode === "clock") {
+            if (selectedMode === "clock")
                 Qt.callLater(refreshWorldClock);
+            if (selectedMode === "clock" || selectedMode === "calc")
                 Qt.callLater(loadWorldZoneCatalog);
-            }
         }
     }
     onSelectedModeChanged: {
         if (selectedMode !== "clock")
             dismissWorldSearchPopup();
-        if (menuOpen && selectedMode === "clock") {
+        if (selectedMode !== "calc")
+            closeConverterDropdowns();
+        if (menuOpen && selectedMode === "clock")
             Qt.callLater(refreshWorldClock);
+        if (menuOpen && (selectedMode === "clock" || selectedMode === "calc"))
             Qt.callLater(loadWorldZoneCatalog);
-        }
     }
     onStandardKeysAvailableChanged: {
         if (standardKeysAvailable)
@@ -525,25 +577,37 @@ PanelWindow {
         TapHandler {
             enabled: timew.worldSearchPopupOpen
                      || worldSearchInput.activeFocus
+                     || timew.activeConverterDropdown !== ""
+                     || converterSourcePicker.searchFocused
+                     || converterTargetPicker.searchFocused
             gesturePolicy: TapHandler.DragThreshold
             onTapped: function(point, button) {
                 if (button !== Qt.LeftButton)
                     return;
-                const search = worldSearchArea.mapToItem(timewFrame, 0, 0);
                 const px = point.position.x;
                 const py = point.position.y;
-                const withinSearch = px >= search.x
-                                     && px <= search.x + worldSearchArea.width
-                                     && py >= search.y
-                                     && py <= search.y + worldSearchArea.height;
-                const popup = worldSearchPopup.mapToItem(timewFrame, 0, 0);
-                const withinPopup = worldSearchPopup.visible
-                                    && px >= popup.x
-                                    && px <= popup.x + worldSearchPopup.width
-                                    && py >= popup.y
-                                    && py <= popup.y + worldSearchPopup.height;
-                if (!withinSearch && !withinPopup)
-                    timew.dismissWorldSearchPopup();
+                if (timew.selectedMode === "clock") {
+                    const search = worldSearchArea.mapToItem(timewFrame, 0, 0);
+                    const withinSearch = px >= search.x
+                                         && px <= search.x + worldSearchArea.width
+                                         && py >= search.y
+                                         && py <= search.y + worldSearchArea.height;
+                    const popup = worldSearchPopup.mapToItem(timewFrame, 0, 0);
+                    const withinPopup = worldSearchPopup.visible
+                                        && px >= popup.x
+                                        && px <= popup.x + worldSearchPopup.width
+                                        && py >= popup.y
+                                        && py <= popup.y + worldSearchPopup.height;
+                    if (!withinSearch && !withinPopup)
+                        timew.dismissWorldSearchPopup();
+                } else if (timew.selectedMode === "calc") {
+                    const inSource = converterSourcePicker.containsFramePoint(
+                                         timewFrame, px, py);
+                    const inTarget = converterTargetPicker.containsFramePoint(
+                                         timewFrame, px, py);
+                    if (!inSource && !inTarget)
+                        timew.closeConverterDropdowns();
+                }
             }
         }
 
@@ -1015,6 +1079,9 @@ PanelWindow {
                     Column {
                         id: converterPane
                         visible: timew.selectedMode === "calc"
+                        // Overlay either dropdown above following inputs,
+                        // results, and the footer, without shifting the page.
+                        z: timew.activeConverterDropdown !== "" ? 20 : 0
                         width: parent.width
                         spacing: 12
 
@@ -1026,17 +1093,21 @@ PanelWindow {
                         }
 
                         Row {
+                            id: converterSourceRow
                             width: parent.width
-                            height: 32
-                            spacing: 8
+                            height: 34
+                            spacing: 6
+                            z: 40
+
                             GohuText {
-                                width: 55
+                                width: 45
                                 height: parent.height
                                 verticalAlignment: Text.AlignVCenter
                                 text: "FROM"
                                 color: Colors.cyan
                                 font.pixelSize: 11
                             }
+
                             ActionButton {
                                 width: 67
                                 height: 30
@@ -1045,29 +1116,43 @@ PanelWindow {
                                 accentColor: Colors.white
                                 onLeftClicked: timew.cycleConverterZone("source")
                             }
-                            GohuText {
-                                width: parent.width - 55 - 67 - 16
-                                height: parent.height
-                                verticalAlignment: Text.AlignVCenter
-                                text: timew.converterSourceZone
-                                elide: Text.ElideRight
-                                color: Colors.white
-                                font.pixelSize: 11
+
+                            TimeZonePicker {
+                                id: converterSourcePicker
+                                width: Math.max(0, converterSourceRow.width
+                                                - 45 - 67
+                                                - converterSourceRow.spacing * 2)
+                                height: converterSourceRow.height
+                                selectedZone: timew.converterSourceZone
+                                catalog: timew.worldZoneCatalog
+                                countryIndex: timew.worldCountryIndex
+                                catalogLoading: timew.worldCatalogLoading
+                                catalogFailed: timew.worldCatalogFailed
+                                expanded: timew.activeConverterDropdown === "source"
+                                onOpenRequested: timew.openConverterDropdown("source")
+                                onToggleRequested: timew.toggleConverterDropdown("source")
+                                onZoneChosen: function(zoneId) {
+                                    timew.chooseConverterSearchZone("source", zoneId);
+                                }
                             }
                         }
 
                         Row {
+                            id: converterTargetRow
                             width: parent.width
-                            height: 32
-                            spacing: 8
+                            height: 34
+                            spacing: 6
+                            z: 30
+
                             GohuText {
-                                width: 55
+                                width: 45
                                 height: parent.height
                                 verticalAlignment: Text.AlignVCenter
                                 text: "TO"
                                 color: Colors.cyan
                                 font.pixelSize: 11
                             }
+
                             ActionButton {
                                 width: 67
                                 height: 30
@@ -1076,14 +1161,24 @@ PanelWindow {
                                 accentColor: Colors.white
                                 onLeftClicked: timew.cycleConverterZone("target")
                             }
-                            GohuText {
-                                width: parent.width - 55 - 67 - 16
-                                height: parent.height
-                                verticalAlignment: Text.AlignVCenter
-                                text: timew.converterTargetZone
-                                elide: Text.ElideRight
-                                color: Colors.white
-                                font.pixelSize: 11
+
+                            TimeZonePicker {
+                                id: converterTargetPicker
+                                width: Math.max(0, converterTargetRow.width
+                                                - 45 - 67
+                                                - converterTargetRow.spacing * 2)
+                                height: converterTargetRow.height
+                                selectedZone: timew.converterTargetZone
+                                catalog: timew.worldZoneCatalog
+                                countryIndex: timew.worldCountryIndex
+                                catalogLoading: timew.worldCatalogLoading
+                                catalogFailed: timew.worldCatalogFailed
+                                expanded: timew.activeConverterDropdown === "target"
+                                onOpenRequested: timew.openConverterDropdown("target")
+                                onToggleRequested: timew.toggleConverterDropdown("target")
+                                onZoneChosen: function(zoneId) {
+                                    timew.chooseConverterSearchZone("target", zoneId);
+                                }
                             }
                         }
 
@@ -1221,8 +1316,8 @@ PanelWindow {
                         GohuText {
                             width: parent.width
                             wrapMode: Text.Wrap
-                            text: "Use CLOCK > WORLD to select other zones, "
-                                  + "then return here. Calculations do not change system time."
+                            text: "FROM and TO support independent country/zone search. "
+                                  + "CHANGE cycles quick presets; system time stays unchanged."
                             color: Colors.white
                             opacity: 0.72
                             font.pixelSize: 11
@@ -1251,6 +1346,8 @@ PanelWindow {
                         // is open; the footer must not overlap its entries.
                         visible: !(timew.selectedMode === "clock"
                                    && timew.worldSearchPopupOpen)
+                                 && !(timew.selectedMode === "calc"
+                                      && timew.activeConverterDropdown !== "")
                         text: timew.selectedMode === "clock"
                               ? "LOCAL + WORLD // LIVE // CALC HAS CONVERTER"
                               : timew.selectedMode === "calc"

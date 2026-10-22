@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "widgets/TimeW.qml"
+      - "widgets/TimeZonePicker.qml"
       - "services/time/WorldClockPolicy.js"
       - "services/time/TimeZoneConverter.py"
       - "services/time/WorldZoneSearch.js"
@@ -17,6 +18,7 @@ on:
       - main
     paths:
       - "widgets/TimeW.qml"
+      - "widgets/TimeZonePicker.qml"
       - "services/time/WorldClockPolicy.js"
       - "services/time/TimeZoneConverter.py"
       - "services/time/WorldZoneSearch.js"

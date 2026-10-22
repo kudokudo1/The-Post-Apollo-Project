@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Post-Apollo Proton Companion (Read-Only Pilot)",
   "version": "0.1.0",
-  "description": "Opt-in read-only Proton native messaging check; no mailbox data or credentials collected.",
+  "description": "Opt-in Proton page readiness check after a read-only native handshake; no mailbox data or actions.",
   "browser_specific_settings": {
     "gecko": {
       "id": "postapollo-proton@extensions.invalid"
@@ -10,7 +10,8 @@
   },
   "permissions": [
     "activeTab",
-    "nativeMessaging"
+    "nativeMessaging",
+    "scripting"
   ],
   "action": {
     "default_title": "Post-Apollo Proton connection check"

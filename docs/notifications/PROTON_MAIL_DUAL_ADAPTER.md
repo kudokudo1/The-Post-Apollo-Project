@@ -90,13 +90,16 @@ Chromium + Firefox companion now has a **click-initiated, `activeTab`-scoped**
 page readiness probe, using the browser `scripting` permission:
 
 1. On the user's explicit extension-button click in an exact Proton-origin tab,
-   the native `PING/PONG` handshake must succeed first.
-2. Only then the companion runs `readiness_probe.js` in that specific tab.
+   the companion runs `readiness_probe.js` in that specific tab. This
+   read-only probe requires no native host installation and remains available
+   even if the host is disconnected.
+2. Independently, the extension tries the native read-only `PING/PONG`
+   handshake; its success does NOT turn page observations into message IDs.
    The probe inspects only button ARIA labels / `title` attributes for the
    exact English `Mark as read` label. It returns only a capped count of
    0, 1 or 2 candidates plus `messageIdentityVerified:false` and
    `canMutate:false`. The background script checks the returned schema.
-3. The result is reported only to the extension's developer console; it is
+3. The readiness result is reported only to the extension's developer console; it is
    never sent to the native host or Notifications history. No message subjects,
    text, addresses, page URLs, tokens, session storage, mail IDs or DOM are
    exported. The probe never clicks a page control.

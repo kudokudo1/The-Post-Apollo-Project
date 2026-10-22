@@ -11,6 +11,23 @@ import Qt5Compat.GraphicalEffects
 PanelWindow {
     id: root
 
+    // Aggregate rebuild costs only; never log notification content or IDs.
+    readonly property bool bgLagProbeEnabled:
+        String(Quickshell.env("POST_APOLLO_UI_LAG_PROBE") || "").trim() === "1"
+    property double bgLastRebuildReportMs: 0
+
+    function reportBgRebuild(startedAtMs, scanned) {
+        const now = Date.now();
+        const elapsed = now - startedAtMs;
+        if (elapsed >= 25 || now - bgLastRebuildReportMs >= 5000) {
+            console.warn("SYNTAGMA_BG_PROBE // notifications rebuild synchronous="
+                         + elapsed + "ms scanned=" + scanned
+                         + " rendered=" + filteredNotifications.count
+                         + " menuOpen=" + menuOpen + " tsMs=" + now);
+            bgLastRebuildReportMs = now;
+        }
+    }
+
     property bool menuOpen: false
     // Read-only update offers and explicit local reviewer. No update
     // credentials, shell snippets, or arbitrary notification actions.
@@ -943,10 +960,14 @@ PanelWindow {
     }
 
     function rebuildFilteredNotifications() {
+        const traceStartMs = bgLagProbeEnabled ? Date.now() : 0;
         filteredNotifications.clear();
 
-        if (root.activeFilter === "manager")
+        if (root.activeFilter === "manager") {
+            if (traceStartMs)
+                reportBgRebuild(traceStartMs, NotificationsService.notifications.count);
             return;
+        }
 
         // Sort presentation only; do not reorder or rewrite durable history.
         const rows = [];
@@ -990,6 +1011,9 @@ PanelWindow {
         });
         for (let j = 0; j < rows.length; j++)
             filteredNotifications.append(rows[j].data);
+
+        if (traceStartMs)
+            reportBgRebuild(traceStartMs, NotificationsService.notifications.count);
     }
 
     function rebuildManagerDndPolicies() {

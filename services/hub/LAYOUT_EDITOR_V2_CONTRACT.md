@@ -1,6 +1,6 @@
 # 🏥💜 ApolloHubW // P1 Layout Editor 2.0, stage 1
 
-**Status:** Implemented in GitHub `main` source. CI source/behavior checks passed; operator's live Quickshell acceptance pending. This stage does **not** implement drag-and-drop, resizing controls, cross-mode transfer, module picker, or full preset management.
+**Status:** Stage 1 tile removal and Undo accepted on the operator's desktop. Stage 2 width/height edit controls are committed to GitHub `main` with source/behavior checks passing; stage 2 runtime acceptance is pending. The current release does **not** implement drag-and-drop, cross-mode transfer, module picker, or full preset management.
 
 ## IMPLEMENTATION
 
@@ -70,13 +70,29 @@ The `×` is an **explicit one-click edit action**, not a destructive record dele
 - [x] Guard against overwriting unsupported saved layout
 - [x] Add source-level behavior and UI wiring tests
 - [ ] Operator runtime acceptance after syncing
-- [ ] Resize controls and richer tile arrangement
+- [x] Stage 2 edit controls for one/two-column width and one/two/three-row chassis heights
+- [ ] Stage 2 operator runtime acceptance
+- [ ] Richer grid packing and tile content expansion
 - [ ] Main mode/group removal controls
 - [ ] Searchable module picker, move between modes, and durable undo/presets
 
+## P1 Stage 2 // Explicit width and height controls
+
+The tile EDIT toolbar now reads **← → SWAP W:1/W:2 H:1/H:2/H:3 ×**, preserving the red destructive `×` after the sizing controls. The `W` and `H` buttons use existing shared `ActionButton` geometry and hover/selection states. This adds no new resize gesture, timer, service, or polling source.
+
+- **W:1** = one column (half of the available Flow width). Click to switch to **W:2** = two columns (full width). Clicking W:2 returns to W:1.
+- **H:1** = existing 140px card, **H:2** = 288px, **H:3** = 436px, based on the observed original 140px height and existing 8px tile-flow spacing. Clicking H:3 returns to H:1.
+- Both buttons operate only in EDIT mode, refuse writes when layout storage reports corruption or an unsupported version, use `Layout.resizeTile`, and persist only metadata for the selected tile.
+- The existing **UNDO** button restores earlier widths/heights, and the default layout retains the same visual sizes and order.
+- Height is *tile chassis size*, not a promise that every mini-widget uses all additional space internally. Vertical content expansion and grid-packing polish are separate design work.
+
+**Stage 2 validation:** `tests/hub/test_apollo_hub_foundation.py` checks labels, placement, visibility, signals, storage guard and Undo connection. `tests/hub/test_apollo_hub_layout_v2.cjs` tests dimension cycles, stable identities, adjacent-tile isolation, no-op invalid inputs, swap preservation, and serialization across restarts. Both run under `.github/workflows/apollo-hub-foundation.yml`.
+
+**Desktop acceptance:** after operator pulls latest `main` and restarts Quickshell, enter EDIT, choose a disposable tile, cycle W and H independently, UNDO both, close/reopen the Hub and restart (when convenient) to confirm dimensions persist. Check that a half-width tall tile may leave a blank area beside it under the existing `Flow` layout; this is not a data-loss bug. A future true grid editor will address packing.
+
 ## NEXT
 
-The next P1 increment should add explicit width/height resizing controls, then mode/submode delete affordances with confirmation/undo, preserving the user-owned layout. Exposing the tested resize policy in an editor can follow the operator's visual grammar and on-device sizing constraints.
+After Stage 2 runtime acceptance, the next P1 increment can add mode/submode removal with confirmation and Undo, then searchable module selection. The true grid packing and expansion behavior needs a separate visual and geometry review.
 
 ## DECISIONS
 

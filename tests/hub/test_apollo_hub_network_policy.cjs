@@ -39,7 +39,7 @@ assert.equal(wifi.wifi.signalPercent, 73);
 assert.equal(wifi.ethernet.connected, false);
 assert.equal(wifi.internetState, "unverified");
 assert.equal(wifi.linkSpeedMbps, -1);
-assert.equal(wifi.linkSpeedApproximate, true);
+assert.equal(wifi.linkSpeedApproximate, false);
 
 // The dock supplies one existing Wi-Fi bitrate; no duplicate probe.
 // Its number represents approximate link rate, NOT Internet throughput.
@@ -60,6 +60,7 @@ let wired = observe({devicesKnown:true, wifiPresent:true, wifiConnected:false,
                      ethernetInterface:"enp2s0", wifiName:"should-hide"});
 assert.equal(wired.transport, "ethernet");
 assert.equal(wired.linkSpeedMbps, -1);
+assert.equal(wired.linkSpeedApproximate, false);
 assert.equal(wired.ethernet.interfaceName, "enp2s0");
 assert.equal(wired.wifi.networkName, "");
 assert.equal(wired.wifi.signalPercent, -1);

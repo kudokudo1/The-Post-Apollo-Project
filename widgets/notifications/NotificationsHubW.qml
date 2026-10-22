@@ -964,6 +964,8 @@ PanelWindow {
                     "title": String(entry.title || ""),
                     "message": String(entry.message || ""),
                     "appIcon": String(entry.appIcon || ""),
+                    "website": String(entry.website || ""),
+                    "websiteIcon": String(entry.websiteIcon || ""),
                     "category": String(entry.category || "generic"),
                     "severity": String(entry.severity || "normal"),
                     "createdAt": Number(entry.createdAt || 0),
@@ -1060,6 +1062,17 @@ PanelWindow {
             return icon;
 
         return Quickshell.iconPath(icon, true);
+    }
+
+    function resolveNotificationIcon(appIcon, sourceId, website, websiteIcon) {
+        // Guaranteed offline identification for YouTube even after Chromium
+        // deletes its transient favicon cache. Other sites use the actual
+        // native site image when available; no third-party favicon requests.
+        if (website === "YouTube")
+            return Qt.resolvedUrl("../../assets/notifications/youtube.svg");
+        if (website !== "" && websiteIcon !== "")
+            return root.resolveAppIcon(websiteIcon, sourceId);
+        return root.resolveAppIcon(appIcon, sourceId);
     }
 
     // ===== DISMISS ==============================================
@@ -2417,6 +2430,8 @@ PanelWindow {
                         required property string title
                         required property string message
                         required property string appIcon
+                        required property string website
+                        required property string websiteIcon
                         required property string category
                         required property string severity
                         required property double createdAt
@@ -2450,7 +2465,9 @@ PanelWindow {
 
                         readonly property color sourceColor: notificationEntry.favorite ? Colors.magenta : notificationEntry.baseColor
 
-                        readonly property url resolvedAppIcon: root.resolveAppIcon(notificationEntry.appIcon, notificationEntry.sourceId)
+                        readonly property url resolvedAppIcon: root.resolveNotificationIcon(
+                            notificationEntry.appIcon, notificationEntry.sourceId,
+                            notificationEntry.website, notificationEntry.websiteIcon)
 
                         // Only multiline ordinary notifications grow; the
                         // 116px one-line cards and report deck retain baseline.
@@ -2690,7 +2707,9 @@ PanelWindow {
                                 anchors.rightMargin: 9
                                 height: 16
                                 z: 1
-                                text: notificationEntry.source
+                                text: notificationEntry.website !== ""
+                                    ? notificationEntry.source + " // " + notificationEntry.website
+                                    : notificationEntry.source
                                 pixelSize: root.appNameFontSize
                                 textColor: notificationEntry.sourceColor
                                 glowColor: notificationEntry.sourceColor

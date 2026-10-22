@@ -56,7 +56,7 @@ SectionFrame {
     readonly property string networkSpeedText: {
         const value = networkSnapshot ? networkSnapshot.linkSpeedMbps : -1;
         return typeof value === "number" && isFinite(value) && value >= 0
-               ? String(value) + " Mbps" : "--";
+               ? String(value) + " Mb/s" : "--";
     }
     // Keep weather and air-quality readiness independent. The backend masks
     // unavailable readings; the UI must not resurrect them from stale values.

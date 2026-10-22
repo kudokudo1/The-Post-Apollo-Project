@@ -9,6 +9,26 @@ Rectangle {
     readonly property bool weatherReady: weatherService && weatherService.ready
     readonly property bool weatherLoading: weatherService && weatherService.loading
     readonly property bool aqiReady: weatherService && weatherService.aqiReady
+
+    readonly property real temperatureValue:
+        weatherReady ? Number(weatherService.tempF) : 0
+    readonly property real humidityValue:
+        weatherReady ? Number(weatherService.humidity) : 0
+    readonly property real windValue:
+        weatherReady ? Number(weatherService.windMph) : 0
+    readonly property real aqiValue:
+        aqiReady ? Number(weatherService.aqi) : 0
+
+    // Normalized live telemetry scales preserved from the original page.
+    readonly property real temperatureMeter:
+        Math.max(0, Math.min(1, temperatureValue / 120))
+    readonly property real aqiMeter:
+        Math.max(0, Math.min(1, aqiValue / 500))
+    readonly property real humidityMeter:
+        Math.max(0, Math.min(1, humidityValue / 100))
+    readonly property real windMeter:
+        Math.max(0, Math.min(1, windValue / 50))
+
     readonly property string conditionText:
         weatherReady && weatherService.condition
         ? weatherService.condition.toUpperCase()
@@ -102,6 +122,22 @@ Rectangle {
                     font.pixelSize: 11
                     color: Colors.white
                 }
+
+                Rectangle {
+                    width: 115
+                    height: 8
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.cyan
+
+                    Rectangle {
+                        x: 2
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: (parent.width - 4) * sky.temperatureMeter
+                        height: parent.height - 4
+                        color: Colors.cyan
+                    }
+                }
             }
 
             Column {
@@ -146,6 +182,22 @@ Rectangle {
                     font.pixelSize: 10
                     color: Colors.white
                 }
+
+                Rectangle {
+                    width: 88
+                    height: 8
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.cyan
+
+                    Rectangle {
+                        x: 2
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: (parent.width - 4) * sky.aqiMeter
+                        height: parent.height - 4
+                        color: Colors.cyan
+                    }
+                }
             }
 
             Column {
@@ -162,6 +214,22 @@ Rectangle {
                           ? weatherService.humidity + "%" : "--%"
                     font.pixelSize: 20
                     color: Colors.white
+                }
+
+                Rectangle {
+                    width: 86
+                    height: 8
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.cyan
+
+                    Rectangle {
+                        x: 2
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: (parent.width - 4) * sky.humidityMeter
+                        height: parent.height - 4
+                        color: Colors.cyan
+                    }
                 }
             }
 
@@ -193,6 +261,22 @@ Rectangle {
                               : "--  -- MPH"
                         font.pixelSize: 14
                         color: Colors.white
+                    }
+
+                    Rectangle {
+                        width: 110
+                        height: 8
+                        color: Colors.black
+                        border.width: 1
+                        border.color: Colors.cyan
+
+                        Rectangle {
+                            x: 2
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: (parent.width - 4) * sky.windMeter
+                            height: parent.height - 4
+                            color: Colors.cyan
+                        }
                     }
                 }
             }

@@ -20,6 +20,7 @@ Item {
         && validPart(uptimeSnapshot.minutes)
     readonly property string statusLine:
         uptimeReady ? "UPTIME // READY // APPROX"
+        : uptimeState === "ready" ? "UPTIME // UNAVAILABLE"
         : "UPTIME // " + uptimeState.toUpperCase().replace(/-/g, " ")
 
     function validPart(value) {
@@ -30,6 +31,36 @@ Item {
     function displayPart(value) {
         return uptimeReady ? String(value) : "--";
     }
+
+    // Shared number/unit column keeps all three values aligned.
+    component UptimePart: Column {
+        id: part
+        property string unitText: ""
+        property string valueText: "--"
+        width: Math.max(0, (uptimeDigits.width - uptimeDigits.columnSpacing * 2) / 3)
+        spacing: 2
+
+        GohuText {
+            width: parent.width
+            height: 31
+            font.pixelSize: 23
+            verticalAlignment: Text.AlignVCenter
+            horizontalAlignment: Text.AlignHCenter
+            color: uptimeMini.uptimeReady ? Colors.white : Colors.orange
+            elide: Text.ElideRight
+            text: part.valueText
+        }
+
+        GohuText {
+            width: parent.width
+            height: 13
+            font.pixelSize: 10
+            horizontalAlignment: Text.AlignHCenter
+            color: Colors.cyan
+            text: part.unitText
+        }
+    }
+
 
     Column {
         anchors {
@@ -51,34 +82,6 @@ Item {
             width: parent.width
             columns: 3
             columnSpacing: 6
-
-            component UptimePart: Column {
-                id: part
-                property string unitText: ""
-                property string valueText: "--"
-                width: Math.max(0, (uptimeDigits.width - uptimeDigits.columnSpacing * 2) / 3)
-                spacing: 2
-
-                GohuText {
-                    width: parent.width
-                    height: 31
-                    font.pixelSize: 23
-                    verticalAlignment: Text.AlignVCenter
-                    horizontalAlignment: Text.AlignHCenter
-                    color: uptimeMini.uptimeReady ? Colors.white : Colors.orange
-                    elide: Text.ElideRight
-                    text: part.valueText
-                }
-
-                GohuText {
-                    width: parent.width
-                    height: 13
-                    font.pixelSize: 10
-                    horizontalAlignment: Text.AlignHCenter
-                    color: Colors.cyan
-                    text: part.unitText
-                }
-            }
 
             UptimePart {
                 unitText: "DAYS"

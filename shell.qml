@@ -485,7 +485,9 @@ PanelWindow {
         anchors.topMargin: 8
         anchors.leftMargin: 5
 
-        spacing: 25
+        // Match the established right-module spacing. The App Control →
+        // Workspaces gap alone keeps its original 25px separation.
+        spacing: 8
 
         // App Launcher
 
@@ -509,6 +511,14 @@ PanelWindow {
                 relationshipFocusModeActive: relationshipFocus.active
                 relationshipFocused: relationshipFocus.owner === "appcontrol"
             }
+        }
+
+        // Reserve the former 25px App Control → Workspaces separation:
+        // 8px Row gap + 9px spacer + 8px Row gap.
+        Item {
+            id: appControlWorkspaceGap
+            width: 9
+            height: 1
         }
 
         // Workspaces

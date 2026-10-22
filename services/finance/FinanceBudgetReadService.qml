@@ -113,6 +113,8 @@ Scope {
             if (!payload || payload.schemaVersion !== 1
                 || payload.source !== "actual-budget"
                 || payload.readOnly !== true
+                || typeof payload.sourceKey !== "string"
+                || !/^[a-f0-9]{64}$/.test(payload.sourceKey)
                 || !/^\d{4}-\d{2}$/.test(String(payload.month || ""))
                 || payload.month !== selectedMonth
                 || !Number.isSafeInteger(payload.toBudgetCents)

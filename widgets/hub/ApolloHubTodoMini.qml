@@ -145,101 +145,64 @@ Item {
         }
     }
 
-    Row {
-        id: entryRow
+    // One right-hand control rail: RELOAD directly over ADD/SAVE, equal
+    // widths and one aligned right edge. The count stays left and the
+    // entry field stays opposite ADD; no extra vertical row is added.
+    Item {
+        id: editorArea
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        height: 23
-        spacing: 5
+        height: 44
 
-        Rectangle {
-            width: Math.max(30, entryRow.width - submitButton.width
-                            - cancelButton.width * (todoMini.editingTitle ? 1 : 0)
-                            - entryRow.spacing * (todoMini.editingTitle ? 2 : 1))
-            height: parent.height
-            color: Colors.black
-            border.width: 1
-            border.color: entryInput.activeFocus ? Colors.magenta : Colors.cyan
+        Column {
+            id: controlStack
+            anchors.top: parent.top
+            anchors.right: parent.right
+            width: 47
+            spacing: 3
 
-            TextInput {
-                id: entryInput
-                anchors.fill: parent
-                anchors.leftMargin: 5
-                anchors.rightMargin: 5
-                verticalAlignment: TextInput.AlignVCenter
-                font.family: "GohuFont 11 Nerd Font Mono"
-                font.pixelSize: 12
-                color: Colors.white
-                selectionColor: Colors.magenta
-                selectedTextColor: Colors.black
-                clip: true
-                selectByMouse: true
-                maximumLength: 160
-                enabled: todoMini.writable
-                onAccepted: todoMini.commitText()
-                onActiveFocusChanged: todoMini.textFocusChanged(activeFocus)
-                Keys.onEscapePressed: function(event) {
-                    if (todoMini.editingTitle)
-                        todoMini.cancelRename();
-                    else
-                        entryInput.focus = false;
-                    event.accepted = true;
+            ActionButton {
+                id: reloadButton
+                width: parent.width
+                height: 20
+                trackLabelGlowLocally: true
+                softGlowEnabled: false
+                labelPixelSize: 9
+                label: "RELOAD"
+                // Explicit recovery; never discard an in-flight save.
+                available: todoMini.todoStore !== null
+                           && todoMini.storeState !== "saving"
+                           && todoMini.pendingWriteKind === ""
+                onLeftClicked: {
+                    if (todoMini.todoStore && todoMini.todoStore.reloadFromDisk()) {
+                        todoMini.confirmDeleteId = "";
+                        todoMini.feedback = "";
+                    }
                 }
             }
-            GohuText {
-                anchors {
-                    left: parent.left
-                    leftMargin: 6
-                    verticalCenter: parent.verticalCenter
-                }
-                visible: entryInput.text.length === 0 && !entryInput.activeFocus
-                font.pixelSize: 11
-                color: Colors.cyan
-                opacity: 0.6
-                text: todoMini.editingTitle ? "RENAME TASK" : "NEW TASK"
+
+            ActionButton {
+                id: submitButton
+                width: parent.width
+                height: 21
+                trackLabelGlowLocally: true
+                softGlowEnabled: false
+                labelPixelSize: 10
+                label: todoMini.editingTitle ? "SAVE" : "ADD"
+                available: todoMini.writable && todoMini.titleValid
+                onLeftClicked: todoMini.commitText()
             }
         }
-
-        ActionButton {
-            id: submitButton
-            width: 43
-            height: parent.height
-            trackLabelGlowLocally: true
-            softGlowEnabled: false
-            labelPixelSize: 10
-            label: todoMini.editingTitle ? "SAVE" : "ADD"
-            available: todoMini.writable && todoMini.titleValid
-            onLeftClicked: todoMini.commitText()
-        }
-
-        ActionButton {
-            id: cancelButton
-            visible: todoMini.editingTitle
-            width: 43
-            height: parent.height
-            trackLabelGlowLocally: true
-            softGlowEnabled: false
-            labelPixelSize: 10
-            label: "BACK"
-            available: todoMini.writable
-            onLeftClicked: todoMini.cancelRename()
-        }
-    }
-
-    Row {
-        id: countRow
-        anchors {
-            top: entryRow.bottom
-            topMargin: 3
-            left: parent.left
-            right: parent.right
-        }
-        height: 14
 
         GohuText {
-            width: parent.width - reloadButton.width - 5
-            height: parent.height
+            id: countRow
+            anchors.left: parent.left
+            anchors.right: controlStack.left
+            anchors.rightMargin: 5
+            anchors.top: parent.top
+            height: 17
+            verticalAlignment: Text.AlignVCenter
             font.pixelSize: 10
             color: todoMini.storeState === "error"
                    || todoMini.storeState === "unsupported" ? Colors.orange : Colors.cyan
@@ -252,23 +215,74 @@ Item {
                   : todoMini.remaining + " OPEN // " + todoMini.total + " TOTAL"
         }
 
-        ActionButton {
-            id: reloadButton
-            width: 44
-            height: parent.height
-            trackLabelGlowLocally: true
-            softGlowEnabled: false
-            labelPixelSize: 9
-            label: "RELOAD"
-            // Explicit recovery. Never reload over an in-flight save.
-            available: todoMini.todoStore !== null
-                       && todoMini.storeState !== "saving"
-                       && todoMini.pendingWriteKind === ""
-            onLeftClicked: {
-                if (todoMini.todoStore && todoMini.todoStore.reloadFromDisk()) {
-                    todoMini.confirmDeleteId = "";
-                    todoMini.feedback = "";
+        Row {
+            id: entryRow
+            anchors.left: parent.left
+            anchors.right: controlStack.left
+            anchors.rightMargin: 5
+            anchors.bottom: parent.bottom
+            height: 23
+            spacing: 5
+
+            Rectangle {
+                width: Math.max(30, entryRow.width
+                                - (cancelButton.visible
+                                   ? cancelButton.width + entryRow.spacing : 0))
+                height: parent.height
+                color: Colors.black
+                border.width: 1
+                border.color: entryInput.activeFocus ? Colors.magenta : Colors.cyan
+
+                TextInput {
+                    id: entryInput
+                    anchors.fill: parent
+                    anchors.leftMargin: 5
+                    anchors.rightMargin: 5
+                    verticalAlignment: TextInput.AlignVCenter
+                    font.family: "GohuFont 11 Nerd Font Mono"
+                    font.pixelSize: 12
+                    color: Colors.white
+                    selectionColor: Colors.magenta
+                    selectedTextColor: Colors.black
+                    clip: true
+                    selectByMouse: true
+                    maximumLength: 160
+                    enabled: todoMini.writable
+                    onAccepted: todoMini.commitText()
+                    onActiveFocusChanged: todoMini.textFocusChanged(activeFocus)
+                    Keys.onEscapePressed: function(event) {
+                        if (todoMini.editingTitle)
+                            todoMini.cancelRename();
+                        else
+                            entryInput.focus = false;
+                        event.accepted = true;
+                    }
                 }
+                GohuText {
+                    anchors {
+                        left: parent.left
+                        leftMargin: 6
+                        verticalCenter: parent.verticalCenter
+                    }
+                    visible: entryInput.text.length === 0 && !entryInput.activeFocus
+                    font.pixelSize: 11
+                    color: Colors.cyan
+                    opacity: 0.6
+                    text: todoMini.editingTitle ? "RENAME TASK" : "NEW TASK"
+                }
+            }
+
+            ActionButton {
+                id: cancelButton
+                visible: todoMini.editingTitle
+                width: 43
+                height: parent.height
+                trackLabelGlowLocally: true
+                softGlowEnabled: false
+                labelPixelSize: 10
+                label: "BACK"
+                available: todoMini.writable
+                onLeftClicked: todoMini.cancelRename()
             }
         }
     }
@@ -276,8 +290,8 @@ Item {
     ListView {
         id: todoList
         anchors {
-            top: countRow.bottom
-            topMargin: 3
+            top: editorArea.bottom
+            topMargin: 4
             bottom: parent.bottom
             left: parent.left
             right: parent.right

@@ -49,6 +49,61 @@ PanelWindow {
           + "//" + localTimeSnapshot.meridiem
         : "--:--:--//--"
 
+    // CALC // Time-zone conversion is deliberately request-driven, not a
+    // new background clock. UTC initial values avoid ambiguous local defaults.
+    property string converterDate: new Date().toISOString().slice(0, 10)
+    property string converterTime: new Date().toISOString().slice(11, 16)
+    property string converterSourceZone: "UTC"
+    property string converterTargetZone: "America/New_York"
+    property bool converterBusy: false
+    property var converterResult: null
+    property string converterSubmittedKey: ""
+    readonly property string converterInputsKey:
+        [converterDate, converterTime, converterSourceZone,
+         converterTargetZone].join("|")
+    // Keep the four clock shortcuts; add a selected WORLD result, if one exists.
+    readonly property var converterZones: worldZones.concat(
+        selectedSearchedZone !== ""
+        && !worldZones.some(function(z) { return z.id === selectedSearchedZone; })
+        ? [{ id: selectedSearchedZone, label: "WORLD" }] : [])
+
+    function cycleConverterZone(which) {
+        const choices = converterZones;
+        if (choices.length === 0)
+            return;
+        const current = which === "source"
+                        ? converterSourceZone : converterTargetZone;
+        let idx = choices.findIndex(function(z) { return z.id === current; });
+        idx = (idx + 1) % choices.length;
+        if (which === "source")
+            converterSourceZone = choices[idx].id;
+        else
+            converterTargetZone = choices[idx].id;
+        converterResult = null;
+    }
+
+    function runTimeConverter() {
+        if (converterBusy || !menuOpen || selectedMode !== "calc")
+            return;
+        const src = converterSourceZone;
+        const dst = converterTargetZone;
+        if (!converterZones.some(function(z) { return z.id === src; })
+                || !converterZones.some(function(z) { return z.id === dst; })) {
+            converterResult = { status: "ZONE_UNAVAILABLE", options: [] };
+            return;
+        }
+        converterResult = null;
+        converterSubmittedKey = converterInputsKey;
+        converterBusy = true;
+        // Fixed executable, fixed repo-owned script path, separate argv.
+        // No string shell, arbitrary script path, or clock mutation.
+        converterProcess.exec([
+            "python3", "-B", "-I",
+            Quickshell.shellPath("services/time/TimeZoneConverter.py"),
+            src, dst, converterDate, converterTime
+        ]);
+    }
+
     // First world-clock slice. Zone IDs are allowlisted and passed only as
     // child-process environment values, never interpolated into a shell.
     readonly property var worldZones: [
@@ -82,6 +137,7 @@ PanelWindow {
                                WorldZoneSearch.MAX_ZONES, worldCountryIndex)
     readonly property bool navigationKeysAvailable:
         standardKeysAvailable && !worldSearchInput.activeFocus
+        && !converterDateInput.activeFocus && !converterTimeInput.activeFocus
     property string worldLookupZone: ""
     property string worldValidZone: ""
     property string worldRawOffset: ""
@@ -290,6 +346,38 @@ PanelWindow {
     SystemClock {
         id: localClock
         precision: SystemClock.Seconds
+    }
+
+    // Manual conversion only. Output is structured JSON from our Python
+    // stdlib zoneinfo helper; stale results are ignored after input changes.
+    Process {
+        id: converterProcess
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (timew.converterSubmittedKey !== timew.converterInputsKey)
+                    return;
+                try {
+                    const result = JSON.parse(this.text);
+                    if (result && typeof result.status === "string"
+                            && Array.isArray(result.options))
+                        timew.converterResult = result;
+                    else
+                        timew.converterResult = {status: "INVALID_RESULT",
+                                                 options: []};
+                } catch (e) {
+                    timew.converterResult = {status: "INVALID_RESULT",
+                                             options: []};
+                }
+            }
+        }
+        onExited: function(exitCode, exitStatus) {
+            timew.converterBusy = false;
+            if (exitCode !== 0
+                    && timew.converterSubmittedKey === timew.converterInputsKey)
+                timew.converterResult = {status: "CONVERTER_UNAVAILABLE",
+                                         options: []};
+        }
     }
 
     // Load the host's actual IANA zone list once per TimeW window lifetime.

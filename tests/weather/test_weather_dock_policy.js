@@ -109,7 +109,7 @@ assert.match(dock, /implicitWidth:\s*Math\.ceil\(weatherContent\.implicitWidth\)
 // Preserve an identifiable weather condition, live numeric readout, and a
 // compact classic thermometer. The tube and wider bulb must be one continuous
 // path and the real temperature level must fill/drain through both.
-assert.match(dock, /id:\s*weatherThermometer[\s\S]*?implicitWidth:\s*20[\s\S]*?implicitHeight:\s*42/);
+assert.match(dock, /id:\s*weatherThermometer[\s\S]*?implicitWidth:\s*20[\s\S]*?implicitHeight:\s*42[\s\S]*?width:\s*implicitWidth[\s\S]*?height:\s*implicitHeight/);
 assert.doesNotMatch(dock, /text:\s*"🌡"/);
 assert.match(dock, /id:\s*thermometerCanvas/);
 assert.match(dock, /function traceThermometer\(/);

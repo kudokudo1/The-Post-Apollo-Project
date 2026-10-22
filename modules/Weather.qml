@@ -261,7 +261,9 @@ DockButton {
                 weatherDock.open || weatherDock.pressed
                 ? Colors.magenta : weatherThermometer.liquidColor
 
-            // Light around the round bulb is the dominant rear glow.
+            // Stronger, broader rear light around the bulb, now matched to
+            // the shared dock opacity instead of attenuating it. This effect
+            // stays behind the vessel and never recolors its white glass.
             RectangularShadow {
                 id: thermometerRearGlow
                 x: weatherThermometer.bulbCenterX - width / 2
@@ -269,11 +271,11 @@ DockButton {
                 width: weatherThermometer.outerBulbRadiusX * 2 - 1
                 height: weatherThermometer.outerBulbRadiusY * 2 - 1
                 radius: Math.min(width, height) / 2
-                blur: 6
-                spread: 1.3
+                blur: 10
+                spread: 2.2
                 z: 0
                 visible: thermometerGlowFrame.hasGlow
-                opacity: weatherDock.contentGlowOpacity * 0.85
+                opacity: weatherDock.contentGlowOpacity
                 color: thermometerGlowFrame.rearGlowColor
             }
 
@@ -289,11 +291,11 @@ DockButton {
                         * (bottomY - topY)
                 y: bottomY - height
                 radius: width / 2
-                blur: 4.5
-                spread: 0.7
+                blur: 7
+                spread: 1.2
                 z: 0
                 visible: thermometerGlowFrame.hasGlow && height >= 1
-                opacity: weatherDock.contentGlowOpacity * 0.72
+                opacity: weatherDock.contentGlowOpacity
                 color: thermometerGlowFrame.rearGlowColor
             }
 
@@ -434,12 +436,12 @@ DockButton {
                     requestedVisible: weatherDock.thermometerState.valid
                                       && weatherThermometer.animatedLevel > 0
                     z: 1
-                    radius: 4
-                    samples: 9
+                    radius: 8
+                    samples: 15
                     horizontalOffset: 0
                     verticalOffset: 0
                     transparentBorder: true
-                    opacity: weatherDock.contentGlowOpacity * 0.55
+                    opacity: weatherDock.contentGlowOpacity * 0.8
                     color: weatherDock.open || weatherDock.pressed
                            ? Colors.magenta : weatherThermometer.liquidColor
                 }

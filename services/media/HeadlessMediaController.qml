@@ -90,6 +90,15 @@ Scope {
         return issue("load", []);
     }
 
+    // Contextual ENTER loads one playable MPD track without staging or autoplay.
+    // Source-specific collection loading and YouTube playback remain unavailable.
+    function loadMedia(ref) {
+        const args = mediaRefArgs(ref);
+        if (args === null || ref.source !== "local-mpd")
+            return false;
+        return issue("load", ["--uri", ref.id, "--source", "local-mpd"]);
+    }
+
     function loadRadio(url) {
         if (typeof url !== "string" || !url.startsWith("https://"))
             return false;

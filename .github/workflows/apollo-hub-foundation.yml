@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "widgets/ApolloHubW.qml"
+      - "services/hub/ApolloHubLayout.js"
+      - "tests/hub/test_apollo_hub_layout_v2.cjs"
       - "widgets/hub/ApolloHubTile.qml"
       - "widgets/hub/ApolloHubMediaMini.qml"
       - "widgets/hub/ApolloHubSystemMini.qml"
@@ -22,6 +24,8 @@ on:
       - main
     paths:
       - "widgets/ApolloHubW.qml"
+      - "services/hub/ApolloHubLayout.js"
+      - "tests/hub/test_apollo_hub_layout_v2.cjs"
       - "widgets/hub/ApolloHubTile.qml"
       - "widgets/hub/ApolloHubMediaMini.qml"
       - "widgets/hub/ApolloHubSystemMini.qml"
@@ -46,3 +50,5 @@ jobs:
       - uses: actions/checkout@v4
       - name: Verify Apollo Hub control and layout contracts
         run: python3 tests/hub/test_apollo_hub_foundation.py
+      - name: Exercise layout v1 migration, v2 tile identity and guarded remove
+        run: node tests/hub/test_apollo_hub_layout_v2.cjs

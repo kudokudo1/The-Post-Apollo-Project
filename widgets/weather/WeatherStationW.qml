@@ -874,19 +874,33 @@ PanelWindow {
                 color: Colors.cyan
             }
 
-            Text {
+            Row {
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
 
                 anchors.leftMargin: 20
 
-                text: weatherStation.footerSourceStatus
+                spacing: 8
 
-                font.family: "GohuFont 11 Nerd Font Mono"
+                Text {
+                    text: "◉"
 
-                font.pixelSize: 16
+                    font.family: "GohuFont 11 Nerd Font Mono"
 
-                color: Colors.cyan
+                    font.pixelSize: 16
+
+                    color: Colors.red
+                }
+
+                Text {
+                    text: weatherStation.footerSourceStatus
+
+                    font.family: "GohuFont 11 Nerd Font Mono"
+
+                    font.pixelSize: 16
+
+                    color: Colors.cyan
+                }
             }
 
             Text {

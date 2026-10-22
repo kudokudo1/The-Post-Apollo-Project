@@ -1725,6 +1725,7 @@ Scope {
             const value = String(lines[i] || "").trim();
 
             if (value.indexOf("PREPARING //") === 0
+                    || value.indexOf("PREPARED //") === 0
                     || value.indexOf("RUNNING // Git subprocess") === 0
                     || value.indexOf("FINALIZING //") === 0
                     || value.indexOf("STILL RUNNING //") === 0)
@@ -2380,6 +2381,13 @@ Scope {
             if (gitService.snapshotPhase === "BEFORE") {
                 gitService.traceSyncPhase("BEFORE_SNAPSHOT_COMPLETE");
                 gitService.snapshotPhase = "";
+                const syncPreparation =
+                    gitService.pendingProcessAction === "fetch"
+                    || gitService.pendingProcessAction === "pull";
+                const snapshotMs = syncPreparation
+                    ? Math.max(0, Date.now() - gitService.syncStartedMs)
+                    : 0;
+                const journalStartedMs = Date.now();
                 const beforeSnapshot =
                     gitService.journalSnapshot(snapshot);
 
@@ -2404,6 +2412,12 @@ Scope {
                 }
 
                 gitService.traceSyncPhase("JOURNAL_STARTED");
+                if (syncPreparation) {
+                    gitService.actionOutput += "\nPREPARED // snapshot "
+                        + snapshotMs + " ms // journal "
+                        + Math.max(0, Date.now() - journalStartedMs)
+                        + " ms";
+                }
                 gitService.startPendingActionProcess();
                 return;
             }

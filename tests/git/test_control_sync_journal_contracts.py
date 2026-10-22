@@ -188,7 +188,8 @@ persist = re.search(r"function persist\(\) \{(.*?)\n    \}", text, re.S)
 assert persist, "durable operation journal persistence path must exist"
 assert "JournalCodec.serializeJournal(" in persist.group(1)
 assert "schemaVersion, entries, encodedEntries" in persist.group(1)
-assert "journalFile.setText(encoded.text)" in persist.group(1)
+assert "journalFile.setText(data)" in persist.group(1)
+assert "deltaFile.setText(serialized)" in persist.group(1)
 assert "null, 2" not in persist.group(1), "pretty JSON must not inflate every journal write"
 assert "blockWrites: true" in text and "atomicWrites: true" in text, (
     "the BEFORE-operation durability barrier cannot become asynchronous"

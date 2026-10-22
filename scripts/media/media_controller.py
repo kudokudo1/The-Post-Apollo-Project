@@ -12,6 +12,7 @@ from youtube_catalog import YouTubeCatalogSource
 from media_intent_store import IntentStore
 from mpd_audio_probe import MpdAudioEvidenceProbe
 from direct_stream_source import DirectHttpsStreamSource
+from radio_browser_catalog import RadioBrowserCatalogSource
 
 
 class MediaController:
@@ -24,7 +25,9 @@ class MediaController:
         local = LocalMpdSource(mpd)
         youtube = YouTubeCatalogSource()
         stream = DirectHttpsStreamSource(mpd)
-        self.sources = {local.id: local, youtube.id: youtube, stream.id: stream}
+        radio = RadioBrowserCatalogSource()
+        self.sources = {local.id: local, youtube.id: youtube, stream.id: stream,
+                        radio.id: radio}
         self.audio_probe = MpdAudioEvidenceProbe(mpd)
         self.browse_context: dict[str, Any] | None = None
         self.selection: dict[str, Any] | None = None
@@ -193,7 +196,7 @@ class MediaController:
             cursor = args.get("cursor")
             if not callable(getattr(source, "search", None)):
                 raise MediaBackendError("UNSUPPORTED", "Source does not support catalog search")
-            if source.id == "youtube":
+            if source.id in ("youtube", "radio-browser"):
                 result = source.search(query, cursor)
             else:
                 if cursor is not None:

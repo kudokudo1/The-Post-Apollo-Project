@@ -72,16 +72,25 @@ assert.strictEqual(plan('archive',binding,{bridge:{...states.bridge,accountKey:'
 assert.strictEqual(P.receiptStatus(plan('archive'),'request.id.0001',null),'not-confirmed');
 assert.strictEqual(P.receiptStatus(plan('archive'),'request.id.0001',
  {requestId:'request.id.0001',adapter:'bridge',accountKey:ACCOUNT,operation:'archive',
- eventId:EVENT,status:'accepted'}),'pending-provider');
+ eventId:EVENT,mailboxKey:bridgeRef.mailboxKey,
+ uidValidity:bridgeRef.uidValidity,uid:bridgeRef.uid,status:'accepted'}),'pending-provider');
 assert.strictEqual(P.receiptStatus(plan('archive'),'request.id.0001',
  {requestId:'request.id.0001',adapter:'bridge',accountKey:ACCOUNT,operation:'archive',
- eventId:EVENT,status:'applied',verified:false}),'not-confirmed');
+ eventId:EVENT,mailboxKey:bridgeRef.mailboxKey,
+ uidValidity:bridgeRef.uidValidity,uid:bridgeRef.uid,status:'applied',verified:false}),'not-confirmed');
 assert.strictEqual(P.receiptStatus(plan('archive'),'request.id.0001',
  {requestId:'request.id.0001',adapter:'browser',accountKey:ACCOUNT,operation:'archive',
- eventId:EVENT,status:'applied',verified:true}),'not-confirmed');
+ eventId:EVENT,mailboxKey:bridgeRef.mailboxKey,
+ uidValidity:bridgeRef.uidValidity,uid:bridgeRef.uid,status:'applied',verified:true}),'not-confirmed');
 assert.strictEqual(P.receiptStatus(plan('archive'),'request.id.0001',
  {requestId:'request.id.0001',adapter:'bridge',accountKey:ACCOUNT,operation:'archive',
- eventId:EVENT,status:'applied',verified:true}),'confirmed');
+ eventId:EVENT,mailboxKey:'different.mailbox.001',
+ uidValidity:bridgeRef.uidValidity,uid:bridgeRef.uid,status:'applied',verified:true}),
+ 'not-confirmed');
+assert.strictEqual(P.receiptStatus(plan('archive'),'request.id.0001',
+ {requestId:'request.id.0001',adapter:'bridge',accountKey:ACCOUNT,operation:'archive',
+ eventId:EVENT,mailboxKey:bridgeRef.mailboxKey,
+ uidValidity:bridgeRef.uidValidity,uid:bridgeRef.uid,status:'applied',verified:true}),'confirmed');
 
 assert.strictEqual(B.validOrigin('https://mail.proton.me'),true);
 assert.strictEqual(B.validOrigin('https://mail.proton.me.evil.test'),false);

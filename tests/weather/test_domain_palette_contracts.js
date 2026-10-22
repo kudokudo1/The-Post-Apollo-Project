@@ -152,8 +152,12 @@ for (const title of [
 // expanded forecast so daily weather, rain and sunrise/sunset stay reachable.
 assert.match(groundSource, /anchors\.margins:\s*24[\s\S]*?spacing:\s*26/);
 assert.match(skySource, /Flickable\s*\{\s*id:\s*skyScroll/);
-assert.match(skySource, /clip:\s*true[\s\S]*?contentHeight:\s*Math\.max\(height, skyContent\.y \+ skyContent\.implicitHeight \+ 24\)/);
-assert.match(skySource, /id:\s*skyContent[\s\S]*?x:\s*24[\s\S]*?y:\s*24[\s\S]*?spacing:\s*20/);
+assert.match(skySource, /clip:\s*true[\s\S]*?contentHeight:\s*Math\.max\(height, skyContent\.y \+ skyContent\.implicitHeight \+ 12\)/);
+assert.match(skySource, /id:\s*skyContent[\s\S]*?x:\s*20[\s\S]*?y:\s*12[\s\S]*?spacing:\s*6/);
+assert.match(skySource, /height:\s*90[\s\S]*?id:\s*hourlyIconGlyph/);
+assert.match(skySource, /height:\s*116[\s\S]*?id:\s*dailyIconGlyph/);
+assert.match(skySource, /id:\s*hourlyRainLabel/);
+assert.ok(!skySource.includes("weather / atmosphere / radar / aviation"));
 assert.match(skySource, /NeonScrollBar\s*\{[\s\S]*?flickable:\s*skyScroll[\s\S]*?handleStyle:\s*"star"/);
 assert.match(spaceSource, /anchors\.margins:\s*24[\s\S]*?spacing:\s*26/);
 
@@ -162,7 +166,7 @@ for (const [id, size] of [["conditionIconGlyph", 80], ["hourlyIconGlyph", 80], [
 }
 for (const id of ["conditionIconGlyph", "hourlyIconGlyph", "dailyIconGlyph"])
     assert.match(skySource, new RegExp("safeSource: " + id));
-assert.match(skySource, /width: parent\.width\s+horizontalAlignment: Text\.AlignHCenter\s+text: modelData\.date/);
+assert.match(skySource, /Row\s*\{\s*anchors\.horizontalCenter:\s*parent\.horizontalCenter\s+spacing:\s*12[\s\S]*?text:\s*modelData\.date/);
 
 // Existing semantic telemetry severity remains independent from page identity.
 assert.match(groundSource, /readonly property color aqiColor:/);

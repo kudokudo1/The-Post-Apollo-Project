@@ -271,3 +271,39 @@ gates. Leaving the activation file absent is the safe rollback: FinanceW
 continues reading the budget and can preview edits, but cannot mutate data.
 Never blindly delete a recovery journal or `.write-lock`: their existence
 can mean a write happened even if the widget did not receive confirmation.
+
+
+## FinanceW D10 // Private local saved drafts (not Actual transactions)
+
+Budget → Budget → Transactions has a SAVE DRAFT action separate from the
+existing PREVIEW → CONFIRM SAVE operation. SAVE DRAFT persists incomplete
+new-transaction text locally; it does not call Actual, authorize budget writes,
+create transactions, or reconcile bank data. SAVE DRAFT works while the real
+transaction writer remains WRITES LOCKED. Existing Actual transaction EDIT
+is not a local draft edit.
+
+Saved drafts appear under SAVED DRAFTS for the selected budget source and
+month. OPEN restores one to the editor, UPDATE DRAFT saves revisions,
+and DELETE → CONFIRM removes the chosen local draft. Dates, amounts, or
+descriptions may be unfinished when saved. PREVIEW / CONFIRM SAVE still require
+complete validated data and the separate operator write gate.
+
+Local storage: ~/.local/state/financew/drafts/index.json, directory 0700,
+file 0600, atomic replacement on changes. The content is plain JSON, not
+encrypted; it may contain payees, amounts, descriptions, and account IDs.
+Do not commit or share this file. The backend checks permissions, rejects
+symlinks, version mismatch, malformed data, stale revisions, and cross-budget
+operations. Maximum 50 total saved drafts. The frontend only presents drafts
+matching the currently authenticated budget source and selected month. Reload
+the Budget page after changing the Actual source to see the appropriate drafts.
+If an account is no longer available, the record cannot be reopened; the data
+is preserved for manual review rather than silently redirected.
+
+A saved draft is never proof that Actual was changed. After an explicitly
+authorized successful Actual transaction, check the ledger before manually
+deleting the corresponding draft. In particular, an Actual UNCERTAIN response
+still requires manual recovery and never automatic retry.
+
+Back up the private JSON file before troubleshooting corrupt data. Avoid
+changing permissions or deleting the file to hide an error. The D10 tests use
+isolated disposable HOME directories; they never read or write actual budgets.

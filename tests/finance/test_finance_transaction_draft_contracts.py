@@ -6,7 +6,7 @@ menu = (root / "widgets/FinanceW.qml").read_text()
 pane = (root / "widgets/FinanceTransactionDraftPane.qml").read_text()
 read_service = (root / "services/finance/FinanceBudgetReadService.qml").read_text()
 
-# Prevent double/ghosted glow on NEW DRAFT and the four staged action
+# Prevent double/ghosted glow on NEW DRAFT and the five staged action
 # labels. These use ActionButton's existing opt-in local source tracking.
 # Preserve the existing non-mutating draft and account-cycle behavior.
 import re
@@ -15,9 +15,9 @@ action_blocks = re.findall(
     r"trackLabelGlowLocally:\s*true",
     pane,
 )
-assert pane.count("ActionButton {") == 4
-assert len(action_blocks) == 4, (
-    "All four staged draft controls need reactive label/glow alignment"
+assert pane.count("ActionButton {") == 5
+assert len(action_blocks) == 5, (
+    "All five staged draft controls need reactive label/glow alignment"
 )
 new_button = menu[menu.index("id: newTransactionDraft"):
                   menu.index("onLeftClicked: transactionDraftPane.begin()")]
@@ -31,6 +31,18 @@ for label in (
     assert label in pane, f"Draft button changed: {label}"
 assert 'label: "NEW DRAFT"' in new_button
 action_shared = (root / "components/ActionButton.qml").read_text()
+assert 'signal draftSaveRequested(var payload)' in pane
+assert 'function requestDraftSave() {' in pane
+assert 'function beginStored(record) {' in pane
+assert 'label: draft.localDraftId ? "UPDATE DRAFT" : "SAVE DRAFT"' in pane
+assert 'onLeftClicked: draft.requestDraftSave()' in pane
+assert 'FinanceServices.FinanceLocalDraftStore {' in menu
+assert 'id: financeDrafts' in menu
+assert 'onDraftSaveRequested: function(payload)' in menu
+assert 'financeDrafts.upsert(payload);' in menu
+assert 'financeDrafts.remove(modelData.id);' in menu
+assert 'transactionDraftPane.beginStored(modelData)' in menu
+assert 'SAVED DRAFTS // ' in menu
 assert "property bool trackLabelGlowLocally: false" in action_shared
 assert "contentHost.x + labelText.x" in action_shared
 assert "contentHost.y + labelText.y" in action_shared

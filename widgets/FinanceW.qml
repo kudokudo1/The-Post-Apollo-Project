@@ -21,6 +21,13 @@ PanelWindow {
         monitoring: root.menuOpen
     }
 
+    FinanceServices.FinanceLocalDraftStore {
+        id: financeDrafts
+        sourceKey: financeBudget.snapshot ? financeBudget.snapshot.sourceKey : ""
+        month: financeBudget.selectedMonth
+        onDraftSaved: transactionDraftPane.clear()
+    }
+
     FinanceServices.FinanceTransactionWriteService {
         id: financeWrite
         onSaved: {
@@ -1088,7 +1095,6 @@ PanelWindow {
                                                && financeBudget.snapshot
                                                && financeBudget.snapshot.accounts.length > 0
                                                && financeWrite.state !== "pending"
-                                               && financeWrite.state !== "uncertain"
                                     onLeftClicked: transactionDraftPane.begin()
                                 }
                             }
@@ -1103,8 +1109,122 @@ PanelWindow {
                                            ? financeBudget.snapshot.sourceKey : ""
                                 saveState: financeWrite.state
                                 saveMessage: financeWrite.message
+                                draftStoreState: financeDrafts.state
+                                draftStoreMessage: financeDrafts.message
+                                onDraftSaveRequested: function(payload) {
+                                    financeDrafts.upsert(payload);
+                                }
                                 onSaveRequested: function(payload) {
                                     financeWrite.submit(payload);
+                                }
+                            }
+
+                            Row {
+                                width: parent.width
+                                spacing: 7
+                                GohuText {
+                                    width: parent.width - reloadDrafts.width - 7
+                                    height: 28
+                                    verticalAlignment: Text.AlignVCenter
+                                    text: "SAVED DRAFTS // " + financeDrafts.drafts.length
+                                    font.pixelSize: 10
+                                    textFormat: Text.PlainText
+                                    color: Colors.cyan
+                                    elide: Text.ElideRight
+                                }
+                                ActionButton {
+                                    id: reloadDrafts
+                                    trackLabelGlowLocally: true
+                                    width: 66
+                                    height: 28
+                                    label: "RELOAD"
+                                    labelPixelSize: 9
+                                    accentColor: Colors.cyan
+                                    available: financeDrafts.state !== "pending"
+                                    onLeftClicked: financeDrafts.refresh()
+                                }
+                            }
+                            GohuText {
+                                width: parent.width
+                                visible: financeDrafts.state === "failed"
+                                text: financeDrafts.message
+                                textFormat: Text.PlainText
+                                font.pixelSize: 9
+                                color: Colors.orange
+                                wrapMode: Text.WordWrap
+                            }
+                            Repeater {
+                                model: financeDrafts.drafts
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    property bool deleteArmed: false
+                                    width: budgetList.width
+                                    height: 62
+                                    color: Colors.black
+                                    border.width: 1
+                                    border.color: Colors.cyan
+                                    GohuText {
+                                        anchors.left: parent.left
+                                        anchors.top: parent.top
+                                        anchors.leftMargin: 5
+                                        anchors.topMargin: 5
+                                        width: parent.width - 10
+                                        text: (modelData.payeeText || "UNTITLED")
+                                              + " // " + (modelData.dateText || "NO DATE")
+                                        textFormat: Text.PlainText
+                                        font.pixelSize: 9
+                                        color: Colors.white
+                                        elide: Text.ElideRight
+                                    }
+                                    GohuText {
+                                        anchors.left: parent.left
+                                        anchors.bottom: parent.bottom
+                                        anchors.leftMargin: 5
+                                        anchors.bottomMargin: 8
+                                        text: "LOCAL ONLY"
+                                        font.pixelSize: 9
+                                        color: Colors.cyan
+                                    }
+                                    ActionButton {
+                                        anchors.bottom: parent.bottom
+                                        anchors.right: deleteLocalDraft.left
+                                        anchors.rightMargin: 7
+                                        anchors.bottomMargin: 4
+                                        width: 50
+                                        height: 25
+                                        trackLabelGlowLocally: true
+                                        label: "OPEN"
+                                        labelPixelSize: 9
+                                        accentColor: Colors.omnitrix
+                                        available: !transactionDraftPane.open
+                                            && financeDrafts.state === "ready"
+                                            && financeBudget.snapshot
+                                            && financeBudget.snapshot.accounts.some(
+                                                function(a) {return a.id === modelData.accountId;})
+                                        onLeftClicked: transactionDraftPane.beginStored(modelData)
+                                    }
+                                    ActionButton {
+                                        id: deleteLocalDraft
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: 4
+                                        anchors.bottom: parent.bottom
+                                        anchors.bottomMargin: 4
+                                        width: 65
+                                        height: 25
+                                        trackLabelGlowLocally: true
+                                        label: deleteArmed ? "CONFIRM" : "DELETE"
+                                        labelPixelSize: 9
+                                        accentColor: deleteArmed ? Colors.red : Colors.orange
+                                        available: financeDrafts.state === "ready"
+                                            && !transactionDraftPane.open
+                                        onLeftClicked: {
+                                            if (!deleteArmed) {
+                                                deleteArmed = true;
+                                            } else {
+                                                financeDrafts.remove(modelData.id);
+                                            }
+                                        }
+                                    }
                                 }
                             }
 

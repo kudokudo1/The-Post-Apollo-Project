@@ -321,10 +321,11 @@ assert.equal((rearGlow.match(/RectangularShadow\s*\{/g) || []).length, 2);
 assert.doesNotMatch(rearGlow, /safeSource:/);
 assert.match(dock, /readonly property color rearGlowColor:\s*weatherDock\.open \|\| weatherDock\.pressed\s*\? Colors\.magenta : weatherThermometer\.liquidColor/);
 assert.match(dock, /readonly property bool hasGlow:\s*weatherDock\.thermometerState\.valid\s*&&\s*weatherThermometer\.animatedLevel > 0/);
-assert.match(rearGlow, /blur:\s*6/);
-assert.match(rearGlow, /spread:\s*1\.3/);
-assert.match(rearGlow, /opacity:\s*weatherDock\.contentGlowOpacity \* 0\.85/);
-assert.match(rearGlow, /opacity:\s*weatherDock\.contentGlowOpacity \* 0\.72/);
+assert.match(rearGlow, /blur:\s*10/);
+assert.match(rearGlow, /spread:\s*2\.2/);
+assert.equal((rearGlow.match(/opacity:\s*weatherDock\.contentGlowOpacity\s*\n/g) || []).length, 2, "both rear halos inherit full dock opacity");
+assert.match(rearGlow, /blur:\s*7/);
+assert.match(rearGlow, /spread:\s*1\.2/);
 assert.match(rearGlow, /visible:\s*thermometerGlowFrame\.hasGlow/);
 assert.match(rearGlow, /height:\s*Math\.max\(0, Math\.min\(1, weatherThermometer\.animatedLevel\)\)/);
 assert.match(rearGlow, /color:\s*thermometerGlowFrame\.rearGlowColor/g);
@@ -345,11 +346,21 @@ const localLiquidGlow = dock.slice(liquidGlowStart, liquidGlowEnd);
 assert.match(localLiquidGlow, /safeSource:\s*thermometerLiquid/);
 assert.match(localLiquidGlow, /requestedVisible:\s*weatherDock\.thermometerState\.valid\s*&&\s*weatherThermometer\.animatedLevel > 0/);
 assert.match(localLiquidGlow, /z:\s*1/);
-assert.match(localLiquidGlow, /radius:\s*4/);
-assert.match(localLiquidGlow, /samples:\s*9/);
-assert.match(localLiquidGlow, /opacity:\s*weatherDock\.contentGlowOpacity \* 0\.55/);
+assert.match(localLiquidGlow, /radius:\s*8/);
+assert.match(localLiquidGlow, /samples:\s*15/);
+assert.match(localLiquidGlow, /opacity:\s*weatherDock\.contentGlowOpacity \* 0\.8/);
 assert.match(localLiquidGlow, /color:\s*weatherDock\.open \|\| weatherDock\.pressed\s*\? Colors\.magenta : weatherThermometer\.liquidColor/);
 assert.doesNotMatch(localLiquidGlow, /weatherDock\.hovered/);
+// Keep the independent glow's state model tied to the same DockButton
+// 75% idle / 95% hover / 100% pressed-open opacity as the rest of
+// the module, while its hue remains temperature-based on hover.
+assert.match(dock, /normalContentGlowColor:\s*weatherColor/);
+assert.match(dock, /hoverContentGlowColor:\s*Colors\.orange/);
+assert.match(dock, /normalDockGlowColor:\s*weatherColor/);
+assert.match(dock, /hoverDockGlowColor:\s*Colors\.orange/);
+assert.doesNotMatch(rearGlow, /opacity:\s*weatherDock\.contentGlowOpacity \*/);
+assert.doesNotMatch(rearGlow, /weatherColor/);
+
 // Colored fluid covers its own shadow; the white vessel and ticks remain on
 // top, retaining the carefully verified 17×35px pixel geometry.
 assert.match(dock, /id:\s*thermometerLiquid\s+anchors\.fill:\s*parent\s+z:\s*2/);

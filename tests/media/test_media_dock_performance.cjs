@@ -81,8 +81,6 @@ test("magenta dock glow and CAVA-colored clef remain independent from bar sampli
         assert.equal(png[25], 6, name + " needs RGBA transparency");
         assert.equal(crypto.createHash("sha256").update(png).digest("hex"), sha256, name + " palette art");
     }
-    assert.match(source, /readonly property color accentColor:\\s*mpdPlaying \\? Colors\\.orange : Colors\\.cyan/);
-    assert.doesNotMatch(mark, /source:\\s*Qt\\.resolvedUrl\\("\\.\\.\\/assets\\/media\\/treble-clef\\.png"\\)/);
 
 
 

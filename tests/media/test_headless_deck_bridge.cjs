@@ -119,7 +119,7 @@ test("search is in the control bay and display results remain read-only", () => 
     assert.match(deck, /function highlightRow\(index\)/);
     assert.match(deck, /function enterHighlighted\(\)/);
     assert.match(bridge, /function loadMedia\(ref\)/);
-    assert.match(bridge, /issue\("load", \["--uri", ref\.id, "--source", "local-mpd"\]\)/);
+    assert.match(bridge, /issue\("load", \["--uri", ref\.id, "--source", ref\.source\]\)/);
     assert.doesNotMatch(deck, /WlrKeyboardFocus\.Exclusive/);
 });
 

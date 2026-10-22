@@ -150,8 +150,17 @@ test("requested music icon retains the exact ornament codepoints and PNG treble 
     // Use the bundled image for U+1D11E. The operator's Qt text font stack
     // previously failed to draw that music symbol, so preserving it is safer.
     assert.ok(source.includes("// Requested Media icon: ‧₊˚ 𝄞 ׅ˖ㅤ"));
-    assert.ok(source.includes('text: "‧₊˚ "'));
-    assert.ok(source.includes('text: " ׅ˖ㅤ"'));
+    assert.ok(source.includes('text: "‧₊˚"'));
+    assert.ok(source.includes('text: "ׅ˖"'));
+    // Only visible ornaments contribute to Row implicitWidth. In particular,
+    // the old trailing U+3164 filler expanded the source item's glow bounds.
+    const markBody = source.match(/Row \\{\\s*id:\\s*musicMark([\\s\\S]*?)\\n\\s*\\}\\n\\n\\s*Item \\{\\s*id:\\s*spectrum/)?.[1];
+    assert.ok(markBody);
+    assert.match(markBody, /spacing:\\s*-2/);
+    assert.doesNotMatch(markBody, /text:\\s*"‧₊˚ "/);
+    assert.doesNotMatch(markBody, /text:\\s*" ׅ˖ㅤ"/);
+    assert.doesNotMatch(markBody, /text:\\s*"[^"]*ㅤ"/);
+
     assert.match(source, /id:\s*trebleClef\s*width:\s*15\s*height:\s*34/);
     assert.match(source, /source:\s*mediaDock\.open\s*\?\s*Qt\.resolvedUrl/);
     assert.match(source, /id:\s*trebleClefGlow\s*safeSource:\s*trebleClef/);
@@ -182,7 +191,7 @@ test("magenta front wash and CAVA-colored static music mark stay independent", (
     const musicMark = source.match(/Row \{\s*id:\s*musicMark([\s\S]*?)\n\s*\}\n\n\s*Item \{\s*id:\s*spectrum/);
     assert.ok(musicMark, "static music-mark cluster is still the one glow source");
     const mark = musicMark[1];
-    assert.match(mark, /spacing:\s*0/);
+    assert.match(mark, /spacing:\s*-2/);
     assert.match(mark, /id:\s*leadingStars/);
     assert.match(mark, /id:\s*trailingStar/);
     assert.equal((mark.match(/GohuText \{/g) || []).length, 2,
@@ -192,8 +201,8 @@ test("magenta front wash and CAVA-colored static music mark stay independent", (
     assert.match(mark, /source:\s*mediaDock\.open\s*\?\s*Qt\.resolvedUrl\("\.\.\/assets\/media\/treble-clef\.png"\)\s*:\s*mediaDock\.mpdPlaying\s*\?\s*Qt\.resolvedUrl\("\.\.\/assets\/media\/treble-clef-orange\.png"\)\s*:\s*Qt\.resolvedUrl\("\.\.\/assets\/media\/treble-clef-cyan\.png"\)/);
     assert.match(mark, /sourceSize:\s*Qt\.size\(45,\s*102\)/);
     assert.match(mark, /onStatusChanged:[\s\S]*?Image\.Error/);
-    assert.match(mark, /textFormat:\s*Text\.PlainText\s*text:\s*"‧₊˚ "/);
-    assert.match(mark, /textFormat:\s*Text\.PlainText\s*text:\s*" ׅ˖ㅤ"/);
+    assert.match(mark, /textFormat:\s*Text\.PlainText[\s\S]*?text:\s*"‧₊˚"/);
+    assert.match(mark, /textFormat:\s*Text\.PlainText[\s\S]*?text:\s*"ׅ˖"/);
     assert.equal((mark.match(/anchors\.verticalCenter:\s*trebleClef\.verticalCenter/g) || []).length, 2);
     assert.equal((mark.match(/color:\s*mediaDock\.foregroundColor/g) || []).length, 2);
     assert.doesNotMatch(mark, /Text\.StyledText|<font |text:\s*"𝄞"/);
@@ -305,8 +314,8 @@ test("stars and treble clef each have a matching local accent aura", () => {
     assert.equal((source.match(/RectangularShadow \{/g) || []).length, 5);
     assert.equal((source.match(/SafeDropShadow \{/g) || []).length, 3);
     assert.match(source, /Row \{\s*id:\s*mediaArtwork\s*anchors\.centerIn:\s*parent\s*spacing:\s*9\s*z:\s*1/);
-    assert.match(source, /id:\s*leadingStars[\s\S]*?text:\s*"‧₊˚ "[\s\S]*?color:\s*mediaDock\.foregroundColor/);
-    assert.match(source, /id:\s*trailingStar[\s\S]*?text:\s*" ׅ˖ㅤ"[\s\S]*?color:\s*mediaDock\.foregroundColor/);
+    assert.match(source, /id:\s*leadingStars[\s\S]*?text:\s*"‧₊˚"[\s\S]*?color:\s*mediaDock\.foregroundColor/);
+    assert.match(source, /id:\s*trailingStar[\s\S]*?text:\s*"ׅ˖"[\s\S]*?color:\s*mediaDock\.foregroundColor/);
     // The clef preserves its font-independent PNG and has one sampled
     // shadow plus one underlight, just like each ornament group.
     assert.match(source, /id:\s*trebleClef\s*width:\s*15\s*height:\s*34/);

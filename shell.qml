@@ -776,9 +776,27 @@ PanelWindow {
             }
         }
 
-        // Clock
+        // Clock and TimeW. This mirrors CPU++/Weather's owner-window
+        // composition while preserving the Clock module's existing size and
+        // right-click 12/24-hour behavior. TimeW stays outside Koinoikos's
+        // keyboard roster until it has an explicit focus-adapter assignment.
+        // Do not use anchors.fill on Clock here: its width is self-sized.
+        Item {
+            width: clockDock.width
+            height: clockDock.height
 
-        Clock {}
+            Clock {
+                id: clockDock
+                timeWindow: timewWindow
+            }
+
+            TimeW {
+                id: timewWindow
+                screen: Quickshell.screens.find(s => s.name === "DP-5")
+                keyboardActive: !relationshipFocus.active
+                relationshipFocusModeActive: relationshipFocus.active
+            }
+        }
 
         // Notifications
 

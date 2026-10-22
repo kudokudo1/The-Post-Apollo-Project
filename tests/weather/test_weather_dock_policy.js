@@ -198,7 +198,14 @@ assert.doesNotMatch(dock, /id:\s*glassBulb/);
 assert.doesNotMatch(dock, /id:\s*liquidBulb/);
 // Scale marks are ordinary QML rectangles inside the tube and use exactly the
 // same glass color and opacity as the outline.
-assert.match(dock, /readonly property color glassColor:\s*Colors\.white/);
+// Open state colors the outline AND interior scale marks together. The
+// condition/temperature hover color must not repaint the structural glass.
+assert.match(dock, /readonly property color glassColor:\s*weatherDock\.open\s*\? Colors\.magenta : Colors\.white/);
+assert.doesNotMatch(dock, /readonly property color glassColor:\s*Colors\.white/);
+assert.match(dock, /strokeColor:\s*weatherThermometer\.glassColor/);
+assert.match(dock, /color:\s*weatherThermometer\.glassColor/);
+// Keeping a single glassColor binding means both visible layers follow open
+// immediately, while idle/hover/press still remain off-white.
 assert.match(dock, /readonly property real glassOpacity:\s*1\.0/);
 assert.match(dock, /Repeater\s*\{\s*model:\s*4[\s\S]*?delegate:\s*Rectangle\s*\{[\s\S]*?color:\s*weatherThermometer\.glassColor[\s\S]*?opacity:\s*weatherThermometer\.glassOpacity/);
 assert.match(dock, /Behavior on animatedLevel[\s\S]*?NumberAnimation\s*\{[\s\S]*?duration:\s*300/);

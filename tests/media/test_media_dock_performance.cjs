@@ -52,6 +52,23 @@ test("magenta idle chassis and treble clef do not recolor or resample CAVA", () 
     assert.doesNotMatch(source, /contentGlowSource:\s*(?:spectrum|mediaArtwork)/);
 });
 
+test("CAVA neon tracks the animated bar using geometry only", () => {
+    const match = source.match(/Item \{\s*width:\s*5\s*height:\s*spectrum\.height([\s\S]*?)\n\s*\}\n\s*\}\n\s*\}\n\s*\}\n\s*\}/);
+    assert.ok(match, "expected a bounded bar item inside the 16-bar Repeater");
+    const bar = match[1];
+    assert.match(bar, /id:\s*cavaBar/);
+    assert.match(bar, /height:\s*cavaBar\.height\s*\+\s*6/);
+    assert.match(bar, /height:\s*cavaBar\.height\s*\+\s*2/);
+    assert.match(bar, /width:\s*parent\.width\s*\+\s*8/);
+    assert.match(bar, /width:\s*parent\.width\s*\+\s*4/);
+    assert.equal((bar.match(/color:\s*mediaDock\.accentColor/g) || []).length, 3,
+        "both glow layers and the bar must follow the same cyan/orange accent");
+    assert.equal((bar.match(/Behavior on height/g) || []).length, 1,
+        "only the actual bar animates; halos follow bindings");
+    assert.doesNotMatch(bar, /DropShadow|RectangularShadow|ShaderEffect|layer\.enabled/);
+    assert.doesNotMatch(source, /contentGlowSource:\s*(?:spectrum|mediaArtwork|cavaBar)/);
+});
+
 test("CAVA preserves 16-bar output at a bounded 15 FPS", () => {
     assert.match(config, /^bars\s*=\s*16$/m);
     assert.match(config, /^framerate\s*=\s*15$/m);

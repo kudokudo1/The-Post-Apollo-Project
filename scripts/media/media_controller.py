@@ -36,6 +36,8 @@ class MediaController:
         self.loaded: dict[str, Any] | None = None
         self.active_backend: str | None = None
         self.owned_active_id: str | None = None
+        # Ownership belongs to the playing queue entry, not the next cassette.
+        self.owned_active: dict[str, Any] | None = None
         self.generation = 0
         self.intent_store = intent_store
         self.persistence_error: str | None = None
@@ -80,30 +82,30 @@ class MediaController:
                                "backend": "mpd", "queueId": pending["queueId"]}
                 self.active_backend = "mpd"
         self.owned_active_id = None
+        self.owned_active = None
         if self.selection or self.loaded:
             self._advance()
+
+    def _queue_matches(self, backend: MpdBackend, entry: dict[str, Any]) -> bool:
+        target_id, target_ref = entry["queueId"], entry["ref"]
+        if target_ref.get("source") == "radio-browser":
+            uri = entry.get("cueUri")
+            return bool(uri and getattr(backend, "radio_relay", None)
+                        and backend.radio_relay.owns(uri)
+                        and any(str(x.get("queueId")) == target_id
+                                and x.get("ref", {}).get("id") == uri
+                                for x in backend.queue()))
+        return any(str(x.get("queueId")) == target_id
+                   and x.get("ref") == target_ref for x in backend.queue())
 
     def _verify_loaded_queue(self) -> MpdBackend:
         backend = self._bound_backend()
         assert self.loaded is not None
-        target_id, target_ref = self.loaded["queueId"], self.loaded["ref"]
-        # Loopback relay queue rows are MPD-local URI records, while the
-        # user-visible loaded ref remains a source-qualified station UUID.
-        if target_ref.get("source") == "radio-browser":
-            uri = self.loaded.get("cueUri")
-            candidates = [x for x in backend.queue()
-                          if str(x.get("queueId")) == target_id
-                          and x.get("ref", {}).get("id") == uri
-                          and getattr(backend, "radio_relay", None)
-                          and backend.radio_relay.owns(uri)]
-        else:
-            candidates = [x for x in backend.queue()
-                          if str(x.get("queueId")) == target_id
-                          and x.get("ref") == target_ref]
-        if len(candidates) != 1:
+        if not self._queue_matches(backend, self.loaded):
+        if True:
             self.loaded = None
-            self.owned_active_id = None
-            self.active_backend = None
+            if self.owned_active_id is None:
+                self.active_backend = None
             self._save_intent()
             self._advance()
             raise MediaBackendError("LOADED_TRACK_STALE",
@@ -144,17 +146,22 @@ class MediaController:
 
     def _verify_current_ownership(self) -> MpdBackend:
         backend = self._bound_backend()
-        if self.owned_active_id is None:
+        if self.owned_active_id is None or self.owned_active is None:
             raise MediaBackendError("NO_OWNED_PLAYBACK", "Start playback through this controller first")
-        # A stale/replaced queue ID must never gain transport ownership.
-        self._verify_loaded_queue()
         current = backend.observe()["current"]
         current_id = str(current["queueId"]) if current and current.get("queueId") else None
         if current_id != self.owned_active_id:
             self.owned_active_id = None
+            self.owned_active = None
             self._advance()
             raise MediaBackendError("PLAYBACK_CHANGED_EXTERNALLY",
                                     "MPD's current track changed outside this controller")
+        if not self._queue_matches(backend, self.owned_active):
+            self.owned_active_id = None
+            self.owned_active = None
+            self._advance()
+            raise MediaBackendError("OWNED_TRACK_STALE",
+                                    "The active MPD queue entry changed")
         return backend
 
     def _session(self) -> dict[str, Any]:
@@ -168,6 +175,7 @@ class MediaController:
             # Observing a mismatch invalidates ownership but never modifies MPD.
             if self.owned_active_id is not None and current_id != self.owned_active_id:
                 self.owned_active_id = None
+                self.owned_active = None
                 self._advance()
             result["ownedByController"] = (
                 self.owned_active_id is not None and current_id == self.owned_active_id
@@ -268,13 +276,18 @@ class MediaController:
             if ref["source"] == "radio-browser":
                 self.loaded["cueUri"] = prepared["uri"]
             self.active_backend = backend.id
-            # Newly cued media isn't necessarily the session already playing.
-            self.owned_active_id = None
+            # A queued cassette must not revoke ownership of the station
+            # still playing. PLAY performs the actual ownership transfer.
             self._advance()
             self._save_intent()
             if autoplay:
                 backend.play_id(queue_id)
+                current = backend.observe().get("current")
+                if not current or str(current.get("queueId")) != queue_id:
+                    raise MediaBackendError("PLAY_NOT_CONFIRMED",
+                                            "MPD did not confirm the queued station")
                 self.owned_active_id = queue_id
+                self.owned_active = self.loaded.copy()
                 self._advance()
             return {"loaded": self.loaded, "autoplay": autoplay,
                     "commandIssued": True, "session": self._session()}
@@ -303,8 +316,8 @@ class MediaController:
             self.backends["mpd"].remove(queue_id)
             if self.loaded and queue_id == self.loaded["queueId"]:
                 self.loaded = None
-                self.active_backend = None
-                self.owned_active_id = None
+                if self.owned_active_id is None:
+                    self.active_backend = None
                 self._save_intent()
             self._advance()
             return {"removed": queue_id, "commandIssued": True}
@@ -313,8 +326,15 @@ class MediaController:
             if not self.loaded:
                 raise MediaBackendError("NO_LOADED_MEDIA", "Select and load music first")
             backend = self._verify_loaded_queue()
-            backend.play_id(self.loaded["queueId"])
-            self.owned_active_id = self.loaded["queueId"]
+            target = self.loaded.copy()
+            backend.play_id(target["queueId"])
+            current = backend.observe().get("current")
+            if not current or str(current.get("queueId")) != target["queueId"]:
+                # Never claim transfer unless MPD reports the requested ID.
+                raise MediaBackendError("PLAY_NOT_CONFIRMED",
+                                        "MPD did not confirm the loaded station")
+            self.owned_active_id = target["queueId"]
+            self.owned_active = target
             self._advance()
             return {"commandIssued": True, "session": self._session()}
 
@@ -328,12 +348,14 @@ class MediaController:
             if op in ("next", "previous"):
                 observed = backend.observe()
                 current = observed.get("current")
-                self.owned_active_id = (
-                    str(current["queueId"]) if current and current.get("queueId") else None
-                )
+                # NEXT/PREVIOUS move beyond the explicitly owned station.
+                # Never adopt a different queue entry without a fresh PLAY.
+                self.owned_active_id = None
+                self.owned_active = None
             if op == "stop":
                 # Preserve loaded cassette while relinquishing live playback.
                 self.owned_active_id = None
+                self.owned_active = None
             self._advance()
             return {"commandIssued": True, "session": self._session()}
 

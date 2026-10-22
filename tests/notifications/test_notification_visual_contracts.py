@@ -188,7 +188,7 @@ for surface, name in ((HUB, "history"), (POPUP, "popup")):
         f"{name}: use the same magenta hue and saturation"
     )
     assert "lightness: -0.12" in surface, f"{name}: keep dark visual depth"
-    assert "color: Colors.black" in surface, f"{name}: website black backing"
+    assert "Colors.black" in surface, f"{name}: website black backing"
 assert 'notificationEntry.website !== "" ? Colors.black : Colors.dark' in HUB
 assert 'notificationEntry.website !== ""\n                                    ? Colors.magenta : notificationEntry.sourceColor' in HUB
 

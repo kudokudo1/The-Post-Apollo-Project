@@ -8,7 +8,7 @@ This file documents only the Notifications implementation boundary; it is not a 
 
 One Notifications **MAIL** deck, two independently authenticated adapters:
 
-- **Brave companion:** Free and paid Proton plans. Must inspect only an explicitly authorized Proton Mail tab. Proton native Snooze is possible only after the site interaction, message selection and result can be reliably verified. No private undocumented Proton HTTP API assumed.
+- **Browser companion (Chromium + Firefox):** Free and paid Proton plans. Must inspect only an explicitly authorized Proton Mail tab. Proton native Snooze is possible only after the site interaction, message selection and result can be reliably verified. No private undocumented Proton HTTP API assumed.
 - **Proton Mail Bridge:** Paid plan, IMAP loopback. Read, Archive, Trash, Spam and Star may be implemented with verified IMAP mailbox identity/flags. Native Snooze is NOT supplied by Bridge, even on paid plans.
 
 The MAIL deck already exists. Native notification actions remain available when the sender advertises them, but these are unrelated to provider authentication. Until a real adapter provides a verified message reference, the six buttons **stay disabled**.
@@ -16,7 +16,7 @@ The MAIL deck already exists. Native notification actions remain available when 
 ## Architecture
 
 ```text
-Brave notification ----> NotificationsService (history + notification id)
+Browser notification --> NotificationsService (history + notification id)
                                |
                   PRIVATE trusted message binding
                                |
@@ -24,7 +24,7 @@ Brave notification ----> NotificationsService (history + notification id)
                                |
             +------------------+------------------+
             |                                     |
-    Brave Companion                      Bridge IMAP (paid)
+    Browser Companion                    Bridge IMAP (paid)
     Proton origin only                   loopback + verified TLS
     Snooze + supported web ops           five IMAP-supported ops
             |                                     |
@@ -43,7 +43,7 @@ Brave notification ----> NotificationsService (history + notification id)
 4. **Trash and Spam require explicit confirmation.** Clicking an available MAIL action is not an authorization to touch another email.
 5. Provider dispatch means **pending**, not success. Show completion only after a verified response matching the same action, account, event, message reference and request id; reconnect/failure/timeout must not infer success.
 6. Bridge must bind **127.0.0.1**, a verified TLS mode/certificate, a single authenticated account, and **UIDVALIDITY + UID + mailbox**. An IMAP move can change UID, so the adapter must refresh binding/receipt before subsequent actions. Never bypass certificate verification or use a Proton account password instead of Bridge credentials.
-7. The browser companion must use a fixed extension ID in its native-host `allowed_origins` and check sender origin independently. The native host manifest and extension installation are **separate explicit operator approvals**. No extension broad browsing permissions, page-injected scripts or session-token copying.
+7. The browser companion must pin the exact extension identity in the native-host allowlist: Chromium uses `allowed_origins` plus a `chrome-extension://` caller; Firefox uses `allowed_extensions` plus the explicit Gecko add-on ID. The native host independently checks the caller using browser-specific launch arguments. The native host manifest and extension installation are **separate explicit operator approvals**. No extension broad browsing permissions, page-injected scripts or session-token copying.
 8. Preserve Notifications SITE/APP, DND, ZZ, FAVS, CLEAR ALL, native default click, Apollo widget routes and ⇲ Bring Here. **Mail Snooze is not Notification ZZ; Mail Star is not Notification Favorites.**
 
 ## Implemented in this slice
@@ -56,12 +56,32 @@ Brave notification ----> NotificationsService (history + notification id)
 
 ## Remaining implementation gates
 
-1. Browser: test Brave's supported extension API and real Proton UI to establish a **stable account and exact message identity** from the authenticated page without capturing session secrets. Explicit local installation + validation required. Do not automate uncertain DOM selectors.
+1. Browser: test each supported browser family's extension API and the real Proton UI to establish a **stable account and exact message identity** from the authenticated page without capturing session secrets. Explicit local installation + validation required. Do not automate uncertain DOM selectors.
 2. Browser: implement each action behind confirmed UI-specific capability, including Snooze time choice (preset time works on Free). No unverified API calls.
 3. Bridge: after paid access and explicit local installation approval, design a local-only TLS-verified IMAP client using **Bridge-generated credentials held only in the OS secret store**. Add a read-only mailbox identity probe, then controlled operations with refresh of UID after moves.
 4. Correlate a browser notification to a confirmed mailbox event through a trusted adapter-controlled event binding. Old saved notifications without identity do not become writable.
 5. Connect trusted bindings + provider receipts to NotificationsService and MAIL buttons, using a pending/confirmed/failed UI. Include rollback and no-duplicate-dispatch tests.
-6. Only after dedicated test evidence, real Quickshell/Brave/Bridge acceptance, and operator approval: enable actions on the local machine.
+6. Only after dedicated test evidence, real Quickshell/browser/Bridge acceptance, and operator approval: enable actions on the local machine.
+
+
+## Multi-browser companion foundation (2026-10-22)
+
+The browser-facing pilot is shared, **not a Brave-only mailbox adapter**:
+
+- **Chromium-family (Brave, Chrome/Chromium, Edge, Opera):** use `integrations/proton/browser/manifest.json` (Manifest V3 background service worker), `background.js`, and `native-host.example.json`. Browser-specific host registration and the actual exact Chromium extension ID are not installed or assumed; each browser must be tested separately.
+- **Firefox:** stage `manifest.firefox.json` **as `manifest.json`** in an isolated extension package with the same `background.js`. Its Manifest V3 background uses `scripts`, with the explicitly pinned Gecko ID `postapollo-proton@extensions.invalid`. Stage `native-host.firefox.example.json` under the browser's proper native-messaging host location with its `allowed_extensions` and an approved absolute executable path. Firefox's native host launch convention uses a manifest-path argument followed by the add-on ID.
+- **Mullvad Browser:** Firefox-derived, but opt-in feasibility-only until separately validated. It is not auto-installed, and reducing fingerprinting protections to make the extension work is not authorized.
+- All families send exactly `{"protocol":1,"kind":"PING"}` after a user click on an exact `https://mail.proton.me`-origin tab. The host returns **read-only** `PONG` with `mailboxAccess:false`, `messageIdentityVerified:false` and no capabilities. No browser gets mailbox privileges from this compatibility slice.
+- A manually approved host environment must pin `POST_APOLLO_PROTON_EXTENSION_ORIGIN` for Chromium or `POST_APOLLO_PROTON_FIREFOX_EXTENSION_ID` for Firefox. The host rejects wrong ID, mismatched family, unexpected manifest-path shape, unknown commands and broad/wildcard identities. A separate native-host manifest must be registered where the selected browser expects it.
+- Browser family is a **transport distinction**, not an email provider. Chrome support does not mean Gmail support. Proton identity, action dispatch, private event binding and provider-confirmed receipts remain future work shared across all browser families.
+- Offline simulated tests execute the shared background logic using both browser API styles and verify origin restrictions, read-only replies, host identity and permission boundaries. No end-to-end browser installation, real Proton account, message identification or MAIL action was tested or activated.
+
+Native host references:
+- Chrome/Chromium native messaging: https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging
+- Firefox native messaging: https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Native_messaging
+- Edge native messaging: https://learn.microsoft.com/en-us/microsoft-edge/extensions/developer-guide/native-messaging
+- Opera native messaging: https://help.opera.com/en/extensions/message-passing/
+- Mullvad extension/fingerprinting advisory: https://mullvad.net/en/help/faq
 
 ## Authoritative external references
 

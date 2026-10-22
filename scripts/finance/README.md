@@ -493,3 +493,34 @@ Funding follow-up (NOT implemented here): read-only reconciliation of
 starting balances and income categorization, then preview and separately
 authorized operations that are supported by Actual. Preserve the user's
 actual accounts and never fabricate a balance to unlock a button.
+
+
+## FinanceW D14 // Monthly Funding Review (READ ONLY)
+
+Under Finance → Budget → Budget, use **REVIEW FUNDING** in the scrollable
+Budget area. It shows selected-month income-category activity as reported by
+Actual's budget month, a count and total of positive uncategorized transactions
+in active on-budget accounts, and warnings about what these numbers cannot
+prove. It reuses the authenticated snapshot already loaded by FinanceW:
+no extra server queries, no permission changes and no writer or APPLY action.
+
+- **Income category activity** is the signed sum of Actual's income-group
+  category \`spent\` fields, not a claim of new funds available to allocate.
+- **Positive uncategorized items** may be income, refunds, adjustments or
+  transfers. Ordinary transfers and split parents/children are excluded
+  when Actual identifies them; the operator must review ambiguous cases.
+- **Opening balances** are deliberately marked **NOT VERIFIED**. A single
+  monthly snapshot cannot prove historical opening balances.
+- **To Budget** remains exactly the value reported by Actual. It is never
+  recomputed from account balances or uncategorized positive transactions.
+
+The same existing read-only Actual API getters supply all data. The normalized
+summary contains **aggregate cents and counts only**, never new transaction
+descriptions, raw sync IDs, account secrets or category writes.
+If the month/source changes, the review closes and cannot display stale data.
+Actual remains the authoritative place to inspect and correct income
+categorization or starting balances, subject to the separate authorization
+rules for any future FinanceW editing tools.
+
+Next potential work: opening-balance historical inspection and a guarded
+income categorization preview. Neither is implemented or activated by D14.

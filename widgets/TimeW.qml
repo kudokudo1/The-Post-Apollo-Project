@@ -33,6 +33,17 @@ PanelWindow {
     property bool use24Hour: true
     readonly property var localTimeSnapshot:
         LocalTimePolicy.snapshot(localClock.date.getTime(), use24Hour)
+    // Local clock display identity follows the dock's 24H/12H colors.
+    // The window chassis remains white. Meridiem is intentionally visible
+    // in both modes as //AM or //PM, even when the hour is in 24H format.
+    readonly property color clockReadoutColor:
+        use24Hour ? Colors.orange : Colors.cyan
+    readonly property string clockReadoutText:
+        localTimeSnapshot.state === "ready"
+        ? (use24Hour ? localTimeSnapshot.time24
+                     : localTimeSnapshot.time12.slice(0, 8))
+          + "//" + localTimeSnapshot.meridiem
+        : "--:--:--//--"
 
     readonly property var modes: [
         { id: "clock", name: "CLOCK" },
@@ -325,8 +336,8 @@ PanelWindow {
                                                 - parent.spacing)
                                 height: parent.height
                                 verticalAlignment: Text.AlignVCenter
-                                text: timew.localTimeSnapshot.displayTime
-                                color: timew.semanticColor
+                                text: timew.clockReadoutText
+                                color: timew.clockReadoutColor
                                 font.pixelSize: timew.use24Hour ? 22 : 19
                                 elide: Text.ElideRight
                             }
@@ -338,7 +349,7 @@ PanelWindow {
                                 label: timew.use24Hour ? "24H" : "12H"
                                 labelPixelSize: 11
                                 trackLabelGlowLocally: true
-                                accentColor: timew.semanticColor
+                                accentColor: timew.clockReadoutColor
                                 onLeftClicked: timew.use24Hour = !timew.use24Hour
                             }
                         }

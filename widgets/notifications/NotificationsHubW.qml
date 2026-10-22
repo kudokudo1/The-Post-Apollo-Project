@@ -2184,6 +2184,7 @@ PanelWindow {
                             }
                             NeonScrollBar {
                                 flickable: dndManagerList
+                                accountForContentOrigin: true
                                 handleStyle: "star"
                                 // The shared star's drop shadow must extend
                                 // beyond the 16px track, not be clipped to it.
@@ -2343,6 +2344,7 @@ PanelWindow {
                             }
                             NeonScrollBar {
                                 flickable: favoriteManagerList
+                                accountForContentOrigin: true
                                 handleStyle: "star"
                                 containGlow: false
                                 handleGlowEnabled: true
@@ -3005,6 +3007,7 @@ PanelWindow {
                     id: scrollBarArea
 
                     flickable: historyList
+                    accountForContentOrigin: true
                     handleStyle: "star"
                     // Reuse NeonScrollBar's star Canvas and SafeDropShadow;
                     // allowing the halo outside its narrow track is essential.

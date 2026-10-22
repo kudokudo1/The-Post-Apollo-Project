@@ -7,6 +7,9 @@ Item {
 
     // Scroll target.
     property var flickable: null
+    // Opt in for ListView/GridView: their origin can move when rows are
+    // inserted, removed or sized lazily. Other consumers retain legacy math.
+    property bool accountForContentOrigin: false
     // Positioner-owned content may mount its overlay into a non-positioning
     // ancestor without counting the scrollbar as a Column/Row layout child.
     property Item mountingParent: null
@@ -334,10 +337,15 @@ Item {
     readonly property real maxContentX:
         flickable ? Math.max(0, flickable.contentWidth - flickable.width) : 0
     readonly property real maxContentExtent: horizontal ? maxContentX : maxContentY
+    readonly property real contentStart:
+        flickable && accountForContentOrigin
+        ? (horizontal ? flickable.originX : flickable.originY) : 0
+    readonly property real contentEnd: contentStart + maxContentExtent
     readonly property real scrollRatio:
         maxContentExtent > 0 && flickable
         ? Math.max(0, Math.min(1,
-             (horizontal ? flickable.contentX : flickable.contentY) / maxContentExtent))
+             ((horizontal ? flickable.contentX : flickable.contentY) - contentStart)
+             / maxContentExtent))
         : 0
     visible: !!flickable
         && (effectiveVisibilityMode === "persistent"
@@ -517,16 +525,16 @@ Item {
         const ratio = travel > 0
             ? clamp((Number(pointerAxis || 0) - offset) / travel, 0, 1) : 0;
         if (horizontal)
-            flickable.contentX = ratio * maxContentExtent;
+            flickable.contentX = contentStart + ratio * maxContentExtent;
         else
-            flickable.contentY = ratio * maxContentExtent;
+            flickable.contentY = contentStart + ratio * maxContentExtent;
     }
     function moveBy(delta, allowChain) {
         if (!flickable || !Number.isFinite(delta) || delta === 0)
             return false;
         const axis = horizontal ? "contentX" : "contentY";
         const before = flickable[axis];
-        flickable[axis] = clamp(before + delta, 0, maxContentExtent);
+        flickable[axis] = clamp(before + delta, contentStart, contentEnd);
         const used = flickable[axis] - before;
         const remainder = delta - used;
         if (allowChain && scrollChaining && chainFlickable
@@ -581,7 +589,7 @@ Item {
         if (key === Qt.Key_PageDown) delta = viewportExtent;
         else if (key === Qt.Key_PageUp) delta = -viewportExtent;
         else if (key === Qt.Key_Home || key === Qt.Key_End) {
-            const target = key === Qt.Key_Home ? 0 : maxContentExtent;
+            const target = key === Qt.Key_Home ? contentStart : contentEnd;
             if (horizontal) flickable.contentX = target;
             else flickable.contentY = target;
             return true;

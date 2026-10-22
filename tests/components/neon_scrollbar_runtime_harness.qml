@@ -5,7 +5,7 @@ import "../../components" as Shared
 Window {
     id: root
     width: 370
-    height: 910
+    height: 1130
     visible: true
     color: "#1B0623"
 
@@ -165,6 +165,46 @@ Window {
                 boxTopInset: graphInset.anchors.margins + graphHeader.height / 2
             }
         }
+    }
+
+    // Notifications COMBI case: mixed delegate heights, a dynamic ListView
+    // origin, and a star track. Removing rows above the viewport can shift
+    // originY away from zero even though the user still has valid content.
+    ListView {
+        id: shiftedList
+        objectName: "shiftedList"
+        x: 14; y: 880; width: 270; height: 180
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        model: ListModel { id: shiftedRows }
+        delegate: Rectangle {
+            required property int cardHeight
+            width: shiftedList.width
+            height: cardHeight
+            color: "#16051F"
+        }
+        Component.onCompleted: {
+            for (let i = 0; i < 40; i++)
+                shiftedRows.append({ "cardHeight": i % 4 === 0 ? 120 : 48 });
+        }
+    }
+    Shared.NeonScrollBar {
+        id: shiftedBar
+        objectName: "shiftedBar"
+        flickable: shiftedList
+        accountForContentOrigin: true
+        handleStyle: "star"
+    }
+
+    function disturbListOrigin() {
+        shiftedList.positionViewAtIndex(24, ListView.Beginning);
+        shiftedRows.remove(0, 12);
+    }
+    function showListStart() {
+        shiftedList.positionViewAtBeginning();
+    }
+    function showListEnd() {
+        shiftedList.positionViewAtEnd();
     }
 
     readonly property bool graphUsesOuterFrame: graphRail.geometryHost === graphFrame

@@ -37,14 +37,40 @@ assert "WindowPanelFrame {" in MENU
 assert "fillColor: Colors.black" in MENU
 assert "borderColor: Colors.cyan" in MENU
 assert "glowColor: Colors.cyan" in MENU
-assert 'text: "TASKS // HOME"' in MENU
+assert 'text: "TASKS // " + root.activeMode.label' in MENU
 assert "color: Colors.magenta" in MENU
 assert "height: 2" in MENU
 assert 'label: "×"' in MENU
 assert "destructive: true" in MENU
 assert 'text: "NO FEED"' in MENU
-assert 'text: "NO TASKS LOADED"' in MENU
-assert 'text: "TASK EDITOR // NOT CONNECTED"' in MENU
+assert 'emptyTitle: "NO TASKS LOADED"' in MENU
+assert 'emptyDetail: "TASK EDITOR // NOT CONNECTED"' in MENU
+
+# Five independent main modes, selected from one existing menu and
+# rendered by ModeButton instead of five ad hoc click/halo implementations.
+expected_modes = ("tasks", "today", "projects", "planner", "sync")
+assert "readonly property var mainModes: [" in MENU
+for mode_id in expected_modes:
+    assert f'id: "{mode_id}"' in MENU
+assert MENU.count("emptyTitle: ") == len(expected_modes)
+assert MENU.count("emptyDetail: ") == len(expected_modes)
+assert 'property int selectedMainModeIndex: 0' in MENU
+assert "readonly property var activeMode: mainModes[selectedMainModeIndex]" in MENU
+assert "function selectMainMode(index)" in MENU
+assert "if (index >= 0 && index < mainModes.length)" in MENU
+assert "selectedMainModeIndex = index;" in MENU
+assert "id: mainModeRail" in MENU
+assert "model: root.mainModes" in MENU
+assert MENU.count("ModeButton {") == 1
+assert "textOnly: true" in MENU
+assert "bordered: false" in MENU
+assert "selected: root.selectedMainModeIndex === index" in MENU
+assert "onTriggered: root.selectMainMode(index)" in MENU
+assert "text: root.activeMode.emptyTitle" in MENU
+assert "text: root.activeMode.emptyDetail" in MENU
+assert "anchors.left: mainModeRail.right" in MENU
+assert "WlrLayershell.keyboardFocus: WlrKeyboardFocus.None" in MENU
+assert "focusable: false" in MENU
 
 for forbidden in (
     "Process {", "FileView {", "JsonAdapter {", "Timer {",

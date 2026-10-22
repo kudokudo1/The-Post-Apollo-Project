@@ -17,6 +17,33 @@ PanelWindow {
     readonly property int frameHeight: 768
     readonly property int glowGutter: 12
 
+    // M2: five main modes share one window and one truthful empty-state view.
+    // Text-only labels are provisional until the user approves mode artwork.
+    readonly property var mainModes: [
+        { id: "tasks", label: "TASKS",
+          emptyTitle: "NO TASKS LOADED",
+          emptyDetail: "TASK EDITOR // NOT CONNECTED" },
+        { id: "today", label: "TODAY",
+          emptyTitle: "TODAY // NO FEED",
+          emptyDetail: "DAILY TASKS // NOT CONNECTED" },
+        { id: "projects", label: "PROJECTS",
+          emptyTitle: "PROJECTS // NO FEED",
+          emptyDetail: "GITHUB PROJECTS // NOT CONNECTED" },
+        { id: "planner", label: "PLANNER",
+          emptyTitle: "PLANNER // NO FEED",
+          emptyDetail: "SCHEDULE // NOT CONNECTED" },
+        { id: "sync", label: "SYNC",
+          emptyTitle: "SYNC // NO FEED",
+          emptyDetail: "SYNC CONTROLS // NOT CONNECTED" }
+    ]
+    property int selectedMainModeIndex: 0
+    readonly property var activeMode: mainModes[selectedMainModeIndex]
+
+    function selectMainMode(index) {
+        if (index >= 0 && index < mainModes.length)
+            selectedMainModeIndex = index;
+    }
+
     function toggle() {
         menuOpen = !menuOpen;
     }
@@ -84,7 +111,7 @@ PanelWindow {
                 anchors.right: feedBadge.left
                 anchors.rightMargin: 8
                 anchors.verticalCenter: parent.verticalCenter
-                text: "TASKS // HOME"
+                text: "TASKS // " + root.activeMode.label
                 font.pixelSize: 17
                 font.bold: true
                 color: Colors.magenta
@@ -138,26 +165,70 @@ PanelWindow {
             color: Colors.cyan
         }
 
+        // Shared main-mode rail, following FinanceW's vertical arrangement.
+        // ModeButton owns its hover/selected/click effects; borders are off.
         Column {
-            anchors.centerIn: parent
-            spacing: 12
-            width: parent.width - 40
+            id: mainModeRail
+            anchors.top: tasksDivider.bottom
+            anchors.topMargin: 12
+            anchors.left: parent.left
+            anchors.leftMargin: 8
+            width: 104
+            spacing: 6
 
-            GohuText {
-                width: parent.width
-                horizontalAlignment: Text.AlignHCenter
-                text: "NO TASKS LOADED"
-                font.pixelSize: 18
-                font.bold: true
-                color: Colors.white
+            Repeater {
+                model: root.mainModes
+
+                ModeButton {
+                    required property var modelData
+                    required property int index
+                    width: mainModeRail.width
+                    height: 56
+                    textOnly: true
+                    labelText: modelData.label
+                    labelFontSize: 12
+                    bordered: false
+                    selected: root.selectedMainModeIndex === index
+                    onTriggered: root.selectMainMode(index)
+                }
             }
+        }
 
-            GohuText {
+        // Independent view area. No data is fabricated for reserved modes.
+        Item {
+            id: mainModeContent
+            anchors.top: tasksDivider.bottom
+            anchors.topMargin: 12
+            anchors.left: mainModeRail.right
+            anchors.leftMargin: 10
+            anchors.right: parent.right
+            anchors.rightMargin: 12
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 14
+
+            Column {
+                anchors.centerIn: parent
                 width: parent.width
-                horizontalAlignment: Text.AlignHCenter
-                text: "TASK EDITOR // NOT CONNECTED"
-                font.pixelSize: 12
-                color: Colors.cyan
+                spacing: 12
+
+                GohuText {
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    text: root.activeMode.emptyTitle
+                    font.pixelSize: 16
+                    font.bold: true
+                    color: Colors.white
+                }
+
+                GohuText {
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    text: root.activeMode.emptyDetail
+                    font.pixelSize: 11
+                    color: Colors.cyan
+                }
             }
         }
     }

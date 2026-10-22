@@ -92,7 +92,9 @@ assert 'text: timew.selectedName + " // TIMEW"\n                        color: t
 assert 'import "../services/hub/ApolloHubTimePolicy.js" as LocalTimePolicy' in window
 assert "LocalTimePolicy.snapshot(localClock.date.getTime(), use24Hour)" in window
 assert window.count("SystemClock {") == 1
-assert "Timer {" not in window
+assert window.count("Timer {") == 1
+assert "interval: 30000" in window
+assert "running: timew.menuOpen && timew.selectedMode === \"clock\"" in window
 assert "property bool use24Hour: true" in window
 # Clock-page presentation: 24H retains PM, 12H retains leading zero;
 # the time/control are orange in 24H and cyan in 12H (not chassis white).
@@ -109,6 +111,27 @@ assert 'accentColor: timew.clockReadoutColor' in window
 assert "text: timew.localTimeSnapshot.displayTime" not in window
 assert "text: timew.localTimeSnapshot.dateLabel" in window
 assert "text: timew.localTimeSnapshot.utcOffsetLabel" in window
+# Both local display modes now share the exact same font size.
+assert "font.pixelSize: 22" in window
+assert "font.pixelSize: timew.use24Hour ? 22 : 19" not in window
+# The world-clock adapter reuses SystemClock seconds and only invokes the
+# system's zone database via a read-only, fixed argv date command while open.
+assert 'import Quickshell.Io' in window
+assert 'import "../services/time/WorldClockPolicy.js" as WorldClockPolicy' in window
+assert "readonly property var worldZones:" in window
+for zone in ("UTC", "America/New_York", "Europe/London", "Asia/Tokyo"):
+    assert '"'+zone+'"' in window, zone
+assert "WorldClockPolicy.snapshot(localClock.date.getTime()," in window
+assert 'command: ["date", "+%z"]' in window
+assert 'environment: { TZ: worldLookupZone, LC_ALL: "C" }' in window
+assert "Process {" in window
+assert window.count("Process {") == 1
+assert "worldLookup.running" in window
+assert 'onLeftClicked: timew.chooseWorldZone(modelData.id)' in window
+assert 'text: timew.worldTimeSnapshot.readout' in window
+assert 'text: timew.worldClockReady' in window
+assert 'text: "WORLD // CURRENT TIME"' in window
+assert 'LOCAL + WORLD // LIVE // CONVERTER NEXT' in window
 assert "label: timew.use24Hour ? \"24H\" : \"12H\"" in window
 assert "onLeftClicked: timew.use24Hour = !timew.use24Hour" in window
 assert "fillColor: Colors.black" in window
@@ -137,8 +160,9 @@ for prop in ('label: "×"', "labelPixelSize: 22", "destructive: true",
 assert "NO SCREENSHOTS OR RESTORATION ACTIVE" in window
 assert "STOPWATCH + TIMERS // NOT CONNECTED" in window
 assert "FOUNDATION PREVIEW // UI ONLY" in window
-for primitive in ("Process {", "JsonAdapter {", "FileView {", "swaymsg",
-                  "grim ", "onTriggered: capture", "kill -"):
+for primitive in ("JsonAdapter {", "FileView {", "swaymsg",
+                  "grim ", "onTriggered: capture", "kill -",
+                  '["sh", "-c"', '["bash", "-c"'):
     assert primitive not in window, primitive
 
 print("TIMEW M1 SOURCE CONTRACTS: PASS (runtime preview still required)")

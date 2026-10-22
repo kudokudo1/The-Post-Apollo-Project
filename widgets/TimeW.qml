@@ -1,8 +1,10 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
+import Quickshell.Io
 import "../components"
 import "../services/hub/ApolloHubTimePolicy.js" as LocalTimePolicy
+import "../services/time/WorldClockPolicy.js" as WorldClockPolicy
 
 // TimeW M1: standalone temporal window foundation.
 // No timers, activity recording, screenshots or restoration are active here.
@@ -45,6 +47,46 @@ PanelWindow {
           + "//" + localTimeSnapshot.meridiem
         : "--:--:--//--"
 
+    // First world-clock slice. Zone IDs are allowlisted and passed only as
+    // child-process environment values, never interpolated into a shell.
+    readonly property var worldZones: [
+        { id: "UTC", label: "UTC" },
+        { id: "America/New_York", label: "NYC" },
+        { id: "Europe/London", label: "LON" },
+        { id: "Asia/Tokyo", label: "TYO" }
+    ]
+    property string selectedWorldZone: "UTC"
+    property string worldLookupZone: ""
+    property string worldValidZone: ""
+    property string worldRawOffset: ""
+    readonly property bool worldClockReady:
+        worldValidZone === selectedWorldZone && worldRawOffset !== ""
+    readonly property var worldTimeSnapshot:
+        WorldClockPolicy.snapshot(localClock.date.getTime(),
+                                  worldClockReady ? worldRawOffset : "",
+                                  use24Hour)
+
+    function chooseWorldZone(zoneId) {
+        if (!worldZones.some(function(zone) { return zone.id === zoneId; }))
+            return;
+        if (selectedWorldZone !== zoneId) {
+            selectedWorldZone = zoneId;
+            worldValidZone = "";
+            worldRawOffset = "";
+        }
+        refreshWorldClock();
+    }
+
+    function refreshWorldClock() {
+        if (!menuOpen || selectedMode !== "clock" || worldLookup.running)
+            return;
+        worldLookupZone = selectedWorldZone;
+        worldLookup.exec({
+            command: ["date", "+%z"],
+            environment: { TZ: worldLookupZone, LC_ALL: "C" }
+        });
+    }
+
     readonly property var modes: [
         { id: "clock", name: "CLOCK" },
         { id: "calc", name: "CALC" },
@@ -77,8 +119,15 @@ PanelWindow {
     }
 
     onMenuOpenChanged: {
-        if (menuOpen)
+        if (menuOpen) {
             Qt.callLater(restoreKeyboardFocus);
+            if (selectedMode === "clock")
+                Qt.callLater(refreshWorldClock);
+        }
+    }
+    onSelectedModeChanged: {
+        if (menuOpen && selectedMode === "clock")
+            Qt.callLater(refreshWorldClock);
     }
     onStandardKeysAvailableChanged: {
         if (standardKeysAvailable)
@@ -122,6 +171,40 @@ PanelWindow {
     SystemClock {
         id: localClock
         precision: SystemClock.Seconds
+    }
+
+    // A short-lived read-only lookup into the host IANA zone database.
+    // Existing SystemClock renders seconds; refresh the zone offset at most
+    // twice a minute, while Clock mode is open. No continuous subprocess.
+    Process {
+        id: worldLookup
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const offset = this.text.trim();
+                if (worldLookupZone === timew.selectedWorldZone
+                        && WorldClockPolicy.parseOffset(offset) !== null) {
+                    timew.worldRawOffset = offset;
+                    timew.worldValidZone = worldLookupZone;
+                }
+            }
+        }
+        onExited: function(exitCode, exitStatus) {
+            if (exitCode !== 0 && worldLookupZone === timew.selectedWorldZone) {
+                timew.worldRawOffset = "";
+                timew.worldValidZone = "";
+            }
+            if (timew.menuOpen && timew.selectedMode === "clock"
+                    && worldLookupZone !== timew.selectedWorldZone)
+                Qt.callLater(timew.refreshWorldClock);
+        }
+    }
+
+    Timer {
+        interval: 30000
+        repeat: true
+        running: timew.menuOpen && timew.selectedMode === "clock"
+        onTriggered: timew.refreshWorldClock()
     }
 
     Item {
@@ -338,7 +421,7 @@ PanelWindow {
                                 verticalAlignment: Text.AlignVCenter
                                 text: timew.clockReadoutText
                                 color: timew.clockReadoutColor
-                                font.pixelSize: timew.use24Hour ? 22 : 19
+                                font.pixelSize: 22
                                 elide: Text.ElideRight
                             }
 
@@ -375,6 +458,70 @@ PanelWindow {
                             color: Colors.orange
                             font.pixelSize: 11
                         }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 2
+                            color: Colors.cyan
+                            opacity: 0.5
+                        }
+
+                        GohuText {
+                            text: "WORLD // CURRENT TIME"
+                            color: timew.semanticColor
+                            font.pixelSize: 14
+                        }
+
+                        Row {
+                            id: worldZoneStrip
+                            width: parent.width
+                            height: 32
+                            spacing: 6
+
+                            Repeater {
+                                model: timew.worldZones
+
+                                ActionButton {
+                                    width: (worldZoneStrip.width
+                                            - (timew.worldZones.length - 1)
+                                              * worldZoneStrip.spacing)
+                                           / timew.worldZones.length
+                                    height: 30
+                                    label: modelData.label
+                                    labelPixelSize: 11
+                                    trackLabelGlowLocally: true
+                                    accentColor: timew.semanticColor
+                                    selected: modelData.id === timew.selectedWorldZone
+                                    onLeftClicked: timew.chooseWorldZone(modelData.id)
+                                }
+                            }
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text: timew.worldTimeSnapshot.readout
+                            color: timew.clockReadoutColor
+                            font.pixelSize: 22
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text: timew.worldClockReady
+                                  ? timew.selectedWorldZone + " // "
+                                    + timew.worldTimeSnapshot.utcOffsetLabel
+                                  : "ZONE LOOKUP // UNAVAILABLE OR UPDATING"
+                            color: Colors.orange
+                            font.pixelSize: 11
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            text: timew.worldClockReady
+                                  ? "DATE // " + timew.worldTimeSnapshot.localDate
+                                  : "DATE // --"
+                            color: Colors.white
+                            font.pixelSize: 11
+                        }
                     }
 
                     GohuText {
@@ -396,7 +543,9 @@ PanelWindow {
                     }
 
                     GohuText {
-                        text: "FOUNDATION PREVIEW // UI ONLY"
+                        text: timew.selectedMode === "clock"
+                              ? "LOCAL + WORLD // LIVE // CONVERTER NEXT"
+                              : "FOUNDATION PREVIEW // UI ONLY"
                         color: Colors.white
                         font.pixelSize: 11
                     }

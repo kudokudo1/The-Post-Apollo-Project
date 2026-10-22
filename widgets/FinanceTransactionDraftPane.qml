@@ -30,7 +30,7 @@ Item {
 
     function parseCents(text) {
         const source = String(text || "");
-        if (!/^\\d{1,9}(?:\\.\\d{1,2})?$/.test(source))
+        if (!/^\d{1,9}(?:\.\d{1,2})?$/.test(source))
             return -1;
         const parts = source.split(".");
         const pennies = Number(parts[0]) * 100
@@ -40,7 +40,7 @@ Item {
 
     function validDate(text) {
         const input = String(text || "");
-        if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(input)
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(input)
                 || input.slice(0, 7) !== selectedMonth)
             return false;
         const parts = input.split("-").map(Number);

@@ -6,6 +6,7 @@ import "../weather/WeatherDockPolicy.js" as WeatherPolicy
 import "ApolloHubSystemPolicy.js" as SystemPolicy
 import "ApolloHubNetworkPolicy.js" as NetworkPolicy
 import "ApolloHubMediaPolicy.js" as MediaPolicy
+import "ApolloHubAppsPolicy.js" as AppsPolicy
 
 // ApolloHubW live-data bridge. This owns NO weather fetch, subprocess,
 // credentials, writable controls, or duplicate WeatherService instance.
@@ -16,6 +17,15 @@ Scope {
 
     property var weatherSource: null
     property var systemSource: null
+
+    // B6 applications catalog: reuse the native Quickshell desktop-entry
+    // index, which already tracks installed .desktop files. No directory scan,
+    // subprocess, launch action, or AppControl ownership transfer.
+    property string appsQuery: ""
+    readonly property var desktopApplicationEntries:
+        DesktopEntries.applications ? DesktopEntries.applications.values : null
+    readonly property var appsSnapshot:
+        AppsPolicy.snapshot(desktopApplicationEntries, appsQuery)
 
     // The B5 uptime reader lives in its own nonvisual read-only component.
     // Preserve bridge safety contracts: no filesystem or process API here.

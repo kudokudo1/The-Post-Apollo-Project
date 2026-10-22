@@ -67,10 +67,12 @@ class GuardedFakeMpd(FakeMpd):
 class RadioRelayTests(unittest.TestCase):
     def test_dns_pin_refuses_private_loopback_linklocal_mixed_and_empty(self):
         def fake(*addresses):
-            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (a, 443))
+            return [((socket.AF_INET6 if ":" in a else socket.AF_INET),
+                     socket.SOCK_STREAM, 6, "", (a, 443))
                     for a in addresses]
         for samples in [("127.0.0.1",), ("10.0.0.2",),
-                        ("192.168.1.4", "8.8.8.8"), ("169.254.1.1",)]:
+                        ("192.168.1.4", "8.8.8.8"), ("169.254.1.1",),
+                        ("224.0.0.1",), ("ff02::1",)]:
             with self.assertRaises(MediaBackendError) as e:
                 public_endpoint("radio.example.net", resolve=lambda *a, x=samples, **k: fake(*x))
             self.assertEqual(e.exception.code, "STREAM_DNS_BLOCKED")

@@ -20,6 +20,8 @@ for needle in (
 
 for needle in (
     ".pragma library", "function normalize(", "function snapshot(",
+    "function collectionLength(", "applicationCount = collectionLength(applications)",
+    "for (var i = 0; i < applicationCount; ++i)",
     "function byName(", "MAX_ITEMS = 24", "MAX_QUERY_LENGTH = 80",
     "genericName:", "icon:", "installedCount:", "matchCount:",
     "shownCount:", "truncated:", "source: \"desktop-entries\"",

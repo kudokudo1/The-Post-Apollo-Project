@@ -10,6 +10,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const root = path.resolve(__dirname, "../..");
 const source = fs.readFileSync(path.join(root, "modules/Mediaplayer.qml"), "utf8");
+const shellSource = fs.readFileSync(path.join(root, "shell.qml"), "utf8");
 const dockButtonSource = fs.readFileSync(path.join(root, "components/DockButton.qml"), "utf8");
 const config = fs.readFileSync(path.join(root, "modules/mediaplayer-cava.conf"), "utf8");
 const trebleSvg = fs.readFileSync(path.join(root, "assets/media/treble-clef.svg"), "utf8");
@@ -31,6 +32,22 @@ function harness() {
     const receive = vm.runInContext("(function(frame) {" + match[1] + "\n})", context);
     return {context, receive};
 }
+
+test("left taskbar places Media before Tray without duplicating either instance", () => {
+    const left = shellSource.split("// ===== LEFT MODULES", 2)[1]
+        ?.split("// ===== CENTER MODULE", 2)[0];
+    assert.ok(left, "left taskbar row must exist");
+    const workspaces = left.indexOf("Workspaces {}");
+    const media = left.indexOf("Mediaplayer {\n            id: sharedMediaDock\n        }");
+    const tray = left.indexOf("Tray {}");
+    const hospital = left.indexOf("// Hospital");
+    assert.ok(workspaces >= 0 && workspaces < media && media < tray && tray < hospital,
+        "expected Workspaces → Media Player → Tray → Hospital");
+    assert.equal((left.match(/Mediaplayer \{/g) || []).length, 1);
+    assert.equal((left.match(/Tray \{\}/g) || []).length, 1);
+    assert.match(shellSource, /mediaControllerSource:\s*sharedMediaDock\.hubMediaController/);
+    assert.match(shellSource, /mpdDockSource:\s*sharedMediaDock/);
+});
 
 test("opening the Hi-Fi deck keeps the Media dock dark without removing its neon", () => {
     // Shared DockButton defaults to a yellow open fill, but Media's stacked

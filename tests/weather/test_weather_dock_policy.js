@@ -216,7 +216,8 @@ assert.match(dock, /id:\s*weatherTemperatureUnit[\s\S]*?text:\s*weatherDock\.tem
 assert.match(dock, /id:\s*weatherDegree[\s\S]*?text:\s*"°"[\s\S]*?font\.pixelSize:\s*20[\s\S]*?color:\s*weatherDock\.open\s*\?\s*Colors\.magenta[\s\S]*?weatherDock\.pressed\s*\?\s*Colors\.white[\s\S]*?weatherDock\.hovered\s*\?\s*Colors\.orange\s*:\s*Colors\.white/);
 assert.match(dock, /SafeDropShadow\s*\{[^}]*safeSource:\s*weatherDegree[^}]*color:\s*weatherDock\.open\s*\|\|\s*weatherDock\.pressed\s*\?\s*Colors\.magenta\s*:\s*Colors\.orange/s);
 assert.match(dock, /id:\s*weatherContent[\s\S]*?anchors\.centerIn:\s*parent[\s\S]*?spacing:\s*0/);
-assert.match(dock, /id:\s*weatherGlowArtwork[\s\S]*?anchors\.verticalCenter:\s*parent\.verticalCenter[\s\S]*?spacing:\s*6/);
+assert.match(dock, /id:\s*weatherArtworkGlowFrame[\s\S]*?anchors\.verticalCenter:\s*parent\.verticalCenter[\s\S]*?implicitWidth:\s*weatherGlowArtwork\.implicitWidth/);
+assert.match(dock, /id:\s*weatherGlowArtwork\s+z:\s*1\s+spacing:\s*6/);
 assert.match(dock, /id:\s*weatherContent[\s\S]*?anchors\.centerIn:\s*parent\s+anchors\.horizontalCenterOffset:\s*2/);
 // The measured group width leaves 3px each side; a 2px optical shift
 // retains at least 1px on the tight (right) edge.
@@ -225,6 +226,17 @@ assert.match(dock, /id:\s*weatherReadout[\s\S]*?spacing:\s*0/);
 assert.match(dock, /id:\s*weatherTemperature[\s\S]*?spacing:\s*0/);
 assert.match(dock, /contentGlowSource:\s*weatherGlowArtwork/);
 assert.doesNotMatch(dock, /contentGlowSource:\s*weatherContent/);
+assert.match(dock, /contentGlowEnabled:\s*false/);
+assert.match(dock, /id:\s*weatherArtworkGlow\s+anchors\.fill:\s*weatherGlowArtwork/);
+assert.match(dock, /safeSource:\s*weatherGlowArtwork/);
+assert.match(dock, /radius:\s*weatherDock\.contentGlowRadius/);
+assert.match(dock, /opacity:\s*weatherDock\.contentGlowOpacity/);
+assert.match(dock, /color:\s*weatherDock\.contentGlowColor/);
+// The unshared artwork effect must be BEHIND its own source, rather
+// than drawn as a full-module overlay above the thermometer.
+const weatherArtShadow = dock.slice(dock.indexOf("id: weatherArtworkGlow"), dock.indexOf("id: weatherGlowArtwork"));
+assert.match(weatherArtShadow, /z:\s*0/);
+assert.match(dock, /id:\s*weatherGlowArtwork\s+z:\s*1/);
 assert.match(dock, /opacity:\s*weatherDock\.contentGlowOpacity/);
 assert.match(dock, /pressedContentGlowColor:\s*Colors\.magenta/);
 assert.match(dock, /pressedDockGlowColor:\s*Colors\.magenta/);

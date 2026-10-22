@@ -140,6 +140,92 @@ PanelWindow {
         return keyboardOwnership.claim(id, reason);
     }
 
+    // Apollo notification destinations are delivered within this already-
+    // running shell to existing widget instances. Never launch another
+    // Quickshell process or mutate the active Hospital Room/Patient.
+    function openApolloNotificationRoute(destination) {
+        const route = destination || {};
+        const widget = String(route.widget || "");
+        if (widget === "cpu") {
+            if (!cpuPlusWindow.menuOpen)
+                cpuPlusWindow.open();
+            if (route.mode === "thermal") {
+                cpuPlusWindow.selectMode(2);
+                cpuPlusWindow.selectThermalSubMode(route.subMode === "fan" ? 1 : 0);
+            } else if (route.mode === "system") {
+                cpuPlusWindow.selectMode(3);
+                cpuPlusWindow.selectSystemSubMode(String(route.subMode || "ALL"));
+            } else {
+                return false;
+            }
+            shellRoot.requestControlKeyboard("cpu", "notification-route");
+            return true;
+        }
+        if (widget === "weather") {
+            const view = String(route.view || "");
+            const index = weatherStationWindow.mainModes.findIndex(
+                function(item) { return item.id === view; });
+            if (index < 0)
+                return false;
+            weatherStationWindow.open();
+            weatherStationWindow.currentView = view;
+            weatherStationWindow.navigationIndex = index;
+            shellRoot.requestControlKeyboard("weather", "notification-route");
+            return true;
+        }
+        if (widget === "hospital") {
+            if (!hospitalWindow.menuOpen)
+                hospitalWindow.open();
+            if (route.view === "reports")
+                hospitalWindow.openReports(String(route.team || ""));
+            else if (route.view === "reception")
+                hospitalWindow.openReception();
+            else
+                return false;
+            shellRoot.requestControlKeyboard("hospital", "notification-route");
+            return true;
+        }
+        if (widget === "git") {
+            if (route.view === "pull") {
+                if (!gitWindow.openGithubPullRequest(
+                        String(route.repository || ""), Number(route.number || 0)))
+                    return false;
+            } else {
+                if (!gitWindow.menuOpen)
+                    gitWindow.open();
+                if (route.view === "operations") {
+                    gitWindow.showGitPage();
+                    gitWindow.showGitOperations();
+                } else if (route.view === "issues") {
+                    gitWindow.showGithubPage();
+                    gitWindow.showGithubIssues();
+                } else if (route.view === "github") {
+                    gitWindow.showGithubPage();
+                    gitWindow.showGithubControl();
+                } else {
+                    return false;
+                }
+            }
+            shellRoot.requestControlKeyboard("git", "notification-route");
+            return true;
+        }
+        if (widget === "notifications" && route.view === "system") {
+            notificationsHubWindow.open();
+            notificationsHubWindow.activeFilter = "system";
+            shellRoot.requestControlKeyboard("notifications", "notification-route");
+            return true;
+        }
+        console.warn("Notification destination unavailable:", widget);
+        return false;
+    }
+
+    Connections {
+        target: NotificationsService
+        function onApolloNavigationRequested(destination) {
+            shellRoot.openApolloNotificationRoute(destination);
+        }
+    }
+
     function swapControlKeyboardOwner() {
         if (!hospitalWindow.menuOpen || !gitWindow.menuOpen)
             return;

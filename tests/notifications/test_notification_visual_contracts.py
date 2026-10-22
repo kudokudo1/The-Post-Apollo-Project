@@ -176,14 +176,16 @@ for needle, message in (
 ):
     require(POPUP, needle, message)
 
-# Site images must stay recognizable. Recoloring arbitrary opaque browser
-# payloads can flatten real favicons into a magenta/black checkerboard.
-# Keep Post-Apollo's black backing / magenta border and its intentionally
-# designed magenta/black YouTube asset, but render all other image pixels
-# without an additional effect pass.
+# Native Notification.image contains arbitrary message media, not a verified
+# website favicon. Never recolor or display it in the website icon slot.
+# Use explicit local artwork for known sites and a magenta-on-black monogram
+# for unknown sites, with no added shader or image duplication.
 youtube_svg = (ROOT / "assets/notifications/youtube.svg").read_text(encoding="utf-8")
 assert 'fill="#C74EC7"' in youtube_svg, "YouTube icon background must be magenta"
 assert 'fill="#000000"' in youtube_svg, "YouTube play triangle must be black"
+proton_svg = (ROOT / "assets/notifications/proton-mail.svg").read_text(encoding="utf-8")
+assert 'stroke="#C74EC7"' in proton_svg, "Proton Mail envelope must be magenta"
+assert 'fill="#000000"' in proton_svg, "Proton Mail backing must be black"
 for surface, name in ((HUB, "history"), (POPUP, "popup")):
     assert "Colorize {" not in surface, f"{name}: no HSL recolor of website images"
     assert "ColorOverlay {" not in surface, f"{name}: no alpha-only tint squares"
@@ -198,10 +200,19 @@ assert "visible: notificationEntry.website" not in hub_icon, (
 )
 assert HUB.count("id: appIconImage") == 1, "history draws exactly one site image"
 popup_icon = POPUP.split("id: notificationIcon", 1)[1].split("// ===== TEXT", 1)[0]
-assert "notificationCard.websiteIcon" in popup_icon
+assert "notificationsWindow.localSiteArtwork(notificationCard.websiteHost)" in popup_icon
 assert "fillMode: Image.PreserveAspectFit" in popup_icon
 assert "visible: notificationCard.website" not in popup_icon
 assert POPUP.count("id: notificationIcon") == 1, "popup draws exactly one site image"
+assert "BrowserSiteIdentity.iconKindFor(websiteHost)" in HUB
+assert "BrowserSiteIdentity.iconKindFor(host)" in POPUP
+assert 'return ""; // Fall back to the website initials' in HUB
+assert 'BrowserSiteIdentity.initialsFor(notificationCard.website,' in POPUP
+assert "websiteIcon !== \"\"" not in POPUP
+assert 'notificationEntry.website, notificationEntry.websiteHost)' in HUB
+assert 'notificationCard.websiteHost' in POPUP
+assert 'notificationEntry.website !== "" ? 16 : 9' in HUB
+
 
 # Website SITE/APP scope goes next to the lower-right Bring Here arrow, not
 # into the top ZZ/DND/CLEAR/× row. Preserve card and action geometry.

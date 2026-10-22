@@ -178,19 +178,25 @@ PanelWindow {
                 wideGlowSpread: 12
                 wideGlowOpacity: 0.14
 
-                // Clicking the popup itself invokes the sender's exact
-                // default action when one exists. Action buttons remain above
-                // this surface (z: 3) and preserve their distinct callbacks.
+                // Native default actions take priority. Apollo's own events
+                // use the same event-ID based shell destination routing as
+                // history cards; explicit native buttons remain independent.
                 MouseArea {
                     id: nativeDefaultClickArea
                     anchors.fill: parent
                     z: 0
                     hoverEnabled: enabled
-                    enabled: NotificationsService.externalActionsRevision >= 0
-                        && NotificationsService.hasExternalDefaultAction(notificationCard.notificationId)
+                    enabled: (NotificationsService.externalActionsRevision >= 0
+                        && NotificationsService.hasExternalDefaultAction(notificationCard.notificationId))
+                        || (NotificationsService.notificationsRevision >= 0
+                            && NotificationsService.hasApolloDestination(notificationCard.notificationId))
                     cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                    onClicked: NotificationsService.invokeExternalDefaultAction(
-                        notificationCard.notificationId)
+                    onClicked: {
+                        if (!NotificationsService.invokeExternalDefaultAction(
+                                notificationCard.notificationId))
+                            NotificationsService.requestApolloDestination(
+                                notificationCard.notificationId);
+                    }
                 }
 
                 // ===== APP ICON ================================

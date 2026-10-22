@@ -72,7 +72,10 @@ const H={
     invokeExternalDefaultAction(id) {
       actions.push({kind:'native-attempt',id});
       return nativeResult;
-    }
+    },
+    // Browser notifications have no registered Apollo event route. Apollo
+    // routing itself is exercised in test_apollo_destination_routing.py.
+    requestApolloDestination(id) { return false; }
   }
 };
 vm.runInNewContext(method(hub,'openNotificationDestination'),H);

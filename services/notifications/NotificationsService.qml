@@ -6,12 +6,16 @@ import Quickshell.Io
 import Quickshell.Services.Notifications
 import "." as NotificationsBackend
 import "BrowserSiteIdentity.js" as BrowserSiteIdentity
+import "ApolloNotificationRoute.js" as ApolloNotificationRoute
 
 Singleton {
     id: root
 
     property ListModel notifications: ListModel {}
     property ListModel activeNotifications: ListModel {}
+    // Delivered by shell.qml to the single, already-mounted widget instance.
+    // This signal carries allowlisted view coordinates, never code/commands.
+    signal apolloNavigationRequested(var destination)
     // Native notification/action objects must NEVER enter a ListModel or the
     // persistent JSON history. They exist only while the sender is live.
     property var liveExternalNotifications: ({})
@@ -1265,6 +1269,32 @@ Singleton {
 
     function triggerAction(actionId, context) {
         NotificationsBackend.NotificationsActionRouter.route(actionId, context);
+    }
+
+    // ===== APOLLO DESTINATION ===================================
+    // Route from the actual historical record. A caller supplies only the
+    // event ID, not arbitrary destination fields, and saved events remain
+    // navigable without storing native action objects.
+    function apolloDestinationFor(eventId) {
+        const id = String(eventId || "");
+        if (id === "")
+            return null;
+        const index = indexOfNotification(notifications, id);
+        if (index < 0)
+            return null;
+        return ApolloNotificationRoute.routeFor(notifications.get(index));
+    }
+
+    function hasApolloDestination(eventId) {
+        return apolloDestinationFor(eventId) !== null;
+    }
+
+    function requestApolloDestination(eventId) {
+        const destination = apolloDestinationFor(eventId);
+        if (!destination)
+            return false;
+        apolloNavigationRequested(destination);
+        return true;
     }
 
     // ===== EXPIRATION ===========================================

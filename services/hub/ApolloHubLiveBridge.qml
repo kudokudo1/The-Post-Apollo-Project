@@ -1,0 +1,131 @@
+import QtQuick
+import Quickshell
+import "../weather/WeatherDockPolicy.js" as WeatherPolicy
+
+// ApolloHubW live-data bridge. This owns NO weather fetch, subprocess,
+// credentials, writable controls, or duplicate WeatherService instance.
+// The shell/owner supplies its existing WeatherService via weatherSource.
+// QML bindings keep the snapshot live when that provider changes.
+Scope {
+    id: bridge
+
+    property var weatherSource: null
+    property double observationNowMs: Date.now()
+
+    // Timestamp freshness must age even when the provider is quiet.
+    // This is one cheap clock tick per minute, NOT network/service polling.
+    onWeatherSourceChanged: observationNowMs = Date.now()
+    Timer {
+        interval: 60000
+        repeat: true
+        running: bridge.weatherSource !== null
+        onTriggered: bridge.observationNowMs = Date.now()
+    }
+
+    readonly property bool weatherConnected: weatherSource !== null
+    readonly property bool weatherLoading: weatherConnected && weatherSource.loading
+    readonly property string weatherError:
+        weatherConnected ? String(weatherSource.errorText || "") : ""
+    readonly property double weatherUpdatedMs:
+        weatherConnected && weatherSource.lastUpdated
+        ? Number(weatherSource.lastUpdated.getTime()) : 0
+
+    // Share the *existing* dock's freshness rule: max one hour old with
+    // five minutes of forward-clock tolerance. Never present stale data as live.
+    readonly property bool weatherFresh:
+        weatherConnected && weatherSource.ready && weatherError === ""
+        && WeatherPolicy.fresh(weatherUpdatedMs, observationNowMs)
+    readonly property int weatherAgeMinutes:
+        weatherUpdatedMs > 0 && observationNowMs >= weatherUpdatedMs
+        ? Math.floor((observationNowMs - weatherUpdatedMs) / 60000) : -1
+
+    readonly property string weatherState: {
+        if (!weatherConnected) return "disconnected";
+        if (weatherFresh) return "ready";
+        if (weatherLoading) return "loading";
+        if (weatherError !== "") return "error";
+        if (weatherSource.ready) return "stale";
+        return "unavailable";
+    }
+
+    // WeatherService stores Fahrenheit strings. Conversion is presentation-
+    // only and reuses the Weather dock's formatter, never a second request.
+    readonly property string temperatureF:
+        WeatherPolicy.formatTemperature(
+            weatherConnected ? weatherSource.tempF : null, weatherFresh, false)
+    readonly property string temperatureC:
+        WeatherPolicy.formatTemperature(
+            weatherConnected ? weatherSource.tempF : null, weatherFresh, true)
+    readonly property string feelsLikeF:
+        WeatherPolicy.formatTemperature(
+            weatherConnected ? weatherSource.feelsLikeF : null, weatherFresh, false)
+    readonly property string feelsLikeC:
+        WeatherPolicy.formatTemperature(
+            weatherConnected ? weatherSource.feelsLikeF : null, weatherFresh, true)
+    readonly property string condition:
+        weatherFresh ? String(weatherSource.condition || "UNKNOWN") : "UNKNOWN"
+    readonly property string humidity:
+        weatherFresh ? String(weatherSource.humidity || "--") : "--"
+    readonly property string windMph:
+        weatherFresh ? String(weatherSource.windMph || "--") : "--"
+    readonly property string windDirection:
+        weatherFresh ? String(weatherSource.windDirection || "--") : "--"
+    readonly property real uvIndex:
+        weatherFresh && isFinite(Number(weatherSource.uvIndex))
+        && Number(weatherSource.uvIndex) >= 0
+        ? Number(weatherSource.uvIndex) : -1
+
+    // Air quality has a separate update/error timeline. A successful
+    // weather observation never implies AQI is available or healthy.
+    readonly property string airQualityError:
+        weatherConnected ? String(weatherSource.aqiErrorText || "") : ""
+    readonly property double airQualityUpdatedMs:
+        weatherConnected && weatherSource.aqiLastUpdated
+        ? Number(weatherSource.aqiLastUpdated.getTime()) : 0
+    readonly property bool airQualityFresh:
+        weatherConnected && weatherSource.aqiReady && airQualityError === ""
+        && WeatherPolicy.fresh(airQualityUpdatedMs, observationNowMs)
+    readonly property string airQualityState: {
+        if (!weatherConnected) return "disconnected";
+        if (airQualityFresh) return "ready";
+        if (weatherSource.aqiLoading) return "loading";
+        if (airQualityError !== "") return "error";
+        if (weatherSource.aqiReady) return "stale";
+        return "unavailable";
+    }
+    readonly property int airQualityIndex:
+        airQualityFresh && isFinite(Number(weatherSource.aqi))
+        && Number(weatherSource.aqi) >= 0
+        ? Math.round(Number(weatherSource.aqi)) : -1
+    readonly property string airQualityLabel:
+        airQualityFresh ? String(weatherSource.aqiLabel || "UNKNOWN") : "UNKNOWN"
+
+    // Single consumer contract. Modules can bind to weatherSnapshot without
+    // importing WeatherService or knowing its private fetch implementation.
+    readonly property var weatherSnapshot: ({
+        state: bridge.weatherState,
+        connected: bridge.weatherConnected,
+        loading: bridge.weatherLoading,
+        fresh: bridge.weatherFresh,
+        error: bridge.weatherError,
+        updatedMs: bridge.weatherUpdatedMs,
+        ageMinutes: bridge.weatherAgeMinutes,
+        temperatureF: bridge.temperatureF,
+        temperatureC: bridge.temperatureC,
+        feelsLikeF: bridge.feelsLikeF,
+        feelsLikeC: bridge.feelsLikeC,
+        condition: bridge.condition,
+        humidity: bridge.humidity,
+        windMph: bridge.windMph,
+        windDirection: bridge.windDirection,
+        uvIndex: bridge.uvIndex,
+        airQuality: {
+            state: bridge.airQualityState,
+            fresh: bridge.airQualityFresh,
+            error: bridge.airQualityError,
+            updatedMs: bridge.airQualityUpdatedMs,
+            index: bridge.airQualityIndex,
+            label: bridge.airQualityLabel
+        }
+    })
+}

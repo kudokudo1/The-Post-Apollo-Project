@@ -64,7 +64,10 @@ Item {
     hoverDockGlowColor: accentColor
     pressedDockGlowColor: Colors.magenta
 
-    contentGlowSource: mediaArtwork
+    // Never texture-sample the 16 animated VU bars for a blur glow.
+    // Sampling them forced a new shadow texture every CAVA frame. Keep the
+    // sampled glow attached to the static music glyph instead.
+    contentGlowSource: musicMark
 
     // Preserve the requested glyph exactly, before the live spectrum.
     Row {
@@ -128,13 +131,20 @@ Item {
             return;
 
         var newLevels = [];
+        var changed = false;
         for (var i = 0; i < barCount; ++i) {
             var value = Number(columns[i]);
             if (!isFinite(value))
                 return;
-            newLevels.push(Math.max(0, Math.min(7, value)));
+            var level = Math.max(0, Math.min(7, value));
+            newLevels.push(level);
+            if (level !== Number(levels[i] || 0))
+                changed = true;
         }
-        levels = newLevels;
+        // Do not trigger 16 QML bindings and animations for identical frames,
+        // especially when the monitor stream is silent but CAVA stays alive.
+        if (changed)
+            levels = newLevels;
     }
 
     Process {

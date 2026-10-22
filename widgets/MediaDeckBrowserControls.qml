@@ -20,7 +20,8 @@ Item {
             anchors { left: parent.left; top: parent.top }
             width: 84
             height: parent.height
-            label: bay.deckHost.catalogSource === "youtube" ? "YOUTUBE" : "LIBRARY"
+            label: bay.deckHost.catalogSource === "youtube" ? "YOUTUBE"
+                : bay.deckHost.catalogSource === "direct-stream" ? "RADIO" : "LIBRARY"
             labelPixelSize: 10
             selected: bay.deckHost.navigationZone === 0
             onClicked: bay.deckHost.toggleCatalogSource()
@@ -47,12 +48,14 @@ Item {
                 font.pixelSize: 12
                 clip: true
                 activeFocusOnTab: true
+                readOnly: bay.deckHost.catalogSource === "direct-stream"
                 onAccepted: bay.deckHost.searchLibrary()
             }
             GohuText {
                 anchors { left: parent.left; leftMargin: 7; verticalCenter: parent.verticalCenter }
                 visible: !searchInput.text.length && !searchInput.activeFocus
-                text: "ARTIST / SONG / ALBUM"
+                text: bay.deckHost.catalogSource === "direct-stream"
+                    ? "GROOVE SALAD / RADIO" : "ARTIST / SONG / ALBUM"
                 font.pixelSize: 10
                 opacity: 0.55
                 color: Colors.cyan
@@ -67,6 +70,7 @@ Item {
             label: "SEARCH"
             labelPixelSize: 10
             available: !bay.controller.busy
+                       && bay.deckHost.catalogSource !== "direct-stream"
             onClicked: bay.deckHost.searchLibrary()
         }
     }
@@ -155,7 +159,8 @@ Item {
                 label: "LOAD"
                 labelPixelSize: 12
                 available: !!bay.controller.selection
-                           && bay.controller.selection.source === "local-mpd"
+                           && (bay.controller.selection.source === "local-mpd"
+                               || bay.controller.selection.source === "direct-stream")
                            && !bay.controller.busy
                            && bay.deckHost.transportMode === "mpd"
                 onClicked: bay.deckHost.loadStaged()

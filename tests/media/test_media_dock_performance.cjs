@@ -90,29 +90,34 @@ test("magenta dock halo and CAVA-colored static music mark stay independent", ()
     assert.doesNotMatch(source, /contentGlowSource:\s*(?:spectrum|mediaArtwork)/);
 });
 
-test("CAVA-colored inner glow sits below artwork but above the magenta chassis", () => {
-    assert.match(source, /import QtQuick\.Effects/);
+test("magenta full-width wash stays separate from tight CAVA accent underlight", () => {
+    // A deliberate Media dock variation: both rear halo and front wash
+    // inherit magenta at idle/hover/pressed/open, not the accent color.
     assert.match(source, /normalDockGlowColor:\s*Colors\.magenta/);
-    assert.match(source, /hoverDockGlowColor:\s*accentColor/);
+    assert.match(source, /hoverDockGlowColor:\s*Colors\.magenta/);
+    assert.match(source, /pressedDockGlowColor:\s*Colors\.magenta/);
     assert.match(source, /normalContentGlowColor:\s*accentColor/);
     assert.match(source, /hoverContentGlowColor:\s*accentColor/);
     assert.match(source, /pressedContentGlowColor:\s*accentColor/);
-    const match = source.match(/RectangularShadow \{\s*id:\s*mediaArtworkUnderlay([\s\S]*?)\n    \}/);
-    assert.ok(match, "a single local underlay should cover the music symbol and CAVA bars");
+
+    // The backing cyan/orange glow tracks only the static mark. Each CAVA
+    // bar already has two separate geometry-only accent halos.
+    const match = source.match(/RectangularShadow \{\s*id:\s*musicMarkUnderlay([\s\S]*?)\n    \}/);
+    assert.ok(match, "static mark should own the only media-level accent underlay");
     const underlay = match[1];
-    assert.match(underlay, /anchors\.centerIn:\s*mediaArtwork/);
-    assert.match(underlay, /width:\s*mediaArtwork\.width\s*\+\s*10/);
-    assert.match(underlay, /height:\s*mediaArtwork\.height\s*\+\s*4/);
-    assert.match(underlay, /spread:\s*mediaDock\.softGlowSpread/);
-    assert.match(underlay, /blur:\s*mediaDock\.contentGlowRadius/);
+    assert.match(underlay, /x:\s*mediaArtwork\.x\s*\+\s*musicMark\.x/);
+    assert.match(underlay, /y:\s*mediaArtwork\.y\s*\+\s*musicMark\.y\s*\+\s*mediaDock\.softGlowSpread/);
+    assert.match(underlay, /width:\s*musicMark\.width/);
+    assert.match(underlay, /height:\s*Math\.max\(0,\s*musicMark\.height\s*-\s*2\s*\*\s*mediaDock\.softGlowSpread\)/);
+    assert.match(underlay, /spread:\s*0/);
+    assert.match(underlay, /blur:\s*mediaDock\.softGlowSpread\s*\*\s*2/);
     assert.match(underlay, /color:\s*mediaDock\.accentColor/);
     assert.match(underlay, /opacity:\s*mediaDock\.softGlowOpacity\s*\*\s*0\.80/);
     assert.match(underlay, /z:\s*0/);
     assert.match(source, /Row \{\s*id:\s*mediaArtwork\s*anchors\.centerIn:\s*parent\s*spacing:\s*9\s*z:\s*1/);
-    assert.equal((source.match(/RectangularShadow \{/g) || []).length, 1,
-        "the media module has only one static backing glow");
-    assert.doesNotMatch(underlay, /levels|frame|Repeater|ShaderEffect|DropShadow|source:/,
-        "underlay must not sample or recalculate animated CAVA frames");
+    assert.equal((source.match(/RectangularShadow \{/g) || []).length, 1);
+    assert.doesNotMatch(source, /id:\s*mediaArtworkUnderlay|width:\s*mediaArtwork\.width\s*\+\s*10/);
+    assert.doesNotMatch(underlay, /levels|frame|Repeater|ShaderEffect|DropShadow|source:/);
     assert.match(source, /contentGlowSource:\s*musicMark/);
     assert.doesNotMatch(source, /contentGlowSource:\s*(?:mediaArtwork|spectrum|cavaBar)/);
 });

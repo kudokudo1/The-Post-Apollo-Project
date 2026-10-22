@@ -64,12 +64,17 @@ for needle in (
 ):
     require(policy, needle, "projection policy")
 
+# Exclude explanatory // comments from forbidden executable-token guards.
+# The source explicitly documents the avoidance of duplicate subprocesses.
+code_only = "\n".join(
+    line.split("//", 1)[0] for line in (bridge + "\n" + policy).splitlines()
+)
 for forbidden in (
     "SystemTelemetry {", "Process {", "Http", "FileView {",
     "systemSource.refresh(", "systemSource.monitorScript(",
     "FanControl {", "pkexec", "subprocess",
 ):
-    assert forbidden not in bridge + policy, f"Bridge must be read-only: {forbidden}"
+    assert forbidden not in code_only, f"Bridge must be read-only: {forbidden}"
 
 for needle in (
     "tests/hub/test_apollo_hub_system_bridge.py",

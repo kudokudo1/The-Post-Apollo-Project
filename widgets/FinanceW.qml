@@ -94,7 +94,7 @@ PanelWindow {
     property string navigationZone: "main"
     property int navigationIndex: 0
     readonly property bool standardKeysAvailable:
-        menuOpen && keyboardActive
+        menuOpen && keyboardActive && !transactionDraftPane.open
 
     function activeMainModes() {
         return mainModes.filter(function(mode) { return !mode.future; });

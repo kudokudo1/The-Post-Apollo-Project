@@ -97,15 +97,16 @@ The pure normalization policy is `services/hub/ApolloHubNetworkPolicy.js`.
 - `internetState`: **always `unverified`**. Local association is not evidence of working DNS, gateway, or internet access.
 - `wifi.present`, `wifi.connected`, `wifi.interfaceName`, `wifi.networkName`, `wifi.signalPercent` (integer 0–100 from a valid 0.0–1.0 strength or `-1` unknown).
 - `ethernet.present`, `ethernet.connected`, `ethernet.interfaceName`.
-- `linkSpeedMbps`: **-1 (unknown)**. The dock's speed probe is private and has not been shared; the bridge will not duplicate it.
+- `linkSpeedMbps`: positive integer for the current Wi-Fi link bitrate, or **-1 (unknown)**. The bridge reads the existing dock's `iw` output through a read-only property and never duplicates that probe. For Ethernet, speed remains unknown.
+- `linkSpeedApproximate`: true for Wi-Fi link-rate semantics; this is negotiated/radio receive link bitrate, **not measured Internet speed**.
 
 No passwords, keys, private IP/MAC, activation methods, NetworkManager objects, or mutable device handles leave the snapshot.
 
 ### UI wiring
 
-The current `shell.qml` already creates `ApolloHubLiveBridge { id: apolloHubLive }` and passes it to `ApolloHubW { liveBridge: apolloHubLive }` for Weather. **B3 needs no additional shell instance or input property.**
+The current `shell.qml` creates one `ApolloHubLiveBridge { id: apolloHubLive }` and passes it to `ApolloHubW { liveBridge: apolloHubLive }`. The B3 speed follow-up has now wired `networkDockSource: sharedNetworkDock` into the existing bridge and given the existing dock the ID `sharedNetworkDock`. It adds neither a second Network dock nor another speed collector.
 
-The UI owner can bind its Network tile to `hub.liveBridge.networkSnapshot` exactly as Weather binds to `weatherSnapshot`. Render `unavailable`, `disconnected`, and connected Wi-Fi/Ethernet separately; unknown signal `-1` must never display as zero signal; `internetState: "unverified"` must not look like a proven all-clear.
+The UI owner already binds its Network tile to `hub.liveBridge.networkSnapshot`. Render `unavailable`, `disconnected`, and connected Wi-Fi/Ethernet separately; unknown signal `-1` must never display as zero signal; `internetState: "unverified"` must not look like a proven all-clear. **Presentation follow-up for UI owner:** the existing `networkSpeedText` formats positive numbers as `229 Mbps`. Change that label to `~ 229 Mb/s` for a known positive Wi-Fi link speed; retain `--` for unknown, disconnected, and Ethernet links. The bridge supplies `linkSpeedMbps` and `linkSpeedApproximate` for this, without changing UI-owned files.
 
 ### Compatibility / acceptance
 

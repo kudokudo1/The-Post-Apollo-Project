@@ -66,16 +66,26 @@ function labelFor(host) {
     return host.startsWith("www.") ? host.substring(4) : host;
 }
 
-function localSiteIcon(value) {
-    const image = token(value);
-    // Never turn a website notification into an unsolicited HTTP fetch.
-    // Chromium's native image paths are local files/image providers.
-    if (image.length > 4096)
-        return "";
-    if (image.startsWith("/") || image.startsWith("file:")
-            || image.startsWith("image:"))
-        return image;
+// Site artwork is selected from local, explicitly known assets, never from
+// Notification.image: that field can be an email thumbnail or profile image.
+function iconKindFor(hostname) {
+    const host = hostnameFor(hostname);
+    if (host === "youtube.com" || host.endsWith(".youtube.com")
+            || host === "youtu.be")
+        return "youtube";
+    if (host === "mail.proton.me" || host === "mail.protonmail.com"
+            || host === "protonmail.com")
+        return "proton-mail";
     return "";
+}
+
+function initialsFor(label, hostname) {
+    const site = labelFor(hostnameFor(hostname));
+    const display = token(label || site).replace(/^www\./i, "");
+    if (display === "GitHub") return "GH";
+    if (display === "Reddit") return "RD";
+    if (display === "Twitch") return "TW";
+    return display.replace(/[^a-z0-9]/gi, "").slice(0, 2).toUpperCase() || "WEB";
 }
 
 function fromNotification(notification) {
@@ -89,11 +99,12 @@ function fromNotification(notification) {
     if (host === "")
         return blank;
 
-    // Chromium's image-path for a web notification often contains the
-    // sender's site icon. It is presentation media, never a navigation URL.
+    // The native image belongs to the notification CONTENT. It is not a
+    // trustworthy favicon. Keep the legacy optional icon field empty while
+    // preserving the image separately in NotificationsConverter.
     return {
         host: host,
         label: labelFor(host),
-        icon: localSiteIcon(notification.image)
+        icon: ""
     };
 }

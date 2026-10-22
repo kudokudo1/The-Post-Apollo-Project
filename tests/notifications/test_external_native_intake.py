@@ -45,9 +45,16 @@ assert '"websiteIcon": website.icon' in convert
 assert 'readonly property url resolvedAppIcon: root.resolveNotificationIcon(' in hub
 assert 'assets/notifications/youtube.svg' in hub
 assert 'assets/notifications/youtube.svg' in popup
+assert 'assets/notifications/proton-mail.svg' in hub
+assert 'assets/notifications/proton-mail.svg' in popup
+assert 'BrowserSiteIdentity.iconKindFor(websiteHost)' in hub
+assert 'BrowserSiteIdentity.iconKindFor(host)' in popup
+assert 'BrowserSiteIdentity.initialsFor(notificationCard.website,' in popup
+assert 'websiteIcon !== ""' not in popup, "do not use notification artwork as site icon"
 assert '"website": notification.website || ""' in server
 assert '"website": String(notification.website || "")' in server
 assert (ROOT/"assets/notifications/youtube.svg").is_file()
+assert (ROOT/"assets/notifications/proton-mail.svg").is_file()
 for banned in ["notifications.append(nativeNotification)", "JSON.stringify(nativeNotification)",
                "nativeNotification.actions.map(", "bodyHyperlinksSupported: true",
                "bodyMarkupSupported: true"]:
@@ -106,7 +113,18 @@ assert.strictEqual(youtube.source,'Brave','source identity remains the browser')
 assert.strictEqual(youtube.sourceId,'brave-browser','DND/FAVS/action policy key stable');
 assert.strictEqual(youtube.website,'YouTube');
 assert.strictEqual(youtube.websiteHost,'www.youtube.com');
-assert.strictEqual(youtube.websiteIcon,'file:///tmp/native-site-logo.png');
+assert.strictEqual(youtube.websiteIcon,'',
+ 'associated notification image is not a verified site favicon');
+assert.strictEqual(youtube.image,'file:///tmp/native-site-logo.png',
+ 'native content image remains available separately');
+assert.strictEqual(Sites.iconKindFor('www.youtube.com'),'youtube');
+assert.strictEqual(Sites.iconKindFor('mail.proton.me'),'proton-mail');
+assert.strictEqual(Sites.iconKindFor('mail.protonmail.com'),'proton-mail');
+assert.strictEqual(Sites.iconKindFor('mail.proton.me.attacker.test'),'',
+ 'do not map attacker suffix to Proton icon');
+assert.strictEqual(Sites.iconKindFor('github.com'),'');
+assert.strictEqual(Sites.initialsFor('GitHub','github.com'),'GH');
+assert.strictEqual(Sites.initialsFor('Reddit','reddit.com'),'RD');
 const maliciousRemote=mock('Brave','brave-browser',null,1);
 maliciousRemote.body='youtube.com\n\nNew video';
 maliciousRemote.image='https://tracker.example/favicon.png';

@@ -4,6 +4,7 @@ import Quickshell.Wayland
 import qs.components
 import qs.services.notifications
 import "../../services/notifications/NotificationFacets.js" as NotificationFacets
+import "../../services/notifications/BrowserSiteIdentity.js" as BrowserSiteIdentity
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 
@@ -1065,15 +1066,22 @@ PanelWindow {
         return Quickshell.iconPath(icon, true);
     }
 
-    function resolveNotificationIcon(appIcon, sourceId, website, websiteIcon) {
-        // Guaranteed offline identification for YouTube even after Chromium
-        // deletes its transient favicon cache. Other sites use the actual
-        // native site image when available; no third-party favicon requests.
-        if (website === "YouTube")
-            return Qt.resolvedUrl("../../assets/notifications/youtube.svg");
-        if (website !== "" && websiteIcon !== "")
-            return root.resolveAppIcon(websiteIcon, sourceId);
+    function resolveNotificationIcon(appIcon, sourceId, website, websiteHost) {
+        if (website !== "") {
+            // Native Notification.image can be arbitrary notification media,
+            // not a website logo. Allow only bundled offline site artwork.
+            const kind = BrowserSiteIdentity.iconKindFor(websiteHost);
+            if (kind === "youtube")
+                return Qt.resolvedUrl("../../assets/notifications/youtube.svg");
+            if (kind === "proton-mail")
+                return Qt.resolvedUrl("../../assets/notifications/proton-mail.svg");
+            return ""; // Fall back to the website initials, never Brave media.
+        }
         return root.resolveAppIcon(appIcon, sourceId);
+    }
+
+    function websiteMonogram(website, websiteHost) {
+        return BrowserSiteIdentity.initialsFor(website, websiteHost);
     }
 
     // ===== DISMISS ==============================================
@@ -2490,7 +2498,7 @@ PanelWindow {
 
                         readonly property url resolvedAppIcon: root.resolveNotificationIcon(
                             notificationEntry.appIcon, notificationEntry.sourceId,
-                            notificationEntry.website, notificationEntry.websiteIcon)
+                            notificationEntry.website, notificationEntry.websiteHost)
 
                         // Only multiline ordinary notifications grow; the
                         // 116px one-line cards and report deck retain baseline.
@@ -2676,23 +2684,11 @@ PanelWindow {
                                     fillMode: Image.PreserveAspectFit
 
                                     asynchronous: true
-                                    // Preserve luminance and transparent shapes
-                                    // while giving arbitrary native site favicons
-                                    // the same magenta/black treatment.
-                                    visible: notificationEntry.website === ""
-                                        || notificationEntry.website === "YouTube"
-                                }
-
-                                Colorize {
-                                    anchors.fill: appIconImage
-                                    source: appIconImage
-                                    visible: notificationEntry.website !== ""
-                                        && notificationEntry.website !== "YouTube"
-                                        && appIconImage.status === Image.Ready
-                                    hue: 0.8333
-                                    saturation: 0.65
-                                    lightness: -0.12
-                                    cached: true
+                                    // Native website icons may already contain
+                                    // opaque backgrounds or detailed artwork.
+                                    // Render their real pixels exactly once;
+                                    // forced HSL recoloring flattened some
+                                    // favicons into magenta/black blocks.
                                 }
 
                                 // ONE icon only:
@@ -2703,9 +2699,11 @@ PanelWindow {
 
                                     visible: appIconImage.status !== Image.Ready
 
-                                    text: "-⋆♱⋆-"
+                                    text: notificationEntry.website !== ""
+                                        ? root.websiteMonogram(notificationEntry.website, notificationEntry.websiteHost)
+                                        : "-⋆♱⋆-"
 
-                                    font.pixelSize: 9
+                                    font.pixelSize: notificationEntry.website !== "" ? 16 : 9
 
                                     color: notificationEntry.website !== ""
                                         ? Colors.magenta : notificationEntry.sourceColor

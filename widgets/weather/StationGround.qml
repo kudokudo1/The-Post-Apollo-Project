@@ -97,7 +97,7 @@ Rectangle {
     Column {
         anchors.fill: parent
         anchors.margins: 24
-        spacing: 20
+        spacing: 26
 
         Row {
             width: parent.width
@@ -122,6 +122,11 @@ Rectangle {
                 font.pixelSize: 12
                 color: ground.aqiReady ? Colors.cyan : Colors.orange
             }
+        }
+
+        StationSectionDivider {
+            width: parent.width
+            title: "AIR // PARTICULATES"
         }
 
         Row {
@@ -260,6 +265,11 @@ Rectangle {
                     color: Colors.white
                 }
             }
+        }
+
+        StationSectionDivider {
+            width: parent.width
+            title: "GASES // POLLEN"
         }
 
         Row {

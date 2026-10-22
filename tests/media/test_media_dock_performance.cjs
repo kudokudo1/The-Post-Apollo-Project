@@ -147,17 +147,18 @@ test("open state magenta-energizes every Media icon and CAVA visual without affe
 });
 
 test("requested music icon retains the exact ornament codepoints and PNG treble clef", () => {
-    // Gohu ornament + bundled U+1D11E image + exact trailing combining-mark
-    // sequence. Do not regress to font-rendered clef: Qt lacked that glyph.
-    assert.match(source, /\/\/ Requested Media icon: ‧₊˚ 𝄞 ׅ˖ㅤ/);
-    assert.match(source, /id:\\s*leadingStars[\\s\\S]*?text:\\s*"‧₊˚ "/);
-    assert.match(source, /id:\\s*trailingStar[\\s\\S]*?text:\\s*" ׅ˖ㅤ"/);
-    assert.match(source, /id:\\s*trebleClef[\\s\\S]*?source:\\s*mediaDock\\.open/);
-    assert.match(source, /id:\\s*trebleClefGlow[\\s\\S]*?safeSource:\\s*trebleClef/);
-    assert.match(source, /id:\\s*trebleClefAura/);
-    assert.match(source, /readonly property color artworkAccentColor:\\s*open \\? Colors\\.magenta : accentColor/);
-    assert.equal((source.match(/SafeDropShadow \\{/g) || []).length, 3);
-    assert.equal((source.match(/RectangularShadow \\{/g) || []).length, 5);
+    // Use the bundled image for U+1D11E. The operator's Qt text font stack
+    // previously failed to draw that music symbol, so preserving it is safer.
+    assert.ok(source.includes("// Requested Media icon: ‧₊˚ 𝄞 ׅ˖ㅤ"));
+    assert.ok(source.includes('text: "‧₊˚ "'));
+    assert.ok(source.includes('text: " ׅ˖ㅤ"'));
+    assert.match(source, /id:\s*trebleClef\s*width:\s*15\s*height:\s*34/);
+    assert.match(source, /source:\s*mediaDock\.open\s*\?\s*Qt\.resolvedUrl/);
+    assert.match(source, /id:\s*trebleClefGlow\s*safeSource:\s*trebleClef/);
+    assert.match(source, /id:\s*trebleClefAura/);
+    assert.match(source, /readonly property color artworkAccentColor:\s*open \? Colors\.magenta : accentColor/);
+    assert.equal((source.match(/SafeDropShadow \{/g) || []).length, 3);
+    assert.equal((source.match(/RectangularShadow \{/g) || []).length, 5);
 });
 
 test("sample only separate static glyphs, never the animated VU spectrum", () => {

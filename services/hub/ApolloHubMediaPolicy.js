@@ -18,7 +18,7 @@ function knownAge(observedAtMs, nowMs) {
     return Math.floor((now - then) / 1000);
 }
 
-function mpdSnapshot(attached, observation, errorText, observedAtMs, nowMs) {
+function mpdSnapshot(attached, observation, errorText, observedAtMs, nowMs, dockObservation) {
     var connected = attached === true;
     var error = connected ? shortText(errorText, 120) : "";
     var age = knownAge(observedAtMs, nowMs);
@@ -47,17 +47,46 @@ function mpdSnapshot(attached, observation, errorText, observedAtMs, nowMs) {
               : !fresh ? "stale" : observedState;
     var usable = fresh && !error && observedState !== "unavailable";
 
+    // The compact Media dock already observes MPD every two seconds even
+    // while the full cassette deck is closed. Treat that as playback evidence,
+    // NOT as controller ownership or proof of a loaded cassette.
+    var dock = dockObservation && typeof dockObservation === "object"
+        && !Array.isArray(dockObservation) ? dockObservation : null;
+    var dockAge = dock ? knownAge(dock.observedAtMs, nowMs) : -1;
+    var dockFresh = dockAge >= 0
+        && Number(nowMs) - Number(dock.observedAtMs) <= MAX_MPD_AGE_MS;
+    var dockState = dock && ["playing", "paused", "stopped"].indexOf(dock.state) >= 0
+        ? dock.state : "unavailable";
+    var dockUsable = dockFresh && dockState !== "unavailable";
+
+    // Use the dock for actual MPD status, but preserve the controller's
+    // distinct last-loaded cassette and ownership data when fresh.
+    var displayFromDock = dockUsable;
+    var displayedState = displayFromDock ? dockState
+        : usable ? state : !connected && !dock ? "disconnected"
+        : error && !dockUsable ? "error"
+        : dock && dockFresh ? "unavailable"
+        : !connected && dock && dockAge < 0 ? "unobserved"
+        : state === "disconnected" || state === "unobserved"
+          ? (dock && dockAge >= 0 ? "stale" : state) : state;
+    var displayedFresh = dockUsable || usable;
+
     return {
-        state: state,
+        state: displayedState,
         source: "mpd",
-        connected: connected,
-        fresh: usable,
-        error: error,
-        ageSeconds: age,
+        observationSource: displayFromDock ? "dock-mpc" : usable ? "controller" : "",
+        connected: connected || dock !== null,
+        fresh: displayedFresh,
+        error: displayFromDock ? "" : error,
+        ageSeconds: displayFromDock ? dockAge : usable ? age
+                    : dock && dockAge >= 0 ? dockAge : age,
         // Loaded title is explicitly LAST KNOWN, including when stale.
         lastKnownLoadedTitle: loadedTitle,
-        title: usable ? currentTitle : "",
-        artist: usable && current ? shortText(current.artist, 120) : "",
+        title: displayFromDock ? shortText(dock.title, 160)
+             : usable ? currentTitle : "",
+        // Dock provides a combined artist-title label, not separate tags.
+        artist: displayFromDock ? ""
+              : usable && current ? shortText(current.artist, 120) : "",
         loaded: usable && loaded !== null,
         ownedByController: usable && session.ownedByController === true,
         // No command capabilities or mutable controller/session references.

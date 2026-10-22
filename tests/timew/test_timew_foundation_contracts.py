@@ -283,6 +283,58 @@ assert 'TIME CALCULATOR // NOT CONNECTED' not in window
 assert window.count("SystemClock {") == 1
 assert window.count("Timer {") == 1
 
+# CALC provides *independent* country-first IANA zone dropdowns. CHANGE
+# remains the existing quick-cycle mechanism, not a replacement for search.
+picker = (ROOT / "widgets/TimeZonePicker.qml").read_text(encoding="utf-8")
+assert 'property string activeConverterDropdown: ""' in window
+assert 'function openConverterDropdown(which)' in window
+assert 'function toggleConverterDropdown(which)' in window
+assert 'function closeConverterDropdowns()' in window
+assert 'function chooseConverterSearchZone(which, zoneId)' in window
+assert 'WorldZoneSearch.contains(worldZoneCatalog, zoneId)' in window
+assert 'function converterZoneAllowed(zoneId)' in window
+assert 'if (!converterZoneAllowed(src) || !converterZoneAllowed(dst))' in window
+assert 'selectedMode !== "clock" && selectedMode !== "calc"' in window
+assert 'selectedMode === "clock" || selectedMode === "calc"' in window
+assert 'id: converterSourcePicker' in window
+assert 'id: converterTargetPicker' in window
+assert window.count("TimeZonePicker {") == 2
+assert 'selectedZone: timew.converterSourceZone' in window
+assert 'selectedZone: timew.converterTargetZone' in window
+assert 'expanded: timew.activeConverterDropdown === "source"' in window
+assert 'expanded: timew.activeConverterDropdown === "target"' in window
+assert 'onZoneChosen: function(zoneId)' in window
+assert 'timew.chooseConverterSearchZone("source", zoneId)' in window
+assert 'timew.chooseConverterSearchZone("target", zoneId)' in window
+assert window.count('label: "CHANGE"') == 2
+assert 'onLeftClicked: timew.cycleConverterZone("source")' in window
+assert 'onLeftClicked: timew.cycleConverterZone("target")' in window
+assert 'converterSourcePicker.searchFocused' in window
+assert 'converterTargetPicker.searchFocused' in window
+assert 'converterSourcePicker.containsFramePoint(' in window
+assert 'converterTargetPicker.containsFramePoint(' in window
+assert 'z: 40' in window and 'z: 30' in window
+assert 'z: timew.activeConverterDropdown !== "" ? 20 : 0' in window
+assert 'TIME ZONE CONVERTER // READ ONLY' in window
+assert 'FROM and TO support independent country/zone search' in window
+assert 'id: zoneResults' in picker
+assert 'ZoneSearch.search(catalog, query, ZoneSearch.MAX_ZONES, countryIndex)' in picker
+assert 'picker.query.trim() === "" ? "ITEMS // " : "MATCHES // "' in picker
+assert 'modelData.country + " // " + modelData.label' in picker
+assert 'NeonScrollBar {' in picker
+assert 'flickable: zoneResults' in picker
+assert 'handleStyle: "star"' in picker
+assert 'handleColor: Colors.magenta' in picker
+assert 'rightMargin: pickerRail.crossExtent + 5' in picker
+assert 'id: searchInput' in picker
+assert 'color: Colors.magenta' in picker
+assert 'cursorDelegate: Rectangle { width: 2; color: Colors.orange }' in picker
+assert 'onTextEdited:' in picker
+assert 'picker.openRequested()' in picker
+assert 'picker.zoneChosen(modelData.id)' in picker
+assert 'function containsFramePoint(frame, px, py)' in picker
+assert 'function dropFocus()' in picker
+
 # Universal visual language remains: magenta header, cyan divider, borderless modes.
 assert 'text: "TIME // W"' in window
 assert "color: Colors.magenta" in window

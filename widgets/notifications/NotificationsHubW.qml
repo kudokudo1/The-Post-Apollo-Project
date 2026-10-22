@@ -183,13 +183,13 @@ PanelWindow {
     // Control Bay scroll speed operates on the HISTORY wheel viewport only.
     // Dragging the star scrollbar and keyboard card selection stay 1:1.
     readonly property real historyScrollSpeedRatio:
-        (NotificationsService.scrollSpeedMultiplier - 0.5) / 2.5
+        (NotificationsService.scrollSpeedMultiplier - 0.5) / 6.5
 
     function requestHistoryScrollSpeed(pointerX, railWidth) {
         if (NotificationsService.scrollSpeedLocked || railWidth <= 0)
             return;
         const ratio = Math.max(0, Math.min(1, Number(pointerX) / railWidth));
-        NotificationsService.setScrollSpeed(0.5 + ratio * 2.5);
+        NotificationsService.setScrollSpeed(0.5 + ratio * 6.5);
     }
 
     // Post-Apollo semantic green.

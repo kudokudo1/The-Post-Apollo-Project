@@ -1309,7 +1309,7 @@ Singleton {
         const number = Number(value);
         if (!Number.isFinite(number))
             return 1.0;
-        return Math.round(Math.max(0.5, Math.min(3.0, number)) * 10) / 10;
+        return Math.round(Math.max(0.5, Math.min(7.0, number)) * 10) / 10;
     }
 
     function setScrollSpeed(value) {

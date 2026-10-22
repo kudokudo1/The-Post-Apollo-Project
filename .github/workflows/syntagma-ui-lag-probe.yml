@@ -4,18 +4,26 @@ on:
   pull_request:
     paths:
       - "shell.qml"
+      - "modules/Mediaplayer.qml"
+      - "modules/Network.qml"
+      - "widgets/notifications/NotificationsHubW.qml"
       - "widgets/GitW.qml"
       - "widgets/HospitalW.qml"
       - "tests/components/test_syntagma_ui_lag_probe.py"
+      - "tests/components/test_syntagma_bg_lag_probe.py"
       - "docs/syntagma-ui-lag-probe.md"
       - ".github/workflows/syntagma-ui-lag-probe.yml"
   push:
     branches: [main]
     paths:
       - "shell.qml"
+      - "modules/Mediaplayer.qml"
+      - "modules/Network.qml"
+      - "widgets/notifications/NotificationsHubW.qml"
       - "widgets/GitW.qml"
       - "widgets/HospitalW.qml"
       - "tests/components/test_syntagma_ui_lag_probe.py"
+      - "tests/components/test_syntagma_bg_lag_probe.py"
       - ".github/workflows/syntagma-ui-lag-probe.yml"
   workflow_dispatch:
 
@@ -28,4 +36,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Verify opt-in diagnostics and preserved widget lifecycles
-        run: python3 tests/components/test_syntagma_ui_lag_probe.py
+        run: |
+          python3 tests/components/test_syntagma_ui_lag_probe.py
+          python3 tests/components/test_syntagma_bg_lag_probe.py

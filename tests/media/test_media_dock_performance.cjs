@@ -49,6 +49,35 @@ test("left taskbar places Media before Tray without duplicating either instance"
     assert.match(shellSource, /mpdDockSource:\s*sharedMediaDock/);
 });
 
+test("left taskbar uses close 8px gaps except App Control to Workspaces", () => {
+    const left = shellSource.split("// ===== LEFT MODULES", 2)[1]
+        ?.split("// ===== CENTER MODULE", 2)[0];
+    const right = shellSource.split("// ===== RIGHT MODULES", 2)[1];
+    assert.ok(left, "leftModules must be present");
+    assert.match(left, /Row \{\s*id:\s*leftModules[\s\S]*?spacing:\s*8/);
+    assert.match(right, /spacing:\s*8/,
+        "use the already-established compact right-module spacing");
+
+    // QtQuick Row inserts spacing before and after a visible spacer Item.
+    // This keeps exactly the old App Control→Workspaces 25px gap.
+    const gap = left.match(/Item \{\s*id:\s*appControlWorkspaceGap\s*width:\s*(\d+)\s*height:\s*1\s*\}/);
+    assert.ok(gap, "only the launcher/workspace boundary needs an extra gap");
+    assert.equal(Number(gap[1]) + 2 * 8, 25);
+    assert.equal((left.match(/id:\s*appControlWorkspaceGap\b/g) || []).length, 1);
+    const launcher = left.indexOf("id: appControlWindow");
+    const gapAt = left.indexOf("id: appControlWorkspaceGap");
+    const workspace = left.indexOf("Workspaces {}");
+    const media = left.indexOf("Mediaplayer {");
+    const tray = left.indexOf("Tray {}");
+    const hospital = left.indexOf("// Hospital");
+    const finance = left.indexOf("// Finance");
+    const git = left.indexOf("// Git");
+    const tasks = left.indexOf("Tasks {\n                id: tasksButton");
+    assert.ok([launcher, gapAt, workspace, media, tray, hospital, finance, git, tasks]
+        .every((v, i, a) => v >= 0 && (!i || v > a[i - 1])),
+        "spacer must appear only after App Control and all left-module order is preserved");
+});
+
 test("opening the Hi-Fi deck keeps the Media dock dark without removing its neon", () => {
     // Shared DockButton defaults to a yellow open fill, but Media's stacked
     // cyan/orange art illumination needs a dark background to remain visible.

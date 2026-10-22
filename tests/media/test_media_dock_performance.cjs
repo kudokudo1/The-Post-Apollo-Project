@@ -169,7 +169,20 @@ test("large faded CAVA-only ambient wash follows a padded spectrum envelope", ()
     assert.match(wash, /anchors\.horizontalCenter:\s*parent\.horizontalCenter/);
     assert.match(wash, /anchors\.bottom:\s*parent\.bottom/);
     assert.match(wash, /anchors\.bottomMargin:\s*-2/);
-    assert.match(wash, /width:\s*Math\.max\(0,\s*spectrum\.width\s*-\s*4\s*\*\s*mediaDock\.softGlowSpread\)/);
+    assert.match(wash, /width:\s*Math\.max\(0,\s*spectrum\.width\s*\+\s*2\s*\*\s*mediaDock\.softGlowSpread\)/);
+    assert.match(source,
+        /id:\s*spectrum\s*width:\s*mediaDock\.barCount\s*\*\s*5\s*\+\s*\(mediaDock\.barCount\s*-\s*1\)\s*\*\s*2/);
+    const washWidthExpression = wash.match(/width:\s*(Math\.max\(0,\s*spectrum\.width\s*\+\s*2\s*\*\s*mediaDock\.softGlowSpread\))/);
+    assert.ok(washWidthExpression, "ambient wash should react to the spectrum width");
+    const widthForBarCount = count => vm.runInNewContext(washWidthExpression[1], {
+        Math,
+        spectrum: {width: count * 5 + (count - 1) * 2},
+        mediaDock: {softGlowSpread: 3}
+    });
+    assert.equal(widthForBarCount(16), 116, "the wash must reach beyond both end bars");
+    assert.equal(widthForBarCount(24), 172, "adding eight bars must extend the wash automatically");
+    assert.equal(widthForBarCount(24) - widthForBarCount(16), 8 * (5 + 2),
+        "wash growth must match the spectrum growth without fixed pixel widths");
     assert.match(wash, /height:\s*mediaDock\.cavaAmbientTargetHeight/);
     assert.match(wash, /radius:\s*height\s*\/\s*2/);
     assert.match(wash, /blur:\s*mediaDock\.contentGlowRadius/);

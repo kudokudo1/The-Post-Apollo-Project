@@ -221,7 +221,9 @@ Item {
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: -2
-                width: Math.max(0, spectrum.width - 4 * mediaDock.softGlowSpread)
+                // Follow spectrum.width (itself derived from barCount), with
+                // a soft 3px shoulder past each outer bar at current settings.
+                width: Math.max(0, spectrum.width + 2 * mediaDock.softGlowSpread)
                 height: mediaDock.cavaAmbientTargetHeight
                 radius: height / 2
                 blur: mediaDock.contentGlowRadius

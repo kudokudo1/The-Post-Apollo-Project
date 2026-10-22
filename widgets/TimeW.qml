@@ -1,10 +1,12 @@
 import QtQuick
+import QtQuick.Controls
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Io
 import "../components"
 import "../services/hub/ApolloHubTimePolicy.js" as LocalTimePolicy
 import "../services/time/WorldClockPolicy.js" as WorldClockPolicy
+import "../services/time/WorldZoneSearch.js" as WorldZoneSearch
 
 // TimeW M1: standalone temporal window foundation.
 // No timers, activity recording, screenshots or restoration are active here.
@@ -55,7 +57,23 @@ PanelWindow {
         { id: "Europe/London", label: "LON" },
         { id: "Asia/Tokyo", label: "TYO" }
     ]
+    // Presets remain available whenever WORLD is off. Selecting WORLD enters
+    // directory-search mode and disables the four preset buttons, without
+    // deleting their selections. Returning restores the last quick zone.
+    property bool worldModeActive: false
+    property string selectedQuickZone: "UTC"
+    property string selectedSearchedZone: ""
     property string selectedWorldZone: "UTC"
+    property string worldSearchQuery: ""
+    property bool worldSearchPopupOpen: false
+    property var worldZoneCatalog: []
+    property bool worldCatalogLoaded: false
+    property bool worldCatalogLoading: false
+    property bool worldCatalogFailed: false
+    readonly property var worldSearchMatches:
+        WorldZoneSearch.search(worldZoneCatalog, worldSearchQuery, 6)
+    readonly property bool navigationKeysAvailable:
+        standardKeysAvailable && !worldSearchInput.activeFocus
     property string worldLookupZone: ""
     property string worldValidZone: ""
     property string worldRawOffset: ""
@@ -67,14 +85,69 @@ PanelWindow {
                                   use24Hour)
 
     function chooseWorldZone(zoneId) {
-        if (!worldZones.some(function(zone) { return zone.id === zoneId; }))
+        if (worldModeActive
+                || !worldZones.some(function(zone) { return zone.id === zoneId; }))
             return;
+        selectedQuickZone = zoneId;
+        selectActiveZone(zoneId);
+    }
+
+    function selectActiveZone(zoneId) {
         if (selectedWorldZone !== zoneId) {
             selectedWorldZone = zoneId;
             worldValidZone = "";
             worldRawOffset = "";
         }
-        refreshWorldClock();
+        if (zoneId !== "")
+            refreshWorldClock();
+    }
+
+    function loadWorldZoneCatalog() {
+        if (!menuOpen || selectedMode !== "clock"
+                || worldCatalogLoaded || worldCatalogLoading)
+            return;
+        worldCatalogLoading = true;
+        worldCatalogFailed = false;
+        zoneCatalogLookup.exec(["timedatectl", "list-timezones", "--no-pager"]);
+    }
+
+    function toggleWorldMode() {
+        worldModeActive = !worldModeActive;
+        worldSearchPopupOpen = worldModeActive;
+        if (worldModeActive) {
+            selectActiveZone(selectedSearchedZone);
+            loadWorldZoneCatalog();
+            Qt.callLater(function() {
+                if (timew.menuOpen && timew.selectedMode === "clock")
+                    worldSearchInput.forceActiveFocus();
+            });
+        } else {
+            selectActiveZone(selectedQuickZone);
+            Qt.callLater(restoreKeyboardFocus);
+        }
+    }
+
+    function worldSearchEdited(query) {
+        worldSearchQuery = query;
+        worldSearchPopupOpen = true;
+        if (!worldModeActive) {
+            worldModeActive = true;
+            selectActiveZone(selectedSearchedZone);
+        }
+        loadWorldZoneCatalog();
+    }
+
+    function selectWorldSearchResult(zoneId) {
+        // Never forward an arbitrary typed string to the TZ process.
+        if (!WorldZoneSearch.contains(worldZoneCatalog, zoneId))
+            return;
+        worldModeActive = true;
+        selectedSearchedZone = zoneId;
+        worldSearchPopupOpen = false;
+        worldSearchQuery = WorldZoneSearch.label(zoneId);
+        worldSearchInput.text = worldSearchQuery;
+        selectActiveZone(zoneId);
+        Qt.callLater(restoreKeyboardFocus);
     }
 
     function refreshWorldClock() {
@@ -121,13 +194,17 @@ PanelWindow {
     onMenuOpenChanged: {
         if (menuOpen) {
             Qt.callLater(restoreKeyboardFocus);
-            if (selectedMode === "clock")
+            if (selectedMode === "clock") {
                 Qt.callLater(refreshWorldClock);
+                Qt.callLater(loadWorldZoneCatalog);
+            }
         }
     }
     onSelectedModeChanged: {
-        if (menuOpen && selectedMode === "clock")
+        if (menuOpen && selectedMode === "clock") {
             Qt.callLater(refreshWorldClock);
+            Qt.callLater(loadWorldZoneCatalog);
+        }
     }
     onStandardKeysAvailableChanged: {
         if (standardKeysAvailable)
@@ -173,6 +250,29 @@ PanelWindow {
         precision: SystemClock.Seconds
     }
 
+    // Load the host's actual IANA zone list once per TimeW window lifetime.
+    // No shell, network or filesystem writes. Missing timedatectl is shown
+    // explicitly; the four built-in shortcuts still work.
+    Process {
+        id: zoneCatalogLookup
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const zones = WorldZoneSearch.parseCatalog(this.text);
+                if (zones.length > 0) {
+                    timew.worldZoneCatalog = zones;
+                    timew.worldCatalogLoaded = true;
+                    timew.worldCatalogFailed = false;
+                }
+            }
+        }
+        onExited: function(exitCode, exitStatus) {
+            timew.worldCatalogLoading = false;
+            if (exitCode !== 0 || !timew.worldCatalogLoaded)
+                timew.worldCatalogFailed = true;
+        }
+    }
+
     // A short-lived read-only lookup into the host IANA zone database.
     // Existing SystemClock renders seconds; refresh the zone offset at most
     // twice a minute, while Clock mode is open. No continuous subprocess.
@@ -211,19 +311,19 @@ PanelWindow {
         id: keyboardAnchor
         anchors.fill: parent
         z: -1000
-        enabled: timew.standardKeysAvailable
-        focus: timew.standardKeysAvailable
+        enabled: timew.navigationKeysAvailable
+        focus: timew.navigationKeysAvailable
 
         Keys.priority: Keys.BeforeItem
         Keys.onShortcutOverride: function(event) {
-            if (!timew.standardKeysAvailable)
+            if (!timew.navigationKeysAvailable)
                 return;
             if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab
                     || event.key === Qt.Key_Escape)
                 event.accepted = true;
         }
         Keys.onPressed: function(event) {
-            if (!timew.standardKeysAvailable)
+            if (!timew.navigationKeysAvailable)
                 return;
             if (event.key === Qt.Key_Escape) {
                 timew.menuOpen = false;
@@ -242,19 +342,19 @@ PanelWindow {
     Shortcut {
         sequence: "Tab"
         context: Qt.WindowShortcut
-        enabled: timew.standardKeysAvailable
+        enabled: timew.navigationKeysAvailable
         onActivated: timew.cycleMainMode(1)
     }
     Shortcut {
         sequence: "Shift+Tab"
         context: Qt.WindowShortcut
-        enabled: timew.standardKeysAvailable
+        enabled: timew.navigationKeysAvailable
         onActivated: timew.cycleMainMode(-1)
     }
     Shortcut {
         sequence: "Esc"
         context: Qt.WindowShortcut
-        enabled: timew.standardKeysAvailable
+        enabled: timew.navigationKeysAvailable
         onActivated: timew.menuOpen = false
     }
 
@@ -472,6 +572,110 @@ PanelWindow {
                             font.pixelSize: 14
                         }
 
+                        // Search remains above all five selectors. Its
+                        // results float over the lower readouts instead of
+                        // resizing the TimeW chassis or moving other modes.
+                        Item {
+                            id: worldSearchArea
+                            width: parent.width
+                            height: 34
+                            z: 30
+
+                            TextField {
+                                id: worldSearchInput
+                                anchors.fill: parent
+                                placeholderText: "SEARCH CITY / TIME ZONE"
+                                placeholderTextColor: Colors.cyan
+                                text: timew.worldSearchQuery
+                                color: Colors.white
+                                selectionColor: Colors.magenta
+                                selectedTextColor: Colors.black
+                                font.family: "GohuFont 11 Nerd Font Mono"
+                                font.pixelSize: 12
+                                leftPadding: 9
+                                rightPadding: 9
+                                selectByMouse: true
+                                background: Rectangle {
+                                    color: Colors.black
+                                    border.color: worldSearchInput.activeFocus
+                                                  ? Colors.magenta : Colors.cyan
+                                    border.width: 1
+                                }
+                                onTextEdited: timew.worldSearchEdited(text)
+                                onAccepted: {
+                                    if (timew.worldSearchMatches.length > 0)
+                                        timew.selectWorldSearchResult(
+                                            timew.worldSearchMatches[0].id);
+                                }
+                                Keys.onPressed: function(event) {
+                                    if (event.key === Qt.Key_Escape) {
+                                        timew.worldSearchPopupOpen = false;
+                                        worldSearchInput.focus = false;
+                                        Qt.callLater(timew.restoreKeyboardFocus);
+                                        event.accepted = true;
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                id: worldSearchPopup
+                                anchors.top: parent.bottom
+                                anchors.topMargin: 3
+                                width: parent.width
+                                height: timew.worldSearchMatches.length > 0
+                                        ? 8 + timew.worldSearchMatches.length * 30
+                                        : 34
+                                z: 60
+                                visible: timew.menuOpen
+                                         && timew.selectedMode === "clock"
+                                         && timew.worldModeActive
+                                         && timew.worldSearchPopupOpen
+                                color: Colors.black
+                                border.width: 1
+                                border.color: Colors.white
+
+                                Column {
+                                    anchors.fill: parent
+                                    anchors.margins: 4
+                                    spacing: 2
+
+                                    Repeater {
+                                        model: timew.worldSearchMatches
+
+                                        ActionButton {
+                                            width: worldSearchPopup.width - 8
+                                            height: 28
+                                            label: modelData.label
+                                            labelPixelSize: 11
+                                            labelHorizontalAlignment: Text.AlignLeft
+                                            trackLabelGlowLocally: true
+                                            accentColor: Colors.white
+                                            softGlowEnabled: false
+                                            onLeftClicked:
+                                                timew.selectWorldSearchResult(
+                                                    modelData.id)
+                                        }
+                                    }
+
+                                    GohuText {
+                                        visible: timew.worldSearchMatches.length === 0
+                                        width: parent.width
+                                        height: 24
+                                        verticalAlignment: Text.AlignVCenter
+                                        font.pixelSize: 11
+                                        color: Colors.orange
+                                        text: timew.worldCatalogLoading
+                                              ? "LOADING SYSTEM ZONES..."
+                                              : timew.worldCatalogFailed
+                                              ? "ZONE DIRECTORY UNAVAILABLE"
+                                              : timew.worldSearchQuery.trim() === ""
+                                              ? "TYPE CITY OR TIME ZONE"
+                                              : "NO MATCHES"
+                                    }
+                                }
+                            }
+                        }
+
                         Row {
                             id: worldZoneStrip
                             width: parent.width
@@ -483,17 +687,34 @@ PanelWindow {
 
                                 ActionButton {
                                     width: (worldZoneStrip.width
-                                            - (timew.worldZones.length - 1)
-                                              * worldZoneStrip.spacing)
-                                           / timew.worldZones.length
+                                            - worldZoneStrip.spacing * 4) / 5
                                     height: 30
                                     label: modelData.label
                                     labelPixelSize: 11
                                     trackLabelGlowLocally: true
                                     accentColor: timew.semanticColor
-                                    selected: modelData.id === timew.selectedWorldZone
-                                    onLeftClicked: timew.chooseWorldZone(modelData.id)
+                                    available: !timew.worldModeActive
+                                    selected: !timew.worldModeActive
+                                              && modelData.id
+                                                 === timew.selectedQuickZone
+                                    onLeftClicked:
+                                        timew.chooseWorldZone(modelData.id)
                                 }
+                            }
+
+                            ActionButton {
+                                id: worldModeButton
+                                width: (worldZoneStrip.width
+                                        - worldZoneStrip.spacing * 4) / 5
+                                height: 30
+                                label: "WORLD"
+                                labelPixelSize: 11
+                                trackLabelGlowLocally: true
+                                accentColor: Colors.white
+                                selected: timew.worldModeActive
+                                selectedFillColor: Colors.magenta
+                                selectedForegroundColor: Colors.black
+                                onLeftClicked: timew.toggleWorldMode()
                             }
                         }
 
@@ -506,7 +727,10 @@ PanelWindow {
 
                         GohuText {
                             width: parent.width
-                            text: timew.worldClockReady
+                            text: timew.worldModeActive
+                                  && timew.selectedWorldZone === ""
+                                  ? "WORLD // SELECT A SEARCH RESULT"
+                                  : timew.worldClockReady
                                   ? timew.selectedWorldZone + " // "
                                     + timew.worldTimeSnapshot.utcOffsetLabel
                                   : "ZONE LOOKUP // UNAVAILABLE OR UPDATING"

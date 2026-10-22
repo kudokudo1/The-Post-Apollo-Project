@@ -125,12 +125,48 @@ assert "WorldClockPolicy.snapshot(localClock.date.getTime()," in window
 assert 'command: ["date", "+%z"]' in window
 assert 'environment: { TZ: worldLookupZone, LC_ALL: "C" }' in window
 assert "Process {" in window
-assert window.count("Process {") == 1
+assert window.count("Process {") == 2
 assert "worldLookup.running" in window
-assert 'onLeftClicked: timew.chooseWorldZone(modelData.id)' in window
+assert 'onLeftClicked:' in window
+assert 'timew.chooseWorldZone(modelData.id)' in window
 assert 'text: timew.worldTimeSnapshot.readout' in window
 assert 'text: timew.worldClockReady' in window
 assert 'text: "WORLD // CURRENT TIME"' in window
+# Keep exactly four presets, plus WORLD as the searchable-mode selector.
+assert 'property bool worldModeActive: false' in window
+assert 'property string selectedQuickZone: "UTC"' in window
+assert 'property string selectedSearchedZone: ""' in window
+assert 'property string selectedWorldZone: "UTC"' in window
+assert 'property string worldSearchQuery: ""' in window
+assert 'import QtQuick.Controls' in window
+assert 'import "../services/time/WorldZoneSearch.js" as WorldZoneSearch' in window
+assert 'zoneCatalogLookup.exec(["timedatectl", "list-timezones", "--no-pager"])' in window
+assert 'WorldZoneSearch.parseCatalog(this.text)' in window
+assert 'WorldZoneSearch.search(worldZoneCatalog, worldSearchQuery, 6)' in window
+assert 'WorldZoneSearch.contains(worldZoneCatalog, zoneId)' in window
+assert 'function toggleWorldMode()' in window
+assert 'function selectWorldSearchResult(zoneId)' in window
+assert 'placeholderText: "SEARCH CITY / TIME ZONE"' in window
+assert 'id: worldSearchInput' in window
+assert 'id: worldSearchPopup' in window
+assert 'timew.worldSearchMatches[0].id' in window
+assert 'timew.selectWorldSearchResult(' in window
+assert 'available: !timew.worldModeActive' in window
+assert 'selected: !timew.worldModeActive' in window
+assert 'label: "WORLD"' in window
+assert 'selected: timew.worldModeActive' in window
+assert 'onLeftClicked: timew.toggleWorldMode()' in window
+assert 'standardKeysAvailable && !worldSearchInput.activeFocus' in window
+assert 'enabled: timew.navigationKeysAvailable' in window
+assert 'WORLD // SELECT A SEARCH RESULT' in window
+assert '"ZONE DIRECTORY UNAVAILABLE"' in window
+assert window.count('onTextEdited:') == 1
+# No dynamic command composition or arbitrary typed TZ values.
+assert 'command: ["date", "+%z"]' in window
+assert 'worldLookup.exec({' in window
+assert 'environment: { TZ: worldLookupZone, LC_ALL: "C" }' in window
+assert '["sh", "-c"' not in window
+assert '["bash", "-c"' not in window
 assert 'LOCAL + WORLD // LIVE // CONVERTER NEXT' in window
 assert "label: timew.use24Hour ? \"24H\" : \"12H\"" in window
 assert "onLeftClicked: timew.use24Hour = !timew.use24Hour" in window

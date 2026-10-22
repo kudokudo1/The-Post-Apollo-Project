@@ -8,6 +8,7 @@ policy = (ROOT / "services/hub/ApolloHubMediaPolicy.js").read_text(encoding="utf
 headless = (ROOT / "services/media/HeadlessMediaController.qml").read_text(encoding="utf-8")
 mpris = (ROOT / "services/media/MprisPlaybackAdapter.qml").read_text(encoding="utf-8")
 deck = (ROOT / "widgets/MediaDeckW.qml").read_text(encoding="utf-8")
+media_dock = (ROOT / "modules/Mediaplayer.qml").read_text(encoding="utf-8")
 shell = (ROOT / "shell.qml").read_text(encoding="utf-8")
 workflow = (ROOT / ".github/workflows/apollo-hub-live-bridge.yml").read_text(encoding="utf-8")
 
@@ -57,7 +58,22 @@ for needle in (
     assert needle in mpris, f"MPRIS adapter seam moved: {needle}"
 assert "HeadlessMediaController {" in deck
 assert "MprisPlaybackAdapter {" in deck
-assert "Mediaplayer {}" in shell  # Nothing wired into shell for B4.
+# The references stay on the existing dock/deck. No duplicate controller or
+# implicit MPRIS selection is introduced by the shell.
+assert "readonly property var hubMediaController: headless" in deck
+assert "readonly property string hubSelectedMprisBusName: mediaAdapter.selectedBusName" in deck
+assert "readonly property var hubMediaController: deckPanel.hubMediaController" in media_dock
+assert "readonly property string hubSelectedMprisBusName:" in media_dock
+assert "deckPanel.hubSelectedMprisBusName" in media_dock
+assert "Mediaplayer {" in shell
+assert "id: sharedMediaDock" in shell
+assert "mediaControllerSource: sharedMediaDock.hubMediaController" in shell
+assert "selectedMprisBusName: sharedMediaDock.hubSelectedMprisBusName" in shell
+assert "HeadlessMediaController {" not in media_dock
+assert "MprisPlaybackAdapter {" not in media_dock
+assert "HeadlessMediaController {" not in shell
+assert "MprisPlaybackAdapter {" not in shell
+assert "selectNextPlayer()" not in shell
 # No second controller, MPRIS write, process or playback command in the Hub.
 for forbidden in (
     "HeadlessMediaController {", "MprisPlaybackAdapter {",

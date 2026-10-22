@@ -118,6 +118,17 @@ Scope {
                 || !/^\d{4}-\d{2}$/.test(String(payload.month || ""))
                 || payload.month !== selectedMonth
                 || !Number.isSafeInteger(payload.toBudgetCents)
+                || !payload.funding
+                || payload.funding.month !== payload.month
+                || payload.funding.toBudgetCents !== payload.toBudgetCents
+                || payload.funding.completeness !== "monthly-review-only"
+                || payload.funding.openingBalancesVerified !== false
+                || !Number.isSafeInteger(payload.funding.accountCount)
+                || !Number.isSafeInteger(payload.funding.accountBalanceCents)
+                || !Number.isSafeInteger(payload.funding.incomeCategoryCount)
+                || !Number.isSafeInteger(payload.funding.incomeCategoryActivityCents)
+                || !Number.isSafeInteger(payload.funding.positiveUncategorizedCount)
+                || !Number.isSafeInteger(payload.funding.positiveUncategorizedCents)
                 || !Array.isArray(payload.accounts)
                 || !Array.isArray(payload.categories)
                 || !Number.isSafeInteger(payload.transactionsCount)

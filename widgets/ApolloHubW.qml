@@ -6,14 +6,15 @@ import "hub"
 import "../services/hub/ApolloHubLayout.js" as Layout
 import qs.services.hub
 
-// ApolloHubW foundation, intentionally NOT wired into shell.qml yet.
-// This is a configurable in-Hub workspace, not a replacement for the domain
-// owners (Calendar, CPU++, Media, Network, etc.).
+// Configurable in-Hub workspace. The shared shell owns live service instances;
+// this UI only consumes snapshots supplied through its liveBridge property.
 PanelWindow {
     id: hub
 
     property bool menuOpen: false
     property bool editMode: false
+    // Injected read-only ApolloHubLiveBridge; do not construct a second provider.
+    property var liveBridge: null
     // Only the currently keyboard-owned window may consume navigation keys.
     // The standalone preview uses keyboardActive=true; the main bar supplies
     // relationship-focus guards when it mounts this window.
@@ -552,6 +553,10 @@ PanelWindow {
                         ApolloHubTile {
                             readonly property var tileConfig: hub.activeTiles[index]
                             moduleId: tileConfig.module
+                            // Live QML binding; changes to the shared bridge's
+                            // weatherSnapshot update the tile without copying data.
+                            weatherSnapshot: hub.liveBridge
+                                             ? hub.liveBridge.weatherSnapshot : null
                             tileIndex: index
                             tileCount: hub.activeTiles.length
                             editing: hub.editMode

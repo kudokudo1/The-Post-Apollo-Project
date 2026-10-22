@@ -333,3 +333,35 @@ changes, or the user presses CANCEL. ACTUAL remains authoritative.
 
 Verify D11 using source contracts and pure fictional-data arithmetic tests.
 Runtime rendering and later guarded allocation writes are separate milestones.
+
+
+## FinanceW D12a // Allocation policy foundation (NOT connected to Actual)
+
+A separate guarded budget-allocation **policy** now exists at
+scripts/finance/allocation_guard.mjs. It is intentionally **not invoked** by
+FinanceW, not imported by a local process or QML, and cannot activate itself.
+This development batch is a fake-data-only foundation for later guarded
+category allocation saving.
+
+The command is an **absolute** category monthly amount in integer cents,
+bound to a specific budget source fingerprint, selected month, stable category
+ID, unique request ID, and the original category/To Budget values observed
+by the operator. Reject malformed data, extra fields, missing/duplicate
+categories, stale amounts, unchanged proposals, changes that spend more
+unallocated funds than are available, and category balances that would remain
+negative. A live allocation's permission and durable journal remain a
+**separate later implementation**, not inherited from D9 transaction writes.
+
+In a future separately authorized execution adapter, the policy will first
+read Actual's current month, verify these invariants, call the adapter's
+durable recordAttempt, perform at most one
+setBudgetAmount(month,categoryId,amountCents), sync, and verify a fresh
+readback. Once recordAttempt occurs, all errors are **UNCERTAIN** until
+manually reconciled; no automatic retries. This batch does not provision a
+write permission file, does not enable UI APPLY, and does not access the
+operator's budget. Its tests inject fictional API methods and never import
+Actual itself.
+
+Next: establish a disposable real Actual test for the specific
+setBudgetAmount semantics, then design a separate local authorization and
+recovery gate. Keep D11 PREVIEW-only until that stage is accepted.

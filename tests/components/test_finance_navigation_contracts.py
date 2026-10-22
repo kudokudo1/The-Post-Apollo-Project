@@ -38,8 +38,8 @@ assert "root.keyboardOwnershipRequested();" in menu
 
 # Reuse the standard controls instead of introducing custom MouseAreas.
 assert menu.count("ModeButton {") == 1
-# Close button, three delegated Budget sub-mode buttons, manual REFRESH and two month arrows.
-assert menu.count("ActionButton {") == 5
+# Close button, manual REFRESH, two month arrows and a draft opener (submode buttons repeat).
+assert menu.count("ActionButton {") == 6
 assert "MouseArea {" not in menu
 
 # Distinct header, divider, and canonical U+00D7 close control.

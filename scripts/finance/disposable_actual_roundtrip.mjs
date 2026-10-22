@@ -31,6 +31,7 @@ const description="FICTIONAL FinanceW Test Cafe";
 let stage="preflight";
 let server=null;
 let apiActive=false;
+let engine=null;
 let temporary=null;
 
 function sleep(ms) {return new Promise(resolve=>setTimeout(resolve,ms));}
@@ -122,13 +123,14 @@ function assertOutcome(result,expected,code=0) {
 
 async function startApi(folder) {
   await mkdir(folder,{recursive:true,mode:0o700});
-  await api.init({dataDir:folder,serverURL,password});
+  engine=await api.init({dataDir:folder,serverURL,password});
   apiActive=true;
 }
 async function endApi() {
   if (apiActive) {
     apiActive=false;
     await api.shutdown();
+    engine=null;
   }
 }
 
@@ -153,10 +155,11 @@ async function run() {
   assert.equal(typeof accountId,"string");
   await api.sync();
   stage="explicit-fictional-upload";
-  const upload=await api.internal.send("upload-budget");
+  assert.equal(typeof engine?.send,"function","Actual engine unavailable");
+  const upload=await engine.send("upload-budget");
   assert.equal(upload?.error,undefined,"Fictional upload failed");
   stage="remote-file-list";
-  const remote=await api.internal.send("get-remote-files");
+  const remote=await engine.send("get-remote-files");
   assert.ok(Array.isArray(remote) && remote.length===1,"No unique remote fixture");
   const id=remote[0]?.fileId;
   assert.equal(typeof id,"string");
@@ -251,8 +254,10 @@ try {
   // are emitted, not payloads, credential contents or budget details.
   process.stderr.write("FINANCEW_DISPOSABLE_ACTUAL_FAIL stage="+stage
     +" class="+(error?.code || error?.name || "Error")
-    +" detail="+(/^[a-z0-9:-]+$/.test(error?.message || "")
-      ? error.message : "none")+"\n");
+    +" detail="+String(error?.message || "none")
+      .replaceAll(password,"[redacted]")
+      .replaceAll(description,"[redacted]")
+      .replace(/[^a-zA-Z0-9 ():._-]/g,"?").slice(0,140)+"\n");
   process.exitCode=1;
 } finally {
   try {await endApi();} catch {}

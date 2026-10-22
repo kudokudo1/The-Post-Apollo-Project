@@ -15,6 +15,7 @@ Item {
     readonly property bool savePending: saveState === "pending"
     property string selectedMonth: ""
     property var accounts: []
+    property string sourceKey: ""
     property bool open: false
     property bool reviewed: false
     property string dateText: ""
@@ -64,7 +65,7 @@ Item {
 
     function validate() {
         if (!Array.isArray(accounts) || accounts.length === 0
-                || !accountName || !accountId)
+                || !accountName || !accountId || !/^[a-f0-9]{64}$/.test(sourceKey))
             return "NO ACCOUNT AVAILABLE";
         if (!validDate(dateText))
             return "DATE MUST BE VALID AND IN SELECTED MONTH";
@@ -119,6 +120,7 @@ Item {
         const payload = {
             action: editing ? "update" : "create",
             requestId: requestId,
+            sourceKey: sourceKey,
             accountId: accountId,
             month: selectedMonth,
             date: dateText,
@@ -163,6 +165,7 @@ Item {
     }
 
     onSelectedMonthChanged: clear()
+    onSourceKeyChanged: clear()
     onAccountsChanged: {
         if (open)
             clear(); // A refreshed snapshot invalidates in-progress context.

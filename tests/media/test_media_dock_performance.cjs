@@ -19,7 +19,14 @@ const trebleOrange = fs.readFileSync(path.join(root, "assets/media/treble-clef-o
 function harness() {
     const match = source.match(/    function receiveCavaFrame\(frame\) \{([\s\S]*?)\n    \}\n\n    Process \{/);
     assert.ok(match, "CAVA frame handler should remain isolated and testable");
-    const context = vm.createContext({barCount: 16, levels: Array(16).fill(0)});
+    // Optional UI-lag diagnostics are disabled by default; model that QML
+    // property explicitly so normal CAVA frame tests exercise the production
+    // fast path even after the probe was introduced.
+    const context = vm.createContext({
+        barCount: 16,
+        levels: Array(16).fill(0),
+        bgLagProbeEnabled: false
+    });
     const receive = vm.runInContext("(function(frame) {" + match[1] + "\n})", context);
     return {context, receive};
 }

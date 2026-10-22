@@ -161,17 +161,23 @@ test("requested music icon retains the exact ornament codepoints and PNG treble 
     assert.doesNotMatch(markBody, /text:\s*" ׅ˖ㅤ"/);
     assert.doesNotMatch(markBody, /text:\s*"[^"]*ㅤ"/);
 
-    // Keep both right ornament marks in the SAME Text object (so the Hebrew
-    // combining accent is shaped with the outer star), but reduce the internal
-    // glyph advance. The start of trailingStar remains anchored next to clef.
+    // Correct the placement: tighten the THREE LEFT ornaments, not the right.
+    // Keep both existing text sources and the separate clef PNG unchanged.
+    const leading = markBody.match(/GohuText \{\s*id:\s*leadingStars([\s\S]*?)\n\s*\}/)?.[1];
     const trailing = markBody.match(/GohuText \{\s*id:\s*trailingStar([\s\S]*?)\n\s*\}/)?.[1];
-    assert.ok(trailing, "right ornament must remain one text/glow source");
+    assert.ok(leading && trailing, "both independent ornament glow sources remain");
+    assert.match(leading, /text:\s*"‧₊˚"/);
+    assert.match(leading, /font\.letterSpacing:\s*-6/,
+        "only the left ornaments have negative internal spacing");
+    assert.match(leading, /color:\s*mediaDock\.foregroundColor/);
     assert.match(trailing, /text:\s*"ׅ˖"/);
-    assert.match(trailing, /font\.letterSpacing:\s*-6/);
+    assert.doesNotMatch(trailing, /font\.letterSpacing/,
+        "revert the previous right-side spacing adjustment");
     assert.match(trailing, /color:\s*mediaDock\.foregroundColor/);
+    assert.equal((markBody.match(/font\.letterSpacing:/g) || []).length, 1,
+        "no unrelated icon glyph spacing changes");
     assert.equal((markBody.match(/GohuText \{/g) || []).length, 2,
-        "no split mark that could break font shaping or duplicate glows");
-
+        "no extra icon/glow sources or changes to combining mark shaping");
 
     assert.match(source, /id:\s*trebleClef\s*width:\s*15\s*height:\s*34/);
     assert.match(source, /source:\s*mediaDock\.open\s*\?\s*Qt\.resolvedUrl/);

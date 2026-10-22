@@ -9,9 +9,11 @@ function safeName(value) {
 }
 
 function signalPercent(value) {
-    if (value === null || value === undefined || value === "")
+    // The Quickshell API reports a real number from 0.0 to 1.0.
+    // Coercing strings/arrays would falsely turn invalid readings into 0%.
+    if (typeof value !== "number")
         return -1;
-    var strength = Number(value);
+    var strength = value;
     return isFinite(strength) && strength >= 0 && strength <= 1
            ? Math.round(strength * 100) : -1;
 }

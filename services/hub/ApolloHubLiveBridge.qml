@@ -1,9 +1,11 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import Quickshell.Networking
 import Quickshell.Services.Mpris
 import "../weather/WeatherDockPolicy.js" as WeatherPolicy
 import "ApolloHubSystemPolicy.js" as SystemPolicy
+import "ApolloHubUptimePolicy.js" as UptimePolicy
 import "ApolloHubNetworkPolicy.js" as NetworkPolicy
 import "ApolloHubMediaPolicy.js" as MediaPolicy
 
@@ -16,6 +18,42 @@ Scope {
 
     property var weatherSource: null
     property var systemSource: null
+
+    // B5 boot uptime, read as a tiny procfs file every minute. The procfs
+    // source is independent of CPU++'s expensive on-demand system monitor.
+    // This read cannot mutate the OS or launch a subprocess.
+    property string uptimeRaw: ""
+    property double uptimeObservedAtMs: 0
+    property bool uptimeLoadError: false
+
+    FileView {
+        id: systemUptimeFile
+        path: "/proc/uptime"
+        watchChanges: false
+        printErrors: false
+        onLoaded: {
+            // A completed read, not shell process lifetime, is the evidence.
+            const readNow = Date.now();
+            bridge.uptimeRaw = systemUptimeFile.text();
+            bridge.uptimeLoadError = false;
+            bridge.observationNowMs = readNow;
+            bridge.uptimeObservedAtMs = readNow;
+        }
+        onLoadFailed: function(error) {
+            bridge.uptimeRaw = "";
+            bridge.uptimeObservedAtMs = 0;
+            bridge.uptimeLoadError = true;
+        }
+    }
+    Timer {
+        // One nonblocking procfs file reload per minute, no subprocess.
+        interval: 60000
+        repeat: true
+        running: true
+        onTriggered: systemUptimeFile.reload()
+    }
+    readonly property var uptimeSnapshot: UptimePolicy.snapshot(
+        uptimeRaw, uptimeObservedAtMs, observationNowMs, uptimeLoadError)
     // Optional reference to the existing Network dock, not another collector.
     property var networkDockSource: null
 

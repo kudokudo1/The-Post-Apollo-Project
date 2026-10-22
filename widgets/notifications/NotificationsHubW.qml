@@ -2184,7 +2184,7 @@ PanelWindow {
                             }
                             NeonScrollBar {
                                 flickable: dndManagerList
-                    accountForContentOrigin: true
+                                accountForContentOrigin: true
                                 handleStyle: "star"
                                 // The shared star's drop shadow must extend
                                 // beyond the 16px track, not be clipped to it.
@@ -2344,7 +2344,7 @@ PanelWindow {
                             }
                             NeonScrollBar {
                                 flickable: favoriteManagerList
-                    accountForContentOrigin: true
+                                accountForContentOrigin: true
                                 handleStyle: "star"
                                 containGlow: false
                                 handleGlowEnabled: true

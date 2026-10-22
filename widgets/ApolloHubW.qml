@@ -13,6 +13,8 @@ PanelWindow {
 
     property bool menuOpen: false
     property bool editMode: false
+    // Do not let Hub mode shortcuts consume typing in the B7 editor.
+    property bool todoInputFocused: false
     // Injected read-only ApolloHubLiveBridge; do not construct a second provider.
     property var liveBridge: null
     // Only the currently keyboard-owned window may consume navigation keys.
@@ -27,6 +29,7 @@ PanelWindow {
         menuOpen && keyboardActive
         && (!relationshipFocusModeActive || relationshipFocused)
         && !modeNameInput.activeFocus
+        && !todoInputFocused
     property bool writingLayout: false
     property var layout: Layout.defaultLayout()
     property int selectedModeIndex: 0
@@ -121,6 +124,8 @@ PanelWindow {
 
     Component.onCompleted: restore()
     onMenuOpenChanged: {
+        if (!menuOpen)
+            todoInputFocused = false;
         if (menuOpen && keyboardActive)
             Qt.callLater(function() {
                 if (hub.standardKeysAvailable)
@@ -578,6 +583,13 @@ PanelWindow {
                             // to launch methods, command lines, or executables.
                             appsSnapshot: hub.liveBridge
                                           ? hub.liveBridge.appsSnapshot : null
+                            // B7 task data belongs to a separate guarded
+                            // singleton; never mix it with hub layout JSON.
+                            todoStore: ApolloHubTodoStore
+                            todoSnapshot: ApolloHubTodoStore.snapshot
+                            onTodoTextFocusChanged: function(focused) {
+                                hub.todoInputFocused = focused;
+                            }
                             tileIndex: index
                             tileCount: hub.activeTiles.length
                             editing: hub.editMode

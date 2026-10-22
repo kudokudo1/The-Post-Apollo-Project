@@ -577,25 +577,37 @@ PanelWindow {
         TapHandler {
             enabled: timew.worldSearchPopupOpen
                      || worldSearchInput.activeFocus
+                     || timew.activeConverterDropdown !== ""
+                     || converterSourcePicker.searchFocused
+                     || converterTargetPicker.searchFocused
             gesturePolicy: TapHandler.DragThreshold
             onTapped: function(point, button) {
                 if (button !== Qt.LeftButton)
                     return;
-                const search = worldSearchArea.mapToItem(timewFrame, 0, 0);
                 const px = point.position.x;
                 const py = point.position.y;
-                const withinSearch = px >= search.x
-                                     && px <= search.x + worldSearchArea.width
-                                     && py >= search.y
-                                     && py <= search.y + worldSearchArea.height;
-                const popup = worldSearchPopup.mapToItem(timewFrame, 0, 0);
-                const withinPopup = worldSearchPopup.visible
-                                    && px >= popup.x
-                                    && px <= popup.x + worldSearchPopup.width
-                                    && py >= popup.y
-                                    && py <= popup.y + worldSearchPopup.height;
-                if (!withinSearch && !withinPopup)
-                    timew.dismissWorldSearchPopup();
+                if (timew.selectedMode === "clock") {
+                    const search = worldSearchArea.mapToItem(timewFrame, 0, 0);
+                    const withinSearch = px >= search.x
+                                         && px <= search.x + worldSearchArea.width
+                                         && py >= search.y
+                                         && py <= search.y + worldSearchArea.height;
+                    const popup = worldSearchPopup.mapToItem(timewFrame, 0, 0);
+                    const withinPopup = worldSearchPopup.visible
+                                        && px >= popup.x
+                                        && px <= popup.x + worldSearchPopup.width
+                                        && py >= popup.y
+                                        && py <= popup.y + worldSearchPopup.height;
+                    if (!withinSearch && !withinPopup)
+                        timew.dismissWorldSearchPopup();
+                } else if (timew.selectedMode === "calc") {
+                    const inSource = converterSourcePicker.containsFramePoint(
+                                         timewFrame, px, py);
+                    const inTarget = converterTargetPicker.containsFramePoint(
+                                         timewFrame, px, py);
+                    if (!inSource && !inTarget)
+                        timew.closeConverterDropdowns();
+                }
             }
         }
 

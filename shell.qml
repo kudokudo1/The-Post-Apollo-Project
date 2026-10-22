@@ -515,15 +515,15 @@ PanelWindow {
 
         Workspaces {}
 
-        // Tray
-
-        Tray {}
-
         // Mediaplayer
 
         Mediaplayer {
             id: sharedMediaDock
         }
+
+        // Tray
+
+        Tray {}
 
         // Hospital
 

@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import Quickshell
 import Quickshell.Io
 import "../components"
@@ -56,10 +57,11 @@ Item {
     hoverForegroundColor: Colors.white
     pressedForegroundColor: Colors.white
 
-    // The static music mark keeps its own magenta glow, independent of CAVA.
-    normalContentGlowColor: Colors.magenta
-    hoverContentGlowColor: Colors.magenta
-    pressedContentGlowColor: Colors.magenta
+    // The static stars/clef cluster follows the same accent as CAVA.
+    // The DockButton's canonical open-magenta priority still applies.
+    normalContentGlowColor: accentColor
+    hoverContentGlowColor: accentColor
+    pressedContentGlowColor: accentColor
 
     // Magenta idle chassis; leave hover and opened dock semantics unchanged.
     normalDockGlowColor: Colors.magenta
@@ -71,11 +73,28 @@ Item {
     // sampled glow attached to the static music glyph instead.
     contentGlowSource: musicMark
 
+    // One non-sampled cyan/orange wash below the entire music mark + CAVA.
+    // It sits inside the module, above the independent magenta chassis glow
+    // but below the artwork. This only changes on MPD state/hover, not on
+    // each CAVA frame (which previously caused Quickshell render stalls).
+    RectangularShadow {
+        id: mediaArtworkUnderlay
+        anchors.centerIn: mediaArtwork
+        width: mediaArtwork.width + 10
+        height: mediaArtwork.height + 4
+        spread: mediaDock.softGlowSpread
+        blur: mediaDock.contentGlowRadius
+        color: mediaDock.accentColor
+        opacity: mediaDock.softGlowOpacity * 0.80
+        z: 0
+    }
+
     // Preserve the requested glyph exactly, before the live spectrum.
     Row {
         id: mediaArtwork
         anchors.centerIn: parent
         spacing: 9
+        z: 1
 
         // Musical-symbol font fallback is not reliable on the operator's Qt
         // runtime (including the previous plain-text attempt). Bundle a

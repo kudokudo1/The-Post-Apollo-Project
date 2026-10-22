@@ -32,10 +32,10 @@ test("sample static music icon, not the animated VU spectrum", () => {
     assert.match(source, /id:\s*spectrum/);
 });
 
-test("magenta dock glow and CAVA-colored clef remain independent from bar sampling", () => {
+test("magenta dock halo and CAVA-colored static music mark stay independent", () => {
     assert.match(source, /normalDockGlowColor:\s*Colors\.magenta/);
-    assert.match(source, /normalContentGlowColor:\s*Colors\.magenta/);
-    assert.match(source, /hoverContentGlowColor:\s*Colors\.magenta/);
+    assert.match(source, /normalContentGlowColor:\s*accentColor/);
+    assert.match(source, /hoverContentGlowColor:\s*accentColor/);
     assert.match(source, /contentGlowSource:\s*musicMark/);
 
     const musicMark = source.match(/Row \{\s*id:\s*musicMark([\s\S]*?)\n\s*\}\n\n\s*Item \{\s*id:\s*spectrum/);
@@ -88,6 +88,33 @@ test("magenta dock glow and CAVA-colored clef remain independent from bar sampli
     assert.match(source, /readonly property color accentColor:\s*mpdPlaying \? Colors\.orange : Colors\.cyan/);
     assert.match(source, /color:\s*mediaDock\.accentColor/);
     assert.doesNotMatch(source, /contentGlowSource:\s*(?:spectrum|mediaArtwork)/);
+});
+
+test("CAVA-colored inner glow sits below artwork but above the magenta chassis", () => {
+    assert.match(source, /import QtQuick\.Effects/);
+    assert.match(source, /normalDockGlowColor:\s*Colors\.magenta/);
+    assert.match(source, /hoverDockGlowColor:\s*accentColor/);
+    assert.match(source, /normalContentGlowColor:\s*accentColor/);
+    assert.match(source, /hoverContentGlowColor:\s*accentColor/);
+    assert.match(source, /pressedContentGlowColor:\s*accentColor/);
+    const match = source.match(/RectangularShadow \{\s*id:\s*mediaArtworkUnderlay([\s\S]*?)\n    \}/);
+    assert.ok(match, "a single local underlay should cover the music symbol and CAVA bars");
+    const underlay = match[1];
+    assert.match(underlay, /anchors\.centerIn:\s*mediaArtwork/);
+    assert.match(underlay, /width:\s*mediaArtwork\.width\s*\+\s*10/);
+    assert.match(underlay, /height:\s*mediaArtwork\.height\s*\+\s*4/);
+    assert.match(underlay, /spread:\s*mediaDock\.softGlowSpread/);
+    assert.match(underlay, /blur:\s*mediaDock\.contentGlowRadius/);
+    assert.match(underlay, /color:\s*mediaDock\.accentColor/);
+    assert.match(underlay, /opacity:\s*mediaDock\.softGlowOpacity\s*\*\s*0\.80/);
+    assert.match(underlay, /z:\s*0/);
+    assert.match(source, /Row \{\s*id:\s*mediaArtwork\s*anchors\.centerIn:\s*parent\s*spacing:\s*9\s*z:\s*1/);
+    assert.equal((source.match(/RectangularShadow \{/g) || []).length, 1,
+        "the media module has only one static backing glow");
+    assert.doesNotMatch(underlay, /levels|frame|Repeater|ShaderEffect|DropShadow|source:/,
+        "underlay must not sample or recalculate animated CAVA frames");
+    assert.match(source, /contentGlowSource:\s*musicMark/);
+    assert.doesNotMatch(source, /contentGlowSource:\s*(?:mediaArtwork|spectrum|cavaBar)/);
 });
 
 test("CAVA neon tracks the animated bar using geometry only", () => {

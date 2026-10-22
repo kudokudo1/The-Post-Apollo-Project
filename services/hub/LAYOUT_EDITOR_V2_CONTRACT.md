@@ -1,6 +1,6 @@
 # 🏥💜 ApolloHubW // P1 Layout Editor 2.0, stage 1
 
-**Status:** Stage 1 tile removal and Undo accepted on the operator's desktop. Stage 2 width/height edit controls are committed to GitHub `main` with source/behavior checks passing; stage 2 runtime acceptance is pending. The current release does **not** implement drag-and-drop, cross-mode transfer, module picker, or full preset management.
+**Status:** Stages 1 (tile ×/UNDO) and 2 (tile resizing) operator-accepted on the live desktop. Stage 3 mode/group removal with two-click confirmation is implemented in GitHub `main` and passes source/behavior CI; Stage 3 desktop acceptance is pending. Drag-and-drop, cross-mode transfer, module picker, and full preset management are not in scope.
 
 ## IMPLEMENTATION
 
@@ -71,9 +71,10 @@ The `×` is an **explicit one-click edit action**, not a destructive record dele
 - [x] Add source-level behavior and UI wiring tests
 - [ ] Operator runtime acceptance after syncing
 - [x] Stage 2 edit controls for one/two-column width and one/two/three-row chassis heights
-- [ ] Stage 2 operator runtime acceptance
+- [x] Stage 2 operator runtime acceptance
 - [ ] Richer grid packing and tile content expansion
-- [ ] Main mode/group removal controls
+- [x] Stage 3 mode/group removal with named confirmation and Undo
+- [ ] Stage 3 operator desktop acceptance
 - [ ] Searchable module picker, move between modes, and durable undo/presets
 
 ## P1 Stage 2 // Explicit width and height controls
@@ -90,9 +91,30 @@ The tile EDIT toolbar now reads **← → SWAP W:1/W:2 H:1/H:2/H:3 ×**, preserv
 
 **Desktop acceptance:** after operator pulls latest `main` and restarts Quickshell, enter EDIT, choose a disposable tile, cycle W and H independently, UNDO both, close/reopen the Hub and restart (when convenient) to confirm dimensions persist. Check that a half-width tall tile may leave a blank area beside it under the existing `Flow` layout; this is not a data-loss bug. A future true grid editor will address packing.
 
+## P1 Stage 3 // Remove main modes and submodes safely
+
+The EDIT toolbar provides **− MODE** and **− GROUP** in addition to the prior + MODE, + GROUP, + TILE, and UNDO. Both removal buttons use the canonical red destructive-action treatment.
+
+**Two-click confirmation:**
+1. Select the mode or group to remove and open EDIT.
+2. Click **− MODE** or **− GROUP**. The toolbar temporarily displays the selected name, the count of groups/tiles under it, and distinct **CONFIRM** and **CANCEL** buttons. The change is not saved yet.
+3. **CONFIRM** rechecks the current selected stable IDs, count limits, editing state, and layout-storage validity before removing the layout branch. **CANCEL** performs no write. Closing the Hub, leaving EDIT, or switching mode/group automatically cancels pending confirmation.
+4. The existing UNDO button restores the prior hierarchy, including group names, tile order, unique tile IDs and W/H sizes, within the same session.
+
+**Safety rules:**
+- At least one main mode must remain; every surviving mode must retain at least one submode. A disabled removal button makes that invariant visible, and the pure policy independently rejects invalid calls.
+- Removal changes only the `ApolloHubStore.layoutJson` arrangement. **It does not delete To-do records, Notes, media, application installations, shared services, or widget-local settings.**
+- `Layout.removeMode(layout, modeIndex, expectedModeId, true)` and `Layout.removeSubMode(layout, modeIndex, subIndex, expectedGroupId, true)` refuse to mutate without explicit boolean confirmation and matching stable IDs.
+- The same single-writer layout store, version-2 schema, unsupported-schema write lock, and ten-entry in-session UNDO history remain unchanged.
+- The confirmation is displayed in place of the ordinary editable mode-name field; it adds no persistent modal window, timeout, service, or new polling process.
+
+**Source verification:** `tests/hub/test_apollo_hub_layout_v2.cjs` exercises no-confirmation, stale/wrong IDs, invalid indexes, populated/empty groups, last-mode/last-group refusal, stable tile-ID preservation, and Undo round trips. `tests/hub/test_apollo_hub_foundation.py` verifies UI buttons, confirmation and cancellation hooks, minimum-one checks, and edit/close/navigation cancellation. These tests passed in the Stage 3 CI run.
+
+**Desktop verification:** Sync `main`, restart Quickshell, add a disposable mode/group, test CANCEL, confirm removal, test UNDO, and verify the original named tabs and tile arrangement reappear. Check that the original Dashboard still opens if only one mode remains. This source checkpoint is **not** a live desktop PASS yet.
+
 ## NEXT
 
-After Stage 2 runtime acceptance, the next P1 increment can add mode/submode removal with confirmation and Undo, then searchable module selection. The true grid packing and expansion behavior needs a separate visual and geometry review.
+After Stage 3 desktop acceptance, the next P1 increment should implement a searchable module picker that replaces cyclic SWAP, followed by cross-mode tile moves. Full grid packing remains a separate geometry and visual review.
 
 ## DECISIONS
 

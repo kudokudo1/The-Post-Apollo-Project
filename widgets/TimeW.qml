@@ -57,6 +57,46 @@ PanelWindow {
     property string converterTargetZone: "America/New_York"
     property bool converterBusy: false
     property var converterResult: null
+    // Only one of the independent FROM/TO selector popups may be open.
+    property string activeConverterDropdown: ""
+
+    function closeConverterDropdowns() {
+        activeConverterDropdown = "";
+        converterSourcePicker.dropFocus();
+        converterTargetPicker.dropFocus();
+        Qt.callLater(restoreKeyboardFocus);
+    }
+
+    function openConverterDropdown(which) {
+        if (!menuOpen || selectedMode !== "calc")
+            return;
+        if (which !== "source" && which !== "target")
+            return;
+        activeConverterDropdown = which;
+        loadWorldZoneCatalog();
+    }
+
+    function toggleConverterDropdown(which) {
+        if (activeConverterDropdown === which)
+            closeConverterDropdowns();
+        else
+            openConverterDropdown(which);
+    }
+
+    function chooseConverterSearchZone(which, zoneId) {
+        // Search text is never passed to subprocesses. Selected IDs must
+        // belong to the trusted catalog from timedatectl.
+        if (!WorldZoneSearch.contains(worldZoneCatalog, zoneId))
+            return;
+        if (which === "source")
+            converterSourceZone = zoneId;
+        else if (which === "target")
+            converterTargetZone = zoneId;
+        else
+            return;
+        converterResult = null;
+        closeConverterDropdowns();
+    }
     property string converterSubmittedKey: ""
     readonly property string converterInputsKey:
         [converterDate, converterTime, converterSourceZone,
@@ -80,6 +120,12 @@ PanelWindow {
         else
             converterTargetZone = choices[idx].id;
         converterResult = null;
+        closeConverterDropdowns();
+    }
+
+    function converterZoneAllowed(zoneId) {
+        return converterZones.some(function(z) { return z.id === zoneId; })
+               || WorldZoneSearch.contains(worldZoneCatalog, zoneId);
     }
 
     function runTimeConverter() {
@@ -87,8 +133,7 @@ PanelWindow {
             return;
         const src = converterSourceZone;
         const dst = converterTargetZone;
-        if (!converterZones.some(function(z) { return z.id === src; })
-                || !converterZones.some(function(z) { return z.id === dst; })) {
+        if (!converterZoneAllowed(src) || !converterZoneAllowed(dst)) {
             converterResult = { status: "ZONE_UNAVAILABLE", options: [] };
             return;
         }
@@ -137,6 +182,8 @@ PanelWindow {
                                WorldZoneSearch.MAX_ZONES, worldCountryIndex)
     readonly property bool navigationKeysAvailable:
         standardKeysAvailable && !worldSearchInput.activeFocus
+        && !converterSourcePicker.searchFocused
+        && !converterTargetPicker.searchFocused
         && !converterDateInput.activeFocus && !converterTimeInput.activeFocus
     property string worldLookupZone: ""
     property string worldValidZone: ""
@@ -169,7 +216,7 @@ PanelWindow {
     }
 
     function loadWorldZoneCatalog() {
-        if (!menuOpen || selectedMode !== "clock"
+        if (!menuOpen || (selectedMode !== "clock" && selectedMode !== "calc")
                 || worldCatalogLoaded || worldCatalogLoading)
             return;
         worldCatalogLoading = true;
@@ -179,7 +226,8 @@ PanelWindow {
     }
 
     function loadWorldCountryMetadata() {
-        if (worldCountryLookupStarted || !menuOpen || selectedMode !== "clock")
+        if (worldCountryLookupStarted || !menuOpen
+                || (selectedMode !== "clock" && selectedMode !== "calc"))
             return;
         worldCountryLookupStarted = true;
         // Fixed, read-only system files; neither command takes user input.
@@ -286,23 +334,27 @@ PanelWindow {
     }
 
     onMenuOpenChanged: {
-        if (!menuOpen)
+        if (!menuOpen) {
             dismissWorldSearchPopup();
+            closeConverterDropdowns();
+        }
         if (menuOpen) {
             Qt.callLater(restoreKeyboardFocus);
-            if (selectedMode === "clock") {
+            if (selectedMode === "clock")
                 Qt.callLater(refreshWorldClock);
+            if (selectedMode === "clock" || selectedMode === "calc")
                 Qt.callLater(loadWorldZoneCatalog);
-            }
         }
     }
     onSelectedModeChanged: {
         if (selectedMode !== "clock")
             dismissWorldSearchPopup();
-        if (menuOpen && selectedMode === "clock") {
+        if (selectedMode !== "calc")
+            closeConverterDropdowns();
+        if (menuOpen && selectedMode === "clock")
             Qt.callLater(refreshWorldClock);
+        if (menuOpen && (selectedMode === "clock" || selectedMode === "calc"))
             Qt.callLater(loadWorldZoneCatalog);
-        }
     }
     onStandardKeysAvailableChanged: {
         if (standardKeysAvailable)

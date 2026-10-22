@@ -43,6 +43,29 @@ assert.equal(result.items[1].id,"org.example.Brave.desktop");
 assert.equal(result.items[2].id,"org.example.BraveBeta.desktop");
 assert.equal(result.items[1].genericName,"Web Browser");
 
+// Quickshell ObjectModel.values is a QML list: indexed and length-bearing,
+// but Array.isArray() is not reliable for Qt-backed sequences. Reproduce its
+// JavaScript-facing shape without requiring the Qt runtime in this test.
+const qtList = Object.assign({length:samples.length}, samples);
+assert.equal(Array.isArray(qtList),false);
+assert.equal(p.collectionLength(qtList),samples.length);
+const qtResult = p.snapshot(qtList,"");
+assert.equal(qtResult.state,"ready");
+assert.equal(qtResult.installedCount,result.installedCount);
+assert.equal(qtResult.matchCount,result.matchCount);
+assert.deepEqual(Array.from(qtResult.items, entry=>entry.id),
+                 Array.from(result.items, entry=>entry.id));
+assert.equal(p.snapshot(Object.assign({length:0})).state,"empty");
+assert.equal(p.snapshot(Object.assign({length:2}, [samples[0],samples[1]]),
+                        "Alpha").matchCount,1);
+for (const badList of [
+    {length:-1}, {length:NaN}, {length:Infinity}, {length:1.5},
+    {length:"2"}, {length:50001}, {}, {0:samples[0]},
+    "not a list"
+]) {
+    assert.equal(p.snapshot(badList).state,"unavailable");
+}
+
 const matched=p.snapshot(samples,"  WEB  ");
 assert.equal(matched.query,"web");
 assert.equal(matched.installedCount,4);

@@ -272,12 +272,16 @@ for phrase in (
     assert phrase in media_mini, f"Missing B4 MPD/MPRIS UI distinction: {phrase}"
 for forbidden in (
     "HeadlessMediaController {", "MprisPlaybackAdapter {",
-    "Mpris {", "Process {", "Timer {", "playerctld",
+    "Mpris {", "Process {", "playerctld",
     "playPause(", "play(", "pause(", "next(", "previous(",
     "selectedMprisBusName =", "startPolling(", "polling:",
 ):
     assert forbidden not in media_mini + tile + window, (
         f"Hub UI must not own/poll/control players: {forbidden}")
+
+# The existing Time/Calendar tile has a clock Timer; only the Media view
+# must remain free of observers/timers.
+assert "Timer {" not in media_mini
 
 # Launchers and widget backends are unchanged in this first stage.
 print("ApolloHubW foundation source contracts passed")

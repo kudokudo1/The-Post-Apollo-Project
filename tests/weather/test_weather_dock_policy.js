@@ -55,8 +55,6 @@ for (const [temp, ready] of [["--", true], ["", true],
     assert.equal(state.valid, false);
     assert.equal(state.level, 0);
 }
-assert.equal(context.temperatureState("72", true).color,
-             context.temperatureState("72", true).color);
 // Changing Fahrenheit/Celsius display cannot alter the physical gauge.
 assert.equal(context.formatTemperature("72", true, true), "22°C");
 assert.equal(context.temperatureState("72", true).color, "yellow");
@@ -108,7 +106,7 @@ const shell = fs.readFileSync(path.join(root, "shell.qml"), "utf8");
 assert.match(dock, /weatherStationWindow\.toggle\(\)/);
 assert.match(dock, /implicitHeight:\s*50/);
 assert.match(dock, /implicitWidth:\s*Math\.ceil\(weatherContent\.implicitWidth\)\s*\+\s*6/);
-// Keep the original identity glyph while rendering condition and temperature separately.
+// Preserve an identifiable weather condition, live numeric readout, and a drawn thermometer.
 assert.match(dock, /id:\s*weatherThermometer[\s\S]*?implicitWidth:\s*23[\s\S]*?implicitHeight:\s*46/);
 assert.doesNotMatch(dock, /text:\s*"🌡"/);
 assert.match(dock, /id:\s*glassTube[\s\S]*?border\.color:\s*Colors\.white[\s\S]*?clip:\s*true/);

@@ -55,7 +55,7 @@ assert.equal(p.update(doc,"t1","rename","  Buy milk and tea ",t+41,false).reason
 assert.equal(p.update(doc,"t1","rename","  ",t+41,false).reason,"INVALID_TITLE");
 assert.equal(p.update(doc,"t1","rename","x".repeat(161),t+41,false).reason,"INVALID_TITLE");
 assert.equal(p.update(doc,"t1","rename","new\nline",t+41,false).reason,"INVALID_TITLE");
-assert.equal(p.update(doc,"t1","done",false,t+35,false).reason,"INVALID_TIME");
+assert.equal(p.update(doc,"t1","done",true,t+35,false).reason,"INVALID_TIME");
 assert.equal(p.update(doc,"missing","rename","Hey",t+41,false).reason,"UNKNOWN_ID");
 assert.equal(p.update(doc,"t1","unrecognized",null,t+41,false).reason,"INVALID_ACTION");
 

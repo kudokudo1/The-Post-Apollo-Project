@@ -70,7 +70,8 @@ Scope {
     function mediaRefArgs(ref) {
         if (!ref || typeof ref.id !== "string" || !ref.id.length
                 || ref.id.length > 4096
-                || (ref.source !== "local-mpd" && ref.source !== "youtube"))
+                || (ref.source !== "local-mpd" && ref.source !== "youtube"
+                    && ref.source !== "direct-stream"))
             return null;
         return [ref.id, "--source", ref.source];
     }

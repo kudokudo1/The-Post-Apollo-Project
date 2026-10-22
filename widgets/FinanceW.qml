@@ -28,6 +28,10 @@ PanelWindow {
         onDraftSaved: transactionDraftPane.clear()
     }
 
+    FinanceServices.FinanceAllocationGateCheck {
+        id: allocationGateCheck
+    }
+
     FinanceServices.FinanceAllocationWriteService {
         id: financeAllocationWrite
         onSaved: {
@@ -917,6 +921,22 @@ PanelWindow {
                         elide: Text.ElideRight
                     }
 
+                    GohuText {
+                        width: parent.width
+                        visible: financeBudget.state === "ready"
+                                 && !!financeBudget.snapshot
+                        text: financeBudget.snapshot && financeBudget.snapshot.toBudgetCents < 0
+                            ? "FUNDING // TO BUDGET BELOW ZERO; REVIEW EXISTING ALLOCATIONS"
+                            : financeBudget.snapshot && financeBudget.snapshot.toBudgetCents === 0
+                            ? "FUNDING // NO UNALLOCATED FUNDS; REVIEW INCOME AND OPENING BALANCES IN ACTUAL"
+                            : "FUNDING // UNALLOCATED FUNDS AVAILABLE FOR CATEGORY PLANNING"
+                        textFormat: Text.PlainText
+                        font.pixelSize: 9
+                        color: financeBudget.snapshot && financeBudget.snapshot.toBudgetCents > 0
+                               ? Colors.cyan : Colors.orange
+                        wrapMode: Text.WordWrap
+                    }
+
                     // Account summary comes from the same verified read-only
                     // response as the list, never an independent bank guess.
                     GohuText {
@@ -1005,6 +1025,26 @@ PanelWindow {
                                 text: "CATEGORIES"
                                 font.pixelSize: 12
                                 color: Colors.cyan
+                            }
+                            ActionButton {
+                                id: checkAllocationLock
+                                width: parent.width
+                                height: 28
+                                trackLabelGlowLocally: true
+                                label: "CHECK WRITE LOCK"
+                                labelPixelSize: 10
+                                accentColor: Colors.cyan
+                                available: allocationGateCheck.state !== "checking"
+                                onLeftClicked: allocationGateCheck.check()
+                            }
+                            GohuText {
+                                width: parent.width
+                                text: allocationGateCheck.message
+                                textFormat: Text.PlainText
+                                font.pixelSize: 9
+                                color: allocationGateCheck.state === "locked"
+                                       ? Colors.cyan : Colors.orange
+                                wrapMode: Text.WordWrap
                             }
                             FinanceCategoryAllocationPane {
                                 id: allocationPreviewPane

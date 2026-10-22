@@ -459,3 +459,37 @@ Quickshell UI verification with the writer permit still absent.
 Do **not** create that permit as part of the UI test. Actual live-budget
 activation, explicit backup review and crash-recovery acceptance remain
 separate operator decisions.
+
+
+## FinanceW D13 // Read-only CHECK WRITE LOCK + funding readiness
+
+Finance → Budget → Budget → CATEGORIES now includes **CHECK WRITE LOCK**.
+This is a **read-only status probe** of the allocation permission file,
+not an attempt to write a transaction or category allocation. It does not
+read Actual credentials, connect to Actual, create or change a file, or
+change the D9/D12c authorization rules. The probe only runs after the
+button is clicked, so its message must be treated as a point-in-time
+status, not a promise about a future operation.
+
+Statuses:
+- **WRITES LOCKED // NO ALLOCATION PERMIT**: no local allocation
+  authorization marker was found.
+- **PERMIT DETECTED // DO NOT TEST LIVE WRITES**: the exact marker
+  appears in a private regular file. This is **not proof the system
+  is safe or that the budget is eligible**; D12c independently checks.
+- **UNSAFE PERMISSION FILE // REVIEW REQUIRED**: malformed marker,
+  loose file permissions or symlink; no activation is recommended.
+- **LOCK CHECK UNAVAILABLE // NO SAFETY CLAIM**: the probe failed.
+
+A separate **FUNDING** line below To Budget distinguishes available-to-
+allocate money from account balances. With zero or negative To Budget,
+it points the operator to review properly entered and categorized income,
+opening balances, or earlier allocations in Actual. **An account balance
+does not automatically equal money available to budget.** The status
+never creates money, does not auto-allocate, and does not authorize
+budget writes.
+
+Funding follow-up (NOT implemented here): read-only reconciliation of
+starting balances and income categorization, then preview and separately
+authorized operations that are supported by Actual. Preserve the user's
+actual accounts and never fabricate a balance to unlock a button.

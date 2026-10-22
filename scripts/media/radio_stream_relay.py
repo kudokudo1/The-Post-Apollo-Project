@@ -21,7 +21,7 @@ from direct_stream_source import validate_https_audio_url
 from headless_mpd import MediaBackendError
 
 _MAX_ACTIVE_STREAMS = 2
-_MAX_REGISTERED_STATIONS = 32
+_MAX_REGISTERED_STATIONS = 256
 _TOKEN_LIFETIME_SECONDS = 12 * 60 * 60
 _ALLOWED_MIME = {"audio/mpeg", "audio/mp3", "audio/x-mpeg"}
 
@@ -200,6 +200,14 @@ class RadioStreamRelay:
             if not uri.startswith(prefix + "/radio/"):
                 return False
             return self._resolve(uri[len(prefix):]) is not None
+
+    def revoke(self, uri: str):
+        """Release an unused token if MPD rejected its queue addition."""
+        with self._lock:
+            if not isinstance(uri, str) or not self.owns(uri):
+                return
+            token = uri.rsplit("/", 1)[-1]
+            self._entries.pop(token, None)
 
     def close(self):
         with self._lock:

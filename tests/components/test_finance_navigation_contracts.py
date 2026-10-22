@@ -38,9 +38,9 @@ assert "root.keyboardOwnershipRequested();" in menu
 
 # Reuse the standard controls instead of introducing custom MouseAreas.
 assert menu.count("ModeButton {") == 1
-# Existing seven controls plus RELOAD, OPEN, and two-step DELETE for local drafts.
+# Existing controls plus RELOAD, OPEN, DELETE and category ALLOCATE.
 # Navigation grammar remains unchanged; no custom MouseArea introduced.
-assert menu.count("ActionButton {") == 10
+assert menu.count("ActionButton {") == 11
 assert "MouseArea {" not in menu
 
 # Distinct header, divider, and canonical U+00D7 close control.

@@ -9,6 +9,9 @@ on:
       - "modules/Finance.qml"
       - "widgets/FinanceW.qml"
       - "widgets/FinanceTransactionDraftPane.qml"
+      - "widgets/FinanceCategoryAllocationPane.qml"
+      - "services/finance/FinanceAllocationPreview.js"
+      - "tests/finance/test_finance_allocation_preview_contracts.py"
       - "services/finance/**"
       - "tests/finance/test_finance_budget_ui_contracts.py"
       - "tests/finance/test_finance_transaction_draft_contracts.py"
@@ -21,6 +24,9 @@ on:
       - "modules/Finance.qml"
       - "widgets/FinanceW.qml"
       - "widgets/FinanceTransactionDraftPane.qml"
+      - "widgets/FinanceCategoryAllocationPane.qml"
+      - "services/finance/FinanceAllocationPreview.js"
+      - "tests/finance/test_finance_allocation_preview_contracts.py"
       - "services/finance/**"
       - "tests/finance/test_finance_budget_ui_contracts.py"
       - "tests/finance/test_finance_transaction_draft_contracts.py"
@@ -45,3 +51,5 @@ jobs:
         run: python3 tests/finance/test_finance_budget_ui_contracts.py
       - name: Verify transaction draft stays non-mutating
         run: python3 tests/finance/test_finance_transaction_draft_contracts.py
+      - name: Verify D11 category allocation stays read-only
+        run: python3 tests/finance/test_finance_allocation_preview_contracts.py

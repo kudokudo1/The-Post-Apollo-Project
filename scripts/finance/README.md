@@ -307,3 +307,29 @@ still requires manual recovery and never automatic retry.
 Back up the private JSON file before troubleshooting corrupt data. Avoid
 changing permissions or deleting the file to hide an error. The D10 tests use
 isolated disposable HOME directories; they never read or write actual budgets.
+
+
+## FinanceW D11 // Category allocation preview (read-only)
+
+Budget → Budget → Categories now offers **ALLOCATE** for each category.
+It opens a non-persistent **PROPOSED ALLOCATION** editor that performs
+pure calculations from the most recent authenticated Actual snapshot.
+PREVIEW shows the existing versus proposed monthly category amount,
+projected available balance, and remaining To Budget. It warns if the
+proposal would over-allocate the month's unallocated funds, or if the
+category would remain overspent.
+
+The preview is an **absolute proposed category allocation**, not a payment
+or a transfer. Example: increasing SET from $200 to $250 uses $50 of
+To Budget and adds $50 to category available. Reducing SET frees funds
+but can leave a category overspent. Negative target allocations are not
+supported in this first UI slice.
+
+**D11 has no save or apply action.** It does not call Actual Budget's
+mutating API, does not use the transaction writer, does not touch financial
+authorization files, and does not persist the proposal. The preview is
+discarded when its source snapshot refreshes, the selected category
+changes, or the user presses CANCEL. ACTUAL remains authoritative.
+
+Verify D11 using source contracts and pure fictional-data arithmetic tests.
+Runtime rendering and later guarded allocation writes are separate milestones.

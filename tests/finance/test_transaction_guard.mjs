@@ -4,7 +4,8 @@ import {validateTransactionCommand,validTransactionDate,executeTransaction}
   from "../../scripts/finance/transaction_guard.mjs";
 
 const base = {
-  action:"create",requestId:"a".repeat(32),accountId:"checking-123",
+  action:"create",requestId:"a".repeat(32),sourceKey:"b".repeat(64),
+  accountId:"checking-123",
   month:"2026-10",date:"2026-10-22",description:"Fictional cafe",
   amountCents:-1250
 };

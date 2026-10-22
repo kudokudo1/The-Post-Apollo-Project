@@ -128,7 +128,33 @@ Item {
                         width: 5
                         height: spectrum.height
 
+                        // Two geometry-only halos follow the animated core.
+                        // Never create a per-frame shader texture or a second
+                        // animation for CAVA: that previously stalled Quickshell.
                         Rectangle {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.bottom: parent.bottom
+                            anchors.bottomMargin: -3
+                            width: parent.width + 8
+                            height: cavaBar.height + 6
+                            radius: 0
+                            color: mediaDock.accentColor
+                            opacity: 0.13
+                        }
+
+                        Rectangle {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.bottom: parent.bottom
+                            anchors.bottomMargin: -1
+                            width: parent.width + 4
+                            height: cavaBar.height + 2
+                            radius: 0
+                            color: mediaDock.accentColor
+                            opacity: 0.28
+                        }
+
+                        Rectangle {
+                            id: cavaBar
                             anchors.bottom: parent.bottom
                             width: parent.width
                             height: Math.max(2, Math.round(

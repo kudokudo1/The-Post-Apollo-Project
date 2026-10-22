@@ -106,23 +106,30 @@ const shell = fs.readFileSync(path.join(root, "shell.qml"), "utf8");
 assert.match(dock, /weatherStationWindow\.toggle\(\)/);
 assert.match(dock, /implicitHeight:\s*50/);
 assert.match(dock, /implicitWidth:\s*Math\.ceil\(weatherContent\.implicitWidth\)\s*\+\s*6/);
-// Preserve an identifiable weather condition, live numeric readout, and a drawn thermometer.
-// The instrument is slightly smaller, uses one continuous glass chamber, and
-// its lower reservoir fills/drains with the same real temperature level.
+// Preserve an identifiable weather condition, live numeric readout, and a
+// compact classic thermometer. The tube and wider bulb must be one continuous
+// path and the real temperature level must fill/drain through both.
 assert.match(dock, /id:\s*weatherThermometer[\s\S]*?implicitWidth:\s*20[\s\S]*?implicitHeight:\s*42/);
 assert.doesNotMatch(dock, /text:\s*"🌡"/);
 assert.match(dock, /id:\s*thermometerCanvas/);
-assert.match(dock, /function traceGlass\(/);
+assert.match(dock, /function traceThermometer\(/);
+assert.match(dock, /outerTubeHalf\s*=\s*5/);
+assert.match(dock, /outerBulbHalf\s*=\s*8/);
+assert.match(dock, /innerTubeHalf\s*=\s*3/);
+assert.match(dock, /innerBulbHalf\s*=\s*5\.5/);
 assert.match(dock, /ctx\.clip\(\)/);
 assert.match(dock, /innerHeight\s*\*\s*weatherThermometer\.animatedLevel/);
 assert.match(dock, /ctx\.fillRect\([\s\S]*?innerBottom - fillHeight[\s\S]*?fillHeight/);
-// No separate fixed bulb is allowed: the bottom curve is part of the same vessel.
+// There must still be no separately painted fixed bulb: the silhouette itself
+// widens into the bulb and the clipped liquid remains one connected body.
 assert.doesNotMatch(dock, /id:\s*glassBulb/);
 assert.doesNotMatch(dock, /id:\s*liquidBulb/);
-assert.match(dock, /bottomRadius[\s\S]*?ctx\.quadraticCurveTo/);
-// Tick endpoints are derived from inner chamber geometry, so they stay inside glass.
-assert.match(dock, /tickStartX\s*=\s*innerX\s*\+\s*innerWidth\s*\*\s*0\.52/);
-assert.match(dock, /longTickEndX\s*=\s*innerX\s*\+\s*innerWidth\s*-\s*1/);
+assert.match(dock, /centerX \+ bulbHalfWidth[\s\S]*?centerX - bulbHalfWidth/);
+// Scale marks remain inside the tube and explicitly share glass color/opacity.
+assert.match(dock, /readonly property color glassColor:\s*Colors\.white/);
+assert.match(dock, /readonly property real glassOpacity:\s*1\.0/);
+assert.match(dock, /ctx\.globalAlpha\s*=\s*weatherThermometer\.glassOpacity[\s\S]*?ctx\.strokeStyle\s*=\s*weatherThermometer\.glassColor[\s\S]*?Four indicator marks inside the tube[\s\S]*?ctx\.strokeStyle\s*=\s*weatherThermometer\.glassColor/);
+assert.match(dock, /tickEndX\s*=\s*innerTubeRight\s*-\s*0\.5/);
 assert.match(dock, /for \(let i = 0; i < 4; i\+\+\)/);
 assert.match(dock, /Behavior on animatedLevel[\s\S]*?NumberAnimation\s*\{[\s\S]*?duration:\s*300/);
 assert.match(dock, /Behavior on liquidColor[\s\S]*?ColorAnimation\s*\{\s*duration:\s*300/);

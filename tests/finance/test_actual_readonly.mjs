@@ -111,7 +111,7 @@ test("transaction input validation refuses bad dates, amounts, and accounts", ()
 
 test("latest transaction preview is bounded to 24 items, never totals splits", () => {
   const entries = Array.from({length: 40}, (_, index) => ({
-    date: "2026-10-18", account: "checking", amount: -100 - index
+    id: "bulk-"+index, date: "2026-10-18", account: "checking", amount: -100 - index
   }));
   const snapshot = normalizeSnapshot({...sample,
     transactionSets: new Map([["checking",entries]])});

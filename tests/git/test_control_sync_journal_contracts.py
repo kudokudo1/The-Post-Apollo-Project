@@ -184,7 +184,7 @@ require("widgets/GitW.qml", 'gitService.actionTitle + " // " + gitService.action
 # synchronous atomic write boundary while reducing serialized bytes.
 JOURNAL = "services/git/GitOperationJournalService.qml"
 text = read(JOURNAL)
-persist = re.search(r"function persist\(\) \{(.*?)\n    \}", text, re.S)
+persist = re.search(r"function persist\(record\) \{(.*?)\n    \}", text, re.S)
 assert persist, "durable operation journal persistence path must exist"
 assert "JournalCodec.serializeJournal(" in persist.group(1)
 assert "schemaVersion, entries, encodedEntries" in persist.group(1)

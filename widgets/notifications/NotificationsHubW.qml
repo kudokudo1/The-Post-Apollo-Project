@@ -180,6 +180,18 @@ PanelWindow {
     property int scrollThumbWidth: 5
     property int scrollThumbMinHeight: 34
 
+    // Control Bay scroll speed operates on the HISTORY wheel viewport only.
+    // Dragging the star scrollbar and keyboard card selection stay 1:1.
+    readonly property real historyScrollSpeedRatio:
+        (NotificationsService.scrollSpeedMultiplier - 0.5) / 2.5
+
+    function requestHistoryScrollSpeed(pointerX, railWidth) {
+        if (NotificationsService.scrollSpeedLocked || railWidth <= 0)
+            return;
+        const ratio = Math.max(0, Math.min(1, Number(pointerX) / railWidth));
+        NotificationsService.setScrollSpeed(0.5 + ratio * 2.5);
+    }
+
     // Post-Apollo semantic green.
     // Use this everywhere this file means "green".
     property color omnitrixGreen: "#00F782"
@@ -1815,6 +1827,107 @@ PanelWindow {
 
                     opacity: 0.18
                 }
+
+                // Scroll speed belongs to the physical Control Bay, not the
+                // history cards or shared NeonScrollBar component.
+                Row {
+                    id: scrollSpeedControls
+                    anchors {
+                        top: parent.top
+                        left: parent.left
+                        right: parent.right
+                        topMargin: 70
+                        leftMargin: 22
+                        rightMargin: 22
+                    }
+                    height: 30
+                    spacing: 10
+
+                    GlowText {
+                        width: 104
+                        height: parent.height
+                        text: "SCROLL SPEED"
+                        pixelSize: 11
+                        textColor: Colors.cyan
+                        glowColor: Colors.cyan
+                    }
+
+                    Item {
+                        id: historySpeedSlider
+                        width: Math.max(100, scrollSpeedControls.width
+                                        - 104 - 55 - 70
+                                        - scrollSpeedControls.spacing * 3)
+                        height: parent.height
+
+                        Rectangle {
+                            id: scrollSpeedRail
+                            x: 8
+                            width: parent.width - 16
+                            anchors.verticalCenter: parent.verticalCenter
+                            height: 6
+                            color: Colors.black
+                            border.width: 1
+                            border.color: Colors.cyan
+                            radius: 2
+
+                            Rectangle {
+                                width: parent.width * root.historyScrollSpeedRatio
+                                height: parent.height
+                                color: Colors.magenta
+                                radius: 2
+                            }
+                        }
+
+                        Rectangle {
+                            id: scrollSpeedHandle
+                            width: 14
+                            height: 20
+                            radius: 3
+                            x: scrollSpeedRail.x + scrollSpeedRail.width
+                               * root.historyScrollSpeedRatio - width / 2
+                            anchors.verticalCenter: parent.verticalCenter
+                            color: NotificationsService.scrollSpeedLocked
+                                   ? Colors.magenta : Colors.white
+                            border.width: 1
+                            border.color: Colors.magenta
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            enabled: !NotificationsService.scrollSpeedLocked
+                            cursorShape: Qt.PointingHandCursor
+                            onPressed: function(mouse) {
+                                root.requestHistoryScrollSpeed(
+                                    mouse.x - scrollSpeedRail.x, scrollSpeedRail.width);
+                            }
+                            onPositionChanged: function(mouse) {
+                                if (pressed)
+                                    root.requestHistoryScrollSpeed(
+                                        mouse.x - scrollSpeedRail.x, scrollSpeedRail.width);
+                            }
+                        }
+                    }
+
+                    GlowText {
+                        width: 55
+                        height: parent.height
+                        text: NotificationsService.scrollSpeedMultiplier.toFixed(1) + "×"
+                        pixelSize: 12
+                        textColor: Colors.white
+                        glowColor: Colors.cyan
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+
+                    MiniButton {
+                        width: 70
+                        height: 28
+                        label: NotificationsService.scrollSpeedLocked ? "LOCKED" : "LOCK"
+                        labelPixelSize: 10
+                        active: NotificationsService.scrollSpeedLocked
+                        activeColor: Colors.magenta
+                        onTriggered: NotificationsService.toggleScrollSpeedLock()
+                    }
+                }
             }
 
             // ===== CLEAR-ALL CONFIRMATION ========================
@@ -2470,6 +2583,25 @@ PanelWindow {
                     model: filteredNotifications
 
                     reuseItems: true
+
+                    // Qt's default wheel path does not provide a per-view
+                    // speed property. Intercept wheel/trackpad deltas once,
+                    // then use the already verified origin-aware scrollbar
+                    // bounds. No extra Flickable or global sensitivity edits.
+                    WheelHandler {
+                        id: historySpeedWheel
+                        target: null
+                        blocking: true
+                        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                        onWheel: function(event) {
+                            const delta = scrollBarArea.wheelDelta(event);
+                            if (delta !== 0 && scrollBarArea.scrollable)
+                                scrollBarArea.moveBy(
+                                    delta * NotificationsService.scrollSpeedMultiplier,
+                                    false);
+                            event.accepted = true;
+                        }
+                    }
 
                     header: Item {
                         width: 1

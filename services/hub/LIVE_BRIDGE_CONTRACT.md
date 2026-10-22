@@ -98,7 +98,7 @@ The pure normalization policy is `services/hub/ApolloHubNetworkPolicy.js`.
 - `wifi.present`, `wifi.connected`, `wifi.interfaceName`, `wifi.networkName`, `wifi.signalPercent` (integer 0–100 from a valid 0.0–1.0 strength or `-1` unknown).
 - `ethernet.present`, `ethernet.connected`, `ethernet.interfaceName`.
 - `linkSpeedMbps`: positive integer for the current Wi-Fi link bitrate, or **-1 (unknown)**. The bridge reads the existing dock's `iw` output through a read-only property and never duplicates that probe. For Ethernet, speed remains unknown.
-- `linkSpeedApproximate`: true for Wi-Fi link-rate semantics; this is negotiated/radio receive link bitrate, **not measured Internet speed**.
+- `linkSpeedApproximate`: true only when a valid Wi-Fi link bitrate is available; this radio receive link-rate estimate is **not measured Internet speed**.
 
 No passwords, keys, private IP/MAC, activation methods, NetworkManager objects, or mutable device handles leave the snapshot.
 

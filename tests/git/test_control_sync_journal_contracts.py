@@ -186,9 +186,9 @@ JOURNAL = "services/git/GitOperationJournalService.qml"
 text = read(JOURNAL)
 persist = re.search(r"function persist\(\) \{(.*?)\n    \}", text, re.S)
 assert persist, "durable operation journal persistence path must exist"
-assert "JSON.stringify({" in persist.group(1)
-assert "schemaVersion: schemaVersion" in persist.group(1)
-assert "entries: entries" in persist.group(1)
+assert "JournalCodec.serializeJournal(" in persist.group(1)
+assert "schemaVersion, entries, encodedEntries" in persist.group(1)
+assert "journalFile.setText(encoded.text)" in persist.group(1)
 assert "null, 2" not in persist.group(1), "pretty JSON must not inflate every journal write"
 assert "blockWrites: true" in text and "atomicWrites: true" in text, (
     "the BEFORE-operation durability barrier cannot become asynchronous"
@@ -201,5 +201,35 @@ for marker in (
     'value.indexOf("PREPARED //") === 0',
 ):
     require(SERVICE, marker, "preparation latency stage accounting")
+
+# Durable full journal writes remain mandatory. Only the serialization of
+# unchanged historical entries is cached.
+JOURNAL_CODEC = "services/git/GitJournalSerialization.js"
+for marker in (
+    'import "GitJournalSerialization.js" as JournalCodec',
+    'encodedEntries = []',
+    'JournalCodec.serializeJournal(',
+    'journalFile.setText(encoded.text)',
+    'encodedEntries = encoded.cache',
+    'lastPersistWriteMs = written - writeStarted',
+):
+    require(JOURNAL, marker, "journal encoding cache and durability")
+for marker in (
+    'function serializeJournal(schemaVersion, entries, previous)',
+    'cache.record === record',
+    'JSON.stringify(record)',
+    'JSON.stringify(schemaVersion)',
+):
+    require(JOURNAL_CODEC, marker, "lossless serializer contract")
+for marker in (
+    '"FINISHED // after snapshot "',
+    '" ms // journal "',
+    '" ms (encode "',
+    '" ms / disk "',
+    '"REFRESHED // repository view "',
+    'syncAfterSnapshotStartedMs = Date.now()',
+    'syncAfterRefreshStartedMs = Date.now()',
+):
+    require(SERVICE, marker, "after-completion stage timing")
 
 print("Git CONTROL sync journal contracts: PASS")

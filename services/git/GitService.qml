@@ -60,6 +60,8 @@ Scope {
     property bool actionBusy: false
     property string actionStage: "IDLE"
     property bool actionProcessDoneSeen: false
+    property double syncAfterSnapshotStartedMs: 0
+    property double syncAfterRefreshStartedMs: 0
     property bool actionOverdueNotified: false
     property string clonePendingQuery: ""
     property bool pendingCloneCreated: false
@@ -1402,6 +1404,14 @@ Scope {
 
             refreshing = false;
             refreshWatchdog.stop();
+            if (syncAfterRefreshStartedMs > 0) {
+                const refreshElapsed =
+                    Math.max(0, Date.now() - syncAfterRefreshStartedMs);
+                syncAfterRefreshStartedMs = 0;
+                actionOutput += (actionOutput.length ? "\n" : "")
+                    + "REFRESHED // repository view "
+                    + refreshElapsed + " ms";
+            }
             const stateMs = trace ? Date.now() - started : 0;
 
             if (!staleRead && !lastError) {
@@ -1754,6 +1764,11 @@ Scope {
                   )
             );
         const success = pendingActionSuccess;
+        const finalizationStarted = Date.now();
+        const afterSnapshotMs =
+            syncAfterSnapshotStartedMs > 0
+            ? Math.max(0, finalizationStarted - syncAfterSnapshotStartedMs)
+            : 0;
         const snapshot =
             afterSnapshot
             ? journalSnapshot(afterSnapshot)
@@ -1785,6 +1800,20 @@ Scope {
                     ? detail + " // " + warning
                     : detail
                 );
+        }
+
+        if (processAction === "fetch" || processAction === "pull") {
+            const metrics = operationJournal;
+            actionOutput += (actionOutput.length ? "\n" : "")
+                + "FINISHED // after snapshot "
+                + afterSnapshotMs
+                + " ms // journal "
+                + (Date.now() - finalizationStarted)
+                + " ms (encode "
+                + (metrics ? metrics.lastPersistSerializationMs : 0)
+                + " ms / disk "
+                + (metrics ? metrics.lastPersistWriteMs : 0)
+                + " ms)";
         }
 
         actionBusy = false;
@@ -1831,6 +1860,9 @@ Scope {
         }
 
         clearPendingControlAction();
+        if (processAction === "fetch" || processAction === "pull")
+            syncAfterRefreshStartedMs = Date.now();
+        syncAfterSnapshotStartedMs = 0;
         refresh();
     }
 
@@ -1871,6 +1903,9 @@ Scope {
             return;
         }
 
+        if (pendingProcessAction === "fetch"
+                || pendingProcessAction === "pull")
+            syncAfterSnapshotStartedMs = Date.now();
         snapshotPhase = "AFTER";
         pendingSnapshotRequest = snapshotService.capture(
             "CONTROL AFTER // " + actionTitle,
@@ -2413,10 +2448,15 @@ Scope {
 
                 gitService.traceSyncPhase("JOURNAL_STARTED");
                 if (syncPreparation) {
+                    const metrics = gitService.operationJournal;
                     gitService.actionOutput += "\nPREPARED // snapshot "
                         + snapshotMs + " ms // journal "
                         + Math.max(0, Date.now() - journalStartedMs)
-                        + " ms";
+                        + " ms (encode "
+                        + (metrics ? metrics.lastPersistSerializationMs : 0)
+                        + " ms / disk "
+                        + (metrics ? metrics.lastPersistWriteMs : 0)
+                        + " ms)";
                 }
                 gitService.startPendingActionProcess();
                 return;

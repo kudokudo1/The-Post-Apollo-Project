@@ -35,6 +35,8 @@ PanelWindow {
     property bool writingLayout: false
     // In-session undo makes accidental tile deletion reversible.
     property var layoutUndoStack: []
+    // Pending destructive layout action. Never touch a service or data store.
+    property var pendingRemoval: null
     readonly property string layoutStorageIssue:
         Layout.storageIssue(ApolloHubStore.layoutJson)
     property var layout: Layout.defaultLayout()
@@ -60,6 +62,7 @@ PanelWindow {
     function restore() {
         if (writingLayout)
             return;
+        cancelPendingRemoval();
         layout = Layout.parse(ApolloHubStore.layoutJson);
         selectedModeIndex = Math.min(selectedModeIndex, layout.modes.length - 1);
         selectedSubModeIndex = 0;
@@ -74,6 +77,7 @@ PanelWindow {
         const previous = JSON.stringify(layout);
         if (JSON.stringify(normalized) === previous)
             return;
+        cancelPendingRemoval();
         const history = layoutUndoStack.slice();
         history.push(previous);
         if (history.length > 10)
@@ -88,6 +92,7 @@ PanelWindow {
     function undoLastLayoutEdit() {
         if (layoutStorageIssue.length > 0 || layoutUndoStack.length < 1)
             return;
+        cancelPendingRemoval();
         const history = layoutUndoStack.slice();
         const previous = history.pop();
         layoutUndoStack = history;
@@ -136,9 +141,77 @@ PanelWindow {
                                tile.size, nextSpan));
     }
 
+    function cancelPendingRemoval() {
+        pendingRemoval = null;
+    }
+
+    function requestLayoutRemoval(kind) {
+        if (!menuOpen || !editMode || layoutStorageIssue.length > 0
+                || !activeMode)
+            return;
+        if (kind === "mode") {
+            if (layout.modes.length <= 1)
+                return;
+            pendingRemoval = {
+                kind: "mode",
+                modeId: activeMode.id,
+                label: activeMode.name,
+                count: activeMode.subModes.length
+            };
+        } else if (kind === "group") {
+            if (!activeSubMode || activeMode.subModes.length <= 1)
+                return;
+            pendingRemoval = {
+                kind: "group",
+                modeId: activeMode.id,
+                groupId: activeSubMode.id,
+                label: activeSubMode.name,
+                count: activeSubMode.tiles.length
+            };
+        }
+    }
+
+    function confirmLayoutRemoval() {
+        const pending = pendingRemoval;
+        if (!pending)
+            return;
+        // Re-check both the expected stable IDs and the live selection.
+        // A stale confirmation cannot delete whichever row moved into place.
+        if (!menuOpen || !editMode || layoutStorageIssue.length > 0
+                || !activeMode || activeMode.id !== pending.modeId) {
+            cancelPendingRemoval();
+            return;
+        }
+        if (pending.kind === "mode") {
+            if (layout.modes.length <= 1) {
+                cancelPendingRemoval();
+                return;
+            }
+            save(Layout.removeMode(layout, selectedModeIndex,
+                                   pending.modeId, true));
+            selectedModeIndex = Math.max(0, Math.min(
+                selectedModeIndex, layout.modes.length - 1));
+            selectedSubModeIndex = 0;
+            selectedTileIndex = 0;
+        } else if (pending.kind === "group") {
+            if (!activeSubMode || activeSubMode.id !== pending.groupId
+                    || activeMode.subModes.length <= 1) {
+                cancelPendingRemoval();
+                return;
+            }
+            save(Layout.removeSubMode(layout, selectedModeIndex,
+                                      selectedSubModeIndex, pending.groupId, true));
+            selectedSubModeIndex = Math.max(0, Math.min(
+                selectedSubModeIndex, activeMode.subModes.length - 1));
+            selectedTileIndex = 0;
+        }
+        cancelPendingRemoval();
+    }
+
     function chooseMode(index) {
         if (index < 0 || index >= layout.modes.length)
             return;
+        cancelPendingRemoval();
         selectedModeIndex = index;
         selectedSubModeIndex = 0;
         selectedTileIndex = 0;
@@ -155,6 +228,7 @@ PanelWindow {
     function selectSubMode(index) {
         if (!activeMode || index < 0 || index >= activeMode.subModes.length)
             return;
+        cancelPendingRemoval();
         selectedSubModeIndex = index;
         selectedTileIndex = 0;
     }
@@ -192,8 +266,10 @@ PanelWindow {
     }
 
     Component.onCompleted: restore()
+    onEditModeChanged: if (!editMode) cancelPendingRemoval()
     onMenuOpenChanged: {
         if (!menuOpen) {
+            cancelPendingRemoval();
             todoInputFocused = false;
             notesInputFocused = false;
         }

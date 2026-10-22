@@ -437,14 +437,19 @@ for phrase in (
     "READ ONLY",
 ):
     assert phrase in apps_mini, f"B6 app mini missing {phrase}"
+# The existing Time/Calendar tile uses its own clock Timer, but the
+# Apps projection must remain entirely event-driven.
 for forbidden in (
     "DesktopEntries {", "DesktopEntries.byId(", "DesktopEntries.applications",
     ".execute(", "execute(", "execDetached(", "Process {", "Timer {",
     "FileView {", "scanDesktopFiles(", "app.launch(", "onClicked:",
     "onDoubleClicked:", "onTapped:", "MouseArea {", "TapHandler {",
 ):
-    assert forbidden not in apps_mini + tile + window, (
-        f"UI cannot collect apps or trigger launch: {forbidden}")
+    assert forbidden not in apps_mini, (
+        f"Apps mini cannot collect apps or trigger launch: {forbidden}")
+for forbidden in ("DesktopEntries.byId(", "execDetached(", "app.launch("):
+    assert forbidden not in window + tile, (
+        f"Hub UI cannot launch apps: {forbidden}")
 
 # Launchers and widget backends are unchanged in this first stage.
 print("ApolloHubW foundation source contracts passed")

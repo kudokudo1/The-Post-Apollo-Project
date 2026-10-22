@@ -113,7 +113,10 @@ DockButton {
     hoverDockGlowColor: Colors.orange
     pressedDockGlowColor: Colors.magenta
 
-    // Glow the condition icon and text, never the thermometer glass.
+    // This module owns two independent, locally stacked glow planes.
+    // Disable DockButton's z=2 overlay, which otherwise spreads orange
+    // from the nearby readout across the temperature-colored thermometer.
+    contentGlowEnabled: false
     contentGlowSource: weatherGlowArtwork
     trackArtworkGlowLocally: true
 
@@ -134,82 +137,107 @@ DockButton {
         anchors.horizontalCenterOffset: 2
         spacing: 0
 
-        Row {
-            id: weatherGlowArtwork
+        // Weather art glow stays behind its icon and readout, not over the
+        // separate thermometer. The wrapper preserves identical implicit
+        // width/height and the same 6px condition-to-readout gap.
+        Item {
+            id: weatherArtworkGlowFrame
             anchors.verticalCenter: parent.verticalCenter
-            spacing: 6
+            implicitWidth: weatherGlowArtwork.implicitWidth
+            implicitHeight: weatherGlowArtwork.implicitHeight
 
-            Item {
-                id: weatherConditionSlot
-                anchors.verticalCenter: parent.verticalCenter
-                implicitWidth: Math.ceil(weatherCondition.implicitWidth)
-                implicitHeight: 46
-
-                Text {
-                    id: weatherCondition
-                    anchors.centerIn: parent
-                    text: weatherDock.weatherState.icon
-                    font.pixelSize: 42
-                    color: weatherDock.foregroundColor
-                }
+            SafeDropShadow {
+                id: weatherArtworkGlow
+                anchors.fill: weatherGlowArtwork
+                safeSource: weatherGlowArtwork
+                requestedVisible: true
+                z: 0
+                radius: weatherDock.contentGlowRadius
+                samples: weatherDock.contentGlowSamples
+                horizontalOffset: 0
+                verticalOffset: 0
+                transparentBorder: true
+                opacity: weatherDock.contentGlowOpacity
+                color: weatherDock.contentGlowColor
             }
 
-            // Keep the icon-to-data gap at 6px; close only the readout-to-🌡 gap.
             Row {
-                id: weatherReadout
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 0
+                id: weatherGlowArtwork
+                z: 1
+                spacing: 6
 
+                Item {
+                    id: weatherConditionSlot
+                    anchors.verticalCenter: parent.verticalCenter
+                    implicitWidth: Math.ceil(weatherCondition.implicitWidth)
+                    implicitHeight: 46
+
+                    Text {
+                        id: weatherCondition
+                        anchors.centerIn: parent
+                        text: weatherDock.weatherState.icon
+                        font.pixelSize: 42
+                        color: weatherDock.foregroundColor
+                    }
+                }
+
+                // Keep the icon-to-data gap at 6px; close only the readout-to-🌡 gap.
                 Row {
-                    id: weatherTemperature
+                    id: weatherReadout
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 0
 
-                    GohuText {
-                        id: weatherTemperatureValue
+                    Row {
+                        id: weatherTemperature
                         anchors.verticalCenter: parent.verticalCenter
-                        text: weatherDock.temperatureLabel.slice(0, -2)
-                        font.pixelSize: 20
-                        color: weatherDock.foregroundColor
-                    }
+                        spacing: 0
 
-                    Item {
-                        id: degreeSlot
-                        anchors.verticalCenter: parent.verticalCenter
-                        implicitWidth: weatherDegree.implicitWidth
-                        implicitHeight: weatherDegree.implicitHeight
+                        GohuText {
+                            id: weatherTemperatureValue
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: weatherDock.temperatureLabel.slice(0, -2)
+                            font.pixelSize: 20
+                            color: weatherDock.foregroundColor
+                        }
 
-                        SafeDropShadow {
-                            anchors.fill: weatherDegree
-                            safeSource: weatherDegree
-                            requestedVisible: true
-                            z: -1
-                            radius: 8
-                            samples: 15
-                            horizontalOffset: 0
-                            verticalOffset: 0
-                            transparentBorder: true
-                            opacity: weatherDock.contentGlowOpacity
-                            color: weatherDock.open || weatherDock.pressed
-                                   ? Colors.magenta : Colors.orange
+                        Item {
+                            id: degreeSlot
+                            anchors.verticalCenter: parent.verticalCenter
+                            implicitWidth: weatherDegree.implicitWidth
+                            implicitHeight: weatherDegree.implicitHeight
+
+                            SafeDropShadow {
+                                anchors.fill: weatherDegree
+                                safeSource: weatherDegree
+                                requestedVisible: true
+                                z: -1
+                                radius: 8
+                                samples: 15
+                                horizontalOffset: 0
+                                verticalOffset: 0
+                                transparentBorder: true
+                                opacity: weatherDock.contentGlowOpacity
+                                color: weatherDock.open || weatherDock.pressed
+                                       ? Colors.magenta : Colors.orange
+                            }
+
+                            GohuText {
+                                id: weatherDegree
+                                text: "°"
+                                font.pixelSize: 20
+                                color: weatherDock.open ? Colors.magenta
+                                       : weatherDock.pressed ? Colors.white
+                                       : weatherDock.hovered ? Colors.orange : Colors.white
+                            }
                         }
 
                         GohuText {
-                            id: weatherDegree
-                            text: "°"
+                            id: weatherTemperatureUnit
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: weatherDock.temperatureLabel.slice(-1)
                             font.pixelSize: 20
-                            color: weatherDock.open ? Colors.magenta
-                                   : weatherDock.pressed ? Colors.white
-                                   : weatherDock.hovered ? Colors.orange : Colors.white
+                            color: weatherDock.foregroundColor
                         }
-                    }
-
-                    GohuText {
-                        id: weatherTemperatureUnit
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: weatherDock.temperatureLabel.slice(-1)
-                        font.pixelSize: 20
-                        color: weatherDock.foregroundColor
                     }
                 }
             }

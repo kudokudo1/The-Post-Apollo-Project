@@ -38,6 +38,9 @@ jobs:
       - name: Validate native and browser notification intake contracts
         run: python3 tests/notifications/test_external_native_intake.py
 
+      - name: Validate native notification click destination and website fallback
+        run: python3 tests/notifications/test_notification_destination_routing.py
+
       - name: Validate recorded Hospital certification lifecycle notifications
         run: python3 tests/notifications/test_hospital_certification_notifications.py
 

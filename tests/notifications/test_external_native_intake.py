@@ -169,19 +169,33 @@ const S={
   'event-1':{notification,expiresAt:4000}
  }
 };
-vm.runInNewContext(['externalActionsFor','invokeExternalAction']
+vm.runInNewContext(['externalActionsFor','invokeExternalAction',
+ 'hasExternalDefaultAction','invokeExternalDefaultAction']
  .map(n=>method(srv,n)).join('\n'),S);
 const actions=S.externalActionsFor('event-1');
 assert.strictEqual(actions.length,2);
 assert.strictEqual(actions[0].identifier,'default');
+assert.strictEqual(S.hasExternalDefaultAction('event-1'),true);
+assert.strictEqual(S.invokeExternalDefaultAction('event-1'),true);
+assert.strictEqual(invokeCount,1);
 assert.strictEqual(S.invokeExternalAction('event-1','reply'),true);
-assert.strictEqual(invokeCount,2);
+assert.strictEqual(invokeCount,3);
 assert.strictEqual(S.invokeExternalAction('event-1','unknown'),false);
 assert.strictEqual(S.invokeExternalAction('unknown','reply'),false);
+assert.strictEqual(S.hasExternalDefaultAction('unknown'),false);
+S.liveExternalNotifications['event-without-default']={
+ notification:{actions:[{identifier:'reply',text:'REPLY',invoke:()=>{invokeCount+=10;}}]},
+ expiresAt:4000
+};
+assert.strictEqual(S.hasExternalDefaultAction('event-without-default'),false);
+assert.strictEqual(S.invokeExternalDefaultAction('event-without-default'),false);
+assert.strictEqual(invokeCount,3,'never invoke a nondefault action by guess');
 now=5000;
 assert.strictEqual(S.externalActionsFor('event-1').length,0);
 assert.strictEqual(S.invokeExternalAction('event-1','default'),false);
-assert.strictEqual(invokeCount,2);
+assert.strictEqual(S.hasExternalDefaultAction('event-1'),false);
+assert.strictEqual(S.invokeExternalDefaultAction('event-1'),false);
+assert.strictEqual(invokeCount,3);
 console.log('Synthetic native metadata, classification, live-action routing: PASS');
 """
 subprocess.run(["node","-e",NODE,str(CONVERTER),str(SERVER),str(FACETS),str(SITES)],check=True)

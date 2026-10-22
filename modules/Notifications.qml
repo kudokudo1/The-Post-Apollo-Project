@@ -178,6 +178,21 @@ PanelWindow {
                 wideGlowSpread: 12
                 wideGlowOpacity: 0.14
 
+                // Clicking the popup itself invokes the sender's exact
+                // default action when one exists. Action buttons remain above
+                // this surface (z: 3) and preserve their distinct callbacks.
+                MouseArea {
+                    id: nativeDefaultClickArea
+                    anchors.fill: parent
+                    z: 0
+                    hoverEnabled: enabled
+                    enabled: NotificationsService.externalActionsRevision >= 0
+                        && NotificationsService.hasExternalDefaultAction(notificationCard.notificationId)
+                    cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                    onClicked: NotificationsService.invokeExternalDefaultAction(
+                        notificationCard.notificationId)
+                }
+
                 // ===== APP ICON ================================
 
                 Rectangle {

@@ -428,6 +428,28 @@ Singleton {
         return false;
     }
 
+    // Native desktop clients use the "default" action for opening a
+    // notification's destination (e.g. Chromium's original web push click).
+    // This is only available while the native QObject is tracked and live.
+    // It must NEVER be reconstructed from saved history or inferred from text.
+    function hasExternalDefaultAction(eventId) {
+        const live = liveExternalNotifications[String(eventId || "")];
+        if (!live || live.expiresAt <= Date.now())
+            return false;
+        const actions = live.notification.actions || [];
+        for (let i = 0; i < actions.length; i++) {
+            if (actions[i] && String(actions[i].identifier || "") === "default")
+                return true;
+        }
+        return false;
+    }
+
+    function invokeExternalDefaultAction(eventId) {
+        if (!hasExternalDefaultAction(eventId))
+            return false;
+        return invokeExternalAction(eventId, "default");
+    }
+
     function expireExternalNotifications() {
         const now = Date.now();
         const ids = Object.keys(liveExternalNotifications);

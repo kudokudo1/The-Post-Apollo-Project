@@ -209,7 +209,11 @@ def test_notifications_non_destructive_list_navigation_stays_guarded():
     assert "const index = !listKeyboardSelectionActive || list.currentIndex < 0" in src
     assert "historyList.currentIndex === notificationEntry.index" in src
     assert "ListView.isCurrentItem ? 2 : 1" in src
-    assert "takeMeToApp(row.sourceId, row.source);" in src
+    # Enter follows the event's native default action when live, then
+    # validated website origin or the original app focus. Never mutate state.
+    assert "root.openNotificationDestination(" in src
+    assert "row.notificationId, row.sourceId, row.source, row.websiteHost" in src
+    assert 'root.takeMeToApp(sourceId, source);' in src
     for key in ("Tab", "Shift+Tab", "Enter", "Return", "Up", "Down"):
         assert 'sequence: "' + key + '"' in src
     assert "!searchInput.activeFocus" in src

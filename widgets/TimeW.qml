@@ -23,6 +23,9 @@ PanelWindow {
     readonly property int frameWidth: 432
     readonly property int frameHeight: 768
     readonly property int glowGutter: 12
+    // TimeW identity is white. Universal magenta header, cyan dividers and
+    // destructive red Close keep their independent semantic roles.
+    readonly property color semanticColor: Colors.white
 
     readonly property var modes: [
         { id: "clock", name: "CLOCK" },
@@ -77,8 +80,8 @@ PanelWindow {
         standardKeysAvailable ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
     focusable: standardKeysAvailable
 
-    // Top/right anchoring and margin values come from existing Media/Messaging
-    // patterns. The final alignment with Clock awaits a live screen review.
+    // Sit flush below the right dock: shell rightModules top = 8, dock = 50.
+    // The actual frame begins one glowGutter below this window margin.
     anchors {
         top: true
         bottom: false
@@ -86,7 +89,7 @@ PanelWindow {
         right: true
     }
     margins {
-        top: 78
+        top: 8 + 50 - timew.glowGutter
         right: 13
     }
     mask: Region {
@@ -157,10 +160,10 @@ PanelWindow {
         anchors.margins: timew.glowGutter
         visible: timew.menuOpen
         glowVisible: timew.menuOpen
-        glowColor: Colors.magenta
+        glowColor: timew.semanticColor
         fillColor: Colors.black
         fillOpacity: 0.95
-        borderColor: Colors.magenta
+        borderColor: timew.semanticColor
         borderWidth: 1
         radius: 0
 
@@ -198,7 +201,7 @@ PanelWindow {
                     GohuText {
                         anchors.centerIn: parent
                         font.pixelSize: 11
-                        color: Colors.cyan
+                        color: timew.semanticColor
                         text: timew.selectedMode === "clock"
                               ? "LOCAL" : "PLANNED"
                     }
@@ -258,6 +261,7 @@ PanelWindow {
                         textOnly: true
                         labelFontSize: 11
                         trackDefaultGlowsLocally: true
+                        idlePrimaryColor: timew.semanticColor
                         selected: timew.selectedModeIndex === index
                         keyboardActive: timew.standardKeysAvailable
                         keyboardSelected: timew.selectedModeIndex === index
@@ -284,7 +288,7 @@ PanelWindow {
 
                     GohuText {
                         text: timew.selectedName + " // TIMEW"
-                        color: Colors.cyan
+                        color: timew.semanticColor
                         font.pixelSize: 18
                     }
 
@@ -301,7 +305,7 @@ PanelWindow {
 
                         GohuText {
                             text: Qt.formatDateTime(localClock.date, "HH:mm:ss")
-                            color: Colors.cyan
+                            color: timew.semanticColor
                             font.pixelSize: 20
                         }
                         GohuText {

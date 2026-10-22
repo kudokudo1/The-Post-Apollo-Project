@@ -75,7 +75,23 @@ for key in ("Tab", "Shift+Tab", "Esc"):
     assert 'sequence: "' + key + '"' in window
 assert "onLeftClicked: timew.menuOpen = false" in window
 
-# Existing TimeW visual language: header, cyan divider, unbordered main modes.
+# TimeW-specific white identity and dock-flush top alignment.
+# The right module's actual top is 8 px; the dock visual height is 50 px.
+# WindowPanelFrame adds its 12 px glow gutter to the frame's screen position.
+assert "anchors.topMargin: 8" in shell
+assert "implicitHeight: 50" in clock
+assert "top: 8 + 50 - timew.glowGutter" in window
+assert "readonly property color semanticColor: Colors.white" in window
+assert "glowColor: timew.semanticColor" in window
+assert "borderColor: timew.semanticColor" in window
+assert "idlePrimaryColor: timew.semanticColor" in window
+assert 'text: timew.selectedName + " // TIMEW"\n                        color: timew.semanticColor' in window
+assert 'text: Qt.formatDateTime(localClock.date, "HH:mm:ss")\n                            color: timew.semanticColor' in window
+assert "fillColor: Colors.black" in window
+assert "border.color: Colors.cyan" in window
+assert "accentColor: Colors.red" in window
+
+# Universal visual language remains: magenta header, cyan divider, borderless modes.
 assert 'text: "TIME // W"' in window
 assert "color: Colors.magenta" in window
 assert "id: headerDivider" in window

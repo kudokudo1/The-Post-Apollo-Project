@@ -82,6 +82,20 @@ assert "property var mpdDockSource: null" in bridge
 assert "readonly property var dockMpdObservation:" in bridge
 assert "bridge.dockMpdObservation" in bridge
 assert "bridge.mpdDockSource !== null" in bridge
+# MPD status fields must arrive atomically and advance the freshness clock
+# together. A 2-second read arriving after the previous 5-second Hub tick
+# must never be classified as a future/invalid observation.
+assert "readonly property var hubMpdObservation: mediaDock.lastValidMpdObservation" in media_dock
+assert "property var lastValidMpdObservation: null" in media_dock
+assert "const parsed = MpdStatus.parseStatus(output)" in media_dock
+assert "if (!parsed)" in media_dock
+assert "lastValidMpdObservation = ({" in media_dock
+assert media_dock.index("lastMpdObservedAtMs = Date.now()") < media_dock.index("lastValidMpdObservation = ({")
+assert 'import "../services/media/MediaDockMpdStatus.js" as MpdStatus' in media_dock
+assert "mpdDockSource ? mpdDockSource.hubMpdObservation : null" in bridge
+assert "function onHubMpdObservationChanged()" in bridge
+assert "bridge.observationNowMs = Date.now();" in bridge
+assert "onMpdDockSourceChanged: bridge.observationNowMs = Date.now()" in bridge
 assert "HeadlessMediaController {" not in media_dock
 assert "MprisPlaybackAdapter {" not in media_dock
 assert "HeadlessMediaController {" not in shell

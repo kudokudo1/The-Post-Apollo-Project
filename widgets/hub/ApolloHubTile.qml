@@ -16,7 +16,10 @@ SectionFrame {
     property var appsSnapshot: null
     property var todoStore: null
     property var todoSnapshot: null
+    property var notesStore: null
+    property var notesSnapshot: null
     signal todoTextFocusChanged(bool focused)
+    signal notesTextFocusChanged(bool focused)
     // B3 deliberately distinguishes local link status from verified internet.
     // Connected Wi-Fi/Ethernet is NOT proof that the internet is reachable.
     readonly property string networkState:
@@ -373,6 +376,26 @@ SectionFrame {
         }
     }
 
+    // B8 local Notes editor: the backend singleton owns revisions, file
+    // safety, and atomic writes. The tile only passes user-initiated actions.
+    ApolloHubNotesMini {
+        id: notesMini
+        visible: tile.moduleId === "notes"
+        notesStore: tile.notesStore
+        notesSnapshot: tile.notesSnapshot
+        onTextFocusChanged: function(focused) {
+            tile.notesTextFocusChanged(focused);
+        }
+        anchors {
+            left: parent.left
+            right: parent.right
+            top: parent.top
+            bottom: parent.bottom
+            topMargin: tile.editing ? 32 : 22
+            bottomMargin: 23
+        }
+    }
+
     // B7 personal checklist, independent from Hospital and Hub layout data.
     ApolloHubTodoMini {
         id: todoMini
@@ -413,6 +436,7 @@ SectionFrame {
                  && tile.moduleId !== "uptime"
                  && tile.moduleId !== "apps"
                  && tile.moduleId !== "todo"
+                 && tile.moduleId !== "notes"
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
@@ -457,6 +481,8 @@ SectionFrame {
               ? appsMini.statusLine
               : tile.moduleId === "todo"
               ? todoMini.statusLine
+              : tile.moduleId === "notes"
+              ? notesMini.statusLine
               : "DATA ADAPTER NOT CONNECTED"
     }
 }

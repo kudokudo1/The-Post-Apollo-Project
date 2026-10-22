@@ -33,13 +33,18 @@ test("magenta idle chassis and treble clef do not recolor or resample CAVA", () 
     assert.match(source, /hoverContentGlowColor:\s*Colors\.magenta/);
     assert.match(source, /contentGlowSource:\s*musicMark/);
 
-    const musicMark = source.match(/GohuText \{\s*id:\s*musicMark([\s\S]*?)\n\s*\}/);
-    assert.ok(musicMark, "music mark remains a single text item");
-    assert.match(musicMark[1], /textFormat:\s*Text\.StyledText/);
-    // The ornaments retain the dock's state-aware foreground; only the
-    // treble clef is a fixed magenta foreground.
-    assert.match(musicMark[1],
-        /mediaDock\.foregroundColor[\s\S]*‧₊˚ [\s\S]*Colors\.magenta[\s\S]*𝄞[\s\S]*mediaDock\.foregroundColor[\s\S]*˖/);
+    const musicMark = source.match(/Row \{\s*id:\s*musicMark([\s\S]*?)\n\s*\}\n\n\s*Item \{\s*id:\s*spectrum/);
+    assert.ok(musicMark, "the static music-mark cluster remains a single sampled source");
+    assert.match(musicMark[1], /spacing:\s*0/);
+    assert.equal((musicMark[1].match(/GohuText \{/g) || []).length, 3);
+    // Plain-text glyph rendering preserves fallback for U+1D11E.
+    // No StyledText parser is allowed to swallow the musical symbol.
+    assert.doesNotMatch(musicMark[1], /Text\.StyledText|<font /);
+    assert.match(musicMark[1], /textFormat:\s*Text\.PlainText\s*text:\s*"‧₊˚ "/);
+    assert.match(musicMark[1], /id:\s*trebleClef\s*textFormat:\s*Text\.PlainText\s*text:\s*"𝄞"\s*font\.pixelSize:\s*21\s*color:\s*Colors\.magenta/);
+    assert.match(musicMark[1], /textFormat:\s*Text\.PlainText\s*text:\s*"˖"/);
+    assert.equal((musicMark[1].match(/anchors\.baseline:\s*trebleClef\.baseline/g) || []).length, 2);
+    assert.equal((musicMark[1].match(/color:\s*mediaDock\.foregroundColor/g) || []).length, 2);
 
     // The animated bars keep their original accent and are never sampled.
     assert.match(source, /readonly property color accentColor:\s*mpdPlaying \? Colors\.orange : Colors\.cyan/);

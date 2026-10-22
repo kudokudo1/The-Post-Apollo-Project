@@ -56,11 +56,16 @@ Scope {
         stdoutText = "";
         stderrText = "";
 
+        const profile = String((pendingContext || {}).snapshotProfile || "FULL");
+        const selectedProfile = profile === "REFS_ONLY" || profile === "PULL_REF_SAFE"
+            ? profile : "FULL";
+
         snapshotProcess.exec([
             "bash",
             "-lc",
             [
                 'repo="$1"',
+                'profile="$2"',
                 'if ! git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1; then',
                 '  printf "ERROR\\tNOT A GIT WORKTREE\\n"',
                 '  exit 21',
@@ -73,6 +78,8 @@ Scope {
                 'printf "IDENTITY\\t%s\\t%s\\t%s\\n" "$branch" "$head" "$head_ref"',
                 'git -C "$repo" for-each-ref --format="REF%09%(refname)%09%(objectname)%09%(objecttype)" refs/heads refs/tags refs/remotes 2>/dev/null',
                 'git -C "$repo" for-each-ref --format="UPSTREAM%09%(refname:short)%09%(upstream:short)" refs/heads 2>/dev/null',
+                'printf "PROFILE\\t%s\\n" "$profile"',
+                'if [ "$profile" = "REFS_ONLY" ]; then exit 0; fi',
                 'git -C "$repo" stash list --format="STASH%x09%gd%x09%H%x09%gs" 2>/dev/null || true',
                 'index_tree="$(git -C "$repo" write-tree 2>/dev/null || true)"',
                 'index_path="$(git -C "$repo" rev-parse --git-path index 2>/dev/null || true)"',
@@ -85,10 +92,16 @@ Scope {
                 'untracked="$(git -C "$repo" ls-files --others --exclude-standard 2>/dev/null | wc -l | tr -d " ")"',
                 'conflicts="$(git -C "$repo" diff --name-only --diff-filter=U 2>/dev/null | wc -l | tr -d " ")"',
                 'status64="$(git -C "$repo" status --porcelain=v1 --untracked-files=all 2>/dev/null | base64 -w0 2>/dev/null || true)"',
-                'staged_hash="$(git -C "$repo" diff --cached --binary 2>/dev/null | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
-                'worktree_hash="$(git -C "$repo" diff --binary 2>/dev/null | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
-                'untracked_hash="$(git -C "$repo" ls-files --others --exclude-standard -z 2>/dev/null | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
-                'untracked_content_hash="$(git -C "$repo" ls-files --others --exclude-standard -z 2>/dev/null | while IFS= read -r -d "" p; do printf "%s\\0" "$p"; git -C "$repo" hash-object -- "$p" 2>/dev/null || true; done | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
+                'staged_hash=""',
+                'worktree_hash=""',
+                'untracked_hash=""',
+                'untracked_content_hash=""',
+                'if [ "$profile" != "PULL_REF_SAFE" ]; then',
+                '  staged_hash="$(git -C "$repo" diff --cached --binary 2>/dev/null | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
+                '  worktree_hash="$(git -C "$repo" diff --binary 2>/dev/null | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
+                '  untracked_hash="$(git -C "$repo" ls-files --others --exclude-standard -z 2>/dev/null | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
+                '  untracked_content_hash="$(git -C "$repo" ls-files --others --exclude-standard -z 2>/dev/null | while IFS= read -r -d "" p; do printf "%s\\0" "$p"; git -C "$repo" hash-object -- "$p" 2>/dev/null || true; done | git -C "$repo" hash-object --stdin 2>/dev/null || true)"',
+                'fi',
                 'printf "STATUS\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$staged" "$unstaged" "$untracked" "$conflicts" "$status64" "$staged_hash" "$worktree_hash" "$untracked_hash" "$untracked_content_hash"',
                 'state="NONE"',
                 'if [ -n "$gitdir" ] && [ -f "$gitdir/MERGE_HEAD" ]; then state="MERGE";',
@@ -113,7 +126,8 @@ Scope {
                 'done < <(git -C "$repo" worktree list --porcelain 2>/dev/null | sed -n "s/^worktree //p")'
             ].join("\n"),
             "git-repository-snapshot",
-            repo
+            repo,
+            selectedProfile
         ]);
 
         return requestId;
@@ -142,6 +156,7 @@ Scope {
         let untrackedListHash = "";
         let untrackedContentHash = "";
 
+        let snapshotProfile = "FULL";
         let operationState = "NONE";
         let origHead = "";
         let mergeHead = "";
@@ -158,6 +173,11 @@ Scope {
 
             if (!line)
                 continue;
+
+            if (line.indexOf("PROFILE\t") === 0) {
+                snapshotProfile = line.slice(8);
+                continue;
+            }
 
             if (line.indexOf("IDENTITY\t") === 0) {
                 const p = line.split("\t");
@@ -269,13 +289,15 @@ Scope {
         }
 
         const evidenceOnly =
-            dirty
+            snapshotProfile === "REFS_ONLY"
+            || dirty
             || anyDirtyWorktree
             || operationState !== "NONE"
             || !head;
 
         return {
             snapshotVersion: 1,
+            snapshotProfile: snapshotProfile,
             requestId: pendingRequestId,
             repository: String(repositoryPath || ""),
             label: pendingLabel,
@@ -328,7 +350,11 @@ Scope {
                 ? "EVIDENCE_ONLY"
                 : "REF_RECOVERABLE",
             recoveryReason:
-                operationState !== "NONE"
+                snapshotProfile === "REFS_ONLY"
+                ? "FETCH REFERENCES ONLY // NO LOCAL CONTENT RECOVERY CLAIM"
+                : snapshotProfile === "PULL_REF_SAFE" && (dirty || anyDirtyWorktree)
+                ? "PULL DIRTY REF SNAPSHOT // EVIDENCE ONLY"
+                : operationState !== "NONE"
                 ? "ACTIVE GIT OPERATION"
                 : anyDirtyWorktree || dirty
                 ? "DIRTY CONTENT IS EVIDENCE-ONLY UNTIL CONTENT SNAPSHOTS EXIST"

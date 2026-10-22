@@ -5764,7 +5764,7 @@ PanelWindow {
                                     anchors.centerIn: parent
                                     text:
                                         gitService.actionBusy
-                                        ? gitService.actionTitle + " // RUNNING"
+                                        ? gitService.actionTitle + " // " + gitService.actionStage
                                         : gitService.worktree
                                     font.pixelSize: 11
                                     color:
@@ -5800,7 +5800,7 @@ PanelWindow {
                                 anchors.rightMargin: 9
                                 text:
                                     gitService.actionBusy
-                                    ? gitService.actionTitle + " // RUNNING"
+                                    ? gitService.actionTitle + " // " + gitService.actionStage
                                     : gitService.actionTitle + " // OUTPUT"
                                 font.pixelSize: 10
                                 color:

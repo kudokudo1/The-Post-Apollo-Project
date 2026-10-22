@@ -58,6 +58,9 @@ Scope {
     property string refreshRepoPath: ""
     property bool discoveringRepos: false
     property bool actionBusy: false
+    property string actionStage: "IDLE"
+    property bool actionProcessDoneSeen: false
+    property bool actionOverdueNotified: false
     property string clonePendingQuery: ""
     property bool pendingCloneCreated: false
     property string pendingCloneDestination: ""
@@ -1649,6 +1652,10 @@ Scope {
     function controlContext() {
         return {
             source: "GitService",
+            snapshotProfile:
+                pendingProcessAction === "fetch" ? "REFS_ONLY"
+                : pendingProcessAction === "pull" ? "PULL_REF_SAFE"
+                : "FULL",
             processAction: String(pendingProcessAction || ""),
             target:
                 pendingProcessAction === "pull"
@@ -1681,6 +1688,7 @@ Scope {
             + String(detail || "SNAPSHOT UNAVAILABLE");
 
         actionBusy = false;
+        actionStage = "IDLE";
         actionExitCode = 1;
         actionOutput =
             (actionOutput.length > 0 ? actionOutput + "\n" : "")
@@ -1699,6 +1707,12 @@ Scope {
             pendingProcessAction === "clone"
             ? 120000
             : 15000;
+        actionProcessDoneSeen = false;
+        actionOverdueNotified = false;
+        actionStage = "RUNNING";
+        actionOutput += (actionOutput.length ? "\n" : "")
+            + "RUNNING // Git subprocess started";
+        traceSyncPhase("GIT_STARTED");
         actionWatchdog.restart();
         actionProcess.exec(pendingActionCommand);
         return true;
@@ -1710,6 +1724,11 @@ Scope {
         for (let i = lines.length - 1; i >= 0; --i) {
             const value = String(lines[i] || "").trim();
 
+            if (value.indexOf("PREPARING //") === 0
+                    || value.indexOf("RUNNING // Git subprocess") === 0
+                    || value.indexOf("FINALIZING //") === 0
+                    || value.indexOf("STILL RUNNING //") === 0)
+                continue;
             if (value)
                 return value;
         }
@@ -1768,7 +1787,9 @@ Scope {
         }
 
         actionBusy = false;
+        actionStage = "IDLE";
         actionWatchdog.stop();
+        traceSyncPhase("JOURNAL_FINALIZED");
 
         if (warning) {
             actionOutput +=
@@ -1817,6 +1838,7 @@ Scope {
             return;
 
         traceSyncPhase("GIT_PROCESS_COMPLETE");
+        actionStage = "FINALIZING";
         actionWatchdog.stop();
         pendingActionSuccess = actionExitCode === 0;
         pendingActionDetail =
@@ -1830,6 +1852,8 @@ Scope {
                         + String(actionExitCode)
                   )
               );
+        actionOutput += (actionOutput.length ? "\n" : "")
+            + "FINALIZING // collecting repository evidence";
 
         if (pendingProcessAction === "clone") {
             finalizeControlAction(
@@ -1959,11 +1983,14 @@ Scope {
         }
 
         actionBusy = true;
+        actionStage = "PREPARING";
         actionTitle =
             trackCheckout
             ? "TRACK // CHECKOUT"
             : action.toUpperCase();
-        actionOutput = "";
+        actionOutput = ["fetch", "pull"].indexOf(action) >= 0
+            ? "PREPARING // capturing repository references and journal evidence"
+            : "";
         actionExitCode = 0;
 
         if (action === "clone") {
@@ -2303,6 +2330,7 @@ Scope {
         }
 
         if (raw === "__PA_DONE__") {
+            actionProcessDoneSeen = true;
             finishActionProcess();
             return;
         }
@@ -2375,6 +2403,7 @@ Scope {
                     return;
                 }
 
+                gitService.traceSyncPhase("JOURNAL_STARTED");
                 gitService.startPendingActionProcess();
                 return;
             }
@@ -2505,6 +2534,14 @@ Scope {
     Process {
         id: actionProcess
 
+        onExited: function(code, exitStatus) {
+            // Broken protocol: finish only once the child has exited and
+            // stdout has had time to emit the completion marker.
+            if (!gitService.actionBusy || gitService.actionProcessDoneSeen)
+                return;
+            actionExitFallback.restart();
+        }
+
         stdout: SplitParser {
             onRead: function(line) {
                 gitService.consumeActionLine(line);
@@ -2537,45 +2574,33 @@ Scope {
     }
 
     Timer {
+        id: actionExitFallback
+        interval: 200
+        repeat: false
+        onTriggered: {
+            if (!gitService.actionBusy || gitService.actionProcessDoneSeen
+                    || actionProcess.running)
+                return;
+            gitService.actionExitCode = 1;
+            gitService.actionOutput += (gitService.actionOutput.length ? "\n" : "")
+                + "GIT PROCESS EXITED WITHOUT COMPLETION MARKER // STATE UNCERTAIN";
+            gitService.finishActionProcess();
+        }
+    }
+
+    Timer {
         id: actionWatchdog
         interval: 15000
         repeat: false
-
         onTriggered: {
-            if (!gitService.actionBusy)
+            if (!gitService.actionBusy || gitService.actionProcessDoneSeen)
                 return;
-
-            const detail =
-                "ACTION TIMEOUT // VERIFY REPOSITORY / REMOTE STATE";
-
-            if (gitService.pendingJournalId
-                    && gitService.operationJournal) {
-                gitService.operationJournal.failOperation(
-                    gitService.pendingJournalId,
-                    {
-                        snapshotVersion: 1,
-                        repository:
-                            String(
-                                gitService.repoRoot
-                                || gitService.repoPath
-                                || ""
-                            ),
-                        capturedAt: new Date().toISOString(),
-                        captureFailed: true,
-                        recoveryClass: "EVIDENCE_ONLY",
-                        recoveryReason:
-                            "CONTROL ACTION TIMEOUT // STATE UNCERTAIN"
-                    },
-                    detail
-                );
-            }
-
-            gitService.actionBusy = false;
-            gitService.actionExitCode = 1;
-            gitService.actionOutput += (
-                gitService.actionOutput.length > 0 ? "\n" : ""
-            ) + detail;
-            gitService.clearPendingControlAction();
+            // Only warn. Never mark failed or unlock while Git may run.
+            gitService.actionOverdueNotified = true;
+            gitService.actionStage = "RUNNING (SLOW)";
+            gitService.actionOutput += (gitService.actionOutput.length ? "\n" : "")
+                + "STILL RUNNING // Git exceeded 15 seconds. Controls remain locked until process completion.";
+            gitService.traceSyncPhase("GIT_OVERDUE");
         }
     }
 

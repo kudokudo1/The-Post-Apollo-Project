@@ -112,13 +112,14 @@ require(
 require_regex(
     SERVICE,
     r'if \(raw === "__PA_DONE__"\) \{\s*'
+    r'actionProcessDoneSeen = true;\s*'
     r'finishActionProcess\(\);',
     "process completion marker must enter the journal-aware completion seam",
 )
 require(
     SERVICE,
-    "CONTROL ACTION TIMEOUT // STATE UNCERTAIN",
-    "CONTROL timeout must be journaled as uncertain state",
+    "STILL RUNNING // Git exceeded 15 seconds",
+    "CONTROL watchdog must warn without releasing subprocess protection",
 )
 require_regex(
     "widgets/GitW.qml",
@@ -150,5 +151,33 @@ for marker in (
     'AFTER_SNAPSHOT_COMPLETE',
 ):
     require(SERVICE, marker, "Git sync stage timing must remain measurable")
+
+# Context-selected snapshots are explicit, and reduced Fetch snapshots
+# must never be promoted to a content-based recovery claim.
+SNAPSHOT = "services/git/GitRepositorySnapshotService.qml"
+for token in (
+    'snapshotProfile === "REFS_ONLY"',
+    '"PULL_REF_SAFE"',
+    'FETCH REFERENCES ONLY // NO LOCAL CONTENT RECOVERY CLAIM',
+    'if [ "$profile" = "REFS_ONLY" ]; then exit 0; fi',
+    'if [ "$profile" != "PULL_REF_SAFE" ]; then',
+):
+    require(SNAPSHOT, token, "profile-specific snapshot contract")
+for token in (
+    'actionStage = "PREPARING"',
+    'actionStage = "RUNNING"',
+    'actionStage = "FINALIZING"',
+    'actionStage = "IDLE"',
+    'id: actionExitFallback',
+    'actionProcessDoneSeen = true',
+    'gitService.actionOverdueNotified = true',
+    'actionProcess.running',
+):
+    require(SERVICE, token, "Git subprocess lifecycle contract")
+assert 'gitService.actionBusy = false;' not in read(SERVICE).split('id: actionWatchdog', 1)[1], (
+    "overdue watchdog must not unlock running subprocess"
+)
+require("widgets/GitW.qml", 'gitService.actionTitle + " // " + gitService.actionStage',
+        "Git Menu must show real operation stage")
 
 print("Git CONTROL sync journal contracts: PASS")

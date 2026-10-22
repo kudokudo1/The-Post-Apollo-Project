@@ -66,9 +66,11 @@ use the normal controlled Quickshell restart; a QML-only reload cannot change
 an already-running Python media controller registry.
 
 Check popular radio results, genre, name and country queries, NEXT PAGE,
-loading distinct station URLs, no autoplay, pause/play/stop, preserving a
-currently loaded local item while searching, timeout/offline response,
-and no regressions in ApolloHub MPD/MPRIS snapshots.
+slider/tuner navigation across 50 listings, staging catalog-only UUIDs
+without issuing any MPD load or autoplay, preservation of the existing
+manually approved PRESET's LOAD → PLAY transport, an already loaded local item
+surviving search, timeout/offline response, and no regressions in ApolloHub
+MPD/MPRIS snapshots.
 
 The branch has source and mock-network tests; a live Fedora/MPD/Radio Browser
 station count and playlist playback are not verified.

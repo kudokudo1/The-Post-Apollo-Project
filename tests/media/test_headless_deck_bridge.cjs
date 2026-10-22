@@ -170,7 +170,7 @@ test("SEARCH and source button positions are swapped, input uses magenta and ora
 
 test("browser action controls retain ordinary ActionButton variants", () => {
     const ui = fs.readFileSync(path.join(base, "widgets/MediaDeckBrowserControls.qml"), "utf8");
-    assert.equal((ui.match(/ActionButton\s*\{/g) || []).length, 5);
+    assert.equal((ui.match(/ActionButton\s*\{/g) || []).length, 6);
     assert.doesNotMatch(ui, /selected:\s*bay\.deckHost\.navigationZone/);
     assert.doesNotMatch(ui, /destructive:\s*true|variant:\s*"special"/);
     assert.match(ui, /id:\s*sourceKey[\s\S]*?onClicked:\s*bay\.deckHost\.toggleCatalogSource/);

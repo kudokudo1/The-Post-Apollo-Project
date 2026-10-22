@@ -10,6 +10,8 @@ const vm = require("node:vm");
 const root = path.resolve(__dirname, "../..");
 const source = fs.readFileSync(path.join(root, "modules/Mediaplayer.qml"), "utf8");
 const config = fs.readFileSync(path.join(root, "modules/mediaplayer-cava.conf"), "utf8");
+const trebleSvg = fs.readFileSync(path.join(root, "assets/media/treble-clef.svg"), "utf8");
+const treblePng = fs.readFileSync(path.join(root, "assets/media/treble-clef.png"));
 
 function harness() {
     const match = source.match(/    function receiveCavaFrame\(frame\) \{([\s\S]*?)\n    \}\n\n    Process \{/);
@@ -34,17 +36,35 @@ test("magenta idle chassis and treble clef do not recolor or resample CAVA", () 
     assert.match(source, /contentGlowSource:\s*musicMark/);
 
     const musicMark = source.match(/Row \{\s*id:\s*musicMark([\s\S]*?)\n\s*\}\n\n\s*Item \{\s*id:\s*spectrum/);
-    assert.ok(musicMark, "the static music-mark cluster remains a single sampled source");
-    assert.match(musicMark[1], /spacing:\s*0/);
-    assert.equal((musicMark[1].match(/GohuText \{/g) || []).length, 3);
-    // Plain-text glyph rendering preserves fallback for U+1D11E.
-    // No StyledText parser is allowed to swallow the musical symbol.
-    assert.doesNotMatch(musicMark[1], /Text\.StyledText|<font /);
-    assert.match(musicMark[1], /textFormat:\s*Text\.PlainText\s*text:\s*"‧₊˚ "/);
-    assert.match(musicMark[1], /id:\s*trebleClef\s*textFormat:\s*Text\.PlainText\s*text:\s*"𝄞"\s*font\.pixelSize:\s*21\s*color:\s*Colors\.magenta/);
-    assert.match(musicMark[1], /textFormat:\s*Text\.PlainText\s*text:\s*"˖"/);
-    assert.equal((musicMark[1].match(/anchors\.baseline:\s*trebleClef\.baseline/g) || []).length, 2);
-    assert.equal((musicMark[1].match(/color:\s*mediaDock\.foregroundColor/g) || []).length, 2);
+    assert.ok(musicMark, "static music-mark cluster is still the one glow source");
+    const mark = musicMark[1];
+    assert.match(mark, /spacing:\s*0/);
+    assert.equal((mark.match(/GohuText \{/g) || []).length, 2,
+        "original decorative text remains, while the treble clef is vector art");
+    assert.equal((mark.match(/Image \{/g) || []).length, 1);
+    assert.match(mark, /id:\s*trebleClef\s*width:\s*15\s*height:\s*34/);
+    assert.match(mark, /source:\s*Qt\.resolvedUrl\("\.\.\/assets\/media\/treble-clef\.png"\)/);
+    assert.match(mark, /sourceSize:\s*Qt\.size\(45,\s*102\)/);
+    assert.match(mark, /onStatusChanged:[\s\S]*?Image\.Error/);
+    assert.match(mark, /textFormat:\s*Text\.PlainText\s*text:\s*"‧₊˚ "/);
+    assert.match(mark, /textFormat:\s*Text\.PlainText\s*text:\s*"˖"/);
+    assert.equal((mark.match(/anchors\.verticalCenter:\s*trebleClef\.verticalCenter/g) || []).length, 2);
+    assert.equal((mark.match(/color:\s*mediaDock\.foregroundColor/g) || []).length, 2);
+    assert.doesNotMatch(mark, /Text\.StyledText|<font |text:\s*"𝄞"/);
+
+    // The vector exists in the repository, visibly contains geometry rather
+    // than a font-dependent <text> node, and uses the palette's magenta.
+    assert.match(trebleSvg, /<svg[^>]*viewBox="0 0 611 1732"/);
+    assert.match(trebleSvg, /fill="#C74EC7"/);
+    assert.match(trebleSvg, /<path[^>]+d="M314 801/);
+    assert.doesNotMatch(trebleSvg, /<text\b/);
+    // PNG is the runtime source, so no user-installed music font or Qt SVG
+    // image plug-in is required. Keep the vector as the editable original.
+    assert.equal(treblePng.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+    assert.equal(treblePng.readUInt32BE(16), 45);
+    assert.equal(treblePng.readUInt32BE(20), 102);
+    assert.equal(treblePng[25], 6, "runtime icon must retain an alpha channel");
+
 
     // The animated bars keep their original accent and are never sampled.
     assert.match(source, /readonly property color accentColor:\s*mpdPlaying \? Colors\.orange : Colors\.cyan/);

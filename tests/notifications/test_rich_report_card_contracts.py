@@ -47,5 +47,11 @@ assert "elideMode: Text.ElideNone" in HUB
 assert "notificationMessage.y + notificationMessage.height" in HUB
 assert "id: bringHereButton" in HUB
 assert re.search(r'id: notificationMessage.*?visible: !notificationEntry.isReport', HUB, re.S)
-assert re.search(r'id: bringHereButton.*?visible: !notificationEntry.isReport', HUB, re.S)
+# Both the scope control and the original Bring Here action share the
+# footer Row, which is hidden on report decks and update offers.
+assert re.search(
+    r'id: cardFooterActions\s+visible: !notificationEntry.isReport'
+    r'\s+&& !notificationEntry.isUpdateOffer.*?id: bringHereButton',
+    HUB, re.S
+)
 print("Weather/Solar extended history card contracts: PASS")

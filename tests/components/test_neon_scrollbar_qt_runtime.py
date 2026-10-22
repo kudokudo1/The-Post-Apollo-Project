@@ -44,7 +44,10 @@ graph_rail = root.findChild(QObject, "graphRail")
 graph_pane = root.findChild(QObject, "graphPane")
 graph_frame = root.findChild(QObject, "graphFrame")
 graph_inset = root.findChild(QObject, "graphInset")
-if any(obj is None for obj in (bar, inner, outer, horizontal_bar, horizontal_pane,
+shifted_list = root.findChild(QObject, "shiftedList")
+shifted_bar = root.findChild(QObject, "shiftedBar")
+if any(obj is None for obj in (bar, inner, outer, shifted_list, shifted_bar,
+                               horizontal_bar, horizontal_pane,
                                positioner_bar, positioner_pane, positioned_host, positioner,
                                section_bar, section_pane, section_host,
                                graph_rail, graph_pane, graph_frame, graph_inset)):
@@ -171,6 +174,36 @@ try:
     near(graph_pane.property("y"), 28 + 4, "graph content stays below header")
     # Normal viewport compatibility is tested by section_bar above. This
     # remounted graph-specific test guards only its intended box-side mode.
+
+    # Notifications COMBI may change its ListView origin after removing old
+    # rows and re-estimating variable-height report/ordinary delegates.
+    assert bar.property("accountForContentOrigin") is False, (
+        "All existing NeonScrollBar consumers must keep the legacy geometry"
+    )
+    assert shifted_bar.property("accountForContentOrigin") is True
+    root.disturbListOrigin()
+    app.processEvents()
+    origin = float(shifted_list.property("originY"))
+    assert abs(origin) > 0.1, (
+        f"Fixture failed to create a nonzero ListView origin: {origin}"
+    )
+    # A thumb jump to the top must use originY, not the absolute zero that can
+    # point to a stale/blank region. This is the reported Notifications fault.
+    shifted_bar.scrollTo(0, 0)
+    app.processEvents()
+    near(shifted_list.property("contentY"),
+         shifted_list.property("originY"), "origin-aware thumb to actual list top")
+    near(shifted_bar.property("scrollRatio"), 0, "top marker after origin shift")
+    # Moving from that shifted top keeps the origin offset and remains
+    # proportional. Home must return to the same true top.
+    assert bool(shifted_bar.moveBy(30, False))
+    app.processEvents()
+    assert float(shifted_bar.property("scrollRatio")) > 0
+    assert bool(shifted_bar.handleKey(0x01000010, 0))
+    app.processEvents()
+    near(shifted_list.property("contentY"),
+         shifted_list.property("originY"), "Home uses shifted list origin")
+    near(shifted_bar.property("scrollRatio"), 0, "Home thumb at beginning")
 
     # Preserve legacy per-layer inactive fading unless explicitly requested.
     assert bar.setProperty("autoHide", False)

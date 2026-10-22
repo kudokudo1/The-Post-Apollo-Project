@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Io
 import "../components"
 import "../widgets"
+import "../services/media/MediaDockMpdStatus.js" as MpdStatus
 
 // Compact music transport placeholder. The full Hi-Fi deck will be a separate
 // surface; this module only owns its taskbar artwork and initial MPD controls.
@@ -26,6 +27,8 @@ Item {
     readonly property string hubMpdPlaybackState: mediaDock.playbackState
     readonly property string hubMpdCurrentTrack: mediaDock.currentTrack
     readonly property double hubMpdObservedAtMs: mediaDock.lastMpdObservedAtMs
+    // Atomic, validated MPD reading for the Hub. Never expose subprocess data.
+    readonly property var hubMpdObservation: mediaDock.lastValidMpdObservation
 
     DockButton {
     id: mediaDock
@@ -40,6 +43,7 @@ Item {
     property string playbackState: "offline"
     property string currentTrack: ""
     property double lastMpdObservedAtMs: 0
+    property var lastValidMpdObservation: null
     readonly property bool mpdOnline: playbackState !== "offline"
     readonly property bool mpdPlaying: playbackState === "playing"
 
@@ -151,21 +155,21 @@ Item {
     }
 
     function receiveMpdStatus(output) {
-        // Timestamp only this completed dock observation. No new collection.
-        lastMpdObservedAtMs = Date.now();
-        var status = String(output || "").trim();
-        var state = status.match(/\[(playing|paused|stopped)\]/);
+        const parsed = MpdStatus.parseStatus(output);
+        // A failed/empty subprocess response is not an observed MPD state.
+        // Keep the last valid reading until the Hub's 15s freshness expiry.
+        if (!parsed)
+            return;
 
-        if (state) {
-            playbackState = state[1];
-            currentTrack = status.split(/\r?\n/)[0];
-        } else if (/volume:|repeat:|random:/.test(status)) {
-            playbackState = "stopped";
-            currentTrack = "";
-        } else {
-            playbackState = "offline";
-            currentTrack = "";
-        }
+        playbackState = parsed.state;
+        currentTrack = parsed.title;
+        lastMpdObservedAtMs = Date.now();
+        // Publish state, track and timestamp together, after they agree.
+        lastValidMpdObservation = ({
+            state: parsed.state,
+            title: parsed.title,
+            observedAtMs: lastMpdObservedAtMs
+        });
     }
 
     Process {

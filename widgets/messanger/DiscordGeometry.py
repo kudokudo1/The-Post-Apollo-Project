@@ -545,6 +545,10 @@ class Bridge:
                 self.queue_command('[app_id="vesktop"] focus')
                 continue
 
+            if op == "focusX":
+                self.queue_command('[class="post-apollo-x"] focus')
+                continue
+
             if op == "stop":
                 self.stop_event.set()
                 self.watch_event.set()

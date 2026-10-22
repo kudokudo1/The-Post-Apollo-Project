@@ -136,15 +136,21 @@ async function main(){
   stage="fresh-preflight";
   await startClient("independent");
   await api.downloadBudget(syncId);
+  stage="fresh-budget-month";
   const before=await api.getBudgetMonth(month);
+  stage="fresh-category-presence";
   assert.equal(findCategory(before,categoryId).length,1);
   const category=findCategory(before,categoryId)[0];
+  stage="fresh-to-budget";
   assert.ok(Number.isSafeInteger(before.toBudget));
+  stage="fresh-category-budgeted";
   assert.ok(Number.isSafeInteger(category.budgeted));
+  stage="fresh-category-balance";
   assert.ok(Number.isSafeInteger(category.balance));
   // Never assume initial envelope state or amount available. Derive the
   // safe increase from actual real-engine values in the fictional budget.
   const capacity=Math.min(before.toBudget,99999999999-category.budgeted);
+  stage="fresh-income-capacity";
   assert.ok(capacity>=100,"fictional-income-unavailable");
   const delta=Math.min(1000,capacity);
   const target=category.budgeted+delta;

@@ -135,7 +135,9 @@ test("open state magenta-energizes every Media icon and CAVA visual without affe
     // Each star underlight + source shadow, clef source shadow, CAVA ambient,
     // and both halos and cores on all 16 bars share the same open-priority
     // color without sampling the animated bars as a blur texture.
-    assert.equal((source.match(/color:\s*mediaDock\.artworkAccentColor/g) || []).length, 9);
+    // The treble clef now owns an additional independently accent-colored
+    // aura, so open-state magenta covers ten rather than nine visual layers.
+    assert.equal((source.match(/color:\s*mediaDock\.artworkAccentColor/g) || []).length, 10);
     assert.doesNotMatch(source, /^\s*color:\s*mediaDock\.accentColor\s*$/m);
     assert.equal((source.match(/SafeDropShadow \{/g) || []).length, 3);
     assert.equal((source.match(/RectangularShadow \{/g) || []).length, 5);

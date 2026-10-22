@@ -2,8 +2,8 @@ import QtQuick
 import "../../components"
 import "../../services/hub/ApolloHubLayout.js" as Layout
 
-// Presentation only: Weather, Network, Media, CPU++, and Uptime consume
-// read-only snapshots. This tile creates no additional providers or pollers.
+// Presentation only: Weather, Network, Media, CPU++, Uptime, and Apps
+// consume read-only snapshots. This tile creates no providers or pollers.
 SectionFrame {
     id: tile
 
@@ -13,6 +13,7 @@ SectionFrame {
     property var mediaSnapshot: null
     property var systemSnapshot: null
     property var uptimeSnapshot: null
+    property var appsSnapshot: null
     // B3 deliberately distinguishes local link status from verified internet.
     // Connected Wi-Fi/Ethernet is NOT proof that the internet is reachable.
     readonly property string networkState:
@@ -354,6 +355,21 @@ SectionFrame {
         }
     }
 
+    // B6 native desktop-entry index: scrollable metadata, no launch path.
+    ApolloHubAppsMini {
+        id: appsMini
+        visible: tile.moduleId === "apps"
+        appsSnapshot: tile.appsSnapshot
+        anchors {
+            left: parent.left
+            right: parent.right
+            top: parent.top
+            bottom: parent.bottom
+            topMargin: tile.editing ? 32 : 22
+            bottomMargin: 23
+        }
+    }
+
     // MPD and MPRIS remain separate; neither gets selected automatically.
     ApolloHubMediaMini {
         visible: tile.moduleId === "media"
@@ -373,6 +389,7 @@ SectionFrame {
                  && tile.moduleId !== "media"
                  && tile.moduleId !== "cpu"
                  && tile.moduleId !== "uptime"
+                 && tile.moduleId !== "apps"
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
@@ -413,6 +430,8 @@ SectionFrame {
               ? systemMini.statusLine
               : tile.moduleId === "uptime"
               ? uptimeMini.statusLine
+              : tile.moduleId === "apps"
+              ? appsMini.statusLine
               : "DATA ADAPTER NOT CONNECTED"
     }
 }

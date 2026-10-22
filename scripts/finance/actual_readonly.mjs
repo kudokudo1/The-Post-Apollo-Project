@@ -1,5 +1,6 @@
 // FinanceW / Actual Budget read-only normalization.
 // This module has no imports from Actual, no persistence, and no write methods.
+import {summarizeFunding} from "./funding_reconciliation.mjs";
 export function validMonth(month) {
   return typeof month === "string"
       && /^(?:19|20)\d{2}-(?:0[1-9]|1[0-2])$/.test(month);
@@ -117,6 +118,7 @@ export function normalizeSnapshot({month, budget, accounts, balances,
     toBudgetCents: cents(budget.toBudget, "toBudget"),
     accounts: accountRows,
     categories: categoryRows,
+    funding: summarizeFunding({month,budget,accounts,balances,transactionSets}),
     transactionsCount: transactionRows.length,
     transactions: transactionRows.slice(0, 24)
   };

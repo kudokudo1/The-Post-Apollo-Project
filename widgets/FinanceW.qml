@@ -10,6 +10,7 @@ PanelWindow {
     id: root
 
     property bool menuOpen: false
+    property bool fundingReviewOpen: false
     property bool keyboardActive: false
     property bool keyboardLock: false
     property bool relationshipFocusModeActive: false
@@ -19,6 +20,7 @@ PanelWindow {
     FinanceServices.FinanceBudgetReadService {
         id: financeBudget
         monitoring: root.menuOpen
+        onSnapshotChanged: root.fundingReviewOpen = false
     }
 
     FinanceServices.FinanceLocalDraftStore {
@@ -985,6 +987,92 @@ PanelWindow {
                             width: budgetScroll.width
                             spacing: 7
 
+                            ActionButton {
+                                id: reviewFunding
+                                width: parent.width
+                                height: 28
+                                trackLabelGlowLocally: true
+                                label: root.fundingReviewOpen ? "HIDE FUNDING REVIEW" : "REVIEW FUNDING"
+                                labelPixelSize: 10
+                                accentColor: Colors.cyan
+                                available: financeBudget.state === "ready"
+                                           && !!financeBudget.snapshot
+                                           && !!financeBudget.snapshot.funding
+                                onLeftClicked: root.fundingReviewOpen = !root.fundingReviewOpen
+                            }
+                            Column {
+                                width: parent.width
+                                spacing: 5
+                                visible: root.fundingReviewOpen && financeBudget.state === "ready"
+                                         && !!financeBudget.snapshot
+                                         && !!financeBudget.snapshot.funding
+                                GohuText {
+                                    width: parent.width
+                                    text: "FUNDING REVIEW // " + financeBudget.selectedMonth
+                                    color: Colors.cyan
+                                    font.pixelSize: 11
+                                    textFormat: Text.PlainText
+                                    elide: Text.ElideRight
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    text: "INCOME CATEGORY ACTIVITY // "
+                                          + root.moneyText(financeBudget.snapshot
+                                              ? financeBudget.snapshot.funding.incomeCategoryActivityCents : null)
+                                    color: Colors.white
+                                    font.pixelSize: 9
+                                    textFormat: Text.PlainText
+                                    wrapMode: Text.WordWrap
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    text: "INCOME CATEGORIES // "
+                                          + (financeBudget.snapshot
+                                             ? financeBudget.snapshot.funding.incomeCategoryCount : 0)
+                                    color: Colors.cyan
+                                    font.pixelSize: 9
+                                    textFormat: Text.PlainText
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    text: "POSITIVE UNCATEGORIZED // "
+                                          + (financeBudget.snapshot
+                                             ? financeBudget.snapshot.funding.positiveUncategorizedCount : 0)
+                                          + " ITEMS / "
+                                          + root.moneyText(financeBudget.snapshot
+                                              ? financeBudget.snapshot.funding.positiveUncategorizedCents : null)
+                                    color: Colors.orange
+                                    font.pixelSize: 9
+                                    textFormat: Text.PlainText
+                                    wrapMode: Text.WordWrap
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    text: "REVIEW POSITIVE UNCATEGORIZED ITEMS IN ACTUAL. "
+                                          + "THEY MAY BE REFUNDS OR TRANSFERS, NOT INCOME."
+                                    color: Colors.orange
+                                    font.pixelSize: 9
+                                    textFormat: Text.PlainText
+                                    wrapMode: Text.WordWrap
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    text: "OPENING BALANCES // NOT VERIFIED FROM THIS MONTH"
+                                    color: Colors.orange
+                                    font.pixelSize: 9
+                                    textFormat: Text.PlainText
+                                    wrapMode: Text.WordWrap
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    text: "ACCOUNT BALANCE IS NOT THE SAME AS TO BUDGET. "
+                                          + "REVIEW STARTING BALANCES AND INCOME IN ACTUAL."
+                                    color: Colors.cyan
+                                    font.pixelSize: 9
+                                    textFormat: Text.PlainText
+                                    wrapMode: Text.WordWrap
+                                }
+                            }
                             GohuText {
                                 text: "ACCOUNTS"
                                 font.pixelSize: 12

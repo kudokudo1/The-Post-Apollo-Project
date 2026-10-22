@@ -313,7 +313,7 @@ Rectangle {
                             anchors.verticalCenter: parent.verticalCenter
                             width: (parent.width - 4) * sky.windMeter
                             height: parent.height - 4
-                            color: Colors.cyan
+                            color: sky.meterFillColor
                         }
                     }
                 }

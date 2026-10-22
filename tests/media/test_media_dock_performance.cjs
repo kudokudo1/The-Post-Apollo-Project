@@ -154,12 +154,12 @@ test("requested music icon retains the exact ornament codepoints and PNG treble 
     assert.ok(source.includes('text: "ׅ˖"'));
     // Only visible ornaments contribute to Row implicitWidth. In particular,
     // the old trailing U+3164 filler expanded the source item's glow bounds.
-    const markBody = source.match(/Row \\{\\s*id:\\s*musicMark([\\s\\S]*?)\\n\\s*\\}\\n\\n\\s*Item \\{\\s*id:\\s*spectrum/)?.[1];
+    const markBody = source.match(/Row \{\s*id:\s*musicMark([\s\S]*?)\n\s*\}\n\n\s*Item \{\s*id:\s*spectrum/)?.[1];
     assert.ok(markBody);
-    assert.match(markBody, /spacing:\\s*-2/);
-    assert.doesNotMatch(markBody, /text:\\s*"‧₊˚ "/);
-    assert.doesNotMatch(markBody, /text:\\s*" ׅ˖ㅤ"/);
-    assert.doesNotMatch(markBody, /text:\\s*"[^"]*ㅤ"/);
+    assert.match(markBody, /spacing:\s*-2/);
+    assert.doesNotMatch(markBody, /text:\s*"‧₊˚ "/);
+    assert.doesNotMatch(markBody, /text:\s*" ׅ˖ㅤ"/);
+    assert.doesNotMatch(markBody, /text:\s*"[^"]*ㅤ"/);
 
     assert.match(source, /id:\s*trebleClef\s*width:\s*15\s*height:\s*34/);
     assert.match(source, /source:\s*mediaDock\.open\s*\?\s*Qt\.resolvedUrl/);

@@ -111,6 +111,42 @@ Item {
     contentGlowEnabled: false
     contentGlowSource: null
 
+    // The tiny ornament glyphs carry far less opaque alpha than the clef.
+    // Keep their independent source-attached shadows, and add a small, soft
+    // accent aura behind EACH star group. These are not a combined strip,
+    // and neither aura samples or follows animated CAVA frames.
+    RectangularShadow {
+        id: leadingStarsAura
+        x: mediaArtwork.x + musicMark.x + leadingStars.x
+           + (leadingStars.width - width) / 2
+        y: mediaArtwork.y + musicMark.y + leadingStars.y
+           + (leadingStars.height - height) / 2
+        width: Math.max(1, leadingStars.width - 2 * mediaDock.softGlowSpread)
+        height: Math.max(1, leadingStars.height - 2 * mediaDock.softGlowSpread)
+        radius: height / 2
+        blur: mediaDock.contentGlowRadius + 4
+        spread: 0
+        color: mediaDock.accentColor
+        opacity: mediaDock.softGlowOpacity
+        z: 0
+    }
+
+    RectangularShadow {
+        id: trailingStarAura
+        x: mediaArtwork.x + musicMark.x + trailingStar.x
+           + (trailingStar.width - width) / 2
+        y: mediaArtwork.y + musicMark.y + trailingStar.y
+           + (trailingStar.height - height) / 2
+        width: Math.max(1, trailingStar.width - 2 * mediaDock.softGlowSpread)
+        height: Math.max(1, trailingStar.height - 2 * mediaDock.softGlowSpread)
+        radius: height / 2
+        blur: mediaDock.contentGlowRadius + 4
+        spread: 0
+        color: mediaDock.accentColor
+        opacity: mediaDock.softGlowOpacity
+        z: 0
+    }
+
     // Strengthen the three *static* symbol shadows without sampling any
     // moving CAVA bars. Leave the magenta full-width dock wash untouched.
     SafeDropShadow {

@@ -115,10 +115,23 @@ async function main(){
   assert.ok(typeof accountId==="string" && accountId.length>4);
   assert.ok(typeof groupId==="string" && groupId.length>4);
   assert.ok(typeof categoryId==="string" && categoryId.length>4);
+  stage="fictional-income-category";
+  // Actual's available-to-budget calculation uses the income category
+  // subtotal, not every unclassified positive account transaction.
+  const initialMonth=await api.getBudgetMonth(month);
+  const incomeGroups=initialMonth.categoryGroups
+    .filter(group=>group && group.is_income && Array.isArray(group.categories));
+  assert.equal(incomeGroups.length,1,"fictional-income-group-required");
+  let incomeCategoryId=incomeGroups[0].categories[0]?.id;
+  if(!incomeCategoryId) {
+    incomeCategoryId=await api.createCategory({name:"FICTIONAL Income",
+      group_id:incomeGroups[0].id,is_income:true,hidden:false});
+  }
+  assert.equal(typeof incomeCategoryId,"string");
   stage="fictional-income";
   const acknowledgment=await api.addTransactions(accountId,[{
     id:"a1111111-aaaa-4aaa-8aaa-aaaaaaaaaaaa",date,amount:10000,
-    payee_name:"FICTIONAL INCOME",cleared:false
+    category:incomeCategoryId,payee_name:"FICTIONAL INCOME",cleared:false
   }],{runTransfers:false,learnCategories:false});
   assert.equal(acknowledgment,"ok");
   await api.sync();

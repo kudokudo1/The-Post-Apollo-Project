@@ -53,7 +53,7 @@ test("no income category is reported, not treated as zero verified income",()=>{
   const f=fixture();f.budget.categoryGroups[0].categories=[];
   const r=summarizeFunding(f);
   assert.equal(r.incomeCategoryCount,0);
-  assert.equal(r.incomeCategoryActivityCents,0);
+  assert.equal(r.incomeCategoryActivityCents,null);
   assert.equal(r.openingBalancesVerified,false);
 });
 test("split parents, transfers, categorized receipts and off-budget accounts not flagged",()=>{
@@ -69,6 +69,25 @@ test("split parents, transfers, categorized receipts and off-budget accounts not
   assert.equal(r.positiveUncategorizedCount,0);
   assert.equal(r.positiveUncategorizedCents,0);
   assert.equal(r.accountCount,1);
+});
+test("Actual income categories without spent remain unavailable; snapshot stays usable",()=>{
+  const f=fixture();
+  delete f.budget.categoryGroups[0].categories[0].spent;
+  const r=summarizeFunding(f);
+  assert.equal(r.incomeCategoryCount,2);
+  assert.equal(r.incomeCategoryActivityCents,null);
+  assert.equal(r.reportedIncomeCents,null);
+  assert.equal(r.toBudgetCents,0);
+  assert.equal(r.openingBalancesVerified,false);
+});
+test("Actual month reported income remains distinct from optional category detail",()=>{
+  const f=fixture();
+  f.budget.totalIncome=12500;
+  delete f.budget.categoryGroups[0].categories[1].spent;
+  const r=summarizeFunding(f);
+  assert.equal(r.incomeCategoryActivityCents,null);
+  assert.equal(r.reportedIncomeCents,12500);
+  assert.equal(r.toBudgetCents,0);
 });
 test("invalid sums and malformed transactional amounts fail closed",()=>{
   const f=fixture();

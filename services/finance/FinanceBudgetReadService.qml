@@ -126,7 +126,10 @@ Scope {
                 || !Number.isSafeInteger(payload.funding.accountCount)
                 || !Number.isSafeInteger(payload.funding.accountBalanceCents)
                 || !Number.isSafeInteger(payload.funding.incomeCategoryCount)
-                || !Number.isSafeInteger(payload.funding.incomeCategoryActivityCents)
+                || !(payload.funding.incomeCategoryActivityCents === null
+                      || Number.isSafeInteger(payload.funding.incomeCategoryActivityCents))
+                || !(payload.funding.reportedIncomeCents === null
+                      || Number.isSafeInteger(payload.funding.reportedIncomeCents))
                 || !Number.isSafeInteger(payload.funding.positiveUncategorizedCount)
                 || !Number.isSafeInteger(payload.funding.positiveUncategorizedCents)
                 || !Array.isArray(payload.accounts)

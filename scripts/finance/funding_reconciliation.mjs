@@ -12,16 +12,29 @@ export function summarizeFunding({month,budget,accounts,balances,transactionSets
       || !(transactionSets instanceof Map))
     throw new Error("invalid-funding-input");
   let incomeCategoryActivityCents=0, incomeCategoryCount=0;
+  let incomeCategoryDetailAvailable=true;
+  // Actual can omit "spent" on income categories. Budget.totalIncome is a
+  // separate month-level figure, never a substitute for category detail.
+  const reportedIncomeCents=budget.totalIncome===undefined || budget.totalIncome===null
+    ? null : budget.totalIncome;
+  if(reportedIncomeCents!==null && !Number.isSafeInteger(reportedIncomeCents))
+    throw new Error("invalid-funding-income-total");
   let positiveUncategorizedCents=0, positiveUncategorizedCount=0;
   let activeAccounts=0, accountBalanceCents=0;
   for(const group of budget.categoryGroups) {
     if(!group || !Array.isArray(group.categories))throw new Error("invalid-funding-group");
     if(group.is_income!==true)continue;
     for(const category of group.categories) {
-      if(!category || !Number.isSafeInteger(category.spent))
-        throw new Error("invalid-funding-income");
-      incomeCategoryActivityCents=addCents(incomeCategoryActivityCents,category.spent);
+      if(!category)throw new Error("invalid-funding-income");
       incomeCategoryCount++;
+      if(category.spent===undefined || category.spent===null){
+        // No category-level activity supplied. Unknown is not zero.
+        incomeCategoryDetailAvailable=false;
+      } else {
+        if(!Number.isSafeInteger(category.spent))
+          throw new Error("invalid-funding-income");
+        incomeCategoryActivityCents=addCents(incomeCategoryActivityCents,category.spent);
+      }
     }
   }
   for(const account of accounts) {
@@ -51,7 +64,10 @@ export function summarizeFunding({month,budget,accounts,balances,transactionSets
   return {
     month,accountCount:activeAccounts,accountBalanceCents,
     toBudgetCents:budget.toBudget,
-    incomeCategoryCount,incomeCategoryActivityCents,
+    incomeCategoryCount,
+    incomeCategoryActivityCents:incomeCategoryDetailAvailable && incomeCategoryCount>0
+      ? incomeCategoryActivityCents : null,
+    reportedIncomeCents,
     positiveUncategorizedCount,positiveUncategorizedCents,
     openingBalancesVerified:false,
     // This is an activity review, NOT an accounting reconciliation.

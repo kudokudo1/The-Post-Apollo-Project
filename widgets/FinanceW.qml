@@ -1017,8 +1017,22 @@ PanelWindow {
                                 GohuText {
                                     width: parent.width
                                     text: "INCOME CATEGORY ACTIVITY // "
-                                          + root.moneyText(financeBudget.snapshot
-                                              ? financeBudget.snapshot.funding.incomeCategoryActivityCents : null)
+                                          + (financeBudget.snapshot
+                                             && financeBudget.snapshot.funding.incomeCategoryActivityCents !== null
+                                             ? root.moneyText(financeBudget.snapshot.funding.incomeCategoryActivityCents)
+                                             : "NOT REPORTED BY ACTUAL")
+                                    color: Colors.white
+                                    font.pixelSize: 9
+                                    textFormat: Text.PlainText
+                                    wrapMode: Text.WordWrap
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    text: "MONTHLY INCOME (ACTUAL) // "
+                                          + (financeBudget.snapshot
+                                             && financeBudget.snapshot.funding.reportedIncomeCents !== null
+                                             ? root.moneyText(financeBudget.snapshot.funding.reportedIncomeCents)
+                                             : "NOT REPORTED")
                                     color: Colors.white
                                     font.pixelSize: 9
                                     textFormat: Text.PlainText

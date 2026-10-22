@@ -84,18 +84,6 @@ Item {
         }
     }
 
-    ActionButton {
-        id: nextRadioPageKey
-        anchors { top: searchRow.bottom; topMargin: 2; right: parent.right }
-        width: 92
-        height: 23
-        label: "NEXT 50"
-        labelPixelSize: 10
-        visible: bay.deckHost.catalogSource === "radio-browser"
-        available: !!bay.deckHost.nextBrowseCursor && !bay.controller.busy
-        onClicked: bay.deckHost.nextRadioPage()
-    }
-
     Row {
         id: navigationRig
         anchors {
@@ -176,8 +164,18 @@ Item {
                            && bay.deckHost.transportMode === "mpd"
                 onClicked: bay.deckHost.loadStaged()
             }
+            ActionButton {
+                width: parent.width
+                height: 16
+                visible: bay.deckHost.catalogSource === "radio-browser"
+                label: "NEXT 50"
+                labelPixelSize: 9
+                available: !!bay.deckHost.nextBrowseCursor && !bay.controller.busy
+                onClicked: bay.deckHost.nextRadioPage()
+            }
             GohuText {
                 width: parent.width
+                visible: bay.deckHost.catalogSource !== "radio-browser"
                 horizontalAlignment: Text.AlignHCenter
                 text: "SHIFT / SELECT"
                 color: Colors.orange

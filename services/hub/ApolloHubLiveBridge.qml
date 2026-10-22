@@ -7,6 +7,7 @@ import "ApolloHubSystemPolicy.js" as SystemPolicy
 import "ApolloHubNetworkPolicy.js" as NetworkPolicy
 import "ApolloHubMediaPolicy.js" as MediaPolicy
 import "ApolloHubAppsPolicy.js" as AppsPolicy
+import "ApolloHubCalendarPolicy.js" as CalendarPolicy
 
 // ApolloHubW live-data bridge. This owns NO weather fetch, subprocess,
 // credentials, writable controls, or duplicate WeatherService instance.
@@ -147,6 +148,14 @@ Scope {
     })
 
     property double observationNowMs: Date.now()
+
+    // B9: Calendar is a pure projection of our existing minute/freshness
+    // clock. Month navigation and week start are display inputs, never
+    // event-provider controls or clock/system-date mutations.
+    property int calendarMonthOffset: 0
+    property int calendarWeekStartsOn: 0
+    readonly property var calendarSnapshot: CalendarPolicy.snapshot(
+        observationNowMs, calendarMonthOffset, calendarWeekStartsOn)
     // Only observations completed AFTER attachment are known to be recent.
     property double systemObservedAtMs: 0
 

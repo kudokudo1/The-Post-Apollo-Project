@@ -202,7 +202,9 @@ assert HUB.count("id: appIconImage") == 1, "history draws exactly one site image
 popup_icon = POPUP.split("id: notificationIcon", 1)[1].split("// ===== TEXT", 1)[0]
 assert "notificationsWindow.localSiteArtwork(notificationCard.websiteHost)" in popup_icon
 assert "fillMode: Image.PreserveAspectFit" in popup_icon
-assert "visible: notificationCard.website" not in popup_icon
+assert "visible: notificationCard.website" not in popup_icon.split("GohuText {", 1)[0], (
+    "The actual site Image must not be hidden; only fallback glyph visibility is conditional"
+)
 assert POPUP.count("id: notificationIcon") == 1, "popup draws exactly one site image"
 assert "BrowserSiteIdentity.iconKindFor(websiteHost)" in HUB
 assert "BrowserSiteIdentity.iconKindFor(host)" in POPUP

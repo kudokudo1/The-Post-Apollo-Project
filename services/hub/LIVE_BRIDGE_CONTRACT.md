@@ -189,3 +189,34 @@ mpdDockSource: sharedMediaDock
 
 **Desktop runtime acceptance remains open** for MPD signal ordering, MPRIS player addition/removal and property updates, and live tile behavior. Do not claim audible output from MPRIS or a successful controller command.
 
+## B5 // Linux system uptime (read-only)
+
+**Status:** Source implemented on `main`; CI and on-device FileView acceptance tracked separately. Hub Uptime tile presentation is UI-owned and not part of this backend batch.
+
+The source is `services/hub/ApolloHubUptimeSource.qml`, instantiated **once** inside the already-mounted `ApolloHubLiveBridge`. It uses one Quickshell `FileView` to read the Linux kernel's `/proc/uptime` and reloads that tiny procfs file every 60 seconds. There is **no shell command, subprocess, extra SystemTelemetry monitor, disk write, external network request, or actuator**. The source is intentionally separate from the central bridge so existing no-file-access safety guards still apply to Weather/CPU++/Network/Media code.
+
+This reports **OS boot uptime**, not time since Quickshell, the Hub, the user session, or an application started. The second field of `/proc/uptime` (aggregate idle time) is parsed only for structural validity and is not exposed.
+
+### Consumer contract
+
+Existing UI already receives `liveBridge`. The Uptime tile can bind to:
+
+```qml
+uptimeSnapshot: hub.liveBridge ? hub.liveBridge.uptimeSnapshot : null
+```
+
+`uptimeSnapshot` fields:
+- `state`: `unobserved` (no completed read), `unavailable` (invalid procfs output), `error` (FileView load failure), `stale` (last reading over 150 seconds old), or `ready`.
+- `ready`, `approximate`, `source: "linux-procfs"`, `observedAtMs`, `ageSeconds`.
+- `uptimeSeconds` (whole-number estimate), `days`, `hours`, `minutes`, and `label` (e.g., `1D 02H 03M`). Unknown numeric values are **-1**; unknown label is `--`.
+
+The source uses the completion timestamp for each valid file read and updates its derived time from the clock. It does **not** invent `0` uptime from an absent or malformed source. The data becomes stale if the file stops refreshing; a failed load produces `error`, not a preserved fictional live reading. Each read refreshes the actual kernel uptime; the exposed value is approximate between reads.
+
+### Owner boundaries and acceptance
+
+B5 creates no new shell instance, UI controls, process or settings. The existing Quickshell import module (`services/hub/qmldir`) registers the single local source component. The UI worker should create the mini Uptime rendering using `uptimeSnapshot`, mask `-1` values, and show loading/error/stale explicitly rather than displaying zeros. Do not duplicate the procfs reader inside the tile.
+
+Tests: `tests/hub/test_apollo_hub_uptime_bridge.py` guards the read-only source and one bridge instance; `tests/hub/test_apollo_hub_uptime_policy.cjs` executes the real normalization policy against valid/malformed values, boundary ages, and error cases. Both run in `.github/workflows/apollo-hub-live-bridge.yml` with B1–B4 regressions.
+
+**Live acceptance pending:** Verify Quickshell `FileView` can read/reload procfs on the user's Fedora host, the displayed number increases correctly, and it does not reset on closing/reopening the Hub. No local files or running Quickshell processes were changed by source implementation.
+

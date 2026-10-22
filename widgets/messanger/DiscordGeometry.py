@@ -149,6 +149,7 @@ def compact_rect(rect: Any) -> dict[str, int] | None:
 def snapshot_from_tree(tree: dict[str, Any]) -> dict[str, Any]:
     social: dict[str, Any] | None = None
     discord_candidates: list[dict[str, Any]] = []
+    x_candidates: list[dict[str, Any]] = []
 
     for node in walk_tree(tree):
         if not node.get("visible", False):
@@ -171,6 +172,10 @@ def snapshot_from_tree(tree: dict[str, Any]) -> dict[str, Any]:
             discord_entry["name"] = node.get("name")
             discord_candidates.append(discord_entry)
 
+        # The X app is forced to XWayland with a dedicated Chromium WM_CLASS.
+        if (node.get("window_properties") or {}).get("class") == "post-apollo-x":
+            x_candidates.append(entry)
+
     discord: dict[str, Any] | None = None
 
     if discord_candidates:
@@ -181,9 +186,16 @@ def snapshot_from_tree(tree: dict[str, Any]) -> dict[str, Any]:
             ),
         )
 
+    x_window = max(
+        x_candidates,
+        key=lambda item: item["rect"]["width"] * item["rect"]["height"],
+        default=None,
+    )
+
     return {
         "social": social,
         "discord": discord,
+        "x": x_window,
     }
 
 
@@ -192,6 +204,8 @@ def sway_criteria(target: str) -> str:
         return '[title="QS_SOCIAL_MENU"]'
     if target == "discord":
         return '[app_id="vesktop"]'
+    if target == "x":
+        return '[class="post-apollo-x"]'
     raise ValueError(f"Unknown sync target: {target}")
 
 
@@ -252,6 +266,8 @@ class Bridge:
         # Fast-follow is active only after the real Discord window is ready.
         self.discord_selected = False
         self.discord_ready = False
+        self.x_selected = False
+        self.x_ready = False
 
     @staticmethod
     def rect_equal(a: dict[str, int] | None, b: dict[str, int] | None) -> bool:
@@ -328,11 +344,17 @@ class Bridge:
         snapshot["fastLeader"] = None
         snapshot["shared"] = None
 
-        if not (self.discord_selected and self.discord_ready):
+        # Only one external app is selected at a time. Keep the Vesktop
+        # path unchanged while allowing the same fast-follow for X.
+        guest_id = (
+            "discord" if self.discord_selected and self.discord_ready else
+            "x" if self.x_selected and self.x_ready else ""
+        )
+        if not guest_id:
             return snapshot
 
         social = snapshot.get("social")
-        discord = snapshot.get("discord")
+        discord = snapshot.get(guest_id)
 
         if not social or not discord:
             return snapshot
@@ -356,7 +378,7 @@ class Bridge:
                 "height": shared["height"],
             }
 
-            snapshot["fastLeader"] = "discord"
+            snapshot["fastLeader"] = guest_id
             snapshot["shared"] = shared
 
             if not self.rect_equal(social_rect, desired_social):
@@ -391,7 +413,7 @@ class Bridge:
             if not self.rect_equal(discord_rect, desired_discord):
                 self.queue_sync({
                     "op": "sync",
-                    "target": "discord",
+                    "target": guest_id,
                     **desired_discord,
                     "focus": False,
                     "setup": False,
@@ -404,7 +426,7 @@ class Bridge:
     def queue_sync(self, message: dict[str, Any]) -> None:
         target = str(message.get("target", ""))
 
-        if target not in ("social", "discord"):
+        if target not in ("social", "discord", "x"):
             return
 
         with self.command_lock:
@@ -501,6 +523,8 @@ class Bridge:
                 self.discord_ready = bool(
                     message.get("discordReady", False)
                 )
+                self.x_selected = bool(message.get("xSelected", False))
+                self.x_ready = bool(message.get("xReady", False))
                 continue
 
             if op == "sync":
@@ -519,6 +543,10 @@ class Bridge:
 
             if op == "focusDiscord":
                 self.queue_command('[app_id="vesktop"] focus')
+                continue
+
+            if op == "focusX":
+                self.queue_command('[class="post-apollo-x"] focus')
                 continue
 
             if op == "stop":

@@ -479,7 +479,7 @@ for phrase in (
     "todoSnapshot.writable === true",
     "storeState === \"saving\"",
     '"TO-DO // SAVING // NOT YET CONFIRMED"',
-    '"WRITES LOCKED"',
+    "WRITES LOCKED",
     "onTodoSnapshotChanged:",
     'pendingWriteKind === "add"',
     'pendingWriteKind === "rename"',

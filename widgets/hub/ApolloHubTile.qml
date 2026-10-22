@@ -1,6 +1,7 @@
 import QtQuick
 import "../../components"
 import "../../services/hub/ApolloHubLayout.js" as Layout
+import "../../services/hub/ApolloHubTimePolicy.js" as TimePolicy
 
 // Hub mini presentations consume shared snapshots. The B7 To-do UI uses
 // the single user-private store only for intentional task actions.
@@ -99,6 +100,18 @@ SectionFrame {
     property int tileIndex: 0
     property int tileCount: 0
     property date now: new Date()
+    // B10 reuses the single existing one-second tile timer. The format
+    // choice is view-local, not a persisted setting or system-clock change.
+    property bool use24Hour: true
+    readonly property var timeSnapshot:
+        TimePolicy.snapshot(tile.now.getTime(), tile.use24Hour)
+
+    // Refresh immediately when a previously hidden Time tile reappears.
+    // The existing timer handles all subsequent one-second ticks.
+    onVisibleChanged: {
+        if (visible && moduleId === "time")
+            now = new Date();
+    }
 
     signal moveLeft(int index)
     signal moveRight(int index)
@@ -378,6 +391,23 @@ SectionFrame {
         }
     }
 
+    // B10 formatted local clock, supplied by the same tile.now timer.
+    ApolloHubTimeMini {
+        id: timeMini
+        visible: tile.moduleId === "time"
+        timeSnapshot: tile.timeSnapshot
+        use24Hour: tile.use24Hour
+        onToggleHourFormat: tile.use24Hour = !tile.use24Hour
+        anchors {
+            left: parent.left
+            right: parent.right
+            top: parent.top
+            bottom: parent.bottom
+            topMargin: tile.editing ? 32 : 22
+            bottomMargin: 23
+        }
+    }
+
     // B9 civil-date calendar: cells are provided by the same live bridge
     // that already tracks local time. Navigation adjusts only view inputs.
     ApolloHubCalendarMini {
@@ -457,6 +487,7 @@ SectionFrame {
                  && tile.moduleId !== "todo"
                  && tile.moduleId !== "notes"
                  && tile.moduleId !== "calendar"
+                 && tile.moduleId !== "time"
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
@@ -465,9 +496,7 @@ SectionFrame {
         wrapMode: Text.Wrap
         color: tile.moduleId === "time" ? Colors.white : Colors.orange
         font.pixelSize: tile.moduleId === "time" ? 23 : 14
-        text: tile.moduleId === "time"
-              ? Qt.formatTime(tile.now, "HH:mm:ss")
-              : "MODULE PREVIEW"
+        text: "MODULE PREVIEW"
     }
 
     GohuText {
@@ -477,7 +506,7 @@ SectionFrame {
         opacity: 0.7
         font.pixelSize: 10
         text: tile.moduleId === "time"
-              ? "LOCAL TIME"
+              ? timeMini.statusLine
               : tile.moduleId === "calendar"
               ? calendarMini.statusLine
               : tile.moduleId === "weather"

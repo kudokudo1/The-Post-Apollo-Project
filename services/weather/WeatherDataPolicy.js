@@ -1,6 +1,12 @@
 .pragma library
 
 function finiteNumber(value, fallback) {
+    if (value === undefined || value === null)
+        return fallback;
+
+    if (typeof value === "string" && value.trim().length === 0)
+        return fallback;
+
     const number = Number(value);
     return isFinite(number) ? number : fallback;
 }

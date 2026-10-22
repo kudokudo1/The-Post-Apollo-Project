@@ -220,3 +220,46 @@ Tests: `tests/hub/test_apollo_hub_uptime_bridge.py` guards the read-only source 
 
 **Live acceptance pending:** Verify Quickshell `FileView` can read/reload procfs on the user's Fedora host, the displayed number increases correctly, and it does not reset on closing/reopening the Hub. No local files or running Quickshell processes were changed by source implementation.
 
+## B6 // Apps: installed application catalog (read-only)
+
+**Status:** B6 backend source implemented on `main`; Apps mini-widget UI and on-device Quickshell binding acceptance pending.
+
+The Hub bridge now exposes `appsSnapshot`. It observes **Quickshell's built-in `DesktopEntries.applications.values`**, a native index of visible desktop applications. This reuses the existing Quickshell process and its own live desktop-entry updates, without manually searching `.desktop` files, starting a command, or instantiating an AppControl service. The official Quickshell v0.2.1 API describes this singleton under `import Quickshell` (https://quickshell.org/docs/v0.2.1/types/Quickshell/DesktopEntries/).
+
+The projection is pure JS in `services/hub/ApolloHubAppsPolicy.js`. It only exposes **display metadata**, not desktop-entry QML objects, argv, raw Exec commands, environment, working directories, or launch methods.
+
+### Consumer contract
+
+Existing UI receives `liveBridge` and can bind the Apps tile to:
+
+```qml
+appsSnapshot: hub.liveBridge ? hub.liveBridge.appsSnapshot : null
+```
+
+`appsSnapshot` fields:
+- `state`: `unavailable` (native index not supplied), `empty` (valid empty list), `ready` (visible applications indexed).
+- `source: "desktop-entries"`, `query` (normalized, bounded to 80 characters).
+- `installedCount`: number of valid distinct visible application IDs.
+- `matchCount`: count matching the query across case-insensitive name, generic name, and exact app ID text.
+- `shownCount`: count included in the bounded result array.
+- `truncated`: true when more than the first **24** alphabetical matching results exist.
+- `items`: up to 24 shallow plain objects with `id`, `name`, `genericName`, `icon` only.
+
+Duplicate display names with different application IDs remain separate; duplicate IDs collapse to one. Absent names/IDs, invalid items, and `noDisplay` entries are excluded. An empty search match is not misreported as a broken index; it remains `state: ready` with `matchCount: 0`.
+
+`ApolloHubLiveBridge.appsQuery` defaults to `""` (the alphabetical first page); a future UI search input may set this property without launching an application or creating another catalog source. **No favorites/recent usage or installed-app recency ranking is inferred** because the native index does not provide it.
+
+### Launch actions are a separate decision
+
+This backend is **observation only**. It does not call `DesktopEntry.execute()`, `DesktopEntries.byId()`, `Quickshell.execDetached()`, or process creation. The eventual UI worker must coordinate explicit click-to-launch behavior with the appropriate launcher owner; app catalog discovery itself is not permission to start anything. There is no automatic execution on opening the Hub, searching, or selecting a card.
+
+No shared `shell.qml`, `Applauncher.qml`, AppControl, CPU++, other Hub mini-tile, or local-machine file was changed in this batch.
+
+### Tests and acceptance
+
+- `tests/hub/test_apollo_hub_apps_bridge.py`: native shared index connection, one Hub bridge, no launch path, CI registration.
+- `tests/hub/test_apollo_hub_apps_policy.cjs`: actual catalog policy exercised with duplicates, hidden/malformed entries, alphabetical/search filtering, 24-item limits, and malicious command metadata.
+- Both run alongside B1–B5 in `.github/workflows/apollo-hub-live-bridge.yml`.
+
+**Desktop acceptance pending:** Verify Quickshell v0.2.1 exposes live DesktopEntries values on the user's installation, that the catalog updates when desktop entries appear/disappear, and that search does not launch any application. The UI owner can display the bounded list and later request a separately authorized launch-action integration.
+

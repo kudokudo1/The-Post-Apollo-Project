@@ -20,6 +20,9 @@ assert 'label: root.fundingReviewOpen ? "HIDE FUNDING REVIEW" : "REVIEW FUNDING"
 assert 'onLeftClicked: root.fundingReviewOpen = !root.fundingReviewOpen' in ui
 assert 'visible: root.fundingReviewOpen && financeBudget.state === "ready"' in ui
 assert 'financeBudget.snapshot.funding.incomeCategoryActivityCents' in ui
+assert 'financeBudget.snapshot.funding.reportedIncomeCents' in ui
+assert 'NOT REPORTED BY ACTUAL' in ui
+assert 'MONTHLY INCOME (ACTUAL)' in ui
 assert 'financeBudget.snapshot.funding.positiveUncategorizedCount' in ui
 assert 'financeBudget.snapshot.funding.positiveUncategorizedCents' in ui
 assert 'OPENING BALANCES // NOT VERIFIED FROM THIS MONTH' in ui
@@ -28,6 +31,8 @@ assert 'THEY MAY BE REFUNDS OR TRANSFERS, NOT INCOME' in ui
 assert 'category.spent' in funding
 assert 'if(row.category || row.category_id)continue;' in funding
 assert 'openingBalancesVerified:false' in funding
+assert 'incomeCategoryDetailAvailable=false' in funding
+assert 'incomeCategoryActivityCents:incomeCategoryDetailAvailable' in funding
 assert 'completeness:"monthly-review-only"' in funding
 for bad in ('Process {','setBudgetAmount(', 'createAccount(', 'addTransactions(', 'writeFile(', 'exec('):
     assert bad not in funding,bad

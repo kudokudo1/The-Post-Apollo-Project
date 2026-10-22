@@ -12,6 +12,7 @@ import {join,dirname} from "node:path";
 import {fileURLToPath} from "node:url";
 import {createHash} from "node:crypto";
 import * as api from "@actual-app/api";
+import {takeReadOnlySnapshot} from "./actual_readonly.mjs";
 import {executeAllocation,preflightAllocation,AllocationRefusal}
   from "./allocation_guard.mjs";
 
@@ -116,6 +117,10 @@ async function main(){
   assert.ok(typeof accountId==="string" && accountId.length>4);
   assert.ok(typeof groupId==="string" && groupId.length>4);
   assert.ok(typeof categoryId==="string" && categoryId.length>4);
+  stage="d14-empty-budget-snapshot";
+  const unfunded=await takeReadOnlySnapshot(api,month);
+  assert.equal(unfunded.readOnly,true);
+  assert.equal(unfunded.funding.openingBalancesVerified,false);
   stage="fictional-income-category";
   // Actual's available-to-budget calculation uses the income category
   // subtotal, not every unclassified positive account transaction.
@@ -152,6 +157,10 @@ async function main(){
   await api.downloadBudget(syncId);
   stage="fresh-budget-month";
   const before=await api.getBudgetMonth(month);
+  stage="d14-funded-budget-snapshot";
+  const funded=await takeReadOnlySnapshot(api,month);
+  assert.equal(funded.funding.toBudgetCents,funded.toBudgetCents);
+  assert.equal(funded.funding.openingBalancesVerified,false);
   stage="fresh-category-presence";
   assert.equal(findCategory(before,categoryId).length,1);
   const category=findCategory(before,categoryId)[0];

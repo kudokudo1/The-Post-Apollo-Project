@@ -12,6 +12,7 @@ import {tmpdir} from "node:os";
 import {join,dirname} from "node:path";
 import {fileURLToPath} from "node:url";
 import * as api from "@actual-app/api";
+import {takeReadOnlySnapshot} from "./actual_readonly.mjs";
 
 if (process.env.GITHUB_ACTIONS !== "true"
     || process.env.CI !== "true"
@@ -191,6 +192,9 @@ async function run() {
   assert.ok(preflightAccounts.some(x=>x.id===accountId));
   stage="fresh-api-transactions";
   assert.deepEqual(await api.getTransactions(accountId,month+"-01",month+"-31"),[]);
+  stage="d14-real-api-normalization";
+  const diagnosticSnapshot=await takeReadOnlySnapshot(api,month);
+  assert.equal(diagnosticSnapshot.funding.openingBalancesVerified,false);
   await endApi();
 
   stage="real-create";

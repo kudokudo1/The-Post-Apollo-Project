@@ -524,3 +524,15 @@ rules for any future FinanceW editing tools.
 
 Next potential work: opening-balance historical inspection and a guarded
 income categorization preview. Neither is implemented or activated by D14.
+
+
+### D14 compatibility: optional Actual income fields
+
+Actual 26.10.0 may omit `spent` on income category entries. Missing data
+is represented as **NOT REPORTED BY ACTUAL** (null), never converted into
+zero, and must never invalidate the rest of the Budget snapshot. When Actual
+supplies integer `totalIncome` in its monthly budget, the separate **MONTHLY
+INCOME (ACTUAL)** line displays that number; it does not imply the amount
+is available to allocate. Opening balances and unallocated funds retain their
+independent source and verification status. This is exercised in both
+fictional unit tests and the real disposable Actual-server read-only probes.

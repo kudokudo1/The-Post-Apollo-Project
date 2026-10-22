@@ -212,6 +212,11 @@ DockButton {
                 anchors.verticalCenter: parent.verticalCenter
                 implicitWidth: 20
                 implicitHeight: 42
+                // Plain Item does not adopt implicit size by itself. The
+                // Canvas fills this Item, so explicit geometry is required or
+                // the instrument paints into a 0×0 surface.
+                width: implicitWidth
+                height: implicitHeight
 
                 property color liquidColor: weatherDock.thermometerLiquidColor
                 property real animatedLevel:

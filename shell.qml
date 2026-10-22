@@ -248,6 +248,8 @@ PanelWindow {
         // Both references are read by the bridge; it never commands playback.
         mediaControllerSource: sharedMediaDock.hubMediaController
         selectedMprisBusName: sharedMediaDock.hubSelectedMprisBusName
+        // Feed the already-running dock's 2s MPD observation: no new poller.
+        mpdDockSource: sharedMediaDock
     }
 
     // Official NWS alerts only when an operator-pinned geographic point exists.

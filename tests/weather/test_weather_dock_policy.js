@@ -117,16 +117,40 @@ assert.match(dock, /\bShape\s*\{/);
 assert.match(dock, /\bShapePath\s*\{/);
 assert.match(dock, /\bPathQuad\s*\{/);
 assert.match(dock, /\bPathCubic\s*\{/);
-// The smaller 17×35 silhouette has a rounded, symmetric 15px-class bulb,
-// with a taper that is continuous with the tube and mirrored left/right.
-// The black vessel and white glass reuse the exact same outline.
-assert.match(dock, /PathLine\s*\{\s*x:\s*12\.2;\s*y:\s*21\.5\s*\}/);
-assert.match(dock, /PathCubic\s*\{\s*x:\s*14\.2\s+y:\s*24\.3[\s\S]*?control1X:\s*12\.2/);
-assert.match(dock, /PathCubic\s*\{\s*x:\s*8\.5\s+y:\s*33\.8/);
-assert.match(dock, /PathCubic\s*\{\s*x:\s*2\.8\s+y:\s*24\.3/);
-assert.match(dock, /PathLine\s*\{\s*x:\s*4\.8;\s*y:\s*5\.2\s*\}/);
-assert.equal((dock.match(/startX:\s*8\.5/g) || []).length, 3);
+// The bulb is now genuinely circular, rather than two independently
+// approximated cubic bases. Body, glass and fluid share the same center,
+// and outer/inner bulb arcs retain a consistent radial clearance.
+assert.match(dock, /readonly property real bulbCenterX:\s*width \/ 2/);
+assert.match(dock, /readonly property real bulbCenterY:\s*26\.6/);
+assert.match(dock, /readonly property real joinDiagonal:\s*Math\.SQRT1_2/);
+assert.equal((dock.match(/PathArc\s*\{/g) || []).length, 6);
+assert.equal((dock.match(/direction:\s*PathArc\.Clockwise/g) || []).length, 6);
+assert.equal((dock.match(/radiusX:\s*weatherThermometer\.outerBulbRadius/g) || []).length, 4);
+assert.equal((dock.match(/radiusY:\s*weatherThermometer\.outerBulbRadius/g) || []).length, 4);
+assert.equal((dock.match(/radiusX:\s*weatherThermometer\.innerBulbRadius/g) || []).length, 2);
+assert.equal((dock.match(/radiusY:\s*weatherThermometer\.innerBulbRadius/g) || []).length, 2);
+assert.equal((dock.match(/startX:\s*weatherThermometer\.bulbCenterX/g) || []).length, 3);
 assert.match(dock, /strokeWidth:\s*1\.5\s+strokeColor:\s*weatherThermometer\.glassColor\s+joinStyle:\s*ShapePath\.RoundJoin\s+capStyle:\s*ShapePath\.RoundCap/);
+
+// Check physical glass clearance, rather than testing arbitrary pixel
+// placements that can reintroduce the original flattened bulb.
+function readGaugeNumber(property) {
+    const pattern = new RegExp("readonly property real " + property + ": ([0-9.]+)");
+    const result = dock.match(pattern);
+    assert.ok(result, "gauge property " + property);
+    return Number(result[1]);
+}
+const outerR = readGaugeNumber("outerBulbRadius");
+const innerR = readGaugeNumber("innerBulbRadius");
+const outerStroke = 1.5;
+const radialGap = outerR - innerR - outerStroke / 2;
+const rightStemGap = (12.2 - outerStroke / 2) - 10.1;
+assert.ok(radialGap >= 1.5, "room around colored bulb");
+assert.ok(Math.abs(radialGap - rightStemGap) <= 0.35,
+          "similar clearance between liquid/glass in tube and bulb");
+assert.ok(readGaugeNumber("bulbCenterY") + outerR + outerStroke / 2 <= 35,
+          "rounded bulb fits inside the dock gauge without cropping");
+
 // The real normalized level drives a vertical gradient through one connected
 // inner tube+bulb path, rather than a permanently filled decorative bulb.
 assert.match(dock, /readonly property real fillStart:[\s\S]*?1 - animatedLevel/);

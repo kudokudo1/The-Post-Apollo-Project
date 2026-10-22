@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "services/hub/ApolloHubTimePolicy.js"
+      - "widgets/hub/ApolloHubTile.qml"
+      - "widgets/hub/ApolloHubTimeMini.qml"
       - "tests/hub/test_apollo_hub_time_policy.cjs"
       - "tests/hub/test_apollo_hub_time_contract.py"
       - ".github/workflows/apollo-hub-time.yml"
@@ -12,6 +14,8 @@ on:
       - main
     paths:
       - "services/hub/ApolloHubTimePolicy.js"
+      - "widgets/hub/ApolloHubTile.qml"
+      - "widgets/hub/ApolloHubTimeMini.qml"
       - "tests/hub/test_apollo_hub_time_policy.cjs"
       - "tests/hub/test_apollo_hub_time_contract.py"
       - ".github/workflows/apollo-hub-time.yml"

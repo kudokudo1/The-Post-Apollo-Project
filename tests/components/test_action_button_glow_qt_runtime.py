@@ -18,7 +18,12 @@ with tempfile.TemporaryDirectory(prefix="quickshell-test-import-") as temp:
     # a module-only stub is sufficient to test its real QtQuick geometry.
     stub = Path(temp) / "Quickshell"
     stub.mkdir()
-    (stub / "qmldir").write_text("module Quickshell\n", encoding="utf-8")
+    (stub / "qmldir").write_text(
+        "module Quickshell\nStub 1.0 Stub.qml\n", encoding="utf-8"
+    )
+    (stub / "Stub.qml").write_text(
+        "import QtQuick\nItem {}\n", encoding="utf-8"
+    )
 
     engine = QQmlEngine()
     engine.addImportPath(temp)

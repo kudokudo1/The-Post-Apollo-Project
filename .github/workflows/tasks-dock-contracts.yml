@@ -1,0 +1,28 @@
+name: TASKS dock contracts
+
+on:
+  pull_request:
+    paths:
+      - "shell.qml"
+      - "modules/Tasks.qml"
+      - "tests/components/test_tasks_dock_contracts.py"
+      - ".github/workflows/tasks-dock-contracts.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "shell.qml"
+      - "modules/Tasks.qml"
+      - "tests/components/test_tasks_dock_contracts.py"
+      - ".github/workflows/tasks-dock-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate TASKS dock source contracts
+        run: python3 tests/components/test_tasks_dock_contracts.py

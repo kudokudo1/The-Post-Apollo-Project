@@ -562,6 +562,10 @@ PanelWindow {
                             // NetworkManager control lives in the tile.
                             networkSnapshot: hub.liveBridge
                                              ? hub.liveBridge.networkSnapshot : null
+                            // B4 read-only Media observation, retaining distinct
+                            // MPD and explicitly selected MPRIS snapshots.
+                            mediaSnapshot: hub.liveBridge
+                                           ? hub.liveBridge.mediaSnapshot : null
                             tileIndex: index
                             tileCount: hub.activeTiles.length
                             editing: hub.editMode

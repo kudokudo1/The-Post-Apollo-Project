@@ -405,9 +405,9 @@ for forbidden in ("FileView {", "Process {", "/proc/uptime"):
     assert forbidden not in window + tile, (
         f"Uptime Hub UI must not add a procfs reader: {forbidden}")
 
-# B6 Apps UI: existing native index only. Opening/scrolling/selecting
-# the Hub never starts an application, changes launcher ownership, or begins
-# an independent desktop-file scan.
+# B6 Apps UI: the native index remains read-only. A direct left tap
+# launches one exact-ID installed DesktopEntry. Opening/scrolling the Hub
+# never starts applications or creates a second launcher/catalog process.
 assert "appsSnapshot: hub.liveBridge" in window
 assert "hub.liveBridge.appsSnapshot : null" in window
 assert "property var appsSnapshot: null" in tile
@@ -436,22 +436,49 @@ for phrase in (
     'text: appsMini.catalogReady ? "NO MATCHES"',
     '"NO APPLICATIONS"',
     '"CATALOG UNAVAILABLE"',
-    "READ ONLY",
+    "CLICK TO LAUNCH",
+    "TapHandler {",
+    "acceptedButtons: Qt.LeftButton",
+    "onTapped: appsMini.launchApp(appEntry.modelData)",
+    "function launchApp(item)",
+    "DesktopEntries.byId(id)",
+    'target.id !== id',
+    'target.noDisplay === true',
+    'typeof target.execute !== "function"',
+    "target.execute();",
+    'launchFeedback = "LAUNCH REQUESTED"',
+    'launchFeedback = "LAUNCH FAILED"',
+    "entries.some(function(candidate)",
 ):
-    assert phrase in apps_mini, f"B6 app mini missing {phrase}"
-# The existing Time/Calendar tile uses its own clock Timer, but the
-# Apps projection must remain entirely event-driven.
+    assert phrase in apps_mini, f"B6 explicit app-launch UI missing {phrase}"
+# Only the Apps row's direct left tap may trigger the existing desktop-entry
+# launch method. No launch from render, model updates, search, or Hub opens.
+assert apps_mini.count("target.execute();") == 1
+assert apps_mini.count("DesktopEntries.byId(") == 1
+assert apps_mini.count("onTapped:") == 1
 for forbidden in (
-    "DesktopEntries {", "DesktopEntries.byId(", "DesktopEntries.applications",
-    ".execute(", "execute(", "execDetached(", "Process {", "Timer {",
-    "FileView {", "scanDesktopFiles(", "app.launch(", "onClicked:",
-    "onDoubleClicked:", "onTapped:", "MouseArea {", "TapHandler {",
+    "DesktopEntries {", "DesktopEntries.applications",
+    "DesktopEntries.heuristicLookup(", "execDetached(", "Process {",
+    "Timer {", "FileView {", "scanDesktopFiles(", "app.launch(",
+    "onCompleted:", "onVisibleChanged:", "onAppsSnapshotChanged:",
+    "onDoubleClicked:", "MouseArea {",
 ):
     assert forbidden not in apps_mini, (
-        f"Apps mini cannot collect apps or trigger launch: {forbidden}")
+        f"Apps mini may only launch on user tap, never poll/auto-start: {forbidden}")
 for forbidden in ("DesktopEntries.byId(", "execDetached(", "app.launch("):
     assert forbidden not in window + tile, (
-        f"Hub UI cannot launch apps: {forbidden}")
+        f"Hub window/tile must not own app launch: {forbidden}")
+
+# To-do compact header: RELOAD directly above ADD/SAVE, exactly the
+# same width and right edge; the task input remains level with ADD.
+assert 'id: controlStack' in todo_mini
+assert 'id: editorArea' in todo_mini
+assert todo_mini.index('id: reloadButton') < todo_mini.index('id: submitButton')
+assert todo_mini.count('width: parent.width') >= 2
+assert todo_mini.count('anchors.right: controlStack.left') == 2
+assert 'id: countRow' in todo_mini
+assert 'top: editorArea.bottom' in todo_mini
+assert 'top: countRow.bottom' not in todo_mini
 
 # B7 To-do: one existing singleton and explicit operator-initiated
 # mutations, never a second store, separate process, or file write in UI.

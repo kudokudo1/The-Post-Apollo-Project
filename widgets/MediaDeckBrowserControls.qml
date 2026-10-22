@@ -122,7 +122,7 @@ Item {
             SelectorDial {
                 id: tuningDial
                 anchors.centerIn: parent
-                scale: 1.07
+                scale: 1.0
                 labelText: "TUNE"
                 options: bay.deckHost.tuningGroups
                 currentIndex: bay.deckHost.tuningGroup

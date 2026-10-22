@@ -80,8 +80,10 @@ PanelWindow {
         standardKeysAvailable ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
     focusable: standardKeysAvailable
 
-    // Sit flush below the right dock: shell rightModules top = 8, dock = 50.
-    // The actual frame begins one glowGutter below this window margin.
+    // Match the right dock's 8px top inset. The earlier formula adding the
+    // dock's 50px height placed the window too low in the live screenshot.
+    // Keep the existing frame glow gutter and compensate only by moving the
+    // owning PanelWindow up; visual acceptance remains a separate check.
     anchors {
         top: true
         bottom: false
@@ -89,7 +91,7 @@ PanelWindow {
         right: true
     }
     margins {
-        top: 8 + 50 - timew.glowGutter
+        top: 8
         right: 13
     }
     mask: Region {

@@ -75,12 +75,13 @@ for key in ("Tab", "Shift+Tab", "Esc"):
     assert 'sequence: "' + key + '"' in window
 assert "onLeftClicked: timew.menuOpen = false" in window
 
-# TimeW-specific white identity and dock-flush top alignment.
-# The right module's actual top is 8 px; the dock visual height is 50 px.
-# WindowPanelFrame adds its 12 px glow gutter to the frame's screen position.
+# TimeW-specific white identity and screenshot-corrected top alignment.
+# Preserve the 8px right-dock top inset; adding 50px for dock height placed
+# the TimeW frame too low in the 2026-10-22 operator screenshot.
 assert "anchors.topMargin: 8" in shell
 assert "implicitHeight: 50" in clock
-assert "top: 8 + 50 - timew.glowGutter" in window
+assert "    margins {\n        top: 8\n        right: 13\n    }" in window
+assert "top: 8 + 50 - timew.glowGutter" not in window
 assert "readonly property color semanticColor: Colors.white" in window
 assert "glowColor: timew.semanticColor" in window
 assert "borderColor: timew.semanticColor" in window

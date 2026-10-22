@@ -55,13 +55,15 @@ PanelWindow {
     readonly property string currentContext: currentViewName
 
     // Header source indicator follows the selected Main Mode's provider.
-    // HOME temporarily reports the weather transport until its aggregate
-    // favorites/relevance model is built.
+    // HOME is an aggregate surface now, so its badge represents both the
+    // weather/air-quality stack and the independent NOAA space-weather stack.
     property int sourceStatusClock: 0
 
-    readonly property bool usesWeatherSource:
+    readonly property bool usesHomeSources:
         currentView === "home"
-        || currentView === "ground"
+
+    readonly property bool usesWeatherSource:
+        currentView === "ground"
         || currentView === "sky"
 
     readonly property bool usesSpaceSource:
@@ -95,7 +97,32 @@ PanelWindow {
             || weatherAgeMinutes >= 20
         )
 
+    readonly property bool homeWeatherUsable:
+        weatherService && weatherService.ready && !weatherStale
+    readonly property bool homeSpaceUsable:
+        spaceService && spaceService.ready
+    readonly property bool homeSourceLoading:
+        (weatherService && weatherService.loading)
+        || (spaceService && spaceService.loading)
+    readonly property bool homeSourceError:
+        (weatherService
+         && String(weatherService.errorText || "").length > 0)
+        || (spaceService
+            && String(spaceService.errorText || "").length > 0)
+
     readonly property string sourceStatusText: {
+        if (usesHomeSources) {
+            if (homeWeatherUsable && homeSpaceUsable)
+                return "HOME LIVE";
+            if (homeWeatherUsable || homeSpaceUsable)
+                return "PARTIAL";
+            if (homeSourceLoading)
+                return "READING";
+            if (homeSourceError)
+                return "OFFLINE";
+            return "CONNECTING";
+        }
+
         if (usesWeatherSource) {
             if (!weatherService)
                 return "OFFLINE";
@@ -125,6 +152,20 @@ PanelWindow {
     }
 
     readonly property string sourceStatusDisplay: {
+        if (usesHomeSources) {
+            if (homeWeatherUsable && homeSpaceUsable)
+                return "HOME LIVE // 2 FEEDS";
+            if (homeWeatherUsable)
+                return "PARTIAL // WEATHER";
+            if (homeSpaceUsable)
+                return "PARTIAL // SPACE";
+            if (homeSourceLoading)
+                return "READING // SOURCES";
+            if (homeSourceError)
+                return "OFFLINE // SOURCES";
+            return "CONNECTING // SOURCES";
+        }
+
         if (usesWeatherSource) {
             if (!weatherService)
                 return "OFFLINE // NO SERVICE";
@@ -150,6 +191,18 @@ PanelWindow {
     }
 
     readonly property color sourceStatusColor: {
+        if (usesHomeSources) {
+            if (homeWeatherUsable && homeSpaceUsable)
+                return Colors.magenta;
+            if (homeWeatherUsable || homeSpaceUsable)
+                return Colors.yellow;
+            if (homeSourceLoading)
+                return Colors.orange;
+            if (homeSourceError)
+                return Colors.red;
+            return Colors.orange;
+        }
+
         if (usesWeatherSource) {
             if (!weatherService)
                 return Colors.red;

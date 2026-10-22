@@ -363,15 +363,16 @@ DockButton {
                     ColorAnimation { duration: 300 }
                 }
 
-                // Glass vessel. Its bottom arcs use a vertically balanced
-                // elliptical silhouette at native dock resolution.
+                // The vessel is transparent: the dock background shows
+                // through the glass around the liquid, including when open.
+                // Its existing curves remain unchanged for outline alignment.
                 Shape {
                     anchors.fill: parent
 
                     ShapePath {
                         strokeWidth: 0
                         strokeColor: "transparent"
-                        fillColor: Colors.black
+                        fillColor: "transparent"
 
                         startX: weatherThermometer.bulbCenterX
                         startY: 1.2
@@ -426,8 +427,8 @@ DockButton {
                     }
                 }
 
-                // A small LOCAL liquid-only halo, layered between black
-                // vessel and colored fluid. The color stays linked to actual
+                // A small LOCAL liquid-only halo, layered behind colored
+                // fluid. The color stays linked to actual
                 // air temperature while idle and hovered; the intensity uses
                 // the shared DockButton state values. Press/open retain the
                 // established magenta glow rule without changing pressed fluid.

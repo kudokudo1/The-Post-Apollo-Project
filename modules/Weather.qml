@@ -203,79 +203,150 @@ DockButton {
                 }
             }
 
-            // QML instrument instead of a monolithic font glyph. The
-            // white glass/ticks never imply that the fluid is a safe color.
+            // One continuous glass chamber: the rounded lower reservoir
+            // stays inside the tube walls and fills/drains with the same live
+            // temperature level as the stem. Scale ticks live inside the glass.
             Item {
                 id: weatherThermometer
                 anchors.verticalCenter: parent.verticalCenter
-                implicitWidth: 23
-                implicitHeight: 46
+                implicitWidth: 20
+                implicitHeight: 42
 
-                readonly property color liquidColor: weatherDock.thermometerLiquidColor
+                property color liquidColor: weatherDock.thermometerLiquidColor
+                property real animatedLevel:
+                    weatherDock.thermometerState.valid
+                    ? weatherDock.thermometerState.level : 0
 
-                Rectangle {
-                    id: glassTube
-                    x: 4
-                    y: 1
-                    width: 12
-                    height: 32
-                    radius: 6
-                    color: Colors.black
-                    border.width: 2
-                    border.color: Colors.white
-                    clip: true
-
-                    Rectangle {
-                        id: liquidColumn
-                        x: 4
-                        anchors.bottom: parent.bottom
-                        anchors.bottomMargin: 3
-                        width: 4
-                        height: weatherDock.thermometerState.level * 26
-                        radius: 2
-                        color: weatherThermometer.liquidColor
-                        Behavior on height {
-                            NumberAnimation { duration: 300; easing.type: Easing.InOutQuad }
-                        }
-                        Behavior on color {
-                            ColorAnimation { duration: 300 }
-                        }
+                Behavior on animatedLevel {
+                    NumberAnimation {
+                        duration: 300
+                        easing.type: Easing.InOutQuad
                     }
                 }
 
-                Rectangle {
-                    id: glassBulb
-                    x: 1
-                    y: 27
-                    width: 18
-                    height: 18
-                    radius: 9
-                    color: Colors.black
-                    border.width: 2
-                    border.color: Colors.white
-
-                    Rectangle {
-                        id: liquidBulb
-                        anchors.centerIn: parent
-                        width: 12
-                        height: 12
-                        radius: 6
-                        visible: weatherDock.thermometerState.valid
-                        color: weatherThermometer.liquidColor
-                        Behavior on color {
-                            ColorAnimation { duration: 300 }
-                        }
-                    }
+                Behavior on liquidColor {
+                    ColorAnimation { duration: 300 }
                 }
 
-                Repeater {
-                    model: 4
-                    delegate: Rectangle {
-                        x: 17
-                        y: 6 + index * 7
-                        width: index % 2 === 0 ? 5 : 3
-                        height: 1
-                        color: Colors.white
+                onAnimatedLevelChanged: thermometerCanvas.requestPaint()
+                onLiquidColorChanged: thermometerCanvas.requestPaint()
+                onWidthChanged: thermometerCanvas.requestPaint()
+                onHeightChanged: thermometerCanvas.requestPaint()
+
+                // Rounded glass body without a separate circular bulb.
+                // The bottom curve terminates at the same side walls as the
+                // stem, so the chamber is one continuous vessel.
+                function traceGlass(ctx, x, y, width, height, topRadius, bottomRadius) {
+                    const left = x;
+                    const right = x + width;
+                    const top = y;
+                    const bottom = y + height;
+
+                    ctx.beginPath();
+                    ctx.moveTo(left + topRadius, top);
+                    ctx.lineTo(right - topRadius, top);
+                    ctx.quadraticCurveTo(right, top, right, top + topRadius);
+                    ctx.lineTo(right, bottom - bottomRadius);
+                    ctx.quadraticCurveTo(
+                        right, bottom,
+                        right - bottomRadius, bottom
+                    );
+                    ctx.lineTo(left + bottomRadius, bottom);
+                    ctx.quadraticCurveTo(
+                        left, bottom,
+                        left, bottom - bottomRadius
+                    );
+                    ctx.lineTo(left, top + topRadius);
+                    ctx.quadraticCurveTo(left, top, left + topRadius, top);
+                    ctx.closePath();
+                }
+
+                Canvas {
+                    id: thermometerCanvas
+                    anchors.fill: parent
+                    antialiasing: true
+
+                    onPaint: {
+                        const ctx = getContext("2d");
+                        ctx.clearRect(0, 0, width, height);
+
+                        const outerX = 2;
+                        const outerY = 1;
+                        const outerWidth = width - 4;
+                        const outerHeight = height - 2;
+                        const wall = 2;
+
+                        const innerX = outerX + wall;
+                        const innerY = outerY + wall;
+                        const innerWidth = outerWidth - wall * 2;
+                        const innerHeight = outerHeight - wall * 2;
+                        const innerBottom = innerY + innerHeight;
+
+                        // Black glass interior first.
+                        weatherThermometer.traceGlass(
+                            ctx,
+                            outerX, outerY,
+                            outerWidth, outerHeight,
+                            5, outerWidth / 2
+                        );
+                        ctx.fillStyle = Colors.black;
+                        ctx.fill();
+
+                        // The fluid is clipped to the entire inner chamber.
+                        // At low readings only the lower reservoir fills; as
+                        // temperature rises the same body continues up the stem.
+                        ctx.save();
+                        weatherThermometer.traceGlass(
+                            ctx,
+                            innerX, innerY,
+                            innerWidth, innerHeight,
+                            3, innerWidth / 2
+                        );
+                        ctx.clip();
+
+                        const fillHeight =
+                            innerHeight * weatherThermometer.animatedLevel;
+                        ctx.fillStyle = weatherThermometer.liquidColor;
+                        ctx.fillRect(
+                            innerX,
+                            innerBottom - fillHeight,
+                            innerWidth,
+                            fillHeight
+                        );
+                        ctx.restore();
+
+                        // White glass outline.
+                        weatherThermometer.traceGlass(
+                            ctx,
+                            outerX, outerY,
+                            outerWidth, outerHeight,
+                            5, outerWidth / 2
+                        );
+                        ctx.lineWidth = wall;
+                        ctx.strokeStyle = Colors.white;
+                        ctx.stroke();
+
+                        // Four scale marks, all inside the right side of glass.
+                        const tickStartX = innerX + innerWidth * 0.52;
+                        const longTickEndX = innerX + innerWidth - 1;
+                        const shortTickEndX = innerX + innerWidth - 3;
+                        const tickTop = innerY + 5;
+                        const tickStep = 7;
+
+                        ctx.lineWidth = 1;
+                        ctx.strokeStyle = Colors.white;
+
+                        for (let i = 0; i < 4; i++) {
+                            const tickY = tickTop + i * tickStep;
+                            ctx.beginPath();
+                            ctx.moveTo(tickStartX, tickY);
+                            ctx.lineTo(
+                                i % 2 === 0
+                                ? longTickEndX : shortTickEndX,
+                                tickY
+                            );
+                            ctx.stroke();
+                        }
                     }
                 }
             }

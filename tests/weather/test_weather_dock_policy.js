@@ -107,15 +107,25 @@ assert.match(dock, /weatherStationWindow\.toggle\(\)/);
 assert.match(dock, /implicitHeight:\s*50/);
 assert.match(dock, /implicitWidth:\s*Math\.ceil\(weatherContent\.implicitWidth\)\s*\+\s*6/);
 // Preserve an identifiable weather condition, live numeric readout, and a drawn thermometer.
-assert.match(dock, /id:\s*weatherThermometer[\s\S]*?implicitWidth:\s*23[\s\S]*?implicitHeight:\s*46/);
+// The instrument is slightly smaller, uses one continuous glass chamber, and
+// its lower reservoir fills/drains with the same real temperature level.
+assert.match(dock, /id:\s*weatherThermometer[\s\S]*?implicitWidth:\s*20[\s\S]*?implicitHeight:\s*42/);
 assert.doesNotMatch(dock, /text:\s*"🌡"/);
-assert.match(dock, /id:\s*glassTube[\s\S]*?border\.color:\s*Colors\.white[\s\S]*?clip:\s*true/);
-assert.match(dock, /id:\s*glassBulb[\s\S]*?border\.color:\s*Colors\.white/);
-assert.match(dock, /id:\s*liquidColumn[\s\S]*?height:\s*weatherDock\.thermometerState\.level\s*\*\s*26/);
-assert.match(dock, /id:\s*liquidBulb[\s\S]*?visible:\s*weatherDock\.thermometerState\.valid/);
-assert.match(dock, /Behavior on height[\s\S]*?NumberAnimation\s*\{\s*duration:\s*300/);
-assert.match(dock, /Behavior on color[\s\S]*?ColorAnimation\s*\{\s*duration:\s*300/);
-assert.match(dock, /Repeater\s*\{\s*model:\s*4[\s\S]*?color:\s*Colors\.white/);
+assert.match(dock, /id:\s*thermometerCanvas/);
+assert.match(dock, /function traceGlass\(/);
+assert.match(dock, /ctx\.clip\(\)/);
+assert.match(dock, /innerHeight\s*\*\s*weatherThermometer\.animatedLevel/);
+assert.match(dock, /ctx\.fillRect\([\s\S]*?innerBottom - fillHeight[\s\S]*?fillHeight/);
+// No separate fixed bulb is allowed: the bottom curve is part of the same vessel.
+assert.doesNotMatch(dock, /id:\s*glassBulb/);
+assert.doesNotMatch(dock, /id:\s*liquidBulb/);
+assert.match(dock, /bottomRadius[\s\S]*?ctx\.quadraticCurveTo/);
+// Tick endpoints are derived from inner chamber geometry, so they stay inside glass.
+assert.match(dock, /tickStartX\s*=\s*innerX\s*\+\s*innerWidth\s*\*\s*0\.52/);
+assert.match(dock, /longTickEndX\s*=\s*innerX\s*\+\s*innerWidth\s*-\s*1/);
+assert.match(dock, /for \(let i = 0; i < 4; i\+\+\)/);
+assert.match(dock, /Behavior on animatedLevel[\s\S]*?NumberAnimation\s*\{[\s\S]*?duration:\s*300/);
+assert.match(dock, /Behavior on liquidColor[\s\S]*?ColorAnimation\s*\{\s*duration:\s*300/);
 assert.match(dock, /WeatherDockPolicy\.temperatureState\(/);
 assert.match(dock, /if \(!thermometerState\.valid\)[\s\S]*?return "transparent"/);
 assert.match(dock, /if \(weatherDock\.open\)[\s\S]*?return Colors\.magenta/);
@@ -157,7 +167,7 @@ for (const [property, color] of [
 ]) {
     assert.ok(dock.includes(property + ": " + color), property + " should use " + color);
 }
-assert.match(dock, /readonly property color liquidColor:\s*weatherDock\.thermometerLiquidColor/);
+assert.match(dock, /property color liquidColor:\s*weatherDock\.thermometerLiquidColor/);
 assert.match(dock, /id:\s*weatherContent[\s\S]*?spacing:\s*6/);
 assert.ok(dock.indexOf("id: weatherCondition") < dock.indexOf("id: weatherTemperature"));
 assert.ok(dock.indexOf("id: weatherTemperature") < dock.indexOf("id: weatherThermometer"));

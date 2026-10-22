@@ -125,7 +125,7 @@ assert "WorldClockPolicy.snapshot(localClock.date.getTime()," in window
 assert 'command: ["date", "+%z"]' in window
 assert 'environment: { TZ: worldLookupZone, LC_ALL: "C" }' in window
 assert "Process {" in window
-assert window.count("Process {") == 4
+assert window.count("Process {") == 5
 assert "worldLookup.running" in window
 assert 'onLeftClicked:' in window
 assert 'timew.chooseWorldZone(modelData.id)' in window
@@ -238,19 +238,50 @@ assert 'standardKeysAvailable && !worldSearchInput.activeFocus' in window
 assert 'enabled: timew.navigationKeysAvailable' in window
 assert 'WORLD // SELECT A SEARCH RESULT' in window
 assert '"ZONE DIRECTORY UNAVAILABLE"' in window
-assert window.count('onTextEdited:') == 1
+assert window.count('onTextEdited:') == 3
 # No dynamic command composition or arbitrary typed TZ values.
 assert 'command: ["date", "+%z"]' in window
 assert 'worldLookup.exec({' in window
 assert 'environment: { TZ: worldLookupZone, LC_ALL: "C" }' in window
 assert '["sh", "-c"' not in window
 assert '["bash", "-c"' not in window
-assert 'LOCAL + WORLD // LIVE // CONVERTER NEXT' in window
+assert 'LOCAL + WORLD // LIVE // CALC HAS CONVERTER' in window
+assert 'TIME ZONE CONVERTER // READ ONLY' in window
 assert "label: timew.use24Hour ? \"24H\" : \"12H\"" in window
 assert "onLeftClicked: timew.use24Hour = !timew.use24Hour" in window
 assert "fillColor: Colors.black" in window
 assert "border.color: Colors.cyan" in window
 assert "accentColor: Colors.red" in window
+
+# CALC now runs a bounded, manual zoneinfo conversion on user request.
+# Its fixed script resolves from the Quickshell config root, and is never
+# a dynamic command or a continuous local/system clock.
+assert 'property string converterSourceZone: "UTC"' in window
+assert 'property string converterTargetZone: "America/New_York"' in window
+assert 'readonly property var converterZones: worldZones.concat(' in window
+assert 'selectedSearchedZone !== ""' in window
+assert 'function cycleConverterZone(which)' in window
+assert 'function runTimeConverter()' in window
+assert 'if (converterBusy || !menuOpen || selectedMode !== "calc")' in window
+assert 'id: converterProcess' in window
+assert 'converterProcess.exec([' in window
+assert '"python3", "-B", "-I"' in window
+assert 'Quickshell.shellPath("services/time/TimeZoneConverter.py")' in window
+assert 'src, dst, converterDate, converterTime' in window
+assert 'id: converterPane' in window
+assert 'id: converterDateInput' in window
+assert 'id: converterTimeInput' in window
+assert 'id: converterRunButton' in window
+assert 'onLeftClicked: timew.runTimeConverter()' in window
+assert 'timew.converterSubmittedKey !== timew.converterInputsKey' in window
+assert 'REPEATED HOUR // TWO POSSIBLE INSTANTS' in window
+assert 'TIME DOES NOT EXIST // DST CLOCK JUMP' in window
+assert 'SOURCE // " + modelData.source' in window
+assert '!converterDateInput.activeFocus && !converterTimeInput.activeFocus' in window
+assert 'TIME CALCULATOR // NOT CONNECTED' not in window
+# Conversion adds one on-demand process, no persistent interval or clock tick.
+assert window.count("SystemClock {") == 1
+assert window.count("Timer {") == 1
 
 # Universal visual language remains: magenta header, cyan divider, borderless modes.
 assert 'text: "TIME // W"' in window

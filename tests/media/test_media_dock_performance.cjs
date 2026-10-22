@@ -27,6 +27,26 @@ test("sample static music icon, not the animated VU spectrum", () => {
     assert.match(source, /id:\s*spectrum/);
 });
 
+test("magenta idle chassis and treble clef do not recolor or resample CAVA", () => {
+    assert.match(source, /normalDockGlowColor:\s*Colors\.magenta/);
+    assert.match(source, /normalContentGlowColor:\s*Colors\.magenta/);
+    assert.match(source, /hoverContentGlowColor:\s*Colors\.magenta/);
+    assert.match(source, /contentGlowSource:\s*musicMark/);
+
+    const musicMark = source.match(/GohuText \{\s*id:\s*musicMark([\s\S]*?)\n\s*\}/);
+    assert.ok(musicMark, "music mark remains a single text item");
+    assert.match(musicMark[1], /textFormat:\s*Text\.StyledText/);
+    // The ornaments retain the dock's state-aware foreground; only the
+    // treble clef is a fixed magenta foreground.
+    assert.match(musicMark[1],
+        /mediaDock\.foregroundColor[\s\S]*‧₊˚ [\s\S]*Colors\.magenta[\s\S]*𝄞[\s\S]*mediaDock\.foregroundColor[\s\S]*˖/);
+
+    // The animated bars keep their original accent and are never sampled.
+    assert.match(source, /readonly property color accentColor:\s*mpdPlaying \? Colors\.orange : Colors\.cyan/);
+    assert.match(source, /color:\s*mediaDock\.accentColor/);
+    assert.doesNotMatch(source, /contentGlowSource:\s*(?:spectrum|mediaArtwork)/);
+});
+
 test("CAVA preserves 16-bar output at a bounded 15 FPS", () => {
     assert.match(config, /^bars\s*=\s*16$/m);
     assert.match(config, /^framerate\s*=\s*15$/m);

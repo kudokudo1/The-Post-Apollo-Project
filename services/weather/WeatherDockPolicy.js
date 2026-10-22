@@ -26,6 +26,31 @@ function formatTemperature(fahrenheit, isFresh, useCelsius) {
     return (rounded === 0 ? 0 : rounded) + unit;
 }
 
+// The thermometer reports absolute air temperature, never relative comfort,
+// wind chill, heat index, UV exposure, or weather-alert severity.
+function temperatureState(fahrenheit, isFresh) {
+    if (!isFresh || fahrenheit === null || fahrenheit === undefined ||
+            String(fahrenheit).trim() === "")
+        return { "valid": false, "color": "white", "level": 0 };
+
+    const value = Number(fahrenheit);
+    if (!isFinite(value) || value < -150 || value > 150)
+        return { "valid": false, "color": "white", "level": 0 };
+
+    const color = value <= 15 ? "white"
+                : value <= 32 ? "cyan"
+                : value <= 49 ? "blue"
+                : value <= 59 ? "magenta"
+                : value <= 75 ? "yellow"
+                : value <= 89 ? "orange"
+                : "red";
+
+    // -20°F to 110°F gives a legible gauge across normal outdoor readings.
+    // Outside that range, clamp the column; the bulb stays filled if valid.
+    const level = Math.max(0, Math.min(1, (value + 20) / 130));
+    return { "valid": true, "color": color, "level": level };
+}
+
 function state(color, icon, label) {
     return { "color": color, "icon": icon, "label": label };
 }

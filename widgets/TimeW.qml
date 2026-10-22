@@ -67,11 +67,19 @@ PanelWindow {
     property string worldSearchQuery: ""
     property bool worldSearchPopupOpen: false
     property var worldZoneCatalog: []
+    // Metadata is read once from the host's tzdata; unavailable files leave
+    // the original city/zone search intact.
+    property var worldCountryNames: ({})
+    property string worldCountryZoneTable: ""
+    property bool worldCountryLookupStarted: false
+    readonly property var worldCountryIndex:
+        WorldZoneSearch.parseCountryZones(worldCountryZoneTable, worldCountryNames)
     property bool worldCatalogLoaded: false
     property bool worldCatalogLoading: false
     property bool worldCatalogFailed: false
     readonly property var worldSearchMatches:
-        WorldZoneSearch.search(worldZoneCatalog, worldSearchQuery, 6)
+        WorldZoneSearch.search(worldZoneCatalog, worldSearchQuery,
+                               120, worldCountryIndex)
     readonly property bool navigationKeysAvailable:
         standardKeysAvailable && !worldSearchInput.activeFocus
     property string worldLookupZone: ""
@@ -111,6 +119,16 @@ PanelWindow {
         worldCatalogLoading = true;
         worldCatalogFailed = false;
         zoneCatalogLookup.exec(["timedatectl", "list-timezones", "--no-pager"]);
+        loadWorldCountryMetadata();
+    }
+
+    function loadWorldCountryMetadata() {
+        if (worldCountryLookupStarted || !menuOpen || selectedMode !== "clock")
+            return;
+        worldCountryLookupStarted = true;
+        // Fixed, read-only system files; neither command takes user input.
+        isoCountryLookup.exec(["cat", "/usr/share/zoneinfo/iso3166.tab"]);
+        zoneCountryLookup.exec(["cat", "/usr/share/zoneinfo/zone.tab"]);
     }
 
     function dismissWorldSearchPopup() {
@@ -294,6 +312,24 @@ PanelWindow {
             timew.worldCatalogLoading = false;
             if (exitCode !== 0 || !timew.worldCatalogLoaded)
                 timew.worldCatalogFailed = true;
+        }
+    }
+
+    Process {
+        id: isoCountryLookup
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished:
+                timew.worldCountryNames =
+                    WorldZoneSearch.parseCountryNames(this.text)
+        }
+    }
+
+    Process {
+        id: zoneCountryLookup
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: timew.worldCountryZoneTable = this.text
         }
     }
 
@@ -709,7 +745,8 @@ PanelWindow {
                                    + 3 - worldSearchArea.y
                                 width: parent.width
                                 height: timew.worldSearchMatches.length > 0
-                                        ? 8 + timew.worldSearchMatches.length * 30
+                                        ? Math.min(188, 8
+                                                   + timew.worldSearchMatches.length * 30)
                                         : 34
                                 z: 60
                                 visible: timew.menuOpen
@@ -720,44 +757,70 @@ PanelWindow {
                                 border.width: 1
                                 border.color: Colors.white
 
-                                Column {
-                                    anchors.fill: parent
-                                    anchors.margins: 4
+                                // Virtualize matches and scroll inside the
+                                // popup; do not expand the TimeW chassis.
+                                ListView {
+                                    id: worldSearchResults
+                                    anchors {
+                                        top: parent.top
+                                        bottom: parent.bottom
+                                        left: parent.left
+                                        right: parent.right
+                                        margins: 4
+                                        rightMargin: 21
+                                    }
+                                    clip: true
                                     spacing: 2
+                                    model: timew.worldSearchMatches
+                                    boundsBehavior: Flickable.StopAtBounds
+                                    interactive: contentHeight > height
 
-                                    Repeater {
-                                        model: timew.worldSearchMatches
-
-                                        ActionButton {
-                                            width: worldSearchPopup.width - 8
-                                            height: 28
-                                            label: modelData.label
-                                            labelPixelSize: 11
-                                            labelHorizontalAlignment: Text.AlignLeft
-                                            trackLabelGlowLocally: true
-                                            accentColor: Colors.white
-                                            softGlowEnabled: false
-                                            onLeftClicked:
-                                                timew.selectWorldSearchResult(
-                                                    modelData.id)
-                                        }
+                                    delegate: ActionButton {
+                                        width: worldSearchResults.width
+                                        height: 28
+                                        label: modelData.country
+                                               ? modelData.label + " // "
+                                                 + modelData.country
+                                               : modelData.label
+                                        labelPixelSize: 11
+                                        labelHorizontalAlignment: Text.AlignLeft
+                                        trackLabelGlowLocally: true
+                                        accentColor: Colors.white
+                                        softGlowEnabled: false
+                                        onLeftClicked:
+                                            timew.selectWorldSearchResult(modelData.id)
                                     }
+                                }
 
-                                    GohuText {
-                                        visible: timew.worldSearchMatches.length === 0
-                                        width: parent.width
-                                        height: 24
-                                        verticalAlignment: Text.AlignVCenter
-                                        font.pixelSize: 11
-                                        color: Colors.orange
-                                        text: timew.worldCatalogLoading
-                                              ? "LOADING SYSTEM ZONES..."
-                                              : timew.worldCatalogFailed
-                                              ? "ZONE DIRECTORY UNAVAILABLE"
-                                              : timew.worldSearchQuery.trim() === ""
-                                              ? "TYPE CITY OR TIME ZONE"
-                                              : "NO MATCHES"
-                                    }
+                                NeonScrollBar {
+                                    flickable: worldSearchResults
+                                    accountForContentOrigin: true
+                                    geometryMode: "viewport"
+                                    handleStyle: "star"
+                                    railColor: Colors.cyan
+                                    handleColor: Colors.white
+                                    handleBorderColor: Colors.white
+                                    railGlowColor: Colors.white
+                                    containGlow: true
+                                    visible: timew.worldSearchPopupOpen
+                                             && scrollable
+                                }
+
+                                GohuText {
+                                    visible: timew.worldSearchMatches.length === 0
+                                    anchors.centerIn: parent
+                                    width: parent.width - 12
+                                    height: 24
+                                    verticalAlignment: Text.AlignVCenter
+                                    font.pixelSize: 11
+                                    color: Colors.orange
+                                    text: timew.worldCatalogLoading
+                                          ? "LOADING SYSTEM ZONES..."
+                                          : timew.worldCatalogFailed
+                                          ? "ZONE DIRECTORY UNAVAILABLE"
+                                          : timew.worldSearchQuery.trim() === ""
+                                          ? "TYPE CITY OR COUNTRY"
+                                          : "NO MATCHES"
                                 }
                             }
                         }

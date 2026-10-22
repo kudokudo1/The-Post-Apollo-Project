@@ -52,11 +52,15 @@ assert.equal(ids("America Los")[0], "America/Los_Angeles");
 assert.equal(ids("europe london")[0], "Europe/London");
 assert.equal(ids("Kathmandu")[0], "Asia/Kathmandu");
 assert.equal(ids("gmt+5")[0], "Etc/GMT+5");
-assert.equal(ids("").length, 0); // empty query returns no suggestions
-assert.equal(ids(" ").length, 0);
+// An empty search browses the catalog instead of an empty popup.
+assert.equal(ids("").length, 6); // helper limit remains enforceable
+assert.equal(ids(" ").length, 6);
+assert.equal(ids("", 1200).length, catalog.length);
+assert.equal(ids("    ", 1200).length, catalog.length);
+assert.equal(ids("", 0).length, 0);
 assert.equal(ids("token-that-does-not-exist").length, 0);
 assert.equal(ids("a", 3).length, 3);
-assert.equal(ids("a", 1000).length <= 120, true);
+assert.equal(ids("a", 1000).length <= 1200, true);
 assert.equal(ids("a", 0).length, 0);
 assert.equal(ids("A".repeat(101)).length, 0);
 assert.equal(Array.isArray(search.parseCatalog(8)), true);
@@ -67,7 +71,9 @@ const more = search.parseCatalog(
     Array.from({ length: 1600 },
         (_, i) => "Area/Place_" + String(i).padStart(4, "0")).join("\n"));
 assert.equal(more.length, 1200);
-assert.equal(search.search(more, "place").length, 120);
+assert.equal(search.search(more, "place").length, 1200);
+assert.equal(search.search(more, "", 1200).length, 1200);
+assert.equal(search.search(more, "", 1210).length, 1200);
 
 // Real tzdata shapes: iso3166.tab lists country names; zone.tab associates
 // countries with IANA identifiers, including multiple zones per country.
@@ -109,6 +115,15 @@ assert.equal(countryIds("Japan").includes("Africa/Abidjan"), false);
 assert.equal(countryIds("Neverland").length, 0);
 assert.equal(Array.isArray(search.search(catalog, "Tokyo", 120, {})), true);
 assert.equal(search.search(catalog, "United States", 120, zoneMap)[0].country, "United States");
+// Country-first empty browse sorts by the country name, then zone.
+// Entries without country metadata remain browsable after country groups.
+const browse = Array.from(search.search(catalog, "", 1200, zoneMap));
+assert.equal(browse.length, catalog.length);
+assert.equal(browse[0].country, "Britain (UK)");
+assert.equal(browse[browse.length - 1].country, "");
+assert.equal(browse.find(x => x.id === "America/New_York").country,
+             "United States");
+assert.equal(search.search(catalog, "   ", 1200, zoneMap).length, catalog.length);
 // Country searches can return many matches, for the scrollable UI.
 const syntheticCatalog = search.parseCatalog(
     Array.from({length: 80}, (_, i) => "America/City_" + i).join("\n"));

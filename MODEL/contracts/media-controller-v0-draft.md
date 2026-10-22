@@ -142,10 +142,11 @@ not live implementation, exact geometry, or a new shared keyboard-focus policy.
   navigation. **Physical Enter button:** contextual Enter. **Right, larger
   knob:** distinct coarse browsing/tuning role; exact behavior remains open.
 - **SELECT** remains distinct from highlighted cursor position, loading
-  and playback. The SELECT control is visibly labeled **`~`**.
-  Its keyboard shortcut is the **bare physical backtick/grave key**
-  (U+0060 with no modifiers). The printed glyph is intentionally a tilde;
-  do not require Shift to activate it.
+  and playback. The physical control is labeled **SELECT**; a compact
+  **SHIFT** legend may identify the keyboard equivalent, not a tilde.
+  Its planned keyboard gesture is **Shift pressed and released alone**,
+  on either Shift key while the Hi-Fi owns keyboard focus. The backtick/grave
+  key (U+0060) is intentionally **unassigned/reserved** for a later purpose.
 - The physical Enter control and normal keyboard Enter/Return perform the
   same contextual action. On an individually highlighted, playable track,
   Enter requests load **without** autoplay. On a collection, Enter navigates
@@ -155,10 +156,18 @@ not live implementation, exact geometry, or a new shared keyboard-focus policy.
   LOAD queues the staged item/collection without playing; PLAY is the
   separate explicit start command. Loading a full playlist with a chosen
   start track is **future backend work**, not currently supported.
-- A search text editor must receive normal typing, including backtick and
-  tilde, without triggering SELECT. The bare grave binding is window-local,
-  only when the Hi-Fi actually owns keyboard input, and must never intercept
-  **Super+grave** (reserved by Koinoikos), Shift, Alt, or Control variants.
+- A search text editor must receive normal typing (including uppercase
+  characters, backtick and tilde) without triggering SELECT. Shift is a
+  modifier, not a normal application shortcut: only a standalone Shift
+  gesture may select, and only **after release**, if the entire gesture
+  contained no other key or mouse action. Shift+arrows, Shift+Tab, ordinary
+  capitalization and any Shift+modifier chord must retain their existing
+  behavior. Do not implement a global Shift binding or intercept modifier
+  events from other applications. Leave **Super+grave** to Koinoikos.
+  Modifier-only key delivery and reliable chord suppression require
+  real Wayland/Quickshell testing; if the desktop cannot distinguish a bare
+  Shift gesture safely, keep keyboard SELECT unavailable rather than
+  hijacking text input or navigation.
 - The existing Media Deck currently declares `WlrKeyboardFocus.None` and
   is not yet registered with the shared focus broker. Keyboard activation
   needs an independently verified owner-approved focus integration; a QML

@@ -127,7 +127,7 @@ assert "onLeftClicked: hub.menuOpen = false" in window[close_start:close_end + 4
 import re
 
 for path, source, count in (
-    ("widgets/ApolloHubW.qml", window, 7),
+    ("widgets/ApolloHubW.qml", window, 11),
     ("widgets/hub/ApolloHubTile.qml", tile, 6),
 ):
     actions = len(re.findall(r"\bActionButton\s*\{", source))
@@ -145,6 +145,10 @@ for action in (
     'label: "+ GROUP"',
     'label: "+ TILE"',
     'label: "UNDO"',
+    'label: "− MODE"',
+    'label: "− GROUP"',
+    'label: "CONFIRM"',
+    'label: "CANCEL"',
 ):
     assert action in window, f"Hub button behavior changed: {action}"
 for action in ('label: "←"', 'label: "→"', 'label: "SWAP"', 'label: "×"'):
@@ -158,7 +162,8 @@ assert "contentHost.y + labelText.y" in shared_action
 # Configure modes/sub-modes and exchange module positions independently.
 for name in ("defaultLayout", "normalize", "parse", "swapTiles",
              "renameMode", "addMode", "addSubMode", "addTile", "cycleTile",
-             "removeTile", "resizeTile", "storageIssue"):
+             "removeTile", "resizeTile", "storageIssue",
+             "removeMode", "removeSubMode"):
     assert "function " + name + "(" in layout
 assert 'var LAYOUT_VERSION = 2' in layout
 assert 'version: LAYOUT_VERSION' in layout
@@ -206,6 +211,38 @@ for token in (
     assert token in window, f"Hub resize wiring missing: {token}"
 assert 'property var layoutUndoStack: []' in window
 assert 'height: 140 * (tileConfig.rowSpan || 1)' in window
+# Stage 3: deletion is staged and identity-bound; the last mode/group
+# cannot be removed, and all successful mutations go through existing Undo.
+for token in (
+    'property var pendingRemoval: null',
+    'function requestLayoutRemoval(kind)',
+    'function confirmLayoutRemoval()',
+    'function cancelPendingRemoval()',
+    'Layout.removeMode(layout, selectedModeIndex,',
+    'Layout.removeSubMode(layout, selectedModeIndex,',
+    'layout.modes.length <= 1',
+    'activeMode.subModes.length <= 1',
+    'activeMode.id !== pending.modeId',
+    'activeSubMode.id !== pending.groupId',
+    'onLeftClicked: hub.requestLayoutRemoval("mode")',
+    'onLeftClicked: hub.requestLayoutRemoval("group")',
+    'onLeftClicked: hub.confirmLayoutRemoval()',
+    'onLeftClicked: hub.cancelPendingRemoval()',
+    'visible: hub.pendingRemoval !== null',
+    'visible: hub.pendingRemoval === null',
+    'destructive: true',
+    'onEditModeChanged: if (!editMode) cancelPendingRemoval()',
+):
+    assert token in window, f"Hub staged deletion contract missing: {token}"
+assert 'confirmed !== true || next.modes.length <= 1' in layout
+assert 'groups.length <= 1 || !validIndex(subIndex, groups.length)' in layout
+assert 'next.modes[modeIndex].id !== expectedModeId' in layout
+assert 'groups[subIndex].id !== expectedGroupId' in layout
+assert window.count('label: "CONFIRM"') == 1
+assert window.count('label: "CANCEL"') == 1
+assert window.count('onLeftClicked: hub.confirmLayoutRemoval()') == 1
+assert window.count('onLeftClicked: hub.cancelPendingRemoval()') == 1
+
 assert 'Layout.removeTile(layout, selectedModeIndex,' in window
 assert 'function undoLastLayoutEdit()' in window
 assert 'onLeftClicked: hub.undoLastLayoutEdit()' in window

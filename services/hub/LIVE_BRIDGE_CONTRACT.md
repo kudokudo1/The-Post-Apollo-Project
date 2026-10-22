@@ -1,6 +1,6 @@
 # ApolloHub // B1 live Weather bridge
 
-**Status:** W1 shared-shell Weather connection implemented on `main`; live desktop acceptance pending.
+**Status:** W1 Weather wiring implemented on `main`; operator reported a live desktop PASS.
 **Ownership:** Backend/live services. UI/editor and `shell.qml` remain with their respective owners.
 
 ## Existing source, no duplicate work
@@ -80,3 +80,40 @@ The UI owner can bind the CPU tile's data to `apolloHubLive.systemSnapshot` and 
 `tests/hub/test_apollo_hub_system_bridge.py` checks the provider contract and absence of new collectors; `tests/hub/test_apollo_hub_system_policy.cjs` runs actual policy behavior cases, including stale timestamps and invalid readings. Both run alongside the Weather contract test in the existing `apollo-hub-live-bridge.yml` CI workflow.
 
 **Not yet verified on the user's Quickshell desktop:** QML `Connections` observation events, synchronized update of the Hub UI, user-visible status changes, and shared-shell focus behavior. No host-machine files or running processes were changed by this batch.
+
+## B3 // Passive Network snapshot (read-only)
+
+**Status:** Backend source implemented. UI integration and on-device runtime certification pending.
+
+`ApolloHubLiveBridge.networkSnapshot` uses the existing in-process `Quickshell.Networking` singleton, already imported by `modules/Network.qml`. No `nmcli`, `iw`, `ethtool`, `Process`, scan loop, network request, connection manipulation, or separate network service is created. The snapshot updates through QML bindings over the shared networking objects.
+
+The pure normalization policy is `services/hub/ApolloHubNetworkPolicy.js`.
+
+### UI consumer contract
+
+- `state`: `unavailable` (no device information), `disconnected` (devices present but no connected local link), or `connected`.
+- `connected`: true if any supported local link is connected.
+- `transport`: `ethernet`, `wifi`, or `none` (Ethernet takes display priority if both connected).
+- `internetState`: **always `unverified`**. Local association is not evidence of working DNS, gateway, or internet access.
+- `wifi.present`, `wifi.connected`, `wifi.interfaceName`, `wifi.networkName`, `wifi.signalPercent` (integer 0–100 from a valid 0.0–1.0 strength or `-1` unknown).
+- `ethernet.present`, `ethernet.connected`, `ethernet.interfaceName`.
+- `linkSpeedMbps`: **-1 (unknown)**. The dock's speed probe is private and has not been shared; the bridge will not duplicate it.
+
+No passwords, keys, private IP/MAC, activation methods, NetworkManager objects, or mutable device handles leave the snapshot.
+
+### UI wiring
+
+The current `shell.qml` already creates `ApolloHubLiveBridge { id: apolloHubLive }` and passes it to `ApolloHubW { liveBridge: apolloHubLive }` for Weather. **B3 needs no additional shell instance or input property.**
+
+The UI owner can bind its Network tile to `hub.liveBridge.networkSnapshot` exactly as Weather binds to `weatherSnapshot`. Render `unavailable`, `disconnected`, and connected Wi-Fi/Ethernet separately; unknown signal `-1` must never display as zero signal; `internetState: "unverified"` must not look like a proven all-clear.
+
+### Compatibility / acceptance
+
+The repo's existing dock already imports `Quickshell.Networking`, but the official published Quickshell **v0.2.1 module list** does not enumerate it (https://quickshell.org/docs/v0.2.1/types/); newer documentation specifies `WifiNetwork.signalStrength` (https://quickshell.org/docs/v0.3.2/types/Quickshell.Networking/WifiNetwork/). The user's runtime may use a newer/custom build. **Check on-device that the existing dock and the new bridge resolve the module and signal property before declaring live pass.** Signal strength remains unknown if the API doesn't provide a valid number.
+
+CI workflow `apollo-hub-live-bridge.yml` runs:
+- `python3 tests/hub/test_apollo_hub_network_bridge.py` for passive integration contracts.
+- `node tests/hub/test_apollo_hub_network_policy.cjs` to execute production policy against wired, Wi-Fi, disconnected, malformed, and privacy cases.
+
+No host restart, local file change, production activation, or live Hospital attachment is part of B3.
+

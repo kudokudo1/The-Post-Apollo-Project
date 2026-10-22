@@ -129,9 +129,9 @@ test("magenta full-width wash, three independent static art glows, per-bar CAVA 
         assert.match(body, new RegExp("height:\\s*" + sourceId + "\\.height"));
         assert.match(body, /horizontalOffset:\s*0/);
         assert.match(body, /verticalOffset:\s*0/);
-        assert.match(body, /radius:\s*mediaDock\.contentGlowRadius/);
-        assert.match(body, /samples:\s*mediaDock\.contentGlowSamples/);
-        assert.match(body, /opacity:\s*mediaDock\.contentGlowOpacity/);
+        assert.match(body, /radius:\s*mediaDock\.contentGlowRadius\s*\+\s*4/);
+        assert.match(body, /samples:\s*mediaDock\.contentGlowSamples\s*\+\s*6/);
+        assert.match(body, /opacity:\s*Math\.min\(1\.0,\s*mediaDock\.contentGlowOpacity\s*\+\s*0\.18\)/);
         assert.match(body, /color:\s*mediaDock\.accentColor/);
         assert.match(body, /transparentBorder:\s*true/);
         assert.match(body, /z:\s*0/);
@@ -158,6 +158,8 @@ test("CAVA neon tracks the animated bar using geometry only", () => {
     assert.match(bar, /height:\s*cavaBar\.height\s*\+\s*2/);
     assert.match(bar, /width:\s*parent\.width\s*\+\s*8/);
     assert.match(bar, /width:\s*parent\.width\s*\+\s*4/);
+    assert.match(bar, /opacity:\s*0\.22/);
+    assert.match(bar, /opacity:\s*0\.40/);
     assert.equal((bar.match(/color:\s*mediaDock\.accentColor/g) || []).length, 3,
         "both glow layers and the bar must follow the same cyan/orange accent");
     assert.equal((bar.match(/Behavior on height/g) || []).length, 1,

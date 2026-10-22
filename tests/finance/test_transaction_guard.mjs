@@ -101,7 +101,8 @@ test("changed amount and split/transfer transactions refuse edits",async()=>{
     original:{date:base.date,amountCents:-1250}};
   for(const wrong of [
     {amount:-1400},{is_parent:true},{is_child:true},
-    {transfer_id:"other"},{subtransactions:[{amount:-1250}]}
+    {transfer_id:"other"},{imported_id:"bank-100"},
+    {subtransactions:[{amount:-1250}]}
   ]) {
     const f=fake([{id:cmd.transactionId,account:base.accountId,
       date:base.date,amount:-1250,...wrong}]);

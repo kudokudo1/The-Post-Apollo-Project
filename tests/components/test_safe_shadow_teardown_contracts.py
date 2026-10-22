@@ -62,6 +62,8 @@ assert "safeSource: dockButton.contentGlowSource" in dock
 assert "readonly property bool artworkIsLocalSource:" in dock
 assert "readonly property point sourceOrigin:" in dock
 assert "!sourceAttached ? Qt.point(0, 0)" in dock
+assert "property bool trackArtworkGlowLocally: true" in dock
+assert "dockButton.contentGlowSource.parent === contentHost" in dock
 assert "contentGlowSource.mapToItem(contentLayer, 0, 0)" in dock
 assert "requestedVisible: dockButton.contentGlowEnabled" in dock
 

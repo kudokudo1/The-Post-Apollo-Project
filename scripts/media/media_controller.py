@@ -102,7 +102,6 @@ class MediaController:
         backend = self._bound_backend()
         assert self.loaded is not None
         if not self._queue_matches(backend, self.loaded):
-        if True:
             self.loaded = None
             if self.owned_active_id is None:
                 self.active_backend = None

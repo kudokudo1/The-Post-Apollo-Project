@@ -16,6 +16,12 @@ DockButton {
         String(Quickshell.env("POST_APOLLO_UI_LAG_PROBE") || "").trim() === "1"
     property double bgLastPollMs: 0
 
+    // Opt-in freeze isolation only. This suppresses the dock's own subprocess
+    // polling without touching NetworkManager, Wi-Fi, Ethernet, or the passive
+    // Quickshell.Networking device observer. Defaults to normal polling.
+    readonly property bool networkPollPaused:
+        String(Quickshell.env("POST_APOLLO_NETWORK_POLL_PAUSED") || "").trim() === "1"
+
     function reportBgCallback(stage, startedAtMs) {
         const now = Date.now();
         const elapsed = now - startedAtMs;
@@ -267,7 +273,7 @@ DockButton {
 
         Timer {
             interval: 500
-            running: true
+            running: !networkDock.networkPollPaused
             repeat: true
 
             onTriggered: {
@@ -295,6 +301,11 @@ DockButton {
         }
 
         Component.onCompleted: {
+            if (networkDock.networkPollPaused) {
+                console.warn("SYNTAGMA_BG_PROBE // network widget polling PAUSED"
+                             + " (startup and timer subprocess probes skipped)");
+                return;
+            }
             wifiEnabledProcess.running = true;
             wifiSignalProcess.running = true;
             wifiLinkProcess.running = true;

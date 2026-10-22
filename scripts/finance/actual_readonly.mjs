@@ -94,6 +94,10 @@ export function normalizeSnapshot({month, budget, accounts, balances,
       transactionRows.push({
         id: item.id,
         accountId: account.id,
+        editable: !item.transfer_id && !item.is_parent && !item.is_child
+          && !item.parent_id && !(Array.isArray(item.subtransactions)
+                   && item.subtransactions.length)
+          && (!item.imported_id || String(item.imported_id).startsWith("financew-")),
         date: item.date,
         account: account.name,
         description: payeeName,

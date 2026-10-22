@@ -8,8 +8,10 @@ on:
     paths:
       - "modules/Finance.qml"
       - "widgets/FinanceW.qml"
+      - "widgets/FinanceTransactionDraftPane.qml"
       - "services/finance/**"
       - "tests/finance/test_finance_budget_ui_contracts.py"
+      - "tests/finance/test_finance_transaction_draft_contracts.py"
       - "shell.qml"
       - "tests/components/test_finance_dock_contracts.py"
       - "tests/components/test_finance_navigation_contracts.py"
@@ -18,8 +20,10 @@ on:
     paths:
       - "modules/Finance.qml"
       - "widgets/FinanceW.qml"
+      - "widgets/FinanceTransactionDraftPane.qml"
       - "services/finance/**"
       - "tests/finance/test_finance_budget_ui_contracts.py"
+      - "tests/finance/test_finance_transaction_draft_contracts.py"
       - "shell.qml"
       - "tests/components/test_finance_dock_contracts.py"
       - "tests/components/test_finance_navigation_contracts.py"
@@ -39,3 +43,5 @@ jobs:
         run: python3 tests/components/test_finance_navigation_contracts.py
       - name: Verify local read-only FinanceW Budget UI
         run: python3 tests/finance/test_finance_budget_ui_contracts.py
+      - name: Verify transaction draft stays non-mutating
+        run: python3 tests/finance/test_finance_transaction_draft_contracts.py

@@ -1,5 +1,6 @@
 """Radio Browser integration tests use injected directory payloads, not real internet."""
 import sys
+import uuid
 from pathlib import Path
 import unittest
 
@@ -13,7 +14,10 @@ SAFE = "https://streams.radio-example.org/jazz-128"
 def station(url=SAFE, name="Jazz Sample", codec="MP3", good=True, **extras):
     return {"url_resolved": url, "name": name, "codec": codec,
             "lastcheckok": good, "country": "United States",
-            "tags": "jazz,downtempo", "bitrate": 128, "stationuuid": "station-01", **extras}
+            "tags": "jazz,downtempo", "bitrate": 128,
+            "countrycode": "US",
+            "stationuuid": str(uuid.uuid5(uuid.NAMESPACE_URL, url)),
+            **extras}
 
 
 class RadioCatalogTests(unittest.TestCase):
@@ -37,7 +41,13 @@ class RadioCatalogTests(unittest.TestCase):
         self.assertEqual(calls[0]["codec"], "MP3")
         self.assertEqual(output["totalObserved"], 1)
         self.assertEqual(output["items"][0]["ref"], {
-            "source": "direct-stream", "kind": "stream", "id": SAFE})
+            "source": "radio-browser", "kind": "station",
+            "id": str(uuid.uuid5(uuid.NAMESPACE_URL, SAFE))})
+        self.assertNotIn("streamUrl", output["items"][0])
+        self.assertEqual(output["items"][0]["streamHost"], "streams.radio-example.org")
+        with self.assertRaises(MediaBackendError) as blocked:
+            cat.prepare(output["items"][0]["ref"])
+        self.assertEqual(blocked.exception.code, "PLAYBACK_UNAVAILABLE")
         self.assertEqual(output["nextCursor"], None)
 
     def test_station_name_genre_country_and_paging(self):
@@ -78,10 +88,16 @@ class RadioCatalogTests(unittest.TestCase):
         before = ctl.snapshot()
         out = ctl.dispatch("search", {"source": "radio-browser", "query": "tag:jazz"})
         self.assertEqual(out["browse"]["source"], "radio-browser")
-        self.assertEqual(out["browse"]["items"][0]["ref"]["source"], "direct-stream")
+        self.assertEqual(out["browse"]["items"][0]["ref"]["source"], "radio-browser")
+        station_ref = out["browse"]["items"][0]["ref"]
+        ctl.dispatch("select", {"ref": station_ref})
+        self.assertEqual(ctl.snapshot()["selection"], station_ref)
+        with self.assertRaises(MediaBackendError) as blocked:
+            ctl.dispatch("load", {"ref": station_ref})
+        self.assertEqual(blocked.exception.code, "PLAYBACK_UNAVAILABLE")
         after = ctl.snapshot()
         self.assertEqual(before["loaded"], after["loaded"])
-        self.assertEqual(before["selection"], after["selection"])
+        self.assertEqual(after["selection"], station_ref)
         self.assertEqual(before["session"]["state"], after["session"]["state"])
         self.assertFalse(any(call[0] in ("addid", "playid") for call in backend.calls))
         self.assertIn("radio-browser", [r["id"] for r in after["sources"]])

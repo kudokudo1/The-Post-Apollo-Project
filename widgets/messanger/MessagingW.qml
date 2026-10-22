@@ -61,6 +61,42 @@ PanelWindow {
         }
     }
 
+    // X runs as a separate browser app; Chromium owns its private profile.
+    Process {
+        id: xShowProcess
+        stderr: StdioCollector {
+            onStreamFinished: {
+                var detail = String(text || "").trim();
+                if (detail !== "")
+                    messagingWindow.xError = detail;
+            }
+        }
+        onExited: function(exitCode, exitStatus) {
+            if (exitCode !== 0 && messagingWindow.xError === "")
+                messagingWindow.xError = "X window could not be opened";
+            // Switching away during startup must not leave X on the desktop.
+            if (!messagingWindow.menuOpen || !messagingWindow.xSelected) {
+                messagingWindow.hideX();
+                return;
+            }
+            messagingWindow.requestGroupGeometry();
+            if (messagingWindow.restoreSelectorAfterXShow) {
+                messagingWindow.restoreSelectorAfterXShow = false;
+                messagingWindow.focusZone = messagingWindow.appZone;
+                messagingWindow.syncSocialGeometry(true);
+                Qt.callLater(function() {
+                    if (messagingWindow.menuOpen && messagingWindow.xSelected)
+                        messagingWindow.focusAppSelector();
+                });
+            }
+        }
+    }
+
+    Process {
+        id: xHideProcess
+        command: ["python3", Quickshell.shellPath("widgets/messanger/XBrowser.py"), "hide"]
+    }
+
     Process {
         id: discordHideProcess
         command: ["swaymsg", "[app_id=\"vesktop\"] move scratchpad"]
@@ -145,10 +181,12 @@ PanelWindow {
 
                     if (messagingWindow.menuOpen) {
                         Qt.callLater(function () {
-                            messagingWindow.syncSocialGeometry(!messagingWindow.discordSelected);
+                            messagingWindow.syncSocialGeometry(!messagingWindow.externalSelected);
 
                             if (messagingWindow.discordSelected && messagingWindow.discordReady) {
                                 messagingWindow.syncDiscordGeometry(false);
+                            } else if (messagingWindow.xSelected && messagingWindow.xReady) {
+                                messagingWindow.syncXGeometry(false);
                             }
                         });
                     }
@@ -182,7 +220,7 @@ PanelWindow {
             if (messagingWindow.socailReady || attempts >= 6) {
                 stop();
 
-                if (!messagingWindow.discordSelected)
+                if (!messagingWindow.externalSelected)
                     keyboardFocus.forceActiveFocus();
             }
         }
@@ -210,6 +248,13 @@ PanelWindow {
     // wait until the drag settles before raising Discord again. Doing it during
     // the drag would cancel Sway's move/resize operation.
     Timer {
+        id: xRaiseDelay
+        interval: 260
+        repeat: false
+        onTriggered: messagingWindow.raiseX()
+    }
+
+    Timer {
         id: discordRaiseDelay
 
         interval: 260
@@ -230,6 +275,8 @@ PanelWindow {
     // Tab navigation belongs to the Social selector, not the external
     // Discord window. Only set while a keyboard Main Mode transition opens it.
     property bool restoreSelectorAfterDiscordShow: false
+    property bool restoreSelectorAfterXShow: false
+    property string xError: ""
 
     property int focusZone: 0
 
@@ -245,9 +292,13 @@ PanelWindow {
     property int discordInset: 1
 
     readonly property bool discordSelected: activeAppIndex === 1
+    readonly property bool xSelected: activeAppIndex === 3
+    readonly property bool externalSelected: discordSelected || xSelected
 
     onDiscordSelectedChanged: updateGeometryHelperMode()
     onDiscordReadyChanged: updateGeometryHelperMode()
+    onXSelectedChanged: updateGeometryHelperMode()
+    onXReadyChanged: updateGeometryHelperMode()
 
     // ============================================================
     // SHARED GEOMETRY
@@ -276,9 +327,12 @@ PanelWindow {
     property bool socialReady: false
     property bool discordReady: false
     property bool discordConfigured: false
+    property bool xReady: false
+    property bool xConfigured: false
 
     property double ignoreSocialGeometryUntil: 0
     property double ignoreDiscordGeometryUntil: 0
+    property double ignoreXGeometryUntil: 0
 
     property int geometryTolerance: 0
 
@@ -401,7 +455,7 @@ PanelWindow {
             x: 0
             y: 0
 
-            width: messagingWindow.menuOpen ? (messagingWindow.discordSelected ? messagingWindow.appSelectorWidth : socialWindow.width) : 0
+            width: messagingWindow.menuOpen ? (messagingWindow.externalSelected ? messagingWindow.appSelectorWidth : socialWindow.width) : 0
 
             height: messagingWindow.menuOpen ? socialWindow.height : 0
         }
@@ -485,7 +539,9 @@ PanelWindow {
         sendGeometryHelper({
             op: "mode",
             discordSelected: discordSelected,
-            discordReady: discordReady
+            discordReady: discordReady,
+            xSelected: xSelected,
+            xReady: xReady
         });
     }
 
@@ -550,6 +606,48 @@ PanelWindow {
         }
 
         var socialChanged = socialReady && socialRect && now >= ignoreSocialGeometryUntil && !socialRectNearShared(socialRect);
+
+        if (xSelected) {
+            // X uses the shared external window slot, but its own lifecycle.
+            var xNode = payload.x;
+            var xRect = xNode ? xNode.rect : null;
+            if (!xRect) {
+                if (socialChanged)
+                    adoptSocialGeometry(socialRect);
+                return;
+            }
+            if (!xReady) {
+                xReady = true;
+                syncXGeometry(true);
+                return;
+            }
+            if (payload.fastLeader && payload.shared) {
+                sharedPanelX = Math.round(Number(payload.shared.x));
+                sharedPanelY = Math.round(Number(payload.shared.y));
+                sharedPanelWidth = Math.max(minimumSharedWidth, Math.round(Number(payload.shared.width)));
+                sharedPanelHeight = Math.max(minimumSharedHeight, Math.round(Number(payload.shared.height)));
+                return;
+            }
+            var xChanged = now >= ignoreXGeometryUntil && !discordRectNearShared(xRect);
+            if (socialChanged && xChanged) {
+                if (xNode.focused && (!socialNode || !socialNode.focused)) {
+                    adoptDiscordGeometry(xRect);
+                    syncSocialGeometry(false);
+                } else {
+                    adoptSocialGeometry(socialRect);
+                    syncXGeometry(false);
+                    xRaiseDelay.restart();
+                }
+            } else if (xChanged) {
+                adoptDiscordGeometry(xRect);
+                syncSocialGeometry(false);
+            } else if (socialChanged) {
+                adoptSocialGeometry(socialRect);
+                syncXGeometry(false);
+                xRaiseDelay.restart();
+            }
+            return;
+        }
 
         // Sessions / Telegram: the normal social window is the thing the user
         // Mod-moves/resizes, so it directly updates the shared geometry.
@@ -676,6 +774,23 @@ PanelWindow {
         discordConfigured = true;
     }
 
+    function syncXGeometry(focusWindow) {
+        if (!menuOpen || !xSelected || !xReady || !sharedPositionReady)
+            return;
+
+        ignoreXGeometryUntil = Date.now() + 280;
+        // Existing discord* values describe the shared external-app slot.
+        syncHelperWindow("x", discordX, discordY, discordWidth,
+                         discordHeight, focusWindow, !xConfigured);
+        xConfigured = true;
+    }
+
+    function raiseX() {
+        if (!menuOpen || !xSelected || !xReady)
+            return;
+        sendGeometryHelper({ op: "focusX" });
+    }
+
     function raiseDiscord() {
         if (!menuOpen || !discordSelected || !discordReady)
             return;
@@ -740,6 +855,36 @@ PanelWindow {
     }
 
     // ============================================================
+    // X APP LIFECYCLE
+    // ============================================================
+
+    function showX() {
+        if (!menuOpen || !xSelected)
+            return;
+        xError = "";
+        xReady = false;
+        xConfigured = false;
+        ignoreXGeometryUntil = 0;
+        if (xHideProcess.running)
+            xHideProcess.running = false;
+        if (!swayGeometryReady)
+            refreshSwayGeometry();
+        if (!xShowProcess.running)
+            xShowProcess.exec(["python3", Quickshell.shellPath("widgets/messanger/XBrowser.py"), "show"]);
+    }
+
+    function hideX() {
+        restoreSelectorAfterXShow = false;
+        xRaiseDelay.stop();
+        xReady = false;
+        xConfigured = false;
+        ignoreXGeometryUntil = 0;
+        if (xHideProcess.running)
+            xHideProcess.running = false;
+        xHideProcess.running = true;
+    }
+
+    // ============================================================
     // FOCUS / APP HELPERS
     // ============================================================
 
@@ -777,12 +922,21 @@ PanelWindow {
         }
 
         if (index === 1) {
+            hideX();
             restoreSelectorAfterDiscordShow = retainSelectorFocus === true;
             showDiscord();
             return;
         }
 
+        if (index === 3) {
+            hideDiscord();
+            restoreSelectorAfterXShow = retainSelectorFocus === true;
+            showX();
+            return;
+        }
+
         hideDiscord();
+        hideX();
 
         // Returning to Sessions / Telegram puts focus back on the same normal
         // social FloatingWindow, preserving the same Mod move/resize controls.
@@ -994,6 +1148,7 @@ PanelWindow {
 
         AppSelector {
             id: appSelector
+            statusText: messagingWindow.xSelected ? messagingWindow.xError : ""
 
             width: messagingWindow.appSelectorWidth
             height: parent.height
@@ -1035,7 +1190,7 @@ PanelWindow {
 
             visible: messagingWindow.menuOpen
 
-            discordMode: messagingWindow.discordSelected
+            discordMode: messagingWindow.externalSelected
 
             z: 2
 
@@ -1087,7 +1242,7 @@ PanelWindow {
 
             visible: messagingWindow.menuOpen
 
-            discordMode: messagingWindow.discordSelected
+            discordMode: messagingWindow.externalSelected
 
             z: 1
 
@@ -1168,6 +1323,7 @@ PanelWindow {
             appSelector.selectedIndex = 0;
 
             messagingWindow.hideDiscord();
+            messagingWindow.hideX();
 
             sharedPanelWidth = defaultPanelWidth;
             sharedPanelHeight = defaultPanelHeight;
@@ -1195,6 +1351,7 @@ PanelWindow {
                 discordLeaveProcess.running = false;
 
             discordLeaveProcess.running = true;
+            messagingWindow.hideX();
 
             activeAppIndex = 0;
             focusZone = appZone;

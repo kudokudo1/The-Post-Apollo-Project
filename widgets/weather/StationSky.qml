@@ -122,14 +122,14 @@ Rectangle {
         clip: true
         boundsBehavior: Flickable.StopAtBounds
         contentWidth: width
-        contentHeight: Math.max(height, skyContent.y + skyContent.implicitHeight + 24)
+        contentHeight: Math.max(height, skyContent.y + skyContent.implicitHeight + 12)
 
         Column {
             id: skyContent
-            x: 24
-            y: 24
-            width: Math.max(0, skyScroll.width - 48)
-            spacing: 20
+            x: 20
+            y: 12
+            width: Math.max(0, skyScroll.width - 40)
+            spacing: 6
 
             Row {
             width: parent.width
@@ -205,44 +205,52 @@ Rectangle {
                 }
             }
 
+            // The 80px condition glyph now shares the line with the name,
+            // reclaiming empty height without reducing the artwork.
             Column {
                 width: 190
-                spacing: 4
+                spacing: 2
 
                 SecondaryText {
                     text: "CONDITION"
                     font.pixelSize: 11
                 }
 
-                GohuText {
-                    text: sky.conditionText
-                    font.pixelSize: 16
-                    color: Colors.orange
-                }
+                Row {
+                    spacing: 4
 
-                Item {
-                    width: 110
-                    height: 110
-
-                    SafeDropShadow {
-                        anchors.fill: conditionIconGlyph
-                        safeSource: conditionIconGlyph
-                        requestedVisible: true
-                        radius: 12
-                        samples: 25
-                        horizontalOffset: 0
-                        verticalOffset: 0
-                        transparentBorder: true
-                        opacity: 0.95
-                        color: sky.iconColor(sky.conditionState.color)
+                    GohuText {
+                        width: 98
+                        text: sky.conditionText
+                        font.pixelSize: 14
+                        wrapMode: Text.WordWrap
+                        color: Colors.orange
                     }
 
-                    Text {
-                        id: conditionIconGlyph
-                        anchors.centerIn: parent
-                        text: sky.conditionState.icon
-                        font.pixelSize: 80
-                        color: sky.iconColor(sky.conditionState.color)
+                    Item {
+                        width: 88
+                        height: 88
+
+                        SafeDropShadow {
+                            anchors.fill: conditionIconGlyph
+                            safeSource: conditionIconGlyph
+                            requestedVisible: true
+                            radius: 12
+                            samples: 25
+                            horizontalOffset: 0
+                            verticalOffset: 0
+                            transparentBorder: true
+                            opacity: 0.95
+                            color: sky.iconColor(sky.conditionState.color)
+                        }
+
+                        Text {
+                            id: conditionIconGlyph
+                            anchors.centerIn: parent
+                            text: sky.conditionState.icon
+                            font.pixelSize: 80
+                            color: sky.iconColor(sky.conditionState.color)
+                        }
                     }
                 }
             }
@@ -504,10 +512,10 @@ Rectangle {
         }
 
         Column {
-            spacing: 8
+            spacing: 4
 
             StationSectionDivider {
-                width: sky.width - 48
+                width: skyContent.width
                 title: "FORECAST // NEXT HOURS"
             }
 
@@ -521,25 +529,29 @@ Rectangle {
                         required property var modelData
 
                         width: 112
-                        spacing: 3
+                        spacing: 2
 
-                        GohuText {
-                            text: modelData.timeLabel
-                            font.pixelSize: 12
-                            color: Colors.cyan
-                        }
+                        Row {
+                            spacing: 6
 
-                        GohuText {
-                            text: modelData.tempF > -900
-                                  ? Math.round(modelData.tempF) + "°F"
-                                  : "--°F"
-                            font.pixelSize: 17
-                            color: Colors.orange
+                            GohuText {
+                                text: modelData.timeLabel
+                                font.pixelSize: 12
+                                color: Colors.cyan
+                            }
+
+                            GohuText {
+                                text: modelData.tempF > -900
+                                      ? Math.round(modelData.tempF) + "°F"
+                                      : "--°F"
+                                font.pixelSize: 17
+                                color: Colors.orange
+                            }
                         }
 
                         Item {
                             width: parent.width
-                            height: 112
+                            height: 90
 
                             readonly property var forecastState:
                                 sky.iconState(modelData.condition, modelData.weatherCode, false)
@@ -566,31 +578,40 @@ Rectangle {
                             }
                         }
 
-                        QuietText {
-                            text: modelData.chanceRain >= 0
-                                  ? "RAIN " + Math.round(
-                                        modelData.chanceRain
-                                    ) + "%"
-                                  : "RAIN --"
-                            font.pixelSize: 9
-                        }
+                        Row {
+                            width: parent.width
+                            spacing: 5
 
-                        Rectangle {
-                            width: 92
-                            height: 6
-                            color: Colors.black
-                            border.width: 1
-                            border.color: sky.meterBorderColor
+                            QuietText {
+                                id: hourlyRainLabel
+                                text: modelData.chanceRain >= 0
+                                      ? "RAIN " + Math.round(
+                                            modelData.chanceRain
+                                        ) + "%"
+                                      : "RAIN --"
+                                font.pixelSize: 9
+                            }
 
                             Rectangle {
-                                x: 2
                                 anchors.verticalCenter: parent.verticalCenter
-                                width: (parent.width - 4)
-                                       * sky.chanceMeter(
-                                           modelData.chanceRain
-                                       )
-                                height: parent.height - 4
-                                color: sky.meterFillColor
+                                width: Math.max(20, parent.width
+                                               - hourlyRainLabel.implicitWidth
+                                               - parent.spacing)
+                                height: 6
+                                color: Colors.black
+                                border.width: 1
+                                border.color: sky.meterBorderColor
+
+                                Rectangle {
+                                    x: 2
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: (parent.width - 4)
+                                           * sky.chanceMeter(
+                                               modelData.chanceRain
+                                           )
+                                    height: parent.height - 4
+                                    color: sky.meterFillColor
+                                }
                             }
                         }
                     }
@@ -599,10 +620,10 @@ Rectangle {
         }
 
         Column {
-            spacing: 8
+            spacing: 4
 
             StationSectionDivider {
-                width: sky.width - 48
+                width: skyContent.width
                 title: "FORECAST // DAILY"
             }
 
@@ -618,31 +639,33 @@ Rectangle {
                         width: 220
                         spacing: 3
 
-                        GohuText {
-                            width: parent.width
-                            horizontalAlignment: Text.AlignHCenter
-                            text: modelData.date
-                            font.pixelSize: 12
-                            color: Colors.cyan
-                        }
+                        // Date and temperature form one centered header row.
+                        Row {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            spacing: 12
 
-                        GohuText {
-                            width: parent.width
-                            horizontalAlignment: Text.AlignHCenter
-                            text: (
-                                modelData.maxTempF > -900
-                                ? Math.round(modelData.maxTempF) : "--"
-                            ) + "° / " + (
-                                modelData.minTempF > -900
-                                ? Math.round(modelData.minTempF) : "--"
-                            ) + "°F"
-                            font.pixelSize: 16
-                            color: Colors.white
+                            GohuText {
+                                text: modelData.date
+                                font.pixelSize: 12
+                                color: Colors.cyan
+                            }
+
+                            GohuText {
+                                text: (
+                                    modelData.maxTempF > -900
+                                    ? Math.round(modelData.maxTempF) : "--"
+                                ) + "° / " + (
+                                    modelData.minTempF > -900
+                                    ? Math.round(modelData.minTempF) : "--"
+                                ) + "°F"
+                                font.pixelSize: 16
+                                color: Colors.white
+                            }
                         }
 
                         Item {
                             width: parent.width
-                            height: 132
+                            height: 116
 
                             readonly property var forecastState:
                                 sky.iconState(modelData.condition, modelData.weatherCode, false)
@@ -669,34 +692,37 @@ Rectangle {
                             }
                         }
 
-                        QuietText {
-                            width: parent.width
-                            horizontalAlignment: Text.AlignHCenter
-                            text: modelData.chanceRain >= 0
-                                  ? "RAIN "
-                                    + Math.round(modelData.chanceRain)
-                                    + "%"
-                                  : "RAIN --"
-                            font.pixelSize: 10
-                        }
-
-                        Rectangle {
-                            width: 180
+                        Row {
                             anchors.horizontalCenter: parent.horizontalCenter
-                            height: 6
-                            color: Colors.black
-                            border.width: 1
-                            border.color: sky.meterBorderColor
+                            spacing: 8
+
+                            QuietText {
+                                text: modelData.chanceRain >= 0
+                                      ? "RAIN "
+                                        + Math.round(modelData.chanceRain)
+                                        + "%"
+                                      : "RAIN --"
+                                font.pixelSize: 10
+                            }
 
                             Rectangle {
-                                x: 2
                                 anchors.verticalCenter: parent.verticalCenter
-                                width: (parent.width - 4)
-                                       * sky.chanceMeter(
-                                           modelData.chanceRain
-                                       )
-                                height: parent.height - 4
-                                color: sky.meterFillColor
+                                width: 120
+                                height: 6
+                                color: Colors.black
+                                border.width: 1
+                                border.color: sky.meterBorderColor
+
+                                Rectangle {
+                                    x: 2
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: (parent.width - 4)
+                                           * sky.chanceMeter(
+                                               modelData.chanceRain
+                                           )
+                                    height: parent.height - 4
+                                    color: sky.meterFillColor
+                                }
                             }
                         }
 
@@ -714,10 +740,6 @@ Rectangle {
             }
         }
 
-        QuietText {
-            text: "weather / atmosphere / radar / aviation"
-            font.pixelSize: 13
-        }
         }
     }
 

@@ -69,8 +69,14 @@ class DirectStreamTests(unittest.TestCase):
         self.controller.dispatch("load", {"ref": REF})
         self.assertEqual(self.mpd.playing_id, old_play_id)
         self.assertEqual([row[0] for row in self.mpd.calls].count("playid"), 1)
-        # Newly loaded item is not the currently playing item.
-        self.assertFalse(self.controller.snapshot()["session"]["ownedByController"])
+        # Loading a different cassette must preserve ownership of the
+        # still-playing local song. The pending cassette is not active yet.
+        self.assertTrue(self.controller.snapshot()["session"]["ownedByController"])
+        self.assertEqual(self.controller.owned_active_id, old_play_id)
+        self.assertNotEqual(self.controller.loaded["queueId"], old_play_id)
+        self.controller.dispatch("play")
+        self.assertEqual(self.mpd.playing_id, self.controller.loaded["queueId"])
+        self.assertTrue(self.controller.snapshot()["session"]["ownedByController"])
 
     def test_existing_youtube_video_is_not_accepted_as_stream(self):
         with self.assertRaises(MediaBackendError):

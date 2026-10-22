@@ -1,0 +1,9 @@
+{
+  "name": "org.postapollo.proton_mail",
+  "description": "Post-Apollo Proton Firefox read-only connection probe",
+  "path": "/ABSOLUTE/PATH/TO/proton_native_host.py",
+  "type": "stdio",
+  "allowed_extensions": [
+    "postapollo-proton@extensions.invalid"
+  ]
+}

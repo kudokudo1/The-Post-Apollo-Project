@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Notifications
 import "." as NotificationsBackend
+import "BrowserSiteIdentity.js" as BrowserSiteIdentity
 
 Singleton {
     id: root
@@ -61,6 +62,16 @@ Singleton {
             return sourceText;
 
         return "unknown";
+    }
+
+    // Optional child of the existing app/source policy key. Stable hostname
+    // identity comes from the browser origin metadata, never message mentions.
+    // Encode the parent so arbitrary app IDs cannot collide with child keys.
+    function websiteKey(sourceId, source, websiteHost) {
+        const host = BrowserSiteIdentity.hostnameFor(websiteHost);
+        if (host === "")
+            return "";
+        return "website:" + encodeURIComponent(sourceKey(sourceId, source)) + "::" + host;
     }
 
     // Favorites are source-wide, just like the card star, but are persisted
@@ -162,11 +173,15 @@ Singleton {
         return Number(policyFor(appKey).snoozeUntil || 0) > Date.now();
     }
 
-    function shouldSuppress(sourceId, source) {
-        const key = sourceKey(sourceId, source);
-        const policy = policyFor(key);
-
-        return policy.dnd === true || Number(policy.snoozeUntil || 0) > Date.now();
+    function shouldSuppress(sourceId, source, websiteHost) {
+        const parent = policyFor(sourceKey(sourceId, source));
+        if (parent.dnd === true || Number(parent.snoozeUntil || 0) > Date.now())
+            return true; // Existing app-wide policies always affect child sites.
+        const childKey = websiteKey(sourceId, source, websiteHost);
+        if (childKey === "")
+            return false;
+        const child = policyFor(childKey);
+        return child.dnd === true || Number(child.snoozeUntil || 0) > Date.now();
     }
 
     function ensurePolicy(appKey, sourceId, source) {
@@ -205,7 +220,8 @@ Singleton {
         for (let i = activeNotifications.count - 1; i >= 0; i--) {
             const entry = activeNotifications.get(i);
 
-            if (sourceKey(entry.sourceId, entry.source) === key)
+            if (sourceKey(entry.sourceId, entry.source) === key
+                    || websiteKey(entry.sourceId, entry.source, entry.websiteHost) === key)
                 activeNotifications.remove(i);
         }
     }
@@ -594,7 +610,7 @@ Singleton {
 
         pruneHistory();
 
-        const suppressed = shouldSuppress(entry.sourceId, entry.source);
+        const suppressed = shouldSuppress(entry.sourceId, entry.source, entry.websiteHost);
 
         if (suppressed) {
             if (activeIndex !== -1)

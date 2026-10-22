@@ -106,7 +106,7 @@ for(const date of [[2026,3,8],[2026,11,1],[2024,3,10],[2024,11,3]]){
 
 for(const invalid of [
     [null,0,0],["",0,0],["2026",0,0],[undefined,0,0],
-    [NaN,0,0],[Infinity,0,0],[0,0,0],
+    [NaN,0,0],[Infinity,0,0],
     [instant(2026,10,22),121,0],[instant(2026,10,22),-121,0],
     [instant(2026,10,22),1.2,0],[instant(2026,10,22),"1",0],
     [instant(2026,10,22),0,2],[instant(2026,10,22),0,"0"],
@@ -118,5 +118,8 @@ for(const invalid of [
     assert.equal(output.eventsState,"not-connected");
     assert.equal(output.eventCount,-1);
 }
+// Numeric zero is a valid instant (Unix epoch), although its LOCAL date
+// can be Dec 31, 1969 in a western time zone.
+assert.equal(policy.snapshot(0,0,0).state,"ready");
 assert.equal(calendar(2026,1,2,0,0).cells.some(x=>x.isToday),true);
 console.log("ApolloHub B9 local calendar civil-grid and DST policy tests passed");

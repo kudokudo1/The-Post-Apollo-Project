@@ -77,6 +77,10 @@ Item {
     readonly property bool mpdPlaying: playbackState === "playing"
 
     readonly property color accentColor: mpdPlaying ? Colors.orange : Colors.cyan
+    // Appearance-only open priority: opening the deck magenta-energizes all
+    // stars, clef, CAVA cores, individual halos and CAVA ambient light.
+    // Keep accentColor tied to playback for normal/closed presentation.
+    readonly property color artworkAccentColor: open ? Colors.magenta : accentColor
 
     // Follow the general height of CAVA without following individual spikes.
     // The four tallest of 16 bars set a padded, bounded ambient envelope.
@@ -132,7 +136,7 @@ Item {
         radius: height / 2
         blur: mediaDock.contentGlowRadius + 4
         spread: 0
-        color: mediaDock.accentColor
+        color: mediaDock.artworkAccentColor
         opacity: mediaDock.softGlowOpacity
         z: 0
     }
@@ -148,7 +152,7 @@ Item {
         radius: height / 2
         blur: mediaDock.contentGlowRadius + 4
         spread: 0
-        color: mediaDock.accentColor
+        color: mediaDock.artworkAccentColor
         opacity: mediaDock.softGlowOpacity
         z: 0
     }
@@ -168,7 +172,7 @@ Item {
         samples: mediaDock.contentGlowSamples + 6
         requestedVisible: true
         opacity: Math.min(1.0, mediaDock.contentGlowOpacity + 0.18)
-        color: mediaDock.accentColor
+        color: mediaDock.artworkAccentColor
         transparentBorder: true
         z: 0
     }
@@ -186,7 +190,7 @@ Item {
         samples: mediaDock.contentGlowSamples + 6
         requestedVisible: true
         opacity: Math.min(1.0, mediaDock.contentGlowOpacity + 0.18)
-        color: mediaDock.accentColor
+        color: mediaDock.artworkAccentColor
         transparentBorder: true
         z: 0
     }
@@ -204,7 +208,7 @@ Item {
         samples: mediaDock.contentGlowSamples + 6
         requestedVisible: true
         opacity: Math.min(1.0, mediaDock.contentGlowOpacity + 0.18)
-        color: mediaDock.accentColor
+        color: mediaDock.artworkAccentColor
         transparentBorder: true
         z: 0
     }
@@ -239,11 +243,14 @@ Item {
                 id: trebleClef
                 width: 15
                 height: 34
-                // One source change per playback-state change, not per CAVA
-                // frame: cyan when idle/paused/stopped, orange when playing.
-                source: mediaDock.mpdPlaying
-                    ? Qt.resolvedUrl("../assets/media/treble-clef-orange.png")
-                    : Qt.resolvedUrl("../assets/media/treble-clef-cyan.png")
+                // Switch only when opening/closing the deck or when MPD
+                // changes state, never on a CAVA frame. Keep the transparent
+                // original magenta PNG for the open state.
+                source: mediaDock.open
+                    ? Qt.resolvedUrl("../assets/media/treble-clef.png")
+                    : mediaDock.mpdPlaying
+                      ? Qt.resolvedUrl("../assets/media/treble-clef-orange.png")
+                      : Qt.resolvedUrl("../assets/media/treble-clef-cyan.png")
                 sourceSize: Qt.size(45, 102)
                 fillMode: Image.PreserveAspectFit
                 smooth: true
@@ -286,7 +293,7 @@ Item {
                 radius: height / 2
                 blur: mediaDock.contentGlowRadius + 4
                 spread: 0
-                color: mediaDock.accentColor
+                color: mediaDock.artworkAccentColor
                 opacity: 0.22
                 z: -1
 
@@ -319,7 +326,7 @@ Item {
                             width: parent.width + 8
                             height: cavaBar.height + 6
                             radius: 0
-                            color: mediaDock.accentColor
+                            color: mediaDock.artworkAccentColor
                             opacity: 0.22
                         }
 
@@ -330,7 +337,7 @@ Item {
                             width: parent.width + 4
                             height: cavaBar.height + 2
                             radius: 0
-                            color: mediaDock.accentColor
+                            color: mediaDock.artworkAccentColor
                             opacity: 0.40
                         }
 
@@ -342,7 +349,7 @@ Item {
                                 (Number(mediaDock.levels[index] || 0) / 7) * 27
                             ))
                             radius: 0
-                            color: mediaDock.accentColor
+                            color: mediaDock.artworkAccentColor
 
                             Behavior on height {
                                 NumberAnimation {

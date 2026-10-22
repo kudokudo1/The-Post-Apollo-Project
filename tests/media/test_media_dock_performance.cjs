@@ -25,8 +25,8 @@ function harness() {
     // property explicitly so normal CAVA frame tests exercise the production
     // fast path even after the probe was introduced.
     const context = vm.createContext({
-        barCount: 16,
-        levels: Array(16).fill(0),
+        barCount: 20,
+        levels: Array(20).fill(0),
         bgLagProbeEnabled: false
     });
     const receive = vm.runInContext("(function(frame) {" + match[1] + "\n})", context);
@@ -133,7 +133,7 @@ test("open state magenta-energizes every Media icon and CAVA visual without affe
     assert.match(source, /pressedDockGlowColor:\s*Colors\.magenta/);
 
     // Each star underlight + source shadow, clef source shadow, CAVA ambient,
-    // and both halos and cores on all 16 bars share the same open-priority
+    // and both halos and cores on all 20 bars share the same open-priority
     // color without sampling the animated bars as a blur texture.
     // The treble clef now owns an additional independently accent-colored
     // aura, so open-state magenta covers ten rather than nine visual layers.
@@ -331,7 +331,7 @@ test("stars and treble clef each have a matching local accent aura", () => {
     }
     assert.equal((source.match(/RectangularShadow \{/g) || []).length, 5);
     assert.equal((source.match(/SafeDropShadow \{/g) || []).length, 3);
-    assert.match(source, /Row \{\s*id:\s*mediaArtwork\s*anchors\.centerIn:\s*parent\s*spacing:\s*9\s*z:\s*1/);
+    assert.match(source, /Row \{\s*id:\s*mediaArtwork\s*anchors\.centerIn:\s*parent[\s\S]*?spacing:\s*13\s*z:\s*1/);
     assert.match(source, /id:\s*leadingStars[\s\S]*?text:\s*"‧₊˚"[\s\S]*?color:\s*mediaDock\.foregroundColor/);
     assert.match(source, /id:\s*trailingStar[\s\S]*?text:\s*"ׅ˖"[\s\S]*?color:\s*mediaDock\.foregroundColor/);
     // The clef preserves its font-independent PNG and has one sampled
@@ -388,7 +388,7 @@ test("magenta front wash, three independent static art glows, per-bar CAVA halos
 
     // Artwork renders above its glow sources. CAVA owns only its existing
     // geometry-only per-bar halos, never a combined drop-shadow texture.
-    assert.match(source, /Row \{\s*id:\s*mediaArtwork\s*anchors\.centerIn:\s*parent\s*spacing:\s*9\s*z:\s*1/);
+    assert.match(source, /Row \{\s*id:\s*mediaArtwork\s*anchors\.centerIn:\s*parent[\s\S]*?spacing:\s*13\s*z:\s*1/);
     assert.doesNotMatch(source, /id:\s*(?:musicMarkUnderlay|mediaArtworkUnderlay)/);
     assert.equal((source.match(/RectangularShadow \{/g) || []).length, 5,
         "rear and CAVA washes plus three independently bounded glyph auras");
@@ -397,8 +397,31 @@ test("magenta front wash, three independent static art glows, per-bar CAVA halos
     assert.doesNotMatch(source, /contentGlowSource:\s*(?:musicMark|mediaArtwork|spectrum|cavaBar)/);
 });
 
+test("music mark shifts left as four CAVA bars extend the centered taskbar artwork", () => {
+    const spectrumExpression = source.match(
+        /id:\s*spectrum\s*width:\s*(mediaDock\.barCount\s*\*\s*5\s*\+\s*\(mediaDock\.barCount\s*-\s*1\)\s*\*\s*2)/
+    )?.[1];
+    assert.ok(spectrumExpression, "the spectrum must derive its width from the CAVA count");
+    const spectrumWidth = count => vm.runInNewContext(spectrumExpression, {
+        mediaDock: {barCount: count}
+    });
+    assert.equal(spectrumWidth(16), 110);
+    assert.equal(spectrumWidth(20), 138);
+    assert.equal(spectrumWidth(20) - spectrumWidth(16), 28);
+
+    // A centered two-child Row places the first child farther left as its
+    // width increases. Widening the gap 9->13 moves it another 2px left.
+    const previousArtSpan = spectrumWidth(16) + 9;
+    const currentArtSpan = spectrumWidth(20) + 13;
+    assert.equal((currentArtSpan - previousArtSpan) / 2, 16,
+        "the left music mark moves ~16px away from the rightmost growth");
+    assert.match(source, /implicitWidth:\s*Math\.max\(200,\s*Math\.ceil\(mediaArtwork\.implicitWidth\)\s*\+\s*24\)/);
+    assert.match(source, /id:\s*musicMark[\s\S]*?spacing:\s*-2/);
+    assert.match(source, /id:\s*trebleClef\s*width:\s*15\s*height:\s*34/);
+});
+
 test("large faded CAVA-only ambient wash follows a padded spectrum envelope", () => {
-    // This is an additional ambient layer, not a replacement for the 16
+    // This is an additional ambient layer, not a replacement for the 20
     // individual CAVA bar halos or the separate static ornament glows.
     const section = source.match(/Item \{\s*id:\s*spectrum([\s\S]*?)\n\s*Row \{\s*anchors\.fill:\s*parent\s*spacing:\s*2/);
     assert.ok(section, "the wash must belong to the CAVA spectrum, not the whole dock");
@@ -419,8 +442,13 @@ test("large faded CAVA-only ambient wash follows a padded spectrum envelope", ()
         spectrum: {width: count * 5 + (count - 1) * 2},
         mediaDock: {softGlowSpread: 3, contentGlowRadius: 14}
     });
-    assert.equal(widthForBarCount(16), 152, "the wash places both blur edges beyond the end bars");
+    assert.equal(widthForBarCount(16), 152, "the 16-bar baseline is unchanged");
+    assert.equal(widthForBarCount(20), 180, "the new 20-bar wash still illuminates both ends");
     assert.equal(widthForBarCount(24), 208, "adding eight bars must extend the side glow automatically");
+    assert.equal(widthForBarCount(20) - widthForBarCount(16), 4 * (5 + 2),
+        "four extra bars expand the halo by four bar pitches");
+    assert.equal(widthForBarCount(24) - widthForBarCount(20), 4 * (5 + 2),
+        "20 to 24 bars keeps the same pitch");
     assert.equal(widthForBarCount(24) - widthForBarCount(16), 8 * (5 + 2),
         "wash growth must match the spectrum growth without fixed pixel widths");
     assert.equal((widthForBarCount(16) - (16 * 5 + 15 * 2)) / 2, 14 + 4 + 3,
@@ -530,8 +558,10 @@ test("CAVA's two existing halos get brighter with taller bars at no added render
     assert.doesNotMatch(body, /ShaderEffect|DropShadow|layer\.enabled|Behavior on opacity/);
 });
 
-test("CAVA preserves 16-bar output at a bounded 15 FPS", () => {
-    assert.match(config, /^bars\s*=\s*16$/m);
+test("CAVA preserves 20-bar output at a bounded 15 FPS", () => {
+    assert.match(config, /^bars\s*=\s*20$/m);
+    assert.match(source, /readonly property int barCount:\s*20/,
+        "the QML delegate count must match the CAVA output format");
     assert.match(config, /^framerate\s*=\s*15$/m);
     assert.match(config, /^method\s*=\s*raw$/m);
     assert.match(config, /^data_format\s*=\s*ascii$/m);
@@ -542,29 +572,29 @@ test("CAVA preserves 16-bar output at a bounded 15 FPS", () => {
 test("silent frames and repeated levels cannot trigger rebinds or animations", () => {
     const {context, receive} = harness();
     const initial = context.levels;
-    receive(Array(16).fill("0").join(";") + ";");
+    receive(Array(20).fill("0").join(";") + ";");
     assert.equal(context.levels, initial, "silent stream must preserve array identity");
-    const song = Array(16).fill("4").join(";") + ";";
+    const song = Array(20).fill("4").join(";") + ";";
     receive(song);
     const published = context.levels;
     assert.notEqual(published, initial);
-    assert.equal(published.length, 16);
+    assert.equal(published.length, 20);
     assert.ok(Array.from(published).every(n => n === 4));
     receive(song);
     assert.equal(context.levels, published, "repeat must not publish new levels");
-    receive(Array(16).fill("0").join(";"));
+    receive(Array(20).fill("0").join(";"));
     assert.notEqual(context.levels, published, "silence transition must still update");
     const zero = context.levels;
-    receive(Array(16).fill("0").join(";"));
+    receive(Array(20).fill("0").join(";"));
     assert.equal(context.levels, zero, "subsequent silence must stay quiet");
 });
 
 test("bad frames cannot reset or replace the current visualizer reading", () => {
     const {context, receive} = harness();
-    receive(Array(16).fill("2").join(";"));
+    receive(Array(20).fill("2").join(";"));
     const valid = context.levels;
-    for (const invalid of ["", "1;2;3", Array(16).fill("NaN").join(";"),
-                           Array(16).fill("bad").join(";")]) {
+    for (const invalid of ["", "1;2;3", Array(20).fill("NaN").join(";"),
+                           Array(20).fill("bad").join(";")]) {
         receive(invalid);
         assert.equal(context.levels, valid);
     }

@@ -139,7 +139,7 @@ The pure, read-only projection policy is `services/hub/ApolloHubMediaPolicy.js`.
 
 A successful `HeadlessMediaController.snapshot` response advances freshness only when `pendingAction === "snapshot"` and `errorText` is empty. Search, inspection, and selection must not renew an old playback observation. Observed MPD state expires after **15 seconds** with no new successful snapshot; a five-second *clock-only timer* enforces expiry while attached. Loaded media and active playing media are kept separate. Neither `selection` nor `browse` are displayed as loaded or playing.
 
-**Existing lifecycle limitation:** The current Hi-Fi deck sets `HeadlessMediaController.polling` only while the deck is open in MPD mode. With the deck closed, MPD observations will expire and the Hub must show `stale`. To display truly live closed-deck MPD state, another owner must expose the **existing** Media dock's already-running `mpc` observation (2-second cadence) or arrange an authorized shared observation source. Do not start another observer here.
+**B4 playback observation fix (draft PR #443):** The Hi-Fi deck still polls its HeadlessMediaController only while open in MPD mode. The shared shell now also injects `mpdDockSource: sharedMediaDock` to reuse the **existing** Media dock's already-running `mpc` observation (2-second cadence). The Hub policy prioritizes a fresh dock MPD playback state and combined artist-title label for continuous closed-deck updates, while retaining HeadlessMediaController's independently observed last-loaded cassette, ownership and freshness. A 15-second expiry applies to both independent sources; neither source proves audible sound. A stopped/offline dock cannot masquerade as playing. No new MPD process or poller is created. This behavior is source/CI tested, **not yet runtime verified**.
 
 ### MPRIS consumer properties
 
@@ -149,18 +149,19 @@ A successful `HeadlessMediaController.snapshot` response advances freshness only
 
 A browser appearing in the MPRIS list is **not** permission to take it over. Even one discovered player stays `selection-required` until the existing Hi-Fi MPRIS selector intentionally supplies its `selectedBusName`. No controls or mutable references escape into the Hub snapshot.
 
-### Owner-mediated integration (NOT yet implemented)
+### Owner-mediated integration (proposed in draft PR; runtime unverified)
 
-The Media Deck currently creates **one** `HeadlessMediaController { id: headless }` and **one** `MprisPlaybackAdapter { id: mediaAdapter }` inside `widgets/MediaDeckW.qml`. They are not exposed to `shell.qml` or the Hub, so **do not construct another instance just to fill the Hub tile**.
+The Media Deck creates **one** `HeadlessMediaController { id: headless }` and **one** `MprisPlaybackAdapter { id: mediaAdapter }` inside `widgets/MediaDeckW.qml`. On the B4 integration branch, these existing instances are exposed through read-only Media Deck/Dock properties and passed to the Hub bridge by the existing shell. **Never construct another instance to fill the Hub tile.**
 
 The Media/UI owner should expose read-only references (or snapshots) via `MediaDeckW` → `Mediaplayer.qml` to the shared shell, without changing playback controls. Then the shell owner can add to the **already existing** `ApolloHubLiveBridge`:
 
 ```qml
 mediaControllerSource: sharedMediaDock.hubMediaController
 selectedMprisBusName: sharedMediaDock.hubSelectedMprisBusName
+mpdDockSource: sharedMediaDock
 ```
 
-These properties are **illustrative proposed interface names, not currently implemented properties**. The media and shell owners must approve their exact names and ensure bindings stay reactive. The Hub UI owner can add `mediaSnapshot: hub.liveBridge ? hub.liveBridge.mediaSnapshot : null` to the mini Media tile, and choose which of the two independent sources to display without silently switching the deck's transport mode.
+**Draft integration:** the owner-facing properties `hubMediaController` and `hubSelectedMprisBusName` are now proposed in a dedicated B4 integration branch, forwarded through `MediaDeckW.qml` → `Mediaplayer.qml`. The shared-shell binding is in the same draft PR for owner coordination, **not yet merged or desktop accepted**. The Hub Media tile already consumes `mediaSnapshot`; no second tile or adapter is required. The shell owner should check concurrent edits and QML lifetime/binding behavior before merge.
 
 ### Tests and acceptance
 

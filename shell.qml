@@ -244,6 +244,12 @@ PanelWindow {
         weatherSource: weatherService
         // Share Network dock's live iw reading; no new speed observer.
         networkDockSource: sharedNetworkDock
+        // B4: consume the ONE Media Dock's existing controller/selection.
+        // Both references are read by the bridge; it never commands playback.
+        mediaControllerSource: sharedMediaDock.hubMediaController
+        selectedMprisBusName: sharedMediaDock.hubSelectedMprisBusName
+        // Feed the already-running dock's 2s MPD observation: no new poller.
+        mpdDockSource: sharedMediaDock
     }
 
     // Official NWS alerts only when an operator-pinned geographic point exists.
@@ -427,7 +433,9 @@ PanelWindow {
 
         // Mediaplayer
 
-        Mediaplayer {}
+        Mediaplayer {
+            id: sharedMediaDock
+        }
 
         // Hospital
 

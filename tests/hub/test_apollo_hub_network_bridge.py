@@ -21,6 +21,10 @@ for name in (
     "readonly property var networkSnapshot: NetworkPolicy.snapshot({",
     "wifiSignal: activeWifiNetwork ? activeWifiNetwork.signalStrength : null",
     "ethernetConnected:",
+    "property var networkDockSource: null",
+    "wifiLinkSpeedMbps: networkDockSource",
+    "networkDockSource.observedWifiLinkMbps",
+
 ):
     assert name in bridge, f"Bridge missing passive Network source: {name}"
 
@@ -32,6 +36,7 @@ for needle in ("import Quickshell.Networking", "Networking.devices",
 
 for needle in (
     ".pragma library", "function snapshot(", "function signalPercent(",
+    "function linkSpeedMbps(", "linkSpeedApproximate:",
     'internetState: "unverified"', "signalPercent:", '? "unavailable"',
 ):
     assert needle in policy, f"Missing projection policy: {needle}"
@@ -46,7 +51,15 @@ for forbidden in (
 ):
     assert forbidden not in code_only, f"Extra polling/control prohibited: {forbidden}"
 
-assert shell.count("Network {}") == 1
+# One existing Network instance supplies both icon UI and its iw speed reading.
+assert shell.count("Network {") == 1
+assert "id: sharedNetworkDock" in shell
+assert "networkDockSource: sharedNetworkDock" in shell
+assert "readonly property real observedWifiLinkMbps:" in dock
+assert "root.wifiEnabled && root.active" in dock
+assert "root.linkSpeed" in dock
+assert dock.count('id: wifiLinkProcess') == 1
+assert dock.count('interval: 500') == 1
 assert "ApolloHubLiveBridge {" in shell
 assert "liveBridge: apolloHubLive" in shell
 assert "systemSnapshot: SystemPolicy.snapshot(" in bridge

@@ -168,11 +168,41 @@ not live implementation, exact geometry, or a new shared keyboard-focus policy.
   real Wayland/Quickshell testing; if the desktop cannot distinguish a bare
   Shift gesture safely, keep keyboard SELECT unavailable rather than
   hijacking text input or navigation.
-- The existing Media Deck currently declares `WlrKeyboardFocus.None` and
-  is not yet registered with the shared focus broker. Keyboard activation
-  needs an independently verified owner-approved focus integration; a QML
-  shortcut alone must never be reported as working on the desktop.
+- Historical mainline Media Deck declared `WlrKeyboardFocus.None`.
+  Draft PR #427 now proposes *local* `WlrKeyboardFocus.OnDemand` only while
+  the Hi-Fi is open; it is still **not registered with the shared focus broker**.
+  Normal Enter/arrow typing is wired for a first on-device trial, but standalone
+  Shift SELECT deliberately remains disabled via `standaloneShiftVerified:false`
+  until reliable modifier-only and cross-widget focus behavior is proven.
+  A QML shortcut alone must never be reported as working on the desktop.
 - Reuse `SelectorDial` and `SelectorSlider` semantics where appropriate.
   Physical sizing, hit areas, and geometry must be grounded in existing
   implementations or live runtime verification; no dimensions are approved
   by this contract.
+
+## 2026-10-22 // Hi-Fi browser control-bay development checkpoint
+
+**Status:** Source and CI pass on draft PR #427; no on-device Quickshell
+rendering or key-delivery acceptance yet. This is not a final geometry
+decision, not a merge, and not a registered Hospital Room checkpoint.
+
+- `widgets/MediaDeckBrowserControls.qml` now uses the existing SelectorDial,
+  SelectorSlider, and ActionButton families. Small left dial selects
+  SOURCE/RESULTS/NOW; slider highlights result rows; right dial moves in
+  five-row browsing groups as a **provisional** tuning interpretation.
+- SEARCH text field, source selection (LIBRARY/YOUTUBE/RADIO), SELECT, ENTER,
+  LOAD, MPD/MPRIS controls and legacy transport keys are in the control bay.
+  The upper display is read-only and the cassette bay no longer has an
+  interactive radio load button.
+- SELECT stages an item; LOAD cues selected supported local or direct-HTTPS
+  source; ENTER cues a highlighted local track or radio station; PLAY remains
+  separate. All three cue paths preserve **no autoplay**. YouTube remains a
+  catalog-only source, and full-playlist cue/start-index is not implemented.
+- The media bridge exposes search/inspect/select/cue operations to the QML
+  client. UI snapshots expose browse and loaded identities separately.
+- Source-level media contracts and grammar checks passed; they are not
+  a substitute for QML loading, SwayFX focus transfer, MPD playback,
+  radio output, or physical visual inspection on the operator desktop.
+- Needs: confirm geometry, real search entry/focus, selector motion and
+  scroll direction, radio/select/load/PLAY separation, no browser-tab
+  takeover, idle playback continuity and other apps retaining keystrokes.

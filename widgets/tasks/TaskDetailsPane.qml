@@ -117,6 +117,12 @@ SectionFrame {
             feedback = "TASK REMOVED";
         }
     }
+    onVisibleChanged: {
+        if (!visible) {
+            dueDateInput.focus = false;
+            descriptionInput.focus = false;
+        }
+    }
 
     Column {
         anchors.fill: parent

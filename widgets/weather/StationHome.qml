@@ -14,6 +14,15 @@ Rectangle {
         weatherService && weatherService.aqiReady
     readonly property bool spaceReady:
         spaceService && spaceService.ready
+    readonly property bool spacePartial:
+        spaceService
+        && !spaceService.ready
+        && (
+            spaceService.kpReady
+            || spaceService.solarWindReady
+            || spaceService.magneticFieldReady
+            || spaceService.solarFluxReady
+        )
 
     readonly property real temperatureValue:
         weatherReady ? Number(weatherService.tempF) : 0
@@ -40,30 +49,348 @@ Rectangle {
         nextForecast && Number(nextForecast.chanceRain) >= 0
         ? Number(nextForecast.chanceRain) : 0
 
-    readonly property var watchItem: StationHomePolicy.chooseRelevant({
-        "weatherReady": weatherReady,
-        "aqiReady": aqiReady,
-        "spaceReady": spaceReady,
-        "aqi": weatherService ? weatherService.aqi : -1,
-        "aqiLabel": weatherService ? weatherService.aqiLabel : "",
-        "uvIndex": weatherService ? weatherService.uvIndex : -1,
-        "hourlyForecast":
-            weatherService ? weatherService.hourlyForecast : [],
-        "kp": spaceService ? spaceService.kp : -1,
-        "kpLabel": spaceService ? spaceService.kpLabel : "",
-        "solarWindSpeed":
-            spaceService ? spaceService.solarWindSpeed : -1,
-        "bz":
-            spaceService && spaceService.magneticFieldReady
-            ? spaceService.magneticFieldBz : 999,
-        "spaceError": spaceService ? spaceService.errorText : ""
-    })
+    property double relevanceClockMs: Date.now()
+
+    readonly property int weatherAgeMinutes: {
+        relevanceClockMs;
+
+        if (!weatherService || !weatherService.ready)
+            return -1;
+
+        const stamp = weatherService.lastUpdated;
+        if (!stamp || typeof stamp.getTime !== "function")
+            return -1;
+
+        const millis = stamp.getTime();
+        if (!isFinite(millis) || millis <= 0)
+            return -1;
+
+        return Math.max(
+            0,
+            Math.floor((relevanceClockMs - millis) / 60000)
+        );
+    }
+
+    readonly property bool weatherStale:
+        weatherReady
+        && (
+            String(weatherService.errorText || "").length > 0
+            || weatherAgeMinutes >= 20
+        )
+
+    // Space feeds have different natural cadences. Kp is reported in
+    // three-hour bins, solar-wind/IMF summaries are near-real-time, and
+    // F10.7 is a daily observation. Use source-specific age windows with
+    // slack instead of falsely applying one freshness threshold to all four.
+    readonly property int kpStaleAfterMinutes: 360
+    readonly property int solarWindStaleAfterMinutes: 45
+    readonly property int magneticFieldStaleAfterMinutes: 45
+    readonly property int solarFluxStaleAfterMinutes: 2160
+
+    function sourceAgeMinutes(value) {
+        relevanceClockMs;
+
+        let raw = String(value || "").trim();
+        if (!raw)
+            return -1;
+
+        raw = raw.replace(" ", "T");
+
+        if (!/(Z|[+\-]\d{2}:?\d{2})$/i.test(raw))
+            raw += "Z";
+
+        const millis = Date.parse(raw);
+        if (!isFinite(millis) || millis <= 0)
+            return -1;
+
+        return Math.max(
+            0,
+            Math.floor((relevanceClockMs - millis) / 60000)
+        );
+    }
+
+    readonly property int kpAgeMinutes:
+        spaceService && spaceService.kpReady
+        ? sourceAgeMinutes(spaceService.kpTime) : -1
+    readonly property int solarWindAgeMinutes:
+        spaceService && spaceService.solarWindReady
+        ? sourceAgeMinutes(spaceService.solarWindTime) : -1
+    readonly property int magneticFieldAgeMinutes:
+        spaceService && spaceService.magneticFieldReady
+        ? sourceAgeMinutes(spaceService.magneticFieldTime) : -1
+    readonly property int solarFluxAgeMinutes:
+        spaceService && spaceService.solarFluxReady
+        ? sourceAgeMinutes(spaceService.solarFluxTime) : -1
+
+    readonly property bool spaceStale:
+        (kpAgeMinutes >= kpStaleAfterMinutes)
+        || (solarWindAgeMinutes >= solarWindStaleAfterMinutes)
+        || (magneticFieldAgeMinutes >= magneticFieldStaleAfterMinutes)
+        || (solarFluxAgeMinutes >= solarFluxStaleAfterMinutes)
+
+    readonly property string spaceStaleDetail: {
+        const parts = [];
+
+        if (kpAgeMinutes >= kpStaleAfterMinutes)
+            parts.push("KP " + kpAgeMinutes + "m");
+        if (solarWindAgeMinutes >= solarWindStaleAfterMinutes)
+            parts.push("WIND " + solarWindAgeMinutes + "m");
+        if (magneticFieldAgeMinutes >= magneticFieldStaleAfterMinutes)
+            parts.push("IMF " + magneticFieldAgeMinutes + "m");
+        if (solarFluxAgeMinutes >= solarFluxStaleAfterMinutes)
+            parts.push("F10.7 " + solarFluxAgeMinutes + "m");
+
+        return parts.length > 0
+               ? "STALE // " + parts.join(" // ")
+               : "";
+    }
+
+    // HOME tracks only session-local deltas between completed provider
+    // observations. The services remain the single owners of fetching.
+    property bool weatherTrendSeeded: false
+    property real previousTemperatureF: 0
+    property real previousPressureHpa: 0
+    property real previousRainChance: 0
+    property real temperatureDelta: 0
+    property real pressureDelta: 0
+    property real rainChanceDelta: 0
+
+    property bool aqiTrendSeeded: false
+    property real previousAqi: 0
+    property real aqiDelta: 0
+
+    property bool kpTrendSeeded: false
+    property real previousKp: 0
+    property real kpDelta: 0
+
+    property bool solarWindTrendSeeded: false
+    property real previousSolarWind: 0
+    property real solarWindDelta: 0
+
+    property bool bzTrendSeeded: false
+    property real previousBz: 0
+    property real bzDelta: 0
+
+    property var watchItems: []
+    property var activeWatchIds: []
+
+    function finiteNumber(value, fallback) {
+        const number = Number(value);
+        return isFinite(number) ? number : fallback;
+    }
 
     function clamp01(value) {
         const number = Number(value);
         if (!isFinite(number))
             return 0;
         return Math.max(0, Math.min(1, number));
+    }
+
+    function currentNowMinutes() {
+        const now = new Date(relevanceClockMs);
+        return now.getHours() * 60 + now.getMinutes();
+    }
+
+    function buildRelevanceInput() {
+        return {
+            "weatherReady": weatherReady,
+            "weatherStale": weatherStale,
+            "weatherAgeMinutes": weatherAgeMinutes,
+            "weatherError":
+                weatherService ? weatherService.errorText : "",
+            "aqiReady": aqiReady,
+            "aqiError":
+                weatherService ? weatherService.aqiErrorText : "",
+            "spaceReady": spaceReady,
+            "spacePartial": spacePartial,
+            "spaceStale": spaceStale,
+            "spaceStaleDetail": spaceStaleDetail,
+            "spaceError": spaceService ? spaceService.errorText : "",
+
+            "temperatureF":
+                weatherService ? weatherService.tempF : -999,
+            "humidity":
+                weatherService ? weatherService.humidity : -1,
+            "windMph":
+                weatherService ? weatherService.windMph : -1,
+            "windDirection":
+                weatherService ? weatherService.windDirection : "",
+            "condition":
+                weatherService ? weatherService.condition : "",
+            "pressureHpa":
+                weatherService ? weatherService.pressureHpa : -1,
+            "visibilityMiles":
+                weatherService ? weatherService.visibilityMiles : -1,
+            "cloudCover":
+                weatherService ? weatherService.cloudCover : -1,
+            "uvIndex":
+                weatherService ? weatherService.uvIndex : -1,
+
+            "aqi": weatherService ? weatherService.aqi : -1,
+            "aqiLabel":
+                weatherService ? weatherService.aqiLabel : "",
+            "pm25":
+                weatherService ? weatherService.pm25 : -1,
+
+            "hourlyForecast":
+                weatherService ? weatherService.hourlyForecast : [],
+            "dailyForecast":
+                weatherService ? weatherService.dailyForecast : [],
+
+            "kp": spaceService ? spaceService.kp : -1,
+            "kpLabel":
+                spaceService ? spaceService.kpLabel : "",
+            "solarWindSpeed":
+                spaceService ? spaceService.solarWindSpeed : -1,
+            "bz":
+                spaceService && spaceService.magneticFieldReady
+                ? spaceService.magneticFieldBz : 999,
+            "bt":
+                spaceService && spaceService.magneticFieldReady
+                ? spaceService.magneticFieldBt : -1,
+            "solarFlux":
+                spaceService && spaceService.solarFluxReady
+                ? spaceService.solarFlux : -1,
+
+            "temperatureDelta":
+                weatherTrendSeeded ? temperatureDelta : 0,
+            "pressureDelta":
+                weatherTrendSeeded ? pressureDelta : 0,
+            "rainChanceDelta":
+                weatherTrendSeeded ? rainChanceDelta : 0,
+            "aqiDelta":
+                aqiTrendSeeded ? aqiDelta : 0,
+            "kpDelta":
+                kpTrendSeeded ? kpDelta : 0,
+            "solarWindDelta":
+                solarWindTrendSeeded ? solarWindDelta : 0,
+            "bzDelta":
+                bzTrendSeeded ? bzDelta : 0,
+
+            "nowMinutes": currentNowMinutes()
+        };
+    }
+
+    function refreshWatch() {
+        const next = StationHomePolicy.rankRelevant(
+            buildRelevanceInput(),
+            activeWatchIds,
+            3
+        );
+
+        watchItems = next;
+
+        const ids = [];
+        for (let i = 0; i < next.length; i++) {
+            if (Number(next[i].rank) > 0)
+                ids.push(String(next[i].id || ""));
+        }
+        activeWatchIds = ids;
+    }
+
+    function captureWeatherSnapshot() {
+        if (!weatherReady) {
+            weatherTrendSeeded = false;
+            refreshWatch();
+            return;
+        }
+
+        const temp = finiteNumber(weatherService.tempF, -999);
+        const pressure = finiteNumber(weatherService.pressureHpa, -1);
+        const rain = nextForecast
+                     ? finiteNumber(nextForecast.chanceRain, -1)
+                     : -1;
+
+        if (weatherTrendSeeded) {
+            temperatureDelta =
+                temp > -900 && previousTemperatureF > -900
+                ? temp - previousTemperatureF : 0;
+            pressureDelta =
+                pressure >= 0 && previousPressureHpa >= 0
+                ? pressure - previousPressureHpa : 0;
+            rainChanceDelta =
+                rain >= 0 && previousRainChance >= 0
+                ? rain - previousRainChance : 0;
+        }
+
+        previousTemperatureF = temp;
+        previousPressureHpa = pressure;
+        previousRainChance = rain;
+        weatherTrendSeeded = true;
+        refreshWatch();
+    }
+
+    function captureAqiSnapshot() {
+        if (!aqiReady) {
+            aqiTrendSeeded = false;
+            refreshWatch();
+            return;
+        }
+
+        const current = finiteNumber(weatherService.aqi, -1);
+        if (aqiTrendSeeded && current >= 0 && previousAqi >= 0)
+            aqiDelta = current - previousAqi;
+
+        previousAqi = current;
+        aqiTrendSeeded = true;
+        refreshWatch();
+    }
+
+    function captureKpSnapshot() {
+        if (!spaceService || !spaceService.kpReady) {
+            kpTrendSeeded = false;
+            refreshWatch();
+            return;
+        }
+
+        const current = finiteNumber(spaceService.kp, -1);
+        if (kpTrendSeeded && current >= 0 && previousKp >= 0)
+            kpDelta = current - previousKp;
+
+        previousKp = current;
+        kpTrendSeeded = true;
+        refreshWatch();
+    }
+
+    function captureSolarWindSnapshot() {
+        if (!spaceService || !spaceService.solarWindReady) {
+            solarWindTrendSeeded = false;
+            refreshWatch();
+            return;
+        }
+
+        const current = finiteNumber(
+            spaceService.solarWindSpeed,
+            -1
+        );
+        if (solarWindTrendSeeded
+                && current >= 0
+                && previousSolarWind >= 0) {
+            solarWindDelta = current - previousSolarWind;
+        }
+
+        previousSolarWind = current;
+        solarWindTrendSeeded = true;
+        refreshWatch();
+    }
+
+    function captureBzSnapshot() {
+        if (!spaceService || !spaceService.magneticFieldReady) {
+            bzTrendSeeded = false;
+            refreshWatch();
+            return;
+        }
+
+        const current = finiteNumber(
+            spaceService.magneticFieldBz,
+            999
+        );
+        if (bzTrendSeeded && current < 900 && previousBz < 900)
+            bzDelta = current - previousBz;
+
+        previousBz = current;
+        bzTrendSeeded = true;
+        refreshWatch();
     }
 
     function uvLabel(value) {
@@ -97,6 +424,96 @@ Rectangle {
         if (key === "space")
             return Colors.magenta;
         return Colors.orange;
+    }
+
+    Timer {
+        interval: 60000
+        repeat: true
+        running: true
+
+        onTriggered: {
+            home.relevanceClockMs = Date.now();
+            home.refreshWatch();
+        }
+    }
+
+    Connections {
+        target: home.weatherService
+
+        function onReadyChanged() {
+            if (home.weatherReady)
+                home.captureWeatherSnapshot();
+            else {
+                home.weatherTrendSeeded = false;
+                home.refreshWatch();
+            }
+        }
+
+        function onLastUpdatedChanged() {
+            home.captureWeatherSnapshot();
+        }
+
+        function onAqiReadyChanged() {
+            if (home.aqiReady)
+                home.captureAqiSnapshot();
+            else {
+                home.aqiTrendSeeded = false;
+                home.refreshWatch();
+            }
+        }
+
+        function onAqiLastUpdatedChanged() {
+            home.captureAqiSnapshot();
+        }
+
+        function onErrorTextChanged() {
+            home.refreshWatch();
+        }
+
+        function onAqiErrorTextChanged() {
+            home.refreshWatch();
+        }
+    }
+
+    Connections {
+        target: home.spaceService
+
+        function onKpTimeChanged() {
+            home.captureKpSnapshot();
+        }
+
+        function onSolarWindTimeChanged() {
+            home.captureSolarWindSnapshot();
+        }
+
+        function onMagneticFieldTimeChanged() {
+            home.captureBzSnapshot();
+        }
+
+        function onReadyChanged() {
+            home.refreshWatch();
+        }
+
+        function onErrorTextChanged() {
+            home.refreshWatch();
+        }
+    }
+
+    Component.onCompleted: {
+        relevanceClockMs = Date.now();
+
+        if (weatherReady)
+            captureWeatherSnapshot();
+        if (aqiReady)
+            captureAqiSnapshot();
+        if (spaceService && spaceService.kpReady)
+            captureKpSnapshot();
+        if (spaceService && spaceService.solarWindReady)
+            captureSolarWindSnapshot();
+        if (spaceService && spaceService.magneticFieldReady)
+            captureBzSnapshot();
+
+        refreshWatch();
     }
 
     color: Colors.black
@@ -150,7 +567,9 @@ Rectangle {
                     ? weatherService.tempF + "°F" : "--°F"
                 detailText:
                     home.weatherReady
-                    ? String(weatherService.condition || "UNKNOWN").toUpperCase()
+                    ? String(
+                        weatherService.condition || "UNKNOWN"
+                      ).toUpperCase()
                     : "WEATHER OFFLINE"
                 footerText:
                     home.weatherReady
@@ -159,7 +578,8 @@ Rectangle {
                 accentColor: Colors.cyan
                 valueColor: Colors.orange
                 meterVisible: home.weatherReady
-                meterValue: home.clamp01(home.temperatureValue / 120)
+                meterValue:
+                    home.clamp01(home.temperatureValue / 120)
                 meterFillColor: Colors.orange
             }
 
@@ -171,11 +591,15 @@ Rectangle {
                 valueText:
                     home.nextForecast
                     && Number(home.nextForecast.tempF) > -900
-                    ? Math.round(Number(home.nextForecast.tempF)) + "°F"
+                    ? Math.round(
+                        Number(home.nextForecast.tempF)
+                      ) + "°F"
                     : "--°F"
                 detailText:
                     home.nextForecast
-                    ? String(home.nextForecast.timeLabel || "--")
+                    ? String(
+                        home.nextForecast.timeLabel || "--"
+                      )
                       + " // "
                       + String(
                           home.nextForecast.condition || "FORECAST"
@@ -190,7 +614,8 @@ Rectangle {
                 accentColor: Colors.cyan
                 valueColor: Colors.orange
                 meterVisible: home.nextForecast !== null
-                meterValue: home.clamp01(home.nextRainChance / 100)
+                meterValue:
+                    home.clamp01(home.nextRainChance / 100)
                 meterFillColor: Colors.orange
             }
 
@@ -201,13 +626,17 @@ Rectangle {
                 title: "AIR QUALITY"
                 valueText:
                     home.aqiReady
-                    ? "AQI " + weatherService.aqi : "AQI --"
+                    ? "AQI " + weatherService.aqi
+                    : "AQI --"
                 detailText:
                     home.aqiReady
-                    ? String(weatherService.aqiLabel || "UNKNOWN").toUpperCase()
+                    ? String(
+                        weatherService.aqiLabel || "UNKNOWN"
+                      ).toUpperCase()
                     : "AIR QUALITY OFFLINE"
                 footerText:
-                    home.aqiReady && Number(weatherService.pm25) >= 0
+                    home.aqiReady
+                    && Number(weatherService.pm25) >= 0
                     ? "PM2.5 "
                       + Number(weatherService.pm25).toFixed(1)
                       + " µg/m³"
@@ -215,7 +644,8 @@ Rectangle {
                 accentColor: Colors.green
                 valueColor: Colors.white
                 meterVisible: home.aqiReady
-                meterValue: home.clamp01(home.aqiValue / 500)
+                meterValue:
+                    home.clamp01(home.aqiValue / 500)
                 meterFillColor: Colors.green
             }
         }
@@ -237,11 +667,13 @@ Rectangle {
                 title: "HUMIDITY"
                 valueText:
                     home.weatherReady
-                    ? weatherService.humidity + "%" : "--%"
+                    ? weatherService.humidity + "%"
+                    : "--%"
                 detailText: "SKY"
                 accentColor: Colors.cyan
                 meterVisible: home.weatherReady
-                meterValue: home.clamp01(home.humidityValue / 100)
+                meterValue:
+                    home.clamp01(home.humidityValue / 100)
                 meterFillColor: Colors.orange
             }
 
@@ -256,11 +688,14 @@ Rectangle {
                     : "-- MPH"
                 detailText:
                     home.weatherReady
-                    ? String(weatherService.windDirection || "--")
+                    ? String(
+                        weatherService.windDirection || "--"
+                      )
                     : "SKY"
                 accentColor: Colors.cyan
                 meterVisible: home.weatherReady
-                meterValue: home.clamp01(home.windValue / 50)
+                meterValue:
+                    home.clamp01(home.windValue / 50)
                 meterFillColor: Colors.orange
             }
 
@@ -271,11 +706,13 @@ Rectangle {
                 title: "UV INDEX"
                 valueText:
                     home.uvValue >= 0
-                    ? String(Math.round(home.uvValue)) : "--"
+                    ? String(Math.round(home.uvValue))
+                    : "--"
                 detailText: home.uvLabel(home.uvValue)
                 accentColor: Colors.cyan
                 meterVisible: home.uvValue >= 0
-                meterValue: home.clamp01(home.uvValue / 11)
+                meterValue:
+                    home.clamp01(home.uvValue / 11)
                 meterFillColor: Colors.orange
             }
 
@@ -286,14 +723,17 @@ Rectangle {
                 title: "SPACE WEATHER"
                 valueText:
                     spaceService && spaceService.kpReady
-                    ? "KP " + spaceService.kpText : "KP --"
+                    ? "KP " + spaceService.kpText
+                    : "KP --"
                 detailText:
                     spaceService && spaceService.kpReady
-                    ? spaceService.kpLabel : "SPACE FEED PARTIAL"
+                    ? spaceService.kpLabel
+                    : "SPACE FEED PARTIAL"
                 accentColor: Colors.magenta
                 meterVisible:
                     spaceService && spaceService.kpReady
-                meterValue: home.clamp01(home.kpValue / 9)
+                meterValue:
+                    home.clamp01(home.kpValue / 9)
                 meterFillColor: Colors.magenta
             }
         }
@@ -303,31 +743,58 @@ Rectangle {
             title: "AUTO // RELEVANT"
         }
 
-        StationHomeMetricCard {
+        Row {
             width: parent.width
             height: 118
+            spacing: 12
 
-            title: home.watchItem.title
-            valueText: home.watchItem.value
-            detailText: home.watchItem.detail
-            footerText:
-                home.watchItem.rank > 0
-                ? "AUTO PROMOTED // "
-                  + String(home.watchItem.source).toUpperCase()
-                : "AUTO WATCH // NO HIGHER PRIORITY CONDITION"
-            accentColor: home.sourceAccent(home.watchItem.source)
-            valueColor:
-                home.watchItem.rank >= 85
-                ? Colors.red
-                : home.watchItem.rank >= 65
-                  ? Colors.orange
-                  : home.watchItem.rank >= 45
-                    ? Colors.yellow
-                    : Colors.white
-            meterVisible: home.watchItem.meterValue > 0
-            meterValue: home.watchItem.meterValue
-            meterFillColor:
-                home.sourceMeterFill(home.watchItem.source)
+            Repeater {
+                model: home.watchItems
+
+                delegate: StationHomeMetricCard {
+                    required property var modelData
+
+                    width:
+                        (
+                            parent.width
+                            - parent.spacing
+                              * Math.max(
+                                  0,
+                                  home.watchItems.length - 1
+                                )
+                        )
+                        / Math.max(
+                            1,
+                            home.watchItems.length
+                        )
+                    height: parent.height
+
+                    title: modelData.title
+                    valueText: modelData.value
+                    detailText: modelData.detail
+                    footerText:
+                        modelData.footer.length > 0
+                        ? modelData.footer
+                        : "AUTO // "
+                          + String(
+                              modelData.source
+                            ).toUpperCase()
+                    accentColor:
+                        home.sourceAccent(modelData.source)
+                    valueColor:
+                        Number(modelData.rank) >= 85
+                        ? Colors.red
+                        : Number(modelData.rank) >= 65
+                          ? Colors.orange
+                          : Number(modelData.rank) >= 45
+                            ? Colors.yellow
+                            : Colors.white
+                    meterVisible: modelData.meterVisible
+                    meterValue: modelData.meterValue
+                    meterFillColor:
+                        home.sourceMeterFill(modelData.source)
+                }
+            }
         }
     }
 }

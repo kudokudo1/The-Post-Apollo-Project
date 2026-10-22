@@ -219,13 +219,36 @@ PanelWindow {
             }
         }
 
+        // Navigation/content separator, aligned to the existing mode rail.
+        // Independent flat glow under a crisp cyan rule, no extra focus target.
+        Rectangle {
+            id: mainModeRailGlow
+            anchors.top: mainModeRail.top
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 14
+            anchors.left: mainModeRail.right
+            anchors.leftMargin: 5
+            width: 6
+            color: Colors.cyan
+            opacity: 0.12
+        }
+        Rectangle {
+            id: mainModeVerticalDivider
+            anchors.top: mainModeRail.top
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 14
+            anchors.horizontalCenter: mainModeRailGlow.horizontalCenter
+            width: 1
+            color: Colors.cyan
+        }
+
         // Shared content frame, with a live local editor only in TASKS mode.
         Item {
             id: mainModeContent
             anchors.top: tasksDivider.bottom
             anchors.topMargin: 12
             anchors.left: mainModeRail.right
-            anchors.leftMargin: 10
+            anchors.leftMargin: 16
             anchors.right: parent.right
             anchors.rightMargin: 12
             anchors.bottom: parent.bottom

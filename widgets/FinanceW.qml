@@ -997,6 +997,11 @@ PanelWindow {
                                 font.pixelSize: 12
                                 color: Colors.cyan
                             }
+                            FinanceCategoryAllocationPane {
+                                id: allocationPreviewPane
+                                width: parent.width
+                                snapshot: financeBudget.snapshot
+                            }
                             Repeater {
                                 model: financeBudget.snapshot
                                        ? financeBudget.snapshot.categories : []
@@ -1014,10 +1019,26 @@ PanelWindow {
                                             / modelData.budgetedCents))
                                         : 0
 
+                                    ActionButton {
+                                        id: allocationButton
+                                        anchors.top: parent.top
+                                        anchors.topMargin: 4
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: 5
+                                        width: 78
+                                        height: 24
+                                        trackLabelGlowLocally: true
+                                        label: "ALLOCATE"
+                                        labelPixelSize: 9
+                                        accentColor: Colors.cyan
+                                        available: financeBudget.state === "ready"
+                                                   && !!financeBudget.snapshot
+                                        onLeftClicked: allocationPreviewPane.begin(modelData)
+                                    }
                                     GohuText {
                                         anchors.top: parent.top
                                         anchors.left: parent.left
-                                        anchors.right: parent.right
+                                        anchors.right: allocationButton.left
                                         anchors.margins: 5
                                         text: modelData.name
                                         textFormat: Text.PlainText

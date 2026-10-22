@@ -106,3 +106,39 @@ assert.equal(mpris({selectedBusName:"named",playerCount:1,
 assert.equal(policy.shortText("  Some\nTitle\t",160),"Some Title");
 assert.equal(policy.shortText("x".repeat(400),160).length,160);
 console.log("ApolloHub B4 MPD/MPRIS media policy behavior tests passed");
+
+const dock = (state, title, observedAtMs=now-2000) =>
+    ({state, title, observedAtMs});
+const dockMpd = (attached, controllerObservation, dockValue, controllerAge=now-18000) =>
+    policy.mpdSnapshot(attached, controllerObservation, "", controllerAge, now, dockValue);
+
+let closedPlaying = dockMpd(false, null, dock("playing", "Artist - Song"));
+assert.equal(closedPlaying.state,"playing");
+assert.equal(closedPlaying.fresh,true);
+assert.equal(closedPlaying.connected,true);
+assert.equal(closedPlaying.title,"Artist - Song");
+assert.equal(closedPlaying.artist,"");
+assert.equal(closedPlaying.observationSource,"dock-mpc");
+assert.equal(closedPlaying.loaded,false);
+assert.equal(closedPlaying.ownedByController,false);
+assert.equal(closedPlaying.audibleOutputVerified,false);
+assert.equal(dockMpd(false,null,dock("paused","Artist - Song")).state,"paused");
+assert.equal(dockMpd(false,null,dock("stopped","")).state,"stopped");
+assert.equal(dockMpd(false,null,dock("playing","Old",now-16000)).state,"stale");
+assert.equal(dockMpd(false,null,dock("offline","",now-1000)).state,"unavailable");
+assert.equal(dockMpd(false,null,dock("playing","Future",now+500)).state,"unobserved");
+
+let combined = dockMpd(true,payload,dock("paused","Dock playing track"),now-1000);
+assert.equal(combined.state,"paused");
+assert.equal(combined.title,"Dock playing track");
+assert.equal(combined.lastKnownLoadedTitle,"Loaded cassette");
+assert.equal(combined.loaded,true);
+assert.equal(combined.ownedByController,true);
+assert.equal(combined.observationSource,"dock-mpc");
+assert.equal(combined.ageSeconds,2);
+assert.equal(dockMpd(true,payload,dock("playing","Too old",now-17000),now-1000).title,
+             "Playing track");
+assert.equal(dockMpd(true,payload,dock("playing","Too old",now-17000),now-1000).observationSource,
+             "controller");
+assert.equal(JSON.stringify(closedPlaying).includes("currentProcess"),false);
+console.log("ApolloHub B4 reuse existing dock MPD observer tests passed");

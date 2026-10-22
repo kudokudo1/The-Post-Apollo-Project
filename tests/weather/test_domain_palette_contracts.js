@@ -15,6 +15,8 @@ function read(relative) {
 
 const windowSource = read("widgets/weather/WeatherStationW.qml");
 const homeSource = read("widgets/weather/StationHome.qml");
+const homeCardSource = read("widgets/weather/StationHomeMetricCard.qml");
+const homePolicySource = read("widgets/weather/StationHomePolicy.js");
 const groundSource = read("widgets/weather/StationGround.qml");
 const skySource = read("widgets/weather/StationSky.qml");
 const spaceSource = read("widgets/weather/StationSpace.qml");
@@ -35,10 +37,43 @@ assert.match(header, /height: 2\s+color: Colors\.cyan/);
 assert.match(header, /border\.color: weatherStation\.sourceStatusColor/);
 assert.match(header, /accentColor: Colors\.red/);
 
-// HOME no longer owns the three domains.
+// HOME is now a mixed-source dashboard instead of a placeholder or a
+// duplicated copy of the three full domain pages.
 for (const title of ["⌁  GROUND", "☁  SKY", "✦  SPACE"])
     assert.ok(!homeSource.includes(title), "HOME still contains " + title);
-assert.ok(homeSource.includes("FAVORITES // RELEVANT // AUTO"));
+
+for (const title of [
+    "SNAPSHOT // NOW",
+    "QUICK // CONDITIONS",
+    "AUTO // RELEVANT",
+])
+    assert.ok(homeSource.includes('title: "' + title + '"'), title);
+
+for (const cardTitle of [
+    "CURRENT WEATHER",
+    "NEXT HOURS",
+    "AIR QUALITY",
+    "HUMIDITY",
+    "WIND",
+    "UV INDEX",
+    "SPACE WEATHER",
+])
+    assert.ok(homeSource.includes('title: "' + cardTitle + '"'), cardTitle);
+
+assert.ok(homeSource.includes("StationHomePolicy.chooseRelevant"));
+assert.ok(homeSource.includes("AUTO PROMOTED // "));
+assert.ok(!homeSource.includes("FAVORITES // RELEVANT // AUTO"));
+
+assert.match(homeCardSource, /border\.color:\s*Colors\.cyan/);
+assert.match(homeCardSource, /border\.color:\s*Colors\.cyan[\s\S]*?meterFillColor/);
+assert.match(homePolicySource, /function chooseRelevant\(input\)/);
+
+// HOME consumes both source families, so the header badge must describe the
+// aggregate rather than pretending HOME is Weather-only.
+assert.match(windowSource, /readonly property bool usesHomeSources:/);
+assert.match(windowSource, /HOME LIVE \/\/ 2 FEEDS/);
+assert.match(windowSource, /PARTIAL \/\/ WEATHER/);
+assert.match(windowSource, /PARTIAL \/\/ SPACE/);
 
 // Stable domain identities survive the structural split.
 assert.match(groundSource, /text: "⌁  GROUND"[\s\S]*?color: Colors\.green/);

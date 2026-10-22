@@ -46,6 +46,13 @@ Singleton {
     property int policyRevision: 0
     property int defaultSnoozeDurationMs: 24 * 60 * 60 * 1000
 
+    // Control Bay viewport preference, independent of notification history,
+    // Favorites and DND/ZZ policy files. Locked means no slider edits;
+    // it never disables scrolling itself.
+    property real scrollSpeedMultiplier: 1.0
+    property bool scrollSpeedLocked: false
+    property bool scrollSettingsReady: false
+
     property int favoriteVersion: 1
     property bool favoritesReady: false
     property string favoritesStatus: "loading"
@@ -1295,6 +1302,84 @@ Singleton {
             return false;
         apolloNavigationRequested(destination);
         return true;
+    }
+
+    // ===== SCROLL SPEED SETTINGS ================================
+    function normalizeScrollSpeed(value) {
+        const number = Number(value);
+        if (!Number.isFinite(number))
+            return 1.0;
+        return Math.round(Math.max(0.5, Math.min(3.0, number)) * 10) / 10;
+    }
+
+    function setScrollSpeed(value) {
+        if (scrollSpeedLocked)
+            return false;
+        const next = normalizeScrollSpeed(value);
+        if (next === scrollSpeedMultiplier)
+            return false;
+        scrollSpeedMultiplier = next;
+        scheduleScrollSettingsSave();
+        return true;
+    }
+
+    function toggleScrollSpeedLock() {
+        scrollSpeedLocked = !scrollSpeedLocked;
+        scheduleScrollSettingsSave();
+    }
+
+    function scheduleScrollSettingsSave() {
+        if (scrollSettingsReady)
+            scrollSettingsSaveTimer.restart();
+    }
+
+    function saveScrollSettings() {
+        if (!scrollSettingsReady)
+            return;
+        scrollSettingsFile.setText(JSON.stringify({
+            "version": 1,
+            "scrollSpeedMultiplier": scrollSpeedMultiplier,
+            "scrollSpeedLocked": scrollSpeedLocked
+        }, null, 2) + "\n");
+    }
+
+    function loadScrollSettings() {
+        const raw = scrollSettingsFile.text().trim();
+        if (raw === "")
+            return;
+        try {
+            const document = JSON.parse(raw);
+            if (!document || typeof document !== "object" || Array.isArray(document))
+                return;
+            if (document.scrollSpeedMultiplier !== undefined)
+                scrollSpeedMultiplier = normalizeScrollSpeed(document.scrollSpeedMultiplier);
+            scrollSpeedLocked = document.scrollSpeedLocked === true;
+        } catch (error) {
+            console.warn("Notifications scroll settings: invalid preferences; defaults retained");
+        }
+    }
+
+    FileView {
+        id: scrollSettingsFile
+        path: Quickshell.dataPath("notification-scroll-settings.json")
+        atomicWrites: true
+        printErrors: true
+        onLoaded: {
+            root.loadScrollSettings();
+            root.scrollSettingsReady = true;
+        }
+        onLoadFailed: function(error) {
+            root.scrollSettingsReady = true;
+            if (error !== FileViewError.FileNotFound)
+                console.warn("Notifications scroll settings: could not load preferences");
+        }
+    }
+
+    Timer {
+        id: scrollSettingsSaveTimer
+        interval: 250
+        repeat: false
+        onTriggered: root.saveScrollSettings()
     }
 
     // ===== EXPIRATION ===========================================

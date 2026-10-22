@@ -39,6 +39,14 @@ Item {
     readonly property int barCount: 16
     property var levels: Array(barCount).fill(0)
 
+    // Dormant unless the existing diagnostic launch flag is enabled.
+    readonly property bool bgLagProbeEnabled:
+        String(Quickshell.env("POST_APOLLO_UI_LAG_PROBE") || "").trim() === "1"
+    property int bgFrameCount: 0
+    property int bgChangedFrameCount: 0
+    property int bgMaxFrameMs: 0
+    property double bgLastFrameSummaryMs: 0
+
     // CAVA visualizes the system's default audio output, not just MPD.
     // MPD state is independent and will later be shared with the full deck.
     property string playbackState: "offline"
@@ -208,6 +216,7 @@ Item {
     }
 
     function receiveCavaFrame(frame) {
+        const traceStartMs = bgLagProbeEnabled ? Date.now() : 0;
         var raw = String(frame).trim();
         if (raw.endsWith(";"))
             raw = raw.slice(0, -1);
@@ -230,6 +239,29 @@ Item {
         // especially when the monitor stream is silent but CAVA stays alive.
         if (changed)
             levels = newLevels;
+
+        if (traceStartMs) {
+            const now = Date.now();
+            const elapsed = now - traceStartMs;
+            bgFrameCount += 1;
+            if (changed)
+                bgChangedFrameCount += 1;
+            bgMaxFrameMs = Math.max(bgMaxFrameMs, elapsed);
+            if (elapsed >= 25)
+                console.warn("SYNTAGMA_BG_PROBE // media cava-frame synchronous="
+                             + elapsed + "ms tsMs=" + now);
+            if (!bgLastFrameSummaryMs)
+                bgLastFrameSummaryMs = now;
+            if (now - bgLastFrameSummaryMs >= 5000) {
+                console.warn("SYNTAGMA_BG_PROBE // media cava-frames 5s count="
+                             + bgFrameCount + " changed=" + bgChangedFrameCount
+                             + " maxHandlerMs=" + bgMaxFrameMs + " tsMs=" + now);
+                bgLastFrameSummaryMs = now;
+                bgFrameCount = 0;
+                bgChangedFrameCount = 0;
+                bgMaxFrameMs = 0;
+            }
+        }
     }
 
     Process {

@@ -2,13 +2,62 @@ import QtQuick
 import "../../components"
 import "../../services/hub/ApolloHubLayout.js" as Layout
 
-// Presentation only: live weather arrives from ApolloHubW as a read-only
-// snapshot. This tile never creates services, polls the network, or refreshes.
+// Presentation only: live Weather and Network snapshots arrive from
+// ApolloHubW. This tile never creates services or polls/controls the network.
 SectionFrame {
     id: tile
 
     property string moduleId: "time"
     property var weatherSnapshot: null
+    property var networkSnapshot: null
+    // B3 deliberately distinguishes local link status from verified internet.
+    // Connected Wi-Fi/Ethernet is NOT proof that the internet is reachable.
+    readonly property string networkState:
+        networkSnapshot && networkSnapshot.state
+        ? String(networkSnapshot.state) : "unavailable"
+    readonly property bool networkConnected:
+        networkState === "connected" && networkSnapshot !== null
+        && networkSnapshot.connected === true
+    readonly property string networkTransport:
+        networkConnected ? String(networkSnapshot.transport || "none") : "none"
+    readonly property var networkWifi:
+        networkSnapshot && networkSnapshot.wifi ? networkSnapshot.wifi : null
+    readonly property var networkEthernet:
+        networkSnapshot && networkSnapshot.ethernet ? networkSnapshot.ethernet : null
+    readonly property string networkHeading:
+        networkState === "unavailable" ? "UNAVAILABLE"
+        : networkState === "disconnected" ? "NO LOCAL LINK"
+        : networkTransport === "ethernet" ? "ETHERNET"
+        : networkTransport === "wifi" ? "WI-FI" : "NO LOCAL LINK"
+    readonly property string networkDetail: {
+        if (!networkConnected)
+            return networkState === "disconnected" ? "DISCONNECTED" : "NO DEVICE DATA";
+        if (networkTransport === "wifi" && networkWifi)
+            return String(networkWifi.networkName || networkWifi.interfaceName || "WI-FI LINK");
+        if (networkTransport === "ethernet" && networkEthernet)
+            return String(networkEthernet.interfaceName || "WIRED LINK");
+        return "LOCAL LINK";
+    }
+    readonly property string wifiLinkText:
+        !networkWifi || networkState === "unavailable" ? "UNKNOWN"
+        : !networkWifi.present ? "NOT PRESENT"
+        : networkWifi.connected === true ? "CONNECTED" : "DISCONNECTED"
+    readonly property string ethernetLinkText:
+        !networkEthernet || networkState === "unavailable" ? "UNKNOWN"
+        : !networkEthernet.present ? "NOT PRESENT"
+        : networkEthernet.connected === true ? "CONNECTED" : "DISCONNECTED"
+    readonly property string wifiSignalText: {
+        if (!networkWifi || networkWifi.connected !== true)
+            return "--";
+        const value = networkWifi.signalPercent;
+        return typeof value === "number" && isFinite(value)
+               && value >= 0 && value <= 100 ? String(value) + "%" : "--";
+    }
+    readonly property string networkSpeedText: {
+        const value = networkSnapshot ? networkSnapshot.linkSpeedMbps : -1;
+        return typeof value === "number" && isFinite(value) && value >= 0
+               ? String(value) + " Mbps" : "--";
+    }
     // Keep weather and air-quality readiness independent. The backend masks
     // unavailable readings; the UI must not resurrect them from stale values.
     readonly property string weatherState:
@@ -183,8 +232,95 @@ SectionFrame {
         }
     }
 
+    // Read-only B3 mini network view, using the established square tile.
+    // Both transports remain visible even when Ethernet takes priority.
+    Row {
+        id: networkInfo
+        visible: tile.moduleId === "network"
+        anchors {
+            left: parent.left
+            right: parent.right
+            top: parent.top
+            bottom: parent.bottom
+            topMargin: tile.editing ? 32 : 22
+            bottomMargin: 23
+        }
+        spacing: 9
+
+        Column {
+            id: networkPrimary
+            width: Math.round(networkInfo.width * 0.43)
+            spacing: 3
+
+            GohuText {
+                width: parent.width
+                height: 26
+                font.pixelSize: 18
+                color: tile.networkConnected ? Colors.white : Colors.orange
+                verticalAlignment: Text.AlignVCenter
+                elide: Text.ElideRight
+                text: tile.networkHeading
+            }
+            GohuText {
+                width: parent.width
+                height: 16
+                font.pixelSize: 11
+                color: Colors.cyan
+                elide: Text.ElideRight
+                text: tile.networkDetail
+            }
+        }
+
+        Column {
+            width: Math.max(0, networkInfo.width - networkPrimary.width
+                            - networkInfo.spacing)
+            spacing: 2
+
+            GohuText {
+                width: parent.width
+                height: 14
+                font.pixelSize: 10
+                color: Colors.cyan
+                elide: Text.ElideRight
+                text: "WI-FI LINK  " + tile.wifiLinkText
+            }
+            GohuText {
+                width: parent.width
+                height: 14
+                font.pixelSize: 10
+                color: Colors.cyan
+                elide: Text.ElideRight
+                text: "ETHERNET   " + tile.ethernetLinkText
+            }
+            GohuText {
+                width: parent.width
+                height: 14
+                font.pixelSize: 10
+                color: Colors.cyan
+                elide: Text.ElideRight
+                text: "SIGNAL     " + tile.wifiSignalText
+            }
+            GohuText {
+                width: parent.width
+                height: 14
+                font.pixelSize: 10
+                color: Colors.cyan
+                elide: Text.ElideRight
+                text: "SPEED      " + tile.networkSpeedText
+            }
+            GohuText {
+                width: parent.width
+                height: 14
+                font.pixelSize: 10
+                color: Colors.orange
+                elide: Text.ElideRight
+                text: "INTERNET   UNVERIFIED"
+            }
+        }
+    }
+
     GohuText {
-        visible: tile.moduleId !== "weather"
+        visible: tile.moduleId !== "weather" && tile.moduleId !== "network"
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
@@ -215,6 +351,10 @@ SectionFrame {
                       + String(tile.weatherSnapshot.ageMinutes) + " MIN OLD"
                     : "WEATHER // FRESH")
                  : "WEATHER // " + tile.weatherStatus)
+              : tile.moduleId === "network"
+              ? ("NETWORK // " + (tile.networkConnected
+                                  ? "LOCAL LINK CONNECTED" : tile.networkState.toUpperCase())
+                 + " // INTERNET UNVERIFIED")
               : "DATA ADAPTER NOT CONNECTED"
     }
 }

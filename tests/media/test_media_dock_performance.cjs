@@ -78,18 +78,20 @@ test("left taskbar uses close 8px gaps except App Control to Workspaces", () => 
         "spacer must appear only after App Control and all left-module order is preserved");
 });
 
-test("opening the Hi-Fi deck keeps the Media dock dark without removing its neon", () => {
-    // Shared DockButton defaults to a yellow open fill, but Media's stacked
-    // cyan/orange art illumination needs a dark background to remain visible.
+test("opening the Hi-Fi deck gives Media the canonical yellow fill without removing neon", () => {
+    // The Media dock now adopts the canonical yellow open fill while
+    // preserving its own magenta open-state icons and independent glows.
     assert.match(source, /open:\s*mediaRoot\.deckOpen/);
-    assert.match(source, /openFillColor:\s*Colors\.black/);
+    assert.match(source, /openFillColor:\s*Colors\.yellow/);
+    assert.match(dockButtonSource, /property color closedFillColor:\s*Colors\.black/,
+        "closed Media retains the existing dark base");
     assert.match(dockButtonSource, /property color openFillColor:\s*Colors\.yellow/,
         "the shared DockButton default remains untouched");
     assert.match(dockButtonSource, /color:\s*open\s*\?\s*openFillColor\s*:\s*closedFillColor/);
     assert.match(source, /mediaRoot\.deckOpen = !mediaRoot\.deckOpen;/);
 
-    // Only the solid fill is Media-specific. The canonical open magenta
-    // front wash, open-state rear priority, and CAVA accent stay as before.
+    // Only the Media fill changes. The magenta front wash, open-state rear
+    // priority, and closed CAVA cyan/orange accent remain as before.
     assert.match(source, /normalDockGlowColor:\s*Colors\.magenta/);
     assert.match(source, /hoverDockGlowColor:\s*Colors\.magenta/);
     assert.match(source, /pressedDockGlowColor:\s*Colors\.magenta/);
@@ -102,7 +104,7 @@ test("opening the Hi-Fi deck keeps the Media dock dark without removing its neon
 
 test("open state magenta-energizes every Media icon and CAVA visual without affecting MPD", () => {
     assert.match(source, /open:\s*mediaRoot\.deckOpen/);
-    assert.match(source, /openFillColor:\s*Colors\.black/);
+    assert.match(source, /openFillColor:\s*Colors\.yellow/);
     assert.match(source, /readonly property color accentColor:\s*mpdPlaying \? Colors\.orange : Colors\.cyan/);
     assert.match(source, /readonly property color artworkAccentColor:\s*open \? Colors\.magenta : accentColor/);
 

@@ -48,8 +48,13 @@ out = io.BytesIO()
 assert mod.serve(origin, origin, io.BytesIO(
     encode_frame({"protocol": 1, "kind": "PING"})
 ), out)
-out.seek(0)
-message = mod.read_frame(out)
+wire = out.getvalue()
+assert len(wire) >= 4
+reported_size = struct.unpack("=I", wire[:4])[0]
+assert reported_size == len(wire) - 4
+# The native host's inbound parser deliberately rejects objects with more
+# than three fields; the five-field PONG must be decoded as outbound data.
+message = json.loads(wire[4:].decode("utf-8"))
 assert message == {
     "protocol": 1,
     "kind": "PONG",

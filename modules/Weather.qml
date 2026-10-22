@@ -214,26 +214,35 @@ DockButton {
                 width: implicitWidth
                 height: implicitHeight
 
-                // Both bulb contours share one center. Native circular
-                // arcs avoid the flattened bottom and uneven liquid-to-glass
-                // gap from separately approximated Bezier bulbs.
+                // Subpixel smoothing matters at a native size of only 17x35.
+                // Sample this tiny native Shape instrument independently,
+                // without applying another effect to the surrounding dock.
+                layer.enabled: true
+                layer.samples: 4
+                layer.smooth: true
+
+                // Both outlines share a center and matched ellipse contours.
+                // Slightly taller bulbs rasterize into more natural side steps
+                // at this scale than a mathematically perfect tiny circle.
                 readonly property real bulbCenterX: width / 2
-                readonly property real bulbCenterY: 26.6
-                readonly property real outerBulbRadius: 6.75
-                readonly property real innerBulbRadius: 4.4
+                readonly property real bulbCenterY: 26.0
+                readonly property real outerBulbRadiusX: 6.2
+                readonly property real outerBulbRadiusY: 7.1
+                readonly property real innerBulbRadiusX: 3.65
+                readonly property real innerBulbRadiusY: 4.6
                 readonly property real joinDiagonal: Math.SQRT1_2
                 readonly property real outerRightJoinX:
-                    bulbCenterX + outerBulbRadius * joinDiagonal
+                    bulbCenterX + outerBulbRadiusX * joinDiagonal
                 readonly property real outerLeftJoinX:
-                    bulbCenterX - outerBulbRadius * joinDiagonal
+                    bulbCenterX - outerBulbRadiusX * joinDiagonal
                 readonly property real outerJoinY:
-                    bulbCenterY - outerBulbRadius * joinDiagonal
+                    bulbCenterY - outerBulbRadiusY * joinDiagonal
                 readonly property real innerRightJoinX:
-                    bulbCenterX + innerBulbRadius * joinDiagonal
+                    bulbCenterX + innerBulbRadiusX * joinDiagonal
                 readonly property real innerLeftJoinX:
-                    bulbCenterX - innerBulbRadius * joinDiagonal
+                    bulbCenterX - innerBulbRadiusX * joinDiagonal
                 readonly property real innerJoinY:
-                    bulbCenterY - innerBulbRadius * joinDiagonal
+                    bulbCenterY - innerBulbRadiusY * joinDiagonal
 
                 property color liquidColor: weatherDock.thermometerLiquidColor
                 property real animatedLevel:
@@ -256,8 +265,8 @@ DockButton {
                     ColorAnimation { duration: 300 }
                 }
 
-                // Glass vessel: the bulb's lower 270 degrees use exact
-                // circular arcs shared by the black body and outline.
+                // Glass vessel. Its bottom arcs use a vertically balanced
+                // elliptical silhouette at native dock resolution.
                 Shape {
                     anchors.fill: parent
 
@@ -275,38 +284,39 @@ DockButton {
                             controlX: 12.2
                             controlY: 1.2
                         }
-                        PathLine { x: 12.2; y: 19.8 }
-                        // Smoothly enter the circular bulb at 45 degrees.
+                        PathLine { x: 12.2; y: 19.3 }
+                        // A mirrored, tangent entry into the bulb avoids
+                        // the accidental right-angle raster step.
                         PathCubic {
                             x: weatherThermometer.outerRightJoinX
                             y: weatherThermometer.outerJoinY
                             control1X: 12.2
-                            control1Y: 20.7
-                            control2X: weatherThermometer.outerRightJoinX - 0.75
-                            control2Y: weatherThermometer.outerJoinY - 0.75
+                            control1Y: 20.0
+                            control2X: weatherThermometer.outerRightJoinX - 0.58
+                            control2Y: weatherThermometer.outerJoinY - 0.66
                         }
                         PathArc {
                             x: weatherThermometer.bulbCenterX
                             y: weatherThermometer.bulbCenterY
-                               + weatherThermometer.outerBulbRadius
-                            radiusX: weatherThermometer.outerBulbRadius
-                            radiusY: weatherThermometer.outerBulbRadius
+                               + weatherThermometer.outerBulbRadiusY
+                            radiusX: weatherThermometer.outerBulbRadiusX
+                            radiusY: weatherThermometer.outerBulbRadiusY
                             direction: PathArc.Clockwise
                         }
                         PathArc {
                             x: weatherThermometer.outerLeftJoinX
                             y: weatherThermometer.outerJoinY
-                            radiusX: weatherThermometer.outerBulbRadius
-                            radiusY: weatherThermometer.outerBulbRadius
+                            radiusX: weatherThermometer.outerBulbRadiusX
+                            radiusY: weatherThermometer.outerBulbRadiusY
                             direction: PathArc.Clockwise
                         }
                         PathCubic {
                             x: 4.8
-                            y: 19.8
-                            control1X: weatherThermometer.outerLeftJoinX + 0.75
-                            control1Y: weatherThermometer.outerJoinY - 0.75
+                            y: 19.3
+                            control1X: weatherThermometer.outerLeftJoinX + 0.58
+                            control1Y: weatherThermometer.outerJoinY - 0.66
                             control2X: 4.8
-                            control2Y: 20.7
+                            control2Y: 20.0
                         }
                         PathLine { x: 4.8; y: 5.2 }
                         PathQuad {
@@ -318,8 +328,8 @@ DockButton {
                     }
                 }
 
-                // Inset fluid bulb uses a concentric circle, providing a
-                // constant radial glass-to-liquid clearance all around.
+                // The inner ellipse is centered with the glass and slightly
+                // narrower, keeping both side voids and bottom clearance even.
                 // A moving gradient stop drains through bulb and tube.
                 Shape {
                     anchors.fill: parent
@@ -334,7 +344,7 @@ DockButton {
                             y1: 3.2
                             x2: 0
                             y2: weatherThermometer.bulbCenterY
-                                + weatherThermometer.innerBulbRadius
+                                + weatherThermometer.innerBulbRadiusY
 
                             GradientStop {
                                 position: 0
@@ -361,48 +371,48 @@ DockButton {
                         startY: 3.2
 
                         PathQuad {
-                            x: 10.1
+                            x: 9.75
                             y: 5.2
-                            controlX: 10.1
+                            controlX: 9.75
                             controlY: 3.2
                         }
-                        PathLine { x: 10.1; y: 21.3 }
+                        PathLine { x: 9.75; y: 21.6 }
                         PathCubic {
                             x: weatherThermometer.innerRightJoinX
                             y: weatherThermometer.innerJoinY
-                            control1X: 10.1
-                            control1Y: 22.2
-                            control2X: weatherThermometer.innerRightJoinX - 0.6
-                            control2Y: weatherThermometer.innerJoinY - 0.6
+                            control1X: 9.75
+                            control1Y: 22.15
+                            control2X: weatherThermometer.innerRightJoinX - 0.55
+                            control2Y: weatherThermometer.innerJoinY - 0.62
                         }
                         PathArc {
                             x: weatherThermometer.bulbCenterX
                             y: weatherThermometer.bulbCenterY
-                               + weatherThermometer.innerBulbRadius
-                            radiusX: weatherThermometer.innerBulbRadius
-                            radiusY: weatherThermometer.innerBulbRadius
+                               + weatherThermometer.innerBulbRadiusY
+                            radiusX: weatherThermometer.innerBulbRadiusX
+                            radiusY: weatherThermometer.innerBulbRadiusY
                             direction: PathArc.Clockwise
                         }
                         PathArc {
                             x: weatherThermometer.innerLeftJoinX
                             y: weatherThermometer.innerJoinY
-                            radiusX: weatherThermometer.innerBulbRadius
-                            radiusY: weatherThermometer.innerBulbRadius
+                            radiusX: weatherThermometer.innerBulbRadiusX
+                            radiusY: weatherThermometer.innerBulbRadiusY
                             direction: PathArc.Clockwise
                         }
                         PathCubic {
-                            x: 6.9
-                            y: 21.3
-                            control1X: weatherThermometer.innerLeftJoinX + 0.6
-                            control1Y: weatherThermometer.innerJoinY - 0.6
-                            control2X: 6.9
-                            control2Y: 22.2
+                            x: 7.25
+                            y: 21.6
+                            control1X: weatherThermometer.innerLeftJoinX + 0.55
+                            control1Y: weatherThermometer.innerJoinY - 0.62
+                            control2X: 7.25
+                            control2Y: 22.15
                         }
-                        PathLine { x: 6.9; y: 5.2 }
+                        PathLine { x: 7.25; y: 5.2 }
                         PathQuad {
                             x: weatherThermometer.bulbCenterX
                             y: 3.2
-                            controlX: 6.9
+                            controlX: 7.25
                             controlY: 3.2
                         }
                     }
@@ -429,38 +439,39 @@ DockButton {
                             controlX: 12.2
                             controlY: 1.2
                         }
-                        PathLine { x: 12.2; y: 19.8 }
-                        // Smoothly enter the circular bulb at 45 degrees.
+                        PathLine { x: 12.2; y: 19.3 }
+                        // A mirrored, tangent entry into the bulb avoids
+                        // the accidental right-angle raster step.
                         PathCubic {
                             x: weatherThermometer.outerRightJoinX
                             y: weatherThermometer.outerJoinY
                             control1X: 12.2
-                            control1Y: 20.7
-                            control2X: weatherThermometer.outerRightJoinX - 0.75
-                            control2Y: weatherThermometer.outerJoinY - 0.75
+                            control1Y: 20.0
+                            control2X: weatherThermometer.outerRightJoinX - 0.58
+                            control2Y: weatherThermometer.outerJoinY - 0.66
                         }
                         PathArc {
                             x: weatherThermometer.bulbCenterX
                             y: weatherThermometer.bulbCenterY
-                               + weatherThermometer.outerBulbRadius
-                            radiusX: weatherThermometer.outerBulbRadius
-                            radiusY: weatherThermometer.outerBulbRadius
+                               + weatherThermometer.outerBulbRadiusY
+                            radiusX: weatherThermometer.outerBulbRadiusX
+                            radiusY: weatherThermometer.outerBulbRadiusY
                             direction: PathArc.Clockwise
                         }
                         PathArc {
                             x: weatherThermometer.outerLeftJoinX
                             y: weatherThermometer.outerJoinY
-                            radiusX: weatherThermometer.outerBulbRadius
-                            radiusY: weatherThermometer.outerBulbRadius
+                            radiusX: weatherThermometer.outerBulbRadiusX
+                            radiusY: weatherThermometer.outerBulbRadiusY
                             direction: PathArc.Clockwise
                         }
                         PathCubic {
                             x: 4.8
-                            y: 19.8
-                            control1X: weatherThermometer.outerLeftJoinX + 0.75
-                            control1Y: weatherThermometer.outerJoinY - 0.75
+                            y: 19.3
+                            control1X: weatherThermometer.outerLeftJoinX + 0.58
+                            control1Y: weatherThermometer.outerJoinY - 0.66
                             control2X: 4.8
-                            control2Y: 20.7
+                            control2Y: 20.0
                         }
                         PathLine { x: 4.8; y: 5.2 }
                         PathQuad {
@@ -472,14 +483,15 @@ DockButton {
                     }
                 }
 
-                // Compact white scale ticks share the glass opacity.
+                // Ticks now sit BESIDE the right glass rail instead of
+                // over the liquid. No stray white pixels inside the bulb.
                 Repeater {
                     model: 4
 
                     delegate: Rectangle {
-                        x: index % 2 === 0 ? 7.5 : 8
-                        y: 6 + index * 5.2
-                        width: index % 2 === 0 ? 3 : 2
+                        x: 13.2
+                        y: 6 + index * 4.8
+                        width: index % 2 === 0 ? 2.5 : 1.8
                         height: 1
                         color: weatherThermometer.glassColor
                         opacity: weatherThermometer.glassOpacity

@@ -56,6 +56,13 @@ Scope {
     property int aqi: -1
     property string aqiLabel: "UNKNOWN"
 
+    // Provider-computed U.S. AQI component indices. These give the pollutant
+    // meters a real 0-500 health-index scale while the labels continue to show
+    // the raw concentration values.
+    property real ozoneAqi: -1
+    property real nitrogenDioxideAqi: -1
+    property real carbonMonoxideAqi: -1
+
     property real pm25: -1
     property real pm10: -1
     property real carbonMonoxide: -1
@@ -100,7 +107,9 @@ Scope {
         return "https://air-quality-api.open-meteo.com/v1/air-quality"
                + "?latitude=" + latitude
                + "&longitude=" + longitude
-               + "&current=us_aqi,pm2_5,pm10,carbon_monoxide,"
+               + "&current=us_aqi,us_aqi_ozone,"
+               + "us_aqi_nitrogen_dioxide,us_aqi_carbon_monoxide,"
+               + "pm2_5,pm10,carbon_monoxide,"
                + "nitrogen_dioxide,ozone,dust,alder_pollen,birch_pollen,"
                + "grass_pollen,mugwort_pollen,olive_pollen,ragweed_pollen"
                + "&timezone=auto";
@@ -298,6 +307,9 @@ Scope {
                 throw new Error("No US AQI value");
 
             aqi = Math.round(parsed.usAqi);
+            ozoneAqi = parsed.ozoneAqi;
+            nitrogenDioxideAqi = parsed.nitrogenDioxideAqi;
+            carbonMonoxideAqi = parsed.carbonMonoxideAqi;
             pm25 = parsed.pm25;
             pm10 = parsed.pm10;
             carbonMonoxide = parsed.carbonMonoxide;

@@ -114,7 +114,7 @@ async function main() {
       version:1,status:"committed",hash:digest,action:cmd.action,
       completedAt:new Date().toISOString()
     };
-    await writeFile(journalPath,JSON.stringify(record)+"\\n",{mode:0o600});
+    await writeFile(journalPath,JSON.stringify(record)+"\n",{mode:0o600});
     const verified = await open(journalPath,"r");
     try {await verified.sync();} finally {await verified.close();}
     return result.status;

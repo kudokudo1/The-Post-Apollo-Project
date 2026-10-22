@@ -157,7 +157,7 @@ test("magenta full-width wash, three independent static art glows, per-bar CAVA 
     assert.doesNotMatch(source, /contentGlowSource:\s*(?:musicMark|mediaArtwork|spectrum|cavaBar)/);
 });
 
-test("large faded CAVA-only ambient wash stays static below individual bars", () => {
+test("large faded CAVA-only ambient wash follows a padded spectrum envelope", () => {
     // This is an additional ambient layer, not a replacement for the 16
     // individual CAVA bar halos or the separate static ornament glows.
     const section = source.match(/Item \{\s*id:\s*spectrum([\s\S]*?)\n\s*Row \{\s*anchors\.fill:\s*parent\s*spacing:\s*2/);
@@ -166,17 +166,20 @@ test("large faded CAVA-only ambient wash stays static below individual bars", ()
     assert.ok(match, "there must be one dedicated wide CAVA wash");
     const wash = match[1];
 
-    assert.match(wash, /anchors\.centerIn:\s*parent/);
+    assert.match(wash, /anchors\.horizontalCenter:\s*parent\.horizontalCenter/);
+    assert.match(wash, /anchors\.bottom:\s*parent\.bottom/);
+    assert.match(wash, /anchors\.bottomMargin:\s*-2/);
     assert.match(wash, /width:\s*Math\.max\(0,\s*spectrum\.width\s*-\s*4\s*\*\s*mediaDock\.softGlowSpread\)/);
-    assert.match(wash, /height:\s*Math\.max\(0,\s*spectrum\.height\s*-\s*2\s*\*\s*mediaDock\.softGlowSpread\)/);
+    assert.match(wash, /height:\s*mediaDock\.cavaAmbientTargetHeight/);
     assert.match(wash, /radius:\s*height\s*\/\s*2/);
     assert.match(wash, /blur:\s*mediaDock\.contentGlowRadius/);
     assert.match(wash, /spread:\s*0/);
     assert.match(wash, /color:\s*mediaDock\.accentColor/);
     assert.match(wash, /opacity:\s*0\.22/);
     assert.match(wash, /z:\s*-1/);
+    assert.match(wash, /Behavior on height\s*\{\s*NumberAnimation\s*\{\s*duration:\s*180\s*easing\.type:\s*Easing\.OutQuad/);
     assert.doesNotMatch(wash, /cavaBar|levels|frame|Repeater|safeSource|ShaderEffect|source:/,
-        "the ambient wash must not sample or bind to moving CAVA frames");
+        "the ambient wash must not sample moving CAVA frames");
 
     // The soft ambient light must never become a full-width cyan panel,
     // nor replace the intentionally magenta rear/front chassis wash.
@@ -187,6 +190,30 @@ test("large faded CAVA-only ambient wash stays static below individual bars", ()
     }
     assert.match(source, /contentGlowEnabled:\s*false/);
     assert.doesNotMatch(source, /contentGlowSource:\s*(?:spectrum|cavaBar|mediaArtwork)/);
+});
+
+test("ambient height averages the four strongest CAVA bars with padding and smoothing", () => {
+    const expression = source.match(
+        /readonly property real cavaAmbientTargetHeight:\s*\{([\s\S]*?)\n    \}/
+    );
+    assert.ok(expression, "ambient target height should be computed from published levels");
+    const envelope = (levels) => vm.runInNewContext(
+        "(function() {" + expression[1] + "\n})()", {levels}
+    );
+
+    const silence = Array(16).fill(0);
+    assert.equal(envelope(silence), 14, "a visible wash should remain at silence");
+    assert.equal(envelope(Array(16).fill(7)), 34, "tall bars cap at the loose envelope limit");
+    assert.equal(envelope([7, ...Array(15).fill(0)]), 19,
+        "one sharp peak should not drag the entire ambient wash up");
+    assert.equal(envelope([7, 7, 7, 7, ...Array(12).fill(0)]), 34,
+        "several high bars should lift the ambient wash");
+    assert.ok(envelope(Array(16).fill(4)) > envelope(Array(16).fill(1)),
+        "the wash should rise as the overall spectrum grows");
+    assert.match(source, /height:\s*mediaDock\.cavaAmbientTargetHeight/);
+    assert.match(source, /if \(changed\)\s*levels = newLevels;/,
+        "the wash must reuse CAVA's existing deduplicated frame publication");
+    assert.doesNotMatch(source, /safeSource:\s*(?:spectrum|cavaBar)/);
 });
 
 test("CAVA neon tracks the animated bar using geometry only", () => {

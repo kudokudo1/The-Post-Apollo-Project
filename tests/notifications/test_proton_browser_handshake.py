@@ -13,7 +13,7 @@ MANIFEST = json.loads((PILOT / "manifest.json").read_text(encoding="utf-8"))
 REG = json.loads((PILOT / "native-host.example.json").read_text(encoding="utf-8"))
 BACKGROUND = (PILOT / "background.js").read_text(encoding="utf-8")
 assert MANIFEST["manifest_version"] == 3
-assert sorted(MANIFEST["permissions"]) == ["activeTab", "nativeMessaging"]
+assert sorted(MANIFEST["permissions"]) == ["activeTab", "nativeMessaging", "scripting"]
 assert "content_scripts" not in MANIFEST
 assert "host_permissions" not in MANIFEST
 assert "webRequest" not in MANIFEST["permissions"]

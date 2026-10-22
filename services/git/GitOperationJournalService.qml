@@ -286,10 +286,12 @@ Scope {
     }
 
     function persist() {
+        // Keep the same schema and durable blocking/atomic write gate.
+        // Avoid re-indenting up to 500 historical snapshots on every action.
         journalFile.setText(JSON.stringify({
             schemaVersion: schemaVersion,
             entries: entries
-        }, null, 2));
+        }));
     }
 
     FileView {

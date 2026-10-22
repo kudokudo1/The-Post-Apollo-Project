@@ -321,3 +321,33 @@ function resizeTile(layout, modeIndex, subIndex, tileIndex, size, rowSpan) {
     tiles[tileIndex].rowSpan = rowSpan;
     return next;
 }
+
+// Stage 3: mode/group deletion only changes saved Hub layout. The widget
+// services and their separate persisted user data are never deleted.
+// Require an explicit confirmation and exact stable ID so a stale UI cannot
+// accidentally remove a different selected mode or group.
+function removeMode(layout, modeIndex, expectedModeId, confirmed) {
+    var next = normalize(clone(layout));
+    if (confirmed !== true || next.modes.length <= 1
+            || !validIndex(modeIndex, next.modes.length)
+            || typeof expectedModeId !== "string"
+            || !expectedModeId.length
+            || next.modes[modeIndex].id !== expectedModeId)
+        return next;
+    next.modes.splice(modeIndex, 1);
+    return next;
+}
+
+function removeSubMode(layout, modeIndex, subIndex, expectedGroupId, confirmed) {
+    var next = normalize(clone(layout));
+    if (confirmed !== true || !validIndex(modeIndex, next.modes.length))
+        return next;
+    var groups = next.modes[modeIndex].subModes;
+    if (groups.length <= 1 || !validIndex(subIndex, groups.length)
+            || typeof expectedGroupId !== "string"
+            || !expectedGroupId.length
+            || groups[subIndex].id !== expectedGroupId)
+        return next;
+    groups.splice(subIndex, 1);
+    return next;
+}

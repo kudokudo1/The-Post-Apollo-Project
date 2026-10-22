@@ -1,0 +1,33 @@
+name: Social X Contracts
+
+on:
+  pull_request:
+    paths:
+      - "widgets/messanger/AppSelector.qml"
+      - "widgets/messanger/MessagingW.qml"
+      - "widgets/messanger/DiscordGeometry.py"
+      - "widgets/messanger/XBrowser.py"
+      - "tests/messaging/test_x_social_contracts.py"
+      - ".github/workflows/social-x-contracts.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "widgets/messanger/AppSelector.qml"
+      - "widgets/messanger/MessagingW.qml"
+      - "widgets/messanger/DiscordGeometry.py"
+      - "widgets/messanger/XBrowser.py"
+      - "tests/messaging/test_x_social_contracts.py"
+      - ".github/workflows/social-x-contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Validate X Social contracts
+        run: python3 tests/messaging/test_x_social_contracts.py

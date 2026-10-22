@@ -1754,6 +1754,7 @@ Scope {
                   )
             );
         const success = pendingActionSuccess;
+        const finalizationStarted = Date.now();
         const snapshot =
             afterSnapshot
             ? journalSnapshot(afterSnapshot)
@@ -1785,6 +1786,18 @@ Scope {
                     ? detail + " // " + warning
                     : detail
                 );
+        }
+
+        if (processAction === "fetch" || processAction === "pull") {
+            const metrics = operationJournal;
+            actionOutput += (actionOutput.length ? "\n" : "")
+                + "FINISHED // journal "
+                + (Date.now() - finalizationStarted)
+                + " ms (encode "
+                + (metrics ? metrics.lastPersistSerializationMs : 0)
+                + " ms / disk "
+                + (metrics ? metrics.lastPersistWriteMs : 0)
+                + " ms)";
         }
 
         actionBusy = false;
@@ -2413,10 +2426,15 @@ Scope {
 
                 gitService.traceSyncPhase("JOURNAL_STARTED");
                 if (syncPreparation) {
+                    const metrics = gitService.operationJournal;
                     gitService.actionOutput += "\nPREPARED // snapshot "
                         + snapshotMs + " ms // journal "
                         + Math.max(0, Date.now() - journalStartedMs)
-                        + " ms";
+                        + " ms (encode "
+                        + (metrics ? metrics.lastPersistSerializationMs : 0)
+                        + " ms / disk "
+                        + (metrics ? metrics.lastPersistWriteMs : 0)
+                        + " ms)";
                 }
                 gitService.startPendingActionProcess();
                 return;

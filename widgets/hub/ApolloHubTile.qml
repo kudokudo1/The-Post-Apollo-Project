@@ -2,8 +2,8 @@ import QtQuick
 import "../../components"
 import "../../services/hub/ApolloHubLayout.js" as Layout
 
-// Presentation only: Weather, Network, Media, and CPU++ arrive as read-only
-// snapshots. This tile creates no provider, collector, controller or poller.
+// Presentation only: Weather, Network, Media, CPU++, and Uptime consume
+// read-only snapshots. This tile creates no additional providers or pollers.
 SectionFrame {
     id: tile
 
@@ -12,6 +12,7 @@ SectionFrame {
     property var networkSnapshot: null
     property var mediaSnapshot: null
     property var systemSnapshot: null
+    property var uptimeSnapshot: null
     // B3 deliberately distinguishes local link status from verified internet.
     // Connected Wi-Fi/Ethernet is NOT proof that the internet is reachable.
     readonly property string networkState:
@@ -338,6 +339,21 @@ SectionFrame {
         }
     }
 
+    // B5 Linux boot uptime, not this widget or Quickshell's session age.
+    ApolloHubUptimeMini {
+        id: uptimeMini
+        visible: tile.moduleId === "uptime"
+        uptimeSnapshot: tile.uptimeSnapshot
+        anchors {
+            left: parent.left
+            right: parent.right
+            top: parent.top
+            bottom: parent.bottom
+            topMargin: tile.editing ? 32 : 22
+            bottomMargin: 23
+        }
+    }
+
     // MPD and MPRIS remain separate; neither gets selected automatically.
     ApolloHubMediaMini {
         visible: tile.moduleId === "media"
@@ -356,6 +372,7 @@ SectionFrame {
         visible: tile.moduleId !== "weather" && tile.moduleId !== "network"
                  && tile.moduleId !== "media"
                  && tile.moduleId !== "cpu"
+                 && tile.moduleId !== "uptime"
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
@@ -394,6 +411,8 @@ SectionFrame {
               ? "MEDIA // READ ONLY // AUDIO OUTPUT NOT VERIFIED"
               : tile.moduleId === "cpu"
               ? systemMini.statusLine
+              : tile.moduleId === "uptime"
+              ? uptimeMini.statusLine
               : "DATA ADAPTER NOT CONNECTED"
     }
 }

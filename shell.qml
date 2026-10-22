@@ -242,6 +242,8 @@ PanelWindow {
     ApolloHubLiveBridge {
         id: apolloHubLive
         weatherSource: weatherService
+        // Share Network dock's live iw reading; no new speed observer.
+        networkDockSource: sharedNetworkDock
     }
 
     // Official NWS alerts only when an operator-pinned geographic point exists.
@@ -640,7 +642,9 @@ PanelWindow {
 
         // Network
 
-        Network {}
+        Network {
+            id: sharedNetworkDock
+        }
 
         // Bluetooth
 

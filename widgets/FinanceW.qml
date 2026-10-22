@@ -21,6 +21,15 @@ PanelWindow {
         monitoring: root.menuOpen
     }
 
+    FinanceServices.FinanceTransactionWriteService {
+        id: financeWrite
+        onSaved: {
+            transactionDraftPane.clear();
+            if (root.menuOpen)
+                financeBudget.refresh();
+        }
+    }
+
     readonly property bool hasBudgetFeed:
         selectedMainMode === "budget" && selectedBudgetSubMode === "budget"
     // NO FEED for reserved/unimplemented pages. LIVE means an authenticated
@@ -1085,6 +1094,11 @@ PanelWindow {
                                 accounts: financeBudget.snapshot
                                           ? financeBudget.snapshot.accounts : []
                                 selectedMonth: financeBudget.selectedMonth
+                                saveState: financeWrite.state
+                                saveMessage: financeWrite.message
+                                onSaveRequested: function(payload) {
+                                    financeWrite.submit(payload);
+                                }
                             }
 
                             GohuText {
@@ -1109,7 +1123,7 @@ PanelWindow {
                                     border.color: Colors.cyan
                                     GohuText {
                                         anchors.left: parent.left
-                                        anchors.right: parent.right
+                                        anchors.right: editTransaction.left
                                         anchors.top: parent.top
                                         anchors.margins: 5
                                         text: modelData.date + "  " + modelData.description
@@ -1138,6 +1152,24 @@ PanelWindow {
                                                ? Colors.orange : Colors.omnitrix
                                         font.pixelSize: 11
                                     }
+                                    ActionButton {
+                                        id: editTransaction
+                                        anchors.top: parent.top
+                                        anchors.topMargin: 4
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: 5
+                                        width: 46
+                                        height: 24
+                                        trackLabelGlowLocally: true
+                                        label: "EDIT"
+                                        labelPixelSize: 9
+                                        accentColor: Colors.cyan
+                                        available: modelData.editable === true
+                                                   && financeWrite.state !== "pending"
+                                                   && financeWrite.state !== "uncertain"
+                                        onLeftClicked: transactionDraftPane.beginEdit(modelData)
+                                    }
+
                                 }
                             }
 

@@ -16,6 +16,12 @@ Item {
 
     property bool deckOpen: false
 
+    // Forward the same Hi-Fi controller and explicit MPRIS selection.
+    // These are observations for the Hub, not second media instances.
+    readonly property var hubMediaController: deckPanel.hubMediaController
+    readonly property string hubSelectedMprisBusName:
+        deckPanel.hubSelectedMprisBusName
+
     DockButton {
     id: mediaDock
     anchors.fill: parent

@@ -164,10 +164,25 @@ function normalizeCore(data) {
 function normalize(data) {
     if (!data || typeof data !== "object" || Array.isArray(data)
             || !Array.isArray(data.modes)
-            || (data.version !== 1 && data.version !== LAYOUT_VERSION))
+            || (data.version !== undefined && data.version !== 1
+                && data.version !== LAYOUT_VERSION))
         return defaultLayout();
     var next = normalizeCore(data);
     return next.modes.length > 0 ? next : defaultLayout();
+}
+
+function storageIssue(text) {
+    if (typeof text !== "string" || !text.trim())
+        return "";
+    var data;
+    try { data = JSON.parse(text); }
+    catch (e) { return "INVALID_JSON"; }
+    if (!data || typeof data !== "object" || Array.isArray(data))
+        return "INVALID_LAYOUT";
+    if (data.version !== undefined && data.version !== 1
+            && data.version !== LAYOUT_VERSION)
+        return "UNSUPPORTED_VERSION";
+    return Array.isArray(data.modes) ? "" : "INVALID_LAYOUT";
 }
 
 function parse(text) {

@@ -167,6 +167,17 @@ async function run() {
   const sourceKey=createHash("sha256")
     .update(serverURL+"\0"+id).digest("hex");
 
+  stage="fresh-api-init";
+  await startApi(join(temporary,"client-preflight"));
+  stage="fresh-api-download";
+  await api.downloadBudget(id);
+  stage="fresh-api-account";
+  const preflightAccounts=await api.getAccounts();
+  assert.ok(preflightAccounts.some(x=>x.id===accountId));
+  stage="fresh-api-transactions";
+  assert.deepEqual(await api.getTransactions(accountId,month+"-01",month+"-31"),[]);
+  await endApi();
+
   stage="real-create";
   const created={
     action:"create",requestId:"a".repeat(32),

@@ -19,6 +19,28 @@ Scope {
     property double traceRefreshSyncMs: 0
     property double traceRefreshPeakMs: 0
 
+    // Diagnostic is dormant unless explicitly enabled. Never changes
+    // snapshot, journal, subprocess, or UI completion ordering.
+    readonly property bool syncTimingEnabled:
+        String(Quickshell.env("POST_APOLLO_GIT_SYNC_TRACE") || "").trim() === "1"
+    property double syncStartedMs: 0
+    property double syncPhaseMs: 0
+
+    function traceSyncPhase(phase) {
+        if (!syncTimingEnabled
+                || (pendingProcessAction !== "fetch"
+                    && pendingProcessAction !== "pull"))
+            return;
+        const now = Date.now();
+        console.warn(
+            "GIT_SYNC_TRACE // kind=" + pendingProcessAction
+            + " phase=" + phase
+            + " stage=" + (now - syncPhaseMs) + "ms"
+            + " total=" + (now - syncStartedMs) + "ms"
+        );
+        syncPhaseMs = now;
+    }
+
     // Normal-workload timestamps: wall time includes subprocess time, while
     // callback sum and peak approximate synchronous QML processing. Neither
     // metric is a function-stack profiler or CPU-time counter.
@@ -1794,6 +1816,7 @@ Scope {
         if (!actionBusy)
             return;
 
+        traceSyncPhase("GIT_PROCESS_COMPLETE");
         actionWatchdog.stop();
         pendingActionSuccess = actionExitCode === 0;
         pendingActionDetail =
@@ -2094,20 +2117,21 @@ Scope {
                 '    remote="${target%%/*}"',
                 '    remote_branch="${target#*/}"',
                 '    current_branch="$(git -C "$repo" branch --show-current)"',
-                '    git -C "$repo" fetch --prune "$remote" || rc=$?',
-                '    if [ "$rc" -eq 0 ]; then',
-                '      if [ "$local_target" = "$current_branch" ]; then',
-                '        case "$pull_mode" in',
-                '          ff-only)',
-                '            printf "PULL // FF ONLY // %s -> checked-out %s\\n" "$target" "$local_target"',
-                '            git -C "$repo" pull --ff-only "$remote" "$remote_branch" || rc=$?',
-                '            ;;',
-                '          merge)',
-                '            printf "PULL // MERGE // %s -> checked-out %s\\n" "$target" "$local_target"',
-                '            git -C "$repo" pull --no-rebase "$remote" "$remote_branch" || rc=$?',
-                '            ;;',
-                '        esac',
-                '      elif [ "$pull_mode" = "ff-only" ]; then',
+                '    if [ "$local_target" = "$current_branch" ]; then',
+                '      case "$pull_mode" in',
+                '        ff-only)',
+                '          printf "PULL // FF ONLY // %s -> checked-out %s\\n" "$target" "$local_target"',
+                '          git -C "$repo" pull --ff-only --prune "$remote" "$remote_branch" || rc=$?',
+                '          ;;',
+                '        merge)',
+                '          printf "PULL // MERGE // %s -> checked-out %s\\n" "$target" "$local_target"',
+                '          git -C "$repo" pull --no-rebase --prune "$remote" "$remote_branch" || rc=$?',
+                '          ;;',
+                '      esac',
+                '    else',
+                '      git -C "$repo" fetch --prune "$remote" || rc=$?',
+                '      if [ "$rc" -eq 0 ]; then',
+                '        if [ "$pull_mode" = "ff-only" ]; then',
                 '        printf "SYNC LOCAL TARGET // %s -> %s // NO CHECKOUT\\n" "$target" "$local_target"',
                 '        if git -C "$repo" merge-base --is-ancestor "$local_target" "$target"; then',
                 '          git -C "$repo" branch -f "$local_target" "$target" || rc=$?',
@@ -2115,10 +2139,11 @@ Scope {
                 '          printf "PULL STOPPED // %s cannot fast-forward to %s\\n" "$local_target" "$target"',
                 '          rc=1',
                 '        fi',
-                '      else',
+                '        else',
                 '        printf "BACKGROUND MERGE REFUSED // %s is not checked out\\n" "$local_target"',
                 '        printf "Use FF mode, or explicitly checkout the branch before a merge-mode pull.\\n"',
                 '        rc=1',
+                '        fi',
                 '      fi',
                 '    fi',
                 '    ;;',
@@ -2161,6 +2186,12 @@ Scope {
         clearPendingControlAction();
         pendingProcessAction = processAction;
         pendingActionCommand = command;
+
+        if (processAction === "fetch" || processAction === "pull") {
+            syncStartedMs = Date.now();
+            syncPhaseMs = syncStartedMs;
+            traceSyncPhase("REQUESTED");
+        }
 
         if (processAction === "clone") {
             if (!operationJournal) {
@@ -2319,6 +2350,7 @@ Scope {
             gitService.pendingSnapshotRequest = "";
 
             if (gitService.snapshotPhase === "BEFORE") {
+                gitService.traceSyncPhase("BEFORE_SNAPSHOT_COMPLETE");
                 gitService.snapshotPhase = "";
                 const beforeSnapshot =
                     gitService.journalSnapshot(snapshot);
@@ -2348,6 +2380,7 @@ Scope {
             }
 
             if (gitService.snapshotPhase === "AFTER") {
+                gitService.traceSyncPhase("AFTER_SNAPSHOT_COMPLETE");
                 gitService.snapshotPhase = "";
                 gitService.finalizeControlAction(snapshot, "");
             }

@@ -82,7 +82,8 @@ test("unexpected fields and malformed values never reach Actual",async()=>{
 });
 test("duplicate category identity cannot be resolved by guesswork",async()=>{
   const b=budget();b.categoryGroups[1].categories.push({...b.categoryGroups[1].categories[0]});
-  await refusal("category-unavailable",()=>preflightAllocation(cmd(),b));
+  assert.throws(()=>preflightAllocation(cmd(),b),error=>error instanceof AllocationRefusal
+    && error.code==="category-unavailable");
 });
 test("a successful set without matching readback is UNCERTAIN, not success",async()=>{
   const m=mocked(),original=m.api.setBudgetAmount;

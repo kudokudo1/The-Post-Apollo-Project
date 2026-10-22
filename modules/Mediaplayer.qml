@@ -31,6 +31,20 @@ Item {
     // Atomic, validated MPD reading for the Hub. Never expose subprocess data.
     readonly property var hubMpdObservation: mediaDock.lastValidMpdObservation
 
+    // Media-only rear halo. The standard DockButton gives the rear and front
+    // the SAME color; disable only its rear layer below, then draw that layer
+    // here behind the dock. Keep its canonical opacity/spread and open-magenta
+    // priority, while cyan/orange tracks the CAVA accent in ordinary states.
+    RectangularShadow {
+        id: mediaRearHalo
+        anchors.fill: mediaDock
+        spread: mediaDock.softGlowSpread
+        opacity: mediaDock.softGlowOpacity
+        color: mediaDock.open ? mediaDock.openGlowColor : mediaDock.accentColor
+        visible: mediaDock.visible
+        z: -1
+    }
+
     DockButton {
     id: mediaDock
     anchors.fill: parent
@@ -83,9 +97,10 @@ Item {
     hoverContentGlowColor: accentColor
     pressedContentGlowColor: accentColor
 
-    // Media-specific color combination: the full-width chassis wash and
-    // perimeter stay magenta, even on hover. Only artwork uses the CAVA
-    // cyan/orange accent; the DockButton's open priority stays intact.
+    // Media-specific two-plane glow: the root-level rear halo follows CAVA
+    // cyan/orange (magenta on open); the built-in front wash remains magenta.
+    // Disable only the original rear halo to prevent double stacking.
+    softGlowEnabled: false
     normalDockGlowColor: Colors.magenta
     hoverDockGlowColor: Colors.magenta
     pressedDockGlowColor: Colors.magenta

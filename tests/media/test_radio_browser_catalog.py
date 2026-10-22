@@ -60,13 +60,28 @@ class RadioCatalogTests(unittest.TestCase):
         page = cat.search("tag:jazz")
         self.assertEqual(seen[-1]["tag"], "jazz")
         self.assertEqual(len(page["items"]), 50)
-        self.assertEqual(page["nextCursor"], "150")
+        self.assertEqual(page["nextCursor"], "50")
         cat.search("country:US", page["nextCursor"])
         self.assertEqual(seen[-1]["countrycode"], "US")
-        self.assertEqual(seen[-1]["offset"], "150")
+        self.assertEqual(seen[-1]["offset"], "50")
         cat.search("ambient")
         self.assertEqual(seen[-1]["name"], "ambient")
         self.assertNotIn("tag", seen[-1])
+
+    def test_directory_ref_never_becomes_mp3_uri_and_mirror_redirects_are_rejected(self):
+        from radio_browser_catalog import _RejectRedirects, _API_MIRRORS
+        self.assertEqual(len(_API_MIRRORS), 2)
+        self.assertTrue(all(x.startswith("https://") for x in _API_MIRRORS))
+        self.assertIsNone(_RejectRedirects().redirect_request(
+            None, None, 302, "Moved", {}, "http://127.0.0.1/private"))
+        cat = RadioBrowserCatalogSource(fetch=lambda params: [station()])
+        result = cat.search("")
+        ref = result["items"][0]["ref"]
+        self.assertEqual(ref["source"], "radio-browser")
+        self.assertEqual(ref["kind"], "station")
+        self.assertNotIn(SAFE, str(ref))
+        with self.assertRaises(MediaBackendError):
+            cat.prepare(ref)
 
     def test_invalid_queries_cursor_and_response_are_rejected(self):
         cat = RadioBrowserCatalogSource(fetch=lambda params: [])

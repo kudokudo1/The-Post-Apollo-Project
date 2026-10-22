@@ -1099,6 +1099,8 @@ PanelWindow {
                                 accounts: financeBudget.snapshot
                                           ? financeBudget.snapshot.accounts : []
                                 selectedMonth: financeBudget.selectedMonth
+                                sourceKey: financeBudget.snapshot
+                                           ? financeBudget.snapshot.sourceKey : ""
                                 saveState: financeWrite.state
                                 saveMessage: financeWrite.message
                                 onSaveRequested: function(payload) {

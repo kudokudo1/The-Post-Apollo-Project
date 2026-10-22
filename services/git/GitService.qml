@@ -1724,6 +1724,11 @@ Scope {
         for (let i = lines.length - 1; i >= 0; --i) {
             const value = String(lines[i] || "").trim();
 
+            if (value.indexOf("PREPARING //") === 0
+                    || value.indexOf("RUNNING // Git subprocess") === 0
+                    || value.indexOf("FINALIZING //") === 0
+                    || value.indexOf("STILL RUNNING //") === 0)
+                continue;
             if (value)
                 return value;
         }
@@ -1834,8 +1839,6 @@ Scope {
 
         traceSyncPhase("GIT_PROCESS_COMPLETE");
         actionStage = "FINALIZING";
-        actionOutput += (actionOutput.length ? "\n" : "")
-            + "FINALIZING // collecting repository evidence";
         actionWatchdog.stop();
         pendingActionSuccess = actionExitCode === 0;
         pendingActionDetail =
@@ -1849,6 +1852,8 @@ Scope {
                         + String(actionExitCode)
                   )
               );
+        actionOutput += (actionOutput.length ? "\n" : "")
+            + "FINALIZING // collecting repository evidence";
 
         if (pendingProcessAction === "clone") {
             finalizeControlAction(

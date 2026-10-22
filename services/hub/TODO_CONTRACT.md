@@ -1,6 +1,6 @@
 # 🏥💜 ApolloHubW // B7 To-do backend contract
 
-**Status:** Source committed to GitHub `main`; on-device storage round-trip and To-do mini-widget UI acceptance pending.
+**Status:** B7 v1 contract is historical baseline. TASKS M4 v2 extension proposed in a separate draft PR; deployment and runtime acceptance pending.
 
 **Ownership boundary:** This is a tiny personal checklist **inside ApolloHub**, not a Hospital Room/Assignment/Worker/Session, AppControl process list, Koinoikos task, calendar service, or Notes/The Study. It changes none of those systems. `shell.qml` and Hub UI are unmodified by B7. Features beyond this first local checklist require separate scope and operator decisions.
 
@@ -85,3 +85,45 @@ The independent workflow `.github/workflows/apollo-hub-todo.yml` runs both in CI
 3. Revisit richer features (due dates, priority, calendar links, notifications, external sync, revisions/undo) only after an explicit design decision and separate work authorization.
 
 **No local files or running Quickshell processes are altered by this GitHub source checkpoint.**
+
+## TASKS M4 // v2 personal task fields (2026-10-22 proposal)
+
+**Current change boundary:** The M4 branch extends the shared personal checklist, not
+Hospital Assignments, AppControl process tasks, Calendar, GitHub Projects or Obsidian.
+B7's one-writer/singleton model and explicit save lifecycle remain in force.
+This section documents the proposed v2 source contract, not live deployment.
+
+- The established path `Quickshell.dataDir + "/apollo-hub-todo-v1.json"`
+  is **not renamed or automatically rewritten**; the path historically carries
+  a v1 suffix. An existing v1 document is parsed and **upcast in memory** to
+  v2 with defaults `priority:"none"`, `description:""`, `dueDate:null`.
+- The first **explicit task mutation** writes a full v2 document to that same
+  file using the existing atomic writer. Opening TASKS or Apollo Hub alone
+  never writes. An older binary/policy limited to version 1 cannot read v2
+  after the upgrade; **do not downgrade without restoring a verified backup**.
+- Each v2 task keeps `id`, `title`, `done`, `createdAtMs`, `updatedAtMs`
+  and adds `priority` (`none|low|medium|high|urgent`),
+  `description` (plain text, ≤2000 characters), and `dueDate`
+  (`YYYY-MM-DD` real Gregorian date or `null`).
+- Existing Hub ADD/EDIT/complete/delete continues to preserve all new fields.
+  The TASKS detail pane edits the three new fields together as one validated
+  store operation, with a separate draft, SAVE/DISCARD, pending/error feedback,
+  and explicit selection by tapping a task title.
+- Only known fields pass the parser; invalid values, duplicate IDs and unknown
+  format versions fail closed. Unknown untrusted metadata is discarded rather
+  than becoming arbitrary persisted executable/user state.
+- The `snapshot.items` projection now includes these three task details,
+  but still excludes internal timestamps and storage/sequence controls.
+  It is a display snapshot, not direct access to the mutable disk document.
+- Max 200 tasks, 160-character titles. JSON size bound increases to 1 MiB
+  to support descriptions. No automatic synchronization, filesystem watching,
+  remote calls, notifications, task scheduling or conflict merging.
+- GitHub Projects custom fields, identifiers, assignees, iterations and
+  Obsidian/Markdown/TXT/Git adapters are **not** part of M4. These require
+  later mapping, ID and version/conflict decisions.
+
+**Verification required before production:** CI on real policy; v1 reload;
+create/edit/complete/reopen/delete; persistence through Quickshell restart;
+correct leap day and invalid date handling; disk save failure preserving draft;
+Hub and TASKS simultaneous editing; no typing captured by unrelated widgets.
+Live operator acceptance is not implied by source tests.

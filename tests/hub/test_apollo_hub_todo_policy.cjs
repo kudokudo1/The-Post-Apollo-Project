@@ -80,7 +80,7 @@ assert.equal(p.parse(JSON.stringify({version:9,nextId:1,tasks:[]})).reason,
              "UNSUPPORTED_VERSION");
 assert.equal(p.parse("{bad").reason,"INVALID_JSON");
 assert.equal(p.parse("").reason,"INVALID_FILE");
-assert.equal(p.parse("x".repeat(131073)).reason,"INVALID_FILE");
+assert.equal(p.parse("x".repeat(1048577)).reason,"INVALID_FILE");
 assert.equal(p.parse(JSON.stringify({version:1,nextId:1,tasks:[{
     id:"t1", title:"A",done:false,createdAtMs:1,updatedAtMs:1
 }]})).reason,"SEQUENCE_REWIND");
@@ -111,7 +111,8 @@ for(const candidate of [
 const max=p.emptyDocument();
 max.nextId=202;
 max.tasks=Array.from({length:200},(_,i)=>({
-    id:"t"+(i+1),title:"Task "+i,done:false,createdAtMs:1,updatedAtMs:1
+    id:"t"+(i+1),title:"Task "+i,done:false,createdAtMs:1,updatedAtMs:1,
+    priority:"none", description:"", dueDate:null
 }));
 assert.equal(p.validate(max).ok,true);
 assert.equal(p.create(max,"Overflow",t).reason,"CAPACITY");

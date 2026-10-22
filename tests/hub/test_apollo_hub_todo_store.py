@@ -24,6 +24,7 @@ for needle in (
     "function stage(result)", "function addTask(title)",
     "function setTaskDone(id, done)", "function renameTask(id, title)",
     "function removeTask(id, confirmed)",
+    "function updateTaskDetails(id, priority, description, dueDate)",
     "if (storageState !== \"ready\" && storageState !== \"empty\")",
     "pendingDocument = result.document",
     'storageState = "saving"',

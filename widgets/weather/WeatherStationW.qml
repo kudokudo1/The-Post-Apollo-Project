@@ -447,25 +447,13 @@ PanelWindow {
 
                 anchors.leftMargin: 22
 
-                text: "✦ WEATHER STATION ✦"
+                text: "WEATHER STATION // " + weatherStation.currentContext
 
                 font.family: "GohuFont 11 Nerd Font Mono"
 
                 font.pixelSize: 20
 
                 color: Colors.magenta
-            }
-
-            Text {
-                anchors.centerIn: parent
-
-                text: weatherStation.currentContext
-
-                font.family: "GohuFont 11 Nerd Font Mono"
-
-                font.pixelSize: 18
-
-                color: Colors.orange
             }
 
             Row {
@@ -582,7 +570,7 @@ PanelWindow {
 
                 height: 2
 
-                color: Colors.magenta
+                color: Colors.cyan
             }
         }
 

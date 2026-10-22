@@ -27,9 +27,10 @@ assert.ok(mainHeaderStart >= 0 && mainHeaderEnd > mainHeaderStart);
 const header = windowSource.slice(mainHeaderStart, mainHeaderEnd);
 assert.match(
     header,
-    /text: "✦ WEATHER STATION ✦"[\s\S]*?color: Colors\.magenta/
+    /text: "WEATHER STATION \/\/ " \+ weatherStation\.currentContext[\s\S]*?color: Colors\.magenta/
 );
-assert.match(header, /height: 2\s+color: Colors\.magenta/);
+assert.doesNotMatch(header, /text:\s*weatherStation\.currentContext/);
+assert.match(header, /height: 2\s+color: Colors\.cyan/);
 assert.match(header, /border\.color: weatherStation\.sourceStatusColor/);
 assert.match(header, /accentColor: Colors\.red/);
 

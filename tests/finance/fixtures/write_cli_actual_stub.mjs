@@ -44,11 +44,33 @@ export async function updateTransaction(id,fields) {
   data.events.push("update");
   await write(data);
 }
+export async function getBudgetMonth(month) {
+  const data=await read();
+  if (!data.budget || !/^\d{4}-\d{2}$/.test(month))
+    throw new Error("missing-fictional-budget");
+  return data.budget;
+}
+export async function setBudgetAmount(month,categoryId,target) {
+  if (!/^\d{4}-\d{2}$/.test(month) || !Number.isSafeInteger(target))
+    throw new Error("invalid-fictional-allocation");
+  const data=await read();
+  const groups=data.budget?.categoryGroups || [];
+  const category=groups.flatMap(group=>group.categories||[])
+    .find(item=>item.id===categoryId);
+  if(!category)throw new Error("fictional-category-not-found");
+  const delta=target-category.budgeted;
+  category.budgeted=target;
+  category.balance+=delta;
+  data.budget.toBudget-=delta;
+  data.events.push("set-allocation");
+  await write(data);
+  return "ok";
+}
 export async function sync() {
   const data=await read();
   data.events.push("sync");
   await write(data);
-  if (process.env.FINANCEW_FAKE_FAIL_STAGE === "sync")
+  if (["sync","allocation-sync"].includes(process.env.FINANCEW_FAKE_FAIL_STAGE))
     throw new Error("fictional-sync-interruption");
 }
 export async function shutdown() {}

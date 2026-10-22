@@ -1,5 +1,4 @@
 import QtQuick
-import Qt5Compat.GraphicalEffects
 import Quickshell
 import "../components"
 import qs.services.notifications
@@ -206,23 +205,10 @@ PanelWindow {
                         : notificationCard.image !== "" ? notificationCard.image
                         : notificationCard.appIcon !== "" ? Quickshell.iconPath(notificationCard.appIcon, true) : ""
 
+                    // Preserve the exact site image pixels. Some opaque
+                    // favicon/image payloads became solid magenta/black tiles
+                    // when passed through a separate Colorize shader.
                     fillMode: Image.PreserveAspectFit
-                    visible: notificationCard.website === ""
-                        || notificationCard.website === "YouTube"
-                }
-
-                // Recolor site-supplied icons without flattening their details.
-                // The bundled YouTube mark is already exact magenta/black.
-                Colorize {
-                    anchors.fill: notificationIcon
-                    source: notificationIcon
-                    visible: notificationCard.website !== ""
-                        && notificationCard.website !== "YouTube"
-                        && notificationIcon.status === Image.Ready
-                    hue: 0.8333
-                    saturation: 0.65
-                    lightness: -0.12
-                    cached: true
                 }
 
                 // ===== TEXT ====================================

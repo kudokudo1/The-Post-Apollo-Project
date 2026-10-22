@@ -79,7 +79,7 @@ PanelWindow {
     property bool worldCatalogFailed: false
     readonly property var worldSearchMatches:
         WorldZoneSearch.search(worldZoneCatalog, worldSearchQuery,
-                               120, worldCountryIndex)
+                               WorldZoneSearch.MAX_ZONES, worldCountryIndex)
     readonly property bool navigationKeysAvailable:
         standardKeysAvailable && !worldSearchInput.activeFocus
     property string worldLookupZone: ""
@@ -744,10 +744,12 @@ PanelWindow {
                                 y: worldZoneStrip.y + worldZoneStrip.height
                                    + 3 - worldSearchArea.y
                                 width: parent.width
+                                // A compact count header sits above the
+                                // results without changing the window size.
                                 height: timew.worldSearchMatches.length > 0
-                                        ? Math.min(188, 8
+                                        ? Math.min(212, 34
                                                    + timew.worldSearchMatches.length * 30)
-                                        : 34
+                                        : 54
                                 z: 60
                                 visible: timew.menuOpen
                                          && timew.selectedMode === "clock"
@@ -757,16 +759,31 @@ PanelWindow {
                                 border.width: 1
                                 border.color: Colors.white
 
-                                // Virtualize matches and scroll inside the
-                                // popup; do not expand the TimeW chassis.
+                                GohuText {
+                                    id: worldSearchCount
+                                    x: 8
+                                    y: 4
+                                    width: parent.width - 16
+                                    height: 18
+                                    verticalAlignment: Text.AlignVCenter
+                                    color: Colors.cyan
+                                    font.pixelSize: 11
+                                    text: (timew.worldSearchQuery.trim() === ""
+                                           ? "ITEMS // " : "MATCHES // ")
+                                          + timew.worldSearchMatches.length
+                                }
+
+                                // Virtualize the full catalog, scrolling only
+                                // the rows below the fixed count header.
                                 ListView {
                                     id: worldSearchResults
                                     anchors {
-                                        top: parent.top
+                                        top: worldSearchCount.bottom
                                         bottom: parent.bottom
                                         left: parent.left
                                         right: parent.right
                                         margins: 4
+                                        topMargin: 4
                                         // Reserve a dedicated gutter for the
                                         // scrollbar's 16px star track plus a
                                         // 5px separation/outer clearance.
@@ -782,8 +799,8 @@ PanelWindow {
                                         width: worldSearchResults.width
                                         height: 28
                                         label: modelData.country
-                                               ? modelData.label + " // "
-                                                 + modelData.country
+                                               ? modelData.country + " // "
+                                                 + modelData.label
                                                : modelData.label
                                         labelPixelSize: 11
                                         labelHorizontalAlignment: Text.AlignLeft

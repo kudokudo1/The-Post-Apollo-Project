@@ -9,6 +9,19 @@ Rectangle {
     readonly property bool aqiReady: weatherService && weatherService.aqiReady
     readonly property bool aqiLoading: weatherService && weatherService.aqiLoading
     readonly property real aqiValue: aqiReady ? Number(weatherService.aqi) : 0
+    readonly property real pm25Value:
+        aqiReady ? Number(weatherService.pm25) : 0
+    readonly property real pm10Value:
+        aqiReady ? Number(weatherService.pm10) : 0
+
+    // These are normalized views of real telemetry, preserved from the
+    // original combined HOME implementation.
+    readonly property real aqiMeter:
+        Math.max(0, Math.min(1, aqiValue / 500))
+    readonly property real pm25Meter:
+        Math.max(0, Math.min(1, pm25Value / 100))
+    readonly property real pm10Meter:
+        Math.max(0, Math.min(1, pm10Value / 150))
 
     readonly property color aqiColor: {
         if (!aqiReady)
@@ -77,6 +90,22 @@ Rectangle {
                     font.pixelSize: 11
                     color: ground.aqiColor
                 }
+
+                Rectangle {
+                    width: 130
+                    height: 8
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.green
+
+                    Rectangle {
+                        x: 2
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: (parent.width - 4) * ground.aqiMeter
+                        height: parent.height - 4
+                        color: Colors.green
+                    }
+                }
             }
 
             Column {
@@ -95,6 +124,22 @@ Rectangle {
                     font.pixelSize: 18
                     color: Colors.white
                 }
+
+                Rectangle {
+                    width: 120
+                    height: 8
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.green
+
+                    Rectangle {
+                        x: 2
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: (parent.width - 4) * ground.pm25Meter
+                        height: parent.height - 4
+                        color: Colors.green
+                    }
+                }
             }
 
             Column {
@@ -112,6 +157,22 @@ Rectangle {
                           : "-- µg/m³"
                     font.pixelSize: 18
                     color: Colors.white
+                }
+
+                Rectangle {
+                    width: 120
+                    height: 8
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.green
+
+                    Rectangle {
+                        x: 2
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: (parent.width - 4) * ground.pm10Meter
+                        height: parent.height - 4
+                        color: Colors.green
+                    }
                 }
             }
 

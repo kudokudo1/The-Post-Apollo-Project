@@ -17,6 +17,19 @@ Rectangle {
     readonly property real bzValue:
         spaceService && spaceService.magneticFieldReady
         ? Number(spaceService.magneticFieldBz) : 0
+    readonly property real solarFluxValue:
+        spaceService && spaceService.solarFlux >= 0
+        ? Number(spaceService.solarFlux) : 0
+
+    // Normalized live NOAA telemetry scales preserved from the original page.
+    readonly property real kpMeter:
+        Math.max(0, Math.min(1, kpValue / 9))
+    readonly property real solarWindMeter:
+        Math.max(0, Math.min(1, solarWindValue / 1000))
+    readonly property real bzMeter:
+        Math.max(0, Math.min(1, Math.abs(bzValue) / 20))
+    readonly property real solarFluxMeter:
+        Math.max(0, Math.min(1, solarFluxValue / 300))
 
     readonly property color kpColor: {
         if (!spaceService || !spaceService.kpReady)
@@ -109,6 +122,22 @@ Rectangle {
                     font.pixelSize: 11
                     color: space.kpColor
                 }
+
+                Rectangle {
+                    width: 135
+                    height: 8
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.magenta
+
+                    Rectangle {
+                        x: 2
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: (parent.width - 4) * space.kpMeter
+                        height: parent.height - 4
+                        color: Colors.magenta
+                    }
+                }
             }
 
             Column {
@@ -125,6 +154,22 @@ Rectangle {
                           ? spaceService.solarWindText : "-- KM/S"
                     font.pixelSize: 19
                     color: space.solarWindColor
+                }
+
+                Rectangle {
+                    width: 135
+                    height: 8
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.magenta
+
+                    Rectangle {
+                        x: 2
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: (parent.width - 4) * space.solarWindMeter
+                        height: parent.height - 4
+                        color: Colors.magenta
+                    }
                 }
             }
 
@@ -148,6 +193,22 @@ Rectangle {
                     font.pixelSize: 10
                     color: space.bzColor
                 }
+
+                Rectangle {
+                    width: 145
+                    height: 8
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.magenta
+
+                    Rectangle {
+                        x: 2
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: (parent.width - 4) * space.bzMeter
+                        height: parent.height - 4
+                        color: Colors.magenta
+                    }
+                }
             }
 
             Column {
@@ -164,6 +225,22 @@ Rectangle {
                           ? spaceService.solarFluxText : "-- SFU"
                     font.pixelSize: 19
                     color: Colors.white
+                }
+
+                Rectangle {
+                    width: 135
+                    height: 8
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.magenta
+
+                    Rectangle {
+                        x: 2
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: (parent.width - 4) * space.solarFluxMeter
+                        height: parent.height - 4
+                        color: Colors.magenta
+                    }
                 }
             }
         }

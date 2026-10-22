@@ -61,4 +61,64 @@ for (const token of [
 ])
     assert.ok(skySource.includes(token), token);
 
+// Restored bars are not decorative/random meters. Their fill widths remain
+// direct normalized functions of the real telemetry already displayed.
+const meterSpecs = [
+    {
+        source: groundSource,
+        accent: "green",
+        meters: {
+            aqi: "aqiValue / 500",
+            pm25: "pm25Value / 100",
+            pm10: "pm10Value / 150",
+        },
+    },
+    {
+        source: skySource,
+        accent: "cyan",
+        meters: {
+            temperature: "temperatureValue / 120",
+            aqi: "aqiValue / 500",
+            humidity: "humidityValue / 100",
+            wind: "windValue / 50",
+        },
+    },
+    {
+        source: spaceSource,
+        accent: "magenta",
+        meters: {
+            kp: "kpValue / 9",
+            solarWind: "solarWindValue / 1000",
+            bz: "Math.abs(bzValue) / 20",
+            solarFlux: "solarFluxValue / 300",
+        },
+    },
+];
+
+for (const spec of meterSpecs) {
+    for (const [name, scale] of Object.entries(spec.meters)) {
+        assert.ok(
+            spec.source.includes("readonly property real " + name + "Meter"),
+            name + " meter property"
+        );
+        assert.ok(spec.source.includes(scale), name + " real telemetry scale");
+        assert.ok(
+            spec.source.includes(
+                "width: (parent.width - 4) * " +
+                (spec.source === groundSource ? "ground."
+                 : spec.source === skySource ? "sky." : "space.") +
+                name + "Meter"
+            ),
+            name + " live fill width"
+        );
+    }
+
+    const fillColor = "color: Colors." + spec.accent;
+    assert.ok(
+        spec.source.split(fillColor).length - 1 >=
+            Object.keys(spec.meters).length,
+        spec.accent + " meter fill identity"
+    );
+}
+
 console.log("Weather Station domain palette contracts: PASS");

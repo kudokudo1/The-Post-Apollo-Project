@@ -1,14 +1,15 @@
 """Read-only Radio Browser directory. Playback stays with the existing MPD controller.
 
 Radio Browser is a community directory, not a trusted audio-origin registry.
-Only publicly shaped HTTPS direct MP3 streams with no URL secrets are exposed;
-every load still requires deliberate SELECT/LOAD and passes the MPD backend's
-existing strict source validation. Network errors never change playback.
+Only station metadata and stable UUID references are exposed to the UI.
+Untrusted directory URLs never become direct-stream refs or MPD commands.
+Network errors never change playback. Playback authorization is separate.
 """
 from __future__ import annotations
 
 import json
 import re
+import uuid
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlsplit
@@ -32,15 +33,16 @@ class RadioBrowserCatalogSource:
     def __init__(self, fetch=None):
         # Tests inject a fake GET transport; production uses this fixed host.
         self._fetch = fetch
+        self._known_stations: dict[str, dict[str, Any]] = {}
 
     def describe(self) -> dict[str, Any]:
         return {
             "id": self.id, "name": "RADIO BROWSER // DIRECTORY",
             "available": True, "reason": "",
             "requirements": ["internet-for-discovery"],
-            "capabilities": ["search"],
+            "capabilities": ["search", "inspect"],
             "playback": {"available": False,
-                         "reason": "Choose station, then existing direct-HTTPS MPD LOAD"},
+                         "reason": "Directory URLs are untrusted; playback approval pending"},
             "note": "Listings are untrusted; stream support is not guaranteed",
         }
 
@@ -71,7 +73,10 @@ class RadioBrowserCatalogSource:
         payload = self._request(params)
         items = []
         seen = set()
+        known = {}
+        scanned = 0
         for row in payload:
+            scanned += 1
             if not isinstance(row, dict) or row.get("lastcheckok") not in (True, 1):
                 continue
             if str(row.get("codec", "")).upper() != "MP3":
@@ -79,30 +84,38 @@ class RadioBrowserCatalogSource:
             uri = row.get("url_resolved") or row.get("url")
             try:
                 uri = validate_https_audio_url(uri)
-            except MediaBackendError:
+                station_id = str(uuid.UUID(str(row.get("stationuuid", ""))))
+            except (MediaBackendError, ValueError, AttributeError):
                 continue
             # These commonly reference playlists or redirects, not direct MP3.
             if urlsplit(uri).path.lower().endswith((".m3u", ".m3u8", ".pls", ".asx", ".xspf")):
                 continue
-            if uri in seen:
+            if uri in seen or station_id in known:
                 continue
             seen.add(uri)
             name = _clean(row.get("name"), 100)
             if not name:
                 continue
-            items.append({
-                "ref": {"source": "direct-stream", "kind": "stream", "id": uri},
+            item = {
+                "ref": {"source": self.id, "kind": "station", "id": station_id},
                 "title": name,
-                "artist": _clean(row.get("country"), 60),
+                "artist": _clean(row.get("countrycode"), 2),
                 "album": _clean(row.get("tags"), 100),
                 "genre": _clean(row.get("tags"), 100),
                 "codec": "MP3", "live": True,
-                "stationuuid": _clean(row.get("stationuuid"), 64),
+                "stationuuid": station_id,
+                "streamHost": urlsplit(uri).hostname,
                 "bitrate": _bitrate(row.get("bitrate")),
-            })
+                "playback": {"available": False, "reason": "Directory only"},
+            }
+            items.append(item)
+            known[station_id] = item
             if len(items) >= _PAGE_SIZE:
                 break
-        next_offset = offset + _REQUEST_ROWS
+        # Cursor follows the number of rows actually consumed, not the
+        # requested batch size: usable hits after row 50 must not be skipped.
+        self._known_stations = known
+        next_offset = offset + scanned
         return {
             "items": items, "truncated": len(payload) >= _REQUEST_ROWS,
             "totalObserved": len(items),
@@ -133,6 +146,22 @@ class RadioBrowserCatalogSource:
         if not isinstance(payload, list) or len(payload) > _REQUEST_ROWS:
             raise MediaBackendError("SOURCE_PROTOCOL", "Invalid radio directory response")
         return payload
+
+    def inspect(self, media_ref: Any) -> dict[str, Any]:
+        if (not isinstance(media_ref, dict)
+                or media_ref.get("source") != self.id
+                or media_ref.get("kind") != "station"):
+            raise MediaBackendError("INVALID_REF", "Expected radio-directory station")
+        station_id = media_ref.get("id")
+        item = self._known_stations.get(station_id)
+        if item is None:
+            raise MediaBackendError("INVALID_REF", "Station not in current radio results")
+        return item.copy()
+
+    def prepare(self, media_ref: Any) -> dict[str, Any]:
+        self.inspect(media_ref)
+        raise MediaBackendError("PLAYBACK_UNAVAILABLE",
+                                "Radio directory URLs require an approved playback policy")
 
 
 def _clean(value: Any, limit: int) -> str:

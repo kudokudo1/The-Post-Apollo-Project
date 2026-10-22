@@ -32,7 +32,9 @@ assert.equal(t24.weekday,"Thu");
 assert.equal(t24.month,10);
 assert.equal(t24.day,22);
 assert.equal(t24.year,2026);
-assert.equal(t24.utcOffsetMinutes,-new Date(at).getTimezoneOffset());
+// Canonical UTC offset zero must be +0, not JavaScript negative zero.
+const rawOffset=new Date(at).getTimezoneOffset();
+assert.equal(t24.utcOffsetMinutes,rawOffset === 0 ? 0 : -rawOffset);
 assert.match(t24.utcOffsetLabel,/^UTC[+-]\d\d:\d\d$/);
 
 const t12=p.snapshot(at,false);

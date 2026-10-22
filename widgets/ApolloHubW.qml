@@ -557,6 +557,11 @@ PanelWindow {
                             // weatherSnapshot update the tile without copying data.
                             weatherSnapshot: hub.liveBridge
                                              ? hub.liveBridge.weatherSnapshot : null
+                            // B3 passive Network state is provided by the
+                            // SAME read-only bridge. No new polling or
+                            // NetworkManager control lives in the tile.
+                            networkSnapshot: hub.liveBridge
+                                             ? hub.liveBridge.networkSnapshot : null
                             tileIndex: index
                             tileCount: hub.activeTiles.length
                             editing: hub.editMode

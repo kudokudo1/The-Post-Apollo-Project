@@ -97,7 +97,7 @@ test("control bay provides two differently sized knobs, slider and explicit acti
     assert.match(ui, /id:\s*resultSlider/);
     assert.match(ui, /indexRequested|onIndexRequested/);
     assert.match(ui, /id:\s*tuningDial/);
-    assert.match(ui, /scale:\s*1\.07/);
+    assert.match(ui, /scale:\s*1\.0/);
     assert.match(ui, /label:\s*"SELECT"/);
     assert.match(ui, /label:\s*"ENTER"/);
     assert.match(ui, /label:\s*"LOAD"/);

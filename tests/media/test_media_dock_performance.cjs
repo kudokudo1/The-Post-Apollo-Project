@@ -48,10 +48,52 @@ test("opening the Hi-Fi deck keeps the Media dock dark without removing its neon
     assert.match(source, /hoverDockGlowColor:\s*Colors\.magenta/);
     assert.match(source, /pressedDockGlowColor:\s*Colors\.magenta/);
     assert.match(source, /color:\s*mediaDock\.open\s*\?\s*mediaDock\.openGlowColor\s*:\s*mediaDock\.accentColor/);
-    assert.match(source, /color:\s*mediaDock\.accentColor/);
+    assert.match(source, /color:\s*mediaDock\.artworkAccentColor/);
     assert.match(source, /id:\s*leadingStarsAura/);
     assert.match(source, /id:\s*trailingStarAura/);
     assert.match(source, /id:\s*cavaAmbientWash/);
+});
+
+test("open state magenta-energizes every Media icon and CAVA visual without affecting MPD", () => {
+    assert.match(source, /open:\s*mediaRoot\.deckOpen/);
+    assert.match(source, /openFillColor:\s*Colors\.black/);
+    assert.match(source, /readonly property color accentColor:\s*mpdPlaying \? Colors\.orange : Colors\.cyan/);
+    assert.match(source, /readonly property color artworkAccentColor:\s*open \? Colors\.magenta : accentColor/);
+
+    // Evaluate the QML binding's actual conditional: closed is driven by
+    // playback, while open always wins even if MPD is playing.
+    const match = source.match(/readonly property color artworkAccentColor:\s*([^\n]+)/);
+    assert.ok(match);
+    const expression = match[1];
+    const visual = (open, playing) => vm.runInNewContext(expression, {
+        open,
+        accentColor: playing ? "#ED981A" : "#55CFCA",
+        Colors: {magenta: "#C74EC7"}
+    });
+    assert.equal(visual(false, false), "#55CFCA");
+    assert.equal(visual(false, true), "#ED981A");
+    assert.equal(visual(true, false), "#C74EC7");
+    assert.equal(visual(true, true), "#C74EC7");
+
+    // The shared DockButton's open foreground turns both ornament texts
+    // magenta without replacing the glyphs. Its front wash stays magenta.
+    assert.match(dockButtonSource, /property color openForegroundColor:\s*Colors\.magenta/);
+    assert.match(dockButtonSource, /readonly property color foregroundColor:\s*open\s*\?\s*openForegroundColor/);
+    assert.equal((source.match(/color:\s*mediaDock\.foregroundColor/g) || []).length, 2);
+    assert.match(source, /normalDockGlowColor:\s*Colors\.magenta/);
+    assert.match(source, /hoverDockGlowColor:\s*Colors\.magenta/);
+    assert.match(source, /pressedDockGlowColor:\s*Colors\.magenta/);
+
+    // Each star underlight + source shadow, clef source shadow, CAVA ambient,
+    // and both halos and cores on all 16 bars share the same open-priority
+    // color without sampling the animated bars as a blur texture.
+    assert.equal((source.match(/color:\s*mediaDock\.artworkAccentColor/g) || []).length, 9);
+    assert.doesNotMatch(source, /^\s*color:\s*mediaDock\.accentColor\s*$/m);
+    assert.equal((source.match(/SafeDropShadow \{/g) || []).length, 3);
+    assert.equal((source.match(/RectangularShadow \{/g) || []).length, 4);
+    assert.doesNotMatch(source, /contentGlowSource:\s*(?:spectrum|cavaBar|mediaArtwork)/);
+    assert.match(source, /id:\s*cavaAmbientWash[\s\S]*?height:\s*mediaDock\.cavaAmbientTargetHeight/);
+    assert.match(source, /if \(changed\)\s*levels = newLevels;/);
 });
 
 test("sample only separate static glyphs, never the animated VU spectrum", () => {
@@ -82,7 +124,7 @@ test("magenta front wash and CAVA-colored static music mark stay independent", (
         "original decorative text remains, while the treble clef is vector art");
     assert.equal((mark.match(/Image \{/g) || []).length, 1);
     assert.match(mark, /id:\s*trebleClef\s*width:\s*15\s*height:\s*34/);
-    assert.match(mark, /source:\s*mediaDock\.mpdPlaying\s*\?\s*Qt\.resolvedUrl\("\.\.\/assets\/media\/treble-clef-orange\.png"\)\s*:\s*Qt\.resolvedUrl\("\.\.\/assets\/media\/treble-clef-cyan\.png"\)/);
+    assert.match(mark, /source:\s*mediaDock\.open\s*\?\s*Qt\.resolvedUrl\("\.\.\/assets\/media\/treble-clef\.png"\)\s*:\s*mediaDock\.mpdPlaying\s*\?\s*Qt\.resolvedUrl\("\.\.\/assets\/media\/treble-clef-orange\.png"\)\s*:\s*Qt\.resolvedUrl\("\.\.\/assets\/media\/treble-clef-cyan\.png"\)/);
     assert.match(mark, /sourceSize:\s*Qt\.size\(45,\s*102\)/);
     assert.match(mark, /onStatusChanged:[\s\S]*?Image\.Error/);
     assert.match(mark, /textFormat:\s*Text\.PlainText\s*text:\s*"‧₊˚ "/);
@@ -122,7 +164,7 @@ test("magenta front wash and CAVA-colored static music mark stay independent", (
 
     // The animated bars keep their original accent and are never sampled.
     assert.match(source, /readonly property color accentColor:\s*mpdPlaying \? Colors\.orange : Colors\.cyan/);
-    assert.match(source, /color:\s*mediaDock\.accentColor/);
+    assert.match(source, /color:\s*mediaDock\.artworkAccentColor/);
     assert.doesNotMatch(source, /contentGlowSource:\s*(?:spectrum|mediaArtwork)/);
 });
 
@@ -188,7 +230,7 @@ test("small stars get their own soft CAVA-accent auras behind the white glyphs",
         assert.match(body, /radius:\s*height\s*\/\s*2/);
         assert.match(body, /blur:\s*mediaDock\.contentGlowRadius\s*\+\s*4/);
         assert.match(body, /spread:\s*0/);
-        assert.match(body, /color:\s*mediaDock\.accentColor/);
+        assert.match(body, /color:\s*mediaDock\.artworkAccentColor/);
         assert.match(body, /opacity:\s*mediaDock\.softGlowOpacity/);
         assert.match(body, /z:\s*0/);
         assert.doesNotMatch(body, /safeSource|cavaBar|levels|frame|Repeater|ShaderEffect|Behavior on/,
@@ -238,7 +280,7 @@ test("magenta front wash, three independent static art glows, per-bar CAVA halos
         assert.match(body, /radius:\s*mediaDock\.contentGlowRadius\s*\+\s*4/);
         assert.match(body, /samples:\s*mediaDock\.contentGlowSamples\s*\+\s*6/);
         assert.match(body, /opacity:\s*Math\.min\(1\.0,\s*mediaDock\.contentGlowOpacity\s*\+\s*0\.18\)/);
-        assert.match(body, /color:\s*mediaDock\.accentColor/);
+        assert.match(body, /color:\s*mediaDock\.artworkAccentColor/);
         assert.match(body, /transparentBorder:\s*true/);
         assert.match(body, /z:\s*0/);
         assert.doesNotMatch(body, /cavaBar|levels|frame|Repeater|ShaderEffect/,
@@ -288,7 +330,7 @@ test("large faded CAVA-only ambient wash follows a padded spectrum envelope", ()
     assert.match(wash, /radius:\s*height\s*\/\s*2/);
     assert.match(wash, /blur:\s*mediaDock\.contentGlowRadius\s*\+\s*4/);
     assert.match(wash, /spread:\s*0/);
-    assert.match(wash, /color:\s*mediaDock\.accentColor/);
+    assert.match(wash, /color:\s*mediaDock\.artworkAccentColor/);
     assert.match(wash, /opacity:\s*0\.22/);
     assert.match(wash, /z:\s*-1/);
     assert.match(wash, /Behavior on height\s*\{\s*NumberAnimation\s*\{\s*duration:\s*180\s*easing\.type:\s*Easing\.OutQuad/);
@@ -341,7 +383,7 @@ test("CAVA neon tracks the animated bar using geometry only", () => {
     assert.match(bar, /width:\s*parent\.width\s*\+\s*4/);
     assert.match(bar, /opacity:\s*0\.22/);
     assert.match(bar, /opacity:\s*0\.40/);
-    assert.equal((bar.match(/color:\s*mediaDock\.accentColor/g) || []).length, 3,
+    assert.equal((bar.match(/color:\s*mediaDock\.artworkAccentColor/g) || []).length, 3,
         "both glow layers and the bar must follow the same cyan/orange accent");
     assert.equal((bar.match(/Behavior on height/g) || []).length, 1,
         "only the actual bar animates; halos follow bindings");

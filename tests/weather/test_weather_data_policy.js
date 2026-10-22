@@ -124,6 +124,9 @@ assert.equal(forecast.daily[0].moonPhase, "Waxing Gibbous");
 const air = context.parseAirQuality({
     time: "2026-10-22T06:15",
     us_aqi: 42,
+    us_aqi_ozone: 37,
+    us_aqi_nitrogen_dioxide: 18,
+    us_aqi_carbon_monoxide: 9,
     pm2_5: 7.2,
     pm10: 14.1,
     carbon_monoxide: 187,
@@ -139,6 +142,9 @@ const air = context.parseAirQuality({
 });
 
 assert.equal(air.usAqi, 42);
+assert.equal(air.ozoneAqi, 37);
+assert.equal(air.nitrogenDioxideAqi, 18);
+assert.equal(air.carbonMonoxideAqi, 9);
 assert.equal(air.pm25, 7.2);
 assert.equal(air.pm10, 14.1);
 assert.equal(air.carbonMonoxide, 187);

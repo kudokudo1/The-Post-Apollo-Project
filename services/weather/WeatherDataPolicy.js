@@ -196,6 +196,11 @@ function parseAirQuality(current) {
     const source = current || {};
     const result = {
         usAqi: finiteNumber(source.us_aqi, -1),
+        ozoneAqi: finiteNumber(source.us_aqi_ozone, -1),
+        nitrogenDioxideAqi:
+            finiteNumber(source.us_aqi_nitrogen_dioxide, -1),
+        carbonMonoxideAqi:
+            finiteNumber(source.us_aqi_carbon_monoxide, -1),
         pm25: finiteNumber(source.pm2_5, -1),
         pm10: finiteNumber(source.pm10, -1),
         carbonMonoxide: finiteNumber(source.carbon_monoxide, -1),

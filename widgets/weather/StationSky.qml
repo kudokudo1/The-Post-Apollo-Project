@@ -50,6 +50,19 @@ Rectangle {
         Math.max(0, Math.min(1, humidityValue / 100))
     readonly property real windMeter:
         Math.max(0, Math.min(1, windValue / 50))
+    readonly property real cloudCoverMeter:
+        Math.max(0, Math.min(1, cloudCoverValue / 100))
+    // UV 11+ is the standard "extreme" top category, so cap the compact
+    // instrument there instead of inventing a weather-specific ceiling.
+    readonly property real uvMeter:
+        Math.max(0, Math.min(1, uvValue / 11))
+
+    function chanceMeter(value) {
+        const number = Number(value);
+        if (!isFinite(number) || number < 0)
+            return 0;
+        return Math.max(0, Math.min(1, number / 100));
+    }
 
     readonly property string conditionText:
         weatherReady && weatherService.condition
@@ -359,6 +372,22 @@ Rectangle {
                     font.pixelSize: 16
                     color: Colors.white
                 }
+
+                Rectangle {
+                    width: 115
+                    height: 8
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.cyan
+
+                    Rectangle {
+                        x: 2
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: (parent.width - 4) * sky.cloudCoverMeter
+                        height: parent.height - 4
+                        color: Colors.cyan
+                    }
+                }
             }
 
             Column {
@@ -399,6 +428,22 @@ Rectangle {
                              ? Colors.orange
                              : sky.uvValue >= 3
                                ? Colors.yellow : Colors.cyan
+                }
+
+                Rectangle {
+                    width: 105
+                    height: 8
+                    color: Colors.black
+                    border.width: 1
+                    border.color: Colors.cyan
+
+                    Rectangle {
+                        x: 2
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: (parent.width - 4) * sky.uvMeter
+                        height: parent.height - 4
+                        color: Colors.cyan
+                    }
                 }
             }
         }
@@ -451,6 +496,25 @@ Rectangle {
                                   : "RAIN --"
                             font.pixelSize: 9
                         }
+
+                        Rectangle {
+                            width: 92
+                            height: 6
+                            color: Colors.black
+                            border.width: 1
+                            border.color: Colors.cyan
+
+                            Rectangle {
+                                x: 2
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: (parent.width - 4)
+                                       * sky.chanceMeter(
+                                           modelData.chanceRain
+                                       )
+                                height: parent.height - 4
+                                color: Colors.cyan
+                            }
+                        }
                     }
                 }
             }
@@ -501,6 +565,25 @@ Rectangle {
                                     + "%"
                                   : "RAIN --"
                             font.pixelSize: 10
+                        }
+
+                        Rectangle {
+                            width: 180
+                            height: 6
+                            color: Colors.black
+                            border.width: 1
+                            border.color: Colors.cyan
+
+                            Rectangle {
+                                x: 2
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: (parent.width - 4)
+                                       * sky.chanceMeter(
+                                           modelData.chanceRain
+                                       )
+                                height: parent.height - 4
+                                color: Colors.cyan
+                            }
                         }
 
                         QuietText {

@@ -1067,6 +1067,9 @@ PanelWindow {
                     Column {
                         id: converterPane
                         visible: timew.selectedMode === "calc"
+                        // Overlay either dropdown above following inputs,
+                        // results, and the footer, without shifting the page.
+                        z: timew.activeConverterDropdown !== "" ? 20 : 0
                         width: parent.width
                         spacing: 12
 
@@ -1078,17 +1081,21 @@ PanelWindow {
                         }
 
                         Row {
+                            id: converterSourceRow
                             width: parent.width
-                            height: 32
-                            spacing: 8
+                            height: 34
+                            spacing: 6
+                            z: 40
+
                             GohuText {
-                                width: 55
+                                width: 45
                                 height: parent.height
                                 verticalAlignment: Text.AlignVCenter
                                 text: "FROM"
                                 color: Colors.cyan
                                 font.pixelSize: 11
                             }
+
                             ActionButton {
                                 width: 67
                                 height: 30
@@ -1097,29 +1104,43 @@ PanelWindow {
                                 accentColor: Colors.white
                                 onLeftClicked: timew.cycleConverterZone("source")
                             }
-                            GohuText {
-                                width: parent.width - 55 - 67 - 16
-                                height: parent.height
-                                verticalAlignment: Text.AlignVCenter
-                                text: timew.converterSourceZone
-                                elide: Text.ElideRight
-                                color: Colors.white
-                                font.pixelSize: 11
+
+                            TimeZonePicker {
+                                id: converterSourcePicker
+                                width: Math.max(0, converterSourceRow.width
+                                                - 45 - 67
+                                                - converterSourceRow.spacing * 2)
+                                height: converterSourceRow.height
+                                selectedZone: timew.converterSourceZone
+                                catalog: timew.worldZoneCatalog
+                                countryIndex: timew.worldCountryIndex
+                                catalogLoading: timew.worldCatalogLoading
+                                catalogFailed: timew.worldCatalogFailed
+                                expanded: timew.activeConverterDropdown === "source"
+                                onOpenRequested: timew.openConverterDropdown("source")
+                                onToggleRequested: timew.toggleConverterDropdown("source")
+                                onZoneChosen: function(zoneId) {
+                                    timew.chooseConverterSearchZone("source", zoneId);
+                                }
                             }
                         }
 
                         Row {
+                            id: converterTargetRow
                             width: parent.width
-                            height: 32
-                            spacing: 8
+                            height: 34
+                            spacing: 6
+                            z: 30
+
                             GohuText {
-                                width: 55
+                                width: 45
                                 height: parent.height
                                 verticalAlignment: Text.AlignVCenter
                                 text: "TO"
                                 color: Colors.cyan
                                 font.pixelSize: 11
                             }
+
                             ActionButton {
                                 width: 67
                                 height: 30
@@ -1128,14 +1149,24 @@ PanelWindow {
                                 accentColor: Colors.white
                                 onLeftClicked: timew.cycleConverterZone("target")
                             }
-                            GohuText {
-                                width: parent.width - 55 - 67 - 16
-                                height: parent.height
-                                verticalAlignment: Text.AlignVCenter
-                                text: timew.converterTargetZone
-                                elide: Text.ElideRight
-                                color: Colors.white
-                                font.pixelSize: 11
+
+                            TimeZonePicker {
+                                id: converterTargetPicker
+                                width: Math.max(0, converterTargetRow.width
+                                                - 45 - 67
+                                                - converterTargetRow.spacing * 2)
+                                height: converterTargetRow.height
+                                selectedZone: timew.converterTargetZone
+                                catalog: timew.worldZoneCatalog
+                                countryIndex: timew.worldCountryIndex
+                                catalogLoading: timew.worldCatalogLoading
+                                catalogFailed: timew.worldCatalogFailed
+                                expanded: timew.activeConverterDropdown === "target"
+                                onOpenRequested: timew.openConverterDropdown("target")
+                                onToggleRequested: timew.toggleConverterDropdown("target")
+                                onZoneChosen: function(zoneId) {
+                                    timew.chooseConverterSearchZone("target", zoneId);
+                                }
                             }
                         }
 
@@ -1273,8 +1304,8 @@ PanelWindow {
                         GohuText {
                             width: parent.width
                             wrapMode: Text.Wrap
-                            text: "Use CLOCK > WORLD to select other zones, "
-                                  + "then return here. Calculations do not change system time."
+                            text: "FROM and TO support independent country/zone search. "
+                                  + "CHANGE cycles quick presets; system time stays unchanged."
                             color: Colors.white
                             opacity: 0.72
                             font.pixelSize: 11
@@ -1303,6 +1334,8 @@ PanelWindow {
                         // is open; the footer must not overlap its entries.
                         visible: !(timew.selectedMode === "clock"
                                    && timew.worldSearchPopupOpen)
+                                 && !(timew.selectedMode === "calc"
+                                      && timew.activeConverterDropdown !== "")
                         text: timew.selectedMode === "clock"
                               ? "LOCAL + WORLD // LIVE // CALC HAS CONVERTER"
                               : timew.selectedMode === "calc"

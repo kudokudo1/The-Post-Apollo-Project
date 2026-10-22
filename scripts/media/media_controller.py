@@ -19,13 +19,15 @@ class MediaController:
     protocol_version = 1
 
     def __init__(self, backend: MpdBackend | None = None,
-                 intent_store: IntentStore | None = None):
+                 intent_store: IntentStore | None = None, radio_relay=None):
         mpd = backend if backend is not None else MpdBackend()
+        if radio_relay is not None:
+            mpd.radio_relay = radio_relay
         self.backends = {mpd.id: mpd}
         local = LocalMpdSource(mpd)
         youtube = YouTubeCatalogSource()
         stream = DirectHttpsStreamSource(mpd)
-        radio = RadioBrowserCatalogSource()
+        radio = RadioBrowserCatalogSource(relay=radio_relay)
         self.sources = {local.id: local, youtube.id: youtube, stream.id: stream,
                         radio.id: radio}
         self.audio_probe = MpdAudioEvidenceProbe(mpd)
@@ -44,7 +46,12 @@ class MediaController:
         if self.intent_store is None:
             return
         try:
-            self.intent_store.save(self.selection, self.loaded)
+            # A session relay URL vanishes on service restart. Do not persist
+            # an unusable loaded radio stream or accidentally adopt playback.
+            durable = (None if self.loaded and
+                       self.loaded["ref"]["source"] == "radio-browser"
+                       else self.loaded)
+            self.intent_store.save(self.selection, durable)
             self.persistence_error = None
         except (OSError, ValueError, PermissionError, UnicodeError):
             # The MPD mutation may already have happened; never falsely report
@@ -80,8 +87,19 @@ class MediaController:
         backend = self._bound_backend()
         assert self.loaded is not None
         target_id, target_ref = self.loaded["queueId"], self.loaded["ref"]
-        candidates = [x for x in backend.queue()
-                      if str(x.get("queueId")) == target_id and x.get("ref") == target_ref]
+        # Loopback relay queue rows are MPD-local URI records, while the
+        # user-visible loaded ref remains a source-qualified station UUID.
+        if target_ref.get("source") == "radio-browser":
+            uri = self.loaded.get("cueUri")
+            candidates = [x for x in backend.queue()
+                          if str(x.get("queueId")) == target_id
+                          and x.get("ref", {}).get("id") == uri
+                          and getattr(backend, "radio_relay", None)
+                          and backend.radio_relay.owns(uri)]
+        else:
+            candidates = [x for x in backend.queue()
+                          if str(x.get("queueId")) == target_id
+                          and x.get("ref") == target_ref]
         if len(candidates) != 1:
             self.loaded = None
             self.owned_active_id = None
@@ -247,6 +265,8 @@ class MediaController:
             queue_id = backend.cue(prepared)
             self.loaded = {"ref": prepared["item"]["ref"], "item": prepared["item"],
                            "backend": backend.id, "queueId": queue_id}
+            if ref["source"] == "radio-browser":
+                self.loaded["cueUri"] = prepared["uri"]
             self.active_backend = backend.id
             # Newly cued media isn't necessarily the session already playing.
             self.owned_active_id = None

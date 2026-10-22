@@ -79,8 +79,9 @@ Item {
 
         // Musical-symbol font fallback is not reliable on the operator's Qt
         // runtime (including the previous plain-text attempt). Bundle a
-        // pre-rendered clef PNG from our SVG source; keep the mark as the *only*
-        // sampled magenta glow source, never the animated CAVA bars.
+        // two static PNG color variants from our SVG source. Follow the same
+        // MPD playing state as CAVA's accent, without a runtime tint shader.
+        // Keep the whole mark's magenta glow separate from the animated bars.
         Row {
             id: musicMark
             anchors.verticalCenter: parent.verticalCenter
@@ -98,7 +99,11 @@ Item {
                 id: trebleClef
                 width: 15
                 height: 34
-                source: Qt.resolvedUrl("../assets/media/treble-clef.png")
+                // One source change per playback-state change, not per CAVA
+                // frame: cyan when idle/paused/stopped, orange when playing.
+                source: mediaDock.mpdPlaying
+                    ? Qt.resolvedUrl("../assets/media/treble-clef-orange.png")
+                    : Qt.resolvedUrl("../assets/media/treble-clef-cyan.png")
                 sourceSize: Qt.size(45, 102)
                 fillMode: Image.PreserveAspectFit
                 smooth: true

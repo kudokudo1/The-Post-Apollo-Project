@@ -548,6 +548,7 @@ test("20 CAVA bars interpolate cool/warm frequency palettes with open-magenta ov
     const blend = vm.runInContext(
         "(function(from, to, amount) {" + mix[1] + "\n})", context
     );
+    context.blendBarColor = blend;
     const band = vm.runInContext(
         "(function(barIndex) {" + palette[1] + "\n})", context
     );

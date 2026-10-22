@@ -143,7 +143,8 @@ assert 'import "../services/time/WorldZoneSearch.js" as WorldZoneSearch' in wind
 assert 'zoneCatalogLookup.exec(["timedatectl", "list-timezones", "--no-pager"])' in window
 assert 'WorldZoneSearch.parseCatalog(this.text)' in window
 assert 'WorldZoneSearch.search(worldZoneCatalog, worldSearchQuery,' in window
-assert '120, worldCountryIndex)' in window
+assert 'WorldZoneSearch.MAX_ZONES, worldCountryIndex)' in window
+assert '120, worldCountryIndex)' not in window
 assert 'WorldZoneSearch.parseCountryZones(worldCountryZoneTable, worldCountryNames)' in window
 assert 'WorldZoneSearch.parseCountryNames(this.text)' in window
 assert 'isoCountryLookup.exec(["cat", "/usr/share/zoneinfo/iso3166.tab"])' in window
@@ -171,7 +172,15 @@ assert 'rightMargin: worldSearchRail.crossExtent + 5' in window
 assert 'x: worldSearchPopup.width - width - 3' in window
 assert 'y: worldSearchResults.y' in window
 assert 'height: worldSearchResults.height' in window
-assert 'Math.min(188, 8' in window
+assert 'Math.min(212, 34' in window
+assert 'id: worldSearchCount' in window
+assert 'top: worldSearchCount.bottom' in window
+assert 'topMargin: 4' in window
+assert '"ITEMS // "' in window
+assert '"MATCHES // "' in window
+assert '+ timew.worldSearchMatches.length' in window
+assert 'modelData.country + " // "' in window
+assert 'modelData.label + " // "' not in window
 assert 'interactive: contentHeight > height' in window
 assert 'model: timew.worldSearchMatches' in window
 assert 'modelData.country' in window

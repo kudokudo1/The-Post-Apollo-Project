@@ -33,6 +33,8 @@ PanelWindow {
         && !todoInputFocused
         && !notesInputFocused
     property bool writingLayout: false
+    // In-session undo makes accidental tile deletion reversible.
+    property var layoutUndoStack: []
     property var layout: Layout.defaultLayout()
     property int selectedModeIndex: 0
     property int selectedSubModeIndex: 0
@@ -63,10 +65,46 @@ PanelWindow {
     }
 
     function save(next) {
+        const normalized = Layout.normalize(next);
+        const previous = JSON.stringify(layout);
+        if (JSON.stringify(normalized) === previous)
+            return;
+        const history = layoutUndoStack.slice();
+        history.push(previous);
+        if (history.length > 10)
+            history.shift();
+        layoutUndoStack = history;
         writingLayout = true;
-        layout = Layout.normalize(next);
+        layout = normalized;
         ApolloHubStore.layoutJson = JSON.stringify(layout);
         writingLayout = false;
+    }
+
+    function undoLastLayoutEdit() {
+        if (layoutUndoStack.length < 1)
+            return;
+        const history = layoutUndoStack.slice();
+        const previous = history.pop();
+        layoutUndoStack = history;
+        writingLayout = true;
+        layout = Layout.parse(previous);
+        ApolloHubStore.layoutJson = JSON.stringify(layout);
+        writingLayout = false;
+        selectedModeIndex = Math.max(0, Math.min(
+            selectedModeIndex, layout.modes.length - 1));
+        selectedSubModeIndex = Math.max(0, Math.min(
+            selectedSubModeIndex, activeMode.subModes.length - 1));
+        selectedTileIndex = Math.max(0, Math.min(
+            selectedTileIndex, activeTiles.length - 1));
+    }
+
+    function removeEditedTile(index) {
+        if (!editMode || index < 0 || index >= activeTiles.length)
+            return;
+        save(Layout.removeTile(layout, selectedModeIndex,
+                               selectedSubModeIndex, index));
+        selectedTileIndex = Math.max(0, Math.min(
+            selectedTileIndex, activeTiles.length - 1));
     }
 
     function chooseMode(index) {
@@ -502,6 +540,14 @@ PanelWindow {
                     onLeftClicked: hub.save(Layout.addTile(
                         hub.layout, hub.selectedModeIndex, hub.selectedSubModeIndex))
                 }
+                ActionButton {
+                    trackLabelGlowLocally: true
+                    width: 65
+                    height: 32
+                    label: "UNDO"
+                    available: hub.layoutUndoStack.length > 0
+                    onLeftClicked: hub.undoLastLayoutEdit()
+                }
                 GohuText {
                     height: 32
                     verticalAlignment: Text.AlignVCenter
@@ -616,12 +662,15 @@ PanelWindow {
                             width: tileConfig.size === "wide"
                                    ? tileFlow.width
                                    : (tileFlow.width - tileFlow.spacing) / 2
-                            height: 140
+                            // v2 rowSpan=1 preserves the original 140px tile.
+                            height: 140 * (tileConfig.rowSpan || 1)
+                                    + tileFlow.spacing * ((tileConfig.rowSpan || 1) - 1)
                             onMoveLeft: hub.shiftTile(index, index - 1)
                             onMoveRight: hub.shiftTile(index, index + 1)
                             onChangeModule: hub.save(Layout.cycleTile(
                                 hub.layout, hub.selectedModeIndex,
                                 hub.selectedSubModeIndex, index))
+                            onRemoveTile: hub.removeEditedTile(index)
                         }
                     }
                 }
@@ -636,8 +685,8 @@ PanelWindow {
                 opacity: 0.8
                 font.pixelSize: 11
                 text: hub.editMode
-                      ? "← → MOVE TILE    SWAP CHANGE MODULE    MAX 6 MODES / 6 GROUPS / 8 TILES"
-                      : "FOUNDATION PREVIEW  //  LIVE TIME + DATE; OTHER DATA ADAPTERS PENDING"
+                      ? "← → MOVE TILE    SWAP CHANGE MODULE    × REMOVE TILE    UNDO RESTORE"
+                      : "APOLLO HUB  //  LIVE MODULES CONNECTED"
             }
         }
     }

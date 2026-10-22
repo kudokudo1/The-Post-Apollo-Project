@@ -117,39 +117,60 @@ assert.match(dock, /\bShape\s*\{/);
 assert.match(dock, /\bShapePath\s*\{/);
 assert.match(dock, /\bPathQuad\s*\{/);
 assert.match(dock, /\bPathCubic\s*\{/);
-// The bulb is now genuinely circular, rather than two independently
-// approximated cubic bases. Body, glass and fluid share the same center,
-// and outer/inner bulb arcs retain a consistent radial clearance.
+// At tiny dock sizes, mathematically circular curves can still rasterize
+// unevenly. Check the deliberate elliptical proportions and matched inset.
 assert.match(dock, /readonly property real bulbCenterX:\s*width \/ 2/);
-assert.match(dock, /readonly property real bulbCenterY:\s*26\.6/);
+assert.match(dock, /readonly property real bulbCenterY:\s*26\.0/);
 assert.match(dock, /readonly property real joinDiagonal:\s*Math\.SQRT1_2/);
+assert.match(dock, /layer\.enabled:\s*true/);
+assert.match(dock, /layer\.samples:\s*4/);
+assert.match(dock, /layer\.smooth:\s*true/);
 assert.equal((dock.match(/PathArc\s*\{/g) || []).length, 6);
 assert.equal((dock.match(/direction:\s*PathArc\.Clockwise/g) || []).length, 6);
-assert.equal((dock.match(/radiusX:\s*weatherThermometer\.outerBulbRadius/g) || []).length, 4);
-assert.equal((dock.match(/radiusY:\s*weatherThermometer\.outerBulbRadius/g) || []).length, 4);
-assert.equal((dock.match(/radiusX:\s*weatherThermometer\.innerBulbRadius/g) || []).length, 2);
-assert.equal((dock.match(/radiusY:\s*weatherThermometer\.innerBulbRadius/g) || []).length, 2);
+assert.equal((dock.match(/radiusX:\s*weatherThermometer\.outerBulbRadiusX/g) || []).length, 4);
+assert.equal((dock.match(/radiusY:\s*weatherThermometer\.outerBulbRadiusY/g) || []).length, 4);
+assert.equal((dock.match(/radiusX:\s*weatherThermometer\.innerBulbRadiusX/g) || []).length, 2);
+assert.equal((dock.match(/radiusY:\s*weatherThermometer\.innerBulbRadiusY/g) || []).length, 2);
 assert.equal((dock.match(/startX:\s*weatherThermometer\.bulbCenterX/g) || []).length, 3);
 assert.match(dock, /strokeWidth:\s*1\.5\s+strokeColor:\s*weatherThermometer\.glassColor\s+joinStyle:\s*ShapePath\.RoundJoin\s+capStyle:\s*ShapePath\.RoundCap/);
 
-// Check physical glass clearance, rather than testing arbitrary pixel
-// placements that can reintroduce the original flattened bulb.
+// Check pixel-space offsets, avoiding hidden one-sided clearance regressions.
 function readGaugeNumber(property) {
     const pattern = new RegExp("readonly property real " + property + ": ([0-9.]+)");
     const result = dock.match(pattern);
     assert.ok(result, "gauge property " + property);
     return Number(result[1]);
 }
-const outerR = readGaugeNumber("outerBulbRadius");
-const innerR = readGaugeNumber("innerBulbRadius");
-const outerStroke = 1.5;
-const radialGap = outerR - innerR - outerStroke / 2;
-const rightStemGap = (12.2 - outerStroke / 2) - 10.1;
-assert.ok(radialGap >= 1.5, "room around colored bulb");
-assert.ok(Math.abs(radialGap - rightStemGap) <= 0.35,
-          "similar clearance between liquid/glass in tube and bulb");
-assert.ok(readGaugeNumber("bulbCenterY") + outerR + outerStroke / 2 <= 35,
-          "rounded bulb fits inside the dock gauge without cropping");
+const width = 17, height = 35;
+const cx = width / 2, cy = readGaugeNumber("bulbCenterY");
+const outerRx = readGaugeNumber("outerBulbRadiusX");
+const outerRy = readGaugeNumber("outerBulbRadiusY");
+const innerRx = readGaugeNumber("innerBulbRadiusX");
+const innerRy = readGaugeNumber("innerBulbRadiusY");
+const strokeHalf = 1.5 / 2;
+const glassGapX = outerRx - innerRx - strokeHalf;
+const glassGapY = outerRy - innerRy - strokeHalf;
+const tubeRightGap = (12.2 - strokeHalf) - 9.75;
+const tubeLeftGap = 7.25 - (4.8 + strokeHalf);
+assert.ok(glassGapX >= 1.5 && glassGapY >= 1.5, "visible dark air around fluid");
+assert.ok(Math.abs(glassGapX - glassGapY) < 0.2, "radial inset stays balanced");
+assert.ok(Math.abs(glassGapX - tubeRightGap) < 0.25, "tube/bulb right clearance");
+assert.ok(Math.abs(tubeRightGap - tubeLeftGap) < 0.01, "tube voids mirrored");
+assert.ok(cx - outerRx - strokeHalf >= 1, "left bulb does not clip");
+assert.ok(cx + outerRx + strokeHalf <= width - 1, "right bulb does not clip");
+assert.ok(cy + outerRy + strokeHalf < height, "bottom curve fits inside gauge");
+assert.match(dock, /control2X:\s*weatherThermometer\.outerRightJoinX - 0\.58/);
+assert.match(dock, /control1X:\s*weatherThermometer\.outerLeftJoinX \+ 0\.58/);
+assert.match(dock, /control2X:\s*weatherThermometer\.innerRightJoinX - 0\.55/);
+assert.match(dock, /control1X:\s*weatherThermometer\.innerLeftJoinX \+ 0\.55/);
+
+// Measurement marks belong to the right of the tube, not over its liquid.
+const tickStart = dock.lastIndexOf("Repeater {");
+const ticks = dock.slice(tickStart, tickStart + 400);
+assert.match(ticks, /x:\s*13\.2/);
+assert.match(ticks, /width:\s*index % 2 === 0 \? 2\.5 : 1\.8/);
+assert.ok(13.2 > 12.2 + strokeHalf);
+assert.ok(13.2 + 2.5 < width);
 
 // The real normalized level drives a vertical gradient through one connected
 // inner tube+bulb path, rather than a permanently filled decorative bulb.

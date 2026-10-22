@@ -15,6 +15,7 @@ on:
       - "tests/finance/test_finance_allocation_write_ui_contracts.py"
       - "tests/finance/test_finance_gate_status_contracts.py"
       - "tests/finance/test_finance_funding_review_contracts.py"
+      - "tests/finance/test_finance_opening_history_contracts.py"
       - "services/finance/**"
       - "tests/finance/test_finance_budget_ui_contracts.py"
       - "tests/finance/test_finance_transaction_draft_contracts.py"
@@ -33,6 +34,7 @@ on:
       - "tests/finance/test_finance_allocation_write_ui_contracts.py"
       - "tests/finance/test_finance_gate_status_contracts.py"
       - "tests/finance/test_finance_funding_review_contracts.py"
+      - "tests/finance/test_finance_opening_history_contracts.py"
       - "services/finance/**"
       - "tests/finance/test_finance_budget_ui_contracts.py"
       - "tests/finance/test_finance_transaction_draft_contracts.py"
@@ -65,3 +67,5 @@ jobs:
         run: python3 tests/finance/test_finance_gate_status_contracts.py
       - name: Verify D14 read-only monthly funding review
         run: python3 tests/finance/test_finance_funding_review_contracts.py
+      - name: Verify D15 manual historical inspection
+        run: python3 tests/finance/test_finance_opening_history_contracts.py

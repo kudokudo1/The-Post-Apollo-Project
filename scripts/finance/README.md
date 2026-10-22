@@ -536,3 +536,31 @@ INCOME (ACTUAL)** line displays that number; it does not imply the amount
 is available to allocate. Opening balances and unallocated funds retain their
 independent source and verification status. This is exercised in both
 fictional unit tests and the real disposable Actual-server read-only probes.
+
+
+## FinanceW D15 // On-demand historical opening-balance inspection
+
+Under **Budget → REVIEW FUNDING → INSPECT OPENING BALANCES**, an explicit
+click downloads a temporary private read-only Actual copy and calls only
+`getAccounts`, `getCategories`, and `getTransactions` for historical
+transactions between **1900-01-01** and the selected month's end.
+
+It reports each active on-budget account's first recorded date and amount,
+transaction count, and any entries linked to a category named **Starting
+Balance** or **Starting Balances** (when available). Those entries are
+**candidates**, not verified opening balances: imported data, history gaps,
+transfers, category naming, and external bank records may differ. Missing
+candidates never imply zero starting balance. The view never computes funds
+available to budget from those transactions.
+
+The scan is deliberately **manual**: no scheduled lookback, polling, or new
+budget modification capability. It rejects more than 30 accounts or 10,000
+history rows in any account rather than silently truncating findings. Large
+budgets should be inspected through Actual itself if the bounded scan refuses.
+Sensitive transaction payees and notes are omitted from results. The scan's
+local API cache is a disposable mode-0700 directory and is cleaned afterward.
+The report clears if the current budget fingerprint or month changes.
+
+For a true opening-balance reconciliation, compare original bank statements
+and historical Actual transactions. This feature **cannot validate external
+balances** and does not authorize real transactions or allocation writes.

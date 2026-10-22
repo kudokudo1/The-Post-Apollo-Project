@@ -38,6 +38,8 @@ function snapshot(reading) {
     var transport = ethernetConnected ? "ethernet"
                   : wifiConnected ? "wifi" : "none";
     var known = data.devicesKnown === true;
+    var activeSpeedMbps = transport === "wifi"
+                         ? linkSpeedMbps(data.wifiLinkSpeedMbps) : -1;
     var state = !known || (!wifiPresent && !ethernetPresent) ? "unavailable"
               : transport === "none" ? "disconnected" : "connected";
 
@@ -61,8 +63,7 @@ function snapshot(reading) {
         },
         // Reuse the live dock's rx bitrate ONLY for the active Wi-Fi link.
         // Ethernet stays unknown until a validated wired source is shared.
-        linkSpeedMbps: transport === "wifi"
-                       ? linkSpeedMbps(data.wifiLinkSpeedMbps) : -1,
-        linkSpeedApproximate: transport === "wifi"
+        linkSpeedMbps: activeSpeedMbps,
+        linkSpeedApproximate: activeSpeedMbps >= 0
     };
 }

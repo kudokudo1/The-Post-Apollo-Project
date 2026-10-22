@@ -110,11 +110,13 @@ check(H.openNotificationDestination('empty','brave-browser','Brave',''),[
 check(H.openNotificationDestination('other','discord','Discord','youtube.com'),[
  {route:'application',actions:['native-attempt','app']}
 ]);
-check(H.openNotificationDestination('unknown','brave-browser','Brave','youtube.com.evil.test'),[
- {route:'site-home',actions:['native-attempt','exec']}
-]);
+assert.strictEqual(
+ H.openNotificationDestination('unknown','brave-browser','Brave','youtube.com.evil.test'),
+ 'site-home');
+assert.deepStrictEqual(actions.map(x=>x.kind),['native-attempt','exec']);
 assert.deepStrictEqual(actions[1].argv,['xdg-open','https://youtube.com.evil.test/'],
-  'exact sender-supplied host, not a guessed Youtube location');
+ 'exact sender-supplied host, not a guessed YouTube location');
+actions.length=0;
 console.log('Native destination, website origin and application fallback: PASS');
 """
 subprocess.run(

@@ -2455,6 +2455,9 @@ PanelWindow {
                         // The SITE/APP selector leaves legacy app-wide controls
                         // available without changing CLEAR ALL or Favorites.
                         property bool targetWholeApp: false
+                        // Delegates are recycled: scope must never leak from
+                        // one history record into a different notification.
+                        onNotificationIdChanged: targetWholeApp = false
                         readonly property string websiteKey: NotificationsService.websiteKey(
                             notificationEntry.sourceId, notificationEntry.source, notificationEntry.websiteHost)
                         readonly property bool targetingWebsite: websiteKey !== "" && !targetWholeApp

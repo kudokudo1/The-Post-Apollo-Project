@@ -22,6 +22,11 @@ Scope {
         !!(snapshot && snapshot.session && snapshot.session.ownedByController)
     readonly property var loaded:
         snapshot && snapshot.loaded ? snapshot.loaded : null
+    readonly property var browse:
+        snapshot && snapshot.browse ? snapshot.browse : null
+    readonly property var selection:
+        snapshot && snapshot.selection ? snapshot.selection : null
+    property var inspectedItem: null
 
     function issue(action, additionalArgs) {
         // One CLI request at a time. Never overlap a transport command and
@@ -43,6 +48,56 @@ Scope {
 
     function refresh() {
         issue("snapshot", []);
+    }
+
+    // All browsing/selection requests use the same versioned CLI and private socket.
+    // None of these methods starts playback or mutates another player's audio.
+    function searchMedia(source, query, cursor) {
+        if ((source !== "local-mpd" && source !== "youtube")
+                || typeof query !== "string" || query.trim().length === 0
+                || query.length > 256)
+            return false;
+        const args = [query, "--source", source];
+        if (cursor !== undefined && cursor !== null && cursor !== "") {
+            if (source !== "youtube" || typeof cursor !== "string"
+                    || cursor.length > 256)
+                return false;
+            args.push("--cursor", cursor);
+        }
+        return issue("search", args);
+    }
+
+    function mediaRefArgs(ref) {
+        if (!ref || typeof ref.id !== "string" || !ref.id.length
+                || ref.id.length > 4096
+                || (ref.source !== "local-mpd" && ref.source !== "youtube"
+                    && ref.source !== "direct-stream"))
+            return null;
+        return [ref.id, "--source", ref.source];
+    }
+
+    function inspectMedia(ref) {
+        const args = mediaRefArgs(ref);
+        return args !== null && issue("inspect", args);
+    }
+
+    // SELECT stages media; LOAD queues it without autoplay; PLAY is separate.
+    function selectMedia(ref) {
+        const args = mediaRefArgs(ref);
+        return args !== null && issue("select", args);
+    }
+
+    function loadSelectedMedia() {
+        return issue("load", []);
+    }
+
+    // Contextual ENTER loads one playable MPD track without staging or autoplay.
+    // Source-specific collection loading and YouTube playback remain unavailable.
+    function loadMedia(ref) {
+        const args = mediaRefArgs(ref);
+        if (args === null || ref.source !== "local-mpd")
+            return false;
+        return issue("load", ["--uri", ref.id, "--source", "local-mpd"]);
     }
 
     function loadRadio(url) {
@@ -89,7 +144,19 @@ Scope {
         if (pendingAction === "snapshot") {
             snapshot = payload.result;
         } else {
-            // Successful command issuance is not the same as audible audio.
+            // Search and staged selection update local view data immediately.
+            // The next snapshot reconciles this with the persistent controller.
+            if (pendingAction === "search" && payload.result.browse) {
+                snapshot = Object.assign({}, snapshot || {},
+                                         { browse: payload.result.browse });
+                inspectedItem = null;
+            } else if (pendingAction === "select" && payload.result.selection) {
+                snapshot = Object.assign({}, snapshot || {},
+                                         { selection: payload.result.selection });
+            } else if (pendingAction === "inspect" && payload.result.item) {
+                inspectedItem = payload.result.item;
+            }
+            // A successful command result is NOT evidence of audible output.
             message = pendingAction.toUpperCase() + " / COMMAND ACCEPTED";
             followup.start();
         }

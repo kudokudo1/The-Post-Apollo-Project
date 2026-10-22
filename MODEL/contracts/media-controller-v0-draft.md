@@ -128,3 +128,81 @@ Credentials and tokens stay out of repo and debug logs; adapters own their provi
 **Open:** exact IPC transport, schema/versioning and persistence; packaged compliant YouTube playback; per-provider auth; source-to-physical-media format mapping; final chassis and control inventory; music-stream routing/identity contract integration; fallback/override UX; whether loaded media remains inserted after stop.
 
 **Implementation status:** `widgets/MediaDeckW.qml` currently drives MPD directly through seven commands. The permanent controller, source adapters, audio isolation, and YouTube deck browsing are **not yet implemented**. This is a design agreement in progress, not certification that runtime features exist.
+
+
+## Operator-approved control-bay input contract (2026-10-22)
+
+**Status:** Approved interaction mapping; this section records design authority,
+not live implementation, exact geometry, or a new shared keyboard-focus policy.
+
+- All media-browsing and selection controls belong in the **control bay**.
+  The upper display reports search results, metadata and Now Playing; the
+  cassette bay represents loaded media, not the browse highlight.
+- **Left, smaller knob:** horizontal navigation. **Vertical slider:** up/down
+  navigation. **Physical Enter button:** contextual Enter. **Right, larger
+  knob:** distinct coarse browsing/tuning role; exact behavior remains open.
+- **SELECT** remains distinct from highlighted cursor position, loading
+  and playback. The physical control is labeled **SELECT**; a compact
+  **SHIFT** legend may identify the keyboard equivalent, not a tilde.
+  Its planned keyboard gesture is **Shift pressed and released alone**,
+  on either Shift key while the Hi-Fi owns keyboard focus. The backtick/grave
+  key (U+0060) is intentionally **unassigned/reserved** for a later purpose.
+- The physical Enter control and normal keyboard Enter/Return perform the
+  same contextual action. On an individually highlighted, playable track,
+  Enter requests load **without** autoplay. On a collection, Enter navigates
+  into its contents. In a focused text field, Enter is handled by that field
+  for search submission, not a hidden playback action.
+- SELECT stages media, or marks a starting track inside a collection.
+  LOAD queues the staged item/collection without playing; PLAY is the
+  separate explicit start command. Loading a full playlist with a chosen
+  start track is **future backend work**, not currently supported.
+- A search text editor must receive normal typing (including uppercase
+  characters, backtick and tilde) without triggering SELECT. Shift is a
+  modifier, not a normal application shortcut: only a standalone Shift
+  gesture may select, and only **after release**, if the entire gesture
+  contained no other key or mouse action. Shift+arrows, Shift+Tab, ordinary
+  capitalization and any Shift+modifier chord must retain their existing
+  behavior. Do not implement a global Shift binding or intercept modifier
+  events from other applications. Leave **Super+grave** to Koinoikos.
+  Modifier-only key delivery and reliable chord suppression require
+  real Wayland/Quickshell testing; if the desktop cannot distinguish a bare
+  Shift gesture safely, keep keyboard SELECT unavailable rather than
+  hijacking text input or navigation.
+- Historical mainline Media Deck declared `WlrKeyboardFocus.None`.
+  Draft PR #427 now proposes *local* `WlrKeyboardFocus.OnDemand` only while
+  the Hi-Fi is open; it is still **not registered with the shared focus broker**.
+  Normal Enter/arrow typing is wired for a first on-device trial, but standalone
+  Shift SELECT deliberately remains disabled via `standaloneShiftVerified:false`
+  until reliable modifier-only and cross-widget focus behavior is proven.
+  A QML shortcut alone must never be reported as working on the desktop.
+- Reuse `SelectorDial` and `SelectorSlider` semantics where appropriate.
+  Physical sizing, hit areas, and geometry must be grounded in existing
+  implementations or live runtime verification; no dimensions are approved
+  by this contract.
+
+## 2026-10-22 // Hi-Fi browser control-bay development checkpoint
+
+**Status:** Source and CI pass on draft PR #427; no on-device Quickshell
+rendering or key-delivery acceptance yet. This is not a final geometry
+decision, not a merge, and not a registered Hospital Room checkpoint.
+
+- `widgets/MediaDeckBrowserControls.qml` now uses the existing SelectorDial,
+  SelectorSlider, and ActionButton families. Small left dial selects
+  SOURCE/RESULTS/NOW; slider highlights result rows; right dial moves in
+  five-row browsing groups as a **provisional** tuning interpretation.
+- SEARCH text field, source selection (LIBRARY/YOUTUBE/RADIO), SELECT, ENTER,
+  LOAD, MPD/MPRIS controls and legacy transport keys are in the control bay.
+  The upper display is read-only and the cassette bay no longer has an
+  interactive radio load button.
+- SELECT stages an item; LOAD cues selected supported local or direct-HTTPS
+  source; ENTER cues a highlighted local track or radio station; PLAY remains
+  separate. All three cue paths preserve **no autoplay**. YouTube remains a
+  catalog-only source, and full-playlist cue/start-index is not implemented.
+- The media bridge exposes search/inspect/select/cue operations to the QML
+  client. UI snapshots expose browse and loaded identities separately.
+- Source-level media contracts and grammar checks passed; they are not
+  a substitute for QML loading, SwayFX focus transfer, MPD playback,
+  radio output, or physical visual inspection on the operator desktop.
+- Needs: confirm geometry, real search entry/focus, selector motion and
+  scroll direction, radio/select/load/PLAY separation, no browser-tab
+  takeover, idle playback continuity and other apps retaining keystrokes.

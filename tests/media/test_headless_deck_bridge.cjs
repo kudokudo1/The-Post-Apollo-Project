@@ -23,7 +23,9 @@ test("MPRIS transport is kept explicitly separate", () => {
 });
 
 test("radio station load is explicit and does not autoplay", () => {
-    assert.match(deck, /onClicked:\s*headless\.loadRadio\(deck\.radioStreamUrl\)/);
+    assert.match(deck, /headless\.loadRadio\(radioStreamUrl\)/);
+    assert.match(deck, /catalogSource === "direct-stream"/);
+    assert.doesNotMatch(deck, /onClicked:\s*headless\.loadRadio/);
     assert.match(bridge, /issue\("load",\s*\["--source",\s*"direct-stream",\s*"--uri",\s*url\]\)/);
     assert.doesNotMatch(bridge, /--autoplay/);
     assert.match(deck, /LOAD DOES NOT AUTOPLAY/);
@@ -61,6 +63,81 @@ test("background snapshot polling never flashes or disables radio cassette contr
     assert.match(bridge, /readonly property bool busy:\s*commandProcess\.running\s*&&\s*pendingAction\s*!==\s*"snapshot"/);
     assert.match(bridge, /onTriggered:\s*bridge\.refresh\(\)/);
     assert.match(bridge, /issue\("snapshot",\s*\[\]\)/);
-    assert.match(deck, /opacity:\s*headless\.busy\s*\?\s*0\.5\s*:\s*1/);
-    assert.match(deck, /enabled:\s*!headless\.busy/);
+    // The cassette bay is now display-only. Polling still never disables it.
+    assert.match(deck, /id:\s*grooveCassette/);
+    assert.doesNotMatch(deck, /id:\s*grooveMouse/);
+    assert.match(deck, /height:\s*38/);
+});
+
+test("search and explicit staged selection are controller-only operations", () => {
+    assert.match(bridge, /function searchMedia\(source, query, cursor\)/);
+    assert.match(bridge, /return issue\("search", args\)/);
+    assert.match(bridge, /function selectMedia\(ref\)/);
+    assert.match(bridge, /return args !== null && issue\("select", args\)/);
+    assert.match(bridge, /function loadSelectedMedia\(\)/);
+    assert.match(bridge, /return issue\("load", \[\]\)/);
+    assert.doesNotMatch(bridge, /--autoplay/);
+});
+
+test("catalog responses update browsing without clobbering loaded media", () => {
+    assert.match(bridge, /pendingAction === "search" && payload\.result\.browse/);
+    assert.match(bridge, /Object\.assign\(\{\}, snapshot \|\| \{\},/);
+    assert.match(bridge, /browse: payload\.result\.browse/);
+    assert.match(bridge, /selection: payload\.result\.selection/);
+    assert.match(bridge, /pendingAction === "inspect" && payload\.result\.item/);
+    assert.match(bridge, /readonly property var loaded:/);
+    assert.match(bridge, /snapshot = payload\.result;/);
+});
+
+test("control bay provides two differently sized knobs, slider and explicit actions", () => {
+    const ui = fs.readFileSync(path.join(base, "widgets/MediaDeckBrowserControls.qml"), "utf8");
+    assert.match(deck, /MediaDeckBrowserControls\s*\{/);
+    assert.match(ui, /id:\s*navigationDial/);
+    assert.match(ui, /scale:\s*0\.77/);
+    assert.match(ui, /id:\s*resultSlider/);
+    assert.match(ui, /indexRequested|onIndexRequested/);
+    assert.match(ui, /id:\s*tuningDial/);
+    assert.match(ui, /scale:\s*1\.0/);
+    assert.match(ui, /label:\s*"SELECT"/);
+    assert.match(ui, /label:\s*"ENTER"/);
+    assert.match(ui, /label:\s*"LOAD"/);
+    assert.match(ui, /label:\s*"SEARCH"/);
+    assert.match(ui, /onClicked:\s*bay\.deckHost\.selectHighlighted\(\)/);
+    assert.match(ui, /onClicked:\s*bay\.deckHost\.loadStaged\(\)/);
+    assert.match(ui, /onClicked:\s*bay\.deckHost\.enterHighlighted\(\)/);
+    assert.doesNotMatch(ui, /issue\("play"/);
+});
+
+test("search is in the control bay and display results remain read-only", () => {
+    assert.match(deck, /function searchLibrary\(\)/);
+    assert.match(deck, /headless\.searchMedia\(catalogSource, query\)/);
+    assert.match(deck, /readonly property var browseItems:/);
+    assert.match(deck, /Flickable\s*\{/);
+    assert.match(deck, /resultViewport/);
+    assert.match(deck, /function tuneToGroup\(index\)/);
+    assert.match(deck, /function highlightRow\(index\)/);
+    assert.match(deck, /function enterHighlighted\(\)/);
+    assert.match(bridge, /function loadMedia\(ref\)/);
+    assert.match(bridge, /issue\("load", \["--uri", ref\.id, "--source", "local-mpd"\]\)/);
+    assert.doesNotMatch(deck, /WlrKeyboardFocus\.Exclusive/);
+});
+
+test("Shift selection remains fail-closed; bare grave is reserved", () => {
+    assert.match(deck, /standaloneShiftVerified:\s*false/);
+    assert.match(deck, /shiftCandidate = standaloneShiftVerified/);
+    assert.match(deck, /!browserControls\.searchEditing/);
+    assert.match(deck, /event\.modifiers !== Qt\.NoModifier/);
+    assert.match(deck, /event\.key === Qt\.Key_Return/);
+    assert.doesNotMatch(deck, /Qt\.Key_QuoteLeft|Qt\.Key_AsciiTilde/);
+});
+
+test("radio cassette is display-only; its SELECT and LOAD are on the bay", () => {
+    const ui = fs.readFileSync(path.join(base, "widgets/MediaDeckBrowserControls.qml"), "utf8");
+    assert.match(deck, /catalogSource === "direct-stream"/);
+    assert.match(deck, /headless\.loadRadio\(radioStreamUrl\)/);
+    assert.match(deck, /function selectHighlighted\(\)/);
+    assert.match(bridge, /ref\.source !== "direct-stream"/);
+    assert.match(ui, /label: bay\.deckHost\.catalogSource === "youtube"/);
+    assert.match(ui, /bay\.controller\.selection\.source === "direct-stream"/);
+    assert.doesNotMatch(deck, /id:\s*grooveMouse/);
 });

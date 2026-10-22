@@ -23,13 +23,15 @@ export function validTransactionDate(date, month) {
 export function validateTransactionCommand(input) {
   if (!input || typeof input !== "object" || Array.isArray(input))
     reject("invalid-command");
-  const allowed = new Set(["action", "requestId", "accountId", "month",
+  const allowed = new Set(["action", "requestId", "sourceKey", "accountId", "month",
     "date", "description", "amountCents", "transactionId", "original"]);
   if (Object.keys(input).some(k => !allowed.has(k))) reject("unexpected-fields");
-  const {action,requestId,accountId,month,date,description,amountCents} = input;
+  const {action,requestId,sourceKey,accountId,month,date,description,amountCents} = input;
   if (!["create", "update"].includes(action)) reject("invalid-action");
   if (typeof requestId !== "string" || !hexPattern.test(requestId))
     reject("invalid-request-id");
+  if (typeof sourceKey !== "string" || !/^[a-f0-9]{64}$/.test(sourceKey))
+    reject("invalid-source-key");
   if (typeof accountId !== "string" || !idPattern.test(accountId))
     reject("invalid-account-id");
   if (!validTransactionDate(date, month)) reject("invalid-date");

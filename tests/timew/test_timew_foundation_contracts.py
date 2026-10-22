@@ -87,7 +87,18 @@ assert "glowColor: timew.semanticColor" in window
 assert "borderColor: timew.semanticColor" in window
 assert "idlePrimaryColor: timew.semanticColor" in window
 assert 'text: timew.selectedName + " // TIMEW"\n                        color: timew.semanticColor' in window
-assert 'text: Qt.formatDateTime(localClock.date, "HH:mm:ss")\n                            color: timew.semanticColor' in window
+# TimeW displays the tested local-time formatter using its preexisting
+# SystemClock tick. There is no second timer, backend, or global preference.
+assert 'import "../services/hub/ApolloHubTimePolicy.js" as LocalTimePolicy' in window
+assert "LocalTimePolicy.snapshot(localClock.date.getTime(), use24Hour)" in window
+assert window.count("SystemClock {") == 1
+assert "Timer {" not in window
+assert "property bool use24Hour: true" in window
+assert "text: timew.localTimeSnapshot.displayTime" in window
+assert "text: timew.localTimeSnapshot.dateLabel" in window
+assert "text: timew.localTimeSnapshot.utcOffsetLabel" in window
+assert "label: timew.use24Hour ? \"24H\" : \"12H\"" in window
+assert "onLeftClicked: timew.use24Hour = !timew.use24Hour" in window
 assert "fillColor: Colors.black" in window
 assert "border.color: Colors.cyan" in window
 assert "accentColor: Colors.red" in window

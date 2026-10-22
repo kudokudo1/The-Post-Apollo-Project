@@ -185,6 +185,8 @@ SectionFrame {
             width: 28
             height: 25
             label: "×"
+            labelPixelSize: 18
+            contentPadding: 3
             accentColor: Colors.red
             destructive: true
             hoverFillColor: Colors.red

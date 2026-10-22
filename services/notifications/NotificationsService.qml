@@ -446,6 +446,9 @@ Singleton {
             // Source
             "source": notification.source || "",
             "sourceId": notification.sourceId || "",
+            "website": notification.website || "",
+            "websiteHost": notification.websiteHost || "",
+            "websiteIcon": notification.websiteIcon || "",
 
             // Content
             "title": notification.title || "",
@@ -733,6 +736,9 @@ Singleton {
             // Source
             "source": String(notification.source || ""),
             "sourceId": String(notification.sourceId || ""),
+            "website": String(notification.website || ""),
+            "websiteHost": String(notification.websiteHost || ""),
+            "websiteIcon": String(notification.websiteIcon || ""),
 
             // Content
             "title": String(notification.title || ""),

@@ -17,6 +17,12 @@ PanelWindow {
     property bool relationshipFocused: false
     signal keyboardOwnershipRequested()
 
+    FinanceServices.FinanceOpeningHistoryService {
+        id: openingHistory
+        sourceKey: financeBudget.snapshot ? financeBudget.snapshot.sourceKey : ""
+        month: financeBudget.selectedMonth
+    }
+
     FinanceServices.FinanceBudgetReadService {
         id: financeBudget
         monitoring: root.menuOpen
@@ -1076,6 +1082,97 @@ PanelWindow {
                                     font.pixelSize: 9
                                     textFormat: Text.PlainText
                                     wrapMode: Text.WordWrap
+                                }
+                                ActionButton {
+                                    id: inspectOpeningBalances
+                                    width: parent.width
+                                    height: 28
+                                    trackLabelGlowLocally: true
+                                    label: "INSPECT OPENING BALANCES"
+                                    labelPixelSize: 9
+                                    accentColor: Colors.cyan
+                                    available: financeBudget.state === "ready"
+                                        && !!financeBudget.snapshot
+                                        && openingHistory.state !== "reading"
+                                    onLeftClicked: openingHistory.scan()
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    text: openingHistory.message
+                                    textFormat: Text.PlainText
+                                    font.pixelSize: 9
+                                    color: openingHistory.state === "ready"
+                                        ? Colors.cyan : Colors.orange
+                                    wrapMode: Text.WordWrap
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    visible: openingHistory.state === "ready"
+                                    text: "RECORDS INSPECTED // " + openingHistory.recordsInspected
+                                    textFormat: Text.PlainText
+                                    font.pixelSize: 9
+                                    color: Colors.cyan
+                                }
+                                Repeater {
+                                    model: openingHistory.state === "ready"
+                                        ? openingHistory.accounts : []
+                                    delegate: Rectangle {
+                                        required property var modelData
+                                        width: budgetList.width
+                                        height: historyColumn.implicitHeight + 12
+                                        color: Colors.black
+                                        border.color: Colors.cyan
+                                        Column {
+                                            id: historyColumn
+                                            x: 6
+                                            y: 6
+                                            width: parent.width - 12
+                                            spacing: 4
+                                            GohuText {
+                                                width: parent.width
+                                                text: modelData.accountName
+                                                textFormat: Text.PlainText
+                                                font.pixelSize: 10
+                                                color: Colors.white
+                                                elide: Text.ElideRight
+                                            }
+                                            GohuText {
+                                                width: parent.width
+                                                text: "FIRST RECORDED // "
+                                                      + (modelData.firstRecordedDate || "NO TRANSACTIONS")
+                                                textFormat: Text.PlainText
+                                                font.pixelSize: 9
+                                                color: Colors.cyan
+                                                wrapMode: Text.WordWrap
+                                            }
+                                            GohuText {
+                                                width: parent.width
+                                                text: "FIRST AMOUNT // "
+                                                      + root.moneyText(modelData.firstRecordedAmountCents)
+                                                textFormat: Text.PlainText
+                                                font.pixelSize: 9
+                                                color: Colors.cyan
+                                            }
+                                            GohuText {
+                                                width: parent.width
+                                                text: "STARTING BALANCE CANDIDATES // "
+                                                      + modelData.startingBalanceCandidateCount
+                                                      + " / " + root.moneyText(modelData.startingBalanceCandidateCents)
+                                                textFormat: Text.PlainText
+                                                font.pixelSize: 9
+                                                color: Colors.orange
+                                                wrapMode: Text.WordWrap
+                                            }
+                                            GohuText {
+                                                width: parent.width
+                                                text: "NOT VERIFIED // CHECK BANK OPENING RECORD"
+                                                textFormat: Text.PlainText
+                                                font.pixelSize: 9
+                                                color: Colors.orange
+                                                wrapMode: Text.WordWrap
+                                            }
+                                        }
+                                    }
                                 }
                                 GohuText {
                                     width: parent.width

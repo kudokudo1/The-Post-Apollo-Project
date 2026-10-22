@@ -12,6 +12,7 @@ import {join,dirname} from "node:path";
 import {fileURLToPath} from "node:url";
 import {createHash} from "node:crypto";
 import * as api from "@actual-app/api";
+import {takeOpeningHistory} from "./opening_history.mjs";
 import {takeReadOnlySnapshot} from "./actual_readonly.mjs";
 import {executeAllocation,preflightAllocation,AllocationRefusal}
   from "./allocation_guard.mjs";
@@ -155,6 +156,13 @@ async function main(){
   stage="fresh-preflight";
   await startClient("independent");
   await api.downloadBudget(syncId);
+  stage="d15-real-opening-history";
+  const historical=await takeOpeningHistory(api,month);
+  assert.equal(historical.kind,"financew-opening-history");
+  assert.equal(historical.openingBalancesVerified,false);
+  assert.equal(historical.accounts.length,1);
+  assert.ok(historical.accounts[0].transactionCount>=1);
+  stage="fresh-preflight";
   stage="fresh-budget-month";
   const before=await api.getBudgetMonth(month);
   stage="d14-funded-budget-snapshot";

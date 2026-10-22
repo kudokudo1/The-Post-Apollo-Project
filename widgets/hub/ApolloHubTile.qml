@@ -116,6 +116,7 @@ SectionFrame {
     signal moveLeft(int index)
     signal moveRight(int index)
     signal changeModule(int index)
+    signal removeTile(int index)
     signal pointerEntered(int index)
 
     HoverHandler {
@@ -177,6 +178,19 @@ SectionFrame {
             height: 25
             label: "SWAP"
             onLeftClicked: tile.changeModule(tile.tileIndex)
+        }
+        ActionButton {
+            // Delete this tile placement ONLY. Never delete stored widget data.
+            trackLabelGlowLocally: true
+            width: 28
+            height: 25
+            label: "×"
+            accentColor: Colors.red
+            destructive: true
+            hoverFillColor: Colors.red
+            hoverForegroundColor: Colors.black
+            hoverBorderColor: Colors.red
+            onLeftClicked: tile.removeTile(tile.tileIndex)
         }
     }
 

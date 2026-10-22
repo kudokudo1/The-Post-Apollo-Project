@@ -17,34 +17,39 @@ Item {
 
         ActionButton {
             id: sourceKey
-            anchors { left: parent.left; top: parent.top }
+            anchors { right: parent.right; top: parent.top }
             width: 84
             height: parent.height
             label: bay.deckHost.catalogSource === "youtube" ? "YOUTUBE"
                 : bay.deckHost.catalogSource === "direct-stream" ? "RADIO" : "LIBRARY"
             labelPixelSize: 10
-            selected: bay.deckHost.navigationZone === 0
+            // Ordinary ActionButton: no specialized/latched selection face.
             onClicked: bay.deckHost.toggleCatalogSource()
         }
 
         Rectangle {
             id: queryBezel
             anchors {
-                left: sourceKey.right; right: searchKey.left
+                left: searchKey.right; right: sourceKey.left
                 top: parent.top; bottom: parent.bottom
                 leftMargin: 7; rightMargin: 7
             }
             color: Colors.black
             radius: 2
-            border.width: 1
-            border.color: searchInput.activeFocus ? Colors.magenta : Colors.cyan
+            border.width: searchInput.activeFocus ? 2 : 1
+            border.color: Colors.magenta
 
             TextInput {
                 id: searchInput
                 anchors { fill: parent; leftMargin: 7; rightMargin: 7; topMargin: 6; bottomMargin: 5 }
-                color: Colors.white
+                color: Colors.magenta
                 selectionColor: Colors.magenta
                 selectedTextColor: Colors.black
+                cursorDelegate: Rectangle {
+                    width: 2
+                    height: Math.max(12, searchInput.cursorRectangle.height)
+                    color: Colors.orange
+                }
                 font.pixelSize: 12
                 clip: true
                 activeFocusOnTab: true
@@ -58,13 +63,13 @@ Item {
                     ? "GROOVE SALAD / RADIO" : "ARTIST / SONG / ALBUM"
                 font.pixelSize: 10
                 opacity: 0.55
-                color: Colors.cyan
+                color: Colors.magenta
             }
         }
 
         ActionButton {
             id: searchKey
-            anchors { right: parent.right; top: parent.top }
+            anchors { left: parent.left; top: parent.top }
             width: 79
             height: parent.height
             label: "SEARCH"
@@ -77,11 +82,32 @@ Item {
 
     Row {
         id: navigationRig
-        anchors { top: searchRow.bottom; topMargin: 2; left: parent.left }
+        anchors {
+            top: searchRow.bottom
+            topMargin: 2
+            left: parent.left
+            right: parent.right
+        }
         height: 160
         spacing: 6
 
-        // Small left encoder navigates SOURCE / RESULTS / NOW.
+        // Leftmost vertical slider: precise result-by-result movement.
+        SelectorSlider {
+            id: resultSlider
+            width: 40
+            height: 151
+            anchors.verticalCenter: parent.verticalCenter
+            count: bay.deckHost.browseItems.length
+            currentIndex: bay.deckHost.browseIndex
+            sideLabel: "TRACK"
+            indexInteraction: "legacy"
+            enabledSlider: bay.deckHost.transportMode === "mpd" && count > 1
+            onIndexRequested: function(index) {
+                bay.deckHost.highlightRow(index);
+            }
+        }
+
+        // Smaller horizontal encoder: SOURCE / RESULTS / NOW.
         Item {
             width: 110
             height: navigationRig.height
@@ -100,42 +126,11 @@ Item {
             }
         }
 
-        SelectorSlider {
-            id: resultSlider
-            width: 40
-            height: 151
-            anchors.verticalCenter: parent.verticalCenter
-            count: bay.deckHost.browseItems.length
-            currentIndex: bay.deckHost.browseIndex
-            sideLabel: "TRACK"
-            indexInteraction: "legacy"
-            enabledSlider: bay.deckHost.transportMode === "mpd" && count > 1
-            onIndexRequested: function(index) {
-                bay.deckHost.highlightRow(index);
-            }
-        }
-
-        // Large encoder jumps between five-item groups without playback.
-        Item {
-            width: 150
-            height: navigationRig.height
-            SelectorDial {
-                id: tuningDial
-                anchors.centerIn: parent
-                scale: 1.0
-                labelText: "TUNE"
-                options: bay.deckHost.tuningGroups
-                currentIndex: bay.deckHost.tuningGroup
-                accentColor: Colors.cyan
-                markerColor: Colors.orange
-                onSelectionRequested: function(index, value) {
-                    bay.deckHost.tuneToGroup(index);
-                }
-            }
-        }
-
+        // Ordinary action buttons between the small encoder and the tuner.
         Column {
-            width: Math.max(90, bay.width - 110 - 40 - 150 - 3 * navigationRig.spacing)
+            id: mediaActionColumn
+            width: Math.max(90, navigationRig.width - 40 - 110 - 150
+                                - 3 * navigationRig.spacing)
             height: navigationRig.height
             spacing: 6
 
@@ -171,6 +166,25 @@ Item {
                 text: "SHIFT / SELECT"
                 color: Colors.orange
                 font.pixelSize: 9
+            }
+        }
+
+        // Larger tuning encoder at the right end of the control bay.
+        Item {
+            width: 150
+            height: navigationRig.height
+            SelectorDial {
+                id: tuningDial
+                anchors.centerIn: parent
+                scale: 1.0
+                labelText: "TUNE"
+                options: bay.deckHost.tuningGroups
+                currentIndex: bay.deckHost.tuningGroup
+                accentColor: Colors.cyan
+                markerColor: Colors.orange
+                onSelectionRequested: function(index, value) {
+                    bay.deckHost.tuneToGroup(index);
+                }
             }
         }
     }

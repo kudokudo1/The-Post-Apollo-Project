@@ -13,18 +13,30 @@ import uuid
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from direct_stream_source import validate_https_audio_url
 from headless_mpd import MediaBackendError
 
-_API = "https://de1.api.radio-browser.info/json/stations/search"
+# Fixed, trusted directory endpoints only. No station URL becomes an HTTP
+# request during discovery. Fallback is bounded by the CLI's 5s timeout.
+_API_MIRRORS = (
+    "https://de1.api.radio-browser.info/json/stations/search",
+    "https://all.api.radio-browser.info/json/stations/search",
+)
 _PAGE_SIZE = 50
 _REQUEST_ROWS = 150
 _MAX_OFFSET = 10_000
 _ALLOWED_SEARCH = re.compile(r"^[^\x00-\x1f\x7f]{0,120}$")
 _FILTERS = {"genre": "tag", "tag": "tag", "country": "countrycode",
             "name": "name", "language": "language"}
+
+
+class _RejectRedirects(HTTPRedirectHandler):
+    """Never follow a directory mirror redirect to an untrusted network host."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
 
 
 class RadioBrowserCatalogSource:
@@ -127,22 +139,30 @@ class RadioBrowserCatalogSource:
         if self._fetch is not None:
             payload = self._fetch(dict(params))
         else:
-            # Fixed HTTPS directory host. No station URL is fetched by discovery.
-            req = Request(_API + "?" + urlencode(params),
-                          headers={"Accept": "application/json",
-                                   "User-Agent": "Post-Apollo-HiFi/0.1"})
-            try:
-                with urlopen(req, timeout=3.5) as response:
-                    raw = response.read(1_500_001)
-                if len(raw) > 1_500_000:
-                    raise MediaBackendError("SOURCE_PROTOCOL", "Radio directory response too large")
-                payload = json.loads(raw)
-            except HTTPError as exc:
-                raise MediaBackendError("SOURCE_HTTP", f"Radio directory HTTP {exc.code}") from None
-            except (URLError, OSError, TimeoutError):
-                raise MediaBackendError("SOURCE_OFFLINE", "Radio directory unavailable") from None
-            except (ValueError, UnicodeError):
-                raise MediaBackendError("SOURCE_PROTOCOL", "Invalid radio directory JSON") from None
+            # No arbitrary redirects. Fallback stays on approved Radio Browser
+            # mirror names and within the existing 5-second socket timeout.
+            opener = build_opener(_RejectRedirects())
+            payload = None
+            error = "SOURCE_OFFLINE"
+            for endpoint in _API_MIRRORS:
+                req = Request(endpoint + "?" + urlencode(params),
+                              headers={"Accept": "application/json",
+                                       "User-Agent": "Post-Apollo-HiFi/0.1"})
+                try:
+                    with opener.open(req, timeout=1.8) as response:
+                        raw = response.read(1_500_001)
+                    if len(raw) > 1_500_000:
+                        raise MediaBackendError("SOURCE_PROTOCOL", "Radio directory response too large")
+                    payload = json.loads(raw)
+                    break
+                except HTTPError:
+                    error = "SOURCE_HTTP"
+                except (URLError, OSError, TimeoutError):
+                    error = "SOURCE_OFFLINE"
+                except (ValueError, UnicodeError):
+                    error = "SOURCE_PROTOCOL"
+            if payload is None:
+                raise MediaBackendError(error, "Radio directory unavailable or invalid") from None
         if not isinstance(payload, list) or len(payload) > _REQUEST_ROWS:
             raise MediaBackendError("SOURCE_PROTOCOL", "Invalid radio directory response")
         return payload

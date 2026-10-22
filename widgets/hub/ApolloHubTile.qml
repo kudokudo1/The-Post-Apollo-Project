@@ -18,6 +18,8 @@ SectionFrame {
     property var todoSnapshot: null
     property var notesStore: null
     property var notesSnapshot: null
+    property var calendarSnapshot: null
+    property var calendarBridge: null
     signal todoTextFocusChanged(bool focused)
     signal notesTextFocusChanged(bool focused)
     // B3 deliberately distinguishes local link status from verified internet.
@@ -376,6 +378,23 @@ SectionFrame {
         }
     }
 
+    // B9 civil-date calendar: cells are provided by the same live bridge
+    // that already tracks local time. Navigation adjusts only view inputs.
+    ApolloHubCalendarMini {
+        id: calendarMini
+        visible: tile.moduleId === "calendar"
+        calendarSnapshot: tile.calendarSnapshot
+        calendarBridge: tile.calendarBridge
+        anchors {
+            left: parent.left
+            right: parent.right
+            top: parent.top
+            bottom: parent.bottom
+            topMargin: tile.editing ? 32 : 22
+            bottomMargin: 23
+        }
+    }
+
     // B8 local Notes editor: the backend singleton owns revisions, file
     // safety, and atomic writes. The tile only passes user-initiated actions.
     ApolloHubNotesMini {
@@ -437,6 +456,7 @@ SectionFrame {
                  && tile.moduleId !== "apps"
                  && tile.moduleId !== "todo"
                  && tile.moduleId !== "notes"
+                 && tile.moduleId !== "calendar"
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
@@ -447,8 +467,6 @@ SectionFrame {
         font.pixelSize: tile.moduleId === "time" ? 23 : 14
         text: tile.moduleId === "time"
               ? Qt.formatTime(tile.now, "HH:mm:ss")
-              : tile.moduleId === "calendar"
-              ? Qt.formatDate(tile.now, "ddd, d MMM yyyy")
               : "MODULE PREVIEW"
     }
 
@@ -458,8 +476,10 @@ SectionFrame {
         color: Colors.cyan
         opacity: 0.7
         font.pixelSize: 10
-        text: tile.moduleId === "time" || tile.moduleId === "calendar"
+        text: tile.moduleId === "time"
               ? "LOCAL TIME"
+              : tile.moduleId === "calendar"
+              ? calendarMini.statusLine
               : tile.moduleId === "weather"
               ? (tile.weatherReady
                  ? (Number(tile.weatherSnapshot.ageMinutes) >= 0

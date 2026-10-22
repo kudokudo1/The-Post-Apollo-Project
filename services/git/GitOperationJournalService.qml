@@ -226,7 +226,7 @@ Scope {
                 overlayRaw, checkpointGeneration
             );
             deltaRecords = overlay.rows;
-            deltaActive = deltaRequested || overlay.rows.length > 0;
+            deltaActive = deltaRequested || overlay.present;
             source = DeltaCodec.overlay(
                 base.entries, overlay.rows, maxEntries
             );
@@ -389,10 +389,6 @@ Scope {
         atomicWrites: true
         printErrors: false
 
-        onLoaded: {
-            if (!root.storageReady)
-                root.load();
-        }
     }
 
     FileView {

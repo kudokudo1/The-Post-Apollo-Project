@@ -94,7 +94,19 @@ assert "LocalTimePolicy.snapshot(localClock.date.getTime(), use24Hour)" in windo
 assert window.count("SystemClock {") == 1
 assert "Timer {" not in window
 assert "property bool use24Hour: true" in window
-assert "text: timew.localTimeSnapshot.displayTime" in window
+# Clock-page presentation: 24H retains PM, 12H retains leading zero;
+# the time/control are orange in 24H and cyan in 12H (not chassis white).
+assert "readonly property color clockReadoutColor:" in window
+assert "use24Hour ? Colors.orange : Colors.cyan" in window
+assert "readonly property string clockReadoutText:" in window
+assert "localTimeSnapshot.state === \"ready\"" in window
+assert "use24Hour ? localTimeSnapshot.time24" in window
+assert "localTimeSnapshot.time12.slice(0, 8)" in window
+assert '+ "//" + localTimeSnapshot.meridiem' in window
+assert 'text: timew.clockReadoutText' in window
+assert 'color: timew.clockReadoutColor' in window
+assert 'accentColor: timew.clockReadoutColor' in window
+assert "text: timew.localTimeSnapshot.displayTime" not in window
 assert "text: timew.localTimeSnapshot.dateLabel" in window
 assert "text: timew.localTimeSnapshot.utcOffsetLabel" in window
 assert "label: timew.use24Hour ? \"24H\" : \"12H\"" in window

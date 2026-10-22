@@ -99,6 +99,10 @@ SectionFrame {
     property bool keyboardSelected: false
     property int tileIndex: 0
     property int tileCount: 0
+    // Width is 1/2 columns and height is 1/2/3 base tile rows.
+    // Defaults reproduce the original half-width, 140px tile.
+    property int tileColumnSpan: 1
+    property int tileRowSpan: 1
     property date now: new Date()
     // B10 reuses the single existing one-second tile timer. The format
     // choice is view-local, not a persisted setting or system-clock change.
@@ -117,6 +121,8 @@ SectionFrame {
     signal moveRight(int index)
     signal changeModule(int index)
     signal removeTile(int index)
+    signal toggleTileWidth(int index)
+    signal cycleTileHeight(int index)
     signal pointerEntered(int index)
 
     HoverHandler {
@@ -178,6 +184,24 @@ SectionFrame {
             height: 25
             label: "SWAP"
             onLeftClicked: tile.changeModule(tile.tileIndex)
+        }
+        ActionButton {
+            // One/two grid columns; metadata lives in the v2 layout.
+            trackLabelGlowLocally: true
+            width: 42
+            height: 25
+            label: "W:" + tile.tileColumnSpan
+            selected: tile.tileColumnSpan === 2
+            onLeftClicked: tile.toggleTileWidth(tile.tileIndex)
+        }
+        ActionButton {
+            // Cycle normal/double/triple height, then return to normal.
+            trackLabelGlowLocally: true
+            width: 42
+            height: 25
+            label: "H:" + tile.tileRowSpan
+            selected: tile.tileRowSpan > 1
+            onLeftClicked: tile.cycleTileHeight(tile.tileIndex)
         }
         ActionButton {
             // Delete this tile placement ONLY. Never delete stored widget data.

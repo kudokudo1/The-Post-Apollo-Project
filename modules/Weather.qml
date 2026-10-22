@@ -483,15 +483,17 @@ DockButton {
                     }
                 }
 
-                // Ticks now sit BESIDE the right glass rail instead of
-                // over the liquid. No stray white pixels inside the bulb.
+                // Mark the right INNER side of the glass tube. The strokes
+                // fit between the liquid edge (x=9.75) and the inside of
+                // the glass rail (x=12.2 - half stroke), not outside the tube.
+                readonly property real tickRightX: 12.2 - 1.5 / 2 - 0.2
                 Repeater {
                     model: 4
 
                     delegate: Rectangle {
-                        x: 13.2
-                        y: 6 + index * 4.8
-                        width: index % 2 === 0 ? 2.5 : 1.8
+                        width: index % 2 === 0 ? 1.2 : 0.65
+                        x: weatherThermometer.tickRightX - width
+                        y: 6 + index * 4.2
                         height: 1
                         color: weatherThermometer.glassColor
                         opacity: weatherThermometer.glassOpacity

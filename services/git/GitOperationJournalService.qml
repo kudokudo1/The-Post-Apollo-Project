@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "GitJournalSerialization.js" as JournalCodec
 
 // Durable Git operation journal foundation.
 //
@@ -18,6 +19,10 @@ Scope {
     property int maxEntries: 500
     property int serial: 0
     property var entries: []
+    property var encodedEntries: []
+    property int lastPersistSerializationMs: 0
+    property int lastPersistWriteMs: 0
+    property int lastPersistReusedCount: 0
 
     signal operationStarted(string operationId, var record)
     signal operationFinished(string operationId, bool success, var record)
@@ -185,6 +190,8 @@ Scope {
     }
 
     function load() {
+        // Do not reuse cached records when the file is reloaded.
+        encodedEntries = [];
         const raw = String(journalFile.text() || "").trim();
 
         if (!raw) {
@@ -286,12 +293,19 @@ Scope {
     }
 
     function persist() {
-        // Keep the same schema and durable blocking/atomic write gate.
-        // Avoid re-indenting up to 500 historical snapshots on every action.
-        journalFile.setText(JSON.stringify({
-            schemaVersion: schemaVersion,
-            entries: entries
-        }));
+        // Serialize only new/replaced records, but write the entire valid
+        // schema atomically and synchronously before execution continues.
+        const start = Date.now();
+        const encoded = JournalCodec.serializeJournal(
+            schemaVersion, entries, encodedEntries
+        );
+        const writeStarted = Date.now();
+        journalFile.setText(encoded.text);
+        const written = Date.now();
+        encodedEntries = encoded.cache;
+        lastPersistSerializationMs = writeStarted - start;
+        lastPersistWriteMs = written - writeStarted;
+        lastPersistReusedCount = encoded.reusedCount;
     }
 
     FileView {

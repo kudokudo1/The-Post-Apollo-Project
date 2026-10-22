@@ -151,10 +151,46 @@ assert 'id: worldSearchInput' in window
 assert 'id: worldSearchPopup' in window
 assert 'timew.worldSearchMatches[0].id' in window
 assert 'timew.selectWorldSearchResult(' in window
-assert 'available: !timew.worldModeActive' in window
+assert 'available: !timew.worldModeActive' not in window
+assert 'if (worldModeActive\n                || !worldZones.some' not in window
+assert 'worldModeActive = false;\n        selectedQuickZone = zoneId;' in window
+assert 'dismissWorldSearchPopup();\n        selectActiveZone(zoneId);' in window
 assert 'selected: !timew.worldModeActive' in window
 assert 'label: "WORLD"' in window
 assert 'selected: timew.worldModeActive' in window
+# The WORLD selector is the leftmost of five *enabled* choices, while
+# the arrow sits LEFT of a shorter search field.
+strip = window.split('id: worldZoneStrip', 1)[1]
+assert strip.index('id: worldModeButton') < strip.index('model: timew.worldZones')
+assert 'id: worldDropdownArrow' in window
+assert 'label: "▾"' in window
+assert 'onLeftClicked: timew.toggleWorldDropdown()' in window
+assert 'id: worldSearchRow' in window
+assert 'worldSearchRow.width' in window
+assert '- worldDropdownArrow.width' in window
+assert 'function toggleWorldDropdown()' in window
+assert 'function dismissWorldSearchPopup()' in window
+assert 'function openWorldSearchPopup()' in window
+assert 'onPressed: timew.openWorldSearchPopup()' in window
+# Typing is magenta and the Qt 6 cursor delegate renders orange.
+search_field = window.split('TextField {\n                                    id: worldSearchInput', 1)[1].split('background: Rectangle', 1)[0]
+assert 'color: Colors.magenta' in search_field
+assert 'cursorDelegate: Rectangle {' in search_field
+assert 'width: 2\n                                        color: Colors.orange' in search_field
+# Popup is painted above the footer and below the shortcuts, so all
+# five buttons still accept clicks with results visible.
+assert 'z: timew.worldSearchPopupOpen ? 20 : 0' in window
+assert 'y: worldZoneStrip.y + worldZoneStrip.height' in window
+assert 'visible: !(timew.selectedMode === "clock"' in window
+# Passive TapHandler keeps other controls usable. Clicking elsewhere in
+# the menu closes the results and releases editor focus.
+assert 'gesturePolicy: TapHandler.DragThreshold' in window
+assert 'onTapped: function(point, button)' in window
+assert 'const withinSearch =' in window
+assert 'const withinPopup =' in window
+assert 'if (!withinSearch && !withinPopup)' in window
+assert 'timew.dismissWorldSearchPopup();' in window
+assert 'worldSearchInput.focus = false;' in window
 assert 'onLeftClicked: timew.toggleWorldMode()' in window
 assert 'standardKeysAvailable && !worldSearchInput.activeFocus' in window
 assert 'enabled: timew.navigationKeysAvailable' in window

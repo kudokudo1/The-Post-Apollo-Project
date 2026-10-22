@@ -365,3 +365,24 @@ Actual itself.
 Next: establish a disposable real Actual test for the specific
 setBudgetAmount semantics, then design a separate local authorization and
 recovery gate. Keep D11 PREVIEW-only until that stage is accepted.
+
+
+## FinanceW D12b // Real Actual disposable-server allocation test
+
+A GitHub Actions **CI-only** script exercises pinned Actual API/server version
+26.10.0 with a fictional budget, account, category group, expense category,
+and income entry. It tests D12's pure allocation guard against the real
+`getBudgetMonth`, `setBudgetAmount`, and `sync` methods. A second
+authenticated API session downloads the fictional uploaded budget and
+verifies the changed category amount/balance and To Budget. Stale budget
+state is refused without invoking the mutation API.
+
+This test uses a temporary isolated server on `127.0.0.1:5006`, hardcoded
+fictional credentials, temp client directories, and an injected
+`recordAttempt` counting spy **only**. It never reads local operator
+credentials or the local finance operations journal. It does **not**
+establish production write safety or an operator-authorized live writer.
+
+No category allocation APPLY button, local write authorization, persistent
+journal integration, or real-budget mutations are introduced in D12b.
+Those remain D12c/D12d and separately authorized stages.

@@ -7,6 +7,8 @@ on:
       - "scripts/finance/transaction_guard.mjs"
       - "scripts/finance/read_budget.mjs"
       - "scripts/finance/disposable_actual_roundtrip.mjs"
+      - "scripts/finance/disposable_allocation_roundtrip.mjs"
+      - "scripts/finance/allocation_guard.mjs"
       - ".github/workflows/financew-disposable-actual.yml"
   push:
     branches: [main]
@@ -15,6 +17,8 @@ on:
       - "scripts/finance/transaction_guard.mjs"
       - "scripts/finance/read_budget.mjs"
       - "scripts/finance/disposable_actual_roundtrip.mjs"
+      - "scripts/finance/disposable_allocation_roundtrip.mjs"
+      - "scripts/finance/allocation_guard.mjs"
       - ".github/workflows/financew-disposable-actual.yml"
   workflow_dispatch:
 
@@ -39,3 +43,9 @@ jobs:
         run: |
           node --check scripts/finance/disposable_actual_roundtrip.mjs
           node scripts/finance/disposable_actual_roundtrip.mjs
+      - name: D12b real Actual category allocation in a fictional budget
+        env:
+          FINANCEW_DISPOSABLE_TEST: "yes"
+        run: |
+          node --check scripts/finance/disposable_allocation_roundtrip.mjs
+          node scripts/finance/disposable_allocation_roundtrip.mjs

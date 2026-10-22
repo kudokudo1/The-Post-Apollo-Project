@@ -52,6 +52,7 @@ test("snapshot contains the original fictional $250 / $50 / $200 values", () => 
   assert.equal(result.accounts[0].id, "checking");
   assert.equal(result.transactions[1].id, "txn-18");
   assert.equal(result.transactions[1].accountId, "checking");
+  assert.equal(result.transactions[1].editable, true);
   assert.equal(result.transactions[1].amountCents, -1200);
   assert.equal(result.transactions[2].description, "TRANSACTION");
 });

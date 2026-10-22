@@ -52,7 +52,10 @@ assert.equal(monday.cells.filter(x=>x.isToday).length,1);
 const before=calendar(2026,1,2,-1);
 assert.equal(before.month,"2025-12");
 assert.equal(before.today,"2026-01-02");
-assert.equal(before.cells.some(x=>x.isToday),false);
+// Today may be a trailing adjacent-month cell; that cell is not inMonth.
+assert.equal(before.cells.some(x=>x.isToday),true);
+assert.equal(before.cells.find(x=>x.isToday).date,"2026-01-02");
+assert.equal(before.cells.find(x=>x.isToday).inMonth,false);
 const next=calendar(2026,12,31,1);
 assert.equal(next.month,"2027-01");
 assert.equal(next.today,"2026-12-31");

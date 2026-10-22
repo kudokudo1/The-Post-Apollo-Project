@@ -16,6 +16,8 @@ todo_mini = (ROOT / "widgets/hub/ApolloHubTodoMini.qml").read_text(encoding="utf
 todo_store = (ROOT / "services/hub/ApolloHubTodoStore.qml").read_text(encoding="utf-8")
 notes_mini = (ROOT / "widgets/hub/ApolloHubNotesMini.qml").read_text(encoding="utf-8")
 notes_store = (ROOT / "services/hub/ApolloHubNotesStore.qml").read_text(encoding="utf-8")
+calendar_mini = (ROOT / "widgets/hub/ApolloHubCalendarMini.qml").read_text(encoding="utf-8")
+calendar_policy = (ROOT / "services/hub/ApolloHubCalendarPolicy.js").read_text(encoding="utf-8")
 layout = (ROOT / "services/hub/ApolloHubLayout.js").read_text(encoding="utf-8")
 store = (ROOT / "services/hub/ApolloHubStore.qml").read_text(encoding="utf-8")
 module = (ROOT / "services/hub/qmldir").read_text(encoding="utf-8")
@@ -162,7 +164,7 @@ assert "onMoveLeft: hub.shiftTile(" in window
 assert "onMoveRight: hub.shiftTile(" in window
 assert "Layout.cycleTile(" in window
 assert "Qt.formatTime" in tile
-assert "Qt.formatDate" in tile
+assert "Qt.formatDate(tile.now" not in tile
 
 # Standard window-local key grammar, without inventing a bottom rail.
 for key in ("Tab", "Shift+Tab", "Shift+Left", "Shift+Right",
@@ -609,6 +611,69 @@ assert "atomicWrites: true" in notes_store
 assert "watchChanges: false" in notes_store
 assert 'storageState="saving"' in notes_store
 assert "onSaved:" in notes_store and "onSaveFailed:" in notes_store
+
+# B9 Calendar mini: month geometry is owned by the pure policy and
+# refreshed through the existing shared bridge clock, never a second timer.
+assert "calendarSnapshot: hub.liveBridge" in window
+assert "hub.liveBridge.calendarSnapshot : null" in window
+assert "calendarBridge: hub.liveBridge" in window
+assert "property var calendarSnapshot: null" in tile
+assert "property var calendarBridge: null" in tile
+assert "ApolloHubCalendarMini {" in tile
+assert 'visible: tile.moduleId === "calendar"' in tile
+assert "calendarSnapshot: tile.calendarSnapshot" in tile
+assert "calendarBridge: tile.calendarBridge" in tile
+assert 'tile.moduleId !== "calendar"' in tile
+assert "calendarMini.statusLine" in tile
+
+for needle in (
+    "property var calendarSnapshot: null",
+    "property var calendarBridge: null",
+    'calendarState === "ready"',
+    "Array.isArray(calendarSnapshot.weekdayLabels)",
+    "Array.isArray(calendarSnapshot.cells)",
+    "calendarSnapshot.weeks >= 4",
+    "calendarSnapshot.weeks <= 6",
+    "calendarSnapshot.cells.length === calendarSnapshot.weeks * 7",
+    "calendarSnapshot.weekdayLabels",
+    "calendarSnapshot.cells",
+    "calendarSnapshot.monthLabel",
+    "Grid {",
+    "columns: 7",
+    "model: calendarMini.weekdayLabels",
+    "model: calendarMini.monthCells",
+    "modelData.isToday === true",
+    "modelData.inMonth === true",
+    "calendarSnapshot.weeks - 1",
+    'label: "TODAY"',
+    'label: calendarMini.weekStart === 0 ? "SUN" : "MON"',
+    "function moveMonth(direction)",
+    "function showToday()",
+    "function toggleWeekStart()",
+    "calendarBridge.calendarMonthOffset = next",
+    "calendarBridge.calendarMonthOffset = 0",
+    "calendarBridge.calendarWeekStartsOn = weekStart === 0 ? 1 : 0",
+    "if (next < -120 || next > 120)",
+    'onLeftClicked: calendarMini.moveMonth(-1)',
+    'onLeftClicked: calendarMini.moveMonth(1)',
+    'onLeftClicked: calendarMini.showToday()',
+    'onLeftClicked: calendarMini.toggleWeekStart()',
+    "EVENTS NOT CONNECTED",
+    '"CALENDAR UNAVAILABLE"',
+):
+    assert needle in calendar_mini, f"B9 UI missing {needle}"
+
+for forbidden in (
+    "Timer {", "SystemClock {", "Process {", "FileView {",
+    "Qt.formatDate(", "new Date(", "Date.now(", "CalendarPolicy.snapshot(",
+    "Qt.openUrlExternally(", "eventCount === 0", "NO EVENTS",
+    "NO APPOINTMENTS", "EventService {", "onCalendarSnapshotChanged:",
+):
+    assert forbidden not in calendar_mini, (
+        f"B9 UI must not duplicate calendar state or invent events: {forbidden}")
+assert "function snapshot(" in calendar_policy
+assert 'eventsState:"not-connected"' in calendar_policy
+assert "eventCount:-1" in calendar_policy
 
 # Launchers and widget backends are unchanged in this first stage.
 print("ApolloHubW foundation source contracts passed")

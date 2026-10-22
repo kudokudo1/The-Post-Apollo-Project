@@ -341,7 +341,7 @@ assert.doesNotMatch(localLiquidGlow, /weatherDock\.hovered/);
 // Colored fluid covers its own shadow; the white vessel and ticks remain on
 // top, retaining the carefully verified 17×35px pixel geometry.
 assert.match(dock, /id:\s*thermometerLiquid\s+anchors\.fill:\s*parent\s+z:\s*2/);
-assert.match(dock, /\/\/ The white glass stays on top of liquid and its halo\.\s*Shape\s*\{\s*anchors\.fill:\s*parent\s+z:\s*3/);
+assert.match(dock, /\/\/ The glass follows open mode and stays over the liquid halo\.\s*Shape\s*\{\s*anchors\.fill:\s*parent\s+z:\s*3/);
 assert.match(dock, /delegate:\s*Rectangle\s*\{\s*z:\s*4\s+readonly property bool majorTick/);
 assert.match(dock, /hoverContentGlowColor:\s*Colors\.orange/);
 

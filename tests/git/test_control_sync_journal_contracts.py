@@ -129,4 +129,26 @@ require_regex(
     "GitW must inject shared journal + snapshots into Git control",
 )
 
+# Checked-out PULL already fetches. The explicit fetch belongs only to
+# the background-local-branch route, and each selected PULL prunes its remote.
+pull_section = re.search(r"'  pull\)',(.*?)'  push\)'", read(SERVICE), re.S)
+assert pull_section, "PULL branch must be present"
+pull_source = pull_section.group(1)
+assert pull_source.count('git -C "$repo" fetch --prune "$remote"') == 1, (
+    "background-only prefetch must not run before checked-out git pull"
+)
+assert 'git -C "$repo" pull --ff-only --prune' in pull_source
+assert 'git -C "$repo" pull --no-rebase --prune' in pull_source
+assert 'BACKGROUND MERGE REFUSED' in pull_source
+assert 'git -C "$repo" merge-base --is-ancestor' in pull_source
+
+# Trace stays opt-in and may not bypass the BEFORE/AFTER journal boundaries.
+for marker in (
+    'POST_APOLLO_GIT_SYNC_TRACE',
+    'BEFORE_SNAPSHOT_COMPLETE',
+    'GIT_PROCESS_COMPLETE',
+    'AFTER_SNAPSHOT_COMPLETE',
+):
+    require(SERVICE, marker, "Git sync stage timing must remain measurable")
+
 print("Git CONTROL sync journal contracts: PASS")

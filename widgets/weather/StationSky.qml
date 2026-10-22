@@ -19,6 +19,28 @@ Rectangle {
     readonly property real aqiValue:
         aqiReady ? Number(weatherService.aqi) : 0
 
+    readonly property real pressureValue:
+        weatherReady ? Number(weatherService.pressureHpa) : -1
+    readonly property real visibilityValue:
+        weatherReady ? Number(weatherService.visibilityMiles) : -1
+    readonly property real cloudCoverValue:
+        weatherReady ? Number(weatherService.cloudCover) : -1
+    readonly property real precipValue:
+        weatherReady ? Number(weatherService.precipMm) : -1
+    readonly property real uvValue:
+        weatherReady ? Number(weatherService.uvIndex) : -1
+
+    readonly property var hourlyForecast:
+        weatherService ? weatherService.hourlyForecast : []
+    readonly property var dailyForecast:
+        weatherService ? weatherService.dailyForecast : []
+
+    function numericText(value, digits, suffix) {
+        return isFinite(value) && value >= 0
+               ? Number(value).toFixed(digits) + suffix
+               : "--";
+    }
+
     // Normalized live telemetry scales preserved from the original page.
     readonly property real temperatureMeter:
         Math.max(0, Math.min(1, temperatureValue / 120))
@@ -69,7 +91,7 @@ Rectangle {
     Column {
         anchors.fill: parent
         anchors.margins: 24
-        spacing: 26
+        spacing: 18
 
         Row {
             width: parent.width
@@ -276,6 +298,217 @@ Rectangle {
                             width: (parent.width - 4) * sky.windMeter
                             height: parent.height - 4
                             color: Colors.cyan
+                        }
+                    }
+                }
+            }
+        }
+
+        Row {
+            spacing: 18
+
+            Column {
+                width: 135
+                spacing: 5
+
+                SecondaryText {
+                    text: "PRESSURE"
+                    font.pixelSize: 11
+                }
+
+                GohuText {
+                    text: sky.numericText(
+                        sky.pressureValue, 0, " hPa"
+                    )
+                    font.pixelSize: 16
+                    color: Colors.white
+                }
+            }
+
+            Column {
+                width: 135
+                spacing: 5
+
+                SecondaryText {
+                    text: "VISIBILITY"
+                    font.pixelSize: 11
+                }
+
+                GohuText {
+                    text: sky.numericText(
+                        sky.visibilityValue, 1, " mi"
+                    )
+                    font.pixelSize: 16
+                    color: Colors.white
+                }
+            }
+
+            Column {
+                width: 135
+                spacing: 5
+
+                SecondaryText {
+                    text: "CLOUD COVER"
+                    font.pixelSize: 11
+                }
+
+                GohuText {
+                    text: sky.numericText(
+                        sky.cloudCoverValue, 0, "%"
+                    )
+                    font.pixelSize: 16
+                    color: Colors.white
+                }
+            }
+
+            Column {
+                width: 135
+                spacing: 5
+
+                SecondaryText {
+                    text: "PRECIP"
+                    font.pixelSize: 11
+                }
+
+                GohuText {
+                    text: sky.numericText(
+                        sky.precipValue, 1, " mm"
+                    )
+                    font.pixelSize: 16
+                    color: Colors.white
+                }
+            }
+
+            Column {
+                width: 125
+                spacing: 5
+
+                SecondaryText {
+                    text: "UV INDEX"
+                    font.pixelSize: 11
+                }
+
+                GohuText {
+                    text: sky.numericText(
+                        sky.uvValue, 0, ""
+                    )
+                    font.pixelSize: 16
+                    color: sky.uvValue >= 8
+                           ? Colors.red
+                           : sky.uvValue >= 6
+                             ? Colors.orange
+                             : sky.uvValue >= 3
+                               ? Colors.yellow : Colors.cyan
+                }
+            }
+        }
+
+        Column {
+            spacing: 8
+
+            SecondaryText {
+                text: "FORECAST // NEXT HOURS"
+                font.pixelSize: 11
+            }
+
+            Row {
+                spacing: 10
+
+                Repeater {
+                    model: sky.hourlyForecast
+
+                    delegate: Column {
+                        required property var modelData
+
+                        width: 112
+                        spacing: 3
+
+                        GohuText {
+                            text: modelData.timeLabel
+                            font.pixelSize: 12
+                            color: Colors.cyan
+                        }
+
+                        GohuText {
+                            text: modelData.tempF > -900
+                                  ? Math.round(modelData.tempF) + "°F"
+                                  : "--°F"
+                            font.pixelSize: 17
+                            color: Colors.orange
+                        }
+
+                        GohuText {
+                            text: sky.iconForCondition(modelData.condition)
+                            font.pixelSize: 18
+                            color: Colors.cyan
+                        }
+
+                        QuietText {
+                            text: modelData.chanceRain >= 0
+                                  ? "RAIN " + Math.round(
+                                        modelData.chanceRain
+                                    ) + "%"
+                                  : "RAIN --"
+                            font.pixelSize: 9
+                        }
+                    }
+                }
+            }
+        }
+
+        Column {
+            spacing: 8
+
+            SecondaryText {
+                text: "FORECAST // DAILY"
+                font.pixelSize: 11
+            }
+
+            Row {
+                spacing: 18
+
+                Repeater {
+                    model: sky.dailyForecast
+
+                    delegate: Column {
+                        required property var modelData
+
+                        width: 220
+                        spacing: 3
+
+                        GohuText {
+                            text: modelData.date
+                            font.pixelSize: 12
+                            color: Colors.cyan
+                        }
+
+                        GohuText {
+                            text: (
+                                modelData.maxTempF > -900
+                                ? Math.round(modelData.maxTempF) : "--"
+                            ) + "° / " + (
+                                modelData.minTempF > -900
+                                ? Math.round(modelData.minTempF) : "--"
+                            ) + "°F"
+                            font.pixelSize: 16
+                            color: Colors.white
+                        }
+
+                        QuietText {
+                            text: modelData.chanceRain >= 0
+                                  ? "RAIN "
+                                    + Math.round(modelData.chanceRain)
+                                    + "%"
+                                  : "RAIN --"
+                            font.pixelSize: 10
+                        }
+
+                        QuietText {
+                            text: "SUN "
+                                  + modelData.sunrise
+                                  + " → "
+                                  + modelData.sunset
+                            font.pixelSize: 9
                         }
                     }
                 }

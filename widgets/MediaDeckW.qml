@@ -158,6 +158,12 @@ PanelWindow {
         id: mediaAdapter
     }
 
+    // B4 owner-mediated observation seam: references to the EXISTING objects.
+    // ApolloHubLiveBridge reads snapshots and selected identity only. This
+    // does not create a controller, select a player or change polling.
+    readonly property var hubMediaController: headless
+    readonly property string hubSelectedMprisBusName: mediaAdapter.selectedBusName
+
     // Read-only use of the existing AppControl-extracted audio physiology.
     // Discovery is application/stream evidence, NOT per-browser-tab ownership.
     ApplicationAudioService {

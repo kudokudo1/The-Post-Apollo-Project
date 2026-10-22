@@ -159,8 +159,18 @@ assert 'ListView {' in window
 assert 'NeonScrollBar {' in window
 assert 'flickable: worldSearchResults' in window
 assert 'handleStyle: "star"' in window
-assert 'handleColor: Colors.white' in window
+assert 'handleColor: Colors.magenta' in window
+assert 'handleBorderColor: Colors.magenta' in window
+assert 'handleColor: Colors.white' not in window
 assert 'geometryMode: "viewport"' in window
+# The ListView reserves a separate gutter: its right edge is five px
+# shy of the popup edge after the star track, while the rail begins
+# only three px inward, leaving two px between rows and star rail.
+assert 'id: worldSearchRail' in window
+assert 'rightMargin: worldSearchRail.crossExtent + 5' in window
+assert 'x: worldSearchPopup.width - width - 3' in window
+assert 'y: worldSearchResults.y' in window
+assert 'height: worldSearchResults.height' in window
 assert 'Math.min(188, 8' in window
 assert 'interactive: contentHeight > height' in window
 assert 'model: timew.worldSearchMatches' in window

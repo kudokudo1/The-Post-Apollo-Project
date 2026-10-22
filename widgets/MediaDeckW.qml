@@ -28,13 +28,16 @@ PanelWindow {
     property string catalogSource: "local-mpd"
     property int browseIndex: 0
     property int navigationZone: 1 // SOURCE / RESULTS / NOW
-    property string browserStatus: "SEARCH LIBRARY OR YOUTUBE"
+    property string browserStatus: "SEARCH LIBRARY, RADIO OR YOUTUBE"
     readonly property var browseItems:
         catalogSource === "direct-stream"
         ? [{ref: {source: "direct-stream", kind: "stream", id: radioStreamUrl},
             title: "Groove Salad", artist: "SomaFM"}]
         : headless.browse && headless.browse.source === catalogSource
           && Array.isArray(headless.browse.items) ? headless.browse.items : []
+    readonly property string nextBrowseCursor:
+        headless.browse && headless.browse.source === catalogSource
+        ? String(headless.browse.nextCursor || "") : ""
     readonly property var highlightedItem:
         browseIndex >= 0 && browseIndex < browseItems.length
         ? browseItems[browseIndex] : null
@@ -64,15 +67,18 @@ PanelWindow {
     }
 
     function toggleCatalogSource() {
-        catalogSource = catalogSource === "local-mpd" ? "youtube"
+        catalogSource = catalogSource === "local-mpd" ? "radio-browser"
+            : catalogSource === "radio-browser" ? "youtube"
             : catalogSource === "youtube" ? "direct-stream" : "local-mpd";
         navigationZone = 0;
         browseIndex = 0;
         browserStatus = catalogSource === "youtube"
             ? "YOUTUBE CATALOG / REQUIRES API KEY / NO PLAYBACK"
-            : catalogSource === "direct-stream"
-              ? "RADIO / SELECT THEN LOAD / NO AUTOPLAY"
-              : "LOCAL MPD LIBRARY";
+            : catalogSource === "radio-browser"
+              ? "RADIO DIRECTORY / SEARCH OR PRESS SEARCH FOR POPULAR"
+              : catalogSource === "direct-stream"
+                ? "RADIO PRESET / SELECT THEN LOAD / NO AUTOPLAY"
+                : "LOCAL MPD LIBRARY";
     }
 
     function searchLibrary() {
@@ -81,7 +87,7 @@ PanelWindow {
             return;
         }
         const query = browserControls.queryText;
-        if (!query.trim()) {
+        if (!query.trim() && catalogSource !== "radio-browser") {
             browserStatus = "ENTER A SEARCH QUERY";
             return;
         }
@@ -91,6 +97,19 @@ PanelWindow {
             browserStatus = "SEARCH REQUESTED / " + catalogSource.toUpperCase();
         } else {
             browserStatus = "SEARCH UNAVAILABLE / CONTROLLER BUSY";
+        }
+    }
+
+    function nextRadioPage() {
+        if (catalogSource !== "radio-browser" || !nextBrowseCursor) {
+            browserStatus = "NO NEXT RADIO PAGE";
+            return;
+        }
+        if (headless.searchMedia("radio-browser", browserControls.queryText, nextBrowseCursor)) {
+            browseIndex = 0;
+            browserStatus = "RADIO / NEXT PAGE REQUESTED";
+        } else {
+            browserStatus = "RADIO / NEXT PAGE UNAVAILABLE";
         }
     }
 
@@ -138,7 +157,7 @@ PanelWindow {
             return;
         }
         const requested = item.ref.source === "direct-stream"
-            ? headless.loadRadio(radioStreamUrl) : headless.loadMedia(item.ref);
+            ? headless.loadRadio(item.ref.id) : headless.loadMedia(item.ref);
         if (requested)
             browserStatus = "ENTER / LOAD REQUESTED / PRESS PLAY";
         else

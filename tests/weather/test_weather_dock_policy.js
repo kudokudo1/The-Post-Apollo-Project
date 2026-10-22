@@ -245,6 +245,27 @@ for (const [property, color] of [
     assert.ok(dock.includes(property + ": " + color), property + " should use " + color);
 }
 assert.match(dock, /property color liquidColor:\s*weatherDock\.thermometerLiquidColor/);
+// The fluid has its own temperature-colored glow, separate from the weather
+// condition's global orange-on-hover dock glow. No double glass halo.
+const liquidGlowStart = dock.indexOf("id: thermometerLiquidGlow");
+const liquidGlowEnd = dock.indexOf("// The inner ellipse is centered", liquidGlowStart);
+assert.ok(liquidGlowStart > 0 && liquidGlowEnd > liquidGlowStart);
+const localLiquidGlow = dock.slice(liquidGlowStart, liquidGlowEnd);
+assert.match(localLiquidGlow, /safeSource:\s*thermometerLiquid/);
+assert.match(localLiquidGlow, /requestedVisible:\s*weatherDock\.thermometerState\.valid\s*&&\s*weatherThermometer\.animatedLevel > 0/);
+assert.match(localLiquidGlow, /z:\s*1/);
+assert.match(localLiquidGlow, /radius:\s*4/);
+assert.match(localLiquidGlow, /samples:\s*9/);
+assert.match(localLiquidGlow, /opacity:\s*weatherDock\.contentGlowOpacity \* 0\.55/);
+assert.match(localLiquidGlow, /color:\s*weatherDock\.open \|\| weatherDock\.pressed\s*\? Colors\.magenta : weatherThermometer\.liquidColor/);
+assert.doesNotMatch(localLiquidGlow, /weatherDock\.hovered/);
+// Colored fluid covers its own shadow; the white vessel and ticks remain on
+// top, retaining the carefully verified 17×35px pixel geometry.
+assert.match(dock, /id:\s*thermometerLiquid\s+anchors\.fill:\s*parent\s+z:\s*2/);
+assert.match(dock, /\/\/ The white glass stays on top of liquid and its halo\.\s*Shape\s*\{\s*anchors\.fill:\s*parent\s+z:\s*3/);
+assert.match(dock, /delegate:\s*Rectangle\s*\{\s*z:\s*4\s+readonly property bool majorTick/);
+assert.match(dock, /hoverContentGlowColor:\s*Colors\.orange/);
+
 assert.match(dock, /id:\s*weatherContent[\s\S]*?spacing:\s*6/);
 assert.ok(dock.indexOf("id: weatherCondition") < dock.indexOf("id: weatherTemperature"));
 assert.ok(dock.indexOf("id: weatherTemperature") < dock.indexOf("id: weatherThermometer"));

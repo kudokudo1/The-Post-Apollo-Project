@@ -24,10 +24,13 @@ function harness() {
     return {context, receive};
 }
 
-test("sample static music icon, not the animated VU spectrum", () => {
-    assert.match(source, /contentGlowSource:\s*musicMark/);
-    assert.doesNotMatch(source, /contentGlowSource:\s*mediaArtwork/);
-    assert.match(source, /id:\s*musicMark/);
+test("sample only separate static glyphs, never the animated VU spectrum", () => {
+    assert.match(source, /contentGlowEnabled:\s*false/);
+    assert.match(source, /contentGlowSource:\s*null/);
+    assert.doesNotMatch(source, /contentGlowSource:\s*(?:musicMark|mediaArtwork|spectrum|cavaBar)/);
+    assert.match(source, /id:\s*leadingStars/);
+    assert.match(source, /id:\s*trebleClef/);
+    assert.match(source, /id:\s*trailingStar/);
     assert.match(source, /id:\s*mediaArtwork/);
     assert.match(source, /id:\s*spectrum/);
 });
@@ -36,12 +39,15 @@ test("magenta dock halo and CAVA-colored static music mark stay independent", ()
     assert.match(source, /normalDockGlowColor:\s*Colors\.magenta/);
     assert.match(source, /normalContentGlowColor:\s*accentColor/);
     assert.match(source, /hoverContentGlowColor:\s*accentColor/);
-    assert.match(source, /contentGlowSource:\s*musicMark/);
+    assert.match(source, /contentGlowEnabled:\s*false/);
+    assert.match(source, /contentGlowSource:\s*null/);
 
     const musicMark = source.match(/Row \{\s*id:\s*musicMark([\s\S]*?)\n\s*\}\n\n\s*Item \{\s*id:\s*spectrum/);
     assert.ok(musicMark, "static music-mark cluster is still the one glow source");
     const mark = musicMark[1];
     assert.match(mark, /spacing:\s*0/);
+    assert.match(mark, /id:\s*leadingStars/);
+    assert.match(mark, /id:\s*trailingStar/);
     assert.equal((mark.match(/GohuText \{/g) || []).length, 2,
         "original decorative text remains, while the treble clef is vector art");
     assert.equal((mark.match(/Image \{/g) || []).length, 1);
@@ -90,36 +96,57 @@ test("magenta dock halo and CAVA-colored static music mark stay independent", ()
     assert.doesNotMatch(source, /contentGlowSource:\s*(?:spectrum|mediaArtwork)/);
 });
 
-test("magenta full-width wash stays separate from tight CAVA accent underlight", () => {
-    // A deliberate Media dock variation: both rear halo and front wash
-    // inherit magenta at idle/hover/pressed/open, not the accent color.
-    assert.match(source, /normalDockGlowColor:\s*Colors\.magenta/);
-    assert.match(source, /hoverDockGlowColor:\s*Colors\.magenta/);
-    assert.match(source, /pressedDockGlowColor:\s*Colors\.magenta/);
-    assert.match(source, /normalContentGlowColor:\s*accentColor/);
-    assert.match(source, /hoverContentGlowColor:\s*accentColor/);
-    assert.match(source, /pressedContentGlowColor:\s*accentColor/);
+test("magenta full-width wash, three independent static art glows, per-bar CAVA halos", () => {
+    // The full-width rear/front chassis glow is the Media-specific magenta variant.
+    for (const mode of ["normal", "hover", "pressed"]) {
+        assert.match(source, new RegExp(mode + "DockGlowColor:\\s*Colors\\.magenta"));
+        assert.match(source, new RegExp(mode + "ContentGlowColor:\\s*accentColor"));
+    }
 
-    // The backing cyan/orange glow tracks only the static mark. Each CAVA
-    // bar already has two separate geometry-only accent halos.
-    const match = source.match(/RectangularShadow \{\s*id:\s*musicMarkUnderlay([\s\S]*?)\n    \}/);
-    assert.ok(match, "static mark should own the only media-level accent underlay");
-    const underlay = match[1];
-    assert.match(underlay, /x:\s*mediaArtwork\.x\s*\+\s*musicMark\.x/);
-    assert.match(underlay, /y:\s*mediaArtwork\.y\s*\+\s*musicMark\.y\s*\+\s*mediaDock\.softGlowSpread/);
-    assert.match(underlay, /width:\s*musicMark\.width/);
-    assert.match(underlay, /height:\s*Math\.max\(0,\s*musicMark\.height\s*-\s*2\s*\*\s*mediaDock\.softGlowSpread\)/);
-    assert.match(underlay, /spread:\s*0/);
-    assert.match(underlay, /blur:\s*mediaDock\.softGlowSpread\s*\*\s*2/);
-    assert.match(underlay, /color:\s*mediaDock\.accentColor/);
-    assert.match(underlay, /opacity:\s*mediaDock\.softGlowOpacity\s*\*\s*0\.80/);
-    assert.match(underlay, /z:\s*0/);
+    // Each static glyph has one source-attached accent halo. No cluster-wide
+    // rectangular cyan strip and no sampled animation shadow.
+    const glows = [
+        ["leadingStarsGlow", "leadingStars"],
+        ["trebleClefGlow", "trebleClef"],
+        ["trailingStarGlow", "trailingStar"]
+    ];
+    assert.equal((source.match(/SafeDropShadow \{/g) || []).length, 3,
+        "only the three static music glyphs should be sampled");
+    for (const [glowId, sourceId] of glows) {
+        const match = source.match(new RegExp(
+            "SafeDropShadow \\{\\s*id:\\s*" + glowId + "([\\s\\S]*?)\\n    \\}"
+        ));
+        assert.ok(match, glowId + " must have its own effect");
+        const body = match[1];
+        assert.match(body, new RegExp("safeSource:\\s*" + sourceId));
+        assert.match(body, new RegExp(
+            "x:\\s*mediaArtwork\\.x\\s*\\+\\s*musicMark\\.x\\s*\\+\\s*" + sourceId + "\\.x"
+        ));
+        assert.match(body, new RegExp(
+            "y:\\s*mediaArtwork\\.y\\s*\\+\\s*musicMark\\.y\\s*\\+\\s*" + sourceId + "\\.y"
+        ));
+        assert.match(body, new RegExp("width:\\s*" + sourceId + "\\.width"));
+        assert.match(body, new RegExp("height:\\s*" + sourceId + "\\.height"));
+        assert.match(body, /horizontalOffset:\s*0/);
+        assert.match(body, /verticalOffset:\s*0/);
+        assert.match(body, /radius:\s*mediaDock\.contentGlowRadius/);
+        assert.match(body, /samples:\s*mediaDock\.contentGlowSamples/);
+        assert.match(body, /opacity:\s*mediaDock\.contentGlowOpacity/);
+        assert.match(body, /color:\s*mediaDock\.accentColor/);
+        assert.match(body, /transparentBorder:\s*true/);
+        assert.match(body, /z:\s*0/);
+        assert.doesNotMatch(body, /cavaBar|levels|frame|Repeater|ShaderEffect/,
+            "no effect can sample the animated spectrum");
+    }
+
+    // Artwork renders above its glow sources. CAVA owns only its existing
+    // geometry-only per-bar halos, never a combined drop-shadow texture.
     assert.match(source, /Row \{\s*id:\s*mediaArtwork\s*anchors\.centerIn:\s*parent\s*spacing:\s*9\s*z:\s*1/);
-    assert.equal((source.match(/RectangularShadow \{/g) || []).length, 1);
-    assert.doesNotMatch(source, /id:\s*mediaArtworkUnderlay|width:\s*mediaArtwork\.width\s*\+\s*10/);
-    assert.doesNotMatch(underlay, /levels|frame|Repeater|ShaderEffect|DropShadow|source:/);
-    assert.match(source, /contentGlowSource:\s*musicMark/);
-    assert.doesNotMatch(source, /contentGlowSource:\s*(?:mediaArtwork|spectrum|cavaBar)/);
+    assert.doesNotMatch(source, /id:\s*(?:musicMarkUnderlay|mediaArtworkUnderlay)/);
+    assert.doesNotMatch(source, /RectangularShadow \{/);
+    assert.match(source, /contentGlowEnabled:\s*false/);
+    assert.match(source, /contentGlowSource:\s*null/);
+    assert.doesNotMatch(source, /contentGlowSource:\s*(?:musicMark|mediaArtwork|spectrum|cavaBar)/);
 });
 
 test("CAVA neon tracks the animated bar using geometry only", () => {

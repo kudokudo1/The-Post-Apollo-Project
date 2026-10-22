@@ -6,7 +6,7 @@ menu = (root / "widgets/FinanceW.qml").read_text()
 pane = (root / "widgets/FinanceTransactionDraftPane.qml").read_text()
 read_service = (root / "services/finance/FinanceBudgetReadService.qml").read_text()
 
-# Prevent double/ghosted glow on NEW DRAFT and the four staged action
+# Prevent double/ghosted glow on NEW DRAFT and the five staged action
 # labels. These use ActionButton's existing opt-in local source tracking.
 # Preserve the existing non-mutating draft and account-cycle behavior.
 import re

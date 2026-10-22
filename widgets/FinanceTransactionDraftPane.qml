@@ -121,7 +121,8 @@ Item {
     function requestDraftSave() {
         // Incomplete dates, descriptions, and amounts are allowed for drafts.
         // This never goes through the Actual transaction writer.
-        if (editing || localPending || savePending || !accountId
+        if (editing || draftStoreState !== "ready"
+                || localPending || savePending || !accountId
                 || !/^[a-f0-9]{64}$/.test(sourceKey))
             return false;
         draftSaveRequested({id:localDraftId || null, sourceKey:sourceKey,
@@ -407,7 +408,8 @@ Item {
             accentColor: Colors.cyan
             label: draft.localDraftId ? "UPDATE DRAFT" : "SAVE DRAFT"
             labelPixelSize: 10
-            available: !draft.editing && !draft.localPending && !draft.savePending
+            available: !draft.editing && draft.draftStoreState === "ready"
+                       && !draft.localPending && !draft.savePending
                        && draft.accounts && draft.accounts.length > 0
             onLeftClicked: draft.requestDraftSave()
         }

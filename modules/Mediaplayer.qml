@@ -78,8 +78,8 @@ Item {
         spacing: 9
 
         // Musical-symbol font fallback is not reliable on the operator's Qt
-        // runtime (including the previous plain-text attempt). Bundle the
-        // static clef vector instead; keep the complete mark as the *only*
+        // runtime (including the previous plain-text attempt). Bundle a
+        // pre-rendered clef PNG from our SVG source; keep the mark as the *only*
         // sampled magenta glow source, never the animated CAVA bars.
         Row {
             id: musicMark
@@ -98,14 +98,14 @@ Item {
                 id: trebleClef
                 width: 15
                 height: 34
-                source: Qt.resolvedUrl("../assets/media/treble-clef.svg")
+                source: Qt.resolvedUrl("../assets/media/treble-clef.png")
                 sourceSize: Qt.size(45, 102)
                 fillMode: Image.PreserveAspectFit
                 smooth: true
                 asynchronous: false
                 onStatusChanged: {
                     if (status === Image.Error)
-                        console.warn("MediaDock: treble clef SVG failed to load", source);
+                        console.warn("MediaDock: treble clef PNG failed to load", source);
                 }
             }
 

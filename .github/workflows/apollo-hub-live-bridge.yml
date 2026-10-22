@@ -1,0 +1,32 @@
+name: Apollo Hub live bridge contracts
+
+on:
+  pull_request:
+    paths:
+      - "services/hub/ApolloHubLiveBridge.qml"
+      - "services/hub/qmldir"
+      - "services/weather/WeatherDockPolicy.js"
+      - "services/weather/WeatherService.qml"
+      - "tests/hub/test_apollo_hub_live_bridge.py"
+      - ".github/workflows/apollo-hub-live-bridge.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "services/hub/ApolloHubLiveBridge.qml"
+      - "services/hub/qmldir"
+      - "services/weather/WeatherDockPolicy.js"
+      - "services/weather/WeatherService.qml"
+      - "tests/hub/test_apollo_hub_live_bridge.py"
+      - ".github/workflows/apollo-hub-live-bridge.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify read-only shared Weather bridge
+        run: python3 tests/hub/test_apollo_hub_live_bridge.py

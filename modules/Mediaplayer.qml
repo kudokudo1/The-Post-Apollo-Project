@@ -55,7 +55,7 @@ Item {
     // CAVA-colored closed-state lighting unchanged.
     openFillColor: Colors.yellow
 
-    readonly property int barCount: 16
+    readonly property int barCount: 20
     property var levels: Array(barCount).fill(0)
 
     // Dormant unless the existing diagnostic launch flag is enabled.
@@ -82,7 +82,7 @@ Item {
     readonly property color artworkAccentColor: open ? Colors.magenta : accentColor
 
     // Follow the general height of CAVA without following individual spikes.
-    // The four tallest of 16 bars set a padded, bounded ambient envelope.
+    // The four tallest of 20 bars set a padded, bounded ambient envelope.
     // This recalculates only when the deduplicated levels array changes.
     readonly property real cavaAmbientTargetHeight: {
         const peaks = levels.slice().sort(function(a, b) { return b - a; });
@@ -237,7 +237,10 @@ Item {
     Row {
         id: mediaArtwork
         anchors.centerIn: parent
-        spacing: 9
+        // With 20 bars the centered artwork grows by 32px: the music mark
+        // shifts 16px left while the spectrum extends to the right. Keep a
+        // little more room between the clef and the added frequency bands.
+        spacing: 13
         z: 1
 
         // Musical-symbol font fallback is not reliable on the operator's Qt
@@ -422,7 +425,7 @@ Item {
             if (level !== Number(levels[i] || 0))
                 changed = true;
         }
-        // Do not trigger 16 QML bindings and animations for identical frames,
+        // Do not trigger 20 QML bindings and animations for identical frames,
         // especially when the monitor stream is silent but CAVA stays alive.
         if (changed)
             levels = newLevels;

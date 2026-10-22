@@ -628,55 +628,85 @@ PanelWindow {
                             font.pixelSize: 14
                         }
 
-                        // Search remains above all five selectors. Its
-                        // results float over the lower readouts instead of
-                        // resizing the TimeW chassis or moving other modes.
+                        // Search stays above WORLD and the four quick
+                        // selectors. Its dropdown opens BELOW their row so
+                        // every preset remains clickable while searching.
                         Item {
                             id: worldSearchArea
                             width: parent.width
                             height: 34
                             z: 30
 
-                            TextField {
-                                id: worldSearchInput
+                            Row {
+                                id: worldSearchRow
                                 anchors.fill: parent
-                                placeholderText: "SEARCH CITY / TIME ZONE"
-                                placeholderTextColor: Colors.cyan
-                                text: timew.worldSearchQuery
-                                color: Colors.white
-                                selectionColor: Colors.magenta
-                                selectedTextColor: Colors.black
-                                font.family: "GohuFont 11 Nerd Font Mono"
-                                font.pixelSize: 12
-                                leftPadding: 9
-                                rightPadding: 9
-                                selectByMouse: true
-                                background: Rectangle {
-                                    color: Colors.black
-                                    border.color: worldSearchInput.activeFocus
-                                                  ? Colors.magenta : Colors.cyan
-                                    border.width: 1
+                                spacing: 6
+
+                                ActionButton {
+                                    id: worldDropdownArrow
+                                    width: 34
+                                    height: 34
+                                    label: "▾"
+                                    labelPixelSize: 18
+                                    trackLabelGlowLocally: true
+                                    accentColor: Colors.white
+                                    selected: timew.worldSearchPopupOpen
+                                    onLeftClicked: timew.toggleWorldDropdown()
                                 }
-                                onTextEdited: timew.worldSearchEdited(text)
-                                onAccepted: {
-                                    if (timew.worldSearchMatches.length > 0)
-                                        timew.selectWorldSearchResult(
-                                            timew.worldSearchMatches[0].id);
-                                }
-                                Keys.onPressed: function(event) {
-                                    if (event.key === Qt.Key_Escape) {
-                                        timew.worldSearchPopupOpen = false;
-                                        worldSearchInput.focus = false;
-                                        Qt.callLater(timew.restoreKeyboardFocus);
-                                        event.accepted = true;
+
+                                TextField {
+                                    id: worldSearchInput
+                                    width: Math.max(0, worldSearchRow.width
+                                                    - worldDropdownArrow.width
+                                                    - worldSearchRow.spacing)
+                                    height: worldSearchRow.height
+                                    placeholderText: "SEARCH CITY / TIME ZONE"
+                                    placeholderTextColor: Colors.cyan
+                                    text: timew.worldSearchQuery
+                                    // Typed text and insertion cursor have
+                                    // their own semantic colors.
+                                    color: Colors.magenta
+                                    selectionColor: Colors.magenta
+                                    selectedTextColor: Colors.black
+                                    cursorDelegate: Rectangle {
+                                        width: 2
+                                        color: Colors.orange
+                                    }
+                                    font.family: "GohuFont 11 Nerd Font Mono"
+                                    font.pixelSize: 12
+                                    leftPadding: 9
+                                    rightPadding: 9
+                                    selectByMouse: true
+                                    background: Rectangle {
+                                        color: Colors.black
+                                        border.color: worldSearchInput.activeFocus
+                                                      ? Colors.magenta : Colors.cyan
+                                        border.width: 1
+                                    }
+                                    onPressed: timew.openWorldSearchPopup()
+                                    onTextEdited: timew.worldSearchEdited(text)
+                                    onAccepted: {
+                                        if (timew.worldSearchMatches.length > 0)
+                                            timew.selectWorldSearchResult(
+                                                timew.worldSearchMatches[0].id);
+                                    }
+                                    Keys.onPressed: function(event) {
+                                        if (event.key === Qt.Key_Escape) {
+                                            timew.dismissWorldSearchPopup();
+                                            event.accepted = true;
+                                        }
                                     }
                                 }
                             }
 
                             Rectangle {
                                 id: worldSearchPopup
-                                anchors.top: parent.bottom
-                                anchors.topMargin: 3
+                                // worldZoneStrip is a sibling of
+                                // worldSearchArea. Position the popup beneath
+                                // the shortcuts without making the Column
+                                // reserve extra space for the floating list.
+                                y: worldZoneStrip.y + worldZoneStrip.height
+                                   + 3 - worldSearchArea.y
                                 width: parent.width
                                 height: timew.worldSearchMatches.length > 0
                                         ? 8 + timew.worldSearchMatches.length * 30
@@ -738,26 +768,6 @@ PanelWindow {
                             height: 32
                             spacing: 6
 
-                            Repeater {
-                                model: timew.worldZones
-
-                                ActionButton {
-                                    width: (worldZoneStrip.width
-                                            - worldZoneStrip.spacing * 4) / 5
-                                    height: 30
-                                    label: modelData.label
-                                    labelPixelSize: 11
-                                    trackLabelGlowLocally: true
-                                    accentColor: timew.semanticColor
-                                    available: !timew.worldModeActive
-                                    selected: !timew.worldModeActive
-                                              && modelData.id
-                                                 === timew.selectedQuickZone
-                                    onLeftClicked:
-                                        timew.chooseWorldZone(modelData.id)
-                                }
-                            }
-
                             ActionButton {
                                 id: worldModeButton
                                 width: (worldZoneStrip.width
@@ -771,6 +781,25 @@ PanelWindow {
                                 selectedFillColor: Colors.magenta
                                 selectedForegroundColor: Colors.black
                                 onLeftClicked: timew.toggleWorldMode()
+                            }
+
+                            Repeater {
+                                model: timew.worldZones
+
+                                ActionButton {
+                                    width: (worldZoneStrip.width
+                                            - worldZoneStrip.spacing * 4) / 5
+                                    height: 30
+                                    label: modelData.label
+                                    labelPixelSize: 11
+                                    trackLabelGlowLocally: true
+                                    accentColor: timew.semanticColor
+                                    selected: !timew.worldModeActive
+                                              && modelData.id
+                                                 === timew.selectedQuickZone
+                                    onLeftClicked:
+                                        timew.chooseWorldZone(modelData.id)
+                                }
                             }
                         }
 
@@ -823,6 +852,10 @@ PanelWindow {
                     }
 
                     GohuText {
+                        // The floating result sheet owns this space while it
+                        // is open; the footer must not overlap its entries.
+                        visible: !(timew.selectedMode === "clock"
+                                   && timew.worldSearchPopupOpen)
                         text: timew.selectedMode === "clock"
                               ? "LOCAL + WORLD // LIVE // CONVERTER NEXT"
                               : "FOUNDATION PREVIEW // UI ONLY"

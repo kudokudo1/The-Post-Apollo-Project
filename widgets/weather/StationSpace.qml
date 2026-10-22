@@ -17,6 +17,9 @@ Rectangle {
     readonly property real bzValue:
         spaceService && spaceService.magneticFieldReady
         ? Number(spaceService.magneticFieldBz) : 0
+    readonly property real btValue:
+        spaceService && spaceService.magneticFieldReady
+        ? Number(spaceService.magneticFieldBt) : -1
     readonly property real solarFluxValue:
         spaceService && spaceService.solarFlux >= 0
         ? Number(spaceService.solarFlux) : 0
@@ -67,12 +70,20 @@ Rectangle {
         return Colors.cyan;
     }
 
+    function shortSampleTime(value) {
+        const text = String(value || "");
+        if (text.length === 0)
+            return "--";
+
+        return text.replace("T", " ").replace("Z", "").slice(5, 16);
+    }
+
     color: Colors.black
 
     Column {
         anchors.fill: parent
         anchors.margins: 24
-        spacing: 26
+        spacing: 20
 
         Row {
             width: parent.width
@@ -241,6 +252,107 @@ Rectangle {
                         height: parent.height - 4
                         color: Colors.magenta
                     }
+                }
+            }
+        }
+
+        Row {
+            spacing: 18
+
+            Column {
+                width: 150
+                spacing: 5
+
+                SecondaryText {
+                    text: "IMF BT"
+                    font.pixelSize: 11
+                }
+
+                GohuText {
+                    text: space.btValue >= 0
+                          ? space.btValue.toFixed(1) + " nT"
+                          : "-- nT"
+                    font.pixelSize: 18
+                    color: Colors.white
+                }
+
+                QuietText {
+                    text: "TOTAL FIELD"
+                    font.pixelSize: 9
+                }
+            }
+
+            Column {
+                width: 135
+                spacing: 5
+
+                SecondaryText {
+                    text: "KP SAMPLE"
+                    font.pixelSize: 11
+                }
+
+                GohuText {
+                    text: spaceService
+                          ? space.shortSampleTime(spaceService.kpTime)
+                          : "--"
+                    font.pixelSize: 12
+                    color: Colors.cyan
+                }
+            }
+
+            Column {
+                width: 135
+                spacing: 5
+
+                SecondaryText {
+                    text: "WIND SAMPLE"
+                    font.pixelSize: 11
+                }
+
+                GohuText {
+                    text: spaceService
+                          ? space.shortSampleTime(spaceService.solarWindTime)
+                          : "--"
+                    font.pixelSize: 12
+                    color: Colors.cyan
+                }
+            }
+
+            Column {
+                width: 135
+                spacing: 5
+
+                SecondaryText {
+                    text: "IMF SAMPLE"
+                    font.pixelSize: 11
+                }
+
+                GohuText {
+                    text: spaceService
+                          ? space.shortSampleTime(
+                                spaceService.magneticFieldTime
+                            )
+                          : "--"
+                    font.pixelSize: 12
+                    color: Colors.cyan
+                }
+            }
+
+            Column {
+                width: 135
+                spacing: 5
+
+                SecondaryText {
+                    text: "FLUX SAMPLE"
+                    font.pixelSize: 11
+                }
+
+                GohuText {
+                    text: spaceService
+                          ? space.shortSampleTime(spaceService.solarFluxTime)
+                          : "--"
+                    font.pixelSize: 12
+                    color: Colors.cyan
                 }
             }
         }

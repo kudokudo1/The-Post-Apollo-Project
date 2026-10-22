@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "WeatherDataPolicy.js" as WeatherDataPolicy
 
 Scope {
     id: weatherService
@@ -22,6 +23,21 @@ Scope {
     property string windMph: "--"
     property string windDirection: "--"
 
+    // Atmospheric observations from the same wttr.in current-condition payload.
+    property real pressureHpa: -1
+    property real visibilityMiles: -1
+    property real cloudCover: -1
+    property real precipMm: -1
+    property string observationTime: ""
+
+    // Forecasts are parsed from the same wttr.in response, so this does not
+    // introduce another weather request or another provider.
+    property var hourlyForecast: []
+    property var dailyForecast: []
+    property date forecastLastUpdated
+    readonly property bool forecastReady:
+        hourlyForecast.length > 0 || dailyForecast.length > 0
+
     property string latitude: ""
     property string longitude: ""
 
@@ -42,6 +58,19 @@ Scope {
 
     property real pm25: -1
     property real pm10: -1
+    property real carbonMonoxide: -1
+    property real nitrogenDioxide: -1
+    property real ozone: -1
+    property real dust: -1
+
+    property real alderPollen: -1
+    property real birchPollen: -1
+    property real grassPollen: -1
+    property real mugwortPollen: -1
+    property real olivePollen: -1
+    property real ragweedPollen: -1
+    property bool pollenAvailable: false
+    property string airQualitySourceTime: ""
 
     property string aqiErrorText: ""
     property date aqiLastUpdated
@@ -68,7 +97,13 @@ Scope {
         if (latitude === "" || longitude === "")
             return "";
 
-        return "https://air-quality-api.open-meteo.com/v1/air-quality" + "?latitude=" + latitude + "&longitude=" + longitude + "&current=us_aqi,pm2_5,pm10" + "&timezone=auto";
+        return "https://air-quality-api.open-meteo.com/v1/air-quality"
+               + "?latitude=" + latitude
+               + "&longitude=" + longitude
+               + "&current=us_aqi,pm2_5,pm10,carbon_monoxide,"
+               + "nitrogen_dioxide,ozone,dust,alder_pollen,birch_pollen,"
+               + "grass_pollen,mugwort_pollen,olive_pollen,ragweed_pollen"
+               + "&timezone=auto";
     }
 
     // ─────────────────────────────────────────────
@@ -173,6 +208,14 @@ Scope {
 
             windDirection = current.winddir16Point || "--";
 
+            const atmosphere =
+                WeatherDataPolicy.currentAtmosphere(current);
+            pressureHpa = atmosphere.pressureHpa;
+            visibilityMiles = atmosphere.visibilityMiles;
+            cloudCover = atmosphere.cloudCover;
+            precipMm = atmosphere.precipMm;
+            observationTime = atmosphere.observationTime;
+
             weatherCode = current.weatherCode || "";
 
             // wttr.in j1 supplies UV alongside the current condition.
@@ -188,6 +231,12 @@ Scope {
             } else {
                 condition = "UNKNOWN";
             }
+
+            const forecast =
+                WeatherDataPolicy.parseForecast(data, current, 6);
+            hourlyForecast = forecast.hourly;
+            dailyForecast = forecast.daily;
+            forecastLastUpdated = new Date();
 
             // ─────────────────────────────────────
             // LOCATION FROM WTTR
@@ -243,20 +292,27 @@ Scope {
                 throw new Error("No current AQI data");
 
             const current = root.current;
+            const parsed = WeatherDataPolicy.parseAirQuality(current);
 
-            if (current.us_aqi === undefined || current.us_aqi === null) {
+            if (parsed.usAqi < 0)
                 throw new Error("No US AQI value");
-            }
 
-            aqi = Math.round(Number(current.us_aqi));
+            aqi = Math.round(parsed.usAqi);
+            pm25 = parsed.pm25;
+            pm10 = parsed.pm10;
+            carbonMonoxide = parsed.carbonMonoxide;
+            nitrogenDioxide = parsed.nitrogenDioxide;
+            ozone = parsed.ozone;
+            dust = parsed.dust;
 
-            if (current.pm2_5 !== undefined && current.pm2_5 !== null) {
-                pm25 = Number(current.pm2_5);
-            }
-
-            if (current.pm10 !== undefined && current.pm10 !== null) {
-                pm10 = Number(current.pm10);
-            }
+            alderPollen = parsed.alderPollen;
+            birchPollen = parsed.birchPollen;
+            grassPollen = parsed.grassPollen;
+            mugwortPollen = parsed.mugwortPollen;
+            olivePollen = parsed.olivePollen;
+            ragweedPollen = parsed.ragweedPollen;
+            pollenAvailable = parsed.pollenAvailable;
+            airQualitySourceTime = parsed.time;
 
             aqiLabel = describeAqi(aqi);
 

@@ -14,6 +14,44 @@ Rectangle {
     readonly property real pm10Value:
         aqiReady ? Number(weatherService.pm10) : 0
 
+    readonly property real ozoneValue:
+        weatherService ? Number(weatherService.ozone) : -1
+    readonly property real nitrogenDioxideValue:
+        weatherService ? Number(weatherService.nitrogenDioxide) : -1
+    readonly property real carbonMonoxideValue:
+        weatherService ? Number(weatherService.carbonMonoxide) : -1
+    readonly property real dustValue:
+        weatherService ? Number(weatherService.dust) : -1
+
+    readonly property var pollenPeak: {
+        if (!weatherService || !weatherService.pollenAvailable)
+            return { "name": "UNAVAILABLE", "value": -1 };
+
+        const entries = [
+            ["ALDER", Number(weatherService.alderPollen)],
+            ["BIRCH", Number(weatherService.birchPollen)],
+            ["GRASS", Number(weatherService.grassPollen)],
+            ["MUGWORT", Number(weatherService.mugwortPollen)],
+            ["OLIVE", Number(weatherService.olivePollen)],
+            ["RAGWEED", Number(weatherService.ragweedPollen)]
+        ];
+
+        let best = { "name": "UNAVAILABLE", "value": -1 };
+        for (let i = 0; i < entries.length; i++) {
+            if (isFinite(entries[i][1]) && entries[i][1] >= 0
+                    && entries[i][1] > best.value) {
+                best = { "name": entries[i][0], "value": entries[i][1] };
+            }
+        }
+        return best;
+    }
+
+    function concentrationText(value, suffix) {
+        return isFinite(value) && value >= 0
+               ? value.toFixed(1) + suffix
+               : "--";
+    }
+
     // These are normalized views of real telemetry, preserved from the
     // original combined HOME implementation.
     readonly property real aqiMeter:
@@ -40,7 +78,7 @@ Rectangle {
     Column {
         anchors.fill: parent
         anchors.margins: 24
-        spacing: 26
+        spacing: 20
 
         Row {
             width: parent.width
@@ -201,6 +239,106 @@ Rectangle {
                     )
                     font.pixelSize: 14
                     color: Colors.white
+                }
+            }
+        }
+
+        Row {
+            spacing: 18
+
+            Column {
+                width: 135
+                spacing: 5
+
+                SecondaryText {
+                    text: "OZONE"
+                    font.pixelSize: 11
+                }
+
+                GohuText {
+                    text: ground.concentrationText(
+                        ground.ozoneValue, " µg/m³"
+                    )
+                    font.pixelSize: 16
+                    color: Colors.white
+                }
+            }
+
+            Column {
+                width: 135
+                spacing: 5
+
+                SecondaryText {
+                    text: "NO₂"
+                    font.pixelSize: 11
+                }
+
+                GohuText {
+                    text: ground.concentrationText(
+                        ground.nitrogenDioxideValue, " µg/m³"
+                    )
+                    font.pixelSize: 16
+                    color: Colors.white
+                }
+            }
+
+            Column {
+                width: 150
+                spacing: 5
+
+                SecondaryText {
+                    text: "CO"
+                    font.pixelSize: 11
+                }
+
+                GohuText {
+                    text: ground.concentrationText(
+                        ground.carbonMonoxideValue, " µg/m³"
+                    )
+                    font.pixelSize: 16
+                    color: Colors.white
+                }
+            }
+
+            Column {
+                width: 135
+                spacing: 5
+
+                SecondaryText {
+                    text: "DUST"
+                    font.pixelSize: 11
+                }
+
+                GohuText {
+                    text: ground.concentrationText(
+                        ground.dustValue, " µg/m³"
+                    )
+                    font.pixelSize: 16
+                    color: Colors.white
+                }
+            }
+
+            Column {
+                width: 170
+                spacing: 5
+
+                SecondaryText {
+                    text: "POLLEN // PEAK"
+                    font.pixelSize: 11
+                }
+
+                GohuText {
+                    text: ground.pollenPeak.value >= 0
+                          ? ground.pollenPeak.value.toFixed(1) + " gr/m³"
+                          : "N/A"
+                    font.pixelSize: 16
+                    color: ground.pollenPeak.value >= 0
+                           ? Colors.green : Colors.white
+                }
+
+                QuietText {
+                    text: ground.pollenPeak.name
+                    font.pixelSize: 10
                 }
             }
         }

@@ -210,9 +210,10 @@ SectionFrame {
               ? "LOCAL TIME"
               : tile.moduleId === "weather"
               ? (tile.weatherReady
-                 ? "WEATHER // FRESH // "
-                   + String(Math.max(0, Number(tile.weatherSnapshot.ageMinutes) || 0))
-                   + " MIN OLD"
+                 ? (Number(tile.weatherSnapshot.ageMinutes) >= 0
+                    ? "WEATHER // FRESH // "
+                      + String(tile.weatherSnapshot.ageMinutes) + " MIN OLD"
+                    : "WEATHER // FRESH")
                  : "WEATHER // " + tile.weatherStatus)
               : "DATA ADAPTER NOT CONNECTED"
     }

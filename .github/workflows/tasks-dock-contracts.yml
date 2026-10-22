@@ -8,6 +8,7 @@ on:
       - "widgets/TasksW.qml"
       - "tests/components/test_tasks_dock_contracts.py"
       - "tests/components/test_tasks_menu_contracts.py"
+      - "tests/components/test_tasks_m3_shared_editor_contracts.py"
       - ".github/workflows/tasks-dock-contracts.yml"
   push:
     branches:
@@ -18,6 +19,7 @@ on:
       - "widgets/TasksW.qml"
       - "tests/components/test_tasks_dock_contracts.py"
       - "tests/components/test_tasks_menu_contracts.py"
+      - "tests/components/test_tasks_m3_shared_editor_contracts.py"
       - ".github/workflows/tasks-dock-contracts.yml"
 
 permissions:
@@ -32,3 +34,5 @@ jobs:
         run: python3 tests/components/test_tasks_dock_contracts.py
       - name: Validate TASKS basic menu source contracts
         run: python3 tests/components/test_tasks_menu_contracts.py
+      - name: Validate TASKS shared editor/store source contracts
+        run: python3 tests/components/test_tasks_m3_shared_editor_contracts.py

@@ -124,14 +124,18 @@ Scope {
                 || payload.transactions.length > 24
                 || payload.transactions.length > payload.transactionsCount
                 || !payload.transactions.every(function(t) {
-                    return t && typeof t.date === "string"
+                    return t && typeof t.id === "string" && !!t.id
+                        && typeof t.accountId === "string" && !!t.accountId
+                        && typeof t.editable === "boolean"
+                        && typeof t.date === "string"
                         && t.date.startsWith(payload.month + "-")
                         && typeof t.description === "string"
                         && typeof t.account === "string"
                         && Number.isSafeInteger(t.amountCents);
                 })
                 || !payload.accounts.every(function(a) {
-                    return a && typeof a.name === "string"
+                    return a && typeof a.id === "string" && !!a.id
+                        && typeof a.name === "string"
                         && Number.isSafeInteger(a.balanceCents);
                 })
                 || !payload.categories.every(function(c) {

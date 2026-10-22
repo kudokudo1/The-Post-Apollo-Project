@@ -24,11 +24,12 @@ assert "contentGlowSource: tasksMark" in TASKS
 for state in ("normal", "hover", "pressed"):
     assert f"{state}ContentGlowColor: Colors.cyan" in TASKS
     assert f"{state}DockGlowColor: Colors.cyan" in TASKS
-for fragment in ("݁˖", "✎๋࣭🗒︎๋࣭", "⊹"):
-    assert fragment in TASKS
-assert TASKS.count('Colors.white + "') == 2
-assert "textFormat: Text.StyledText" in TASKS
-assert "color: Colors.yellow" in TASKS
+# All artwork, including combining stars, is one tintable white text run.
+assert 'text: "݁˖✎๋࣭🗒︎๋࣭⊹"' in TASKS
+assert "textFormat: Text.PlainText" in TASKS
+assert "color: Colors.white" in TASKS
+assert "Colors.yellow" not in TASKS
+assert "<font" not in TASKS
 for forbidden in ("MouseArea {", "SafeDropShadow {", "RectangularShadow {", "Process {", "TasksW {"):
     assert forbidden not in TASKS, forbidden
 

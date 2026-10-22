@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - "services/hub/ApolloHubLiveBridge.qml"
+      - "services/hub/ApolloHubSystemPolicy.js"
+      - "services/system/SystemTelemetry.qml"
+      - "tests/hub/test_apollo_hub_system_bridge.py"
+      - "tests/hub/test_apollo_hub_system_policy.cjs"
       - "services/hub/qmldir"
       - "services/weather/WeatherDockPolicy.js"
       - "services/weather/WeatherService.qml"
@@ -14,6 +18,10 @@ on:
       - main
     paths:
       - "services/hub/ApolloHubLiveBridge.qml"
+      - "services/hub/ApolloHubSystemPolicy.js"
+      - "services/system/SystemTelemetry.qml"
+      - "tests/hub/test_apollo_hub_system_bridge.py"
+      - "tests/hub/test_apollo_hub_system_policy.cjs"
       - "services/hub/qmldir"
       - "services/weather/WeatherDockPolicy.js"
       - "services/weather/WeatherService.qml"
@@ -30,3 +38,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Verify read-only shared Weather bridge
         run: python3 tests/hub/test_apollo_hub_live_bridge.py
+      - name: Verify shared CPU++ telemetry bridge
+        run: python3 tests/hub/test_apollo_hub_system_bridge.py
+      - name: Exercise CPU++ projection and freshness states
+        run: node tests/hub/test_apollo_hub_system_policy.cjs

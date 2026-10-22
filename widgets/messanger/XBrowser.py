@@ -106,9 +106,15 @@ def browser_prefix() -> list[str]:
 
 
 def browser_command() -> list[str]:
-    data_root = Path(os.environ.get("XDG_DATA_HOME") or (Path.home() / ".local/share"))
+    prefix = browser_prefix()
+    if len(prefix) >= 3 and prefix[:2] == ["flatpak", "run"]:
+        # Flatpak Chromium cannot normally write into the host XDG_DATA_HOME.
+        # Its own sandbox data directory is persistent and accessible instead.
+        data_root = Path.home() / ".var" / "app" / prefix[2] / "data"
+    else:
+        data_root = Path(os.environ.get("XDG_DATA_HOME") or (Path.home() / ".local/share"))
     profile = data_root / "post-apollo" / "x-browser"
-    return browser_prefix() + [
+    return prefix + [
         "--ozone-platform=x11",
         f"--class={X_CLASS}",
         f"--user-data-dir={profile}",

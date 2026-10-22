@@ -306,7 +306,7 @@ Item {
                 // this blurred wash. Its feathered edges extend outside
                 // BOTH spectrum ends by the blur radius + a small shoulder,
                 // so neither edge loses ambient light. Width still follows
-                // barCount via spectrum.width and never samples CAVA frames.
+                // barCount via spectrum.width, without sampling moving bars.
                 width: Math.max(0, spectrum.width
                     + 2 * (mediaDock.contentGlowRadius + 4 + mediaDock.softGlowSpread))
                 height: mediaDock.cavaAmbientTargetHeight

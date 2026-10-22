@@ -5,6 +5,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const crypto = require("node:crypto");
 const path = require("node:path");
 const vm = require("node:vm");
 const root = path.resolve(__dirname, "../..");
@@ -12,6 +13,8 @@ const source = fs.readFileSync(path.join(root, "modules/Mediaplayer.qml"), "utf8
 const config = fs.readFileSync(path.join(root, "modules/mediaplayer-cava.conf"), "utf8");
 const trebleSvg = fs.readFileSync(path.join(root, "assets/media/treble-clef.svg"), "utf8");
 const treblePng = fs.readFileSync(path.join(root, "assets/media/treble-clef.png"));
+const trebleCyan = fs.readFileSync(path.join(root, "assets/media/treble-clef-cyan.png"));
+const trebleOrange = fs.readFileSync(path.join(root, "assets/media/treble-clef-orange.png"));
 
 function harness() {
     const match = source.match(/    function receiveCavaFrame\(frame\) \{([\s\S]*?)\n    \}\n\n    Process \{/);
@@ -29,7 +32,7 @@ test("sample static music icon, not the animated VU spectrum", () => {
     assert.match(source, /id:\s*spectrum/);
 });
 
-test("magenta idle chassis and treble clef do not recolor or resample CAVA", () => {
+test("magenta dock glow and CAVA-colored clef remain independent from bar sampling", () => {
     assert.match(source, /normalDockGlowColor:\s*Colors\.magenta/);
     assert.match(source, /normalContentGlowColor:\s*Colors\.magenta/);
     assert.match(source, /hoverContentGlowColor:\s*Colors\.magenta/);
@@ -43,7 +46,7 @@ test("magenta idle chassis and treble clef do not recolor or resample CAVA", () 
         "original decorative text remains, while the treble clef is vector art");
     assert.equal((mark.match(/Image \{/g) || []).length, 1);
     assert.match(mark, /id:\s*trebleClef\s*width:\s*15\s*height:\s*34/);
-    assert.match(mark, /source:\s*Qt\.resolvedUrl\("\.\.\/assets\/media\/treble-clef\.png"\)/);
+    assert.match(mark, /source:\s*mediaDock\.mpdPlaying\s*\?\s*Qt\.resolvedUrl\("\.\.\/assets\/media\/treble-clef-orange\.png"\)\s*:\s*Qt\.resolvedUrl\("\.\.\/assets\/media\/treble-clef-cyan\.png"\)/);
     assert.match(mark, /sourceSize:\s*Qt\.size\(45,\s*102\)/);
     assert.match(mark, /onStatusChanged:[\s\S]*?Image\.Error/);
     assert.match(mark, /textFormat:\s*Text\.PlainText\s*text:\s*"‧₊˚ "/);
@@ -64,6 +67,21 @@ test("magenta idle chassis and treble clef do not recolor or resample CAVA", () 
     assert.equal(treblePng.readUInt32BE(16), 45);
     assert.equal(treblePng.readUInt32BE(20), 102);
     assert.equal(treblePng[25], 6, "runtime icon must retain an alpha channel");
+
+    // Pre-rendered variants match the *exact* palette colors, with the
+    // original alpha silhouette. Hashes pin the visually verified outputs,
+    // avoiding per-frame tint shaders or font-dependent glyph fallback.
+    for (const [name, png, sha256] of [
+        ["cyan", trebleCyan, "3e7a63956306b12ea714390968c70c03671c6099b2b45b98fc9ad91197b3f014"],
+        ["orange", trebleOrange, "72aab7636233a5a6574295e781f00b4eaf103b3d15bb9bb9a14e643a59a00494"]
+    ]) {
+        assert.equal(png.subarray(0, 8).toString("hex"), "89504e470d0a1a0a", name + " PNG header");
+        assert.equal(png.readUInt32BE(16), 45, name + " width");
+        assert.equal(png.readUInt32BE(20), 102, name + " height");
+        assert.equal(png[25], 6, name + " needs RGBA transparency");
+        assert.equal(crypto.createHash("sha256").update(png).digest("hex"), sha256, name + " palette art");
+    }
+
 
 
     // The animated bars keep their original accent and are never sampled.

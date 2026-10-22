@@ -11,6 +11,9 @@ Item {
     height: clockButton.height + 46
 
     property bool is24Hour: false
+    // Optional TimeW window reference. The shared shell will connect it in a
+    // separate, ownership-cleared integration step.
+    property var timeWindow: null
 
     DockButton {
         id: clockButton
@@ -409,8 +412,11 @@ Item {
             clockArea.is24Hour = !clockArea.is24Hour;
         }
 
-        onClicked: {
-            console.log("clockButton clicked");
+        onLeftClicked: {
+            if (clockArea.timeWindow)
+                clockArea.timeWindow.toggle();
+            else
+                console.log("clockButton clicked");
         }
     }
 }

@@ -1,0 +1,29 @@
+name: TimeW foundation source contracts
+
+on:
+  pull_request:
+    paths:
+      - "widgets/TimeW.qml"
+      - "timew_click_preview.qml"
+      - "modules/Clock.qml"
+      - "tests/timew/**"
+      - ".github/workflows/timew-foundation.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "widgets/TimeW.qml"
+      - "modules/Clock.qml"
+      - "tests/timew/**"
+      - ".github/workflows/timew-foundation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check TimeW first-milestone source contracts
+        run: python3 tests/timew/test_timew_foundation_contracts.py

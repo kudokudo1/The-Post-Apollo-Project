@@ -72,14 +72,19 @@ async function run(){
 
     // Includes D9 transaction journals. One unresolved operation anywhere
     // blocks every FinanceW write; no automatic lock or journal cleanup.
-    for(const filename of await readdir(journalDir)){
+    const priorNames=await readdir(journalDir);
+    for(const filename of priorNames){
       if(!filename.endsWith(".json"))continue;
       let entry;
       try{entry=JSON.parse(await privateFile(join(journalDir,filename)));}
       catch{refusal("recovery-needed");}
       if(!entry || entry.status!=="committed")refusal("recovery-needed");
     }
-    const path=join(journalDir,"allocation-"+command.requestId+".json");
+    const journalName="allocation-"+command.requestId+".json";
+    // A committed request ID is still single-use, regardless of current
+    // month balances. Replay must never silently become a new allocation.
+    if(priorNames.includes(journalName))refusal("operation-already-attempted");
+    const path=join(journalDir,journalName);
     const digest=createHash("sha256").update(JSON.stringify(command)).digest("hex");
     const recordAttempt=async()=>{
       let file;

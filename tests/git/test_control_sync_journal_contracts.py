@@ -180,4 +180,26 @@ assert 'gitService.actionBusy = false;' not in read(SERVICE).split('id: actionWa
 require("widgets/GitW.qml", 'gitService.actionTitle + " // " + gitService.actionStage',
         "Git Menu must show real operation stage")
 
+# Compact persistence keeps the same record set, schema, and crash-safe
+# synchronous atomic write boundary while reducing serialized bytes.
+JOURNAL = "services/git/GitOperationJournalService.qml"
+text = read(JOURNAL)
+persist = re.search(r"function persist\\(\\) \\{(.*?)\\n    \\}", text, re.S)
+assert persist, "durable operation journal persistence path must exist"
+assert "JSON.stringify({" in persist.group(1)
+assert "schemaVersion: schemaVersion" in persist.group(1)
+assert "entries: entries" in persist.group(1)
+assert "null, 2" not in persist.group(1), "pretty JSON must not inflate every journal write"
+assert "blockWrites: true" in text and "atomicWrites: true" in text, (
+    "the BEFORE-operation durability barrier cannot become asynchronous"
+)
+for marker in (
+    'const snapshotMs = syncPreparation',
+    'const journalStartedMs = Date.now()',
+    '"\\nPREPARED // snapshot "',
+    'Math.max(0, Date.now() - journalStartedMs)',
+    'value.indexOf("PREPARED //") === 0',
+):
+    require(SERVICE, marker, "preparation latency stage accounting")
+
 print("Git CONTROL sync journal contracts: PASS")

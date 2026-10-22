@@ -60,6 +60,7 @@ export function normalizeSnapshot({month, budget, accounts, balances,
         throw new Error("unexpected-account");
       }
       return {
+        id: account.id,
         name: account.name,
         balanceCents: cents(balances.get(account.id), "account-balance")
       };
@@ -80,7 +81,8 @@ export function normalizeSnapshot({month, budget, accounts, balances,
     if (!Array.isArray(items))
       throw new Error("unexpected-transactions");
     for (const item of items) {
-      if (!item || typeof item.date !== "string"
+      if (!item || typeof item.id !== "string" || !item.id
+                || typeof item.date !== "string"
                 || !/^\d{4}-\d{2}-\d{2}$/.test(item.date)
                 || !item.date.startsWith(month + "-")
                 || (item.account !== undefined && item.account !== account.id))
@@ -90,6 +92,12 @@ export function normalizeSnapshot({month, budget, accounts, balances,
             || (typeof item.imported_payee === "string" ? item.imported_payee : "")
             || (item.transfer_id ? "TRANSFER" : "TRANSACTION");
       transactionRows.push({
+        id: item.id,
+        accountId: account.id,
+        editable: !item.transfer_id && !item.is_parent && !item.is_child
+          && !item.parent_id && !(Array.isArray(item.subtransactions)
+                   && item.subtransactions.length)
+          && (!item.imported_id || String(item.imported_id).startsWith("financew-")),
         date: item.date,
         account: account.name,
         description: payeeName,

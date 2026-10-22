@@ -3,6 +3,7 @@
 import {readFile, stat, mkdtemp, rm, chmod} from "node:fs/promises";
 import {tmpdir, homedir} from "node:os";
 import {join} from "node:path";
+import {createHash} from "node:crypto";
 import {validMonth, takeReadOnlySnapshot} from "./actual_readonly.mjs";
 import {readActualServerURL} from "./source_config.mjs";
 
@@ -57,6 +58,10 @@ async function run() {
     await api.downloadBudget(syncId, encryptionPassword
       ? {password: encryptionPassword} : undefined);
     const snapshot = await takeReadOnlySnapshot(api, month);
+    // Fingerprint the exact source/budget this snapshot came from. Neither
+    // the server password nor raw Sync ID enters the widget.
+    snapshot.sourceKey = createHash("sha256")
+      .update(serverURL + "\0" + syncId).digest("hex");
     process.stdout.write(JSON.stringify(snapshot) + "\n");
   } finally {
     if (api) {

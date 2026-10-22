@@ -5,8 +5,17 @@ import "../components"
 // no Actual API, Process, persistence, or mutation methods.
 Item {
     id: draft
+    signal saveRequested(var payload)
+    property bool editing: false
+    property string editingId: ""
+    property string requestId: ""
+    property var original: null
+    property string saveState: "idle"
+    property string saveMessage: ""
+    readonly property bool savePending: saveState === "pending"
     property string selectedMonth: ""
     property var accounts: []
+    property string sourceKey: ""
     property bool open: false
     property bool reviewed: false
     property string dateText: ""
@@ -19,6 +28,10 @@ Item {
         Array.isArray(accounts) && accountIndex >= 0
         && accountIndex < accounts.length
         ? String(accounts[accountIndex].name || "") : ""
+    readonly property string accountId:
+        Array.isArray(accounts) && accountIndex >= 0
+        && accountIndex < accounts.length
+        ? String(accounts[accountIndex].id || "") : ""
     readonly property string validationError: validate()
     readonly property int amountCents: parseCents(amountText)
     readonly property int signedAmountCents:
@@ -51,7 +64,8 @@ Item {
     }
 
     function validate() {
-        if (!Array.isArray(accounts) || accounts.length === 0 || !accountName)
+        if (!Array.isArray(accounts) || accounts.length === 0
+                || !accountName || !accountId || !/^[a-f0-9]{64}$/.test(sourceKey))
             return "NO ACCOUNT AVAILABLE";
         if (!validDate(dateText))
             return "DATE MUST BE VALID AND IN SELECTED MONTH";
@@ -65,10 +79,68 @@ Item {
         return "";
     }
 
+    function newRequestId() {
+        let result = "";
+        for (let i = 0; i < 32; ++i)
+            result += Math.floor(Math.random() * 16).toString(16);
+        return result;
+    }
+
+    function beginEdit(transaction) {
+        if (!transaction || transaction.editable !== true
+                || !transaction.id || !transaction.accountId
+                || !Number.isSafeInteger(transaction.amountCents)
+                || transaction.amountCents === 0
+                || !validDate(transaction.date))
+            return false;
+        const position = Array.isArray(accounts)
+            ? accounts.findIndex(function(a) {return a.id === transaction.accountId;})
+            : -1;
+        if (position < 0)
+            return false;
+        clear();
+        editing = true;
+        editingId = transaction.id;
+        original = {date:transaction.date,amountCents:transaction.amountCents};
+        accountIndex = position;
+        dateText = transaction.date;
+        payeeText = transaction.description;
+        amountText = (Math.abs(transaction.amountCents) / 100).toFixed(2);
+        direction = transaction.amountCents < 0 ? "expense" : "income";
+        requestId = newRequestId();
+        reviewed = false;
+        open = true;
+        return true;
+    }
+
+    function requestCommit() {
+        if (!reviewed || validationError !== "" || !requestId
+                || savePending || saveState === "uncertain")
+            return false;
+        const payload = {
+            action: editing ? "update" : "create",
+            requestId: requestId,
+            sourceKey: sourceKey,
+            accountId: accountId,
+            month: selectedMonth,
+            date: dateText,
+            description: payeeText.trim(),
+            amountCents: signedAmountCents
+        };
+        if (editing) {
+            payload.transactionId = editingId;
+            payload.original = original;
+        }
+        saveRequested(payload);
+        return true;
+    }
+
     function begin() {
         if (!Array.isArray(accounts) || accounts.length === 0)
             return false;
+        clear();
         accountIndex = 0;
+        requestId = newRequestId();
         dateText = selectedMonth + "-01";
         payeeText = "";
         amountText = "";
@@ -81,6 +153,10 @@ Item {
     function clear() {
         open = false;
         reviewed = false;
+        editing = false;
+        editingId = "";
+        requestId = "";
+        original = null;
         accountIndex = 0;
         dateText = "";
         payeeText = "";
@@ -89,6 +165,7 @@ Item {
     }
 
     onSelectedMonthChanged: clear()
+    onSourceKeyChanged: clear()
     onAccountsChanged: {
         if (open)
             clear(); // A refreshed snapshot invalidates in-progress context.
@@ -110,7 +187,7 @@ Item {
 
         GohuText {
             width: parent.width
-            text: "NEW TRANSACTION // DRAFT ONLY"
+            text: draft.editing ? "EDIT TRANSACTION // REVIEW" : "NEW TRANSACTION // REVIEW"
             font.pixelSize: 11
             color: Colors.omnitrix
             textFormat: Text.PlainText
@@ -162,6 +239,7 @@ Item {
                 color: Colors.white
                 font.pixelSize: 12
                 maximumLength: 120
+                readOnly: draft.editing
                 selectByMouse: true
                 onTextEdited: {
                     draft.payeeText = text;
@@ -205,6 +283,7 @@ Item {
             label: "ACCOUNT // " + draft.accountName
             labelPixelSize: 10
             available: draft.accounts && draft.accounts.length > 0
+                       && !draft.editing && !draft.savePending
             onLeftClicked: {
                 draft.accountIndex = (draft.accountIndex + 1) % draft.accounts.length;
                 draft.reviewed = false;
@@ -219,6 +298,7 @@ Item {
             accentColor: Colors.cyan
             label: draft.direction === "expense" ? "EXPENSE" : "INCOME"
             labelPixelSize: 10
+            available: !draft.savePending
             onLeftClicked: {
                 draft.direction = draft.direction === "expense" ? "income" : "expense";
                 draft.reviewed = false;
@@ -258,9 +338,15 @@ Item {
                 width: (parent.width - 7) / 2
                 height: 30
                 accentColor: Colors.omnitrix
-                label: "PREVIEW"
-                available: !draft.validationError
-                onLeftClicked: draft.reviewed = true
+                label: draft.reviewed ? "CONFIRM SAVE" : "PREVIEW"
+                available: !draft.validationError && !draft.savePending
+                           && draft.saveState !== "uncertain"
+                onLeftClicked: {
+                    if (draft.reviewed)
+                        draft.requestCommit();
+                    else
+                        draft.reviewed = true;
+                }
             }
             ActionButton {
                 // Keep its label and sampled shadow aligned when content/state changes.
@@ -269,13 +355,20 @@ Item {
                 height: 30
                 accentColor: Colors.orange
                 label: "CANCEL"
+                available: !draft.savePending
                 onLeftClicked: draft.clear()
             }
         }
 
         GohuText {
             width: parent.width
-            text: "NOT SENT // NO SAVE OR EDIT PERMISSION"
+            text: draft.saveState === "pending"
+                  ? "SAVING // DO NOT CLOSE OR RESTART SHELL"
+                  : draft.saveState === "blocked" || draft.saveState === "uncertain"
+                  ? draft.saveMessage
+                  : draft.reviewed
+                  ? "VERIFY DETAILS, THEN CONFIRM SAVE"
+                  : "PREVIEW ONLY // NO CHANGES YET"
             font.pixelSize: 9
             color: Colors.orange
             textFormat: Text.PlainText

@@ -574,6 +574,10 @@ PanelWindow {
                             // bridge. This binding adds no timer or procfs IO.
                             uptimeSnapshot: hub.liveBridge
                                             ? hub.liveBridge.uptimeSnapshot : null
+                            // B6 passive desktop app catalog, without access
+                            // to launch methods, command lines, or executables.
+                            appsSnapshot: hub.liveBridge
+                                          ? hub.liveBridge.appsSnapshot : null
                             tileIndex: index
                             tileCount: hub.activeTiles.length
                             editing: hub.editMode

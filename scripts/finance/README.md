@@ -426,3 +426,36 @@ Never create the authorization file merely to test the interface.
 The next step is to validate the complete guarded writer against a
 disposable **real** Actual server, including controlled failure recovery,
 before adding any D12d UI controls or considering a real-budget activation.
+
+
+## FinanceW D12d // Guarded category allocation confirmation UI
+
+**This UI does not activate money writes.** Finance → Budget → Budget →
+CATEGORIES → ALLOCATE keeps the existing safe PREVIEW. A valid nonzero
+proposal that does not over-allocate or leave a category overspent may
+advance to **ARM SAVE → CONFIRM SAVE**. This explicit action submits one
+command to the separate D12c writer via process stdin. With the separate
+\`allocation-writes-enabled\` operator permit absent, the writer refuses
+with **ALLOCATION WRITES LOCKED // OPERATOR ACTIVATION REQUIRED**.
+No authorization files or credentials are created or displayed by the widget.
+
+The proposal is bound to the authenticated budget fingerprint, month,
+category ID, original allocation, category balance and To Budget value.
+Any source refresh/change or change to the input clears the approval
+state. An eligible command carries one request ID, with no automatic
+retry after submission. The D12c writer independently downloads fresh
+Actual data, checks the original values, journal and shared global lock,
+then blocks stale or unsafe writes before any Actual mutation.
+
+Writer outcomes surface as COMMITTED, REFUSED, or UNCERTAIN. Any process
+failure or missing status is conservatively labeled UNCERTAIN.
+UNCERTAIN suppresses further allocation submissions until manual
+reconciliation and a future recovery procedure; restarting Quickshell
+does not clear an attempted journal. On successful save, the pane
+closes and the read-only budget snapshot refreshes.
+
+Acceptance scope: source contracts and GitHub CI, then operator
+Quickshell UI verification with the writer permit still absent.
+Do **not** create that permit as part of the UI test. Actual live-budget
+activation, explicit backup review and crash-recovery acceptance remain
+separate operator decisions.

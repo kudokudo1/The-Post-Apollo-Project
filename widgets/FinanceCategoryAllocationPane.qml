@@ -2,8 +2,8 @@ import QtQuick
 import "../components"
 import "../services/finance/FinanceAllocationPreview.js" as PreviewRules
 
-// D11 proposal calculator only. No Process, persistence, financial write,
-// Actual API methods, or mutation authority exists in this pane.
+// D12d: preview and explicit confirmation only. The separate guarded writer
+// owns every mutation and permission check; no Actual API exists in this pane.
 Item {
     id: allocation
     property var snapshot: null
@@ -12,6 +12,24 @@ Item {
     property string targetText: ""
     property var proposal: null
     property string errorText: ""
+    property string writeState: "idle"
+    property string writeMessage: ""
+    property bool approvalArmed: false
+    property bool submitted: false
+    property string requestId: ""
+    signal saveRequested(var payload)
+    readonly property bool writePending: writeState === "pending"
+    readonly property bool writeUncertain: writeState === "uncertain"
+    readonly property bool proposalEligible: !!proposal && proposal.ok
+        && proposal.allocationChangeCents !== 0
+        && !proposal.exceedsUnallocatedFunds
+        && !proposal.categoryRemainsOverspent
+        && category && proposal.categoryId === category.id
+        && snapshot && proposal.sourceKey === snapshot.sourceKey
+        && proposal.month === snapshot.month
+        && proposal.originalBudgetedCents === category.budgetedCents
+        && proposal.originalAvailableCents === category.availableCents
+        && proposal.toBudgetBeforeCents === snapshot.toBudgetCents
     readonly property bool sourceReady: !!snapshot
         && snapshot.sourceKey && snapshot.readOnly === true
     readonly property var category:
@@ -28,6 +46,16 @@ Item {
         targetText = "";
         proposal = null;
         errorText = "";
+        approvalArmed = false;
+        submitted = false;
+        requestId = "";
+    }
+
+    function newRequestId() {
+        let result = "";
+        for (let i=0;i<32;++i)
+            result += Math.floor(Math.random() * 16).toString(16);
+        return result;
     }
 
     function begin(categoryRow) {
@@ -55,13 +83,42 @@ Item {
         }
         errorText = "";
         proposal = result;
+        approvalArmed = false;
+        submitted = false;
+        requestId = newRequestId();
+        return true;
+    }
+
+    function requestSave() {
+        if (!open || !proposalEligible || !approvalArmed
+                || submitted || writePending || writeUncertain || !requestId)
+            return false;
+        // Values are bound to the exact source/month/category from preview.
+        // The writer independently rereads Actual and rejects stale data.
+        submitted = true;
+        saveRequested({
+            action:"set-amount",requestId:requestId,
+            sourceKey:proposal.sourceKey,month:proposal.month,
+            categoryId:proposal.categoryId,
+            expectedBudgetedCents:proposal.originalBudgetedCents,
+            expectedAvailableCents:proposal.originalAvailableCents,
+            expectedToBudgetCents:proposal.toBudgetBeforeCents,
+            targetBudgetedCents:proposal.targetBudgetedCents
+        });
         return true;
     }
 
     onSnapshotChanged: clear()
     onTargetTextChanged: {
         proposal = null;
+        approvalArmed = false;
+        submitted = false;
+        requestId = "";
         errorText = "";
+    }
+    onWriteStateChanged: {
+        if (writeState === "uncertain" || writeState === "committed")
+            approvalArmed = false;
     }
 
     Rectangle {
@@ -110,6 +167,7 @@ Item {
                 color: Colors.white
                 font.pixelSize: 12
                 selectByMouse: true
+                readOnly: allocation.writePending || allocation.writeUncertain
                 onTextEdited: allocation.targetText = text
             }
         }
@@ -134,6 +192,7 @@ Item {
                 labelPixelSize: 10
                 accentColor: Colors.cyan
                 available: allocation.open && allocation.sourceReady
+                    && !allocation.writePending && !allocation.writeUncertain
                 onLeftClicked: allocation.calculate()
             }
             ActionButton {
@@ -143,6 +202,7 @@ Item {
                 label: "CANCEL"
                 labelPixelSize: 10
                 accentColor: Colors.orange
+                available: !allocation.writePending
                 onLeftClicked: allocation.clear()
             }
         }
@@ -201,9 +261,48 @@ Item {
                 wrapMode: Text.WordWrap
             }
         }
+        ActionButton {
+            trackLabelGlowLocally: true
+            width: parent.width
+            height: 30
+            label: allocation.submitted ? "REQUEST SUBMITTED"
+                 : allocation.approvalArmed ? "CONFIRM SAVE" : "ARM SAVE"
+            labelPixelSize: 10
+            accentColor: allocation.approvalArmed ? Colors.magenta : Colors.orange
+            available: allocation.proposalEligible && !allocation.submitted
+                && !allocation.writePending && !allocation.writeUncertain
+            onLeftClicked: {
+                if (allocation.approvalArmed)
+                    allocation.requestSave();
+                else
+                    allocation.approvalArmed = true;
+            }
+        }
         GohuText {
             width: parent.width
-            text: "SIMULATION ONLY // NO ACTUAL CHANGES"
+            visible: !!allocation.proposal && !allocation.proposalEligible
+            text: "NOT ELIGIBLE TO SAVE // ADJUST PROPOSAL"
+            font.pixelSize: 9
+            color: Colors.orange
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
+        }
+        GohuText {
+            width: parent.width
+            visible: allocation.writePending
+                || allocation.writeState === "blocked"
+                || allocation.writeUncertain
+            text: allocation.writeMessage
+            textFormat: Text.PlainText
+            font.pixelSize: 9
+            color: Colors.orange
+            wrapMode: Text.WordWrap
+        }
+        GohuText {
+            width: parent.width
+            text: allocation.approvalArmed
+                  ? "NEXT STEP CHANGES ACTUAL IF SEPARATELY AUTHORIZED"
+                  : "PREVIEW IS SAFE // SAVING REQUIRES OPERATOR ACTIVATION"
             font.pixelSize: 9
             color: Colors.orange
             textFormat: Text.PlainText

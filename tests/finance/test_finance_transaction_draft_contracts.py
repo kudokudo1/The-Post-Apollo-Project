@@ -43,7 +43,8 @@ assert 'financeDrafts.upsert(payload);' in menu
 assert 'financeDrafts.remove(modelData.id);' in menu
 assert 'transactionDraftPane.beginStored(modelData)' in menu
 assert 'SAVED DRAFTS // ' in menu
-assert "property bool trackLabelGlowLocally: false" in action_shared
+# Shared ActionButton now tracks labels by default; FinanceW still opts in explicitly.
+assert "property bool trackLabelGlowLocally: true" in action_shared
 assert "contentHost.x + labelText.x" in action_shared
 assert "contentHost.y + labelText.y" in action_shared
 

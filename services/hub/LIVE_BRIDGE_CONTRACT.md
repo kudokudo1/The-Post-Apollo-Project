@@ -41,3 +41,42 @@ The UI owner may accept a `liveBridge` property in `ApolloHubW.qml`, then pass `
 Run `python3 tests/hub/test_apollo_hub_live_bridge.py` for source contracts. GitHub workflow `apollo-hub-live-bridge.yml` checks it on relevant updates.
 
 **Not yet verified on Fedora/Quickshell:** module loading, reactive transitions for fresh/stale/error/air-quality, live tile rendering, and shared-shell wiring. These remain runtime acceptance checks. No local files or running service processes were touched.
+
+## B2 // CPU++ shared system telemetry (read-only)
+
+**Status:** Backend implemented and CI-wired; not yet bound to the Hub UI or the shared shell.
+
+`ApolloHubLiveBridge` now accepts **`systemSource`**, which must be the existing `SystemTelemetry { id: sharedSystemTelemetry }` object from `shell.qml`. Never construct a second `SystemTelemetry` and never copy or expose its actuator metadata to the Hub.
+
+The new **`systemSnapshot`** is an automatically updated plain object with:
+
+- `state`: `disconnected`, `loading`, `error`, `unobserved`, `stale`, `unavailable`, or `ready`.
+- `connected`, `loading`, `fresh`, `error`, `observedAtMs`, `ageMinutes`.
+- `cpuPercent`, `cpuMetric`, `memoryPercent`, `memoryMetric`.
+- `swapPercent`, `swapMetric`, `rootFilesystemPercent`, `rootFilesystemMetric`.
+
+Percentages are numeric, rounded to one decimal, **0–100** when known, or **-1** when unknown. Metrics are strings and become empty when no fresh observation is available. CPU and RAM rows are mandatory for `ready`; swap and root filesystem may be absent. No process IDs, commands, device targets, or mutation capabilities are exposed.
+
+The bridge observes the existing `SystemTelemetry.refreshed` signal and timestamps successful **completed** samples. It does not guess the age of rows that existed before it was attached, so `unobserved` is normal until a new sample completes. A new sample in progress invalidates the previous timestamp. Results expire after **five minutes** without another completed sample. The existing one-minute bridge timer only checks the clock; it does not start device monitoring. `SystemTelemetry` currently samples on demand, including when CPU++ opens its SYSTEM/THERMAL modes.
+
+### UI/shell-owner integration (not done here)
+
+The shared-shell owner can extend the existing bridge installation:
+
+```qml
+ApolloHubLiveBridge {
+    id: apolloHubLive
+    weatherSource: weatherService
+    systemSource: sharedSystemTelemetry
+}
+```
+
+The UI owner can bind the CPU tile's data to `apolloHubLive.systemSnapshot` and render unknown/error/loading/stale states distinctly. Read through `systemSnapshot` rather than directly accessing `SystemTelemetry.systemRows`.
+
+**Important activation dependency:** If the Hub should show a fresh CPU++ reading immediately when opened, the shell owner must decide when to request the existing shared monitor refresh. The bridge intentionally makes no hardware calls on its own. Coordinate that decision with the shared telemetry owner; do not secretly introduce another sampling loop.
+
+### Verification
+
+`tests/hub/test_apollo_hub_system_bridge.py` checks the provider contract and absence of new collectors; `tests/hub/test_apollo_hub_system_policy.cjs` runs actual policy behavior cases, including stale timestamps and invalid readings. Both run alongside the Weather contract test in the existing `apollo-hub-live-bridge.yml` CI workflow.
+
+**Not yet verified on the user's Quickshell desktop:** QML `Connections` observation events, synchronized update of the Hub UI, user-visible status changes, and shared-shell focus behavior. No host-machine files or running processes were changed by this batch.

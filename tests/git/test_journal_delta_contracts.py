@@ -49,7 +49,7 @@ const stale=d.readSidecar(sidecar,newBase.checkpointGeneration);
 assert.equal(stale.stale,true);
 const afterCrash=d.overlay(newBase.entries,stale.rows,500);
 assert.equal(JSON.stringify(afterCrash),JSON.stringify(updated));
-assert.equal(afterCrash.some(x=>x.id==='op-2'),false);
+assert.equal(afterCrash.some(x=>x.id==='op-1'),false);
 
 // Crash C: cleared sidecar matches new checkpoint.
 const clean=d.readSidecar(d.encodeSidecar(1,[]),1);

@@ -1,16 +1,49 @@
 import QtQuick
 import Quickshell
 import "../weather/WeatherDockPolicy.js" as WeatherPolicy
+import "ApolloHubSystemPolicy.js" as SystemPolicy
 
 // ApolloHubW live-data bridge. This owns NO weather fetch, subprocess,
 // credentials, writable controls, or duplicate WeatherService instance.
-// The shell/owner supplies its existing WeatherService via weatherSource.
+// The shell/owner supplies existing WeatherService and SystemTelemetry objects.
 // QML bindings keep the snapshot live when that provider changes.
 Scope {
     id: bridge
 
     property var weatherSource: null
+    property var systemSource: null
     property double observationNowMs: Date.now()
+    // Only observations completed AFTER attachment are known to be recent.
+    property double systemObservedAtMs: 0
+
+    onSystemSourceChanged: systemObservedAtMs = 0
+    Connections {
+        target: bridge.systemSource
+        // Starting a new sample invalidates the previous live reading.
+        function onLoadingChanged() {
+            if (bridge.systemSource && bridge.systemSource.loading)
+                bridge.systemObservedAtMs = 0;
+        }
+        function onRefreshed() {
+            if (bridge.systemSource && !bridge.systemSource.loading
+                    && !bridge.systemSource.errorText)
+                bridge.systemObservedAtMs = Date.now();
+        }
+    }
+
+    readonly property bool systemConnected: systemSource !== null
+    readonly property bool systemLoading:
+        systemConnected && systemSource.loading
+    readonly property string systemError:
+        systemConnected ? String(systemSource.errorText || "") : ""
+    readonly property var systemRows:
+        systemConnected && Array.isArray(systemSource.systemRows)
+        ? systemSource.systemRows : []
+    // Source rows are reduced to harmless scalar values. The existing
+    // SystemTelemetry instance retains sole ownership of hardware collection.
+    readonly property var systemSnapshot: SystemPolicy.snapshot(
+        systemConnected, systemLoading, systemError, systemRows,
+        systemObservedAtMs, observationNowMs)
 
     // Timestamp freshness must age even when the provider is quiet.
     // This is one cheap clock tick per minute, NOT network/service polling.
@@ -18,7 +51,7 @@ Scope {
     Timer {
         interval: 60000
         repeat: true
-        running: bridge.weatherSource !== null
+        running: bridge.weatherSource !== null || bridge.systemSource !== null
         onTriggered: bridge.observationNowMs = Date.now()
     }
 

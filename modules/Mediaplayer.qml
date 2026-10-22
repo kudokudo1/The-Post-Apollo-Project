@@ -248,13 +248,16 @@ Item {
         Row {
             id: musicMark
             anchors.verticalCenter: parent.verticalCenter
-            spacing: 0
+            // Small overlap closes remaining monospace side bearings.
+            // Each glow already tracks its own glyph's actual bounds.
+            spacing: -2
 
             GohuText {
                 id: leadingStars
                 anchors.verticalCenter: trebleClef.verticalCenter
                 textFormat: Text.PlainText
-                text: "‧₊˚ "
+                // Do not reserve an extra monospaced cell after the stars.
+                text: "‧₊˚"
                 font.pixelSize: 21
                 color: mediaDock.foregroundColor
             }
@@ -285,7 +288,10 @@ Item {
                 id: trailingStar
                 anchors.verticalCenter: trebleClef.verticalCenter
                 textFormat: Text.PlainText
-                text: " ׅ˖ㅤ"
+                // The old leading space and Hangul filler widened the Row.
+                // Preserve the visible combining accent and star without
+                // reserving invisible spacing on either side.
+                text: "ׅ˖"
                 font.pixelSize: 21
                 color: mediaDock.foregroundColor
             }

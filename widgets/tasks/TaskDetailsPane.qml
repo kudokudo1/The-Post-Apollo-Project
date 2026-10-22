@@ -1,5 +1,6 @@
 import QtQuick
 import "../../components"
+import "../../services/hub/ApolloHubTodoPolicy.js" as TodoPolicy
 
 // TASKS M4: edits only the user's local task fields. No new writer.
 // Choosing a different task cannot silently discard an unsaved detail draft.
@@ -37,10 +38,10 @@ SectionFrame {
         || descriptionInput.text !== selectedTask.description
         || dueDateDraft.trim() !== (selectedTask.dueDate || "")
     )
+    // Use the same Gregorian date validator as the persistence policy.
     readonly property bool dateValid:
-        dueDateDraft.trim() === ""
-        || /^\d{4}-\d{2}-\d{2}$/.test(dueDateDraft.trim())
-        // Full calendar validation is repeated by the domain policy on save.
+        TodoPolicy.validDueDate(dueDateDraft.trim() === ""
+                                ? null : dueDateDraft.trim())
     readonly property bool fieldsValid: descriptionInput.text.length <= 2000
         && !/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(descriptionInput.text)
         && dateValid

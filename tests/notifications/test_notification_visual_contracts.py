@@ -176,4 +176,32 @@ for needle, message in (
 ):
     require(POPUP, needle, message)
 
+# Browser website icons use the Post-Apollo magenta/black colors. The
+# bundled YouTube mark retains its black play glyph while site-supplied native
+# favicons receive a luminance-preserving Qt Colorize pass.
+youtube_svg = (ROOT / "assets/notifications/youtube.svg").read_text(encoding="utf-8")
+assert 'fill="#C74EC7"' in youtube_svg, "YouTube icon background must be magenta"
+assert 'fill="#000000"' in youtube_svg, "YouTube play triangle must be black"
+for surface, name in ((HUB, "history"), (POPUP, "popup")):
+    assert "Colorize {" in surface, f"{name}: website icon colorization"
+    assert "hue: 0.8333" in surface and "saturation: 0.65" in surface, (
+        f"{name}: use the same magenta hue and saturation"
+    )
+    assert "lightness: -0.12" in surface, f"{name}: keep dark visual depth"
+    assert "color: Colors.black" in surface, f"{name}: website black backing"
+assert 'notificationEntry.website !== "" ? Colors.black : Colors.dark' in HUB
+assert 'notificationEntry.website !== ""\n                                    ? Colors.magenta : notificationEntry.sourceColor' in HUB
+
+# Website SITE/APP scope goes next to the lower-right Bring Here arrow, not
+# into the top ZZ/DND/CLEAR/× row. Preserve card and action geometry.
+top_buttons = HUB.split("id: appControls", 1)[1].split("// ===== NOTIFICATION TITLE", 1)[0]
+footer_buttons = HUB.split("id: cardFooterActions", 1)[1].split("// ===== CUSTOM SCROLL BAR", 1)[0]
+assert 'notificationEntry.targetWholeApp ? "APP"' not in top_buttons
+assert 'notificationEntry.targetWholeApp ? "APP"' in footer_buttons
+assert footer_buttons.index('notificationEntry.targetWholeApp ? "APP"') < footer_buttons.index('id: bringHereButton')
+assert 'spacing: 5' in footer_buttons
+assert 'right: cardFooterActions.left' in HUB, "reserve actual footer row width beside message"
+assert 'label: "ZZ"' in top_buttons and 'label: "DND"' in top_buttons
+assert 'label: "CLEAR ALL"' in top_buttons and 'label: "×"' in top_buttons
+
 print("Notification visual contracts: PASS")

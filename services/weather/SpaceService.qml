@@ -109,6 +109,11 @@ Scope {
     property string magneticFieldTime: ""
     property string solarFluxTime: ""
 
+    // Local receive time for footer freshness. This is intentionally
+    // distinct from the NOAA sample timestamps above because those products
+    // publish at different cadences.
+    property date lastUpdated
+
     // ─────────────────────────────────────────────
     // ERROR STATE
     // ─────────────────────────────────────────────
@@ -234,6 +239,7 @@ Scope {
             kpTime = latest.time_tag || "";
 
             kpReady = true;
+            lastUpdated = new Date();
         } catch (error) {
             console.log("SpaceService Kp parse error:", error);
 
@@ -260,6 +266,7 @@ Scope {
             solarWindTime = latest.time_tag || "";
 
             solarWindReady = true;
+            lastUpdated = new Date();
         } catch (error) {
             console.log("SpaceService solar wind parse error:", error);
 
@@ -288,6 +295,7 @@ Scope {
             magneticFieldTime = latest.time_tag || "";
 
             magneticFieldReady = true;
+            lastUpdated = new Date();
         } catch (error) {
             console.log("SpaceService magnetic field parse error:", error);
 
@@ -314,6 +322,7 @@ Scope {
             solarFluxTime = latest.time_tag || "";
 
             solarFluxReady = true;
+            lastUpdated = new Date();
         } catch (error) {
             console.log("SpaceService solar flux parse error:", error);
 

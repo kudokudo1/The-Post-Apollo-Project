@@ -9,6 +9,7 @@ dock = (ROOT / "modules/ApolloHub.qml").read_text(encoding="utf-8")
 window = (ROOT / "widgets/ApolloHubW.qml").read_text(encoding="utf-8")
 tile = (ROOT / "widgets/hub/ApolloHubTile.qml").read_text(encoding="utf-8")
 media_mini = (ROOT / "widgets/hub/ApolloHubMediaMini.qml").read_text(encoding="utf-8")
+system_mini = (ROOT / "widgets/hub/ApolloHubSystemMini.qml").read_text(encoding="utf-8")
 layout = (ROOT / "services/hub/ApolloHubLayout.js").read_text(encoding="utf-8")
 store = (ROOT / "services/hub/ApolloHubStore.qml").read_text(encoding="utf-8")
 module = (ROOT / "services/hub/qmldir").read_text(encoding="utf-8")
@@ -282,6 +283,49 @@ for forbidden in (
 # The existing Time/Calendar tile has a clock Timer; only the Media view
 # must remain free of observers/timers.
 assert "Timer {" not in media_mini
+
+# B2 CPU++ UI is a passive consumer of the existing normalized snapshot.
+# The shared shell controls on-demand refresh; no new collection loop or
+# device action is permitted in this presentation.
+assert "systemSnapshot: hub.liveBridge" in window
+assert "hub.liveBridge.systemSnapshot : null" in window
+assert "property var systemSnapshot: null" in tile
+assert "ApolloHubSystemMini {" in tile
+assert 'visible: tile.moduleId === "cpu"' in tile
+assert "systemSnapshot: tile.systemSnapshot" in tile
+assert 'tile.moduleId !== "cpu"' in tile
+assert "systemMini.statusLine" in tile
+for needle in (
+    "property var systemSnapshot: null",
+    'systemState === "ready"',
+    "systemSnapshot.fresh === true",
+    "typeof value !== \"number\"",
+    "!isFinite(value)",
+    "value < 0 || value > 100",
+    "return -1;",
+    "systemSnapshot.cpuPercent",
+    "systemSnapshot.memoryPercent",
+    "systemSnapshot.swapPercent",
+    "systemSnapshot.rootFilesystemPercent",
+    'labelText: "CPU"',
+    'labelText: "RAM"',
+    'labelText: "SWAP"',
+    'labelText: "ROOT FS"',
+    "percentValue >= 0",
+    'String(gauge.percentValue) + "%"',
+    '"--"',
+    'statusLine:',
+    'systemState.toUpperCase().replace(/-/g, " ")',
+    "systemSnapshot.ageMinutes",
+):
+    assert needle in system_mini, f"B2 CPU++ mini missing {needle}"
+for forbidden in (
+    "SystemTelemetry {", "HeadlessMediaController {",
+    "Process {", "Timer {", "refresh(", "systemRows",
+    "FanControl {", "IpcHandler {",
+):
+    assert forbidden not in system_mini, f"CPU++ UI collecting/controlling: {forbidden}"
+assert "SystemTelemetry {" not in window + tile
 
 # Launchers and widget backends are unchanged in this first stage.
 print("ApolloHubW foundation source contracts passed")

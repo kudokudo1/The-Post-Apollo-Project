@@ -543,7 +543,9 @@ PanelWindow {
                     }
 
                     GohuText {
-                        text: "FOUNDATION PREVIEW // UI ONLY"
+                        text: timew.selectedMode === "clock"
+                              ? "LOCAL + WORLD // LIVE // CONVERTER NEXT"
+                              : "FOUNDATION PREVIEW // UI ONLY"
                         color: Colors.white
                         font.pixelSize: 11
                     }

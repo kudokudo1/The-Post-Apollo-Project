@@ -767,7 +767,10 @@ PanelWindow {
                                         left: parent.left
                                         right: parent.right
                                         margins: 4
-                                        rightMargin: 21
+                                        // Reserve a dedicated gutter for the
+                                        // scrollbar's 16px star track plus a
+                                        // 5px separation/outer clearance.
+                                        rightMargin: worldSearchRail.crossExtent + 5
                                     }
                                     clip: true
                                     spacing: 2
@@ -793,13 +796,21 @@ PanelWindow {
                                 }
 
                                 NeonScrollBar {
+                                    id: worldSearchRail
                                     flickable: worldSearchResults
                                     accountForContentOrigin: true
                                     geometryMode: "viewport"
+                                    // Default viewport geometry positions the
+                                    // rail INSIDE the ListView. Place it in
+                                    // the reserved popup gutter instead and
+                                    // align its track with the row viewport.
+                                    x: worldSearchPopup.width - width - 3
+                                    y: worldSearchResults.y
+                                    height: worldSearchResults.height
                                     handleStyle: "star"
                                     railColor: Colors.cyan
-                                    handleColor: Colors.white
-                                    handleBorderColor: Colors.white
+                                    handleColor: Colors.magenta
+                                    handleBorderColor: Colors.magenta
                                     railGlowColor: Colors.white
                                     containGlow: true
                                     visible: timew.worldSearchPopupOpen

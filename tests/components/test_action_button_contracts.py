@@ -122,17 +122,31 @@ for needle, message in (
 ):
     require(COMPONENT, needle, message)
 
-# Projects ARCHIVE changes to CONFIRM while retaining its custom white/orange
-# state identity. Opt it into reactive label-to-glow positioning only.
+# Standard text labels use reactive source-local geometry by DEFAULT.
+# A label-width change (ARCHIVE -> CONFIRM, EDIT -> VIEW) must not leave a
+# separately sampled shadow at stale mapToItem coordinates. Custom artwork
+# retains the original fallback and explicit opt-out remains available.
 ARCHIVE = (ROOT / "widgets/GitHubProjectsArchiveButton.qml").read_text(encoding="utf-8")
 for needle in (
-    "property bool trackLabelGlowLocally: false",
+    "property bool trackLabelGlowLocally: true",
     "readonly property bool labelIsLocalSource:",
+    "sourceAttached && actionButton.trackLabelGlowLocally",
+    "actionButton.contentGlowSource === labelText",
+    "labelText.parent === contentHost",
     "contentHost.x + labelText.x",
     "contentHost.y + labelText.y",
     "contentGlowSource.mapToItem(",
+    "x: sourceOrigin.x",
+    "y: sourceOrigin.y",
+    "safeSource: actionButton.contentGlowSource",
+    "requestedVisible:",
 ):
-    require(COMPONENT, needle, "reactive ActionButton label geometry")
+    require(COMPONENT, needle, "automatic ActionButton label glow geometry")
+# Never attach the effect under its own sampled glyph. Cross-parent cases
+# must preserve the existing mapToItem fallback until audited individually.
+content_effect = COMPONENT[COMPONENT.index("SafeDropShadow {"):COMPONENT.index("\n    MouseArea {")]
+assert "parent: labelText" not in content_effect
+assert "contentGlowSource.mapToItem(" in content_effect
 for needle in (
     'label: root.armed ? "CONFIRM" : "ARCHIVE"',
     "trackLabelGlowLocally: true",

@@ -43,6 +43,38 @@ It is not a directive to replace all QML shadows or normalize every widget.
   source-attached text/icon effects. Do not replace it with unguarded
   `layer.effect: DropShadow` during cleanup.
 
+## Default sampled-glow alignment // ActionButton rollout (2026-10-22)
+
+**Owner:** Post-Apollo shared controls. **Status:** first implementation stage;
+ModeButton and DockButton defaults require separate source and live verification.
+
+- Standard `ActionButton` label glow follows the actual anchored label's local
+  coordinates by default (`trackLabelGlowLocally: true`). Size and source
+  are bound to the same item; text changes, resize, and selection must not
+  create a detached second glyph silhouette.
+- The automatic local path is **only** for the built-in label directly owned
+  by the content host. Custom `contentGlowSource` items retain the previous
+  cross-parent `mapToItem` fallback. Explicit `false` is a temporary
+  compatibility exception, not the expected setting for new buttons.
+- Keep a sampled effect **outside the item it samples** (no ancestor/self
+  sampling), preserve source window teardown disconnection in
+  `SafeDropShadow`, and leave foreground, halo layering, radius, samples,
+  opacity, hover/pressed states, geometry, and action routing unchanged.
+- `ModeButton`'s Grid layout and independent halo plane, `DockButton`'s
+  multi-part artwork, and the documented Wi-Fi source-local
+  `layer.effect` repair are **not implicitly migrated** by this stage.
+  Specialized composites require their own geometry and lifetime audit.
+- Test label changes, hover/selected states, resizing, hidden/unavailable
+  states, reparenting and teardown; use static contracts as architecture
+  checks, not proof of actual Wayland/Qt/NVIDIA pixels. Live visual acceptance
+  remains an explicit boundary.
+
+**Provenance:** operator-reported duplicate glyphs corrected on AppControl
+KILL, CPU++, GitHub Projects ARCHIVE, Apollo Hub, and Finance New Draft;
+shared `ActionButton` reactive label tracking was already piloted
+successfully on individual buttons. This rollout removes the need to remember
+the per-button opt-in for ordinary labels.
+
 ## Green-family semantic recipes (operator decision 003)
 
 **Green is a two-token family, not three separate hex colors.**

@@ -44,7 +44,7 @@ Run `python3 tests/hub/test_apollo_hub_live_bridge.py` for source contracts. Git
 
 ## B2 // CPU++ shared system telemetry (read-only)
 
-**Status:** Backend implemented and CI-wired; not yet bound to the Hub UI or the shared shell.
+**Status:** Backend implemented and source-verified; B2 shared-shell telemetry wiring now installed on `main`. CPU mini-tile UI and live desktop acceptance remain pending.
 
 `ApolloHubLiveBridge` now accepts **`systemSource`**, which must be the existing `SystemTelemetry { id: sharedSystemTelemetry }` object from `shell.qml`. Never construct a second `SystemTelemetry` and never copy or expose its actuator metadata to the Hub.
 
@@ -55,13 +55,13 @@ The new **`systemSnapshot`** is an automatically updated plain object with:
 - `cpuPercent`, `cpuMetric`, `memoryPercent`, `memoryMetric`.
 - `swapPercent`, `swapMetric`, `rootFilesystemPercent`, `rootFilesystemMetric`.
 
-Percentages are numeric, rounded to one decimal, **0–100** when known, or **-1** when unknown. Metrics are strings and become empty when no fresh observation is available. CPU and RAM rows are mandatory for `ready`; swap and root filesystem may be absent. No process IDs, commands, device targets, or mutation capabilities are exposed.
+Percentages are numeric, rounded to one decimal, **0–100** when known, or **-1** when unknown. Metrics are strings and become empty when no fresh observation is available. CPU and RAM rows **with valid numeric percentages** are mandatory for `ready`; swap and root filesystem may be absent. An invalid CPU or RAM utilization sets `state: unavailable` and masks numeric outputs instead of presenting a false `ready`. No process IDs, commands, device targets, or mutation capabilities are exposed.
 
 The bridge observes the existing `SystemTelemetry.refreshed` signal and timestamps successful **completed** samples. It does not guess the age of rows that existed before it was attached, so `unobserved` is normal until a new sample completes. A new sample in progress invalidates the previous timestamp. Results expire after **five minutes** without another completed sample. The existing one-minute bridge timer only checks the clock; it does not start device monitoring. `SystemTelemetry` currently samples on demand, including when CPU++ opens its SYSTEM/THERMAL modes.
 
-### UI/shell-owner integration (not done here)
+### Shared-shell integration (implemented) / UI integration (pending)
 
-The shared-shell owner can extend the existing bridge installation:
+The existing shared shell now includes this source binding in its one `ApolloHubLiveBridge` instance:
 
 ```qml
 ApolloHubLiveBridge {
@@ -71,9 +71,9 @@ ApolloHubLiveBridge {
 }
 ```
 
-The UI owner can bind the CPU tile's data to `apolloHubLive.systemSnapshot` and render unknown/error/loading/stale states distinctly. Read through `systemSnapshot` rather than directly accessing `SystemTelemetry.systemRows`.
+The UI owner should bind the CPU tile's data to `hub.liveBridge.systemSnapshot` (the window already receives `liveBridge` from the shell) and render `disconnected`, `loading`, `error`, `unobserved`, `unavailable`, `stale`, and `ready` distinctly. Display `--` for any `-1` percentage, including optional swap and filesystem. Read through `systemSnapshot` rather than directly accessing `SystemTelemetry.systemRows`; do not instantiate a new collector.
 
-**Important activation dependency:** If the Hub should show a fresh CPU++ reading immediately when opened, the shell owner must decide when to request the existing shared monitor refresh. The bridge intentionally makes no hardware calls on its own. Coordinate that decision with the shared telemetry owner; do not secretly introduce another sampling loop.
+**Refresh behavior installed:** the shell requests exactly one on-demand `sharedSystemTelemetry.refresh()` on opening the Hub with a visible CPU tile or switching to a layout containing one. `SystemTelemetry` itself ignores overlapping requests. There is no Hub polling timer or new subprocess. The bridge updates `observationNowMs` and `systemObservedAtMs` together on a successful completed refresh, avoiding a falsely stale snapshot between one-minute clock ticks. Without another refresh, results expire after five minutes, as designed.
 
 ### Verification
 

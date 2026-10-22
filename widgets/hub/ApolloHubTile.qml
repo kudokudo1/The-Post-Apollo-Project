@@ -2,8 +2,8 @@ import QtQuick
 import "../../components"
 import "../../services/hub/ApolloHubLayout.js" as Layout
 
-// Presentation only: Weather, Network, and Media arrive as read-only
-// snapshots. This tile creates no provider, controller, poller, or player.
+// Presentation only: Weather, Network, Media, and CPU++ arrive as read-only
+// snapshots. This tile creates no provider, collector, controller or poller.
 SectionFrame {
     id: tile
 
@@ -11,6 +11,7 @@ SectionFrame {
     property var weatherSnapshot: null
     property var networkSnapshot: null
     property var mediaSnapshot: null
+    property var systemSnapshot: null
     // B3 deliberately distinguishes local link status from verified internet.
     // Connected Wi-Fi/Ethernet is NOT proof that the internet is reachable.
     readonly property string networkState:
@@ -320,6 +321,23 @@ SectionFrame {
         }
     }
 
+    // B2 CPU++ shows fresh CPU/RAM and optional SWAP/rootfs gauges.
+    // All four percentages remain unknown while a sample is stale,
+    // unavailable, disconnected, or being refreshed.
+    ApolloHubSystemMini {
+        id: systemMini
+        visible: tile.moduleId === "cpu"
+        systemSnapshot: tile.systemSnapshot
+        anchors {
+            left: parent.left
+            right: parent.right
+            top: parent.top
+            bottom: parent.bottom
+            topMargin: tile.editing ? 32 : 22
+            bottomMargin: 23
+        }
+    }
+
     // MPD and MPRIS remain separate; neither gets selected automatically.
     ApolloHubMediaMini {
         visible: tile.moduleId === "media"
@@ -337,6 +355,7 @@ SectionFrame {
     GohuText {
         visible: tile.moduleId !== "weather" && tile.moduleId !== "network"
                  && tile.moduleId !== "media"
+                 && tile.moduleId !== "cpu"
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
@@ -373,6 +392,8 @@ SectionFrame {
                  + " // INTERNET UNVERIFIED")
               : tile.moduleId === "media"
               ? "MEDIA // READ ONLY // AUDIO OUTPUT NOT VERIFIED"
+              : tile.moduleId === "cpu"
+              ? systemMini.statusLine
               : "DATA ADAPTER NOT CONNECTED"
     }
 }

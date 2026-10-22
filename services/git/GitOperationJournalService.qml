@@ -250,7 +250,9 @@ Scope {
             const interrupted =
                 status === "RUNNING"
                 && !durableRunning;
-            const record = {
+            // Preserve future/optional fields (Undo provenance included).
+            // Only normalize interruption status and required legacy fields.
+            const record = Object.assign({}, row, {
                 schemaVersion: Number(row.schemaVersion || schemaVersion),
                 id: String(row.id || ""),
                 repository: String(row.repository || ""),
@@ -276,7 +278,7 @@ Scope {
                     ? "EVIDENCE_ONLY"
                     : String(row.recoveryClass || "EVIDENCE_ONLY"),
                 undoState: String(row.undoState || "NOT_IMPLEMENTED")
-            };
+            });
 
             if (interrupted)
                 repairedInterrupted = true;

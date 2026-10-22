@@ -55,7 +55,8 @@ Scope {
     function searchMedia(source, query, cursor) {
         if ((source !== "local-mpd" && source !== "youtube"
                 && source !== "radio-browser")
-                || typeof query !== "string" || query.trim().length === 0
+                || typeof query !== "string"
+                || (query.trim().length === 0 && source !== "radio-browser")
                 || query.length > 256)
             return false;
         const args = [query, "--source", source];

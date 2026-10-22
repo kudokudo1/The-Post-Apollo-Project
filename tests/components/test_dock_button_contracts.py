@@ -161,7 +161,9 @@ DOCK_MODULES = {
         "implicitHeight: 50",
         "open: menuOpen",
         "normalForegroundColor: weatherColor",
-        "normalDockGlowColor: weatherColor",
+        "normalDockGlowColor: thermometerState.valid",
+        "hoverDockGlowColor: thermometerState.valid",
+        "pressedDockGlowColor: Colors.magenta",
         "openFillColor: Colors.yellow",
     ),
 }

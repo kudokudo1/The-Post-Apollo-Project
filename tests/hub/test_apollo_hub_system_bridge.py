@@ -21,7 +21,8 @@ for needle in (
     "target: bridge.systemSource",
     "function onLoadingChanged()",
     "function onRefreshed()",
-    "bridge.systemObservedAtMs = Date.now()",
+    "bridge.observationNowMs = Date.now()",
+    "bridge.systemObservedAtMs = bridge.observationNowMs",
     "readonly property var systemRows:",
     "readonly property var systemSnapshot: SystemPolicy.snapshot(",
     "systemConnected, systemLoading, systemError, systemRows,",
@@ -41,8 +42,21 @@ for needle in (
 for needle in (
     "SystemTelemetry {",
     "id: sharedSystemTelemetry",
+    "systemSource: sharedSystemTelemetry",
+    "function refreshCpuTileWhenVisible()",
+    "function onMenuOpenChanged()",
+    "function onActiveTilesChanged()",
+    'tile.module === "cpu"',
+    "sharedSystemTelemetry.refresh();",
 ):
     require(shell, needle, "shell shared telemetry")
+assert shell.count("SystemTelemetry {") == 1, "Must reuse existing telemetry"
+assert shell.count("ApolloHubLiveBridge {") == 1, "Must reuse existing Hub bridge"
+assert shell.count("systemSource: sharedSystemTelemetry") == 1
+assert "if (!apolloHubWindow.menuOpen)" in shell
+assert "if (!Array.isArray(tiles)" in shell
+assert "mediaControllerSource: sharedMediaDock.hubMediaController" in shell
+assert "weatherSource: weatherService" in shell
 
 for needle in (
     ".pragma library",

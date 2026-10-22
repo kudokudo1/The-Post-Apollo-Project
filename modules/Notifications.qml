@@ -1,4 +1,5 @@
 import QtQuick
+import Qt5Compat.GraphicalEffects
 import Quickshell
 import "../components"
 import qs.services.notifications
@@ -169,6 +170,20 @@ PanelWindow {
 
                 // ===== APP ICON ================================
 
+                Rectangle {
+                    anchors {
+                        left: parent.left
+                        top: parent.top
+                    }
+                    anchors.leftMargin: 15
+                    anchors.topMargin: 15
+                    width: 42
+                    height: 42
+                    radius: 4
+                    color: Colors.black
+                    visible: notificationCard.website !== ""
+                }
+
                 Image {
                     id: notificationIcon
 
@@ -192,6 +207,22 @@ PanelWindow {
                         : notificationCard.appIcon !== "" ? Quickshell.iconPath(notificationCard.appIcon, true) : ""
 
                     fillMode: Image.PreserveAspectFit
+                    visible: notificationCard.website === ""
+                        || notificationCard.website === "YouTube"
+                }
+
+                // Recolor site-supplied icons without flattening their details.
+                // The bundled YouTube mark is already exact magenta/black.
+                Colorize {
+                    anchors.fill: notificationIcon
+                    source: notificationIcon
+                    visible: notificationCard.website !== ""
+                        && notificationCard.website !== "YouTube"
+                        && notificationIcon.status === Image.Ready
+                    hue: 0.8333
+                    saturation: 0.65
+                    lightness: -0.12
+                    cached: true
                 }
 
                 // ===== TEXT ====================================

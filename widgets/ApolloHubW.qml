@@ -113,6 +113,29 @@ PanelWindow {
             selectedTileIndex, activeTiles.length - 1));
     }
 
+    function toggleEditedTileWidth(index) {
+        if (!editMode || layoutStorageIssue.length > 0
+                || index < 0 || index >= activeTiles.length)
+            return;
+        const tile = activeTiles[index];
+        const nextSize = tile.size === "wide" ? "half" : "wide";
+        save(Layout.resizeTile(layout, selectedModeIndex,
+                               selectedSubModeIndex, index,
+                               nextSize, tile.rowSpan));
+    }
+
+    function cycleEditedTileHeight(index) {
+        if (!editMode || layoutStorageIssue.length > 0
+                || index < 0 || index >= activeTiles.length)
+            return;
+        const tile = activeTiles[index];
+        const nextSpan = tile.rowSpan >= Layout.MAX_ROW_SPAN
+                         ? 1 : tile.rowSpan + 1;
+        save(Layout.resizeTile(layout, selectedModeIndex,
+                               selectedSubModeIndex, index,
+                               tile.size, nextSpan));
+    }
+
     function chooseMode(index) {
         if (index < 0 || index >= layout.modes.length)
             return;
@@ -662,6 +685,8 @@ PanelWindow {
                             calendarBridge: hub.liveBridge
                             tileIndex: index
                             tileCount: hub.activeTiles.length
+                            tileColumnSpan: tileConfig.size === "wide" ? 2 : 1
+                            tileRowSpan: tileConfig.rowSpan || 1
                             editing: hub.editMode
                             keyboardSelected: hub.standardKeysAvailable
                                               && hub.selectedTileIndex === index
@@ -678,6 +703,8 @@ PanelWindow {
                                 hub.layout, hub.selectedModeIndex,
                                 hub.selectedSubModeIndex, index))
                             onRemoveTile: hub.removeEditedTile(index)
+                            onToggleTileWidth: hub.toggleEditedTileWidth(index)
+                            onCycleTileHeight: hub.cycleEditedTileHeight(index)
                         }
                     }
                 }
@@ -694,7 +721,7 @@ PanelWindow {
                 text: hub.layoutStorageIssue.length > 0
                       ? "LAYOUT READ ONLY // " + hub.layoutStorageIssue
                       : hub.editMode
-                      ? "← → MOVE TILE    SWAP CHANGE MODULE    × REMOVE TILE    UNDO RESTORE"
+                      ? "← → MOVE    SWAP MODULE    W:1/2 WIDTH    H:1/2/3 HEIGHT    × REMOVE    UNDO"
                       : "APOLLO HUB  //  LIVE MODULES CONNECTED"
             }
         }

@@ -23,7 +23,7 @@ test("MPRIS transport is kept explicitly separate", () => {
 });
 
 test("radio station load is explicit and does not autoplay", () => {
-    assert.match(deck, /headless\.loadRadio\(radioStreamUrl\)/);
+    assert.match(deck, /headless\.loadRadio\(item\.ref\.id\)/);
     assert.match(deck, /catalogSource === "direct-stream"/);
     assert.doesNotMatch(deck, /onClicked:\s*headless\.loadRadio/);
     assert.match(bridge, /issue\("load",\s*\["--source",\s*"direct-stream",\s*"--uri",\s*url\]\)/);
@@ -134,7 +134,7 @@ test("Shift selection remains fail-closed; bare grave is reserved", () => {
 test("radio cassette is display-only; its SELECT and LOAD are on the bay", () => {
     const ui = fs.readFileSync(path.join(base, "widgets/MediaDeckBrowserControls.qml"), "utf8");
     assert.match(deck, /catalogSource === "direct-stream"/);
-    assert.match(deck, /headless\.loadRadio\(radioStreamUrl\)/);
+    assert.match(deck, /headless\.loadRadio\(item\.ref\.id\)/);
     assert.match(deck, /function selectHighlighted\(\)/);
     assert.match(bridge, /ref\.source !== "direct-stream"/);
     assert.match(ui, /label: bay\.deckHost\.catalogSource === "youtube"/);

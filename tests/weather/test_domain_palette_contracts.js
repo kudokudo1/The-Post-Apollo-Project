@@ -105,6 +105,10 @@ assert.match(
     /"WEATHER " \+ compactAge\(weatherAgeMinutes\)[\s\S]*?" \/\/ SPACE " \+ compactAge\(spaceAgeMinutes\)/
 );
 assert.match(windowSource, /text:\s*weatherStation\.footerSourceStatus/);
+assert.match(
+    windowSource,
+    /Row \{[\s\S]*?anchors\.leftMargin:\s*20[\s\S]*?spacing:\s*8[\s\S]*?text:\s*"◉"[\s\S]*?color:\s*Colors\.red[\s\S]*?text:\s*weatherStation\.footerSourceStatus[\s\S]*?color:\s*Colors\.cyan/
+);
 assert.doesNotMatch(windowSource, /WEATHER LINK ONLINE/);
 assert.match(spaceServiceSource, /property date lastUpdated/);
 assert.ok(

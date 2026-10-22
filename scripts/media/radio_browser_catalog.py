@@ -119,7 +119,7 @@ class RadioBrowserCatalogSource:
                           headers={"Accept": "application/json",
                                    "User-Agent": "Post-Apollo-HiFi/0.1"})
             try:
-                with urlopen(req, timeout=6) as response:
+                with urlopen(req, timeout=3.5) as response:
                     raw = response.read(1_500_001)
                 if len(raw) > 1_500_000:
                     raise MediaBackendError("SOURCE_PROTOCOL", "Radio directory response too large")

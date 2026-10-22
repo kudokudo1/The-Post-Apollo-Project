@@ -293,6 +293,10 @@ Item {
                 // reserving invisible spacing on either side.
                 text: "ׅ˖"
                 font.pixelSize: 21
+                // Tighten only the space BETWEEN these two right ornaments.
+                // Keep the combining mark and outer star in one shaped text
+                // item so the near-note mark and its glow stay in place.
+                font.letterSpacing: -6
                 color: mediaDock.foregroundColor
             }
         }

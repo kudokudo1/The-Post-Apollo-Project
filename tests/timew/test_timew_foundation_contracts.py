@@ -20,7 +20,23 @@ assert 'import "widgets"' in preview and 'import "modules"' in preview
 assert "Scope {" in preview and "TimeW {" in preview
 assert "Clock {" in preview and "timeWindow: timewWindow" in preview
 assert "screen: previewDockWindow.screen" in preview
-assert "Clock {}" in shell  # The existing bar clock remains mounted.
+# Integrated bar clock still owns one visible dock, now paired with TimeW.
+clock_section = shell.split("        // Clock and TimeW.", 1)
+assert len(clock_section) == 2, "Missing TimeW dock section"
+clock_section = clock_section[1].split("        // Notifications", 1)[0]
+assert shell.count("            Clock {") == 1, "Duplicate bar clock"
+assert "width: clockDock.width" in clock_section
+assert "height: clockDock.height" in clock_section
+assert "id: clockDock" in clock_section
+assert "timeWindow: timewWindow" in clock_section
+assert "TimeW {" in clock_section
+assert "id: timewWindow" in clock_section
+assert 'screen: Quickshell.screens.find(s => s.name === "DP-5")' in clock_section
+assert "keyboardActive: !relationshipFocus.active" in clock_section
+assert "relationshipFocusModeActive: relationshipFocus.active" in clock_section
+assert "anchors.fill: parent" not in clock_section, "Clock uses self-sized geometry"
+assert shell.index("        // Clock and TimeW.") < shell.index("        // Notifications")
+
 
 # No accidental clock-format or dock-chassis rewrite.
 assert "property bool is24Hour: false" in clock

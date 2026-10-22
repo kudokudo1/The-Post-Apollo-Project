@@ -2,9 +2,12 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import "../components"
+import "hub"
+import qs.services.hub
 
-// TASKS M1: a presentation-only menu with no task data or sync service.
-// Stay mapped across opens; closed state uses an empty pointer input mask.
+// TASKS M3: reuses Hub's local checklist editor and single guarded store.
+// Other modes remain placeholders. Keep the window mapped with an empty
+// input mask while closed to avoid layer-shell remapping crashes.
 PanelWindow {
     id: root
 
@@ -22,7 +25,7 @@ PanelWindow {
     readonly property var mainModes: [
         { id: "tasks", label: "TASKS",
           emptyTitle: "NO TASKS LOADED",
-          emptyDetail: "TASK EDITOR // NOT CONNECTED" },
+          emptyDetail: "LOCAL CHECKLIST" },
         { id: "today", label: "TODAY",
           emptyTitle: "TODAY // NO FEED",
           emptyDetail: "DAILY TASKS // NOT CONNECTED" },
@@ -38,6 +41,23 @@ PanelWindow {
     ]
     property int selectedMainModeIndex: 0
     readonly property var activeMode: mainModes[selectedMainModeIndex]
+
+    // Keep task storage shared with ApolloHub. This menu does not create a
+    // FileView, storage service, or parallel task document.
+    readonly property string taskStoreState:
+        ApolloHubTodoStore.snapshot
+        ? ApolloHubTodoStore.snapshot.state : "loading"
+    readonly property string feedStatus:
+        activeMode.id !== "tasks" ? "NO FEED"
+        : taskStoreState === "ready" || taskStoreState === "empty" ? "LOCAL"
+        : taskStoreState === "saving" ? "SAVING"
+        : taskStoreState === "loading" ? "READING"
+        : taskStoreState === "unsupported" ? "UNSUP"
+        : "LOCKED"
+    readonly property color feedColor:
+        feedStatus === "LOCAL" ? Colors.cyan
+        : feedStatus === "SAVING" ? Colors.magenta
+        : Colors.orange
 
     function selectMainMode(index) {
         if (index >= 0 && index < mainModes.length)
@@ -69,8 +89,12 @@ PanelWindow {
 
     exclusiveZone: 0
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-    focusable: false
+    // TextInput needs keyboard focus, but only while the TASKS page is open.
+    // OnDemand does not request an indefinite exclusive keyboard lock.
+    WlrLayershell.keyboardFocus:
+        root.menuOpen && root.activeMode.id === "tasks"
+        ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    focusable: root.menuOpen && root.activeMode.id === "tasks"
 
     color: "transparent"
     surfaceFormat.opaque: false
@@ -118,7 +142,7 @@ PanelWindow {
                 elide: Text.ElideRight
             }
 
-            // A truthful state indicator, not a fake local task feed.
+            // Local store health for TASKS; reserved pages have no feed.
             Rectangle {
                 id: feedBadge
                 width: 68
@@ -128,13 +152,13 @@ PanelWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 color: Colors.dark
                 border.width: 1
-                border.color: Colors.orange
+                border.color: root.feedColor
 
                 GohuText {
                     anchors.centerIn: parent
-                    text: "NO FEED"
+                    text: root.feedStatus
                     font.pixelSize: 9
-                    color: Colors.orange
+                    color: root.feedColor
                 }
             }
 
@@ -194,7 +218,7 @@ PanelWindow {
             }
         }
 
-        // Independent view area. No data is fabricated for reserved modes.
+        // Shared content frame, with a live local editor only in TASKS mode.
         Item {
             id: mainModeContent
             anchors.top: tasksDivider.bottom
@@ -207,6 +231,7 @@ PanelWindow {
             anchors.bottomMargin: 14
 
             Column {
+                visible: root.activeMode.id !== "tasks"
                 anchors.centerIn: parent
                 width: parent.width
                 spacing: 12
@@ -229,6 +254,17 @@ PanelWindow {
                     font.pixelSize: 11
                     color: Colors.cyan
                 }
+            }
+
+            // The same presentation already used by ApolloHub's To-do tile.
+            // Explicit clicks initiate the single store's guarded, atomic
+            // asynchronous writes. A pending write is never called "saved".
+            ApolloHubTodoMini {
+                id: taskEditor
+                anchors.fill: parent
+                visible: root.menuOpen && root.activeMode.id === "tasks"
+                todoStore: ApolloHubTodoStore
+                todoSnapshot: ApolloHubTodoStore.snapshot
             }
         }
     }

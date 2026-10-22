@@ -32,7 +32,7 @@ for needle in ("import Quickshell.Networking", "Networking.devices",
 
 for needle in (
     ".pragma library", "function snapshot(", "function signalPercent(",
-    'internetState: "unverified"', "signalPercent:", 'state = "unavailable"',
+    'internetState: "unverified"', "signalPercent:", '? "unavailable"',
 ):
     assert needle in policy, f"Missing projection policy: {needle}"
 

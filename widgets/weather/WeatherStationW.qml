@@ -89,6 +89,38 @@ PanelWindow {
         );
     }
 
+    readonly property int spaceAgeMinutes: {
+        sourceStatusClock;
+
+        if (!spaceService)
+            return -1;
+
+        const stamp = spaceService.lastUpdated;
+        if (!stamp || typeof stamp.getTime !== "function")
+            return -1;
+
+        const millis = stamp.getTime();
+        if (!isFinite(millis) || millis <= 0)
+            return -1;
+
+        return Math.max(
+            0,
+            Math.floor((Date.now() - millis) / 60000)
+        );
+    }
+
+    function compactAge(ageMinutes) {
+        if (ageMinutes < 0)
+            return "--";
+        if (ageMinutes === 0)
+            return "<1m";
+        return ageMinutes + "m";
+    }
+
+    readonly property string footerSourceStatus:
+        "WEATHER " + compactAge(weatherAgeMinutes)
+        + " // SPACE " + compactAge(spaceAgeMinutes)
+
     readonly property bool weatherStale:
         weatherService
         && weatherService.ready
@@ -848,7 +880,7 @@ PanelWindow {
 
                 anchors.leftMargin: 20
 
-                text: weatherStation.weatherService && weatherStation.weatherService.ready ? "◉ WEATHER LINK ONLINE" : "◉ SYSTEM ONLINE"
+                text: weatherStation.footerSourceStatus
 
                 font.family: "GohuFont 11 Nerd Font Mono"
 

@@ -201,6 +201,23 @@ Item {
             height: 28
             anchors.verticalCenter: parent.verticalCenter
 
+            // Separate, wider ambient wash behind *only* the spectrum.
+            // Rounded, blurred, and faint so it tints the area rather than
+            // forming another rectangular cyan panel across the entire dock.
+            // Static geometry: this is NOT sampled from animated CAVA bars.
+            RectangularShadow {
+                id: cavaAmbientWash
+                anchors.centerIn: parent
+                width: Math.max(0, spectrum.width - 4 * mediaDock.softGlowSpread)
+                height: Math.max(0, spectrum.height - 2 * mediaDock.softGlowSpread)
+                radius: height / 2
+                blur: mediaDock.contentGlowRadius
+                spread: 0
+                color: mediaDock.accentColor
+                opacity: 0.22
+                z: -1
+            }
+
             Row {
                 anchors.fill: parent
                 spacing: 2

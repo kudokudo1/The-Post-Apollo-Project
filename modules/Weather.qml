@@ -204,14 +204,13 @@ DockButton {
                 }
             }
 
-            // Native scene-graph thermometer. Canvas proved unreliable in
-            // this dock path at runtime, so draw the same connected tube+bulb
-            // silhouette with Qt Quick Shapes instead.
+            // Compact native scene-graph thermometer: one smooth connected
+            // tube and circular bulb. Original 20×42 scaled to 17×35.
             Item {
                 id: weatherThermometer
                 anchors.verticalCenter: parent.verticalCenter
-                implicitWidth: 20
-                implicitHeight: 42
+                implicitWidth: 17
+                implicitHeight: 35
                 width: implicitWidth
                 height: implicitHeight
 
@@ -236,8 +235,8 @@ DockButton {
                     ColorAnimation { duration: 300 }
                 }
 
-                // Black vessel body. The narrow tube flares directly into the
-                // wider bulb, so the silhouette is one connected unit.
+                // Single connected vessel silhouette. The matching outline
+                // below uses identical geometry and rounded stroke joins.
                 Shape {
                     anchors.fill: parent
 
@@ -246,57 +245,62 @@ DockButton {
                         strokeColor: "transparent"
                         fillColor: Colors.black
 
-                        startX: 10
-                        startY: 1
+                        startX: 8.5
+                        startY: 1.2
 
                         PathQuad {
-                            x: 15
-                            y: 6
-                            controlX: 15
-                            controlY: 1
+                            x: 12.2
+                            y: 5.2
+                            controlX: 12.2
+                            controlY: 1.2
                         }
-                        PathLine { x: 15; y: 24 }
-                        PathQuad {
-                            x: 18
-                            y: 28
-                            controlX: 15
-                            controlY: 27
+                        PathLine { x: 12.2; y: 21.5 }
+                        // Shoulders meet the round bulb tangentially rather
+                        // than forming a sharp corner at the tube junction.
+                        PathCubic {
+                            x: 14.2
+                            y: 24.3
+                            control1X: 12.2
+                            control1Y: 23.0
+                            control2X: 13.5
+                            control2Y: 23.0
                         }
                         PathCubic {
-                            x: 10
-                            y: 41
-                            control1X: 18
-                            control1Y: 33
-                            control2X: 17
-                            control2Y: 39
+                            x: 8.5
+                            y: 33.8
+                            control1X: 18.0
+                            control1Y: 28.2
+                            control2X: 14.8
+                            control2Y: 33.8
                         }
                         PathCubic {
-                            x: 2
-                            y: 28
-                            control1X: 3
-                            control1Y: 39
-                            control2X: 2
-                            control2Y: 33
+                            x: 2.8
+                            y: 24.3
+                            control1X: 2.2
+                            control1Y: 33.8
+                            control2X: -1.0
+                            control2Y: 28.2
                         }
-                        PathQuad {
-                            x: 5
-                            y: 24
-                            controlX: 5
-                            controlY: 27
+                        PathCubic {
+                            x: 4.8
+                            y: 21.5
+                            control1X: 3.5
+                            control1Y: 23.0
+                            control2X: 4.8
+                            control2Y: 23.0
                         }
-                        PathLine { x: 5; y: 6 }
+                        PathLine { x: 4.8; y: 5.2 }
                         PathQuad {
-                            x: 10
-                            y: 1
-                            controlX: 5
-                            controlY: 1
+                            x: 8.5
+                            y: 1.2
+                            controlX: 4.8
+                            controlY: 1.2
                         }
                     }
                 }
 
-                // Real temperature liquid. This uses the same connected inner
-                // tube+bulb path and a hard vertical fill boundary, so the bulb
-                // fills first and the same body continues upward through the stem.
+                // Same joined fluid silhouette, inset inside the glass.
+                // A moving gradient stop drains through bulb and tube.
                 Shape {
                     anchors.fill: parent
                     visible: weatherThermometer.animatedLevel > 0
@@ -307,9 +311,9 @@ DockButton {
 
                         fillGradient: LinearGradient {
                             x1: 0
-                            y1: 3
+                            y1: 3.2
                             x2: 0
-                            y2: 39
+                            y2: 31.8
 
                             GradientStop {
                                 position: 0
@@ -332,122 +336,132 @@ DockButton {
                             }
                         }
 
-                        startX: 10
-                        startY: 3
+                        startX: 8.5
+                        startY: 3.2
 
                         PathQuad {
-                            x: 13
-                            y: 6
-                            controlX: 13
-                            controlY: 3
+                            x: 10.4
+                            y: 5.2
+                            controlX: 10.4
+                            controlY: 3.2
                         }
-                        PathLine { x: 13; y: 25 }
-                        PathQuad {
-                            x: 15.5
-                            y: 28
-                            controlX: 13
-                            controlY: 27
+                        PathLine { x: 10.4; y: 22.3 }
+                        PathCubic {
+                            x: 12.5
+                            y: 25.0
+                            control1X: 10.4
+                            control1Y: 23.6
+                            control2X: 11.9
+                            control2Y: 23.8
                         }
                         PathCubic {
-                            x: 10
-                            y: 39
-                            control1X: 15.5
-                            control1Y: 32
-                            control2X: 15
-                            control2Y: 37
+                            x: 8.5
+                            y: 31.8
+                            control1X: 15.9
+                            control1Y: 27.8
+                            control2X: 12.9
+                            control2Y: 31.8
                         }
                         PathCubic {
                             x: 4.5
-                            y: 28
-                            control1X: 5
-                            control1Y: 37
-                            control2X: 4.5
-                            control2Y: 32
+                            y: 25.0
+                            control1X: 4.1
+                            control1Y: 31.8
+                            control2X: 1.1
+                            control2Y: 27.8
                         }
-                        PathQuad {
-                            x: 7
-                            y: 25
-                            controlX: 7
-                            controlY: 27
+                        PathCubic {
+                            x: 6.6
+                            y: 22.3
+                            control1X: 5.1
+                            control1Y: 23.8
+                            control2X: 6.6
+                            control2Y: 23.6
                         }
-                        PathLine { x: 7; y: 6 }
+                        PathLine { x: 6.6; y: 5.2 }
                         PathQuad {
-                            x: 10
-                            y: 3
-                            controlX: 7
-                            controlY: 3
+                            x: 8.5
+                            y: 3.2
+                            controlX: 6.6
+                            controlY: 3.2
                         }
                     }
                 }
 
-                // White glass outline, drawn last so the liquid never obscures it.
+                // The white glass stays on top of the animated liquid.
                 Shape {
                     anchors.fill: parent
                     opacity: weatherThermometer.glassOpacity
 
                     ShapePath {
-                        strokeWidth: 2
+                        strokeWidth: 1.5
                         strokeColor: weatherThermometer.glassColor
+                        joinStyle: ShapePath.RoundJoin
+                        capStyle: ShapePath.RoundCap
                         fillColor: "transparent"
 
-                        startX: 10
-                        startY: 1
+                        startX: 8.5
+                        startY: 1.2
 
                         PathQuad {
-                            x: 15
-                            y: 6
-                            controlX: 15
-                            controlY: 1
+                            x: 12.2
+                            y: 5.2
+                            controlX: 12.2
+                            controlY: 1.2
                         }
-                        PathLine { x: 15; y: 24 }
-                        PathQuad {
-                            x: 18
-                            y: 28
-                            controlX: 15
-                            controlY: 27
+                        PathLine { x: 12.2; y: 21.5 }
+                        // Shoulders meet the round bulb tangentially rather
+                        // than forming a sharp corner at the tube junction.
+                        PathCubic {
+                            x: 14.2
+                            y: 24.3
+                            control1X: 12.2
+                            control1Y: 23.0
+                            control2X: 13.5
+                            control2Y: 23.0
                         }
                         PathCubic {
-                            x: 10
-                            y: 41
-                            control1X: 18
-                            control1Y: 33
-                            control2X: 17
-                            control2Y: 39
+                            x: 8.5
+                            y: 33.8
+                            control1X: 18.0
+                            control1Y: 28.2
+                            control2X: 14.8
+                            control2Y: 33.8
                         }
                         PathCubic {
-                            x: 2
-                            y: 28
-                            control1X: 3
-                            control1Y: 39
-                            control2X: 2
-                            control2Y: 33
+                            x: 2.8
+                            y: 24.3
+                            control1X: 2.2
+                            control1Y: 33.8
+                            control2X: -1.0
+                            control2Y: 28.2
                         }
-                        PathQuad {
-                            x: 5
-                            y: 24
-                            controlX: 5
-                            controlY: 27
+                        PathCubic {
+                            x: 4.8
+                            y: 21.5
+                            control1X: 3.5
+                            control1Y: 23.0
+                            control2X: 4.8
+                            control2Y: 23.0
                         }
-                        PathLine { x: 5; y: 6 }
+                        PathLine { x: 4.8; y: 5.2 }
                         PathQuad {
-                            x: 10
-                            y: 1
-                            controlX: 5
-                            controlY: 1
+                            x: 8.5
+                            y: 1.2
+                            controlX: 4.8
+                            controlY: 1.2
                         }
                     }
                 }
 
-                // Indicator marks are ordinary QML rectangles now, so their
-                // visibility is independent of the shape renderer. They share
-                // exactly the same glass color and opacity.
+                // Compact white scale ticks share the glass opacity.
                 Repeater {
                     model: 4
 
                     delegate: Rectangle {
-                        x: index % 2 === 0 ? 9 : 10
-                        y: 7 + index * 6
-                        width: index % 2 === 0 ? 3.5 : 2.5
+                        x: index % 2 === 0 ? 7.5 : 8
+                        y: 6 + index * 5.2
+                        width: index % 2 === 0 ? 3 : 2
                         height: 1
                         color: weatherThermometer.glassColor
                         opacity: weatherThermometer.glassOpacity

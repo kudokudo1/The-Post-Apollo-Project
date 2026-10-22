@@ -16,6 +16,8 @@ Item {
     property string feedback: ""
 
     signal textFocusChanged(bool focused)
+    // Optional host navigation into richer task details. Hub remains unchanged.
+    signal taskSelected(string taskId)
 
     readonly property string storeState:
         todoSnapshot && todoSnapshot.state ? String(todoSnapshot.state) : "loading"
@@ -335,6 +337,11 @@ Item {
                     elide: Text.ElideRight
                     text: todoEntry.awaitingDelete
                           ? "DELETE THIS TASK?" : todoEntry.modelData.title
+
+                    TapHandler {
+                        enabled: !todoEntry.awaitingDelete
+                        onTapped: todoMini.taskSelected(String(todoEntry.modelData.id))
+                    }
                 }
                 ActionButton {
                     width: 44

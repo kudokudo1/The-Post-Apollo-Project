@@ -14,6 +14,8 @@ Scope {
 
     property var weatherSource: null
     property var systemSource: null
+    // Optional reference to the existing Network dock, not another collector.
+    property var networkDockSource: null
 
     // Read the same Quickshell.Networking singleton already used by
     // modules/Network.qml. No second nmcli/iw/ethtool loop, and no writes.
@@ -45,7 +47,9 @@ Scope {
         ethernetConnected: ethernetNetworkDevice !== null
                            && ethernetNetworkDevice.connected === true,
         ethernetInterface: ethernetNetworkDevice
-                           ? ethernetNetworkDevice.name : ""
+                           ? ethernetNetworkDevice.name : "",
+        wifiLinkSpeedMbps: networkDockSource
+                           ? networkDockSource.observedWifiLinkMbps : -1
     })
 
     property double observationNowMs: Date.now()

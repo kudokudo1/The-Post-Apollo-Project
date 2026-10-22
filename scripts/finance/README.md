@@ -217,3 +217,57 @@ actual writes we must include stable transaction IDs and account IDs,
 explicit mutation authority, review confirmation, durable failure/retry
 boundaries, and a tested rollback path. A displayed account name alone
 must never be used as a write target.
+
+## FinanceW D9 // guarded transaction create and edit (opt-in, NOT activated)
+
+A reviewed D8 draft can now be explicitly confirmed. The UI offers NEW DRAFT,
+PREVIEW then CONFIRM SAVE; eligible history rows offer EDIT. Editing is
+limited to the date and amount of a simple, unlinked transaction. The
+existing payee is deliberately preserved and the description field is read-only
+during edit. Creating a new transaction uses a payee name, a selected stable
+account ID, and an uncategorized amount. There is no bank syncing, deleting,
+bulk import, or automatic retry.
+
+**IMPORTANT:** GitHub merge does not authorize financial writes. The writer
+refuses every request by default. To permit live operations, the operator
+must explicitly create the local 0600 file
+`~/.config/financew/transaction-writes-enabled` containing exactly
+`FINANCEW_TRANSACTION_WRITES_APPROVED`. Do not create it until after a new
+Actual data export and a successful local runtime review. The UI itself
+cannot create or change this permission. A missing, unsafe, or mismatched
+file leaves saving locked.
+
+### Mechanism
+
+- QML sends a reviewed JSON frame over private Node process stdin,
+  never over command-line arguments, tracked files, or logs.
+- The Node worker downloads the selected budget with the existing
+  `actual-password`, `actual-sync-id` and loopback URL credentials.
+- Before mutation it checks the active on-budget account, the transaction
+  date/amount, duplicate-date-and-amount candidates, and stale IDs. Imported
+  bank transactions, transfers, split/parent transactions, and closed or
+  off-budget accounts cannot be edited.
+- The code records a one-attempt journal in
+  `~/.local/state/financew/operations/` (0700 directory, 0600 files).
+  The journal has a SHA-256 command hash and outcome but no raw financial
+  fields. Each request ID is unique, any repeated ID is blocked, and an
+  unresolved attempt blocks every subsequent write. A crash can leave the
+  global `.write-lock` behind to block all future writes as well.
+- The Actual client uses a disposable data directory and performs exactly
+  one `addTransactions` or `updateTransaction` call, then `api.sync()`,
+  then a read-back check. Only this path can return committed.
+- Post-attempt errors and interrupted operations must be treated as
+  **UNCERTAIN**; do not retry. Inspect Actual on the standalone server,
+  reconcile the transaction and journal with the operator, and export a
+  safe backup before considering a new attempt.
+- No LIVE state or saved balance is inferred from an HTTP success alone.
+
+### Verification and recovery gates
+
+The D9 tests exercise only fake API objects and temp HOME directories;
+they do not execute real Actual mutations or use personal financial data.
+Live QML and end-to-end sync validation remain separate operator acceptance
+gates. Leaving the activation file absent is the safe rollback: FinanceW
+continues reading the budget and can preview edits, but cannot mutate data.
+Never blindly delete a recovery journal or `.write-lock`: their existence
+can mean a write happened even if the widget did not receive confirmation.

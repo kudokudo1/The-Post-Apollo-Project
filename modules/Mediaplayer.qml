@@ -140,6 +140,24 @@ Item {
         z: 0
     }
 
+    // Match the stars' extra local aura on the otherwise thinner clef PNG.
+    // It stays behind this single static icon, never the animated CAVA bars.
+    RectangularShadow {
+        id: trebleClefAura
+        x: mediaArtwork.x + musicMark.x + trebleClef.x
+           + (trebleClef.width - width) / 2
+        y: mediaArtwork.y + musicMark.y + trebleClef.y
+           + (trebleClef.height - height) / 2
+        width: Math.max(1, trebleClef.width - 2 * mediaDock.softGlowSpread)
+        height: Math.max(1, trebleClef.height - 2 * mediaDock.softGlowSpread)
+        radius: height / 2
+        blur: mediaDock.contentGlowRadius + 4
+        spread: 0
+        color: mediaDock.artworkAccentColor
+        opacity: mediaDock.softGlowOpacity
+        z: 0
+    }
+
     RectangularShadow {
         id: trailingStarAura
         x: mediaArtwork.x + musicMark.x + trailingStar.x

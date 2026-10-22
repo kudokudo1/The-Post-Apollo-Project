@@ -41,6 +41,9 @@ jobs:
       - name: Validate Apollo widget/menu/submenu notification destinations
         run: python3 tests/notifications/test_apollo_destination_routing.py
 
+      - name: Validate Notifications Control Bay scroll speed and lock
+        run: python3 tests/notifications/test_notification_scroll_speed.py
+
       - name: Validate native notification click destination and website fallback
         run: python3 tests/notifications/test_notification_destination_routing.py
 

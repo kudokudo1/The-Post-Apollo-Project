@@ -165,7 +165,7 @@ test("SEARCH and source button positions are swapped, input uses magenta and ora
     assert.match(ui, /id:\s*queryBezel[\s\S]*?border\.color:\s*Colors\.magenta/);
     assert.match(ui, /id:\s*searchInput[\s\S]*?color:\s*Colors\.magenta/);
     assert.match(ui, /cursorDelegate:\s*Rectangle\s*\{[\s\S]*?color:\s*Colors\.orange/);
-    assert.match(ui, /GohuText\s*\{[\s\S]*?GROOVE SALAD \/ RADIO[\s\S]*?color:\s*Colors\.magenta/);
+    assert.match(ui, /GohuText\s*\{[\s\S]*?GROOVE SALAD \/ PRESET[\s\S]*?color:\s*Colors\.magenta/);
 });
 
 test("browser action controls retain ordinary ActionButton variants", () => {
@@ -175,4 +175,17 @@ test("browser action controls retain ordinary ActionButton variants", () => {
     assert.doesNotMatch(ui, /destructive:\s*true|variant:\s*"special"/);
     assert.match(ui, /id:\s*sourceKey[\s\S]*?onClicked:\s*bay\.deckHost\.toggleCatalogSource/);
     assert.match(ui, /id:\s*searchKey[\s\S]*?onClicked:\s*bay\.deckHost\.searchLibrary/);
+});
+
+test("radio directory is browsable, paginated and loads the highlighted stream", () => {
+    const ui = fs.readFileSync(path.join(base, "widgets/MediaDeckBrowserControls.qml"), "utf8");
+    assert.match(deck, /catalogSource === "radio-browser"/);
+    assert.match(deck, /function nextRadioPage\(\)/);
+    assert.match(deck, /headless\.searchMedia\("radio-browser", browserControls\.queryText, nextBrowseCursor\)/);
+    assert.match(deck, /headless\.loadRadio\(item\.ref\.id\)/);
+    assert.match(deck, /headless\.browse\.nextCursor/);
+    assert.match(ui, /label: "NEXT 50"/);
+    assert.match(ui, /onClicked: bay\.deckHost\.nextRadioPage\(\)/);
+    assert.match(ui, /label: bay\.deckHost\.catalogSource === "youtube"/);
+    assert.match(bridge, /source !== "radio-browser"/);
 });

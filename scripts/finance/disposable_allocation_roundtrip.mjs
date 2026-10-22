@@ -3,10 +3,10 @@
 // This is an integration test for allocation_guard.mjs with an injected
 // recordAttempt spy. It is NOT a production writer and has no local activation.
 import assert from "node:assert/strict";
-import {spawn} from "node:child_process";
+import {spawn,spawnSync} from "node:child_process";
 import {createConnection} from "node:net";
 import {existsSync} from "node:fs";
-import {mkdtemp,mkdir,rm,chmod} from "node:fs/promises";
+import {mkdtemp,mkdir,rm,chmod,writeFile,readFile,stat} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join,dirname} from "node:path";
 import {fileURLToPath} from "node:url";
@@ -21,6 +21,7 @@ if(process.env.GITHUB_ACTIONS!=="true" || process.env.CI!=="true"
 
 const here=dirname(fileURLToPath(import.meta.url));
 const binary=join(here,"node_modules",".bin","actual-server");
+const writer=join(here,"write_allocation.mjs");
 const host="http://127.0.0.1:5006";
 const password="FICTIONAL-ONLY-D12-TEST-2026";
 const date=new Date().toISOString().slice(0,7)+"-01";
@@ -213,8 +214,76 @@ async function main(){
   assert.equal(rows[0].budgeted,target);
   assert.equal(rows[0].balance,category.balance+delta);
   assert.equal(after.toBudget,before.toBudget-delta);
+
+  // D12c: end the test API session. Run the actual production Node writer
+  // in its own process against this disposable loopback server and budget.
+  await endClient();
+  stage="real-writer-private-config";
+  const writerHome=join(temporary,"fictional-writer-home");
+  const config=join(writerHome,".config","financew");
+  await mkdir(config,{recursive:true,mode:0o700});
+  for(const [name,value] of [
+    ["actual-server-url",host],
+    ["actual-password",password],
+    ["actual-sync-id",syncId]
+  ])await writeFile(join(config,name),value+"\n",{mode:0o600,flag:"wx"});
+  const writerDelta=Math.min(100,after.toBudget);
+  assert.ok(writerDelta>=1,"fictional-writer-funds-unavailable");
+  const newTarget=rows[0].budgeted+writerDelta;
+  const writerCommand={
+    ...command,requestId:"d".repeat(32),
+    expectedBudgetedCents:rows[0].budgeted,
+    expectedAvailableCents:rows[0].balance,
+    expectedToBudgetCents:after.toBudget,
+    targetBudgetedCents:newTarget
+  };
+  const executeWriter=()=>{
+    return spawnSync(process.execPath,[writer],{
+      encoding:"utf8",timeout:45000,
+      input:JSON.stringify(writerCommand)+"\n",
+      env:{...process.env,HOME:writerHome,ACTUAL_SERVER_URL:"",
+        ACTUAL_PASSWORD_FILE:"",ACTUAL_SYNC_ID:"",
+        ACTUAL_SYNC_ID_FILE:"",ACTUAL_ENCRYPTION_PASSWORD_FILE:""}
+    });
+  };
+  stage="real-writer-gate-refusal";
+  const locked=executeWriter();
+  assert.equal(locked.error,undefined);
+  assert.equal(locked.status,1);
+  assert.equal(locked.stdout.trim(),
+    "FINANCEW_ALLOCATION_RESULT blocked:writes-disabled");
+  const journal=join(writerHome,".local","state","financew","operations",
+    "allocation-"+writerCommand.requestId+".json");
+  assert.equal(existsSync(journal),false);
+
+  stage="real-writer-commit";
+  await writeFile(join(config,"allocation-writes-enabled"),
+    "FINANCEW_ALLOCATION_WRITES_APPROVED\n",{mode:0o600,flag:"wx"});
+  const saved=executeWriter();
+  assert.equal(saved.error,undefined);
+  assert.equal(saved.status,0);
+  assert.equal(saved.stdout.trim(),"FINANCEW_ALLOCATION_RESULT committed");
+  const receipt=JSON.parse(await readFile(journal,"utf8"));
+  assert.equal(receipt.status,"committed");
+  assert.equal((await stat(journal)).mode & 0o077,0);
+  assert.equal((await readFile(journal,"utf8")).includes(categoryId),false);
+  stage="real-writer-repeat-refusal";
+  const duplicate=executeWriter();
+  assert.equal(duplicate.status,1);
+  assert.equal(duplicate.stdout.trim(),
+    "FINANCEW_ALLOCATION_RESULT blocked:operation-already-attempted");
+
+  stage="real-writer-fresh-client-readback";
+  await startClient("after-cli");
+  await api.downloadBudget(syncId);
+  const confirmed=await api.getBudgetMonth(month);
+  const updated=findCategory(confirmed,categoryId);
+  assert.equal(updated.length,1);
+  assert.equal(updated[0].budgeted,newTarget);
+  assert.equal(updated[0].balance,rows[0].balance+writerDelta);
+  assert.equal(confirmed.toBudget,after.toBudget-writerDelta);
   stage="pass";
-  process.stdout.write("FINANCEW_D12B_DISPOSABLE_PASS allocated/synced/readback/stale-guard\n");
+  process.stdout.write("FINANCEW_D12B_D12C_DISPOSABLE_PASS real-server/gate/allocation/replay/readback\n");
 }
 try{await main();}
 catch(e){

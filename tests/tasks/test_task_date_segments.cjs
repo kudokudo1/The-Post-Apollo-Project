@@ -1,0 +1,52 @@
+#!/usr/bin/env node
+"use strict";
+const assert=require("node:assert/strict");
+const fs=require("node:fs");
+const path=require("node:path");
+const vm=require("node:vm");
+const file=path.join(__dirname,"../../widgets/tasks/TaskDateSegments.js");
+const code=fs.readFileSync(file,"utf8").replace(/^\s*\.pragma library\s*/m,"");
+const P=vm.createContext({Date,Number,String,Math,isNaN});
+vm.runInContext(code,P,{filename:file});
+
+assert.equal(P.daysInMonth(2028,2),29);
+assert.equal(P.daysInMonth(2029,2),28);
+assert.equal(P.daysInMonth(2000,2),29);
+assert.equal(P.daysInMonth(1900,2),28);
+assert.equal(P.daysInMonth(2026,13),0);
+assert.equal(P.part("2028-02-29","year"),"2028");
+assert.equal(P.part("2028-02-29","month"),"02");
+assert.equal(P.part("2028-02-29","day"),"29");
+assert.equal(P.part("","month"),"");
+
+assert.equal(P.step("2028-02-29","year",1),"2029-02-28");
+assert.equal(P.step("2026-01-31","month",1),"2026-02-28");
+assert.equal(P.step("2028-01-31","month",1),"2028-02-29");
+assert.equal(P.step("2026-12-31","month",1),"2027-01-31");
+assert.equal(P.step("2027-01-31","month",-1),"2026-12-31");
+assert.equal(P.step("2028-03-01","day",-1),"2028-02-29");
+assert.equal(P.step("2026-12-31","day",1),"2027-01-01");
+assert.equal(P.step("0001-01-01","day",-1),"0001-01-01");
+assert.equal(P.step("9999-12-31","day",1),"9999-12-31");
+assert.equal(P.step("0001-01-31","month",-1),"0001-01-31");
+assert.equal(P.step("9999-12-31","year",1),"9999-12-31");
+assert.equal(P.step("2026-10-22","banana",1),"2026-10-22");
+assert.equal(P.step("2026-10-22","day",3),"2026-10-22");
+// Day stepping at local DST edges is civil, not a local-time 24h duration.
+assert.equal(P.step("2026-03-07","day",1),"2026-03-08");
+assert.equal(P.step("2026-11-01","day",1),"2026-11-02");
+assert.equal(P.step("", "day",1,new Date(2026,9,22)),"2026-10-23");
+assert.equal(P.setPart("2028-02-29","year","2029").date,"2029-02-28");
+assert.equal(P.setPart("2026-04-30","day","31").date,"2026-04-30");
+assert.equal(P.setPart("2026-10-22","month","2").date,"2026-02-22");
+assert.equal(P.setPart("2026-10-22","year","0001").date,"0001-10-22");
+assert.equal(P.setPart("2026-10-22","month","00").accepted,false);
+assert.equal(P.setPart("2026-10-22","month","13").accepted,false);
+assert.equal(P.setPart("2026-10-22","year","0").accepted,false);
+assert.equal(P.setPart("2026-10-22","day","32").accepted,false);
+assert.equal(P.setPart("2026-10-22","day","abc").accepted,false);
+assert.equal(P.setPart("2026-10-22","day","").accepted,false);
+assert.equal(P.setPart("2026-10-22","year","20267").accepted,false);
+assert.equal(P.setPart("2026-10-22","day","",new Date(2026,9,22)).date,"2026-10-22");
+assert.equal(P.setPart("", "month","12",new Date(2026,9,22)).date,"2026-12-22");
+console.log("TASKS date stepper Gregorian/DST/edit contracts: PASS");

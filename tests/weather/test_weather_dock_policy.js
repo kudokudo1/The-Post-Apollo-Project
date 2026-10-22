@@ -164,13 +164,21 @@ assert.match(dock, /control1X:\s*weatherThermometer\.outerLeftJoinX \+ 0\.58/);
 assert.match(dock, /control2X:\s*weatherThermometer\.innerRightJoinX - 0\.55/);
 assert.match(dock, /control1X:\s*weatherThermometer\.innerLeftJoinX \+ 0\.55/);
 
-// Measurement marks belong to the right of the tube, not over its liquid.
+// Tick strokes must sit inside the right glass wall AND remain beyond
+// the liquid. Test actual numeric coordinates to prevent a repeat of #434.
 const tickStart = dock.lastIndexOf("Repeater {");
-const ticks = dock.slice(tickStart, tickStart + 400);
-assert.match(ticks, /x:\s*13\.2/);
-assert.match(ticks, /width:\s*index % 2 === 0 \? 2\.5 : 1\.8/);
-assert.ok(13.2 > 12.2 + strokeHalf);
-assert.ok(13.2 + 2.5 < width);
+const ticks = dock.slice(tickStart, tickStart + 410);
+assert.match(dock, /readonly property real tickRightX:\s*12\.2 - 1\.5 \/ 2 - 0\.2/);
+assert.match(ticks, /width:\s*index % 2 === 0 \? 1\.2 : 0\.65/);
+assert.match(ticks, /x:\s*weatherThermometer\.tickRightX - width/);
+assert.match(ticks, /y:\s*6 \+ index \* 4\.2/);
+const tickRight = 12.2 - strokeHalf - 0.2;
+for (const tickLength of [1.2, 0.65]) {
+    const tickLeft = tickRight - tickLength;
+    assert.ok(tickLeft >= 9.75 + 0.2, "no overlap with liquid");
+    assert.ok(tickRight < 12.2 - strokeHalf, "tick is inside the glass rail");
+}
+assert.ok(6 + 3 * 4.2 < 19.3, "all ticks stay above the rounded shoulder");
 
 // The real normalized level drives a vertical gradient through one connected
 // inner tube+bulb path, rather than a permanently filled decorative bulb.

@@ -1012,11 +1012,227 @@ PanelWindow {
                         }
                     }
 
+                    Column {
+                        id: converterPane
+                        visible: timew.selectedMode === "calc"
+                        width: parent.width
+                        spacing: 12
+
+                        GohuText {
+                            width: parent.width
+                            text: "TIME ZONE // DATE + TIME CONVERTER"
+                            color: Colors.white
+                            font.pixelSize: 13
+                        }
+
+                        Row {
+                            width: parent.width
+                            height: 32
+                            spacing: 8
+                            GohuText {
+                                width: 55
+                                height: parent.height
+                                verticalAlignment: Text.AlignVCenter
+                                text: "FROM"
+                                color: Colors.cyan
+                                font.pixelSize: 11
+                            }
+                            ActionButton {
+                                width: 67
+                                height: 30
+                                label: "CHANGE"
+                                labelPixelSize: 9
+                                accentColor: Colors.white
+                                onLeftClicked: timew.cycleConverterZone("source")
+                            }
+                            GohuText {
+                                width: parent.width - 55 - 67 - 16
+                                height: parent.height
+                                verticalAlignment: Text.AlignVCenter
+                                text: timew.converterSourceZone
+                                elide: Text.ElideRight
+                                color: Colors.white
+                                font.pixelSize: 11
+                            }
+                        }
+
+                        Row {
+                            width: parent.width
+                            height: 32
+                            spacing: 8
+                            GohuText {
+                                width: 55
+                                height: parent.height
+                                verticalAlignment: Text.AlignVCenter
+                                text: "TO"
+                                color: Colors.cyan
+                                font.pixelSize: 11
+                            }
+                            ActionButton {
+                                width: 67
+                                height: 30
+                                label: "CHANGE"
+                                labelPixelSize: 9
+                                accentColor: Colors.white
+                                onLeftClicked: timew.cycleConverterZone("target")
+                            }
+                            GohuText {
+                                width: parent.width - 55 - 67 - 16
+                                height: parent.height
+                                verticalAlignment: Text.AlignVCenter
+                                text: timew.converterTargetZone
+                                elide: Text.ElideRight
+                                color: Colors.white
+                                font.pixelSize: 11
+                            }
+                        }
+
+                        Row {
+                            id: converterInputs
+                            width: parent.width
+                            height: 34
+                            spacing: 7
+                            TextField {
+                                id: converterDateInput
+                                width: (converterInputs.width
+                                        - converterInputs.spacing) * 0.59
+                                height: parent.height
+                                text: timew.converterDate
+                                placeholderText: "YYYY-MM-DD"
+                                color: Colors.magenta
+                                placeholderTextColor: Colors.cyan
+                                selectionColor: Colors.magenta
+                                selectedTextColor: Colors.black
+                                font.family: "GohuFont 11 Nerd Font Mono"
+                                font.pixelSize: 12
+                                cursorDelegate: Rectangle {
+                                    width: 2
+                                    color: Colors.orange
+                                }
+                                background: Rectangle {
+                                    color: Colors.black
+                                    border.width: 1
+                                    border.color: converterDateInput.activeFocus
+                                                  ? Colors.magenta : Colors.cyan
+                                }
+                                onTextEdited: {
+                                    timew.converterDate = text;
+                                    timew.converterResult = null;
+                                }
+                            }
+                            TextField {
+                                id: converterTimeInput
+                                width: converterInputs.width
+                                       - converterDateInput.width
+                                       - converterInputs.spacing
+                                height: parent.height
+                                text: timew.converterTime
+                                placeholderText: "HH:MM (24H)"
+                                color: Colors.magenta
+                                placeholderTextColor: Colors.cyan
+                                selectionColor: Colors.magenta
+                                selectedTextColor: Colors.black
+                                font.family: "GohuFont 11 Nerd Font Mono"
+                                font.pixelSize: 12
+                                cursorDelegate: Rectangle {
+                                    width: 2
+                                    color: Colors.orange
+                                }
+                                background: Rectangle {
+                                    color: Colors.black
+                                    border.width: 1
+                                    border.color: converterTimeInput.activeFocus
+                                                  ? Colors.magenta : Colors.cyan
+                                }
+                                onTextEdited: {
+                                    timew.converterTime = text;
+                                    timew.converterResult = null;
+                                }
+                            }
+                        }
+
+                        ActionButton {
+                            id: converterRunButton
+                            width: parent.width
+                            height: 34
+                            label: timew.converterBusy ? "CONVERTING..." : "CONVERT // DATE + TIME"
+                            accentColor: Colors.white
+                            available: !timew.converterBusy
+                            onLeftClicked: timew.runTimeConverter()
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 2
+                            color: Colors.cyan
+                            opacity: 0.5
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            color: timew.converterResult
+                                   && timew.converterResult.status === "READY"
+                                   ? Colors.cyan : Colors.orange
+                            font.pixelSize: 11
+                            text: timew.converterBusy
+                                  ? "CONVERSION // WORKING"
+                                  : !timew.converterResult
+                                  ? "CONVERSION // ENTER DATE AND TIME"
+                                  : timew.converterResult.status === "READY"
+                                  ? "CONVERSION // 1 VALID INSTANT"
+                                  : timew.converterResult.status === "AMBIGUOUS_LOCAL_TIME"
+                                  ? "REPEATED HOUR // TWO POSSIBLE INSTANTS"
+                                  : timew.converterResult.status === "NONEXISTENT_LOCAL_TIME"
+                                  ? "TIME DOES NOT EXIST // DST CLOCK JUMP"
+                                  : "CONVERSION // " + timew.converterResult.status
+                        }
+
+                        Repeater {
+                            model: timew.converterResult
+                                   && timew.converterResult.options
+                                   ? timew.converterResult.options : []
+                            Column {
+                                width: converterPane.width
+                                spacing: 4
+                                GohuText {
+                                    width: parent.width
+                                    font.pixelSize: 11
+                                    color: Colors.white
+                                    text: "RESULT " + (index + 1)
+                                          + " // " + (index === 0 ? "EARLIER" : "LATER")
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    text: modelData.destination
+                                    color: timew.clockReadoutColor
+                                    font.pixelSize: 13
+                                    elide: Text.ElideRight
+                                }
+                                GohuText {
+                                    width: parent.width
+                                    text: "SOURCE // " + modelData.source
+                                    color: Colors.orange
+                                    font.pixelSize: 11
+                                    elide: Text.ElideRight
+                                }
+                            }
+                        }
+
+                        GohuText {
+                            width: parent.width
+                            wrapMode: Text.Wrap
+                            text: "Use CLOCK > WORLD to select other zones, "
+                                  + "then return here. Calculations do not change system time."
+                            color: Colors.white
+                            opacity: 0.72
+                            font.pixelSize: 11
+                        }
+                    }
+
                     GohuText {
-                        visible: timew.selectedMode !== "clock"
-                        text: timew.selectedMode === "calc"
-                              ? "TIME CALCULATOR // NOT CONNECTED"
-                              : timew.selectedMode === "tools"
+                        visible: timew.selectedMode === "tools"
+                                 || timew.selectedMode === "machine"
+                        text: timew.selectedMode === "tools"
                               ? "STOPWATCH + TIMERS // NOT CONNECTED"
                               : "DESKTOP CHECKPOINTS // NOT CONNECTED"
                         color: Colors.orange
@@ -1036,7 +1252,9 @@ PanelWindow {
                         visible: !(timew.selectedMode === "clock"
                                    && timew.worldSearchPopupOpen)
                         text: timew.selectedMode === "clock"
-                              ? "LOCAL + WORLD // LIVE // CONVERTER NEXT"
+                              ? "LOCAL + WORLD // LIVE // CALC HAS CONVERTER"
+                              : timew.selectedMode === "calc"
+                              ? "TIME ZONE CONVERTER // READ ONLY"
                               : "FOUNDATION PREVIEW // UI ONLY"
                         color: Colors.white
                         font.pixelSize: 11

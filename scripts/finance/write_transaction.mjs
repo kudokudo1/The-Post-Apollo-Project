@@ -2,7 +2,7 @@
 // FinanceW D9: explicit, guarded transaction writer. Nothing writes unless a
 // mode-0600 operator-owned local authorization file is present. No argv data.
 // One JSON command over stdin; no automatic retries or exposed financial logs.
-import {readFile, lstat, mkdir, open, mkdtemp, rm, chmod} from "node:fs/promises";
+import {readFile, writeFile, readdir, lstat, mkdir, open, mkdtemp, rm, chmod} from "node:fs/promises";
 import {tmpdir, homedir} from "node:os";
 import {join} from "node:path";
 import {createHash} from "node:crypto";
@@ -67,6 +67,16 @@ async function main() {
     const syncId = await privateFile(join(config,"actual-sync-id"));
     if (!/^[a-zA-Z0-9-]{8,80}$/.test(syncId))
       throw new TransactionRefusal("invalid-sync-id");
+    // Any unresolved earlier attempt blocks ALL later saves until manual
+    // inspection. Neither reboot nor creating a new request ID bypasses it.
+    for (const name of await readdir(ledgerDir)) {
+      if (!name.endsWith(".json")) continue;
+      let prior;
+      try { prior = JSON.parse(await privateFile(join(ledgerDir,name))); }
+      catch {throw new TransactionRefusal("recovery-needed");}
+      if (!prior || prior.status !== "committed")
+        throw new TransactionRefusal("recovery-needed");
+    }
     const journalPath = join(ledgerDir,cmd.requestId+".json");
     // A repeated request identity is always blocked, including after crash.
     // The journal carries only a command digest, never transaction details.
@@ -78,7 +88,7 @@ async function main() {
       catch {throw new TransactionRefusal("operation-already-attempted");}
       try {
         await file.writeFile(JSON.stringify({
-          version:1,hash:digest,action:cmd.action,attemptedAt:new Date().toISOString()
+          version:1,status:"attempted",hash:digest,action:cmd.action,attemptedAt:new Date().toISOString()
         })+"\n");
         await file.sync();
         attempted = true;
@@ -92,6 +102,15 @@ async function main() {
     await api.downloadBudget(syncId,encryptionPassword
       ? {password:encryptionPassword} : undefined);
     const result = await executeTransaction({api, input:cmd, recordAttempt});
+    // Mark successful only after Actual explicitly completed sync and
+    // the operation re-read succeeded. Ledger update itself must be durable.
+    const record = {
+      version:1,status:"committed",hash:digest,action:cmd.action,
+      completedAt:new Date().toISOString()
+    };
+    await writeFile(journalPath,JSON.stringify(record)+"\\n",{mode:0o600});
+    const verified = await open(journalPath,"r");
+    try {await verified.sync();} finally {await verified.close();}
     return result.status;
   } catch (error) {
     if (attempted) return "uncertain";

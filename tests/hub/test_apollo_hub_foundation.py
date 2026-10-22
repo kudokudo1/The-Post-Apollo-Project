@@ -127,8 +127,8 @@ assert "onLeftClicked: hub.menuOpen = false" in window[close_start:close_end + 4
 import re
 
 for path, source, count in (
-    ("widgets/ApolloHubW.qml", window, 6),
-    ("widgets/hub/ApolloHubTile.qml", tile, 3),
+    ("widgets/ApolloHubW.qml", window, 7),
+    ("widgets/hub/ApolloHubTile.qml", tile, 4),
 ):
     actions = len(re.findall(r"\bActionButton\s*\{", source))
     tracked = len(re.findall(
@@ -144,9 +144,10 @@ for action in (
     'label: "+ MODE"',
     'label: "+ GROUP"',
     'label: "+ TILE"',
+    'label: "UNDO"',
 ):
     assert action in window, f"Hub button behavior changed: {action}"
-for action in ('label: "←"', 'label: "→"', 'label: "SWAP"'):
+for action in ('label: "←"', 'label: "→"', 'label: "SWAP"', 'label: "×"'):
     assert action in tile, f"Hub edit-tile action changed: {action}"
 
 shared_action = (ROOT / "components/ActionButton.qml").read_text(encoding="utf-8")
@@ -156,15 +157,33 @@ assert "contentHost.y + labelText.y" in shared_action
 
 # Configure modes/sub-modes and exchange module positions independently.
 for name in ("defaultLayout", "normalize", "parse", "swapTiles",
-             "renameMode", "addMode", "addSubMode", "addTile", "cycleTile"):
+             "renameMode", "addMode", "addSubMode", "addTile", "cycleTile",
+             "removeTile", "resizeTile", "storageIssue"):
     assert "function " + name + "(" in layout
-assert 'version: 1' in layout
-assert 'Math.min(6, data.modes.length)' in layout
-assert 'Math.min(6, inputMode.subModes.length)' in layout
-assert 'Math.min(8, inputSub.tiles.length)' in layout
+assert 'var LAYOUT_VERSION = 2' in layout
+assert 'version: LAYOUT_VERSION' in layout
+assert 'Math.min(MAX_MODES, data.modes.length)' in layout
+assert 'Math.min(MAX_SUBMODES, inputMode.subModes.length)' in layout
+assert 'Math.min(MAX_TILES, inputSub.tiles.length)' in layout
+assert 'rowSpan:' in layout
+assert 'nextTileId' in layout
+assert 'function assignId(input)' in layout
 assert "onMoveLeft: hub.shiftTile(" in window
 assert "onMoveRight: hub.shiftTile(" in window
 assert "Layout.cycleTile(" in window
+assert "signal removeTile(int index)" in tile
+assert 'label: "×"' in tile
+assert 'accentColor: Colors.red' in tile
+assert 'onLeftClicked: tile.removeTile(tile.tileIndex)' in tile
+assert 'onRemoveTile: hub.removeEditedTile(index)' in window
+assert 'Layout.removeTile(layout, selectedModeIndex,' in window
+assert 'function undoLastLayoutEdit()' in window
+assert 'onLeftClicked: hub.undoLastLayoutEdit()' in window
+assert 'property var layoutUndoStack: []' in window
+assert 'layoutStorageIssue.length > 0' in window
+assert 'Layout.storageIssue(ApolloHubStore.layoutJson)' in window
+assert 'height: 140 * (tileConfig.rowSpan || 1)' in window
+assert 'APOLLO HUB  //  LIVE MODULES CONNECTED' in window
 assert 'TimePolicy.snapshot(tile.now.getTime(), tile.use24Hour)' in tile
 assert "Qt.formatDate(tile.now" not in tile
 

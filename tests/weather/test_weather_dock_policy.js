@@ -107,30 +107,33 @@ assert.match(dock, /weatherStationWindow\.toggle\(\)/);
 assert.match(dock, /implicitHeight:\s*50/);
 assert.match(dock, /implicitWidth:\s*Math\.ceil\(weatherContent\.implicitWidth\)\s*\+\s*6/);
 // Preserve an identifiable weather condition, live numeric readout, and a
-// compact classic thermometer. The tube and wider bulb must be one continuous
-// path and the real temperature level must fill/drain through both.
+// compact classic thermometer. Canvas was not rendering in the dock at runtime,
+// so the instrument must use native Qt Quick Shapes instead.
+assert.match(dock, /import QtQuick\.Shapes/);
 assert.match(dock, /id:\s*weatherThermometer[\s\S]*?implicitWidth:\s*20[\s\S]*?implicitHeight:\s*42[\s\S]*?width:\s*implicitWidth[\s\S]*?height:\s*implicitHeight/);
 assert.doesNotMatch(dock, /text:\s*"🌡"/);
-assert.match(dock, /id:\s*thermometerCanvas/);
-assert.match(dock, /function traceThermometer\(/);
-assert.match(dock, /outerTubeHalf\s*=\s*5/);
-assert.match(dock, /outerBulbHalf\s*=\s*8/);
-assert.match(dock, /innerTubeHalf\s*=\s*3/);
-assert.match(dock, /innerBulbHalf\s*=\s*5\.5/);
-assert.match(dock, /ctx\.clip\(\)/);
-assert.match(dock, /innerHeight\s*\*\s*weatherThermometer\.animatedLevel/);
-assert.match(dock, /ctx\.fillRect\([\s\S]*?innerBottom - fillHeight[\s\S]*?fillHeight/);
-// There must still be no separately painted fixed bulb: the silhouette itself
-// widens into the bulb and the clipped liquid remains one connected body.
+assert.doesNotMatch(dock, /\bCanvas\s*\{/);
+assert.match(dock, /\bShape\s*\{/);
+assert.match(dock, /\bShapePath\s*\{/);
+assert.match(dock, /\bPathQuad\s*\{/);
+assert.match(dock, /\bPathCubic\s*\{/);
+// Outer tube narrows to x=5..15 and widens to a x=2..18 bulb.
+assert.match(dock, /PathLine\s*\{\s*x:\s*15;\s*y:\s*24\s*\}/);
+assert.match(dock, /PathQuad\s*\{[\s\S]*?x:\s*18[\s\S]*?y:\s*28/);
+assert.match(dock, /PathCubic\s*\{[\s\S]*?x:\s*10[\s\S]*?y:\s*41/);
+// The real normalized level drives a vertical gradient through one connected
+// inner tube+bulb path, rather than a permanently filled decorative bulb.
+assert.match(dock, /readonly property real fillStart:[\s\S]*?1 - animatedLevel/);
+assert.match(dock, /fillGradient:\s*LinearGradient\s*\{/);
+assert.match(dock, /position:\s*weatherThermometer\.fillStart[\s\S]*?color:\s*weatherThermometer\.liquidColor/);
+assert.match(dock, /visible:\s*weatherThermometer\.animatedLevel > 0/);
 assert.doesNotMatch(dock, /id:\s*glassBulb/);
 assert.doesNotMatch(dock, /id:\s*liquidBulb/);
-assert.match(dock, /centerX \+ bulbHalfWidth[\s\S]*?centerX - bulbHalfWidth/);
-// Scale marks remain inside the tube and explicitly share glass color/opacity.
+// Scale marks are ordinary QML rectangles inside the tube and use exactly the
+// same glass color and opacity as the outline.
 assert.match(dock, /readonly property color glassColor:\s*Colors\.white/);
 assert.match(dock, /readonly property real glassOpacity:\s*1\.0/);
-assert.match(dock, /ctx\.globalAlpha\s*=\s*weatherThermometer\.glassOpacity[\s\S]*?ctx\.strokeStyle\s*=\s*weatherThermometer\.glassColor[\s\S]*?Four indicator marks inside the tube[\s\S]*?ctx\.strokeStyle\s*=\s*weatherThermometer\.glassColor/);
-assert.match(dock, /tickEndX\s*=\s*innerTubeRight\s*-\s*0\.5/);
-assert.match(dock, /for \(let i = 0; i < 4; i\+\+\)/);
+assert.match(dock, /Repeater\s*\{\s*model:\s*4[\s\S]*?delegate:\s*Rectangle\s*\{[\s\S]*?color:\s*weatherThermometer\.glassColor[\s\S]*?opacity:\s*weatherThermometer\.glassOpacity/);
 assert.match(dock, /Behavior on animatedLevel[\s\S]*?NumberAnimation\s*\{[\s\S]*?duration:\s*300/);
 assert.match(dock, /Behavior on liquidColor[\s\S]*?ColorAnimation\s*\{\s*duration:\s*300/);
 assert.match(dock, /WeatherDockPolicy\.temperatureState\(/);

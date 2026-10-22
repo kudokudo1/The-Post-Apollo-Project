@@ -23,15 +23,16 @@ export async function getTransactions(accountId,from,to) {
   return (await read()).transactions.filter(t => t.account === accountId
     && t.date >= from && t.date <= to);
 }
-export async function addTransactions(accountId,entries,runTransfers,learnCategories) {
-  if (runTransfers !== false || learnCategories !== false || entries.length !== 1)
+export async function addTransactions(accountId,entries,options) {
+  if (options?.runTransfers !== false
+      || options?.learnCategories !== false || entries.length !== 1)
     throw new Error("unexpected-test-mutation");
   const data=await read();
-  const entry={...entries[0]};
+  const entry={account:accountId,...entries[0]};
   data.transactions.push(entry);
   data.events.push("add");
   await write(data);
-  return [entry.id];
+  return "ok";
 }
 export async function updateTransaction(id,fields) {
   if (Object.keys(fields).sort().join(",") !== "amount,date")

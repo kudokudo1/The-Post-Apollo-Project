@@ -572,6 +572,110 @@ PanelWindow {
                             font.pixelSize: 14
                         }
 
+                        // Search remains above all five selectors. Its
+                        // results float over the lower readouts instead of
+                        // resizing the TimeW chassis or moving other modes.
+                        Item {
+                            id: worldSearchArea
+                            width: parent.width
+                            height: 34
+                            z: 30
+
+                            TextField {
+                                id: worldSearchInput
+                                anchors.fill: parent
+                                placeholderText: "SEARCH CITY / TIME ZONE"
+                                placeholderTextColor: Colors.cyan
+                                text: timew.worldSearchQuery
+                                color: Colors.white
+                                selectionColor: Colors.magenta
+                                selectedTextColor: Colors.black
+                                font.family: "GohuFont 11 Nerd Font Mono"
+                                font.pixelSize: 12
+                                leftPadding: 9
+                                rightPadding: 9
+                                selectByMouse: true
+                                background: Rectangle {
+                                    color: Colors.black
+                                    border.color: worldSearchInput.activeFocus
+                                                  ? Colors.magenta : Colors.cyan
+                                    border.width: 1
+                                }
+                                onTextEdited: timew.worldSearchEdited(text)
+                                onAccepted: {
+                                    if (timew.worldSearchMatches.length > 0)
+                                        timew.selectWorldSearchResult(
+                                            timew.worldSearchMatches[0].id);
+                                }
+                                Keys.onPressed: function(event) {
+                                    if (event.key === Qt.Key_Escape) {
+                                        timew.worldSearchPopupOpen = false;
+                                        worldSearchInput.focus = false;
+                                        Qt.callLater(timew.restoreKeyboardFocus);
+                                        event.accepted = true;
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                id: worldSearchPopup
+                                anchors.top: parent.bottom
+                                anchors.topMargin: 3
+                                width: parent.width
+                                height: timew.worldSearchMatches.length > 0
+                                        ? 8 + timew.worldSearchMatches.length * 30
+                                        : 34
+                                z: 60
+                                visible: timew.menuOpen
+                                         && timew.selectedMode === "clock"
+                                         && timew.worldModeActive
+                                         && timew.worldSearchPopupOpen
+                                color: Colors.black
+                                border.width: 1
+                                border.color: Colors.white
+
+                                Column {
+                                    anchors.fill: parent
+                                    anchors.margins: 4
+                                    spacing: 2
+
+                                    Repeater {
+                                        model: timew.worldSearchMatches
+
+                                        ActionButton {
+                                            width: worldSearchPopup.width - 8
+                                            height: 28
+                                            label: modelData.label
+                                            labelPixelSize: 11
+                                            labelHorizontalAlignment: Text.AlignLeft
+                                            trackLabelGlowLocally: true
+                                            accentColor: Colors.white
+                                            softGlowEnabled: false
+                                            onLeftClicked:
+                                                timew.selectWorldSearchResult(
+                                                    modelData.id)
+                                        }
+                                    }
+
+                                    GohuText {
+                                        visible: timew.worldSearchMatches.length === 0
+                                        width: parent.width
+                                        height: 24
+                                        verticalAlignment: Text.AlignVCenter
+                                        font.pixelSize: 11
+                                        color: Colors.orange
+                                        text: timew.worldCatalogLoading
+                                              ? "LOADING SYSTEM ZONES..."
+                                              : timew.worldCatalogFailed
+                                              ? "ZONE DIRECTORY UNAVAILABLE"
+                                              : timew.worldSearchQuery.trim() === ""
+                                              ? "TYPE CITY OR TIME ZONE"
+                                              : "NO MATCHES"
+                                    }
+                                }
+                            }
+                        }
+
                         Row {
                             id: worldZoneStrip
                             width: parent.width
@@ -583,17 +687,34 @@ PanelWindow {
 
                                 ActionButton {
                                     width: (worldZoneStrip.width
-                                            - (timew.worldZones.length - 1)
-                                              * worldZoneStrip.spacing)
-                                           / timew.worldZones.length
+                                            - worldZoneStrip.spacing * 4) / 5
                                     height: 30
                                     label: modelData.label
                                     labelPixelSize: 11
                                     trackLabelGlowLocally: true
                                     accentColor: timew.semanticColor
-                                    selected: modelData.id === timew.selectedWorldZone
-                                    onLeftClicked: timew.chooseWorldZone(modelData.id)
+                                    available: !timew.worldModeActive
+                                    selected: !timew.worldModeActive
+                                              && modelData.id
+                                                 === timew.selectedQuickZone
+                                    onLeftClicked:
+                                        timew.chooseWorldZone(modelData.id)
                                 }
+                            }
+
+                            ActionButton {
+                                id: worldModeButton
+                                width: (worldZoneStrip.width
+                                        - worldZoneStrip.spacing * 4) / 5
+                                height: 30
+                                label: "WORLD"
+                                labelPixelSize: 11
+                                trackLabelGlowLocally: true
+                                accentColor: Colors.white
+                                selected: timew.worldModeActive
+                                selectedFillColor: Colors.magenta
+                                selectedForegroundColor: Colors.black
+                                onLeftClicked: timew.toggleWorldMode()
                             }
                         }
 
@@ -606,7 +727,10 @@ PanelWindow {
 
                         GohuText {
                             width: parent.width
-                            text: timew.worldClockReady
+                            text: timew.worldModeActive
+                                  && timew.selectedWorldZone === ""
+                                  ? "WORLD // SELECT A SEARCH RESULT"
+                                  : timew.worldClockReady
                                   ? timew.selectedWorldZone + " // "
                                     + timew.worldTimeSnapshot.utcOffsetLabel
                                   : "ZONE LOOKUP // UNAVAILABLE OR UPDATING"

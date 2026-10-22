@@ -21,6 +21,11 @@ Item {
     readonly property var hubMediaController: deckPanel.hubMediaController
     readonly property string hubSelectedMprisBusName:
         deckPanel.hubSelectedMprisBusName
+    // The already-running Media dock polls MPD every two seconds independently
+    // of Hi-Fi visibility. Forward only scalars, never the Process or controls.
+    readonly property string hubMpdPlaybackState: mediaDock.playbackState
+    readonly property string hubMpdCurrentTrack: mediaDock.currentTrack
+    readonly property double hubMpdObservedAtMs: mediaDock.lastMpdObservedAtMs
 
     DockButton {
     id: mediaDock
@@ -34,6 +39,7 @@ Item {
     // MPD state is independent and will later be shared with the full deck.
     property string playbackState: "offline"
     property string currentTrack: ""
+    property double lastMpdObservedAtMs: 0
     readonly property bool mpdOnline: playbackState !== "offline"
     readonly property bool mpdPlaying: playbackState === "playing"
 
@@ -145,6 +151,8 @@ Item {
     }
 
     function receiveMpdStatus(output) {
+        // Timestamp only this completed dock observation. No new collection.
+        lastMpdObservedAtMs = Date.now();
         var status = String(output || "").trim();
         var state = status.match(/\[(playing|paused|stopped)\]/);
 

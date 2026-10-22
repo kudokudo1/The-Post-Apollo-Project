@@ -7,6 +7,7 @@ import "../components"
 import "../services/hub/ApolloHubTimePolicy.js" as LocalTimePolicy
 import "../services/time/WorldClockPolicy.js" as WorldClockPolicy
 import "../services/time/WorldZoneSearch.js" as WorldZoneSearch
+import "../services/time/TimeConverterFormat.js" as ConverterFormat
 
 // TimeW M1: standalone temporal window foundation.
 // No timers, activity recording, screenshots or restoration are active here.
@@ -53,6 +54,36 @@ PanelWindow {
     // new background clock. UTC initial values avoid ambiguous local defaults.
     property string converterDate: new Date().toISOString().slice(0, 10)
     property string converterTime: new Date().toISOString().slice(11, 16)
+    // Independent format preferences: input controls how a civil time is
+    // entered; output only changes presentation of a completed conversion.
+    property bool converterInput24Hour: true
+    property bool converterOutput24Hour: true
+    readonly property color converterInputFormatColor:
+        converterInput24Hour ? Colors.orange : Colors.cyan
+    readonly property color converterOutputFormatColor:
+        converterOutput24Hour ? Colors.orange : Colors.cyan
+    readonly property var converterParsedTime:
+        ConverterFormat.parseInput(converterTime, converterInput24Hour)
+
+    function toggleConverterInputFormat() {
+        const target24 = !converterInput24Hour;
+        const converted = ConverterFormat.convertInput(
+                              converterTime, converterInput24Hour, target24);
+        if (!converted.valid) {
+            // Avoid rewriting an invalid, partially typed value, or silently
+            // assuming PM for an ambiguous 12H entry.
+            converterResult = {status: converted.error, options: []};
+            return;
+        }
+        converterInput24Hour = target24;
+        converterTime = converted.text;
+        // Same canonical civil instant: retain an existing result.
+    }
+
+    function toggleConverterOutputFormat() {
+        converterOutput24Hour = !converterOutput24Hour;
+        // Repaint existing results; neither input nor backend is touched.
+    }
     property string converterSourceZone: "UTC"
     property string converterTargetZone: "America/New_York"
     property bool converterBusy: false
@@ -99,8 +130,9 @@ PanelWindow {
     }
     property string converterSubmittedKey: ""
     readonly property string converterInputsKey:
-        [converterDate, converterTime, converterSourceZone,
-         converterTargetZone].join("|")
+        [converterDate, converterParsedTime.valid
+                        ? converterParsedTime.canonical : "INVALID:" + converterTime,
+         converterSourceZone, converterTargetZone].join("|")
     // Keep the four clock shortcuts; add a selected WORLD result, if one exists.
     readonly property var converterZones: worldZones.concat(
         selectedSearchedZone !== ""
@@ -137,6 +169,10 @@ PanelWindow {
             converterResult = { status: "ZONE_UNAVAILABLE", options: [] };
             return;
         }
+        if (!converterParsedTime.valid) {
+            converterResult = {status: converterParsedTime.error, options: []};
+            return;
+        }
         converterResult = null;
         converterSubmittedKey = converterInputsKey;
         converterBusy = true;
@@ -145,7 +181,7 @@ PanelWindow {
         converterProcess.exec([
             "python3", "-B", "-I",
             Quickshell.shellPath("services/time/TimeZoneConverter.py"),
-            src, dst, converterDate, converterTime
+            src, dst, converterDate, converterParsedTime.canonical
         ]);
     }
 
@@ -1186,11 +1222,15 @@ PanelWindow {
                             id: converterInputs
                             width: parent.width
                             height: 34
-                            spacing: 7
+                            spacing: 4
+
                             TextField {
                                 id: converterDateInput
-                                width: (converterInputs.width
-                                        - converterInputs.spacing) * 0.59
+                                // A compact three-column row preserves enough
+                                // width for date, time/AM-PM, and format button.
+                                width: Math.max(0, (converterInputs.width
+                                        - converterInputFormatButton.width
+                                        - converterInputs.spacing * 2) / 2)
                                 height: parent.height
                                 text: timew.converterDate
                                 placeholderText: "YYYY-MM-DD"
@@ -1199,7 +1239,9 @@ PanelWindow {
                                 selectionColor: Colors.magenta
                                 selectedTextColor: Colors.black
                                 font.family: "GohuFont 11 Nerd Font Mono"
-                                font.pixelSize: 12
+                                font.pixelSize: 10
+                                leftPadding: 3
+                                rightPadding: 3
                                 cursorDelegate: Rectangle {
                                     width: 2
                                     color: Colors.orange
@@ -1215,20 +1257,25 @@ PanelWindow {
                                     timew.converterResult = null;
                                 }
                             }
+
                             TextField {
                                 id: converterTimeInput
-                                width: converterInputs.width
-                                       - converterDateInput.width
-                                       - converterInputs.spacing
+                                width: Math.max(0, converterInputs.width
+                                        - converterDateInput.width
+                                        - converterInputFormatButton.width
+                                        - converterInputs.spacing * 2)
                                 height: parent.height
                                 text: timew.converterTime
-                                placeholderText: "HH:MM (24H)"
+                                placeholderText: timew.converterInput24Hour
+                                                 ? "HH:MM" : "HH:MM//PM"
                                 color: Colors.magenta
                                 placeholderTextColor: Colors.cyan
                                 selectionColor: Colors.magenta
                                 selectedTextColor: Colors.black
                                 font.family: "GohuFont 11 Nerd Font Mono"
-                                font.pixelSize: 12
+                                font.pixelSize: 10
+                                leftPadding: 3
+                                rightPadding: 3
                                 cursorDelegate: Rectangle {
                                     width: 2
                                     color: Colors.orange
@@ -1243,6 +1290,17 @@ PanelWindow {
                                     timew.converterTime = text;
                                     timew.converterResult = null;
                                 }
+                            }
+
+                            ActionButton {
+                                id: converterInputFormatButton
+                                width: 44
+                                height: converterInputs.height
+                                label: timew.converterInput24Hour ? "24H" : "12H"
+                                labelPixelSize: 11
+                                accentColor: timew.converterInputFormatColor
+                                trackLabelGlowLocally: true
+                                onLeftClicked: timew.toggleConverterInputFormat()
                             }
                         }
 
@@ -1263,23 +1321,50 @@ PanelWindow {
                             opacity: 0.5
                         }
 
-                        GohuText {
+                        Row {
+                            id: converterResultHeader
                             width: parent.width
-                            color: timew.converterResult
-                                   && timew.converterResult.status === "READY"
-                                   ? Colors.cyan : Colors.orange
-                            font.pixelSize: 11
-                            text: timew.converterBusy
-                                  ? "CONVERSION // WORKING"
-                                  : !timew.converterResult
-                                  ? "CONVERSION // ENTER DATE AND TIME"
-                                  : timew.converterResult.status === "READY"
-                                  ? "CONVERSION // 1 VALID INSTANT"
-                                  : timew.converterResult.status === "AMBIGUOUS_LOCAL_TIME"
-                                  ? "REPEATED HOUR // TWO POSSIBLE INSTANTS"
-                                  : timew.converterResult.status === "NONEXISTENT_LOCAL_TIME"
-                                  ? "TIME DOES NOT EXIST // DST CLOCK JUMP"
-                                  : "CONVERSION // " + timew.converterResult.status
+                            height: 44
+                            spacing: 5
+
+                            GohuText {
+                                id: converterStatusLabel
+                                width: Math.max(0, parent.width
+                                                - converterOutputFormatButton.width
+                                                - converterResultHeader.spacing)
+                                height: parent.height
+                                verticalAlignment: Text.AlignVCenter
+                                wrapMode: Text.Wrap
+                                color: timew.converterResult
+                                       && timew.converterResult.status === "READY"
+                                       ? Colors.cyan : Colors.orange
+                                font.pixelSize: 11
+                                text: timew.converterBusy
+                                      ? "CONVERSION // WORKING"
+                                      : !timew.converterResult
+                                      ? "CONVERSION // ENTER DATE AND TIME"
+                                      : timew.converterResult.status === "READY"
+                                      ? "CONVERSION // 1 VALID INSTANT"
+                                      : timew.converterResult.status === "AMBIGUOUS_LOCAL_TIME"
+                                      ? "REPEATED HOUR // TWO POSSIBLE INSTANTS"
+                                      : timew.converterResult.status === "NONEXISTENT_LOCAL_TIME"
+                                      ? "TIME DOES NOT EXIST // DST CLOCK JUMP"
+                                      : "CONVERSION // " + timew.converterResult.status
+                            }
+
+                            // Output format is independent of how the user
+                            // typed the source time. Switching never reruns
+                            // the converter or changes its DST-fold choices.
+                            ActionButton {
+                                id: converterOutputFormatButton
+                                width: 44
+                                height: 30
+                                label: timew.converterOutput24Hour ? "24H" : "12H"
+                                labelPixelSize: 11
+                                accentColor: timew.converterOutputFormatColor
+                                trackLabelGlowLocally: true
+                                onLeftClicked: timew.toggleConverterOutputFormat()
+                            }
                         }
 
                         Repeater {
@@ -1298,14 +1383,19 @@ PanelWindow {
                                 }
                                 GohuText {
                                     width: parent.width
-                                    text: modelData.destination
-                                    color: timew.clockReadoutColor
+                                    text: ConverterFormat.formatResult(
+                                              modelData.destination,
+                                              timew.converterOutput24Hour)
+                                    color: timew.converterOutputFormatColor
                                     font.pixelSize: 13
                                     elide: Text.ElideRight
                                 }
                                 GohuText {
                                     width: parent.width
-                                    text: "SOURCE // " + modelData.source
+                                    text: "SOURCE // "
+                                          + ConverterFormat.formatResult(
+                                                modelData.source,
+                                                timew.converterOutput24Hour)
                                     color: Colors.orange
                                     font.pixelSize: 11
                                     elide: Text.ElideRight

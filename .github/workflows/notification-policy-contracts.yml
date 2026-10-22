@@ -35,6 +35,9 @@ jobs:
       - name: Validate exact website DND/ZZ scope and legacy inheritance
         run: python3 tests/notifications/test_notification_website_scope.py
 
+      - name: Validate email action deck live sender capabilities
+        run: python3 tests/notifications/test_notification_email_actions.py
+
       - name: Validate native and browser notification intake contracts
         run: python3 tests/notifications/test_external_native_intake.py
 

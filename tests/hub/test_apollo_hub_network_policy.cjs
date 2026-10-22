@@ -39,11 +39,27 @@ assert.equal(wifi.wifi.signalPercent, 73);
 assert.equal(wifi.ethernet.connected, false);
 assert.equal(wifi.internetState, "unverified");
 assert.equal(wifi.linkSpeedMbps, -1);
+assert.equal(wifi.linkSpeedApproximate, true);
+
+// The dock supplies one existing Wi-Fi bitrate; no duplicate probe.
+// Its number represents approximate link rate, NOT Internet throughput.
+const fastWifi = observe(connectedWifi({wifiLinkSpeedMbps:229.2}));
+assert.equal(fastWifi.linkSpeedMbps, 229);
+assert.equal(fastWifi.linkSpeedApproximate, true);
+assert.equal(fastWifi.internetState, "unverified");
+assert.equal(observe(connectedWifi({wifiLinkSpeedMbps:0})).linkSpeedMbps, -1);
+assert.equal(observe(connectedWifi({wifiLinkSpeedMbps:100.5})).linkSpeedMbps, 101);
+for (const badSpeed of [null, undefined, "", "229", -2, 0, NaN, Infinity,
+                        {}, []]) {
+    assert.equal(observe(connectedWifi({wifiLinkSpeedMbps:badSpeed})).linkSpeedMbps, -1);
+}
+assert.equal(observe(connectedWifi({wifiConnected:false, wifiLinkSpeedMbps:229})).linkSpeedMbps, -1);
 
 let wired = observe({devicesKnown:true, wifiPresent:true, wifiConnected:false,
                      ethernetPresent:true, ethernetConnected:true,
                      ethernetInterface:"enp2s0", wifiName:"should-hide"});
 assert.equal(wired.transport, "ethernet");
+assert.equal(wired.linkSpeedMbps, -1);
 assert.equal(wired.ethernet.interfaceName, "enp2s0");
 assert.equal(wired.wifi.networkName, "");
 assert.equal(wired.wifi.signalPercent, -1);
@@ -54,6 +70,8 @@ assert.equal(both.transport, "ethernet");
 assert.equal(both.wifi.connected, true);
 assert.equal(both.ethernet.connected, true);
 assert.equal(both.internetState, "unverified");
+assert.equal(observe({...connectedWifi({wifiLinkSpeedMbps:229}),
+                      ethernetPresent:true, ethernetConnected:true}).linkSpeedMbps, -1);
 
 // Malformed strength and absent connected SSID are unknown, never 0%.
 // Don't confuse values from a *different* network with this connected link.

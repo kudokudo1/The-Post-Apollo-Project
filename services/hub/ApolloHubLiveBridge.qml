@@ -22,6 +22,9 @@ Scope {
     // Existing Hi-Fi controller/adapter instances are injected by their
     // owners. No second controller, player selection or CLI polling here.
     property var mediaControllerSource: null
+    // The existing Media dock's MPD status observer remains operational even
+    // when the full deck is closed. Read-only scalar observation only.
+    property var mpdDockSource: null
     property string selectedMprisBusName: ""
     property double mediaObservedAtMs: 0
     onMediaControllerSourceChanged: mediaObservedAtMs = 0
@@ -39,11 +42,16 @@ Scope {
         }
     }
 
+    readonly property var dockMpdObservation: mpdDockSource ? ({
+        state: mpdDockSource.hubMpdPlaybackState,
+        title: mpdDockSource.hubMpdCurrentTrack,
+        observedAtMs: mpdDockSource.hubMpdObservedAtMs
+    }) : null
     readonly property var mpdSnapshot: MediaPolicy.mpdSnapshot(
         mediaControllerSource !== null,
         mediaControllerSource ? mediaControllerSource.snapshot : null,
         mediaControllerSource ? mediaControllerSource.errorText : "",
-        mediaObservedAtMs, observationNowMs)
+        mediaObservedAtMs, observationNowMs, bridge.dockMpdObservation)
 
     // MPRIS is an in-process Quickshell singleton. Playerctld is only a
     // repeater. No automatic player selection, even when exactly one exists.
@@ -151,7 +159,7 @@ Scope {
         // Clock-only freshness check; does not poll MPD, MPRIS or a CLI.
         interval: 5000
         repeat: true
-        running: bridge.mediaControllerSource !== null
+        running: bridge.mediaControllerSource !== null || bridge.mpdDockSource !== null
         onTriggered: bridge.observationNowMs = Date.now()
     }
     Timer {

@@ -97,6 +97,21 @@ assert.match(windowSource, /HOME LIVE \/\/ 2 FEEDS/);
 assert.match(windowSource, /PARTIAL \/\/ WEATHER/);
 assert.match(windowSource, /PARTIAL \/\/ SPACE/);
 
+// Footer is source-level freshness, not a duplicate of the aggregate HOME badge.
+assert.match(windowSource, /readonly property int spaceAgeMinutes:/);
+assert.match(windowSource, /function compactAge\(ageMinutes\)/);
+assert.match(
+    windowSource,
+    /"WEATHER " \+ compactAge\(weatherAgeMinutes\)[\s\S]*?" \/\/ SPACE " \+ compactAge\(spaceAgeMinutes\)/
+);
+assert.match(windowSource, /text:\s*weatherStation\.footerSourceStatus/);
+assert.doesNotMatch(windowSource, /WEATHER LINK ONLINE/);
+assert.match(spaceServiceSource, /property date lastUpdated/);
+assert.ok(
+    spaceServiceSource.split("lastUpdated = new Date();").length - 1 >= 4,
+    "each successful Space parser refreshes local receive age"
+);
+
 // Stable domain identities survive the structural split.
 assert.match(groundSource, /text: "⌁  GROUND"[\s\S]*?color: Colors\.green/);
 assert.match(skySource, /text: "☁  SKY"[\s\S]*?color: Colors\.cyan/);

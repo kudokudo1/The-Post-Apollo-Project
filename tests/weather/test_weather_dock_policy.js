@@ -216,7 +216,10 @@ assert.match(dock, /id:\s*weatherTemperatureUnit[\s\S]*?text:\s*weatherDock\.tem
 assert.match(dock, /id:\s*weatherDegree[\s\S]*?text:\s*"°"[\s\S]*?font\.pixelSize:\s*20[\s\S]*?color:\s*weatherDock\.open\s*\?\s*Colors\.magenta[\s\S]*?weatherDock\.pressed\s*\?\s*Colors\.white[\s\S]*?weatherDock\.hovered\s*\?\s*Colors\.orange\s*:\s*Colors\.white/);
 assert.match(dock, /SafeDropShadow\s*\{[^}]*safeSource:\s*weatherDegree[^}]*color:\s*weatherDock\.open\s*\|\|\s*weatherDock\.pressed\s*\?\s*Colors\.magenta\s*:\s*Colors\.orange/s);
 assert.match(dock, /id:\s*weatherContent[\s\S]*?anchors\.centerIn:\s*parent[\s\S]*?spacing:\s*6/);
-assert.doesNotMatch(dock, /anchors\.horizontalCenterOffset:\s*2/);
+assert.match(dock, /id:\s*weatherContent[\s\S]*?anchors\.centerIn:\s*parent\s+anchors\.horizontalCenterOffset:\s*2/);
+// The measured group width leaves 3px each side; a 2px optical shift
+// retains at least 1px on the tight (right) edge.
+assert.ok(6 / 2 - 2 >= 1, "optical offset fits content padding");
 assert.match(dock, /id:\s*weatherReadout[\s\S]*?spacing:\s*0/);
 assert.match(dock, /id:\s*weatherTemperature[\s\S]*?spacing:\s*0/);
 assert.match(dock, /contentGlowSource:\s*weatherContent/);
@@ -231,10 +234,8 @@ assert.match(dock, /implicitWidth:\s*Math\.ceil\(weatherContent\.implicitWidth\)
 for (const [property, color] of [
     ["normalForegroundColor", "weatherColor"],
     ["normalContentGlowColor", "weatherColor"],
-    ["normalDockGlowColor", "weatherColor"],
     ["hoverForegroundColor", "Colors.orange"],
     ["hoverContentGlowColor", "Colors.orange"],
-    ["hoverDockGlowColor", "Colors.orange"],
     ["pressedForegroundColor", "weatherColor"],
     ["pressedContentGlowColor", "Colors.magenta"],
     ["pressedDockGlowColor", "Colors.magenta"],
@@ -244,6 +245,15 @@ for (const [property, color] of [
 ]) {
     assert.ok(dock.includes(property + ": " + color), property + " should use " + color);
 }
+// The low dock/frame halo belongs to temperature at idle and hover;
+// the icon/readout content still keeps weather color and orange hover.
+assert.match(dock, /normalDockGlowColor:\s*thermometerState\.valid\s*\? thermometerLiquidColor : weatherColor/);
+assert.match(dock, /hoverDockGlowColor:\s*thermometerState\.valid\s*\? thermometerLiquidColor : Colors\.orange/);
+assert.match(dock, /normalContentGlowColor:\s*weatherColor/);
+assert.match(dock, /hoverContentGlowColor:\s*Colors\.orange/);
+assert.match(dock, /pressedDockGlowColor:\s*Colors\.magenta/);
+// No new effect should sample the white glass a second time.
+assert.equal((dock.match(/id:\s*thermometerLiquidGlow/g) || []).length, 1);
 assert.match(dock, /property color liquidColor:\s*weatherDock\.thermometerLiquidColor/);
 // The fluid has its own temperature-colored glow, separate from the weather
 // condition's global orange-on-hover dock glow. No double glass halo.

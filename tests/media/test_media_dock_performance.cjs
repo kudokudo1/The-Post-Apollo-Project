@@ -139,6 +139,47 @@ test("Media's rear halo follows CAVA while DockButton's front wash stays magenta
     assert.match(dockButtonSource, /property color openGlowColor:\s*Colors\.magenta/);
 });
 
+test("small stars get their own soft CAVA-accent auras behind the white glyphs", () => {
+    // Small white ornament pixels form weaker sampled shadows than the
+    // larger clef image. Add one local underlight per star group only.
+    for (const [auraId, glyphId] of [
+        ["leadingStarsAura", "leadingStars"],
+        ["trailingStarAura", "trailingStar"]
+    ]) {
+        const match = source.match(new RegExp(
+            "RectangularShadow \\{\\s*id:\\s*" + auraId + "([\\s\\S]*?)\\n    \\}"
+        ));
+        assert.ok(match, auraId + " must be a separate, static underlight");
+        const body = match[1];
+        assert.match(body, new RegExp(
+            "x:\\s*mediaArtwork\\.x\\s*\\+\\s*musicMark\\.x\\s*\\+\\s*" + glyphId + "\\.x"
+        ));
+        assert.match(body, new RegExp(
+            "y:\\s*mediaArtwork\\.y\\s*\\+\\s*musicMark\\.y\\s*\\+\\s*" + glyphId + "\\.y"
+        ));
+        assert.match(body, new RegExp(
+            "width:\\s*Math\\.max\\(1,\\s*" + glyphId + "\\.width\\s*-\\s*2\\s*\\*\\s*mediaDock\\.softGlowSpread\\)"
+        ));
+        assert.match(body, new RegExp(
+            "height:\\s*Math\\.max\\(1,\\s*" + glyphId + "\\.height\\s*-\\s*2\\s*\\*\\s*mediaDock\\.softGlowSpread\\)"
+        ));
+        assert.match(body, /radius:\s*height\s*\/\s*2/);
+        assert.match(body, /blur:\s*mediaDock\.contentGlowRadius\s*\+\s*4/);
+        assert.match(body, /spread:\s*0/);
+        assert.match(body, /color:\s*mediaDock\.accentColor/);
+        assert.match(body, /opacity:\s*mediaDock\.softGlowOpacity/);
+        assert.match(body, /z:\s*0/);
+        assert.doesNotMatch(body, /safeSource|cavaBar|levels|frame|Repeater|ShaderEffect|Behavior on/,
+            "star underlights must not sample or follow CAVA bar frames");
+    }
+    assert.equal((source.match(/RectangularShadow \{/g) || []).length, 4);
+    assert.equal((source.match(/SafeDropShadow \{/g) || []).length, 3);
+    assert.match(source, /Row \{\s*id:\s*mediaArtwork\s*anchors\.centerIn:\s*parent\s*spacing:\s*9\s*z:\s*1/);
+    assert.match(source, /id:\s*leadingStars[\s\S]*?text:\s*"‧₊˚ "[\s\S]*?color:\s*mediaDock\.foregroundColor/);
+    assert.match(source, /id:\s*trailingStar[\s\S]*?text:\s*"˖"[\s\S]*?color:\s*mediaDock\.foregroundColor/);
+    assert.doesNotMatch(source, /id:\s*(?:musicMarkUnderlay|mediaArtworkUnderlay)/);
+});
+
 test("magenta front wash, three independent static art glows, per-bar CAVA halos", () => {
     // Media keeps the built-in front wash magenta; rear halo is overridden separately.
     for (const mode of ["normal", "hover", "pressed"]) {
@@ -186,8 +227,8 @@ test("magenta front wash, three independent static art glows, per-bar CAVA halos
     // geometry-only per-bar halos, never a combined drop-shadow texture.
     assert.match(source, /Row \{\s*id:\s*mediaArtwork\s*anchors\.centerIn:\s*parent\s*spacing:\s*9\s*z:\s*1/);
     assert.doesNotMatch(source, /id:\s*(?:musicMarkUnderlay|mediaArtworkUnderlay)/);
-    assert.equal((source.match(/RectangularShadow \{/g) || []).length, 2,
-        "only one rear halo and one CAVA-only ambient wash are allowed");
+    assert.equal((source.match(/RectangularShadow \{/g) || []).length, 4,
+        "rear and CAVA washes plus two individually bounded star auras");
     assert.match(source, /contentGlowEnabled:\s*false/);
     assert.match(source, /contentGlowSource:\s*null/);
     assert.doesNotMatch(source, /contentGlowSource:\s*(?:musicMark|mediaArtwork|spectrum|cavaBar)/);
@@ -234,7 +275,7 @@ test("large faded CAVA-only ambient wash follows a padded spectrum envelope", ()
 
     // The soft CAVA ambient wash must remain separate from the rear accent
     // halo and the intentionally magenta front wash.
-    assert.equal((source.match(/RectangularShadow \{/g) || []).length, 2);
+    assert.equal((source.match(/RectangularShadow \{/g) || []).length, 4);
     assert.doesNotMatch(source, /id:\s*(?:musicMarkUnderlay|mediaArtworkUnderlay)/);
     for (const mode of ["normal", "hover", "pressed"]) {
         assert.match(source, new RegExp(mode + "DockGlowColor:\\s*Colors\\.magenta"));

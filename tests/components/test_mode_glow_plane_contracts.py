@@ -32,6 +32,11 @@ assert "safeSource: modeButton.labelGlowSource" in mode
 assert "ModeButtonWideHalo {" in mode and "ModeButtonCloseHalo {" in mode
 assert "id: contentLayer" in base and "z: 0" in base
 assert "source: sourceAttached ? safeSource : null" in safe
+# Default Grid glows use reactive coordinates only when their effect is
+# on the local contentLayer. Custom effect hosts remain independent.
+assert "property bool trackDefaultGlowsLocally: true" in mode
+assert mode.count("modeButton.effectivePrimaryGlowHost === contentLayer") == 2
+assert mode.count("modeButton.effectiveLabelGlowHost === contentLayer") == 2
 assert "sourceAttached && parent !== null" in hash_glow
 
 # A structural brace parser verifies both sampled shadows are declared INSIDE

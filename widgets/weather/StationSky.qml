@@ -1,5 +1,6 @@
 import QtQuick
 import "../../components"
+import "../../services/weather/WeatherDockPolicy.js" as WeatherDockPolicy
 
 Rectangle {
     id: sky
@@ -68,27 +69,36 @@ Rectangle {
         weatherReady && weatherService.condition
         ? weatherService.condition.toUpperCase()
         : weatherLoading ? "RECEIVING..." : "DATA OFFLINE"
-    readonly property string conditionIcon: iconForCondition(conditionText)
-
-    function iconForCondition(condition) {
-        const value = String(condition).toLowerCase();
-
-        if (value.includes("thunder"))
-            return "⛈";
-        if (value.includes("snow") || value.includes("blizzard")
-                || value.includes("sleet") || value.includes("ice"))
-            return "❄";
-        if (value.includes("rain") || value.includes("drizzle")
-                || value.includes("shower"))
-            return "🌧";
-        if (value.includes("fog") || value.includes("mist"))
-            return "≋";
-        if (value.includes("cloud") || value.includes("overcast"))
-            return "☁";
-        if (value.includes("sun") || value.includes("clear"))
-            return "☀";
-        return "◌";
+    // SKY shares the dock's condition glyphs and semantic colors.
+    function iconState(condition, weatherCode, current) {
+        const now = Date.now();
+        return WeatherDockPolicy.classify({
+            ready: true, errorText: "", weatherTimeMs: now, nowMs: now,
+            weatherCode: weatherCode || "", condition: condition || "",
+            windMph: current && weatherReady ? weatherService.windMph : 0,
+            uvIndex: current && weatherReady ? weatherService.uvIndex : -1,
+            aqiReady: Boolean(current && aqiReady), aqiErrorText: "",
+            aqiTimeMs: now, aqi: current && aqiReady ? weatherService.aqi : -1
+        });
     }
+
+    function iconColor(name) {
+        switch (name) {
+        case "red": return Colors.red;
+        case "orange": return Colors.orange;
+        case "yellow": return Colors.yellow;
+        case "green": return Colors.green;
+        case "omnitrix": return Colors.omnitrix;
+        case "cyan": return Colors.cyan;
+        case "blue": return Colors.blue;
+        case "magenta": return Colors.magenta;
+        default: return Colors.white;
+        }
+    }
+
+    readonly property var conditionState: weatherReady
+        ? iconState(weatherService.condition, weatherService.weatherCode, true)
+        : { icon: "?", color: "white" }
 
     function windAngle(direction) {
         const directions = [
@@ -198,10 +208,10 @@ Rectangle {
                     color: Colors.orange
                 }
 
-                GohuText {
-                    text: sky.conditionIcon
-                    font.pixelSize: 28
-                    color: Colors.cyan
+                Text {
+                    text: sky.conditionState.icon
+                    font.pixelSize: 44
+                    color: sky.iconColor(sky.conditionState.color)
                 }
             }
 
@@ -495,10 +505,12 @@ Rectangle {
                             color: Colors.orange
                         }
 
-                        GohuText {
-                            text: sky.iconForCondition(modelData.condition)
-                            font.pixelSize: 18
-                            color: Colors.cyan
+                        Text {
+                            readonly property var forecastState:
+                                sky.iconState(modelData.condition, modelData.weatherCode, false)
+                            text: forecastState.icon
+                            font.pixelSize: 32
+                            color: sky.iconColor(forecastState.color)
                         }
 
                         QuietText {
@@ -569,6 +581,14 @@ Rectangle {
                             ) + "°F"
                             font.pixelSize: 16
                             color: Colors.white
+                        }
+
+                        Text {
+                            readonly property var forecastState:
+                                sky.iconState(modelData.condition, modelData.weatherCode, false)
+                            text: forecastState.icon
+                            font.pixelSize: 32
+                            color: sky.iconColor(forecastState.color)
                         }
 
                         QuietText {

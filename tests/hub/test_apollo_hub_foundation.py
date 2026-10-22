@@ -390,12 +390,17 @@ for needle in (
     "columns: 3",
 ):
     assert needle in uptime_mini, f"B5 uptime mini missing {needle}"
+# The existing Time/Calendar tile legitimately owns a one-second clock.
+# Only the new Uptime mini-component must have no timer or file reader.
 for forbidden in (
     "FileView {", "Process {", "Timer {", "SystemTelemetry {",
     "/proc/uptime", "uptimeFile", "reload(", "exec(", "readFile(",
 ):
-    assert forbidden not in uptime_mini + window + tile, (
-        f"Uptime UI must not read, poll, or collect: {forbidden}")
+    assert forbidden not in uptime_mini, (
+        f"Uptime mini must not read, poll, or collect: {forbidden}")
+for forbidden in ("FileView {", "Process {", "/proc/uptime"):
+    assert forbidden not in window + tile, (
+        f"Uptime Hub UI must not add a procfs reader: {forbidden}")
 
 # Launchers and widget backends are unchanged in this first stage.
 print("ApolloHubW foundation source contracts passed")

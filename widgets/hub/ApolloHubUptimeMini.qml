@@ -37,7 +37,7 @@ Item {
         id: part
         property string unitText: ""
         property string valueText: "--"
-        width: Math.max(0, (uptimeDigits.width - uptimeDigits.columnSpacing * 2) / 3)
+        property bool known: false
         spacing: 2
 
         GohuText {
@@ -46,7 +46,7 @@ Item {
             font.pixelSize: 23
             verticalAlignment: Text.AlignVCenter
             horizontalAlignment: Text.AlignHCenter
-            color: uptimeMini.uptimeReady ? Colors.white : Colors.orange
+            color: part.known ? Colors.white : Colors.orange
             elide: Text.ElideRight
             text: part.valueText
         }
@@ -84,16 +84,22 @@ Item {
             columnSpacing: 6
 
             UptimePart {
+                width: Math.max(0, (uptimeDigits.width - uptimeDigits.columnSpacing * 2) / 3)
+                known: uptimeMini.uptimeReady
                 unitText: "DAYS"
                 valueText: uptimeMini.displayPart(
                     uptimeMini.uptimeSnapshot ? uptimeMini.uptimeSnapshot.days : -1)
             }
             UptimePart {
+                width: Math.max(0, (uptimeDigits.width - uptimeDigits.columnSpacing * 2) / 3)
+                known: uptimeMini.uptimeReady
                 unitText: "HOURS"
                 valueText: uptimeMini.displayPart(
                     uptimeMini.uptimeSnapshot ? uptimeMini.uptimeSnapshot.hours : -1)
             }
             UptimePart {
+                width: Math.max(0, (uptimeDigits.width - uptimeDigits.columnSpacing * 2) / 3)
+                known: uptimeMini.uptimeReady
                 unitText: "MIN"
                 valueText: uptimeMini.displayPart(
                     uptimeMini.uptimeSnapshot ? uptimeMini.uptimeSnapshot.minutes : -1)

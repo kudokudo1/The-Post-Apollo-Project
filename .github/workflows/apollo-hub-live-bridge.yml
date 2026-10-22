@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - "services/hub/ApolloHubLiveBridge.qml"
+      - "services/hub/ApolloHubAppsPolicy.js"
+      - "tests/hub/test_apollo_hub_apps_policy.cjs"
+      - "tests/hub/test_apollo_hub_apps_bridge.py"
       - "services/hub/ApolloHubUptimeSource.qml"
       - "services/hub/ApolloHubUptimePolicy.js"
       - "tests/hub/test_apollo_hub_uptime_bridge.py"
@@ -35,6 +38,9 @@ on:
       - main
     paths:
       - "services/hub/ApolloHubLiveBridge.qml"
+      - "services/hub/ApolloHubAppsPolicy.js"
+      - "tests/hub/test_apollo_hub_apps_policy.cjs"
+      - "tests/hub/test_apollo_hub_apps_bridge.py"
       - "services/hub/ApolloHubUptimeSource.qml"
       - "services/hub/ApolloHubUptimePolicy.js"
       - "tests/hub/test_apollo_hub_uptime_bridge.py"
@@ -90,3 +96,7 @@ jobs:
         run: python3 tests/hub/test_apollo_hub_uptime_bridge.py
       - name: Exercise B5 uptime parser and aging states
         run: node tests/hub/test_apollo_hub_uptime_policy.cjs
+      - name: Guard B6 native app index and no-launch boundary
+        run: python3 tests/hub/test_apollo_hub_apps_bridge.py
+      - name: Exercise B6 application search and safe normalization
+        run: node tests/hub/test_apollo_hub_apps_policy.cjs

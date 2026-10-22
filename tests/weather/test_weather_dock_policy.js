@@ -110,17 +110,23 @@ assert.match(dock, /implicitWidth:\s*Math\.ceil\(weatherContent\.implicitWidth\)
 // compact classic thermometer. Canvas was not rendering in the dock at runtime,
 // so the instrument must use native Qt Quick Shapes instead.
 assert.match(dock, /import QtQuick\.Shapes/);
-assert.match(dock, /id:\s*weatherThermometer[\s\S]*?implicitWidth:\s*20[\s\S]*?implicitHeight:\s*42[\s\S]*?width:\s*implicitWidth[\s\S]*?height:\s*implicitHeight/);
+assert.match(dock, /id:\s*weatherThermometer[\s\S]*?implicitWidth:\s*17[\s\S]*?implicitHeight:\s*35[\s\S]*?width:\s*implicitWidth[\s\S]*?height:\s*implicitHeight/);
 assert.doesNotMatch(dock, /text:\s*"🌡"/);
 assert.doesNotMatch(dock, /\bCanvas\s*\{/);
 assert.match(dock, /\bShape\s*\{/);
 assert.match(dock, /\bShapePath\s*\{/);
 assert.match(dock, /\bPathQuad\s*\{/);
 assert.match(dock, /\bPathCubic\s*\{/);
-// Outer tube narrows to x=5..15 and widens to a x=2..18 bulb.
-assert.match(dock, /PathLine\s*\{\s*x:\s*15;\s*y:\s*24\s*\}/);
-assert.match(dock, /PathQuad\s*\{[\s\S]*?x:\s*18[\s\S]*?y:\s*28/);
-assert.match(dock, /PathCubic\s*\{[\s\S]*?x:\s*10[\s\S]*?y:\s*41/);
+// The smaller 17×35 silhouette has a rounded, symmetric 15px-class bulb,
+// with a taper that is continuous with the tube and mirrored left/right.
+// The black vessel and white glass reuse the exact same outline.
+assert.match(dock, /PathLine\s*\{\s*x:\s*12\.2;\s*y:\s*21\.5\s*\}/);
+assert.match(dock, /PathCubic\s*\{\s*x:\s*14\.2\s+y:\s*24\.3[\s\S]*?control1X:\s*12\.2/);
+assert.match(dock, /PathCubic\s*\{\s*x:\s*8\.5\s+y:\s*33\.8/);
+assert.match(dock, /PathCubic\s*\{\s*x:\s*2\.8\s+y:\s*24\.3/);
+assert.match(dock, /PathLine\s*\{\s*x:\s*4\.8;\s*y:\s*5\.2\s*\}/);
+assert.equal((dock.match(/startX:\s*8\.5/g) || []).length, 3);
+assert.match(dock, /strokeWidth:\s*1\.5\s+strokeColor:\s*weatherThermometer\.glassColor\s+joinStyle:\s*ShapePath\.RoundJoin\s+capStyle:\s*ShapePath\.RoundCap/);
 // The real normalized level drives a vertical gradient through one connected
 // inner tube+bulb path, rather than a permanently filled decorative bulb.
 assert.match(dock, /readonly property real fillStart:[\s\S]*?1 - animatedLevel/);

@@ -16,6 +16,8 @@ on:
       - "scripts/media/youtube_catalog.py"
       - "scripts/media/direct_stream_source.py"
       - "scripts/media/radio_browser_catalog.py"
+      - "scripts/media/radio_stream_relay.py"
+      - "tests/media/test_radio_stream_relay.py"
       - "tests/media/test_radio_browser_catalog.py"
       - "scripts/media/media_controller.py"
       - "scripts/media/media_intent_store.py"
@@ -48,6 +50,7 @@ jobs:
             scripts/media/youtube_catalog.py \
             scripts/media/direct_stream_source.py \
             scripts/media/radio_browser_catalog.py \
+            scripts/media/radio_stream_relay.py \
             scripts/media/media_controller.py \
             scripts/media/media_intent_store.py \
             scripts/media/mpd_audio_probe.py \
@@ -58,6 +61,7 @@ jobs:
             tests/media/test_youtube_catalog.py \
             tests/media/test_direct_stream_source.py \
             tests/media/test_radio_browser_catalog.py \
+            tests/media/test_radio_stream_relay.py \
             tests/media/test_media_intent_store.py \
             tests/media/test_mpd_audio_probe.py \
             tests/media/test_native_pipewire_evidence.py

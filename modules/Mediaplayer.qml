@@ -70,25 +70,63 @@ Item {
     hoverDockGlowColor: Colors.magenta
     pressedDockGlowColor: Colors.magenta
 
-    // Never texture-sample the 16 animated VU bars for a blur glow.
-    // Sampling them forced a new shadow texture every CAVA frame. Keep the
-    // sampled glow attached to the static music glyph instead.
-    contentGlowSource: musicMark
+    // Do not texture-sample the entire mark or the animated CAVA spectrum.
+    // Each static glyph has its own source-attached glow below the artwork.
+    // The spectrum already owns cheap per-bar accent-colored geometry halos.
+    contentGlowEnabled: false
+    contentGlowSource: null
 
-    // Focus the CAVA-colored underlight on the static stars/clef alone.
-    // The 16 bars already have two geometry-only accent halos each; do not
-    // add another cyan slab spanning the entire dock or sample bar textures.
-    // Resolve the nested mark's coordinates in contentHost (our parent).
-    RectangularShadow {
-        id: musicMarkUnderlay
-        x: mediaArtwork.x + musicMark.x
-        y: mediaArtwork.y + musicMark.y + mediaDock.softGlowSpread
-        width: musicMark.width
-        height: Math.max(0, musicMark.height - 2 * mediaDock.softGlowSpread)
-        spread: 0
-        blur: mediaDock.softGlowSpread * 2
+    SafeDropShadow {
+        id: leadingStarsGlow
+        safeSource: leadingStars
+        x: mediaArtwork.x + musicMark.x + leadingStars.x
+        y: mediaArtwork.y + musicMark.y + leadingStars.y
+        width: leadingStars.width
+        height: leadingStars.height
+        horizontalOffset: 0
+        verticalOffset: 0
+        radius: mediaDock.contentGlowRadius
+        samples: mediaDock.contentGlowSamples
+        requestedVisible: true
+        opacity: mediaDock.contentGlowOpacity
         color: mediaDock.accentColor
-        opacity: mediaDock.softGlowOpacity * 0.80
+        transparentBorder: true
+        z: 0
+    }
+
+    SafeDropShadow {
+        id: trebleClefGlow
+        safeSource: trebleClef
+        x: mediaArtwork.x + musicMark.x + trebleClef.x
+        y: mediaArtwork.y + musicMark.y + trebleClef.y
+        width: trebleClef.width
+        height: trebleClef.height
+        horizontalOffset: 0
+        verticalOffset: 0
+        radius: mediaDock.contentGlowRadius
+        samples: mediaDock.contentGlowSamples
+        requestedVisible: true
+        opacity: mediaDock.contentGlowOpacity
+        color: mediaDock.accentColor
+        transparentBorder: true
+        z: 0
+    }
+
+    SafeDropShadow {
+        id: trailingStarGlow
+        safeSource: trailingStar
+        x: mediaArtwork.x + musicMark.x + trailingStar.x
+        y: mediaArtwork.y + musicMark.y + trailingStar.y
+        width: trailingStar.width
+        height: trailingStar.height
+        horizontalOffset: 0
+        verticalOffset: 0
+        radius: mediaDock.contentGlowRadius
+        samples: mediaDock.contentGlowSamples
+        requestedVisible: true
+        opacity: mediaDock.contentGlowOpacity
+        color: mediaDock.accentColor
+        transparentBorder: true
         z: 0
     }
 
@@ -110,6 +148,7 @@ Item {
             spacing: 0
 
             GohuText {
+                id: leadingStars
                 anchors.verticalCenter: trebleClef.verticalCenter
                 textFormat: Text.PlainText
                 text: "‧₊˚ "
@@ -137,6 +176,7 @@ Item {
             }
 
             GohuText {
+                id: trailingStar
                 anchors.verticalCenter: trebleClef.verticalCenter
                 textFormat: Text.PlainText
                 text: "˖"

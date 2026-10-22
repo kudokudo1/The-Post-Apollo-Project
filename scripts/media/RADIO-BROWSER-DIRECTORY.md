@@ -5,8 +5,9 @@
 ## Purpose
 
 Make the physical slider and tuning knob useful without downloaded local music.
-Browse station directory listings, then deliberately SELECT, LOAD, and PLAY
-a station using the existing controller and MPD backend. The directory
+Browse station directory listings and stage selections to test controls.
+**Untrusted directory results are browse-only**, pending an approved source-to-MPD
+playback policy. The previous operator-supplied PRESET remains playable. The directory
 does not create or control a second player.
 
 ## How the first iteration works
@@ -21,9 +22,10 @@ does not create or control a second player.
 - **NEXT 50** fetches another page when the directory has more rows.
   The value is the NEXT PAGE button label, not a claim of exactly 50
   returned stations.
-- SELECT chooses the highlighted source-qualified direct HTTPS stream.
-  LOAD cues without autoplay; PLAY begins afterward. ENTER directly cues a
-  highlighted station without autoplay. This retains distinct states.
+- SELECT stages a source-qualified radio-directory UUID. ENTER reports that
+  catalog playback isn't approved; LOAD is disabled for radio-directory refs.
+- PRESET retains SELECT → LOAD → PLAY without autoplay for the prior
+  operator-supplied HTTPS station URL.
 - **PRESET** remains the existing operator-chosen Groove Salad station.
   Local MPD and YouTube catalog stay separate; YouTube remains catalog-only.
 
@@ -48,12 +50,14 @@ redirect to other services, or require codecs/HTTPS URL forms outside this
 first implementation's safe subset.
 
 **Security boundary:** Directory data are untrusted. The existing URL-shape
-validation does not resolve DNS or prove redirects stay public. No autoplay
-or background probing occurs. A user must explicitly select/load a station.
-Before enabling arbitrary directory-fed playback in a production configuration,
-review network redirect/DNS egress restrictions and provider permissions.
-If that review blocks, use browsing only until an approved playback route is
-available. Never silently relax the MPD direct-stream validator.
+validator does not resolve DNS or prove redirects stay public. Directory
+results use source-qualified `radio-browser` station UUIDs rather than
+`direct-stream` refs. The radio source supports inspect/selection but
+`prepare()` explicitly refuses playback. No URL is sent to MPD from
+directory results. The existing user-supplied PRESET remains available.
+An independently approved egress/redirect policy and broadcaster permissions
+are needed for arbitrary station playback. Never relax the direct-stream
+validator to simulate authorization.
 
 ## Runtime acceptance / recovery
 

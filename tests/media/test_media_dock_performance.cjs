@@ -11,6 +11,7 @@ const root = path.resolve(__dirname, "../..");
 const source = fs.readFileSync(path.join(root, "modules/Mediaplayer.qml"), "utf8");
 const config = fs.readFileSync(path.join(root, "modules/mediaplayer-cava.conf"), "utf8");
 const trebleSvg = fs.readFileSync(path.join(root, "assets/media/treble-clef.svg"), "utf8");
+const treblePng = fs.readFileSync(path.join(root, "assets/media/treble-clef.png"));
 
 function harness() {
     const match = source.match(/    function receiveCavaFrame\(frame\) \{([\s\S]*?)\n    \}\n\n    Process \{/);
@@ -42,7 +43,7 @@ test("magenta idle chassis and treble clef do not recolor or resample CAVA", () 
         "original decorative text remains, while the treble clef is vector art");
     assert.equal((mark.match(/Image \{/g) || []).length, 1);
     assert.match(mark, /id:\s*trebleClef\s*width:\s*15\s*height:\s*34/);
-    assert.match(mark, /source:\s*Qt\.resolvedUrl\("\.\.\/assets\/media\/treble-clef\.svg"\)/);
+    assert.match(mark, /source:\s*Qt\.resolvedUrl\("\.\.\/assets\/media\/treble-clef\.png"\)/);
     assert.match(mark, /sourceSize:\s*Qt\.size\(45,\s*102\)/);
     assert.match(mark, /onStatusChanged:[\s\S]*?Image\.Error/);
     assert.match(mark, /textFormat:\s*Text\.PlainText\s*text:\s*"‧₊˚ "/);
@@ -57,6 +58,13 @@ test("magenta idle chassis and treble clef do not recolor or resample CAVA", () 
     assert.match(trebleSvg, /fill="#C74EC7"/);
     assert.match(trebleSvg, /<path[^>]+d="M314 801/);
     assert.doesNotMatch(trebleSvg, /<text\b/);
+    // PNG is the runtime source, so no user-installed music font or Qt SVG
+    // image plug-in is required. Keep the vector as the editable original.
+    assert.equal(treblePng.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+    assert.equal(treblePng.readUInt32BE(16), 45);
+    assert.equal(treblePng.readUInt32BE(20), 102);
+    assert.equal(treblePng[25], 6, "runtime icon must retain an alpha channel");
+
 
     // The animated bars keep their original accent and are never sampled.
     assert.match(source, /readonly property color accentColor:\s*mpdPlaying \? Colors\.orange : Colors\.cyan/);

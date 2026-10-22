@@ -150,10 +150,43 @@ test("magenta full-width wash, three independent static art glows, per-bar CAVA 
     // geometry-only per-bar halos, never a combined drop-shadow texture.
     assert.match(source, /Row \{\s*id:\s*mediaArtwork\s*anchors\.centerIn:\s*parent\s*spacing:\s*9\s*z:\s*1/);
     assert.doesNotMatch(source, /id:\s*(?:musicMarkUnderlay|mediaArtworkUnderlay)/);
-    assert.doesNotMatch(source, /RectangularShadow \{/);
+    assert.equal((source.match(/RectangularShadow \{/g) || []).length, 1,
+        "one static ambient wash is allowed inside the CAVA spectrum only");
     assert.match(source, /contentGlowEnabled:\s*false/);
     assert.match(source, /contentGlowSource:\s*null/);
     assert.doesNotMatch(source, /contentGlowSource:\s*(?:musicMark|mediaArtwork|spectrum|cavaBar)/);
+});
+
+test("large faded CAVA-only ambient wash stays static below individual bars", () => {
+    // This is an additional ambient layer, not a replacement for the 16
+    // individual CAVA bar halos or the separate static ornament glows.
+    const section = source.match(/Item \{\s*id:\s*spectrum([\s\S]*?)\n\s*Row \{\s*anchors\.fill:\s*parent\s*spacing:\s*2/);
+    assert.ok(section, "the wash must belong to the CAVA spectrum, not the whole dock");
+    const match = section[1].match(/RectangularShadow \{\s*id:\s*cavaAmbientWash([\s\S]*?)\n\s*\}/);
+    assert.ok(match, "there must be one dedicated wide CAVA wash");
+    const wash = match[1];
+
+    assert.match(wash, /anchors\.centerIn:\s*parent/);
+    assert.match(wash, /width:\s*Math\.max\(0,\s*spectrum\.width\s*-\s*4\s*\*\s*mediaDock\.softGlowSpread\)/);
+    assert.match(wash, /height:\s*Math\.max\(0,\s*spectrum\.height\s*-\s*2\s*\*\s*mediaDock\.softGlowSpread\)/);
+    assert.match(wash, /radius:\s*height\s*\/\s*2/);
+    assert.match(wash, /blur:\s*mediaDock\.contentGlowRadius/);
+    assert.match(wash, /spread:\s*0/);
+    assert.match(wash, /color:\s*mediaDock\.accentColor/);
+    assert.match(wash, /opacity:\s*0\.22/);
+    assert.match(wash, /z:\s*-1/);
+    assert.doesNotMatch(wash, /cavaBar|levels|frame|Repeater|safeSource|ShaderEffect|source:/,
+        "the ambient wash must not sample or bind to moving CAVA frames");
+
+    // The soft ambient light must never become a full-width cyan panel,
+    // nor replace the intentionally magenta rear/front chassis wash.
+    assert.equal((source.match(/RectangularShadow \{/g) || []).length, 1);
+    assert.doesNotMatch(source, /id:\s*(?:musicMarkUnderlay|mediaArtworkUnderlay)/);
+    for (const mode of ["normal", "hover", "pressed"]) {
+        assert.match(source, new RegExp(mode + "DockGlowColor:\\s*Colors\\.magenta"));
+    }
+    assert.match(source, /contentGlowEnabled:\s*false/);
+    assert.doesNotMatch(source, /contentGlowSource:\s*(?:spectrum|cavaBar|mediaArtwork)/);
 });
 
 test("CAVA neon tracks the animated bar using geometry only", () => {

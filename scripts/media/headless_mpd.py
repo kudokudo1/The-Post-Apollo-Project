@@ -158,10 +158,15 @@ class MpdBackend:
                 raise MediaBackendError("INVALID_REF", "Unregistered radio relay URI")
         if not isinstance(uri, str) or not uri:
             raise MediaBackendError("INVALID_REF", "No MPD library file supplied")
-        response = properties(self.command("addid", uri))
-        song_id = response.get("Id")
-        if not song_id or not song_id.isdecimal():
-            raise MediaBackendError("BACKEND_PROTOCOL", "MPD addid returned no song ID")
+        try:
+            response = properties(self.command("addid", uri))
+            song_id = response.get("Id")
+            if not song_id or not song_id.isdecimal():
+                raise MediaBackendError("BACKEND_PROTOCOL", "MPD addid returned no song ID")
+        except MediaBackendError:
+            if kind == "mpd-guarded-radio":
+                relay.revoke(uri)
+            raise
         # addid queues a track without starting playback.
         return song_id
 

@@ -1852,6 +1852,16 @@ PanelWindow {
                         glowColor: Colors.cyan
                     }
 
+                    GlowText {
+                        width: 55
+                        height: parent.height
+                        text: NotificationsService.scrollSpeedMultiplier.toFixed(1) + "×"
+                        pixelSize: 12
+                        textColor: Colors.white
+                        glowColor: Colors.cyan
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+
                     Item {
                         id: historySpeedSlider
                         width: Math.max(100, scrollSpeedControls.width
@@ -1906,16 +1916,6 @@ PanelWindow {
                                         mouse.x - scrollSpeedRail.x, scrollSpeedRail.width);
                             }
                         }
-                    }
-
-                    GlowText {
-                        width: 55
-                        height: parent.height
-                        text: NotificationsService.scrollSpeedMultiplier.toFixed(1) + "×"
-                        pixelSize: 12
-                        textColor: Colors.white
-                        glowColor: Colors.cyan
-                        horizontalAlignment: Text.AlignHCenter
                     }
 
                     MiniButton {

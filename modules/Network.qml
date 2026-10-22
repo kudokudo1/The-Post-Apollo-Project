@@ -14,6 +14,16 @@ DockButton {
     implicitHeight: 50
     implicitWidth: root.implicitWidth + 8
 
+    // Passive public interface for ApolloHubW. The dock's existing iw
+    // observer owns updates; consumers must not launch a second probe.
+    // Zero/malformed readings and disconnected Wi-Fi mean unknown speed.
+    readonly property real observedWifiLinkMbps: {
+        const speed = Number(root.linkSpeed);
+        return root.wifiEnabled && root.active
+               && isFinite(speed) && speed > 0 && speed <= 100000
+               ? speed : -1;
+    }
+
     contentGlowEnabled: false
 
     // Modulate shadow COLOR alpha; the source layer never changes opacity.

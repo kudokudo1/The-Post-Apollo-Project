@@ -230,7 +230,10 @@ Item {
         z: 0
     }
 
-    // Preserve the requested glyph exactly, before the live spectrum.
+    // Requested Media icon: ‧₊˚ 𝄞 ׅ˖ㅤ
+    // The treble clef stays as the matching bundled U+1D11E PNG because
+    // the operator's Qt font stack previously failed to render it as text.
+    // Existing per-glyph sampled shadows and local auras remain unchanged.
     Row {
         id: mediaArtwork
         anchors.centerIn: parent
@@ -282,7 +285,7 @@ Item {
                 id: trailingStar
                 anchors.verticalCenter: trebleClef.verticalCenter
                 textFormat: Text.PlainText
-                text: "˖"
+                text: " ׅ˖ㅤ"
                 font.pixelSize: 21
                 color: mediaDock.foregroundColor
             }

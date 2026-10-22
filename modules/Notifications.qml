@@ -3,9 +3,19 @@ import Quickshell
 import "../components"
 import qs.services.notifications
 import "../services/notifications/NotificationFacets.js" as NotificationFacets
+import "../services/notifications/BrowserSiteIdentity.js" as BrowserSiteIdentity
 
 PanelWindow {
     id: notificationsWindow
+
+    function localSiteArtwork(host) {
+        const kind = BrowserSiteIdentity.iconKindFor(host);
+        if (kind === "youtube")
+            return Qt.resolvedUrl("../assets/notifications/youtube.svg");
+        if (kind === "proton-mail")
+            return Qt.resolvedUrl("../assets/notifications/proton-mail.svg");
+        return "";
+    }
 
     // Display the latest activity time for a continuing event; ordinary
     // notifications display their receipt time. Qt formats in local time.
@@ -124,6 +134,7 @@ PanelWindow {
                 required property string appIcon
                 required property string image
                 required property string website
+                required property string websiteHost
                 required property string websiteIcon
                 required property string category
                 required property string severity
@@ -195,13 +206,11 @@ PanelWindow {
                     anchors.leftMargin: 15
                     anchors.topMargin: 15
 
-                    // Website mark overrides the browser logo only when
-                    // origin metadata identifies the website. Other native
-                    // notifications retain their existing image preference.
-                    source: notificationCard.website === "YouTube"
-                        ? Qt.resolvedUrl("../assets/notifications/youtube.svg")
-                        : notificationCard.website !== "" && notificationCard.websiteIcon !== ""
-                        ? notificationCard.websiteIcon
+                    // Website artwork is local and deterministic, never the
+                    // notification.image payload (which may be an attachment).
+                    // Nonwebsite app notifications retain the original media.
+                    source: notificationCard.website !== ""
+                        ? notificationsWindow.localSiteArtwork(notificationCard.websiteHost)
                         : notificationCard.image !== "" ? notificationCard.image
                         : notificationCard.appIcon !== "" ? Quickshell.iconPath(notificationCard.appIcon, true) : ""
 
@@ -209,6 +218,16 @@ PanelWindow {
                     // favicon/image payloads became solid magenta/black tiles
                     // when passed through a separate Colorize shader.
                     fillMode: Image.PreserveAspectFit
+                }
+
+                GohuText {
+                    anchors.centerIn: notificationIcon
+                    visible: notificationCard.website !== ""
+                        && notificationIcon.status !== Image.Ready
+                    text: BrowserSiteIdentity.initialsFor(notificationCard.website,
+                                                          notificationCard.websiteHost)
+                    font.pixelSize: 18
+                    color: Colors.magenta
                 }
 
                 // ===== TEXT ====================================

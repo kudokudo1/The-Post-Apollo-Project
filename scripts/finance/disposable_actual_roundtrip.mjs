@@ -24,9 +24,11 @@ const reader=join(here,"read_budget.mjs");
 const binary=join(here,"node_modules",".bin","actual-server");
 const serverURL="http://127.0.0.1:5006";
 const password="FICTIONAL-RUNNER-PASSWORD-ONLY-12345";
-const month="2026-10";
-const day=month+"-22";
-const editedDay=month+"-23";
+// Use UTC today for the edited transaction: Actual's account balance
+// may omit future-dated transactions, even though their ledger rows exist.
+const editedDay=new Date().toISOString().slice(0,10);
+const month=editedDay.slice(0,7);
+const day=month+"-01";
 const description="FICTIONAL FinanceW Test Cafe";
 let stage="preflight";
 let server=null;

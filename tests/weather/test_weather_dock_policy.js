@@ -218,10 +218,11 @@ assert.match(dock, /SafeDropShadow\s*\{[^}]*safeSource:\s*weatherDegree[^}]*colo
 assert.match(dock, /id:\s*weatherContent[\s\S]*?anchors\.centerIn:\s*parent[\s\S]*?spacing:\s*0/);
 assert.match(dock, /id:\s*weatherArtworkGlowFrame[\s\S]*?anchors\.verticalCenter:\s*parent\.verticalCenter[\s\S]*?implicitWidth:\s*weatherGlowArtwork\.implicitWidth/);
 assert.match(dock, /id:\s*weatherGlowArtwork\s+z:\s*1\s+spacing:\s*6/);
-assert.match(dock, /id:\s*weatherContent[\s\S]*?anchors\.centerIn:\s*parent\s+anchors\.horizontalCenterOffset:\s*2/);
-// The measured group width leaves 3px each side; a 2px optical shift
-// retains at least 1px on the tight (right) edge.
-assert.ok(6 / 2 - 2 >= 1, "optical offset fits content padding");
+assert.match(dock, /id:\s*weatherContent[\s\S]*?anchors\.centerIn:\s*parent\s+anchors\.horizontalCenterOffset:\s*-1/);
+// The corrected optical offset moves the visible cluster left 3px from
+// the old +2px value while keeping its measured layout and 6px padding.
+assert.equal(2 - (-1), 3, "optical balance moves group left by three pixels");
+assert.ok(6 / 2 - Math.abs(-1) >= 2, "center offset stays inside padding");
 assert.match(dock, /id:\s*weatherReadout[\s\S]*?spacing:\s*0/);
 assert.match(dock, /id:\s*weatherTemperature[\s\S]*?spacing:\s*0/);
 assert.match(dock, /contentGlowSource:\s*weatherGlowArtwork/);
@@ -282,21 +283,36 @@ const sampledArtwork = dock.slice(artworkStart, frameStart);
 assert.match(sampledArtwork, /id:\s*weatherConditionSlot/);
 assert.match(sampledArtwork, /id:\s*weatherTemperature/);
 assert.doesNotMatch(sampledArtwork, /id:\s*weatherThermometer/);
-// Rear halo must be external to the gauge's antialiasing layer, so
-// temperature-colored light extends behind the outline on idle/hover.
+// The rear halo must not depend on a ShaderEffectSource sampling a
+// QtQuick.Shapes item nested inside the gauge's offscreen layer.
+// Qt Quick's two RectangularShadow shapes draw direct bulb/stem halos.
+assert.match(dock, /import QtQuick\.Effects/);
 const rearGlowStart = dock.indexOf("id: thermometerRearGlow");
 const rearGlowEnd = dock.indexOf("// Compact native scene-graph thermometer", rearGlowStart);
 assert.ok(rearGlowStart > frameStart && rearGlowEnd > rearGlowStart);
 assert.ok(rearGlowEnd < thermometerStart);
 const rearGlow = dock.slice(rearGlowStart, rearGlowEnd);
-assert.match(rearGlow, /anchors\.fill:\s*weatherThermometer/);
-assert.match(rearGlow, /safeSource:\s*thermometerLiquid/);
-assert.match(rearGlow, /requestedVisible:\s*weatherDock\.thermometerState\.valid\s*&&\s*weatherThermometer\.animatedLevel > 0/);
+assert.match(dock, /id:\s*thermometerGlowFrame[\s\S]*?clip:\s*false/);
+assert.match(rearGlow, /id:\s*thermometerRearGlow/);
+assert.match(rearGlow, /id:\s*thermometerStemRearGlow/);
+assert.match(rearGlow, /RectangularShadow\s*\{\s*id:\s*thermometerRearGlow/);
+assert.match(rearGlow, /RectangularShadow\s*\{\s*id:\s*thermometerStemRearGlow/);
+assert.equal((rearGlow.match(/RectangularShadow\s*\{/g) || []).length, 2);
+assert.doesNotMatch(rearGlow, /safeSource:/);
+assert.match(rearGlow, /readonly property color rearGlowColor:\s*weatherDock\.open \|\| weatherDock\.pressed\s*\? Colors\.magenta : weatherThermometer\.liquidColor/);
+assert.match(rearGlow, /readonly property bool hasGlow:\s*weatherDock\.thermometerState\.valid\s*&&\s*weatherThermometer\.animatedLevel > 0/);
+assert.match(rearGlow, /blur:\s*6/);
+assert.match(rearGlow, /spread:\s*1\.3/);
+assert.match(rearGlow, /opacity:\s*weatherDock\.contentGlowOpacity \* 0\.85/);
+assert.match(rearGlow, /opacity:\s*weatherDock\.contentGlowOpacity \* 0\.72/);
+assert.match(rearGlow, /visible:\s*thermometerGlowFrame\.hasGlow/);
+assert.match(rearGlow, /height:\s*Math\.max\(0, Math\.min\(1, weatherThermometer\.animatedLevel\)\)/);
+assert.match(rearGlow, /color:\s*thermometerGlowFrame\.rearGlowColor/g);
 assert.match(rearGlow, /z:\s*0/);
-assert.match(rearGlow, /radius:\s*6/);
-assert.match(rearGlow, /opacity:\s*weatherDock\.contentGlowOpacity \* 0\.75/);
-assert.match(rearGlow, /color:\s*weatherDock\.open \|\| weatherDock\.pressed\s*\? Colors\.magenta : weatherThermometer\.liquidColor/);
-assert.doesNotMatch(rearGlow, /weatherDock\.hovered/);
+// Preserve the weather-state perimeter while the gauge keeps temperature hue.
+assert.match(dock, /normalDockGlowColor:\s*weatherColor/);
+assert.match(dock, /hoverDockGlowColor:\s*Colors\.orange/);
+
 // Geometry is unchanged and the thermometer remains in its own layer.
 assert.match(dock, /id:\s*weatherThermometer\s+z:\s*1[\s\S]*?implicitWidth:\s*17[\s\S]*?implicitHeight:\s*35/);
 

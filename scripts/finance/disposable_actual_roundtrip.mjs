@@ -113,9 +113,10 @@ function runWriter(home,cmd) {
 }
 function assertOutcome(result,expected,code=0) {
   assert.equal(result.error,undefined,"Writer process error");
-  assert.equal(result.status,code,"Unexpected writer exit");
-  assert.match(result.stdout,new RegExp(
-    "^FINANCEW_TRANSACTION_RESULT "+expected+"\\s*$"));
+  const observed=/FINANCEW_TRANSACTION_RESULT ([a-z0-9:-]+)/.exec(result.stdout)?.[1]
+    || "no-status";
+  if (result.status !== code || observed !== expected)
+    throw new Error("writer-"+observed);
   assert.equal(result.stderr.includes(description),false);
 }
 
@@ -230,7 +231,9 @@ try {
   // Real money never enters this test; only the stage and error class
   // are emitted, not payloads, credential contents or budget details.
   process.stderr.write("FINANCEW_DISPOSABLE_ACTUAL_FAIL stage="+stage
-    +" class="+(error?.code || error?.name || "Error")+"\n");
+    +" class="+(error?.code || error?.name || "Error")
+    +" detail="+(/^[a-z0-9:-]+$/.test(error?.message || "")
+      ? error.message : "none")+"\n");
   process.exitCode=1;
 } finally {
   try {await endApi();} catch {}

@@ -14,6 +14,8 @@ uptime_mini = (ROOT / "widgets/hub/ApolloHubUptimeMini.qml").read_text(encoding=
 apps_mini = (ROOT / "widgets/hub/ApolloHubAppsMini.qml").read_text(encoding="utf-8")
 todo_mini = (ROOT / "widgets/hub/ApolloHubTodoMini.qml").read_text(encoding="utf-8")
 todo_store = (ROOT / "services/hub/ApolloHubTodoStore.qml").read_text(encoding="utf-8")
+notes_mini = (ROOT / "widgets/hub/ApolloHubNotesMini.qml").read_text(encoding="utf-8")
+notes_store = (ROOT / "services/hub/ApolloHubNotesStore.qml").read_text(encoding="utf-8")
 layout = (ROOT / "services/hub/ApolloHubLayout.js").read_text(encoding="utf-8")
 store = (ROOT / "services/hub/ApolloHubStore.qml").read_text(encoding="utf-8")
 module = (ROOT / "services/hub/qmldir").read_text(encoding="utf-8")
@@ -544,6 +546,69 @@ assert "function requestDelete(task)" in todo_mini
 assert "onCompleted: todoStore" not in todo_mini
 assert "onVisibleChanged:" in todo_mini
 assert "onSaved:" in todo_store and "atomicWrites: true" in todo_store
+
+# B8 Notes mini: separate user-private singleton, revision-safe detached
+# editor, explicit Save, and two-step revision-guarded delete. No autosave,
+# second FileView, filesystem writes, or background processing in the UI.
+assert "notesStore: ApolloHubNotesStore" in window
+assert "notesSnapshot: ApolloHubNotesStore.snapshot" in window
+assert "property bool notesInputFocused: false" in window
+assert "&& !notesInputFocused" in window
+assert "onNotesTextFocusChanged: function(focused)" in window
+assert "property var notesStore: null" in tile
+assert "property var notesSnapshot: null" in tile
+assert "signal notesTextFocusChanged(bool focused)" in tile
+assert "ApolloHubNotesMini {" in tile
+assert 'visible: tile.moduleId === "notes"' in tile
+assert "notesStore: tile.notesStore" in tile
+assert "notesSnapshot: tile.notesSnapshot" in tile
+assert 'tile.moduleId !== "notes"' in tile
+assert "notesMini.statusLine" in tile
+for phrase in (
+    "property var notesStore: null", "property var notesSnapshot: null",
+    "signal textFocusChanged(bool focused)",
+    "onTypingChanged: textFocusChanged(typing)",
+    "notesSnapshot.writable === true",
+    '"loading"', '"saving"', '"error"', '"unsupported"',
+    "NOT YET CONFIRMED", "WRITES LOCKED", "DRAFT RETAINED",
+    "property int openedRevision: 0",
+    "property string openedTitle:", "property string openedBody:",
+    "notesStore.getNote(item.id)", "openedRevision = detail.revision",
+    "openedTitle = detail.title", "openedBody = detail.body",
+    "titleInput.text = detail.title", "bodyInput.text = detail.body",
+    "notesStore.createNote(title, body)",
+    "notesStore.saveNote(openedId, openedRevision, title, body)",
+    "notesStore.deleteNote(openedId, openedRevision, true)",
+    "notesStore.reloadFromDisk()",
+    "if (!deleteArmed)", "deleteArmed = true",
+    'label: notesMini.deleteArmed ? "YES" : "DEL"',
+    "label: \"NO\"", "saveDraft()", "deleteNote()",
+    "if (storeState === \"ready\" || storeState === \"empty\")",
+    "onNotesSnapshotChanged:", 'pendingAction = "";',
+    "if (!started)", "feedback = \"SAVE REJECTED // CHECK REVISION\"",
+    "if (draftDirty && !discardArmed)", "discardArmed = true",
+    'label: notesMini.discardArmed ? "DISCARD" : "BACK"',
+    "maximumLength: 120", "bodyInput.text.length <= 8192",
+    "textFormat: TextEdit.PlainText", "textFormat: Text.PlainText",
+    "notesMini.entries", "model: notesMini.entries",
+    "noteRow.modelData.preview", "noteRow.modelData.title",
+    'id: titleInput', 'id: bodyInput', 'id: noteList',
+):
+    assert phrase in notes_mini, f"B8 Notes UI missing {phrase}"
+for forbidden in (
+    "ApolloHubNotesStore {", "FileView {", "Process {",
+    "Timer {", "JsonAdapter {", "Quickshell.dataDir",
+    "atomicWrites:", "setText(", "execDetached(",
+    "onTextChanged:", "onTitleChanged:", "onBodyChanged:",
+    "Component.onCompleted:", "onSaved:", "createNote()",
+):
+    assert forbidden not in notes_mini, (
+        f"Notes UI must not own persistence or autosave: {forbidden}")
+assert "singleton ApolloHubNotesStore 1.0 ApolloHubNotesStore.qml" in module
+assert "atomicWrites: true" in notes_store
+assert "watchChanges: false" in notes_store
+assert 'storageState="saving"' in notes_store
+assert "onSaved:" in notes_store and "onSaveFailed:" in notes_store
 
 # Launchers and widget backends are unchanged in this first stage.
 print("ApolloHubW foundation source contracts passed")

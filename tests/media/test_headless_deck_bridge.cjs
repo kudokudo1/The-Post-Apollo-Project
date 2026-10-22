@@ -64,3 +64,23 @@ test("background snapshot polling never flashes or disables radio cassette contr
     assert.match(deck, /opacity:\s*headless\.busy\s*\?\s*0\.5\s*:\s*1/);
     assert.match(deck, /enabled:\s*!headless\.busy/);
 });
+
+test("search and explicit staged selection are controller-only operations", () => {
+    assert.match(bridge, /function searchMedia\(source, query, cursor\)/);
+    assert.match(bridge, /return issue\("search", args\)/);
+    assert.match(bridge, /function selectMedia\(ref\)/);
+    assert.match(bridge, /return args !== null && issue\("select", args\)/);
+    assert.match(bridge, /function loadSelectedMedia\(\)/);
+    assert.match(bridge, /return issue\("load", \[\]\)/);
+    assert.doesNotMatch(bridge, /--autoplay/);
+});
+
+test("catalog responses update browsing without clobbering loaded media", () => {
+    assert.match(bridge, /pendingAction === "search" && payload\.result\.browse/);
+    assert.match(bridge, /Object\.assign\(\{\}, snapshot \|\| \{\},/);
+    assert.match(bridge, /browse: payload\.result\.browse/);
+    assert.match(bridge, /selection: payload\.result\.selection/);
+    assert.match(bridge, /pendingAction === "inspect" && payload\.result\.item/);
+    assert.match(bridge, /readonly property var loaded:/);
+    assert.match(bridge, /snapshot = payload\.result;/);
+});

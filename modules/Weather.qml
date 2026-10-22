@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Shapes
 import Quickshell
 import "../components"
 import "../services/weather/WeatherDockPolicy.js" as WeatherDockPolicy
@@ -203,18 +204,14 @@ DockButton {
                 }
             }
 
-            // Classic thermometer silhouette again: a narrow tube feeding a
-            // wider bulb. Tube and bulb are traced as one continuous glass
-            // chamber, so there is no seam and the live fluid fills/drains
-            // through both as a single temperature reading.
+            // Native scene-graph thermometer. Canvas proved unreliable in
+            // this dock path at runtime, so draw the same connected tube+bulb
+            // silhouette with Qt Quick Shapes instead.
             Item {
                 id: weatherThermometer
                 anchors.verticalCenter: parent.verticalCenter
                 implicitWidth: 20
                 implicitHeight: 42
-                // Plain Item does not adopt implicit size by itself. The
-                // Canvas fills this Item, so explicit geometry is required or
-                // the instrument paints into a 0×0 surface.
                 width: implicitWidth
                 height: implicitHeight
 
@@ -223,9 +220,10 @@ DockButton {
                     weatherDock.thermometerState.valid
                     ? weatherDock.thermometerState.level : 0
 
-                // Glass and scale marks deliberately share one opacity.
                 readonly property color glassColor: Colors.white
                 readonly property real glassOpacity: 1.0
+                readonly property real fillStart:
+                    Math.max(0, Math.min(1, 1 - animatedLevel))
 
                 Behavior on animatedLevel {
                     NumberAnimation {
@@ -238,161 +236,221 @@ DockButton {
                     ColorAnimation { duration: 300 }
                 }
 
-                onAnimatedLevelChanged: thermometerCanvas.requestPaint()
-                onLiquidColorChanged: thermometerCanvas.requestPaint()
-                onGlassColorChanged: thermometerCanvas.requestPaint()
-                onWidthChanged: thermometerCanvas.requestPaint()
-                onHeightChanged: thermometerCanvas.requestPaint()
+                // Black vessel body. The narrow tube flares directly into the
+                // wider bulb, so the silhouette is one connected unit.
+                Shape {
+                    anchors.fill: parent
 
-                // One path, shaped like the original tube + bulb instrument.
-                // The shoulder curves flare from the tube directly into the
-                // bulb, so neither glass nor liquid has a dividing line.
-                function traceThermometer(
-                    ctx, centerX, topY, bottomY,
-                    tubeHalfWidth, shoulderY, bulbHalfWidth
-                ) {
-                    const left = centerX - tubeHalfWidth;
-                    const right = centerX + tubeHalfWidth;
-                    const topRadius = tubeHalfWidth;
-                    const bulbTopY = shoulderY + 1;
-                    const bulbMidY = (bulbTopY + bottomY) / 2;
+                    ShapePath {
+                        strokeWidth: 0
+                        strokeColor: "transparent"
+                        fillColor: Colors.black
 
-                    ctx.beginPath();
-                    ctx.moveTo(centerX, topY);
-                    ctx.quadraticCurveTo(
-                        right, topY,
-                        right, topY + topRadius
-                    );
-                    ctx.lineTo(right, shoulderY - 2);
-                    ctx.quadraticCurveTo(
-                        right, shoulderY,
-                        centerX + bulbHalfWidth, bulbTopY
-                    );
-                    ctx.cubicCurveTo(
-                        centerX + bulbHalfWidth, bulbMidY,
-                        centerX + bulbHalfWidth, bottomY - 2,
-                        centerX, bottomY
-                    );
-                    ctx.cubicCurveTo(
-                        centerX - bulbHalfWidth, bottomY - 2,
-                        centerX - bulbHalfWidth, bulbMidY,
-                        centerX - bulbHalfWidth, bulbTopY
-                    );
-                    ctx.quadraticCurveTo(
-                        left, shoulderY,
-                        left, shoulderY - 2
-                    );
-                    ctx.lineTo(left, topY + topRadius);
-                    ctx.quadraticCurveTo(
-                        left, topY,
-                        centerX, topY
-                    );
-                    ctx.closePath();
+                        startX: 10
+                        startY: 1
+
+                        PathQuad {
+                            x: 15
+                            y: 6
+                            controlX: 15
+                            controlY: 1
+                        }
+                        PathLine { x: 15; y: 24 }
+                        PathQuad {
+                            x: 18
+                            y: 28
+                            controlX: 15
+                            controlY: 27
+                        }
+                        PathCubic {
+                            x: 10
+                            y: 41
+                            control1X: 18
+                            control1Y: 33
+                            control2X: 17
+                            control2Y: 39
+                        }
+                        PathCubic {
+                            x: 2
+                            y: 28
+                            control1X: 3
+                            control1Y: 39
+                            control2X: 2
+                            control2Y: 33
+                        }
+                        PathQuad {
+                            x: 5
+                            y: 24
+                            controlX: 5
+                            controlY: 27
+                        }
+                        PathLine { x: 5; y: 6 }
+                        PathQuad {
+                            x: 10
+                            y: 1
+                            controlX: 5
+                            controlY: 1
+                        }
+                    }
                 }
 
-                Canvas {
-                    id: thermometerCanvas
+                // Real temperature liquid. This uses the same connected inner
+                // tube+bulb path and a hard vertical fill boundary, so the bulb
+                // fills first and the same body continues upward through the stem.
+                Shape {
                     anchors.fill: parent
-                    antialiasing: true
+                    visible: weatherThermometer.animatedLevel > 0
 
-                    onPaint: {
-                        const ctx = getContext("2d");
-                        ctx.clearRect(0, 0, width, height);
+                    ShapePath {
+                        strokeWidth: 0
+                        strokeColor: "transparent"
 
-                        const centerX = width / 2;
-                        const outerTop = 1;
-                        const outerBottom = height - 1;
-                        const outerTubeHalf = 5;
-                        const outerShoulderY = 26;
-                        const outerBulbHalf = 8;
+                        fillGradient: LinearGradient {
+                            x1: 0
+                            y1: 3
+                            x2: 0
+                            y2: 39
 
-                        const innerTop = 3;
-                        const innerBottom = height - 3;
-                        const innerTubeHalf = 3;
-                        const innerShoulderY = 27;
-                        const innerBulbHalf = 5.5;
-
-                        // Black glass interior.
-                        weatherThermometer.traceThermometer(
-                            ctx,
-                            centerX,
-                            outerTop,
-                            outerBottom,
-                            outerTubeHalf,
-                            outerShoulderY,
-                            outerBulbHalf
-                        );
-                        ctx.fillStyle = Colors.black;
-                        ctx.fill();
-
-                        // Continuous live fluid, clipped to the entire inner
-                        // tube + bulb chamber. The bulb therefore fills and
-                        // drains with the same normalized reading as the stem.
-                        ctx.save();
-                        weatherThermometer.traceThermometer(
-                            ctx,
-                            centerX,
-                            innerTop,
-                            innerBottom,
-                            innerTubeHalf,
-                            innerShoulderY,
-                            innerBulbHalf
-                        );
-                        ctx.clip();
-
-                        const innerHeight = innerBottom - innerTop;
-                        const fillHeight =
-                            innerHeight * weatherThermometer.animatedLevel;
-                        ctx.globalAlpha = 1.0;
-                        ctx.fillStyle = weatherThermometer.liquidColor;
-                        ctx.fillRect(
-                            centerX - innerBulbHalf,
-                            innerBottom - fillHeight,
-                            innerBulbHalf * 2,
-                            fillHeight
-                        );
-                        ctx.restore();
-
-                        // Glass outline.
-                        ctx.save();
-                        ctx.globalAlpha = weatherThermometer.glassOpacity;
-                        weatherThermometer.traceThermometer(
-                            ctx,
-                            centerX,
-                            outerTop,
-                            outerBottom,
-                            outerTubeHalf,
-                            outerShoulderY,
-                            outerBulbHalf
-                        );
-                        ctx.lineWidth = 2;
-                        ctx.strokeStyle = weatherThermometer.glassColor;
-                        ctx.stroke();
-
-                        // Four indicator marks inside the tube. They use the
-                        // exact same color and opacity as the glass outline.
-                        const innerTubeRight = centerX + innerTubeHalf;
-                        const tickLongStartX = centerX - 0.5;
-                        const tickShortStartX = centerX + 0.5;
-                        const tickEndX = innerTubeRight - 0.5;
-                        const tickTop = 7;
-                        const tickStep = 6;
-
-                        ctx.lineWidth = 1;
-                        ctx.strokeStyle = weatherThermometer.glassColor;
-
-                        for (let i = 0; i < 4; i++) {
-                            const tickY = tickTop + i * tickStep;
-                            ctx.beginPath();
-                            ctx.moveTo(
-                                i % 2 === 0
-                                ? tickLongStartX : tickShortStartX,
-                                tickY
-                            );
-                            ctx.lineTo(tickEndX, tickY);
-                            ctx.stroke();
+                            GradientStop {
+                                position: 0
+                                color: "transparent"
+                            }
+                            GradientStop {
+                                position: Math.max(
+                                    0,
+                                    weatherThermometer.fillStart - 0.002
+                                )
+                                color: "transparent"
+                            }
+                            GradientStop {
+                                position: weatherThermometer.fillStart
+                                color: weatherThermometer.liquidColor
+                            }
+                            GradientStop {
+                                position: 1
+                                color: weatherThermometer.liquidColor
+                            }
                         }
-                        ctx.restore();
+
+                        startX: 10
+                        startY: 3
+
+                        PathQuad {
+                            x: 13
+                            y: 6
+                            controlX: 13
+                            controlY: 3
+                        }
+                        PathLine { x: 13; y: 25 }
+                        PathQuad {
+                            x: 15.5
+                            y: 28
+                            controlX: 13
+                            controlY: 27
+                        }
+                        PathCubic {
+                            x: 10
+                            y: 39
+                            control1X: 15.5
+                            control1Y: 32
+                            control2X: 15
+                            control2Y: 37
+                        }
+                        PathCubic {
+                            x: 4.5
+                            y: 28
+                            control1X: 5
+                            control1Y: 37
+                            control2X: 4.5
+                            control2Y: 32
+                        }
+                        PathQuad {
+                            x: 7
+                            y: 25
+                            controlX: 7
+                            controlY: 27
+                        }
+                        PathLine { x: 7; y: 6 }
+                        PathQuad {
+                            x: 10
+                            y: 3
+                            controlX: 7
+                            controlY: 3
+                        }
+                    }
+                }
+
+                // White glass outline, drawn last so the liquid never obscures it.
+                Shape {
+                    anchors.fill: parent
+                    opacity: weatherThermometer.glassOpacity
+
+                    ShapePath {
+                        strokeWidth: 2
+                        strokeColor: weatherThermometer.glassColor
+                        fillColor: "transparent"
+
+                        startX: 10
+                        startY: 1
+
+                        PathQuad {
+                            x: 15
+                            y: 6
+                            controlX: 15
+                            controlY: 1
+                        }
+                        PathLine { x: 15; y: 24 }
+                        PathQuad {
+                            x: 18
+                            y: 28
+                            controlX: 15
+                            controlY: 27
+                        }
+                        PathCubic {
+                            x: 10
+                            y: 41
+                            control1X: 18
+                            control1Y: 33
+                            control2X: 17
+                            control2Y: 39
+                        }
+                        PathCubic {
+                            x: 2
+                            y: 28
+                            control1X: 3
+                            control1Y: 39
+                            control2X: 2
+                            control2Y: 33
+                        }
+                        PathQuad {
+                            x: 5
+                            y: 24
+                            controlX: 5
+                            controlY: 27
+                        }
+                        PathLine { x: 5; y: 6 }
+                        PathQuad {
+                            x: 10
+                            y: 1
+                            controlX: 5
+                            controlY: 1
+                        }
+                    }
+                }
+
+                // Indicator marks are ordinary QML rectangles now, so their
+                // visibility is independent of the shape renderer. They share
+                // exactly the same glass color and opacity.
+                Repeater {
+                    model: 4
+
+                    delegate: Rectangle {
+                        x: index % 2 === 0 ? 9 : 10
+                        y: 7 + index * 6
+                        width: index % 2 === 0 ? 3.5 : 2.5
+                        height: 1
+                        color: weatherThermometer.glassColor
+                        opacity: weatherThermometer.glassOpacity
                     }
                 }
             }

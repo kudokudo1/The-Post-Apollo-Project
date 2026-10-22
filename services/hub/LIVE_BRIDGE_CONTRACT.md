@@ -118,3 +118,55 @@ CI workflow `apollo-hub-live-bridge.yml` runs:
 
 No host restart, local file change, production activation, or live Hospital attachment is part of B3.
 
+## B4 // Media: MPD session + explicitly selected MPRIS player (read-only)
+
+**Status:** Source implementation and isolated CI tests passed. No shell or UI integration yet; desktop runtime verification pending.
+
+`ApolloHubLiveBridge.mediaSnapshot` has **two distinct objects**:
+- `mediaSnapshot.mpd`: live **observations from the existing `HeadlessMediaController` instance**, when an owner injects `mediaControllerSource`. This is controller/session state, not MPRIS and not proof of audible output.
+- `mediaSnapshot.mpris`: passive observations from the in-process `Quickshell.Services.Mpris` singleton for one explicitly selected player. The bridge has `selectedMprisBusName` input and never chooses a player by guessing. `playerctld` mirrors are ignored, as in the existing `MprisPlaybackAdapter`.
+
+The pure, read-only projection policy is `services/hub/ApolloHubMediaPolicy.js`. No new MPD, controller, MPRIS adapter, process, CLI request, polling loop, audio routing, or playback/volume action is introduced by this batch.
+
+### MPD consumer properties
+
+`mediaSnapshot.mpd` exposes:
+- `state`: `disconnected`, `unobserved`, `error`, `stale`, `unavailable`, `unloaded`, `playing`, `paused`, or `stopped`.
+- `source: "mpd"`, `connected`, `fresh`, `error`, `ageSeconds`.
+- `title`, `artist`: current **observed session track**, blank when unobserved/stale/error.
+- `lastKnownLoadedTitle`: the cassette's **last observed loaded item**, retained on stale snapshots but never represented as live playback.
+- `loaded`, `ownedByController`, `audibleOutputVerified: false`.
+
+A successful `HeadlessMediaController.snapshot` response advances freshness only when `pendingAction === "snapshot"` and `errorText` is empty. Search, inspection, and selection must not renew an old playback observation. Observed MPD state expires after **15 seconds** with no new successful snapshot; a five-second *clock-only timer* enforces expiry while attached. Loaded media and active playing media are kept separate. Neither `selection` nor `browse` are displayed as loaded or playing.
+
+**Existing lifecycle limitation:** The current Hi-Fi deck sets `HeadlessMediaController.polling` only while the deck is open in MPD mode. With the deck closed, MPD observations will expire and the Hub must show `stale`. To display truly live closed-deck MPD state, another owner must expose the **existing** Media dock's already-running `mpc` observation (2-second cadence) or arrange an authorized shared observation source. Do not start another observer here.
+
+### MPRIS consumer properties
+
+`mediaSnapshot.mpris` exposes:
+- `state`: `unavailable`, `selection-required`, `player-missing`, `unknown`, `playing`, `paused`, or `stopped`.
+- `source: "mpris"`, `selected`, `playerCount`, `playerName`, `title`, `artist`, `album`, `audibleOutputVerified: false`.
+
+A browser appearing in the MPRIS list is **not** permission to take it over. Even one discovered player stays `selection-required` until the existing Hi-Fi MPRIS selector intentionally supplies its `selectedBusName`. No controls or mutable references escape into the Hub snapshot.
+
+### Owner-mediated integration (NOT yet implemented)
+
+The Media Deck currently creates **one** `HeadlessMediaController { id: headless }` and **one** `MprisPlaybackAdapter { id: mediaAdapter }` inside `widgets/MediaDeckW.qml`. They are not exposed to `shell.qml` or the Hub, so **do not construct another instance just to fill the Hub tile**.
+
+The Media/UI owner should expose read-only references (or snapshots) via `MediaDeckW` → `Mediaplayer.qml` to the shared shell, without changing playback controls. Then the shell owner can add to the **already existing** `ApolloHubLiveBridge`:
+
+```qml
+mediaControllerSource: sharedMediaDock.hubMediaController
+selectedMprisBusName: sharedMediaDock.hubSelectedMprisBusName
+```
+
+These properties are **illustrative proposed interface names, not currently implemented properties**. The media and shell owners must approve their exact names and ensure bindings stay reactive. The Hub UI owner can add `mediaSnapshot: hub.liveBridge ? hub.liveBridge.mediaSnapshot : null` to the mini Media tile, and choose which of the two independent sources to display without silently switching the deck's transport mode.
+
+### Tests and acceptance
+
+- `python3 tests/hub/test_apollo_hub_media_bridge.py`: source seam, existing controllers, no duplicate polling/action commands.
+- `node tests/hub/test_apollo_hub_media_policy.cjs`: production policy tests for unloaded/paused/playing/stale/error, ownership loss, loaded vs playing, missing/ambiguous MPRIS selection and privacy.
+- Both run in `.github/workflows/apollo-hub-live-bridge.yml` with B1/B2/B3 regressions.
+
+**Desktop runtime acceptance remains open** for MPD signal ordering, MPRIS player addition/removal and property updates, and live tile behavior. Do not claim audible output from MPRIS or a successful controller command.
+

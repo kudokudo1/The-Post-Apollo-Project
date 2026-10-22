@@ -144,7 +144,7 @@ not live implementation, exact geometry, or a new shared keyboard-focus policy.
 - **SELECT** remains distinct from highlighted cursor position, loading
   and playback. The SELECT control is visibly labeled **`~`**.
   Its keyboard shortcut is the **bare physical backtick/grave key**
-  (`\``, without modifiers). The printed glyph is intentionally a tilde;
+  (U+0060 with no modifiers). The printed glyph is intentionally a tilde;
   do not require Shift to activate it.
 - The physical Enter control and normal keyboard Enter/Return perform the
   same contextual action. On an individually highlighted, playable track,

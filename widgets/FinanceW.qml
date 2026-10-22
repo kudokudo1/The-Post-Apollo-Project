@@ -206,6 +206,8 @@ PanelWindow {
             financeBudget.refresh();
             if (keyboardActive)
                 Qt.callLater(function() { financeKeyboardAnchor.forceActiveFocus(); });
+        } else {
+            transactionDraftPane.clear();
         }
     }
     onKeyboardActiveChanged: {
@@ -1045,15 +1047,41 @@ PanelWindow {
                                 }
                             }
 
-                            GohuText {
+                            Row {
                                 width: parent.width
-                                text: "TRANSACTIONS // "
-                                      + (financeBudget.snapshot
-                                         ? financeBudget.snapshot.transactionsCount : 0)
-                                      + " THIS MONTH"
-                                textFormat: Text.PlainText
-                                font.pixelSize: 12
-                                color: Colors.cyan
+                                spacing: 7
+                                GohuText {
+                                    width: parent.width - newTransactionDraft.width - 7
+                                    height: 30
+                                    verticalAlignment: Text.AlignVCenter
+                                    text: "TRANSACTIONS // "
+                                          + (financeBudget.snapshot
+                                             ? financeBudget.snapshot.transactionsCount : 0)
+                                    textFormat: Text.PlainText
+                                    font.pixelSize: 11
+                                    color: Colors.cyan
+                                    elide: Text.ElideRight
+                                }
+                                ActionButton {
+                                    id: newTransactionDraft
+                                    width: 84
+                                    height: 30
+                                    label: "NEW DRAFT"
+                                    labelPixelSize: 9
+                                    accentColor: Colors.omnitrix
+                                    available: financeBudget.state === "ready"
+                                               && financeBudget.snapshot
+                                               && financeBudget.snapshot.accounts.length > 0
+                                    onLeftClicked: transactionDraftPane.begin()
+                                }
+                            }
+
+                            FinanceTransactionDraftPane {
+                                id: transactionDraftPane
+                                width: parent.width
+                                accounts: financeBudget.snapshot
+                                          ? financeBudget.snapshot.accounts : []
+                                selectedMonth: financeBudget.selectedMonth
                             }
 
                             GohuText {

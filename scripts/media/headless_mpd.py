@@ -71,7 +71,7 @@ def track_item(row: dict[str, str]) -> dict[str, Any]:
 class MpdBackend:
     id = "mpd"
     required_kind = "mpd-local-track"
-    required_kinds = ("mpd-local-track", "mpd-https-stream")
+    required_kinds = ("mpd-local-track", "mpd-https-stream", "mpd-guarded-radio")
 
     def __init__(self, host: str = "127.0.0.1", port: int = 6600, timeout: float = 2.0):
         self.host = host
@@ -150,6 +150,12 @@ class MpdBackend:
         if kind == "mpd-https-stream":
             from direct_stream_source import validate_https_audio_url
             uri = validate_https_audio_url(uri)
+        elif kind == "mpd-guarded-radio":
+            # Never hand MPD a directory-provided HTTPS URL. The only
+            # allowed address is an active, opaque, loopback relay capability.
+            relay = getattr(self, "radio_relay", None)
+            if relay is None or not relay.owns(uri):
+                raise MediaBackendError("INVALID_REF", "Unregistered radio relay URI")
         if not isinstance(uri, str) or not uri:
             raise MediaBackendError("INVALID_REF", "No MPD library file supplied")
         response = properties(self.command("addid", uri))

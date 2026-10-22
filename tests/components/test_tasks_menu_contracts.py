@@ -22,8 +22,8 @@ assert "root.screen ? root.screen.width - root.implicitWidth : 0" in MENU
 
 # Leave the Wayland surface mapped and empty its pointer mask when closed.
 assert "WlrLayershell.layer: WlrLayer.Overlay" in MENU
-assert "WlrLayershell.keyboardFocus: WlrKeyboardFocus.None" in MENU
-assert "focusable: false" in MENU
+assert "WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None" in MENU
+assert 'focusable: root.menuOpen && root.activeMode.id === "tasks"' in MENU
 assert "visible: true" in MENU
 assert "mask: Region {" in MENU
 assert "width: root.menuOpen ? root.frameWidth : 0" in MENU
@@ -42,9 +42,9 @@ assert "color: Colors.magenta" in MENU
 assert "height: 2" in MENU
 assert 'label: "×"' in MENU
 assert "destructive: true" in MENU
-assert 'text: "NO FEED"' in MENU
+assert "text: root.feedStatus" in MENU
 assert 'emptyTitle: "NO TASKS LOADED"' in MENU
-assert 'emptyDetail: "TASK EDITOR // NOT CONNECTED"' in MENU
+assert 'emptyDetail: "LOCAL CHECKLIST"' in MENU
 
 # Five independent main modes, selected from one existing menu and
 # rendered by ModeButton instead of five ad hoc click/halo implementations.
@@ -69,8 +69,8 @@ assert "onTriggered: root.selectMainMode(index)" in MENU
 assert "text: root.activeMode.emptyTitle" in MENU
 assert "text: root.activeMode.emptyDetail" in MENU
 assert "anchors.left: mainModeRail.right" in MENU
-assert "WlrLayershell.keyboardFocus: WlrKeyboardFocus.None" in MENU
-assert "focusable: false" in MENU
+assert "WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None" in MENU
+assert 'focusable: root.menuOpen && root.activeMode.id === "tasks"' in MENU
 
 for forbidden in (
     "Process {", "FileView {", "JsonAdapter {", "Timer {",

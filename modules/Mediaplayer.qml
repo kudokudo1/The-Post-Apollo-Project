@@ -336,9 +336,15 @@ Item {
                         width: 5
                         height: spectrum.height
 
-                        // Two geometry-only halos follow the animated core.
-                        // Never create a per-frame shader texture or a second
-                        // animation for CAVA: that previously stalled Quickshell.
+                        // One scalar per bar, updated from CAVA's already
+                        // deduplicated 0–7 levels (15 FPS maximum). No new
+                        // animation, shader, texture sampling or CAVA process.
+                        readonly property real glowActivity: Math.max(0, Math.min(1,
+                            Number(mediaDock.levels[index] || 0) / 7))
+
+                        // Two existing geometry-only halos follow the core.
+                        // Their opacity also rises with activity, so tall
+                        // bars keep a visible glow even at maximum height.
                         Rectangle {
                             anchors.horizontalCenter: parent.horizontalCenter
                             anchors.bottom: parent.bottom
@@ -347,7 +353,7 @@ Item {
                             height: cavaBar.height + 6
                             radius: 0
                             color: mediaDock.artworkAccentColor
-                            opacity: 0.22
+                            opacity: 0.22 + 0.24 * parent.glowActivity
                         }
 
                         Rectangle {
@@ -358,7 +364,7 @@ Item {
                             height: cavaBar.height + 2
                             radius: 0
                             color: mediaDock.artworkAccentColor
-                            opacity: 0.40
+                            opacity: 0.40 + 0.30 * parent.glowActivity
                         }
 
                         Rectangle {

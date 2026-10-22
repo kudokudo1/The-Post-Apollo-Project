@@ -438,14 +438,54 @@ test("CAVA neon tracks the animated bar using geometry only", () => {
     assert.match(bar, /height:\s*cavaBar\.height\s*\+\s*2/);
     assert.match(bar, /width:\s*parent\.width\s*\+\s*8/);
     assert.match(bar, /width:\s*parent\.width\s*\+\s*4/);
-    assert.match(bar, /opacity:\s*0\.22/);
-    assert.match(bar, /opacity:\s*0\.40/);
+    assert.match(bar, /opacity:\s*0\.22\s*\+\s*0\.24\s*\*\s*parent\.glowActivity/);
+    assert.match(bar, /opacity:\s*0\.40\s*\+\s*0\.30\s*\*\s*parent\.glowActivity/);
     assert.equal((bar.match(/color:\s*mediaDock\.artworkAccentColor/g) || []).length, 3,
         "both glow layers and the bar must follow the same cyan/orange accent");
     assert.equal((bar.match(/Behavior on height/g) || []).length, 1,
         "only the actual bar animates; halos follow bindings");
     assert.doesNotMatch(bar, /DropShadow|RectangularShadow|ShaderEffect|layer\.enabled/);
     assert.doesNotMatch(source, /contentGlowSource:\s*(?:spectrum|mediaArtwork|cavaBar)/);
+});
+
+test("CAVA's two existing halos get brighter with taller bars at no added render cost", () => {
+    // One normalized scalar per delegate, fed only by the existing
+    // deduplicated 0–7 CAVA levels, not by the animated bar height.
+    const item = source.match(/Item \{\s*width:\s*5\s*height:\s*spectrum\.height([\s\S]*?)\n\s*\}\n\s*\}\n\s*\}\n\s*\}\n\s*\}/);
+    assert.ok(item, "expected a single geometry-only CAVA bar delegate");
+    const body = item[1];
+    const activityMatch = body.match(/readonly property real glowActivity:\s*(Math\.max\(0,\s*Math\.min\(1,\s*Number\(mediaDock\.levels\[index\] \|\| 0\)\s*\/\s*7\)\))/);
+    assert.ok(activityMatch, "activity must be normalized from the existing CAVA frame levels");
+
+    const activityFor = level => vm.runInNewContext(activityMatch[1], {
+        Math, Number, index: 0, mediaDock: {levels: [level]}
+    });
+    const outerOpacityMatch = body.match(/opacity:\s*(0\.22\s*\+\s*0\.24\s*\*\s*parent\.glowActivity)/);
+    const innerOpacityMatch = body.match(/opacity:\s*(0\.40\s*\+\s*0\.30\s*\*\s*parent\.glowActivity)/);
+    assert.ok(outerOpacityMatch);
+    assert.ok(innerOpacityMatch);
+    const opacityFor = (expr, level) => vm.runInNewContext(expr, {
+        parent: {glowActivity: activityFor(level)}
+    });
+    for (const [low, high] of [
+        [0.22, 0.46],
+        [0.40, 0.70]
+    ]) {
+        const expr = low === 0.22 ? outerOpacityMatch[1] : innerOpacityMatch[1];
+        assert.ok(Math.abs(opacityFor(expr, 0) - low) < 1e-9);
+        assert.ok(Math.abs(opacityFor(expr, 7) - high) < 1e-9);
+        assert.ok(opacityFor(expr, 4) > opacityFor(expr, 2));
+        assert.ok(opacityFor(expr, 7) <= 1);
+    }
+    assert.equal(activityFor(-4), 0, "out-of-range activity must clamp");
+    assert.equal(activityFor(20), 1, "out-of-range activity must clamp");
+    assert.equal((body.match(/Behavior on height/g) || []).length, 1,
+        "only the existing core height animates; halos do not get animations");
+    assert.equal((source.match(/RectangularShadow \{/g) || []).length, 5,
+        "no extra ambient or per-bar shadow effects");
+    assert.equal((source.match(/SafeDropShadow \{/g) || []).length, 3,
+        "no new sampled visualizer shadows");
+    assert.doesNotMatch(body, /ShaderEffect|DropShadow|layer\.enabled|Behavior on opacity/);
 });
 
 test("CAVA preserves 16-bar output at a bounded 15 FPS", () => {

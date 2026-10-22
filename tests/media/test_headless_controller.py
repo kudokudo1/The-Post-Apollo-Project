@@ -149,6 +149,57 @@ class HiFiControllerTests(unittest.TestCase):
         self.assertTrue(self.c.snapshot()["session"]["ownedByController"])
         self.assertEqual(self.mpd.status, "play")
 
+    def test_loading_b_preserves_playing_a_control_until_play(self):
+        self.c.dispatch("load", {"ref": ref(), "autoplay": True})
+        first_id = self.c.owned_active_id
+        self.c.dispatch("select", {"ref": ref("music/two.ogg")})
+        self.c.dispatch("load")
+        self.assertEqual(self.c.owned_active_id, first_id)
+        self.assertTrue(self.c.snapshot()["session"]["ownedByController"])
+        self.assertEqual(self.mpd.playing_id, first_id)
+        self.assertTrue(self.c.request({"version": 1, "op": "pause"})["ok"])
+        self.assertEqual(self.mpd.status, "pause")
+        self.c.dispatch("play")
+        self.assertEqual(self.mpd.playing_id, self.c.loaded["queueId"])
+        self.assertNotEqual(self.c.owned_active_id, first_id)
+
+    def test_failed_switch_keeps_old_owned_queue(self):
+        self.c.dispatch("load", {"ref": ref(), "autoplay": True})
+        original = self.c.owned_active.copy()
+        self.c.dispatch("load", {"ref": ref("music/two.ogg")})
+        original_playid = self.mpd.play_id
+        def refused(song_id):
+            raise MediaBackendError("BACKEND_REJECTED", "station unavailable")
+        self.mpd.play_id = refused
+        try:
+            failure = self.c.request({"version": 1, "op": "play"})
+            self.assertFalse(failure["ok"])
+            self.assertEqual(self.c.owned_active, original)
+            self.assertTrue(self.c.snapshot()["session"]["ownedByController"])
+            self.assertTrue(self.c.request({"version": 1, "op": "pause"})["ok"])
+        finally:
+            self.mpd.play_id = original_playid
+
+    def test_external_queue_replacement_never_gains_ownership(self):
+        self.c.dispatch("load", {"ref": ref(), "autoplay": True})
+        self.c.dispatch("load", {"ref": ref("music/two.ogg")})
+        self.mpd.queue_items[0]["uri"] = "music/two.ogg"
+        denied = self.c.request({"version": 1, "op": "pause"})
+        self.assertEqual(denied["error"]["code"], "OWNED_TRACK_STALE")
+
+    def test_playid_success_without_matching_observation_does_not_transfer(self):
+        self.c.dispatch("load", {"ref": ref(), "autoplay": True})
+        former = self.c.owned_active_id
+        self.c.dispatch("load", {"ref": ref("music/two.ogg")})
+        original_playid = self.mpd.play_id
+        self.mpd.play_id = lambda song_id: None
+        try:
+            failure = self.c.request({"version": 1, "op": "play"})
+            self.assertEqual(failure["error"]["code"], "PLAY_NOT_CONFIRMED")
+            self.assertEqual(self.c.owned_active_id, former)
+        finally:
+            self.mpd.play_id = original_playid
+
     def test_queue_add_does_not_replace_loaded_track(self):
         self.c.dispatch("load", {"ref": ref()})
         loaded = self.c.loaded.copy()

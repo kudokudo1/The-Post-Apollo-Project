@@ -25,7 +25,7 @@ assert "trackLabelGlowLocally: true" in new_button
 for label in (
     'label: "ACCOUNT // " + draft.accountName',
     'label: draft.direction === "expense" ? "EXPENSE" : "INCOME"',
-    'label: "PREVIEW"',
+    'label: draft.reviewed ? "CONFIRM SAVE" : "PREVIEW"',
     'label: "CANCEL"',
 ):
     assert label in pane, f"Draft button changed: {label}"
@@ -68,7 +68,15 @@ assert 'String(payeeText).trim().length > 120' in pane
 assert 'available: !draft.validationError' in pane
 assert 'onLeftClicked: draft.reviewed = true' in pane
 assert 'onLeftClicked: draft.clear()' in pane
-assert 'NOT SENT // NO SAVE OR EDIT PERMISSION' in pane
+assert 'PREVIEW ONLY // NO CHANGES YET' in pane
+assert 'signal saveRequested(var payload)' in pane
+assert 'function requestCommit() {' in pane
+assert 'saveRequested(payload);' in pane
+assert 'onLeftClicked: transactionDraftPane.beginEdit(modelData)' in menu
+assert 'id: editTransaction' in menu
+assert 'FinanceServices.FinanceTransactionWriteService {' in menu
+assert 'onSaved:' in menu
+assert 'saveState: financeWrite.state' in menu
 for forbidden in (
     "Process {", "Timer {", "LocalStorage", "Settings {",
     "getTransactions(", "updateTransaction(", "addTransaction(",

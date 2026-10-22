@@ -10,6 +10,7 @@ window = (ROOT / "widgets/ApolloHubW.qml").read_text(encoding="utf-8")
 tile = (ROOT / "widgets/hub/ApolloHubTile.qml").read_text(encoding="utf-8")
 media_mini = (ROOT / "widgets/hub/ApolloHubMediaMini.qml").read_text(encoding="utf-8")
 system_mini = (ROOT / "widgets/hub/ApolloHubSystemMini.qml").read_text(encoding="utf-8")
+uptime_mini = (ROOT / "widgets/hub/ApolloHubUptimeMini.qml").read_text(encoding="utf-8")
 layout = (ROOT / "services/hub/ApolloHubLayout.js").read_text(encoding="utf-8")
 store = (ROOT / "services/hub/ApolloHubStore.qml").read_text(encoding="utf-8")
 module = (ROOT / "services/hub/qmldir").read_text(encoding="utf-8")
@@ -352,6 +353,49 @@ for forbidden in (
 ):
     assert forbidden not in system_mini, f"CPU++ UI collecting/controlling: {forbidden}"
 assert "SystemTelemetry {" not in window + tile
+
+# B5 Linux uptime: the mini tile consumes one pre-normalized snapshot.
+# Never instantiate another procfs reader or claim zero uptime when source is
+# unobserved, unavailable, stale, malformed, or in error.
+assert "uptimeSnapshot: hub.liveBridge" in window
+assert "hub.liveBridge.uptimeSnapshot : null" in window
+assert "property var uptimeSnapshot: null" in tile
+assert "ApolloHubUptimeMini {" in tile
+assert 'visible: tile.moduleId === "uptime"' in tile
+assert "uptimeSnapshot: tile.uptimeSnapshot" in tile
+assert 'tile.moduleId !== "uptime"' in tile
+assert "uptimeMini.statusLine" in tile
+for needle in (
+    "property var uptimeSnapshot: null",
+    'uptimeState === "ready"',
+    "uptimeSnapshot.ready === true",
+    "validPart(uptimeSnapshot.days)",
+    "validPart(uptimeSnapshot.hours)",
+    "validPart(uptimeSnapshot.minutes)",
+    'typeof value === "number"',
+    "isFinite(value)",
+    "value >= 0",
+    'return uptimeReady ? String(value) : "--";',
+    "uptimeMini.uptimeSnapshot.days",
+    "uptimeMini.uptimeSnapshot.hours",
+    "uptimeMini.uptimeSnapshot.minutes",
+    'unitText: "DAYS"',
+    'unitText: "HOURS"',
+    'unitText: "MIN"',
+    '"LINUX // SINCE BOOT"',
+    '"UPTIME // READY // APPROX"',
+    'uptimeState === "ready" ? "UPTIME // UNAVAILABLE"',
+    'uptimeState.toUpperCase().replace(/-/g, " ")',
+    "Grid {",
+    "columns: 3",
+):
+    assert needle in uptime_mini, f"B5 uptime mini missing {needle}"
+for forbidden in (
+    "FileView {", "Process {", "Timer {", "SystemTelemetry {",
+    "/proc/uptime", "uptimeFile", "reload(", "exec(", "readFile(",
+):
+    assert forbidden not in uptime_mini + window + tile, (
+        f"Uptime UI must not read, poll, or collect: {forbidden}")
 
 # Launchers and widget backends are unchanged in this first stage.
 print("ApolloHubW foundation source contracts passed")

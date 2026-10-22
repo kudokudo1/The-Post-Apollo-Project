@@ -128,3 +128,42 @@ Credentials and tokens stay out of repo and debug logs; adapters own their provi
 **Open:** exact IPC transport, schema/versioning and persistence; packaged compliant YouTube playback; per-provider auth; source-to-physical-media format mapping; final chassis and control inventory; music-stream routing/identity contract integration; fallback/override UX; whether loaded media remains inserted after stop.
 
 **Implementation status:** `widgets/MediaDeckW.qml` currently drives MPD directly through seven commands. The permanent controller, source adapters, audio isolation, and YouTube deck browsing are **not yet implemented**. This is a design agreement in progress, not certification that runtime features exist.
+
+
+## Operator-approved control-bay input contract (2026-10-22)
+
+**Status:** Approved interaction mapping; this section records design authority,
+not live implementation, exact geometry, or a new shared keyboard-focus policy.
+
+- All media-browsing and selection controls belong in the **control bay**.
+  The upper display reports search results, metadata and Now Playing; the
+  cassette bay represents loaded media, not the browse highlight.
+- **Left, smaller knob:** horizontal navigation. **Vertical slider:** up/down
+  navigation. **Physical Enter button:** contextual Enter. **Right, larger
+  knob:** distinct coarse browsing/tuning role; exact behavior remains open.
+- **SELECT** remains distinct from highlighted cursor position, loading
+  and playback. The SELECT control is visibly labeled **`~`**.
+  Its keyboard shortcut is the **bare physical backtick/grave key**
+  (`\``, without modifiers). The printed glyph is intentionally a tilde;
+  do not require Shift to activate it.
+- The physical Enter control and normal keyboard Enter/Return perform the
+  same contextual action. On an individually highlighted, playable track,
+  Enter requests load **without** autoplay. On a collection, Enter navigates
+  into its contents. In a focused text field, Enter is handled by that field
+  for search submission, not a hidden playback action.
+- SELECT stages media, or marks a starting track inside a collection.
+  LOAD queues the staged item/collection without playing; PLAY is the
+  separate explicit start command. Loading a full playlist with a chosen
+  start track is **future backend work**, not currently supported.
+- A search text editor must receive normal typing, including backtick and
+  tilde, without triggering SELECT. The bare grave binding is window-local,
+  only when the Hi-Fi actually owns keyboard input, and must never intercept
+  **Super+grave** (reserved by Koinoikos), Shift, Alt, or Control variants.
+- The existing Media Deck currently declares `WlrKeyboardFocus.None` and
+  is not yet registered with the shared focus broker. Keyboard activation
+  needs an independently verified owner-approved focus integration; a QML
+  shortcut alone must never be reported as working on the desktop.
+- Reuse `SelectorDial` and `SelectorSlider` semantics where appropriate.
+  Physical sizing, hit areas, and geometry must be grounded in existing
+  implementations or live runtime verification; no dimensions are approved
+  by this contract.

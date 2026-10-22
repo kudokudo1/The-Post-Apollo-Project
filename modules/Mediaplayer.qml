@@ -63,9 +63,11 @@ Item {
     hoverContentGlowColor: accentColor
     pressedContentGlowColor: accentColor
 
-    // Magenta idle chassis; leave hover and opened dock semantics unchanged.
+    // Media-specific color combination: the full-width chassis wash and
+    // perimeter stay magenta, even on hover. Only artwork uses the CAVA
+    // cyan/orange accent; the DockButton's open priority stays intact.
     normalDockGlowColor: Colors.magenta
-    hoverDockGlowColor: accentColor
+    hoverDockGlowColor: Colors.magenta
     pressedDockGlowColor: Colors.magenta
 
     // Never texture-sample the 16 animated VU bars for a blur glow.
@@ -73,17 +75,18 @@ Item {
     // sampled glow attached to the static music glyph instead.
     contentGlowSource: musicMark
 
-    // One non-sampled cyan/orange wash below the entire music mark + CAVA.
-    // It sits inside the module, above the independent magenta chassis glow
-    // but below the artwork. This only changes on MPD state/hover, not on
-    // each CAVA frame (which previously caused Quickshell render stalls).
+    // Focus the CAVA-colored underlight on the static stars/clef alone.
+    // The 16 bars already have two geometry-only accent halos each; do not
+    // add another cyan slab spanning the entire dock or sample bar textures.
+    // Resolve the nested mark's coordinates in contentHost (our parent).
     RectangularShadow {
-        id: mediaArtworkUnderlay
-        anchors.centerIn: mediaArtwork
-        width: mediaArtwork.width + 10
-        height: mediaArtwork.height + 4
-        spread: mediaDock.softGlowSpread
-        blur: mediaDock.contentGlowRadius
+        id: musicMarkUnderlay
+        x: mediaArtwork.x + musicMark.x
+        y: mediaArtwork.y + musicMark.y + mediaDock.softGlowSpread
+        width: musicMark.width
+        height: Math.max(0, musicMark.height - 2 * mediaDock.softGlowSpread)
+        spread: 0
+        blur: mediaDock.softGlowSpread * 2
         color: mediaDock.accentColor
         opacity: mediaDock.softGlowOpacity * 0.80
         z: 0

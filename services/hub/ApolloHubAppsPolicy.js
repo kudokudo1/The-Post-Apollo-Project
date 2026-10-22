@@ -35,9 +35,22 @@ function byName(a, b) {
     return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 
+// Quickshell ObjectModel.values is a QML list, NOT necessarily a
+// JavaScript Array: Array.isArray(values) can be false. Accept bounded,
+// integer-indexed QML list views without copying or exposing the raw entries.
+function collectionLength(values) {
+    if (!values || typeof values !== "object")
+        return -1;
+    var length = values.length;
+    return typeof length === "number" && isFinite(length)
+           && Math.floor(length) === length
+           && length >= 0 && length <= 50000 ? length : -1;
+}
+
 function snapshot(applications, requestedQuery) {
     var query = clean(requestedQuery, MAX_QUERY_LENGTH).toLowerCase();
-    if (!Array.isArray(applications)) {
+    var applicationCount = collectionLength(applications);
+    if (applicationCount < 0) {
         return {
             state: "unavailable",
             source: "desktop-entries",
@@ -52,7 +65,7 @@ function snapshot(applications, requestedQuery) {
 
     var items = [];
     var seen = {};
-    for (var i = 0; i < applications.length; ++i) {
+    for (var i = 0; i < applicationCount; ++i) {
         var item = normalize(applications[i]);
         if (!item)
             continue;

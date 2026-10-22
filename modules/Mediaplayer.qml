@@ -77,33 +77,40 @@ Item {
         anchors.centerIn: parent
         spacing: 9
 
-        // Keep the treble clef as plain text. The StyledText color run
-        // suppressed this supplementary-plane symbol on the live desktop.
-        // Separate static glyphs share one baseline and one sampled glow;
-        // do not sample the animated CAVA bars.
+        // Musical-symbol font fallback is not reliable on the operator's Qt
+        // runtime (including the previous plain-text attempt). Bundle the
+        // static clef vector instead; keep the complete mark as the *only*
+        // sampled magenta glow source, never the animated CAVA bars.
         Row {
             id: musicMark
             anchors.verticalCenter: parent.verticalCenter
             spacing: 0
 
             GohuText {
-                anchors.baseline: trebleClef.baseline
+                anchors.verticalCenter: trebleClef.verticalCenter
                 textFormat: Text.PlainText
                 text: "‧₊˚ "
                 font.pixelSize: 21
                 color: mediaDock.foregroundColor
             }
 
-            GohuText {
+            Image {
                 id: trebleClef
-                textFormat: Text.PlainText
-                text: "𝄞"
-                font.pixelSize: 21
-                color: Colors.magenta
+                width: 15
+                height: 34
+                source: Qt.resolvedUrl("../assets/media/treble-clef.svg")
+                sourceSize: Qt.size(45, 102)
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+                asynchronous: false
+                onStatusChanged: {
+                    if (status === Image.Error)
+                        console.warn("MediaDock: treble clef SVG failed to load", source);
+                }
             }
 
             GohuText {
-                anchors.baseline: trebleClef.baseline
+                anchors.verticalCenter: trebleClef.verticalCenter
                 textFormat: Text.PlainText
                 text: "˖"
                 font.pixelSize: 21

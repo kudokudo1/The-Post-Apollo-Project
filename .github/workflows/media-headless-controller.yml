@@ -5,6 +5,8 @@ on:
     paths:
       - "widgets/MediaDeckW.qml"
       - "modules/Mediaplayer.qml"
+      - "modules/mediaplayer-cava.conf"
+      - "tests/media/test_media_dock_performance.cjs"
       - "services/media/MediaDockMpdStatus.js"
       - "tests/media/test_media_dock_mpd_status.cjs"
       - "widgets/MediaDeckBrowserControls.qml"
@@ -61,3 +63,5 @@ jobs:
         run: node --test tests/media/test_headless_deck_bridge.cjs
       - name: Validate existing MPD dock status parser
         run: node --test tests/media/test_media_dock_mpd_status.cjs
+      - name: Guard Media dock spectrum render budget
+        run: node --test tests/media/test_media_dock_performance.cjs

@@ -11,6 +11,19 @@ import qs.services.notifications
 DockButton {
     id: networkDock
 
+    // Background diagnostic only: no extra commands or polling when enabled.
+    readonly property bool bgLagProbeEnabled:
+        String(Quickshell.env("POST_APOLLO_UI_LAG_PROBE") || "").trim() === "1"
+    property double bgLastPollMs: 0
+
+    function reportBgCallback(stage, startedAtMs) {
+        const now = Date.now();
+        const elapsed = now - startedAtMs;
+        if (elapsed >= 25)
+            console.warn("SYNTAGMA_BG_PROBE // network " + stage
+                         + " synchronous=" + elapsed + "ms tsMs=" + now);
+    }
+
     implicitHeight: 50
     implicitWidth: root.implicitWidth + 8
 
@@ -134,7 +147,10 @@ DockButton {
 
             stdout: StdioCollector {
                 onStreamFinished: {
+                    const traceStartMs = networkDock.bgLagProbeEnabled ? Date.now() : 0;
                     root.wifiEnabled = text.trim() === "enabled";
+                    if (traceStartMs)
+                        networkDock.reportBgCallback("wifi-radio", traceStartMs);
                 }
             }
         }
@@ -150,9 +166,12 @@ DockButton {
 
             stdout: StdioCollector {
                 onStreamFinished: {
+                    const traceStartMs = networkDock.bgLagProbeEnabled ? Date.now() : 0;
                     const match = text.split("\n").find(line => line.startsWith("*:"));
 
                     root.signalPercent = match ? parseInt(match.split(":")[1]) : 0;
+                    if (traceStartMs)
+                        networkDock.reportBgCallback("wifi-signal", traceStartMs);
                 }
             }
         }
@@ -168,6 +187,8 @@ DockButton {
 
             stdout: StdioCollector {
                 onStreamFinished: {
+                    const traceStartMs = networkDock.bgLagProbeEnabled ? Date.now() : 0;
+                    try {
                     // One shared observation for both Wi-Fi and Ethernet.
                     // Unknown/partial results are ignored by the policy.
                     networkLinkProducer.observeDeviceResult(text);
@@ -186,6 +207,10 @@ DockButton {
 
                     root.ethernetName = parts[0] || "";
                     root.ethernetConnected = parts[2] === "connected";
+                    } finally {
+                        if (traceStartMs)
+                            networkDock.reportBgCallback("device-and-notification-producers", traceStartMs);
+                    }
                 }
             }
         }
@@ -201,9 +226,12 @@ DockButton {
 
             stdout: StdioCollector {
                 onStreamFinished: {
+                    const traceStartMs = networkDock.bgLagProbeEnabled ? Date.now() : 0;
                     const match = text.match(/rx bitrate:\s*([\d.]+)\s*MBit\/s/);
 
                     root.linkSpeed = match ? Math.round(parseFloat(match[1])) : "0";
+                    if (traceStartMs)
+                        networkDock.reportBgCallback("wifi-link", traceStartMs);
                 }
             }
         }
@@ -219,6 +247,7 @@ DockButton {
 
             stdout: StdioCollector {
                 onStreamFinished: {
+                    const traceStartMs = networkDock.bgLagProbeEnabled ? Date.now() : 0;
                     const match = text.match(/Speed:\s*([^\s]+)/);
 
                     if (match) {
@@ -226,6 +255,8 @@ DockButton {
                     } else {
                         root.ethernetSpeed = "0";
                     }
+                    if (traceStartMs)
+                        networkDock.reportBgCallback("ethernet-speed", traceStartMs);
                 }
             }
         }
@@ -240,12 +271,26 @@ DockButton {
             repeat: true
 
             onTriggered: {
+                const startedAtMs = networkDock.bgLagProbeEnabled ? Date.now() : 0;
+                if (startedAtMs) {
+                    if (networkDock.bgLastPollMs) {
+                        const gap = startedAtMs - networkDock.bgLastPollMs;
+                        // A missed deadline is not evidence that Network caused it.
+                        if (gap >= 850)
+                            console.warn("SYNTAGMA_BG_PROBE // network poll-gap="
+                                         + gap + "ms target=500ms tsMs=" + startedAtMs);
+                    }
+                    networkDock.bgLastPollMs = startedAtMs;
+                }
                 wifiEnabledProcess.running = true;
                 wifiSignalProcess.running = true;
                 wifiLinkProcess.running = true;
                 ethernetProcess.running = true;
 
                 ethernetSpeedProcess.running = root.ethernetName !== "";
+
+                if (startedAtMs)
+                    networkDock.reportBgCallback("poll-dispatch", startedAtMs);
             }
         }
 

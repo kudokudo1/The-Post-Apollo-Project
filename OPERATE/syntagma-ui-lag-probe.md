@@ -2,7 +2,9 @@
 
 **Owner:** Nurse 3c. **Status:** diagnostic instrumentation only, not
 an optimization or fix. **Introduced:** October 13, 2026.
-**Scope:** `shell.qml` only (dock Git/Hospital controls and a shell timer).
+**Original scope:** `shell.qml` (dock Git/Hospital controls and a shell timer).
+**October 22 follow-up:** optional background timing in Media dock, Network dock,
+and Notifications Hub (no production behavior changes).
 
 ## Why this exists
 
@@ -115,3 +117,52 @@ processing. Do not infer the precise function from the gap alone.
 
 Existing evidence ledger:
 `EVIDENCE/syntagma-main-thread-freeze-evidence-20261013.md`.
+
+## October 22 follow-up // background callback timing (draft diagnostic)
+
+The existing `POST_APOLLO_UI_LAG_PROBE=1` launch flag now also enables
+`SYNTAGMA_BG_PROBE` lines. No second environment variable, new timer,
+process, background data collector, or change to control/visual policy.
+
+- **Music / CAVA:** warn if a single synchronous CAVA parse/model-update
+  callback takes **25 ms or more**. A `media cava-frames 5s` line reports
+  received and changed frames and maximum callback duration once per
+  five seconds of incoming frames. This does not measure asynchronous
+  rendering, blur effects, or MPD decoding.
+- **Network:** report a `network poll-gap` when the existing **500 ms**
+  timer is delayed to at least **850 ms** (correlation only, **not**
+  proof that Network caused the delay). Dispatch and each existing
+  stdout callback log only when their synchronous work reaches **25 ms**.
+  The ethernet-device callback includes the existing link/internet
+  notification producers; original commands/interval remain unchanged.
+- **Notifications:** time the existing filtered-history model rebuild.
+  Log if it takes at least **25 ms**, or once per five seconds of
+  rebuild activity, with scanned/retained counts and menu-open state.
+  This does not time asynchronous disk persistence or deferred Qt painting.
+
+Logs contain numeric timestamps, durations, aggregate counts and menu
+state only. They do **not** expose notification text, site URLs, finance
+records, song titles, or subprocess output. On a normal launch without
+the flag, no additional timer or logging is active; the fast-path has
+only dormant condition guards.
+
+Retrieve both streams together using a terminal with wide output:
+
+```bash
+qs log --tail 3000 | rg 'SYNTAGMA_(LAG|BG)_PROBE'
+```
+
+The merged source must exist in the actual Quickshell checkout, and the
+process must be deliberately restarted with the flag to run the
+instrumentation. A GitHub branch is not live-shell runtime.
+
+**Interpretation:** a slow callback temporally aligned with an event-loop
+gap is a candidate bottleneck. A 10–20 second event-loop delay without
+one of these callbacks logging as slow does not clear any widget or prove
+a driver issue; unmeasured callbacks and deferred scene-graph work remain.
+Timer gaps from multiple components may all describe the **same** stall.
+Do not optimize, disable features, or declare a cause from one log.
+
+**Rollback:** relaunch without `POST_APOLLO_UI_LAG_PROBE=1` using the
+existing restart procedure above. Reverting the diagnostic PR also
+removes the source instrumentation without data migrations.

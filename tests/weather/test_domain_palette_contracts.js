@@ -18,6 +18,8 @@ const homeSource = read("widgets/weather/StationHome.qml");
 const groundSource = read("widgets/weather/StationGround.qml");
 const skySource = read("widgets/weather/StationSky.qml");
 const spaceSource = read("widgets/weather/StationSpace.qml");
+const weatherServiceSource = read("services/weather/WeatherService.qml");
+const spaceServiceSource = read("services/weather/SpaceService.qml");
 
 const mainHeaderStart = windowSource.indexOf("id: header");
 const mainHeaderEnd = windowSource.indexOf("// NAVIGATION", mainHeaderStart);
@@ -60,6 +62,71 @@ for (const token of [
     "weatherService.windMph",
 ])
     assert.ok(skySource.includes(token), token);
+
+// The first expansion pass wires real provider fields before redesigning
+// the instruments around them.
+for (const token of [
+    "pressureHpa",
+    "visibilityMiles",
+    "cloudCover",
+    "precipMm",
+    "hourlyForecast",
+    "dailyForecast",
+])
+    assert.ok(weatherServiceSource.includes(token), "weather service " + token);
+
+for (const token of [
+    "carbonMonoxide",
+    "nitrogenDioxide",
+    "ozone",
+    "dust",
+    "grassPollen",
+    "ragweedPollen",
+    "pollenAvailable",
+])
+    assert.ok(weatherServiceSource.includes(token), "air quality " + token);
+
+for (const token of [
+    "weatherService.pressureHpa",
+    "weatherService.visibilityMiles",
+    "weatherService.cloudCover",
+    "weatherService.precipMm",
+    "weatherService.uvIndex",
+    "weatherService.hourlyForecast",
+    "weatherService.dailyForecast",
+    "FORECAST // NEXT HOURS",
+    "FORECAST // DAILY",
+])
+    assert.ok(skySource.includes(token), "SKY expansion " + token);
+
+for (const token of [
+    "weatherService.ozone",
+    "weatherService.nitrogenDioxide",
+    "weatherService.carbonMonoxide",
+    "weatherService.dust",
+    "weatherService.pollenAvailable",
+    "POLLEN // PEAK",
+])
+    assert.ok(groundSource.includes(token), "GROUND expansion " + token);
+
+for (const token of [
+    "spaceService.magneticFieldBt",
+    "spaceService.kpTime",
+    "spaceService.solarWindTime",
+    "spaceService.magneticFieldTime",
+    "spaceService.solarFluxTime",
+    "IMF BT",
+])
+    assert.ok(spaceSource.includes(token), "SPACE expansion " + token);
+
+for (const token of [
+    "property real magneticFieldBt",
+    "property string kpTime",
+    "property string solarWindTime",
+    "property string magneticFieldTime",
+    "property string solarFluxTime",
+])
+    assert.ok(spaceServiceSource.includes(token), "space service " + token);
 
 // Restored bars are not decorative/random meters. Their fill widths remain
 // direct normalized functions of the real telemetry already displayed.

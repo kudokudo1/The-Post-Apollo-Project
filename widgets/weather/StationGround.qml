@@ -89,6 +89,9 @@ Rectangle {
         return Colors.red;
     }
 
+    readonly property color meterBorderColor: Colors.cyan
+    readonly property color meterFillColor: Colors.green
+
     color: Colors.black
 
     Column {
@@ -150,14 +153,14 @@ Rectangle {
                     height: 8
                     color: Colors.black
                     border.width: 1
-                    border.color: Colors.green
+                    border.color: ground.meterBorderColor
 
                     Rectangle {
                         x: 2
                         anchors.verticalCenter: parent.verticalCenter
                         width: (parent.width - 4) * ground.aqiMeter
                         height: parent.height - 4
-                        color: Colors.green
+                        color: ground.meterFillColor
                     }
                 }
             }
@@ -184,14 +187,14 @@ Rectangle {
                     height: 8
                     color: Colors.black
                     border.width: 1
-                    border.color: Colors.green
+                    border.color: ground.meterBorderColor
 
                     Rectangle {
                         x: 2
                         anchors.verticalCenter: parent.verticalCenter
                         width: (parent.width - 4) * ground.pm25Meter
                         height: parent.height - 4
-                        color: Colors.green
+                        color: ground.meterFillColor
                     }
                 }
             }
@@ -218,14 +221,14 @@ Rectangle {
                     height: 8
                     color: Colors.black
                     border.width: 1
-                    border.color: Colors.green
+                    border.color: ground.meterBorderColor
 
                     Rectangle {
                         x: 2
                         anchors.verticalCenter: parent.verticalCenter
                         width: (parent.width - 4) * ground.pm10Meter
                         height: parent.height - 4
-                        color: Colors.green
+                        color: ground.meterFillColor
                     }
                 }
             }
@@ -284,14 +287,14 @@ Rectangle {
                     height: 8
                     color: Colors.black
                     border.width: 1
-                    border.color: Colors.green
+                    border.color: ground.meterBorderColor
 
                     Rectangle {
                         x: 2
                         anchors.verticalCenter: parent.verticalCenter
                         width: (parent.width - 4) * ground.ozoneMeter
                         height: parent.height - 4
-                        color: Colors.green
+                        color: ground.meterFillColor
                     }
                 }
             }
@@ -318,14 +321,14 @@ Rectangle {
                     height: 8
                     color: Colors.black
                     border.width: 1
-                    border.color: Colors.green
+                    border.color: ground.meterBorderColor
 
                     Rectangle {
                         x: 2
                         anchors.verticalCenter: parent.verticalCenter
                         width: (parent.width - 4) * ground.nitrogenDioxideMeter
                         height: parent.height - 4
-                        color: Colors.green
+                        color: ground.meterFillColor
                     }
                 }
             }
@@ -352,14 +355,14 @@ Rectangle {
                     height: 8
                     color: Colors.black
                     border.width: 1
-                    border.color: Colors.green
+                    border.color: ground.meterBorderColor
 
                     Rectangle {
                         x: 2
                         anchors.verticalCenter: parent.verticalCenter
                         width: (parent.width - 4) * ground.carbonMonoxideMeter
                         height: parent.height - 4
-                        color: Colors.green
+                        color: ground.meterFillColor
                     }
                 }
             }

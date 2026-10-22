@@ -176,4 +176,88 @@ const noSpan=toPlain(taller);
 delete noSpan.modes[0].subModes[0].tiles[0].rowSpan;
 assert.equal(layout.normalize(noSpan).modes[0].subModes[0].tiles[0].rowSpan,1);
 
+// P1 Stage 3: explicit mode/group confirmation, stable identity, and
+// minimum-one protections. Removing a layout branch must never rewrite the
+// remaining tile IDs, content models or next-ID counter.
+const hierarchy=layout.defaultLayout();
+const hierarchyOriginal=JSON.stringify(hierarchy);
+const modeToRemove=hierarchy.modes[1];
+const groupToRemove=hierarchy.modes[0].subModes[0];
+const rejectedMode=layout.removeMode(hierarchy,1,modeToRemove.id,false);
+assert.deepEqual(toPlain(rejectedMode),toPlain(hierarchy));
+assert.deepEqual(toPlain(layout.removeMode(hierarchy,1,"wrong-id",true)),
+                 toPlain(hierarchy));
+assert.deepEqual(toPlain(layout.removeMode(hierarchy,99,modeToRemove.id,true)),
+                 toPlain(hierarchy));
+assert.deepEqual(toPlain(layout.removeMode(hierarchy,-1,modeToRemove.id,true)),
+                 toPlain(hierarchy));
+assert.deepEqual(toPlain(layout.removeMode(hierarchy,0.5,modeToRemove.id,true)),
+                 toPlain(hierarchy));
+assert.deepEqual(toPlain(layout.removeMode(hierarchy,1,modeToRemove.id,1)),
+                 toPlain(hierarchy));
+const modeRemoved=layout.removeMode(hierarchy,1,modeToRemove.id,true);
+assert.equal(modeRemoved.modes.length,2);
+assert.equal(modeRemoved.modes.some(m=>m.id===modeToRemove.id),false);
+assert.equal(modeRemoved.modes[0].id,hierarchy.modes[0].id);
+assert.equal(modeRemoved.modes[1].id,hierarchy.modes[2].id);
+assert.equal(modeRemoved.nextTileId,hierarchy.nextTileId);
+validateIds(modeRemoved);
+assert.equal(JSON.stringify(hierarchy),hierarchyOriginal);
+assert.deepEqual(toPlain(layout.parse(hierarchyOriginal)),toPlain(hierarchy));
+// Last remaining mode is protected, even with explicit confirmation.
+const lastModeLayout=layout.removeMode(
+    modeRemoved,1,modeRemoved.modes[1].id,true);
+assert.equal(lastModeLayout.modes.length,1);
+assert.deepEqual(toPlain(layout.removeMode(
+    lastModeLayout,0,lastModeLayout.modes[0].id,true)),
+    toPlain(lastModeLayout));
+assert.equal(layout.parse(JSON.stringify(lastModeLayout)).modes.length,1);
+
+// A default mode has only one group; it must be impossible to leave it
+// with zero groups or silently recreate the entire default configuration.
+assert.deepEqual(toPlain(layout.removeSubMode(
+    hierarchy,0,0,groupToRemove.id,true)),toPlain(hierarchy));
+const withGroup=layout.addSubMode(hierarchy,0);
+assert.equal(withGroup.modes[0].subModes.length,2);
+const secondGroup=withGroup.modes[0].subModes[1];
+assert.deepEqual(toPlain(layout.removeSubMode(
+    withGroup,0,1,secondGroup.id,false)),toPlain(withGroup));
+assert.deepEqual(toPlain(layout.removeSubMode(
+    withGroup,0,1,secondGroup.id,undefined)),toPlain(withGroup));
+assert.deepEqual(toPlain(layout.removeSubMode(
+    withGroup,0,1,"wrong-group",true)),toPlain(withGroup));
+assert.deepEqual(toPlain(layout.removeSubMode(
+    withGroup,0,99,secondGroup.id,true)),toPlain(withGroup));
+assert.deepEqual(toPlain(layout.removeSubMode(
+    withGroup,9,1,secondGroup.id,true)),toPlain(withGroup));
+assert.deepEqual(toPlain(layout.removeSubMode(
+    withGroup,0,1,secondGroup.id,"true")),toPlain(withGroup));
+const secondGone=layout.removeSubMode(withGroup,0,1,secondGroup.id,true);
+assert.equal(secondGone.modes[0].subModes.length,1);
+assert.equal(secondGone.modes[0].subModes[0].id,groupToRemove.id);
+assert.equal(secondGone.nextTileId,withGroup.nextTileId);
+validateIds(secondGone);
+assert.deepEqual(toPlain(layout.removeSubMode(
+    secondGone,0,0,groupToRemove.id,true)),toPlain(secondGone));
+
+// Group removal can also remove a populated group and its placements,
+// without mutating the sibling group or the persisted module's own data.
+const filled=layout.addTile(withGroup,0,1);
+const filledId=filled.modes[0].subModes[1].id;
+const siblingBefore=toPlain(filled.modes[0].subModes[0]);
+const savedBeforeGroupRemoval=JSON.stringify(filled);
+const afterGroupRemoval=layout.removeSubMode(filled,0,1,filledId,true);
+assert.deepEqual(toPlain(afterGroupRemoval.modes[0].subModes[0]),siblingBefore);
+assert.equal(afterGroupRemoval.nextTileId,filled.nextTileId);
+assert.equal(afterGroupRemoval.modes[0].subModes.length,1);
+assert.equal(JSON.stringify(filled),savedBeforeGroupRemoval);
+assert.deepEqual(toPlain(layout.parse(savedBeforeGroupRemoval)),toPlain(filled));
+
+// Undo uses the existing captured previous JSON layout without allocating
+// new identities or defaulting to another mode/group.
+assert.deepEqual(toPlain(layout.parse(JSON.stringify(modeRemoved))),
+                 toPlain(modeRemoved));
+assert.deepEqual(toPlain(layout.parse(JSON.stringify(afterGroupRemoval))),
+                 toPlain(afterGroupRemoval));
+
 console.log("ApolloHub Layout v2 migration, stable tile IDs, guarded remove and sizing tests passed");

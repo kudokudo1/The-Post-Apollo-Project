@@ -23,7 +23,9 @@ test("MPRIS transport is kept explicitly separate", () => {
 });
 
 test("radio station load is explicit and does not autoplay", () => {
-    assert.match(deck, /onClicked:\s*headless\.loadRadio\(deck\.radioStreamUrl\)/);
+    assert.match(deck, /headless\.loadRadio\(radioStreamUrl\)/);
+    assert.match(deck, /catalogSource === "direct-stream"/);
+    assert.doesNotMatch(deck, /onClicked:\s*headless\.loadRadio/);
     assert.match(bridge, /issue\("load",\s*\["--source",\s*"direct-stream",\s*"--uri",\s*url\]\)/);
     assert.doesNotMatch(bridge, /--autoplay/);
     assert.match(deck, /LOAD DOES NOT AUTOPLAY/);
@@ -61,8 +63,10 @@ test("background snapshot polling never flashes or disables radio cassette contr
     assert.match(bridge, /readonly property bool busy:\s*commandProcess\.running\s*&&\s*pendingAction\s*!==\s*"snapshot"/);
     assert.match(bridge, /onTriggered:\s*bridge\.refresh\(\)/);
     assert.match(bridge, /issue\("snapshot",\s*\[\]\)/);
-    assert.match(deck, /opacity:\s*headless\.busy\s*\?\s*0\.5\s*:\s*1/);
-    assert.match(deck, /enabled:\s*!headless\.busy/);
+    // The cassette bay is now display-only. Polling still never disables it.
+    assert.match(deck, /id:\s*grooveCassette/);
+    assert.doesNotMatch(deck, /id:\s*grooveMouse/);
+    assert.match(deck, /height:\s*38/);
 });
 
 test("search and explicit staged selection are controller-only operations", () => {
@@ -125,4 +129,15 @@ test("Shift selection remains fail-closed; bare grave is reserved", () => {
     assert.match(deck, /event\.modifiers !== Qt\.NoModifier/);
     assert.match(deck, /event\.key === Qt\.Key_Return/);
     assert.doesNotMatch(deck, /Qt\.Key_QuoteLeft|Qt\.Key_AsciiTilde/);
+});
+
+test("radio cassette is display-only; its SELECT and LOAD are on the bay", () => {
+    const ui = fs.readFileSync(path.join(base, "widgets/MediaDeckBrowserControls.qml"), "utf8");
+    assert.match(deck, /catalogSource === "direct-stream"/);
+    assert.match(deck, /headless\.loadRadio\(radioStreamUrl\)/);
+    assert.match(deck, /function selectHighlighted\(\)/);
+    assert.match(bridge, /ref\.source !== "direct-stream"/);
+    assert.match(ui, /label: bay\.deckHost\.catalogSource === "youtube"/);
+    assert.match(ui, /bay\.controller\.selection\.source === "direct-stream"/);
+    assert.doesNotMatch(deck, /id:\s*grooveMouse/);
 });

@@ -212,5 +212,38 @@ for forbidden in ("WeatherService {", "ApolloHubLiveBridge {", "SystemTelemetry 
 assert "SystemTelemetry {" not in window
 assert "HeadlessMediaController {" not in window
 
+# W3 Network UI: use the existing B3 passive bridge, not an additional
+# NetworkManager/polling instance. The visible status must say LOCAL LINK
+# and explicitly UNVERIFIED INTERNET; unknown signal/speed stays "--".
+assert "networkSnapshot: hub.liveBridge" in window
+assert "hub.liveBridge.networkSnapshot : null" in window
+assert "property var networkSnapshot: null" in tile
+for needle in (
+    'networkState === "connected"',
+    "networkSnapshot.connected === true",
+    'networkTransport === "ethernet"',
+    'networkTransport === "wifi"',
+    'networkState === "disconnected"',
+    'networkState === "unavailable"',
+    "networkWifi.networkName",
+    "networkWifi.interfaceName",
+    "networkEthernet.interfaceName",
+    "networkWifi.signalPercent",
+    "value >= 0 && value <= 100",
+    'return "--";',
+    "networkSnapshot.linkSpeedMbps",
+    '"WI-FI LINK  " + tile.wifiLinkText',
+    '"ETHERNET   " + tile.ethernetLinkText',
+    '"INTERNET   UNVERIFIED"',
+    '"LOCAL LINK CONNECTED"',
+    '" // INTERNET UNVERIFIED"',
+):
+    assert needle in tile, f"B3 Network mini-tile missing {needle}"
+assert 'visible: tile.moduleId === "network"' in tile
+assert 'tile.moduleId !== "weather" && tile.moduleId !== "network"' in tile
+for forbidden in ("Network {", "Networking {", "Process {", "nmcli", "iw dev",
+                  "ethtool", "checkConnectivity(", "Networking.devices"):
+    assert forbidden not in window + tile, f"UI must not collect/control network: {forbidden}"
+
 # Launchers and widget backends are unchanged in this first stage.
 print("ApolloHubW foundation source contracts passed")

@@ -33,18 +33,40 @@ test("magenta idle chassis and treble clef do not recolor or resample CAVA", () 
     assert.match(source, /hoverContentGlowColor:\s*Colors\.magenta/);
     assert.match(source, /contentGlowSource:\s*musicMark/);
 
-    const musicMark = source.match(/GohuText \{\s*id:\s*musicMark([\s\S]*?)\n\s*\}/);
-    assert.ok(musicMark, "music mark remains a single text item");
-    assert.match(musicMark[1], /textFormat:\s*Text\.StyledText/);
-    // The ornaments retain the dock's state-aware foreground; only the
-    // treble clef is a fixed magenta foreground.
-    assert.match(musicMark[1],
-        /mediaDock\.foregroundColor[\s\S]*‧₊˚ [\s\S]*Colors\.magenta[\s\S]*𝄞[\s\S]*mediaDock\.foregroundColor[\s\S]*˖/);
+    const musicMark = source.match(/Row \{\s*id:\s*musicMark([\s\S]*?)\n\s*\}\n\n\s*Item \{\s*id:\s*spectrum/);
+    assert.ok(musicMark, "the static music-mark cluster remains a single sampled source");
+    assert.match(musicMark[1], /spacing:\s*0/);
+    assert.equal((musicMark[1].match(/GohuText \{/g) || []).length, 3);
+    // Plain-text glyph rendering preserves fallback for U+1D11E.
+    // No StyledText parser is allowed to swallow the musical symbol.
+    assert.doesNotMatch(musicMark[1], /Text\.StyledText|<font /);
+    assert.match(musicMark[1], /textFormat:\s*Text\.PlainText\s*text:\s*"‧₊˚ "/);
+    assert.match(musicMark[1], /id:\s*trebleClef\s*textFormat:\s*Text\.PlainText\s*text:\s*"𝄞"\s*font\.pixelSize:\s*21\s*color:\s*Colors\.magenta/);
+    assert.match(musicMark[1], /textFormat:\s*Text\.PlainText\s*text:\s*"˖"/);
+    assert.equal((musicMark[1].match(/anchors\.baseline:\s*trebleClef\.baseline/g) || []).length, 2);
+    assert.equal((musicMark[1].match(/color:\s*mediaDock\.foregroundColor/g) || []).length, 2);
 
     // The animated bars keep their original accent and are never sampled.
     assert.match(source, /readonly property color accentColor:\s*mpdPlaying \? Colors\.orange : Colors\.cyan/);
     assert.match(source, /color:\s*mediaDock\.accentColor/);
     assert.doesNotMatch(source, /contentGlowSource:\s*(?:spectrum|mediaArtwork)/);
+});
+
+test("CAVA neon tracks the animated bar using geometry only", () => {
+    const match = source.match(/Item \{\s*width:\s*5\s*height:\s*spectrum\.height([\s\S]*?)\n\s*\}\n\s*\}\n\s*\}\n\s*\}\n\s*\}/);
+    assert.ok(match, "expected a bounded bar item inside the 16-bar Repeater");
+    const bar = match[1];
+    assert.match(bar, /id:\s*cavaBar/);
+    assert.match(bar, /height:\s*cavaBar\.height\s*\+\s*6/);
+    assert.match(bar, /height:\s*cavaBar\.height\s*\+\s*2/);
+    assert.match(bar, /width:\s*parent\.width\s*\+\s*8/);
+    assert.match(bar, /width:\s*parent\.width\s*\+\s*4/);
+    assert.equal((bar.match(/color:\s*mediaDock\.accentColor/g) || []).length, 3,
+        "both glow layers and the bar must follow the same cyan/orange accent");
+    assert.equal((bar.match(/Behavior on height/g) || []).length, 1,
+        "only the actual bar animates; halos follow bindings");
+    assert.doesNotMatch(bar, /DropShadow|RectangularShadow|ShaderEffect|layer\.enabled/);
+    assert.doesNotMatch(source, /contentGlowSource:\s*(?:spectrum|mediaArtwork|cavaBar)/);
 });
 
 test("CAVA preserves 16-bar output at a bounded 15 FPS", () => {

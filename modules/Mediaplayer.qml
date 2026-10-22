@@ -77,18 +77,38 @@ Item {
         anchors.centerIn: parent
         spacing: 9
 
-        GohuText {
+        // Keep the treble clef as plain text. The StyledText color run
+        // suppressed this supplementary-plane symbol on the live desktop.
+        // Separate static glyphs share one baseline and one sampled glow;
+        // do not sample the animated CAVA bars.
+        Row {
             id: musicMark
             anchors.verticalCenter: parent.verticalCenter
-            // A single styled Text keeps the original icon shaping/centering.
-            // Only the treble clef is permanently magenta. The ornaments
-            // retain the dock's normal foreground and open-state behavior.
-            textFormat: Text.StyledText
-            text: "<font color='" + mediaDock.foregroundColor + "'>‧₊˚ </font>"
-                + "<font color='" + Colors.magenta + "'>𝄞</font>"
-                + "<font color='" + mediaDock.foregroundColor + "'>˖</font>"
-            font.pixelSize: 21
-            color: mediaDock.foregroundColor
+            spacing: 0
+
+            GohuText {
+                anchors.baseline: trebleClef.baseline
+                textFormat: Text.PlainText
+                text: "‧₊˚ "
+                font.pixelSize: 21
+                color: mediaDock.foregroundColor
+            }
+
+            GohuText {
+                id: trebleClef
+                textFormat: Text.PlainText
+                text: "𝄞"
+                font.pixelSize: 21
+                color: Colors.magenta
+            }
+
+            GohuText {
+                anchors.baseline: trebleClef.baseline
+                textFormat: Text.PlainText
+                text: "˖"
+                font.pixelSize: 21
+                color: mediaDock.foregroundColor
+            }
         }
 
         Item {
@@ -108,7 +128,33 @@ Item {
                         width: 5
                         height: spectrum.height
 
+                        // Two geometry-only halos follow the animated core.
+                        // Never create a per-frame shader texture or a second
+                        // animation for CAVA: that previously stalled Quickshell.
                         Rectangle {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.bottom: parent.bottom
+                            anchors.bottomMargin: -3
+                            width: parent.width + 8
+                            height: cavaBar.height + 6
+                            radius: 0
+                            color: mediaDock.accentColor
+                            opacity: 0.13
+                        }
+
+                        Rectangle {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.bottom: parent.bottom
+                            anchors.bottomMargin: -1
+                            width: parent.width + 4
+                            height: cavaBar.height + 2
+                            radius: 0
+                            color: mediaDock.accentColor
+                            opacity: 0.28
+                        }
+
+                        Rectangle {
+                            id: cavaBar
                             anchors.bottom: parent.bottom
                             width: parent.width
                             height: Math.max(2, Math.round(

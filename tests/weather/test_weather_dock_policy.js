@@ -288,10 +288,11 @@ assert.doesNotMatch(sampledArtwork, /id:\s*weatherThermometer/);
 // Qt Quick's two RectangularShadow shapes draw direct bulb/stem halos.
 assert.match(dock, /import QtQuick\.Effects/);
 const rearGlowStart = dock.indexOf("id: thermometerRearGlow");
+const rearGlowBlockStart = dock.lastIndexOf("RectangularShadow {", rearGlowStart);
 const rearGlowEnd = dock.indexOf("// Compact native scene-graph thermometer", rearGlowStart);
-assert.ok(rearGlowStart > frameStart && rearGlowEnd > rearGlowStart);
-assert.ok(rearGlowEnd < thermometerStart);
-const rearGlow = dock.slice(rearGlowStart, rearGlowEnd);
+assert.ok(rearGlowBlockStart > frameStart && rearGlowStart > rearGlowBlockStart);
+assert.ok(rearGlowEnd > rearGlowStart && rearGlowEnd < thermometerStart);
+const rearGlow = dock.slice(rearGlowBlockStart, rearGlowEnd);
 assert.match(dock, /id:\s*thermometerGlowFrame[\s\S]*?clip:\s*false/);
 assert.match(rearGlow, /id:\s*thermometerRearGlow/);
 assert.match(rearGlow, /id:\s*thermometerStemRearGlow/);

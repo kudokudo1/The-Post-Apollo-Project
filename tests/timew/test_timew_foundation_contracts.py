@@ -267,7 +267,7 @@ assert 'id: converterProcess' in window
 assert 'converterProcess.exec([' in window
 assert '"python3", "-B", "-I"' in window
 assert 'Quickshell.shellPath("services/time/TimeZoneConverter.py")' in window
-assert 'src, dst, converterDate, converterTime' in window
+assert 'src, dst, converterDate, converterParsedTime.canonical' in window
 assert 'id: converterPane' in window
 assert 'id: converterDateInput' in window
 assert 'id: converterTimeInput' in window
@@ -276,12 +276,57 @@ assert 'onLeftClicked: timew.runTimeConverter()' in window
 assert 'timew.converterSubmittedKey !== timew.converterInputsKey' in window
 assert 'REPEATED HOUR // TWO POSSIBLE INSTANTS' in window
 assert 'TIME DOES NOT EXIST // DST CLOCK JUMP' in window
-assert 'SOURCE // " + modelData.source' in window
+assert 'modelData.source,' in window
 assert '!converterDateInput.activeFocus && !converterTimeInput.activeFocus' in window
 assert 'TIME CALCULATOR // NOT CONNECTED' not in window
 # Conversion adds one on-demand process, no persistent interval or clock tick.
 assert window.count("SystemClock {") == 1
 assert window.count("Timer {") == 1
+
+# Two independent CALC 12/24-hour presentation controls. The input is
+# converted to backend-ready HH:MM; output formats the existing result only.
+formatting = (ROOT / "services/time/TimeConverterFormat.js").read_text(encoding="utf-8")
+assert 'import "../services/time/TimeConverterFormat.js" as ConverterFormat' in window
+assert 'property bool converterInput24Hour: true' in window
+assert 'property bool converterOutput24Hour: true' in window
+assert 'converterInput24Hour ? Colors.orange : Colors.cyan' in window
+assert 'converterOutput24Hour ? Colors.orange : Colors.cyan' in window
+assert 'function toggleConverterInputFormat()' in window
+assert 'function toggleConverterOutputFormat()' in window
+assert 'ConverterFormat.convertInput(' in window
+assert 'ConverterFormat.parseInput(converterTime, converterInput24Hour)' in window
+assert 'converterInput24Hour = target24;' in window
+assert 'converterTime = converted.text;' in window
+assert 'if (!converted.valid)' in window
+assert 'converterResult = {status: converted.error, options: []};' in window
+assert 'if (!converterParsedTime.valid)' in window
+assert 'converterParsedTime.canonical' in window
+assert 'property bool converterBusy: false' in window
+assert 'id: converterInputFormatButton' in window
+assert 'id: converterOutputFormatButton' in window
+assert 'label: timew.converterInput24Hour ? "24H" : "12H"' in window
+assert 'label: timew.converterOutput24Hour ? "24H" : "12H"' in window
+assert 'onLeftClicked: timew.toggleConverterInputFormat()' in window
+assert 'onLeftClicked: timew.toggleConverterOutputFormat()' in window
+assert 'id: converterResultHeader' in window
+assert 'width: Math.max(0, parent.width' in window
+assert 'converterResultHeader.spacing' in window
+assert 'ConverterFormat.formatResult(' in window
+assert window.count('timew.converterOutput24Hour)') >= 2
+assert 'color: timew.converterOutputFormatColor' in window
+assert 'color: timew.converterInputFormatColor' not in window or (
+    'accentColor: timew.converterInputFormatColor' in window)
+# No switch may trigger an extra process or overwrite another format state.
+assert window.count('converterProcess.exec([') == 1
+assert 'converterInput24Hour = !converterInput24Hour;' not in window
+assert 'converterOutput24Hour = !converterOutput24Hour;' in window
+assert 'converterResult = null;' not in window.split(
+    'function toggleConverterOutputFormat()', 1)[1].split('}', 1)[0]
+assert 'function parseInput(value, is24Hour)' in formatting
+assert 'function convertInput(value, sourceIs24Hour, targetIs24Hour)' in formatting
+assert 'function formatResult(value, use24Hour)' in formatting
+assert 'const parsed = parseInput(value, sourceIs24Hour);' in formatting
+assert 'return displayInput(parsed.canonical, targetIs24Hour);' in formatting
 
 # CALC provides *independent* country-first IANA zone dropdowns. CHANGE
 # remains the existing quick-cycle mechanism, not a replacement for search.

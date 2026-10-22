@@ -13,6 +13,7 @@ import "widgets/notifications"
 
 import "services/weather"
 import "services/system"
+import qs.services.hub
 import qs.services.notifications
 
 import QtQuick.Effects
@@ -234,6 +235,13 @@ PanelWindow {
 
     WeatherService {
         id: weatherService
+    }
+
+    // ApolloHub reads the same live WeatherService as Weather Station.
+    // This bridge is read-only and starts no additional weather fetches.
+    ApolloHubLiveBridge {
+        id: apolloHubLive
+        weatherSource: weatherService
     }
 
     // Official NWS alerts only when an operator-pinned geographic point exists.
@@ -606,6 +614,7 @@ PanelWindow {
         ApolloHubW {
             id: apolloHubWindow
             screen: shellRoot.screen
+            liveBridge: apolloHubLive
             // The Hub is not yet enrolled in Koinoikos's cross-window
             // registry; it cannot take keyboard input during that mode.
             keyboardActive: !relationshipFocus.active

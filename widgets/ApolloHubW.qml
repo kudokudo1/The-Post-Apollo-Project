@@ -617,6 +617,7 @@ PanelWindow {
                     width: 88
                     height: 32
                     label: "+ MODE"
+                    visible: hub.pendingRemoval === null
                     available: hub.layout.modes.length < 6
                     onLeftClicked: {
                         hub.save(Layout.addMode(hub.layout));
@@ -629,6 +630,7 @@ PanelWindow {
                     width: 92
                     height: 32
                     label: "+ GROUP"
+                    visible: hub.pendingRemoval === null
                     available: hub.activeMode && hub.activeMode.subModes.length < 6
                     onLeftClicked: {
                         hub.save(Layout.addSubMode(hub.layout, hub.selectedModeIndex));
@@ -641,6 +643,7 @@ PanelWindow {
                     width: 85
                     height: 32
                     label: "+ TILE"
+                    visible: hub.pendingRemoval === null
                     available: hub.activeTiles.length < 8
                     onLeftClicked: hub.save(Layout.addTile(
                         hub.layout, hub.selectedModeIndex, hub.selectedSubModeIndex))
@@ -650,17 +653,88 @@ PanelWindow {
                     width: 65
                     height: 32
                     label: "UNDO"
+                    visible: hub.pendingRemoval === null
                     available: hub.layoutStorageIssue.length === 0
                                && hub.layoutUndoStack.length > 0
                     onLeftClicked: hub.undoLastLayoutEdit()
+                }
+                ActionButton {
+                    // A request is not deletion: explicit second confirmation
+                    // is required before any layout is saved.
+                    trackLabelGlowLocally: true
+                    width: 84
+                    height: 32
+                    visible: hub.pendingRemoval === null
+                    label: "− MODE"
+                    accentColor: Colors.red
+                    destructive: true
+                    hoverFillColor: Colors.red
+                    hoverForegroundColor: Colors.black
+                    hoverBorderColor: Colors.red
+                    available: hub.layoutStorageIssue.length === 0
+                               && hub.layout.modes.length > 1
+                    onLeftClicked: hub.requestLayoutRemoval("mode")
+                }
+                ActionButton {
+                    trackLabelGlowLocally: true
+                    width: 90
+                    height: 32
+                    visible: hub.pendingRemoval === null
+                    label: "− GROUP"
+                    accentColor: Colors.red
+                    destructive: true
+                    hoverFillColor: Colors.red
+                    hoverForegroundColor: Colors.black
+                    hoverBorderColor: Colors.red
+                    available: hub.layoutStorageIssue.length === 0
+                               && hub.activeMode !== null
+                               && hub.activeMode.subModes.length > 1
+                    onLeftClicked: hub.requestLayoutRemoval("group")
+                }
+                GohuText {
+                    width: 320
+                    height: 32
+                    visible: hub.pendingRemoval !== null
+                    verticalAlignment: Text.AlignVCenter
+                    elide: Text.ElideRight
+                    color: Colors.orange
+                    text: hub.pendingRemoval
+                          ? "REMOVE " + hub.pendingRemoval.kind.toUpperCase()
+                            + ": " + hub.pendingRemoval.label
+                            + " (" + hub.pendingRemoval.count
+                            + (hub.pendingRemoval.kind === "mode" ? " GROUPS)" : " TILES)")
+                          : ""
+                }
+                ActionButton {
+                    trackLabelGlowLocally: true
+                    width: 96
+                    height: 32
+                    visible: hub.pendingRemoval !== null
+                    label: "CONFIRM"
+                    accentColor: Colors.red
+                    destructive: true
+                    hoverFillColor: Colors.red
+                    hoverForegroundColor: Colors.black
+                    hoverBorderColor: Colors.red
+                    onLeftClicked: hub.confirmLayoutRemoval()
+                }
+                ActionButton {
+                    trackLabelGlowLocally: true
+                    width: 74
+                    height: 32
+                    visible: hub.pendingRemoval !== null
+                    label: "CANCEL"
+                    onLeftClicked: hub.cancelPendingRemoval()
                 }
                 GohuText {
                     height: 32
                     verticalAlignment: Text.AlignVCenter
                     color: Colors.cyan
                     text: "MODE:"
+                    visible: hub.pendingRemoval === null
                 }
                 SectionFrame {
+                    visible: hub.pendingRemoval === null
                     width: 190
                     height: 32
                     fillColor: Colors.black
@@ -796,6 +870,9 @@ PanelWindow {
                 font.pixelSize: 11
                 text: hub.layoutStorageIssue.length > 0
                       ? "LAYOUT READ ONLY // " + hub.layoutStorageIssue
+                      : hub.pendingRemoval !== null
+                      ? "CONFIRM REMOVE " + hub.pendingRemoval.kind.toUpperCase()
+                        + " // " + hub.pendingRemoval.label + " // UNDO AVAILABLE"
                       : hub.editMode
                       ? "← → MOVE    SWAP MODULE    W:1/2 WIDTH    H:1/2/3 HEIGHT    × REMOVE    UNDO"
                       : "APOLLO HUB  //  LIVE MODULES CONNECTED"

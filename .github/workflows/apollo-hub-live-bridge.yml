@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - "services/hub/ApolloHubLiveBridge.qml"
+      - "services/hub/ApolloHubNetworkPolicy.js"
+      - "modules/Network.qml"
+      - "tests/hub/test_apollo_hub_network_policy.cjs"
+      - "tests/hub/test_apollo_hub_network_bridge.py"
       - "shell.qml"
       - "widgets/ApolloHubW.qml"
       - "widgets/hub/ApolloHubTile.qml"
@@ -22,6 +26,10 @@ on:
       - main
     paths:
       - "services/hub/ApolloHubLiveBridge.qml"
+      - "services/hub/ApolloHubNetworkPolicy.js"
+      - "modules/Network.qml"
+      - "tests/hub/test_apollo_hub_network_policy.cjs"
+      - "tests/hub/test_apollo_hub_network_bridge.py"
       - "shell.qml"
       - "widgets/ApolloHubW.qml"
       - "widgets/hub/ApolloHubTile.qml"
@@ -52,3 +60,7 @@ jobs:
         run: python3 tests/hub/test_apollo_hub_system_bridge.py
       - name: Exercise CPU++ projection and freshness states
         run: node tests/hub/test_apollo_hub_system_policy.cjs
+      - name: Verify B3 passive Network bridge
+        run: python3 tests/hub/test_apollo_hub_network_bridge.py
+      - name: Exercise network link and unknown states
+        run: node tests/hub/test_apollo_hub_network_policy.cjs

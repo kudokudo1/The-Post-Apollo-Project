@@ -85,10 +85,12 @@ PanelWindow {
                                   use24Hour)
 
     function chooseWorldZone(zoneId) {
-        if (worldModeActive
-                || !worldZones.some(function(zone) { return zone.id === zoneId; }))
+        if (!worldZones.some(function(zone) { return zone.id === zoneId; }))
             return;
+        // Presets are always usable, including when WORLD was selected.
+        worldModeActive = false;
         selectedQuickZone = zoneId;
+        dismissWorldSearchPopup();
         selectActiveZone(zoneId);
     }
 
@@ -111,19 +113,39 @@ PanelWindow {
         zoneCatalogLookup.exec(["timedatectl", "list-timezones", "--no-pager"]);
     }
 
-    function toggleWorldMode() {
-        worldModeActive = !worldModeActive;
-        worldSearchPopupOpen = worldModeActive;
-        if (worldModeActive) {
+    function dismissWorldSearchPopup() {
+        worldSearchPopupOpen = false;
+        worldSearchInput.focus = false;
+        Qt.callLater(restoreKeyboardFocus);
+    }
+
+    function openWorldSearchPopup() {
+        if (!worldModeActive) {
+            worldModeActive = true;
             selectActiveZone(selectedSearchedZone);
-            loadWorldZoneCatalog();
-            Qt.callLater(function() {
-                if (timew.menuOpen && timew.selectedMode === "clock")
-                    worldSearchInput.forceActiveFocus();
-            });
-        } else {
+        }
+        worldSearchPopupOpen = true;
+        loadWorldZoneCatalog();
+        Qt.callLater(function() {
+            if (timew.menuOpen && timew.selectedMode === "clock")
+                worldSearchInput.forceActiveFocus();
+        });
+    }
+
+    function toggleWorldDropdown() {
+        if (worldSearchPopupOpen)
+            dismissWorldSearchPopup();
+        else
+            openWorldSearchPopup();
+    }
+
+    function toggleWorldMode() {
+        if (worldModeActive) {
+            worldModeActive = false;
+            dismissWorldSearchPopup();
             selectActiveZone(selectedQuickZone);
-            Qt.callLater(restoreKeyboardFocus);
+        } else {
+            openWorldSearchPopup();
         }
     }
 
@@ -143,11 +165,9 @@ PanelWindow {
             return;
         worldModeActive = true;
         selectedSearchedZone = zoneId;
-        worldSearchPopupOpen = false;
         worldSearchQuery = WorldZoneSearch.label(zoneId);
-        worldSearchInput.text = worldSearchQuery;
+        dismissWorldSearchPopup();
         selectActiveZone(zoneId);
-        Qt.callLater(restoreKeyboardFocus);
     }
 
     function refreshWorldClock() {
@@ -192,6 +212,8 @@ PanelWindow {
     }
 
     onMenuOpenChanged: {
+        if (!menuOpen)
+            dismissWorldSearchPopup();
         if (menuOpen) {
             Qt.callLater(restoreKeyboardFocus);
             if (selectedMode === "clock") {
@@ -201,6 +223,8 @@ PanelWindow {
         }
     }
     onSelectedModeChanged: {
+        if (selectedMode !== "clock")
+            dismissWorldSearchPopup();
         if (menuOpen && selectedMode === "clock") {
             Qt.callLater(refreshWorldClock);
             Qt.callLater(loadWorldZoneCatalog);
@@ -359,6 +383,7 @@ PanelWindow {
     }
 
     WindowPanelFrame {
+        id: timewFrame
         anchors.fill: parent
         anchors.margins: timew.glowGutter
         visible: timew.menuOpen
@@ -369,6 +394,34 @@ PanelWindow {
         borderColor: timew.semanticColor
         borderWidth: 1
         radius: 0
+
+        // Passive grab observes taps anywhere inside TimeW, including on
+        // buttons, without consuming their own clicks. Search/popup taps stay
+        // open; other taps close suggestions and restore window navigation.
+        TapHandler {
+            enabled: timew.worldSearchPopupOpen
+                     || worldSearchInput.activeFocus
+            gesturePolicy: TapHandler.DragThreshold
+            onTapped: function(point, button) {
+                if (button !== Qt.LeftButton)
+                    return;
+                const search = worldSearchArea.mapToItem(timewFrame, 0, 0);
+                const px = point.position.x;
+                const py = point.position.y;
+                const withinSearch = px >= search.x
+                                     && px <= search.x + worldSearchArea.width
+                                     && py >= search.y
+                                     && py <= search.y + worldSearchArea.height;
+                const popup = worldSearchPopup.mapToItem(timewFrame, 0, 0);
+                const withinPopup = worldSearchPopup.visible
+                                    && px >= popup.x
+                                    && px <= popup.x + worldSearchPopup.width
+                                    && py >= popup.y
+                                    && py <= popup.y + worldSearchPopup.height;
+                if (!withinSearch && !withinPopup)
+                    timew.dismissWorldSearchPopup();
+            }
+        }
 
         Column {
             id: chassis
@@ -505,6 +558,9 @@ PanelWindow {
                     Column {
                         id: localClockPane
                         visible: timew.selectedMode === "clock"
+                        // The CLOCK pane owns popup stacking above later
+                        // sibling text, including the status footer.
+                        z: timew.worldSearchPopupOpen ? 20 : 0
                         width: parent.width
                         spacing: 10
 

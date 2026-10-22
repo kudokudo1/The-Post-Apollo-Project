@@ -4,6 +4,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 policy=(ROOT/"services/hub/ApolloHubTimePolicy.js").read_text()
 tile=(ROOT/"widgets/hub/ApolloHubTile.qml").read_text()
+mini=(ROOT/"widgets/hub/ApolloHubTimeMini.qml").read_text()
 timew=(ROOT/"widgets/TimeW.qml").read_text()
 clock=(ROOT/"modules/Clock.qml").read_text()
 shell=(ROOT/"shell.qml").read_text()
@@ -25,7 +26,17 @@ assert "property date now: new Date()" in tile
 assert 'interval: 1000' in tile
 assert 'tile.moduleId === "time"' in tile
 assert 'onTriggered: tile.now = new Date()' in tile
-assert 'Qt.formatTime(tile.now, "HH:mm:ss")' in tile
+assert 'import "../../services/hub/ApolloHubTimePolicy.js" as TimePolicy' in tile
+assert 'TimePolicy.snapshot(tile.now.getTime(), tile.use24Hour)' in tile
+assert tile.count("Timer {")==1
+assert 'ApolloHubTimeMini {' in tile
+assert 'onToggleHourFormat: tile.use24Hour = !tile.use24Hour' in tile
+assert 'timeSnapshot.displayTime' in mini
+assert 'timeSnapshot.dateLabel' in mini
+assert 'timeSnapshot.utcOffsetLabel' in mini
+assert 'onLeftClicked: timeMini.toggleHourFormat()' in mini
+assert "Timer {" not in mini and "SystemClock {" not in mini
+assert "Qt.formatTime(" not in tile
 assert "SystemClock {" in clock
 assert "SystemClock {" in timew
 assert shell.count("ApolloHubLiveBridge {")==1

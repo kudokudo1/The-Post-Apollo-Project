@@ -12,8 +12,8 @@ DockButton {
     signal toggleRequested()
     open: menuOpen
 
-    // White monochrome task identity with independent cyan artwork glow
-    // and dock halo. Keep the glyph color separate from glow color.
+    // White artwork when closed, magenta when the menu opens.
+    // Artwork color remains separate from the existing glow behavior.
     normalContentGlowColor: Colors.cyan
     hoverContentGlowColor: Colors.cyan
     pressedContentGlowColor: Colors.cyan
@@ -29,7 +29,7 @@ DockButton {
         // A single text run prevents style-span boundaries from splitting
         // the combining marks. U+FE0E requests a tintable text notepad.
         textFormat: Text.PlainText
-        color: Colors.white
+        color: tasksDock.menuOpen ? Colors.magenta : Colors.white
         text: "݁˖✎๋࣭🗒︎๋࣭⊹"
     }
 

@@ -33,10 +33,11 @@ assert "contentGlowSource: tasksMark" in TASKS
 for state in ("normal", "hover", "pressed"):
     assert f"{state}ContentGlowColor: Colors.cyan" in TASKS
     assert f"{state}DockGlowColor: Colors.cyan" in TASKS
-# All artwork, including combining stars, is one tintable white text run.
+# All artwork, including combining stars, is one tintable text run.
+# The entire glyph cluster follows menu state, independent of hover.
 assert 'text: "݁˖✎๋࣭🗒︎๋࣭⊹"' in TASKS
 assert "textFormat: Text.PlainText" in TASKS
-assert "color: Colors.white" in TASKS
+assert "color: tasksDock.menuOpen ? Colors.magenta : Colors.white" in TASKS
 assert "Colors.yellow" not in TASKS
 assert "<font" not in TASKS
 for forbidden in ("MouseArea {", "SafeDropShadow {", "RectangularShadow {", "Process {", "TasksW {"):

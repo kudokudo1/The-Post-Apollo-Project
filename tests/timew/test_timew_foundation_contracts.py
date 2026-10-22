@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 window = (ROOT / "widgets/TimeW.qml").read_text(encoding="utf-8")
 clock = (ROOT / "modules/Clock.qml").read_text(encoding="utf-8")
-preview = (ROOT / "tests/timew/timew_preview.qml").read_text(encoding="utf-8")
+preview = (ROOT / "timew_click_preview.qml").read_text(encoding="utf-8")
 finance = (ROOT / "widgets/FinanceW.qml").read_text(encoding="utf-8")
 shell = (ROOT / "shell.qml").read_text(encoding="utf-8")
 
@@ -16,9 +16,10 @@ shell = (ROOT / "shell.qml").read_text(encoding="utf-8")
 for name in ("PanelWindow {", "WindowPanelFrame {", "ActionButton {",
              "ModeButton {", "SystemClock {"):
     assert name in window, name
-assert 'import "../../widgets"' in preview
+assert 'import "widgets"' in preview and 'import "modules"' in preview
 assert "Scope {" in preview and "TimeW {" in preview
-assert "menuOpen: true" in preview
+assert "Clock {" in preview and "timeWindow: timewWindow" in preview
+assert "screen: previewDockWindow.screen" in preview
 assert "Clock {}" in shell  # The existing bar clock remains mounted.
 
 # No accidental clock-format or dock-chassis rewrite.

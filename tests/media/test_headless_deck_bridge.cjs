@@ -87,42 +87,42 @@ test("catalog responses update browsing without clobbering loaded media", () => 
 
 test("control bay provides two differently sized knobs, slider and explicit actions", () => {
     const ui = fs.readFileSync(path.join(base, "widgets/MediaDeckBrowserControls.qml"), "utf8");
-    assert.match(deck, /MediaDeckBrowserControls\\s*\\{/);
-    assert.match(ui, /id:\\s*navigationDial/);
-    assert.match(ui, /scale:\\s*0\\.77/);
-    assert.match(ui, /id:\\s*resultSlider/);
+    assert.match(deck, /MediaDeckBrowserControls\s*\{/);
+    assert.match(ui, /id:\s*navigationDial/);
+    assert.match(ui, /scale:\s*0\.77/);
+    assert.match(ui, /id:\s*resultSlider/);
     assert.match(ui, /indexRequested|onIndexRequested/);
-    assert.match(ui, /id:\\s*tuningDial/);
-    assert.match(ui, /scale:\\s*1\\.07/);
-    assert.match(ui, /label:\\s*"SELECT"/);
-    assert.match(ui, /label:\\s*"ENTER"/);
-    assert.match(ui, /label:\\s*"LOAD"/);
-    assert.match(ui, /label:\\s*"SEARCH"/);
-    assert.match(ui, /onClicked:\\s*bay\\.deckHost\\.selectHighlighted\\(\\)/);
-    assert.match(ui, /onClicked:\\s*bay\\.deckHost\\.loadStaged\\(\\)/);
-    assert.match(ui, /onClicked:\\s*bay\\.deckHost\\.enterHighlighted\\(\\)/);
-    assert.doesNotMatch(ui, /issue\\("play"/);
+    assert.match(ui, /id:\s*tuningDial/);
+    assert.match(ui, /scale:\s*1\.07/);
+    assert.match(ui, /label:\s*"SELECT"/);
+    assert.match(ui, /label:\s*"ENTER"/);
+    assert.match(ui, /label:\s*"LOAD"/);
+    assert.match(ui, /label:\s*"SEARCH"/);
+    assert.match(ui, /onClicked:\s*bay\.deckHost\.selectHighlighted\(\)/);
+    assert.match(ui, /onClicked:\s*bay\.deckHost\.loadStaged\(\)/);
+    assert.match(ui, /onClicked:\s*bay\.deckHost\.enterHighlighted\(\)/);
+    assert.doesNotMatch(ui, /issue\("play"/);
 });
 
 test("search is in the control bay and display results remain read-only", () => {
-    assert.match(deck, /function searchLibrary\\(\\)/);
-    assert.match(deck, /headless\\.searchMedia\\(catalogSource, query\\)/);
+    assert.match(deck, /function searchLibrary\(\)/);
+    assert.match(deck, /headless\.searchMedia\(catalogSource, query\)/);
     assert.match(deck, /readonly property var browseItems:/);
-    assert.match(deck, /Flickable\\s*\\{/);
+    assert.match(deck, /Flickable\s*\{/);
     assert.match(deck, /resultViewport/);
-    assert.match(deck, /function tuneToGroup\\(index\\)/);
-    assert.match(deck, /function highlightRow\\(index\\)/);
-    assert.match(deck, /function enterHighlighted\\(\\)/);
-    assert.match(bridge, /function loadMedia\\(ref\\)/);
-    assert.match(bridge, /issue\\("load", \\["--uri", ref\\.id, "--source", "local-mpd"\\]\\)/);
-    assert.doesNotMatch(deck, /WlrKeyboardFocus\\.Exclusive/);
+    assert.match(deck, /function tuneToGroup\(index\)/);
+    assert.match(deck, /function highlightRow\(index\)/);
+    assert.match(deck, /function enterHighlighted\(\)/);
+    assert.match(bridge, /function loadMedia\(ref\)/);
+    assert.match(bridge, /issue\("load", \["--uri", ref\.id, "--source", "local-mpd"\]\)/);
+    assert.doesNotMatch(deck, /WlrKeyboardFocus\.Exclusive/);
 });
 
 test("Shift selection remains fail-closed; bare grave is reserved", () => {
-    assert.match(deck, /standaloneShiftVerified:\\s*false/);
+    assert.match(deck, /standaloneShiftVerified:\s*false/);
     assert.match(deck, /shiftCandidate = standaloneShiftVerified/);
-    assert.match(deck, /!browserControls\\.searchEditing/);
-    assert.match(deck, /event\\.modifiers !== Qt\\.NoModifier/);
-    assert.match(deck, /event\\.key === Qt\\.Key_Return/);
-    assert.doesNotMatch(deck, /Qt\\.Key_QuoteLeft|Qt\\.Key_AsciiTilde/);
+    assert.match(deck, /!browserControls\.searchEditing/);
+    assert.match(deck, /event\.modifiers !== Qt\.NoModifier/);
+    assert.match(deck, /event\.key === Qt\.Key_Return/);
+    assert.doesNotMatch(deck, /Qt\.Key_QuoteLeft|Qt\.Key_AsciiTilde/);
 });

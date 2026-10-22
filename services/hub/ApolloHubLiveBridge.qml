@@ -26,6 +26,17 @@ Scope {
     // when the full deck is closed. Read-only scalar observation only.
     property var mpdDockSource: null
     property string selectedMprisBusName: ""
+    // A 2s dock reading can arrive AFTER the last 5s Hub clock tick.
+    // Advance the projection clock on each complete, coherent observation,
+    // otherwise knownAge() sees a future timestamp and falsely rejects it.
+    onMpdDockSourceChanged: bridge.observationNowMs = Date.now()
+    Connections {
+        target: bridge.mpdDockSource
+        function onHubMpdObservationChanged() {
+            if (bridge.mpdDockSource && bridge.mpdDockSource.hubMpdObservation)
+                bridge.observationNowMs = Date.now();
+        }
+    }
     property double mediaObservedAtMs: 0
     onMediaControllerSourceChanged: mediaObservedAtMs = 0
     Connections {
@@ -42,11 +53,10 @@ Scope {
         }
     }
 
-    readonly property var dockMpdObservation: mpdDockSource ? ({
-        state: mpdDockSource.hubMpdPlaybackState,
-        title: mpdDockSource.hubMpdCurrentTrack,
-        observedAtMs: mpdDockSource.hubMpdObservedAtMs
-    }) : null
+    // Atomic observation avoids separate state/title/timestamp notifications
+    // being assembled into a hybrid status during a QML binding reevaluation.
+    readonly property var dockMpdObservation:
+        mpdDockSource ? mpdDockSource.hubMpdObservation : null
     readonly property var mpdSnapshot: MediaPolicy.mpdSnapshot(
         mediaControllerSource !== null,
         mediaControllerSource ? mediaControllerSource.snapshot : null,

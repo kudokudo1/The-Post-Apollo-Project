@@ -12,6 +12,8 @@ media_mini = (ROOT / "widgets/hub/ApolloHubMediaMini.qml").read_text(encoding="u
 system_mini = (ROOT / "widgets/hub/ApolloHubSystemMini.qml").read_text(encoding="utf-8")
 uptime_mini = (ROOT / "widgets/hub/ApolloHubUptimeMini.qml").read_text(encoding="utf-8")
 apps_mini = (ROOT / "widgets/hub/ApolloHubAppsMini.qml").read_text(encoding="utf-8")
+todo_mini = (ROOT / "widgets/hub/ApolloHubTodoMini.qml").read_text(encoding="utf-8")
+todo_store = (ROOT / "services/hub/ApolloHubTodoStore.qml").read_text(encoding="utf-8")
 layout = (ROOT / "services/hub/ApolloHubLayout.js").read_text(encoding="utf-8")
 store = (ROOT / "services/hub/ApolloHubStore.qml").read_text(encoding="utf-8")
 module = (ROOT / "services/hub/qmldir").read_text(encoding="utf-8")
@@ -450,6 +452,71 @@ for forbidden in (
 for forbidden in ("DesktopEntries.byId(", "execDetached(", "app.launch("):
     assert forbidden not in window + tile, (
         f"Hub UI cannot launch apps: {forbidden}")
+
+# B7 To-do: one existing singleton and explicit operator-initiated
+# mutations, never a second store, separate process, or file write in UI.
+assert "import qs.services.hub" in window
+assert "todoStore: ApolloHubTodoStore" in window
+assert "todoSnapshot: ApolloHubTodoStore.snapshot" in window
+assert "property bool todoInputFocused: false" in window
+assert "&& !todoInputFocused" in window
+assert "onTodoTextFocusChanged: function(focused)" in window
+assert "property var todoStore: null" in tile
+assert "property var todoSnapshot: null" in tile
+assert "signal todoTextFocusChanged(bool focused)" in tile
+assert "ApolloHubTodoMini {" in tile
+assert 'visible: tile.moduleId === "todo"' in tile
+assert "todoStore: tile.todoStore" in tile
+assert "todoSnapshot: tile.todoSnapshot" in tile
+assert 'tile.moduleId !== "todo"' in tile
+assert "todoMini.statusLine" in tile
+
+for phrase in (
+    "property var todoStore: null",
+    "property var todoSnapshot: null",
+    "signal textFocusChanged(bool focused)",
+    'storeState === "ready" || storeState === "empty"',
+    "todoSnapshot.writable === true",
+    "storeState === \"saving\"",
+    '"TO-DO // SAVING // NOT YET CONFIRMED"',
+    '"WRITES LOCKED"',
+    "onTodoSnapshotChanged:",
+    'pendingWriteKind === "add"',
+    'pendingWriteKind === "rename"',
+    'pendingWriteKind === "remove"',
+    "if (storeState === \"ready\" || storeState === \"empty\")",
+    'storeState === "error" || storeState === "unsupported"',
+    "todoStore.addTask(value)",
+    "todoStore.renameTask(target, value)",
+    "todoStore.setTaskDone(task.id, task.done !== true)",
+    "todoStore.removeTask(task.id, true)",
+    "confirmDeleteId !== task.id",
+    "confirmDeleteId = String(task.id)",
+    "todoStore.reloadFromDisk()",
+    'todoMini.storeState !== "saving"',
+    "MAXIMUM_LENGTH_PLACEHOLDER",
+    "onActiveFocusChanged: todoMini.textFocusChanged(activeFocus)",
+    "onTextFocusChanged: function(focused)",
+    'label: todoEntry.awaitingDelete ? "YES" : "DEL"',
+    'label: todoEntry.awaitingDelete ? "NO" : "EDIT"',
+):
+    if phrase == "MAXIMUM_LENGTH_PLACEHOLDER":
+        phrase = "maximumLength: 160"
+    assert phrase in (todo_mini + tile), f"B7 To-do UI missing {phrase}"
+for forbidden in (
+    "ApolloHubTodoStore {", "FileView {", "Process {", "Timer {",
+    "JsonAdapter {", "Quickshell.dataDir", "atomicWrites:",
+    "Qt.openUrlExternally(", "execDetached(", "setTimeout(",
+):
+    assert forbidden not in todo_mini, f"To-do UI must not own storage/processes: {forbidden}"
+# No direct arbitrary writes or automatic save from lifecycle handlers.
+assert "removeTask(task.id, true)" in todo_mini
+assert "removeTask(task.id, false)" not in todo_mini
+assert "function confirmDelete(task)" in todo_mini
+assert "function requestDelete(task)" in todo_mini
+assert "onCompleted: todoStore" not in todo_mini
+assert "onVisibleChanged:" in todo_mini
+assert "onSaved:" in todo_store and "atomicWrites: true" in todo_store
 
 # Launchers and widget backends are unchanged in this first stage.
 print("ApolloHubW foundation source contracts passed")

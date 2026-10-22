@@ -203,9 +203,10 @@ DockButton {
                 }
             }
 
-            // One continuous glass chamber: the rounded lower reservoir
-            // stays inside the tube walls and fills/drains with the same live
-            // temperature level as the stem. Scale ticks live inside the glass.
+            // Classic thermometer silhouette again: a narrow tube feeding a
+            // wider bulb. Tube and bulb are traced as one continuous glass
+            // chamber, so there is no seam and the live fluid fills/drains
+            // through both as a single temperature reading.
             Item {
                 id: weatherThermometer
                 anchors.verticalCenter: parent.verticalCenter
@@ -216,6 +217,10 @@ DockButton {
                 property real animatedLevel:
                     weatherDock.thermometerState.valid
                     ? weatherDock.thermometerState.level : 0
+
+                // Glass and scale marks deliberately share one opacity.
+                readonly property color glassColor: Colors.white
+                readonly property real glassOpacity: 1.0
 
                 Behavior on animatedLevel {
                     NumberAnimation {
@@ -230,34 +235,53 @@ DockButton {
 
                 onAnimatedLevelChanged: thermometerCanvas.requestPaint()
                 onLiquidColorChanged: thermometerCanvas.requestPaint()
+                onGlassColorChanged: thermometerCanvas.requestPaint()
                 onWidthChanged: thermometerCanvas.requestPaint()
                 onHeightChanged: thermometerCanvas.requestPaint()
 
-                // Rounded glass body without a separate circular bulb.
-                // The bottom curve terminates at the same side walls as the
-                // stem, so the chamber is one continuous vessel.
-                function traceGlass(ctx, x, y, width, height, topRadius, bottomRadius) {
-                    const left = x;
-                    const right = x + width;
-                    const top = y;
-                    const bottom = y + height;
+                // One path, shaped like the original tube + bulb instrument.
+                // The shoulder curves flare from the tube directly into the
+                // bulb, so neither glass nor liquid has a dividing line.
+                function traceThermometer(
+                    ctx, centerX, topY, bottomY,
+                    tubeHalfWidth, shoulderY, bulbHalfWidth
+                ) {
+                    const left = centerX - tubeHalfWidth;
+                    const right = centerX + tubeHalfWidth;
+                    const topRadius = tubeHalfWidth;
+                    const bulbTopY = shoulderY + 1;
+                    const bulbMidY = (bulbTopY + bottomY) / 2;
 
                     ctx.beginPath();
-                    ctx.moveTo(left + topRadius, top);
-                    ctx.lineTo(right - topRadius, top);
-                    ctx.quadraticCurveTo(right, top, right, top + topRadius);
-                    ctx.lineTo(right, bottom - bottomRadius);
+                    ctx.moveTo(centerX, topY);
                     ctx.quadraticCurveTo(
-                        right, bottom,
-                        right - bottomRadius, bottom
+                        right, topY,
+                        right, topY + topRadius
                     );
-                    ctx.lineTo(left + bottomRadius, bottom);
+                    ctx.lineTo(right, shoulderY - 2);
                     ctx.quadraticCurveTo(
-                        left, bottom,
-                        left, bottom - bottomRadius
+                        right, shoulderY,
+                        centerX + bulbHalfWidth, bulbTopY
                     );
-                    ctx.lineTo(left, top + topRadius);
-                    ctx.quadraticCurveTo(left, top, left + topRadius, top);
+                    ctx.cubicCurveTo(
+                        centerX + bulbHalfWidth, bulbMidY,
+                        centerX + bulbHalfWidth, bottomY - 2,
+                        centerX, bottomY
+                    );
+                    ctx.cubicCurveTo(
+                        centerX - bulbHalfWidth, bottomY - 2,
+                        centerX - bulbHalfWidth, bulbMidY,
+                        centerX - bulbHalfWidth, bulbTopY
+                    );
+                    ctx.quadraticCurveTo(
+                        left, shoulderY,
+                        left, shoulderY - 2
+                    );
+                    ctx.lineTo(left, topY + topRadius);
+                    ctx.quadraticCurveTo(
+                        left, topY,
+                        centerX, topY
+                    );
                     ctx.closePath();
                 }
 
@@ -270,83 +294,100 @@ DockButton {
                         const ctx = getContext("2d");
                         ctx.clearRect(0, 0, width, height);
 
-                        const outerX = 2;
-                        const outerY = 1;
-                        const outerWidth = width - 4;
-                        const outerHeight = height - 2;
-                        const wall = 2;
+                        const centerX = width / 2;
+                        const outerTop = 1;
+                        const outerBottom = height - 1;
+                        const outerTubeHalf = 5;
+                        const outerShoulderY = 26;
+                        const outerBulbHalf = 8;
 
-                        const innerX = outerX + wall;
-                        const innerY = outerY + wall;
-                        const innerWidth = outerWidth - wall * 2;
-                        const innerHeight = outerHeight - wall * 2;
-                        const innerBottom = innerY + innerHeight;
+                        const innerTop = 3;
+                        const innerBottom = height - 3;
+                        const innerTubeHalf = 3;
+                        const innerShoulderY = 27;
+                        const innerBulbHalf = 5.5;
 
-                        // Black glass interior first.
-                        weatherThermometer.traceGlass(
+                        // Black glass interior.
+                        weatherThermometer.traceThermometer(
                             ctx,
-                            outerX, outerY,
-                            outerWidth, outerHeight,
-                            5, outerWidth / 2
+                            centerX,
+                            outerTop,
+                            outerBottom,
+                            outerTubeHalf,
+                            outerShoulderY,
+                            outerBulbHalf
                         );
                         ctx.fillStyle = Colors.black;
                         ctx.fill();
 
-                        // The fluid is clipped to the entire inner chamber.
-                        // At low readings only the lower reservoir fills; as
-                        // temperature rises the same body continues up the stem.
+                        // Continuous live fluid, clipped to the entire inner
+                        // tube + bulb chamber. The bulb therefore fills and
+                        // drains with the same normalized reading as the stem.
                         ctx.save();
-                        weatherThermometer.traceGlass(
+                        weatherThermometer.traceThermometer(
                             ctx,
-                            innerX, innerY,
-                            innerWidth, innerHeight,
-                            3, innerWidth / 2
+                            centerX,
+                            innerTop,
+                            innerBottom,
+                            innerTubeHalf,
+                            innerShoulderY,
+                            innerBulbHalf
                         );
                         ctx.clip();
 
+                        const innerHeight = innerBottom - innerTop;
                         const fillHeight =
                             innerHeight * weatherThermometer.animatedLevel;
+                        ctx.globalAlpha = 1.0;
                         ctx.fillStyle = weatherThermometer.liquidColor;
                         ctx.fillRect(
-                            innerX,
+                            centerX - innerBulbHalf,
                             innerBottom - fillHeight,
-                            innerWidth,
+                            innerBulbHalf * 2,
                             fillHeight
                         );
                         ctx.restore();
 
-                        // White glass outline.
-                        weatherThermometer.traceGlass(
+                        // Glass outline.
+                        ctx.save();
+                        ctx.globalAlpha = weatherThermometer.glassOpacity;
+                        weatherThermometer.traceThermometer(
                             ctx,
-                            outerX, outerY,
-                            outerWidth, outerHeight,
-                            5, outerWidth / 2
+                            centerX,
+                            outerTop,
+                            outerBottom,
+                            outerTubeHalf,
+                            outerShoulderY,
+                            outerBulbHalf
                         );
-                        ctx.lineWidth = wall;
-                        ctx.strokeStyle = Colors.white;
+                        ctx.lineWidth = 2;
+                        ctx.strokeStyle = weatherThermometer.glassColor;
                         ctx.stroke();
 
-                        // Four scale marks, all inside the right side of glass.
-                        const tickStartX = innerX + innerWidth * 0.52;
-                        const longTickEndX = innerX + innerWidth - 1;
-                        const shortTickEndX = innerX + innerWidth - 3;
-                        const tickTop = innerY + 5;
-                        const tickStep = 7;
+                        // Four indicator marks inside the tube. They use the
+                        // exact same color and opacity as the glass outline.
+                        const innerTubeRight = centerX + innerTubeHalf;
+                        const tickLongStartX = centerX - 0.5;
+                        const tickShortStartX = centerX + 0.5;
+                        const tickEndX = innerTubeRight - 0.5;
+                        const tickTop = 7;
+                        const tickStep = 6;
 
                         ctx.lineWidth = 1;
-                        ctx.strokeStyle = Colors.white;
+                        ctx.strokeStyle = weatherThermometer.glassColor;
 
                         for (let i = 0; i < 4; i++) {
                             const tickY = tickTop + i * tickStep;
                             ctx.beginPath();
-                            ctx.moveTo(tickStartX, tickY);
-                            ctx.lineTo(
+                            ctx.moveTo(
                                 i % 2 === 0
-                                ? longTickEndX : shortTickEndX,
+                                ? tickLongStartX : tickShortStartX,
                                 tickY
                             );
+                            ctx.lineTo(tickEndX, tickY);
                             ctx.stroke();
                         }
+                        ctx.restore();
                     }
                 }
             }

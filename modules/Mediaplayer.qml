@@ -56,11 +56,13 @@ Item {
     hoverForegroundColor: Colors.white
     pressedForegroundColor: Colors.white
 
-    normalContentGlowColor: accentColor
-    hoverContentGlowColor: accentColor
+    // The static music mark keeps its own magenta glow, independent of CAVA.
+    normalContentGlowColor: Colors.magenta
+    hoverContentGlowColor: Colors.magenta
     pressedContentGlowColor: Colors.magenta
 
-    normalDockGlowColor: accentColor
+    // Magenta idle chassis; leave hover and opened dock semantics unchanged.
+    normalDockGlowColor: Colors.magenta
     hoverDockGlowColor: accentColor
     pressedDockGlowColor: Colors.magenta
 
@@ -78,7 +80,13 @@ Item {
         GohuText {
             id: musicMark
             anchors.verticalCenter: parent.verticalCenter
-            text: "‧₊˚ 𝄞˖"
+            // A single styled Text keeps the original icon shaping/centering.
+            // Only the treble clef is permanently magenta. The ornaments
+            // retain the dock's normal foreground and open-state behavior.
+            textFormat: Text.StyledText
+            text: "<font color='" + mediaDock.foregroundColor + "'>‧₊˚ </font>"
+                + "<font color='" + Colors.magenta + "'>𝄞</font>"
+                + "<font color='" + mediaDock.foregroundColor + "'>˖</font>"
             font.pixelSize: 21
             color: mediaDock.foregroundColor
         }

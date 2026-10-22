@@ -60,7 +60,8 @@ export function validateTransactionCommand(input) {
 
 function rejectSplitOrTransfer(row) {
   // A simple editor must not break both sides of a transfer or a split.
-  if (row.transfer_id || row.is_parent || row.is_child
+  if ((row.imported_id && !String(row.imported_id).startsWith("financew-"))
+      || row.transfer_id || row.is_parent || row.is_child
       || row.parent_id || (Array.isArray(row.subtransactions)
                           && row.subtransactions.length))
     reject("unsupported-complex-transaction");

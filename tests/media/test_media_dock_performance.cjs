@@ -484,14 +484,14 @@ test("ambient height averages the four strongest CAVA bars with padding and smoo
         "(function() {" + expression[1] + "\n})()", {levels}
     );
 
-    const silence = Array(16).fill(0);
+    const silence = Array(20).fill(0);
     assert.equal(envelope(silence), 14, "a visible wash should remain at silence");
-    assert.equal(envelope(Array(16).fill(7)), 34, "tall bars cap at the loose envelope limit");
+    assert.equal(envelope(Array(20).fill(7)), 34, "tall bars cap at the loose envelope limit");
     assert.equal(envelope([7, ...Array(15).fill(0)]), 19,
         "one sharp peak should not drag the entire ambient wash up");
     assert.equal(envelope([7, 7, 7, 7, ...Array(12).fill(0)]), 34,
         "several high bars should lift the ambient wash");
-    assert.ok(envelope(Array(16).fill(4)) > envelope(Array(16).fill(1)),
+    assert.ok(envelope(Array(20).fill(4)) > envelope(Array(20).fill(1)),
         "the wash should rise as the overall spectrum grows");
     assert.match(source, /height:\s*mediaDock\.cavaAmbientTargetHeight/);
     assert.match(source, /if \(changed\)\s*levels = newLevels;/,
@@ -501,7 +501,7 @@ test("ambient height averages the four strongest CAVA bars with padding and smoo
 
 test("CAVA neon tracks the animated bar using geometry only", () => {
     const match = source.match(/Item \{\s*width:\s*5\s*height:\s*spectrum\.height([\s\S]*?)\n\s*\}\n\s*\}\n\s*\}\n\s*\}\n\s*\}/);
-    assert.ok(match, "expected a bounded bar item inside the 16-bar Repeater");
+    assert.ok(match, "expected a bounded bar item inside the 20-bar Repeater");
     const bar = match[1];
     assert.match(bar, /id:\s*cavaBar/);
     assert.match(bar, /height:\s*cavaBar\.height\s*\+\s*6/);
@@ -593,7 +593,8 @@ test("bad frames cannot reset or replace the current visualizer reading", () => 
     const {context, receive} = harness();
     receive(Array(20).fill("2").join(";"));
     const valid = context.levels;
-    for (const invalid of ["", "1;2;3", Array(20).fill("NaN").join(";"),
+    for (const invalid of ["", "1;2;3", Array(16).fill("2").join(";"),
+                           Array(20).fill("NaN").join(";"),
                            Array(20).fill("bad").join(";")]) {
         receive(invalid);
         assert.equal(context.levels, valid);

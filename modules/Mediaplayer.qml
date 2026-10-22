@@ -314,7 +314,7 @@ Item {
                 blur: mediaDock.contentGlowRadius + 4
                 spread: 0
                 color: mediaDock.artworkAccentColor
-                opacity: 0.22
+                opacity: 0.30
                 z: -1
 
                 Behavior on height {
@@ -353,7 +353,7 @@ Item {
                             height: cavaBar.height + 6
                             radius: 0
                             color: mediaDock.artworkAccentColor
-                            opacity: 0.22 + 0.24 * parent.glowActivity
+                            opacity: 0.30 + 0.24 * parent.glowActivity
                         }
 
                         Rectangle {
@@ -364,7 +364,7 @@ Item {
                             height: cavaBar.height + 2
                             radius: 0
                             color: mediaDock.artworkAccentColor
-                            opacity: 0.40 + 0.30 * parent.glowActivity
+                            opacity: 0.50 + 0.30 * parent.glowActivity
                         }
 
                         Rectangle {

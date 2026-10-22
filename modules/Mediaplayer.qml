@@ -221,12 +221,13 @@ Item {
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: -2
-                // Follow spectrum.width (itself derived from barCount), with
-                // a soft 3px shoulder past each outer bar at current settings.
-                width: Math.max(0, spectrum.width + 2 * mediaDock.softGlowSpread)
+                // Expand beyond both ends of the spectrum (derived from
+                // barCount) so the ambient accent lights the side edges, not
+                // only the area above the bars. No fixed bar-count sizing.
+                width: Math.max(0, spectrum.width + 8 * mediaDock.softGlowSpread)
                 height: mediaDock.cavaAmbientTargetHeight
                 radius: height / 2
-                blur: mediaDock.contentGlowRadius
+                blur: mediaDock.contentGlowRadius + 4
                 spread: 0
                 color: mediaDock.accentColor
                 opacity: 0.22

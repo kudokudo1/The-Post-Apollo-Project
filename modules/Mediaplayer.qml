@@ -84,6 +84,8 @@ Item {
     contentGlowEnabled: false
     contentGlowSource: null
 
+    // Strengthen the three *static* symbol shadows without sampling any
+    // moving CAVA bars. Leave the magenta full-width dock wash untouched.
     SafeDropShadow {
         id: leadingStarsGlow
         safeSource: leadingStars
@@ -93,10 +95,10 @@ Item {
         height: leadingStars.height
         horizontalOffset: 0
         verticalOffset: 0
-        radius: mediaDock.contentGlowRadius
-        samples: mediaDock.contentGlowSamples
+        radius: mediaDock.contentGlowRadius + 4
+        samples: mediaDock.contentGlowSamples + 6
         requestedVisible: true
-        opacity: mediaDock.contentGlowOpacity
+        opacity: Math.min(1.0, mediaDock.contentGlowOpacity + 0.18)
         color: mediaDock.accentColor
         transparentBorder: true
         z: 0
@@ -111,10 +113,10 @@ Item {
         height: trebleClef.height
         horizontalOffset: 0
         verticalOffset: 0
-        radius: mediaDock.contentGlowRadius
-        samples: mediaDock.contentGlowSamples
+        radius: mediaDock.contentGlowRadius + 4
+        samples: mediaDock.contentGlowSamples + 6
         requestedVisible: true
-        opacity: mediaDock.contentGlowOpacity
+        opacity: Math.min(1.0, mediaDock.contentGlowOpacity + 0.18)
         color: mediaDock.accentColor
         transparentBorder: true
         z: 0
@@ -129,10 +131,10 @@ Item {
         height: trailingStar.height
         horizontalOffset: 0
         verticalOffset: 0
-        radius: mediaDock.contentGlowRadius
-        samples: mediaDock.contentGlowSamples
+        radius: mediaDock.contentGlowRadius + 4
+        samples: mediaDock.contentGlowSamples + 6
         requestedVisible: true
-        opacity: mediaDock.contentGlowOpacity
+        opacity: Math.min(1.0, mediaDock.contentGlowOpacity + 0.18)
         color: mediaDock.accentColor
         transparentBorder: true
         z: 0
@@ -221,7 +223,7 @@ Item {
                             height: cavaBar.height + 6
                             radius: 0
                             color: mediaDock.accentColor
-                            opacity: 0.13
+                            opacity: 0.22
                         }
 
                         Rectangle {
@@ -232,7 +234,7 @@ Item {
                             height: cavaBar.height + 2
                             radius: 0
                             color: mediaDock.accentColor
-                            opacity: 0.28
+                            opacity: 0.40
                         }
 
                         Rectangle {

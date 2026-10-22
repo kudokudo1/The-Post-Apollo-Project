@@ -74,7 +74,6 @@ function inspectHandshake(response, tab) {
     return;
   }
   console.info("Post-Apollo Proton: read-only native handshake OK");
-  inspectReadiness(tab);
 }
 
 function reportUnavailable() {
@@ -85,6 +84,9 @@ function reportUnavailable() {
 function onCompanionClicked(tab) {
   if (!isProtonTab(tab))
     return;
+  // This observation is read-only and does not need native-host privileges.
+  // It can be manually inspected before a host is installed/authorized.
+  inspectReadiness(tab);
   const request = { protocol: 1, kind: "PING" };
   if (firefoxApi) {
     // Firefox WebExtensions return a Promise from sendNativeMessage.

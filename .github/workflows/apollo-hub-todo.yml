@@ -1,0 +1,36 @@
+name: Apollo Hub B7 local To-do contracts
+
+on:
+  pull_request:
+    paths:
+      - "services/hub/ApolloHubTodoPolicy.js"
+      - "services/hub/ApolloHubTodoStore.qml"
+      - "services/hub/qmldir"
+      - "tests/hub/test_apollo_hub_todo_policy.cjs"
+      - "tests/hub/test_apollo_hub_todo_store.py"
+      - ".github/workflows/apollo-hub-todo.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "services/hub/ApolloHubTodoPolicy.js"
+      - "services/hub/ApolloHubTodoStore.qml"
+      - "services/hub/qmldir"
+      - "tests/hub/test_apollo_hub_todo_policy.cjs"
+      - "tests/hub/test_apollo_hub_todo_store.py"
+      - ".github/workflows/apollo-hub-todo.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise pure To-do policy and guarded mutations
+        run: node tests/hub/test_apollo_hub_todo_policy.cjs
+      - name: Guard single writer and file failure handling
+        run: python3 tests/hub/test_apollo_hub_todo_store.py

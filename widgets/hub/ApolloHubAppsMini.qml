@@ -2,13 +2,42 @@ import QtQuick
 import Quickshell
 import "../../components"
 
-// B6: read-only native DesktopEntries catalog projection.
-// This component cannot execute, choose, or launch an application. Launch
-// actions require their own separately authorized launcher integration.
+// The B6 catalog is read-only. A separate explicit user tap resolves an
+// installed DesktopEntry by its exact ID and requests launch through Qt's
+// existing Quickshell DesktopEntry API. Browsing never executes programs.
 Item {
     id: appsMini
 
     property var appsSnapshot: null
+    property string launchFeedback: ""
+
+    // Only a deliberate left-click on a visible installed app may execute.
+    // The catalog itself carries metadata, not commands or launch handles.
+    function launchApp(item) {
+        if (!catalogReady || !item || typeof item.id !== "string")
+            return false;
+        const id = item.id;
+        if (!entries.some(function(candidate) {
+            return candidate && candidate.id === id;
+        }))
+            return false;
+        const target = DesktopEntries.byId(id);
+        if (!target || target.id !== id || target.noDisplay === true
+                || typeof target.execute !== "function") {
+            launchFeedback = "APP UNAVAILABLE";
+            return false;
+        }
+        try {
+            target.execute();
+            // An accepted request is not proof that a window opened.
+            launchFeedback = "LAUNCH REQUESTED";
+            return true;
+        } catch (error) {
+            launchFeedback = "LAUNCH FAILED";
+            console.warn("APOLLO HUB APP LAUNCH:", String(error));
+            return false;
+        }
+    }
 
     readonly property string catalogState:
         appsSnapshot && appsSnapshot.state
@@ -39,10 +68,11 @@ Item {
             + (truncated ? " // FIRST " + shownCount : "")
           : "APPLICATION INDEX // " + catalogState.toUpperCase()
     readonly property string statusLine:
-        catalogReady
-        ? (shownCount === 0 ? "APPS // NO MATCHES // READ ONLY"
-           : "APPS // " + shownCount + " SHOWN // READ ONLY")
-        : "APPS // " + catalogState.toUpperCase() + " // READ ONLY"
+        launchFeedback.length > 0 ? "APPS // " + launchFeedback
+        : catalogReady
+        ? (shownCount === 0 ? "APPS // NO MATCHES"
+           : "APPS // " + shownCount + " SHOWN // CLICK TO LAUNCH")
+        : "APPS // " + catalogState.toUpperCase()
 
     GohuText {
         id: counter
@@ -73,13 +103,26 @@ Item {
         cellHeight: 27
         flow: GridView.FlowLeftToRight
         boundsBehavior: Flickable.StopAtBounds
-        // Scrolling browses metadata; there are deliberately no click or
-        // double-click handlers, launch commands, or player-like controls.
+        // Scrolling only browses; direct user taps request one exact-ID
+        // application launch. No selection or opening-time autostart.
         delegate: Item {
             id: appEntry
             required property var modelData
             width: appGrid.cellWidth
             height: appGrid.cellHeight
+
+            HoverHandler {
+                id: appHover
+            }
+            Rectangle {
+                anchors.fill: parent
+                color: appHover.hovered ? Colors.orange : "transparent"
+                opacity: 0.13
+            }
+            TapHandler {
+                acceptedButtons: Qt.LeftButton
+                onTapped: appsMini.launchApp(appEntry.modelData)
+            }
 
             Image {
                 id: appIcon

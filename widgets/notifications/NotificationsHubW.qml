@@ -5,6 +5,7 @@ import qs.components
 import qs.services.notifications
 import "../../services/notifications/NotificationFacets.js" as NotificationFacets
 import "../../services/notifications/BrowserSiteIdentity.js" as BrowserSiteIdentity
+import "../../services/notifications/EmailNotificationActions.js" as EmailNotificationActions
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects
 
@@ -127,6 +128,15 @@ PanelWindow {
     property real controlBayOpacity: 0.64
 
     // Notification cards.
+    readonly property var emailActionOrder: [
+        { "kind": "mark-read", "label": "MARK READ" },
+        { "kind": "archive", "label": "ARCHIVE" },
+        { "kind": "trash", "label": "TRASH" },
+        { "kind": "snooze", "label": "SNOOZE" },
+        { "kind": "spam", "label": "SPAM" },
+        { "kind": "star", "label": "MAIL STAR" }
+    ]
+
     property int cardHeight: 116
     property int reportCardHeight: 352 // solar/weather records need readable multiline history
     property int cardSpacing: 2
@@ -2649,7 +2659,21 @@ PanelWindow {
                         property bool targetWholeApp: false
                         // Delegates are recycled: scope must never leak from
                         // one history record into a different notification.
-                        onNotificationIdChanged: targetWholeApp = false
+                        property bool emailDeckOpen: false
+                        readonly property bool isEmailCard: EmailNotificationActions.isEmail({
+                            "source": notificationEntry.source,
+                            "sourceId": notificationEntry.sourceId,
+                            "websiteHost": notificationEntry.websiteHost,
+                            "category": notificationEntry.category
+                        })
+                        readonly property var availableEmailActions:
+                            notificationEntry.isEmailCard
+                            && NotificationsService.externalActionsRevision >= 0
+                            ? NotificationsService.emailActionsFor(notificationEntry.notificationId) : []
+                        onNotificationIdChanged: {
+                            targetWholeApp = false;
+                            emailDeckOpen = false;
+                        }
                         readonly property string websiteKey: NotificationsService.websiteKey(
                             notificationEntry.sourceId, notificationEntry.source, notificationEntry.websiteHost)
                         readonly property bool targetingWebsite: websiteKey !== "" && !targetWholeApp
@@ -2691,7 +2715,7 @@ PanelWindow {
                             notificationMessage.y + notificationMessage.height
                             + root.cardContentMargin + 4
                             + (notificationEntry.isUpdateOffer ? 32 : 0)
-                        )
+                        ) + (notificationEntry.emailDeckOpen && notificationEntry.isEmailCard ? 102 : 0)
                         readonly property real extendedReportCardHeight: Math.max(
                             root.reportCardHeight,
                             reportText.y + reportText.contentHeight
@@ -3215,6 +3239,90 @@ PanelWindow {
                                 verticalAlignment: Text.AlignTop
                                 z: 1
                             }
+                            // ===== MAILBOX ACTIONS =================
+                            // Sender callback only: historical notifications
+                            // have no authenticated message ID, and the
+                            // six mail operations must never mutate our local
+                            // Favorites or ZZ notification policies.
+                            Rectangle {
+                                id: mailActionDeck
+                                visible: notificationEntry.isEmailCard
+                                         && notificationEntry.emailDeckOpen
+                                         && !notificationEntry.isReport
+                                anchors {
+                                    left: parent.left
+                                    right: parent.right
+                                    bottom: parent.bottom
+                                }
+                                anchors.leftMargin: root.cardContentMargin + 8
+                                anchors.rightMargin: root.cardContentMargin
+                                anchors.bottomMargin: 8
+                                height: 92
+                                color: Colors.black
+                                border.width: 1
+                                border.color: Colors.cyan
+                                z: 3
+
+                                GohuText {
+                                    id: mailActionStatus
+                                    anchors {
+                                        top: parent.top
+                                        left: parent.left
+                                        right: parent.right
+                                    }
+                                    anchors.topMargin: 6
+                                    anchors.leftMargin: 8
+                                    anchors.rightMargin: 8
+                                    height: 14
+                                    font.pixelSize: 9
+                                    color: notificationEntry.availableEmailActions.length > 0
+                                        ? Colors.cyan : Colors.orange
+                                    text: notificationEntry.availableEmailActions.length > 0
+                                        ? "MAIL // SENDER ACTIONS AVAILABLE"
+                                        : "MAIL // NO LIVE MAILBOX ACTIONS"
+                                    elide: Text.ElideRight
+                                }
+
+                                Grid {
+                                    id: mailActionGrid
+                                    anchors {
+                                        top: mailActionStatus.bottom
+                                        left: parent.left
+                                        right: parent.right
+                                    }
+                                    anchors.topMargin: 4
+                                    anchors.leftMargin: 7
+                                    anchors.rightMargin: 7
+                                    columns: 3
+                                    spacing: 4
+                                    z: 4
+
+                                    Repeater {
+                                        model: root.emailActionOrder
+                                        delegate: MiniButton {
+                                            required property var modelData
+                                            width: (mailActionGrid.width - 2 * mailActionGrid.spacing) / 3
+                                            height: 26
+                                            label: modelData.label
+                                            labelPixelSize: 9
+                                            active: false
+                                            enabled: NotificationsService.externalActionsRevision >= 0
+                                                && NotificationsService.hasEmailAction(
+                                                    notificationEntry.notificationId,
+                                                    modelData.kind)
+                                            opacity: enabled ? 1.0 : 0.38
+                                            onTriggered: {
+                                                // Means callback dispatched, NOT mailbox
+                                                // confirmed; original sender owns outcome.
+                                                NotificationsService.dispatchEmailAction(
+                                                    notificationEntry.notificationId,
+                                                    modelData.kind);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
                             // ===== BRING HERE / OPEN =============
                             //
                             // Card click:
@@ -3231,10 +3339,23 @@ PanelWindow {
                                     bottom: parent.bottom
                                     right: parent.right
                                 }
-                                anchors.bottomMargin: 8
+                                anchors.bottomMargin: notificationEntry.emailDeckOpen
+                                    && notificationEntry.isEmailCard ? 110 : 8
                                 anchors.rightMargin: root.cardContentMargin
                                 spacing: 5
                                 z: 3
+
+                                MiniButton {
+                                    width: 44
+                                    height: 24
+                                    visible: notificationEntry.isEmailCard
+                                    label: "MAIL"
+                                    labelPixelSize: 10
+                                    active: notificationEntry.emailDeckOpen
+                                    activeColor: Colors.magenta
+                                    onTriggered: notificationEntry.emailDeckOpen
+                                        = !notificationEntry.emailDeckOpen
+                                }
 
                                 MiniButton {
                                     width: 44

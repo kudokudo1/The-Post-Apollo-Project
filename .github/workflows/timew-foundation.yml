@@ -6,6 +6,7 @@ on:
       - "widgets/TimeW.qml"
       - "timew_click_preview.qml"
       - "modules/Clock.qml"
+      - "shell.qml"
       - "tests/timew/**"
       - ".github/workflows/timew-foundation.yml"
   push:
@@ -14,6 +15,7 @@ on:
     paths:
       - "widgets/TimeW.qml"
       - "modules/Clock.qml"
+      - "shell.qml"
       - "tests/timew/**"
       - ".github/workflows/timew-foundation.yml"
 

@@ -152,10 +152,18 @@ async function run() {
   });
   assert.equal(typeof accountId,"string");
   await api.sync();
+  stage="explicit-fictional-upload";
+  const upload=await api.internal.send("upload-budget");
+  assert.equal(upload?.error,undefined,"Fictional upload failed");
+  stage="remote-file-list";
+  const remote=await api.internal.send("get-remote-files");
+  assert.ok(Array.isArray(remote) && remote.length===1,"No unique remote fixture");
+  const id=remote[0]?.fileId;
+  assert.equal(typeof id,"string");
+  assert.ok(id.length>8);
   const budgets=await api.getBudgets();
-  const id=budgets.find(x=>typeof x.cloudFileId==="string"
-                           && x.cloudFileId.length>8)?.cloudFileId;
-  assert.ok(id,"Fictional upload lacked a Sync ID");
+  assert.ok(budgets.some(x=>x.cloudFileId===id),
+    "Remote fixture ID must match an Actual budget");
   await endApi();
 
   stage="private-test-credentials";

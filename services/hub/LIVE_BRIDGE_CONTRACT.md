@@ -228,6 +228,8 @@ The Hub bridge now exposes `appsSnapshot`. It observes **Quickshell's built-in `
 
 The projection is pure JS in `services/hub/ApolloHubAppsPolicy.js`. It only exposes **display metadata**, not desktop-entry QML objects, argv, raw Exec commands, environment, working directories, or launch methods.
 
+**B6 runtime fix (October 22, 2026):** Quickshell `DesktopEntries.applications.values` is a QML `ObjectModel` list, not guaranteed to pass JavaScript `Array.isArray()`. The original B6 policy rejected this valid Qt list and returned `state: unavailable`; the Hub consequently rendered `CATALOG UNAVAILABLE` despite the native index being present. `ApolloHubAppsPolicy.collectionLength()` now accepts valid finite, bounded, non-negative integer-indexed Qt list views **as well as plain JS arrays**. Other invalid objects and missing native data still fail closed. The `tests/hub/test_apollo_hub_apps_policy.cjs` regression suite exercises this Qt array-like shape explicitly. This is a backend-only correction; it does not add a scanner or launch capabilities. **Operator desktop confirmation remains pending.**
+
 ### Consumer contract
 
 Existing UI receives `liveBridge` and can bind the Apps tile to:

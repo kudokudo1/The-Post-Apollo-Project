@@ -1167,6 +1167,10 @@ PanelWindow {
     function openNotificationDestination(notificationId, sourceId, source, websiteHost) {
         if (NotificationsService.invokeExternalDefaultAction(notificationId))
             return "native-default";
+        // Internal Apollo event IDs resolve through the existing service,
+        // which validates sourceId/eventType and emits a shell-only route.
+        if (NotificationsService.requestApolloDestination(notificationId))
+            return "apollo-view";
 
         if (BrowserSiteIdentity.chromiumFamily(source, sourceId)) {
             const hostname = BrowserSiteIdentity.hostnameFor(websiteHost);

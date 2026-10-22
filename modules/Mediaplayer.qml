@@ -302,10 +302,13 @@ Item {
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: -2
-                // Expand beyond both ends of the spectrum (derived from
-                // barCount) so the ambient accent lights the side edges, not
-                // only the area above the bars. No fixed bar-count sizing.
-                width: Math.max(0, spectrum.width + 8 * mediaDock.softGlowSpread)
+                // Keep the full bar range within the flatter center of
+                // this blurred wash. Its feathered edges extend outside
+                // BOTH spectrum ends by the blur radius + a small shoulder,
+                // so neither edge loses ambient light. Width still follows
+                // barCount via spectrum.width and never samples CAVA frames.
+                width: Math.max(0, spectrum.width
+                    + 2 * (mediaDock.contentGlowRadius + 4 + mediaDock.softGlowSpread))
                 height: mediaDock.cavaAmbientTargetHeight
                 radius: height / 2
                 blur: mediaDock.contentGlowRadius + 4

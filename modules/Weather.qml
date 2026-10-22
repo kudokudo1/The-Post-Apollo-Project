@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Shapes
+import QtQuick.Effects
 import Quickshell
 import "../components"
 import "../services/weather/WeatherDockPolicy.js" as WeatherDockPolicy
@@ -128,13 +129,13 @@ DockButton {
         onTriggered: weatherDock.observationClockMs = Date.now()
     }
 
-    // Condition -> measured temperature -> active thermometer.
-    // Keep the accepted 2px optical center, but divide glow ownership:
-    // condition+readout is sampled by DockButton; the gauge is not.
+    // Optical center: the 2px right shift overcompensated for emoji bearings.
+    // Shift the full group 3px left relative to that version while keeping
+    // its responsive width, icon/readout gap and independent glow planes.
     Row {
         id: weatherContent
         anchors.centerIn: parent
-        anchors.horizontalCenterOffset: 2
+        anchors.horizontalCenterOffset: -1
         spacing: 0
 
         // Weather art glow stays behind its icon and readout, not over the
@@ -243,30 +244,57 @@ DockButton {
             }
         }
 
-        // The rear halo is intentionally OUTSIDE the gauge's 17x35px
-        // antialiasing layer, so temperature-colored light can spill behind
-        // the white glass without sampling that glass a second time.
+        // The rear light stays OUTSIDE the thermometer's antialiasing
+        // layer. RectangularShadow paints a visible bulb/stem halo directly
+        // instead of sampling an animated QtQuick.Shape nested in that layer.
+        // Neither halo samples white glass, avoiding doubled outlines.
         Item {
             id: thermometerGlowFrame
             anchors.verticalCenter: parent.verticalCenter
             implicitWidth: 17
             implicitHeight: 35
+            clip: false
 
-            SafeDropShadow {
+            readonly property bool hasGlow: weatherDock.thermometerState.valid
+                                            && weatherThermometer.animatedLevel > 0
+            readonly property color rearGlowColor:
+                weatherDock.open || weatherDock.pressed
+                ? Colors.magenta : weatherThermometer.liquidColor
+
+            // Light around the round bulb is the dominant rear glow.
+            RectangularShadow {
                 id: thermometerRearGlow
-                anchors.fill: weatherThermometer
-                safeSource: thermometerLiquid
-                requestedVisible: weatherDock.thermometerState.valid
-                                  && weatherThermometer.animatedLevel > 0
+                x: weatherThermometer.bulbCenterX - width / 2
+                y: weatherThermometer.bulbCenterY - height / 2
+                width: weatherThermometer.outerBulbRadiusX * 2 - 1
+                height: weatherThermometer.outerBulbRadiusY * 2 - 1
+                radius: Math.min(width, height) / 2
+                blur: 6
+                spread: 1.3
                 z: 0
-                radius: 6
-                samples: 9
-                horizontalOffset: 0
-                verticalOffset: 0
-                transparentBorder: true
-                opacity: weatherDock.contentGlowOpacity * 0.75
-                color: weatherDock.open || weatherDock.pressed
-                       ? Colors.magenta : weatherThermometer.liquidColor
+                visible: thermometerGlowFrame.hasGlow
+                opacity: weatherDock.contentGlowOpacity * 0.85
+                color: thermometerGlowFrame.rearGlowColor
+            }
+
+            // A narrower glow rises with the animated liquid, instead of
+            // lighting the entire tube when only the bulb is filled.
+            RectangularShadow {
+                id: thermometerStemRearGlow
+                readonly property real topY: 3.2
+                readonly property real bottomY: 22.5
+                x: weatherThermometer.bulbCenterX - width / 2
+                width: 2.5
+                height: Math.max(0, Math.min(1, weatherThermometer.animatedLevel))
+                        * (bottomY - topY)
+                y: bottomY - height
+                radius: width / 2
+                blur: 4.5
+                spread: 0.7
+                z: 0
+                visible: thermometerGlowFrame.hasGlow && height >= 1
+                opacity: weatherDock.contentGlowOpacity * 0.72
+                color: thermometerGlowFrame.rearGlowColor
             }
 
             // Compact native scene-graph thermometer: one smooth connected

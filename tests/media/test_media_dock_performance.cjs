@@ -10,6 +10,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const root = path.resolve(__dirname, "../..");
 const source = fs.readFileSync(path.join(root, "modules/Mediaplayer.qml"), "utf8");
+const dockButtonSource = fs.readFileSync(path.join(root, "components/DockButton.qml"), "utf8");
 const config = fs.readFileSync(path.join(root, "modules/mediaplayer-cava.conf"), "utf8");
 const trebleSvg = fs.readFileSync(path.join(root, "assets/media/treble-clef.svg"), "utf8");
 const treblePng = fs.readFileSync(path.join(root, "assets/media/treble-clef.png"));
@@ -42,7 +43,7 @@ test("sample only separate static glyphs, never the animated VU spectrum", () =>
     assert.match(source, /id:\s*spectrum/);
 });
 
-test("magenta dock halo and CAVA-colored static music mark stay independent", () => {
+test("magenta front wash and CAVA-colored static music mark stay independent", () => {
     assert.match(source, /normalDockGlowColor:\s*Colors\.magenta/);
     assert.match(source, /normalContentGlowColor:\s*accentColor/);
     assert.match(source, /hoverContentGlowColor:\s*accentColor/);
@@ -103,8 +104,43 @@ test("magenta dock halo and CAVA-colored static music mark stay independent", ()
     assert.doesNotMatch(source, /contentGlowSource:\s*(?:spectrum|mediaArtwork)/);
 });
 
-test("magenta full-width wash, three independent static art glows, per-bar CAVA halos", () => {
-    // The full-width rear/front chassis glow is the Media-specific magenta variant.
+test("Media's rear halo follows CAVA while DockButton's front wash stays magenta", () => {
+    // Split the two planes locally; no shared DockButton code may change to
+    // customize one module, especially while the alignment pilot is active.
+    assert.match(source, /softGlowEnabled:\s*false/);
+    const rearMatch = source.match(/RectangularShadow \{\s*id:\s*mediaRearHalo([\s\S]*?)\n    \}/);
+    assert.ok(rearMatch, "Media owns a replacement rear halo behind the DockButton");
+    const rear = rearMatch[1];
+    assert.match(rear, /anchors\.fill:\s*mediaDock/);
+    assert.match(rear, /spread:\s*mediaDock\.softGlowSpread/);
+    assert.match(rear, /opacity:\s*mediaDock\.softGlowOpacity/);
+    assert.match(rear, /color:\s*mediaDock\.open\s*\?\s*mediaDock\.openGlowColor\s*:\s*mediaDock\.accentColor/);
+    assert.match(rear, /visible:\s*mediaDock\.visible/);
+    assert.match(rear, /z:\s*-1/);
+    assert.doesNotMatch(rear, /safeSource|levels|cavaBar|ShaderEffect|Behavior on height/,
+        "rear chassis halo must not sample or animate with CAVA bars");
+    assert.ok(source.indexOf("id: mediaRearHalo") < source.indexOf("DockButton {"),
+        "the rear halo must be outside and behind the dock content plane");
+
+    assert.match(source, /normalDockGlowColor:\s*Colors\.magenta/);
+    assert.match(source, /hoverDockGlowColor:\s*Colors\.magenta/);
+    assert.match(source, /pressedDockGlowColor:\s*Colors\.magenta/);
+    assert.match(source, /readonly property color accentColor:\s*mpdPlaying \? Colors\.orange : Colors\.cyan/);
+
+    // The shared component retains the default identity and numeric rules
+    // for other modules; only this module disables its built-in rear halo.
+    assert.match(dockButtonSource, /property bool softGlowEnabled:\s*true/);
+    assert.match(dockButtonSource, /property bool wideGlowEnabled:\s*true/);
+    assert.match(dockButtonSource, /readonly property color dockGlowColor:/);
+    const rearIndex = dockButtonSource.indexOf("visible: dockButton.softGlowEnabled");
+    const frontIndex = dockButtonSource.indexOf("visible: dockButton.wideGlowEnabled");
+    assert.ok(rearIndex >= 0 && frontIndex > rearIndex);
+    assert.match(dockButtonSource.slice(frontIndex), /color:\s*dockButton\.dockGlowColor/);
+    assert.match(dockButtonSource, /property color openGlowColor:\s*Colors\.magenta/);
+});
+
+test("magenta front wash, three independent static art glows, per-bar CAVA halos", () => {
+    // Media keeps the built-in front wash magenta; rear halo is overridden separately.
     for (const mode of ["normal", "hover", "pressed"]) {
         assert.match(source, new RegExp(mode + "DockGlowColor:\\s*Colors\\.magenta"));
         assert.match(source, new RegExp(mode + "ContentGlowColor:\\s*accentColor"));
@@ -150,8 +186,8 @@ test("magenta full-width wash, three independent static art glows, per-bar CAVA 
     // geometry-only per-bar halos, never a combined drop-shadow texture.
     assert.match(source, /Row \{\s*id:\s*mediaArtwork\s*anchors\.centerIn:\s*parent\s*spacing:\s*9\s*z:\s*1/);
     assert.doesNotMatch(source, /id:\s*(?:musicMarkUnderlay|mediaArtworkUnderlay)/);
-    assert.equal((source.match(/RectangularShadow \{/g) || []).length, 1,
-        "one static ambient wash is allowed inside the CAVA spectrum only");
+    assert.equal((source.match(/RectangularShadow \{/g) || []).length, 2,
+        "only one rear halo and one CAVA-only ambient wash are allowed");
     assert.match(source, /contentGlowEnabled:\s*false/);
     assert.match(source, /contentGlowSource:\s*null/);
     assert.doesNotMatch(source, /contentGlowSource:\s*(?:musicMark|mediaArtwork|spectrum|cavaBar)/);
@@ -196,9 +232,9 @@ test("large faded CAVA-only ambient wash follows a padded spectrum envelope", ()
     assert.doesNotMatch(wash, /cavaBar|levels|frame|Repeater|safeSource|ShaderEffect|source:/,
         "the ambient wash must not sample moving CAVA frames");
 
-    // The soft ambient light must never become a full-width cyan panel,
-    // nor replace the intentionally magenta rear/front chassis wash.
-    assert.equal((source.match(/RectangularShadow \{/g) || []).length, 1);
+    // The soft CAVA ambient wash must remain separate from the rear accent
+    // halo and the intentionally magenta front wash.
+    assert.equal((source.match(/RectangularShadow \{/g) || []).length, 2);
     assert.doesNotMatch(source, /id:\s*(?:musicMarkUnderlay|mediaArtworkUnderlay)/);
     for (const mode of ["normal", "hover", "pressed"]) {
         assert.match(source, new RegExp(mode + "DockGlowColor:\\s*Colors\\.magenta"));

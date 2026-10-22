@@ -48,7 +48,7 @@ for token in (
 # content plane (never inside the Grid, which would lay them out as cells),
 # but follow the live icon and caption positions reactively.
 HUB = (ROOT / "widgets/ApolloHubW.qml").read_text(encoding="utf-8")
-for needle in ("property bool trackDefaultGlowsLocally: false",
+for needle in ("property bool trackDefaultGlowsLocally: true",
                "id: defaultArtworkGrid",
                "defaultArtworkGrid.x",
                "defaultArtworkGrid.y",
@@ -56,6 +56,15 @@ for needle in ("property bool trackDefaultGlowsLocally: false",
                "defaultLabel.x",
                "defaultLabel.y"):
     assert needle in mode, f"Missing reactive default main-mode glow: {needle}"
+# Keep all four x/y placement expressions guarded by the original
+# ModeButton content effect plane. A caller with a custom effect host must
+# retain the established sourceOrigin path instead of using Grid coordinates
+# relative to the wrong parent.
+assert mode.count("modeButton.effectivePrimaryGlowHost === contentLayer") == 2
+assert mode.count("modeButton.effectiveLabelGlowHost === contentLayer") == 2
+assert mode.count(": sourceOrigin.x") == 2
+assert mode.count(": sourceOrigin.y") == 2
+assert mode.count("&& !modeButton.customArtwork && sourceAttached") == 4
 assert "trackDefaultGlowsLocally: true" in HUB
 assert HUB.count("trackDefaultGlowsLocally: true") == 1
 

@@ -95,13 +95,14 @@ Scope {
         return issue("load", []);
     }
 
-    // Contextual ENTER loads one playable MPD track without staging or autoplay.
-    // Source-specific collection loading and YouTube playback remain unavailable.
+    // Contextual ENTER cues an exact local track or guarded radio station
+    // without autoplay. YouTube and collection loading stay unavailable.
     function loadMedia(ref) {
         const args = mediaRefArgs(ref);
-        if (args === null || ref.source !== "local-mpd")
+        if (args === null || (ref.source !== "local-mpd"
+                              && ref.source !== "radio-browser"))
             return false;
-        return issue("load", ["--uri", ref.id, "--source", "local-mpd"]);
+        return issue("load", ["--uri", ref.id, "--source", ref.source]);
     }
 
     function loadRadio(url) {

@@ -159,7 +159,8 @@ Item {
                 labelPixelSize: 12
                 available: !!bay.controller.selection
                            && (bay.controller.selection.source === "local-mpd"
-                               || bay.controller.selection.source === "direct-stream")
+                               || bay.controller.selection.source === "direct-stream"
+                               || bay.controller.selection.source === "radio-browser")
                            && !bay.controller.busy
                            && bay.deckHost.transportMode === "mpd"
                 onClicked: bay.deckHost.loadStaged()

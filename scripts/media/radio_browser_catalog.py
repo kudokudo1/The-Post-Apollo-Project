@@ -2,8 +2,8 @@
 
 Radio Browser is a community directory, not a trusted audio-origin registry.
 Only station metadata and stable UUID references are exposed to the UI.
-Untrusted directory URLs never become direct-stream refs or MPD commands.
-Network errors never change playback. Playback authorization is separate.
+A selected station's private URI can only reach a guarded loopback relay,
+never MPD directly. Network failures do not change the existing loaded song.
 """
 from __future__ import annotations
 
@@ -42,19 +42,22 @@ class _RejectRedirects(HTTPRedirectHandler):
 class RadioBrowserCatalogSource:
     id = "radio-browser"
 
-    def __init__(self, fetch=None):
-        # Tests inject a fake GET transport; production uses this fixed host.
+    def __init__(self, fetch=None, relay=None):
+        # Tests inject a fake GET transport; production uses fixed trusted mirrors.
         self._fetch = fetch
+        self._relay = relay
         self._known_stations: dict[str, dict[str, Any]] = {}
+        self._station_urls: dict[str, str] = {}
 
     def describe(self) -> dict[str, Any]:
         return {
             "id": self.id, "name": "RADIO BROWSER // DIRECTORY",
             "available": True, "reason": "",
             "requirements": ["internet-for-discovery"],
-            "capabilities": ["search", "inspect"],
-            "playback": {"available": False,
-                         "reason": "Directory URLs are untrusted; playback approval pending"},
+            "capabilities": ["search", "inspect"] + (["prepare"] if self._relay else []),
+            "playback": {"available": self._relay is not None,
+                         "reason": ("Guarded local MP3 relay; requires explicit LOAD and PLAY"
+                                    if self._relay else "Radio relay not registered")},
             "note": "Listings are untrusted; stream support is not guaranteed",
         }
 
@@ -86,6 +89,7 @@ class RadioBrowserCatalogSource:
         items = []
         seen = set()
         known = {}
+        station_urls = {}
         scanned = 0
         for row in payload:
             scanned += 1
@@ -118,15 +122,19 @@ class RadioBrowserCatalogSource:
                 "stationuuid": station_id,
                 "streamHost": urlsplit(uri).hostname,
                 "bitrate": _bitrate(row.get("bitrate")),
-                "playback": {"available": False, "reason": "Directory only"},
+                "playback": {"available": self._relay is not None,
+                             "reason": "Guarded MP3 relay" if self._relay
+                                       else "Relay unavailable"},
             }
             items.append(item)
             known[station_id] = item
+            station_urls[station_id] = uri
             if len(items) >= _PAGE_SIZE:
                 break
         # Cursor follows the number of rows actually consumed, not the
         # requested batch size: usable hits after row 50 must not be skipped.
         self._known_stations = known
+        self._station_urls = station_urls
         next_offset = offset + scanned
         return {
             "items": items, "truncated": len(payload) >= _REQUEST_ROWS,
@@ -179,9 +187,17 @@ class RadioBrowserCatalogSource:
         return item.copy()
 
     def prepare(self, media_ref: Any) -> dict[str, Any]:
-        self.inspect(media_ref)
-        raise MediaBackendError("PLAYBACK_UNAVAILABLE",
-                                "Radio directory URLs require an approved playback policy")
+        # Loading requires a selected UUID already returned in this session;
+        # no caller-provided URL or local address is accepted here.
+        item = self.inspect(media_ref)
+        if self._relay is None:
+            raise MediaBackendError("PLAYBACK_UNAVAILABLE",
+                                    "Guarded radio relay not available")
+        uri = self._station_urls.get(item["stationuuid"])
+        if not uri:
+            raise MediaBackendError("INVALID_REF", "Station URI not in current results")
+        return {"requiredKind": "mpd-guarded-radio",
+                "uri": self._relay.register(uri), "item": item}
 
 
 def _clean(value: Any, limit: int) -> str:

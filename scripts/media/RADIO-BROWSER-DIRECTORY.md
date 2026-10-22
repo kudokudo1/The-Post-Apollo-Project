@@ -1,76 +1,75 @@
-# HI-FI // Radio Browser directory integration
+# HI-FI // Guarded Radio Browser playback draft
 
-**Status:** Development PR #458. No deployment or live MPD playback test yet.
+**State:** draft PR under review. No live Fedora, MPD or Quickshell activation.
+This extends the merged radio-directory browsing work from PR #458.
 
-## Purpose
+## User workflow
 
-Make the physical slider and tuning knob useful without downloaded local music.
-Browse station directory listings and stage selections to test controls.
-**Untrusted directory results are browse-only**, pending an approved source-to-MPD
-playback policy. The previous operator-supplied PRESET remains playable. The directory
-does not create or control a second player.
+1. In Hi-Fi, set SOURCE to **RADIO** and SEARCH with an empty query, or
+   \`tag:jazz\`, \`country:US\` or a station name.
+2. Navigate the returned station UUIDs using the slider and TUNE encoder.
+3. Press **SELECT** on one result. This stages it but does not load anything.
+4. Press **LOAD** to queue the selected radio station through the controller's
+   guarded localhost relay. Or press **ENTER** to queue the highlighted station
+   without staging first. **Neither LOAD nor ENTER autoplays.**
+5. Press **PLAY** to switch to the exact loaded station's MPD queue ID.
+6. To switch again, SELECT/LOAD/PLAY another station. LOAD does not interrupt
+   currently playing audio. PRESET and local MPD remain separate sources.
 
-## How the first iteration works
+The upper display and cassette bay show the loaded station title, distinct
+from the currently highlighted search result. Quickshell never receives
+or directly opens arbitrary directory stream URLs.
 
-- In the Hi-Fi control bay, press SOURCE until it reads **RADIO**.
-- Press **SEARCH** with the field empty for a page of popular MP3 stations.
-- To filter a station name, enter text (example: `ambient`).
-- To search a genre, enter `tag:jazz` or `genre:downtempo`.
-- To filter country code, enter `country:US`; language: `language:en`.
-- Results are displayed above the controls (up to 50 filtered hits per page).
-  The vertical slider and right TUNE knob navigate the current result page.
-- **NEXT 50** fetches another page when the directory has more rows.
-  The value is the NEXT PAGE button label, not a claim of exactly 50
-  returned stations.
-- SELECT stages a source-qualified radio-directory UUID. ENTER reports that
-  catalog playback isn't approved; LOAD is disabled for radio-directory refs.
-- PRESET retains SELECT → LOAD → PLAY without autoplay for the prior
-  operator-supplied HTTPS station URL.
-- **PRESET** remains the existing operator-chosen Groove Salad station.
-  Local MPD and YouTube catalog stay separate; YouTube remains catalog-only.
+## Transport and security boundary
 
-## Directory and filtering
+Radio Browser catalog search uses fixed HTTPS directory hosts and still
+rejects invalid, broken, unsupported or playlist-style results. Returned
+results have \`{source:"radio-browser",kind:"station",id:UUID}\` refs. Their
+candidate direct MP3 URLs remain private in the existing Python media
+controller and are scoped to the active search batch.
 
-Uses the free Radio Browser community directory API:
+An explicit LOAD starts a session-owned \`RadioStreamRelay\` lazily in the
+existing controller service. The relay binds to IPv4 localhost on a random
+port, registers an unguessable 256-bit token for the selected station and
+returns \`http://127.0.0.1:PORT/radio/TOKEN\` to MPD. The backend rejects
+unregistered relay URLs. The relay never runs on SEARCH or UI open.
 
-https://docs.radio-browser.info/
+The outbound fetch accepts only direct HTTPS MP3 URLs. It resolves the
+hostname, rejects **every** DNS response set containing a private, reserved,
+loopback or otherwise non-global IP, and connects to a pinned numeric public
+IP. TLS SNI and certificate verification use the original hostname, preventing
+the usual DNS-validation/re-resolution race. HTTP redirects are refused,
+response must be HTTP 200 with MP3 Content-Type, and tokens expire after
+12 hours. At most two concurrent audio streams and 256 outstanding tokens
+are supported. A failed MPD queue insertion releases its unneeded token.
+No playlist fetch, subprocess player, Quickshell audio worker, or disk cache
+is introduced.
 
-Requests go only to a fixed HTTPS directory hostname from the existing
-persistent controller service. Queries fetch at most 150 rows with
-`hidebroken=true`, `is_https=true`, and `codec=MP3`. We further filter
-for the existing direct-stream validation: HTTPS, default port, no user info,
-no query/fragment, no local/short/IP/restricted hosts, valid DNS-looking name,
-no playlist extension, no repeated URL, name present and successful directory
-health check. Display at most 50 rows and page in bounded 150-row offsets.
+The controller preserves source-qualified station identity, MPD queue ID and
+the relay URI for queue ownership verification. Only selection survives the
+controller restart; temporary radio relay URLs do not. A service restart
+requires another explicit LOAD and PLAY to listen again. MPD transport
+continues to require verified queue ownership. MPRIS remains independent.
 
-**No playable-station guarantee:** A directory's last check is not proof
-that MPD can decode the stream now. Results can be fewer than 50. Stations
-may be unavailable by geography, change URLs, disallow embedding,
-redirect to other services, or require codecs/HTTPS URL forms outside this
-first implementation's safe subset.
+**Limitations:** This is not a complete OS network sandbox, does not prove
+broadcaster licensing, and trusts Python TLS and MPD's audio decoder.
+Stations requiring HTTP, redirects, AAC/OGG, playlists, ICY-only responses,
+query-string tokens or nonstandard ports can still fail. Directory health
+checks do not prove MPD audio output. No automatic fallbacks that bypass
+validation are allowed.
 
-**Security boundary:** Directory data are untrusted. The existing URL-shape
-validator does not resolve DNS or prove redirects stay public. Directory
-results use source-qualified `radio-browser` station UUIDs rather than
-`direct-stream` refs. The radio source supports inspect/selection but
-`prepare()` explicitly refuses playback. No URL is sent to MPD from
-directory results. The existing user-supplied PRESET remains available.
-An independently approved egress/redirect policy and broadcaster permissions
-are needed for arbitrary station playback. Never relax the direct-stream
-validator to simulate authorization.
+## Verification and rollout
 
-## Runtime acceptance / recovery
+Offline tests cover URL and DNS validation, redirect and MIME rejection,
+the opaque localhost handler, MPD cue capability checks, SELECT/LOAD/PLAY
+separation, multi-station switching, tampered queue IDs and ownership,
+and the preserved browse-only behavior when no relay is registered.
 
-After approved merge, first update the Python user controller service, then
-use the normal controlled Quickshell restart; a QML-only reload cannot change
-an already-running Python media controller registry.
+Before merge, review the added service-owned stream relay, its network scope,
+and any applicable broadcaster requirements. A green CI run does not replace
+operator approval for service activation. After approved merge, the operator
+updates local files, restarts the existing media-controller service, uses the
+normal controlled Quickshell reload and tests two working public radio streams.
 
-Check popular radio results, genre, name and country queries, NEXT PAGE,
-slider/tuner navigation across 50 listings, staging catalog-only UUIDs
-without issuing any MPD load or autoplay, preservation of the existing
-manually approved PRESET's LOAD → PLAY transport, an already loaded local item
-surviving search, timeout/offline response, and no regressions in ApolloHub
-MPD/MPRIS snapshots.
-
-The branch has source and mock-network tests; a live Fedora/MPD/Radio Browser
-station count and playlist playback are not verified.
+If any playback failure, keep the original PRESET as a fallback and do not
+weaken the guards without a separate decision.

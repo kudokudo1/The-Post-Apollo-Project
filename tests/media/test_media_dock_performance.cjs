@@ -72,7 +72,7 @@ test("left taskbar uses close 8px gaps except App Control to Workspaces", () => 
     const hospital = left.indexOf("// Hospital");
     const finance = left.indexOf("// Finance");
     const git = left.indexOf("// Git");
-    const tasks = left.indexOf("Tasks {}");
+    const tasks = left.indexOf("Tasks {\n                id: tasksButton");
     assert.ok([launcher, gapAt, workspace, media, tray, hospital, finance, git, tasks]
         .every((v, i, a) => v >= 0 && (!i || v > a[i - 1])),
         "spacer must appear only after App Control and all left-module order is preserved");

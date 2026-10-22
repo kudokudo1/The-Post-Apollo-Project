@@ -483,18 +483,21 @@ DockButton {
                     }
                 }
 
-                // Mark the right INNER side of the glass tube. The strokes
-                // fit between the liquid edge (x=9.75) and the inside of
-                // the glass rail (x=12.2 - half stroke), not outside the tube.
-                readonly property real tickRightX: 12.2 - 1.5 / 2 - 0.2
+                // Major/minor scale marks: both use the EXACT white and
+                // opacity of the glass. Snap their edges to whole pixels so
+                // 4-sample antialiasing does not fade the tiny strokes.
+                // The long marks intentionally cross the right edge of the
+                // narrow liquid column, like a graduated thermometer scale.
+                readonly property real tickRightX: 12.2 - 1.5 / 2 - 0.45
                 Repeater {
                     model: 4
 
                     delegate: Rectangle {
-                        width: index % 2 === 0 ? 1.2 : 0.65
-                        x: weatherThermometer.tickRightX - width
-                        y: 6 + index * 4.2
-                        height: 1
+                        readonly property bool majorTick: index % 2 === 0
+                        width: majorTick ? 3 : 2
+                        x: Math.round(weatherThermometer.tickRightX) - width
+                        y: Math.round(6 + index * 3.8)
+                        height: 1.25
                         color: weatherThermometer.glassColor
                         opacity: weatherThermometer.glassOpacity
                     }

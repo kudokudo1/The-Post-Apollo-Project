@@ -164,21 +164,29 @@ assert.match(dock, /control1X:\s*weatherThermometer\.outerLeftJoinX \+ 0\.58/);
 assert.match(dock, /control2X:\s*weatherThermometer\.innerRightJoinX - 0\.55/);
 assert.match(dock, /control1X:\s*weatherThermometer\.innerLeftJoinX \+ 0\.55/);
 
-// Tick strokes must sit inside the right glass wall AND remain beyond
-// the liquid. Test actual numeric coordinates to prevent a repeat of #434.
+// The inner glass rail owns the tick endpoints. Snapping to whole pixels
+// keeps the markings legible after native shape antialiasing. A longer major
+// mark intentionally crosses the narrow liquid region; it stays inside glass.
 const tickStart = dock.lastIndexOf("Repeater {");
-const ticks = dock.slice(tickStart, tickStart + 410);
-assert.match(dock, /readonly property real tickRightX:\s*12\.2 - 1\.5 \/ 2 - 0\.2/);
-assert.match(ticks, /width:\s*index % 2 === 0 \? 1\.2 : 0\.65/);
-assert.match(ticks, /x:\s*weatherThermometer\.tickRightX - width/);
-assert.match(ticks, /y:\s*6 \+ index \* 4\.2/);
-const tickRight = 12.2 - strokeHalf - 0.2;
-for (const tickLength of [1.2, 0.65]) {
-    const tickLeft = tickRight - tickLength;
-    assert.ok(tickLeft >= 9.75 + 0.2, "no overlap with liquid");
-    assert.ok(tickRight < 12.2 - strokeHalf, "tick is inside the glass rail");
+const ticks = dock.slice(tickStart, tickStart + 550);
+assert.match(dock, /readonly property real tickRightX:\s*12\.2 - 1\.5 \/ 2 - 0\.45/);
+assert.match(ticks, /readonly property bool majorTick:\s*index % 2 === 0/);
+assert.match(ticks, /width:\s*majorTick \? 3 : 2/);
+assert.match(ticks, /x:\s*Math\.round\(weatherThermometer\.tickRightX\) - width/);
+assert.match(ticks, /y:\s*Math\.round\(6 \+ index \* 3\.8\)/);
+assert.match(ticks, /height:\s*1\.25/);
+assert.match(ticks, /color:\s*weatherThermometer\.glassColor/);
+assert.match(ticks, /opacity:\s*weatherThermometer\.glassOpacity/);
+const tickRight = Math.round(12.2 - strokeHalf - 0.45);
+for (let index = 0; index < 4; index++) {
+    const length = index % 2 === 0 ? 3 : 2;
+    const left = tickRight - length;
+    const y = Math.round(6 + index * 3.8);
+    assert.ok(left >= 7.25, "ticks stay inside left glass edge");
+    assert.ok(tickRight < 12.2 - strokeHalf, "ticks stay inside right glass");
+    assert.ok(y + 1.25 < 19.3, "ticks clear rounded shoulders");
+    if (index % 2 === 0) assert.equal(length, 3, "alternate major ticks");
 }
-assert.ok(6 + 3 * 4.2 < 19.3, "all ticks stay above the rounded shoulder");
 
 // The real normalized level drives a vertical gradient through one connected
 // inner tube+bulb path, rather than a permanently filled decorative bulb.

@@ -161,12 +161,14 @@ async function run() {
   stage="remote-file-list";
   const remote=await engine.send("get-remote-files");
   assert.ok(Array.isArray(remote) && remote.length===1,"No unique remote fixture");
-  const id=remote[0]?.fileId;
+  // Actual's displayed Sync ID is the groupId, not the uploaded fileId.
+  // downloadBudget(syncId) resolves remote files by groupId.
+  const id=remote[0]?.groupId;
   assert.equal(typeof id,"string");
   assert.ok(id.length>8);
   const budgets=await api.getBudgets();
-  assert.ok(budgets.some(x=>x.cloudFileId===id),
-    "Remote fixture ID must match an Actual budget");
+  assert.ok(budgets.some(x=>x.groupId===id),
+    "Remote fixture Sync ID must match an Actual budget");
   await endApi();
 
   stage="private-test-credentials";

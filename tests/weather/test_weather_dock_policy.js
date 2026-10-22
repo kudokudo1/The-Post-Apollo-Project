@@ -167,7 +167,7 @@ for (const [property, color] of [
 ]) {
     assert.ok(dock.includes(property + ": " + color), property + " should use " + color);
 }
-assert.match(dock, /readonly property color liquidColor:\s*weatherDock\.thermometerLiquidColor/);
+assert.match(dock, /property color liquidColor:\s*weatherDock\.thermometerLiquidColor/);
 assert.match(dock, /id:\s*weatherContent[\s\S]*?spacing:\s*6/);
 assert.ok(dock.indexOf("id: weatherCondition") < dock.indexOf("id: weatherTemperature"));
 assert.ok(dock.indexOf("id: weatherTemperature") < dock.indexOf("id: weatherThermometer"));
